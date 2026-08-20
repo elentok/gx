@@ -54,13 +54,18 @@ type Deps struct {
 	// DeleteBranch force-deletes an iteration's now-redundant branch once its
 	// commits have landed on the feature branch (as different hashes, via
 	// cherry-pick — never merged, so a non-force delete would refuse it).
-	DeleteBranch  func(repoDir, branch string) error
-	TabCreate     func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
-	TabClose      func(tabID string) error
-	TabList       func(workspaceID string) ([]herdr.Tab, error)
-	AgentStart    func(opts herdr.AgentStartOptions) (herdr.Agent, error)
-	AgentPrompt   func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
-	AgentGet      func(target string) (herdr.Agent, error)
+	DeleteBranch func(repoDir, branch string) error
+	TabCreate    func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
+	TabClose     func(tabID string) error
+	TabList      func(workspaceID string) ([]herdr.Tab, error)
+	AgentStart   func(opts herdr.AgentStartOptions) (herdr.Agent, error)
+	AgentPrompt  func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
+	AgentGet     func(target string) (herdr.Agent, error)
+	// AgentExplain reports which detection rule herdr's pane monitor matched
+	// for a pane's current state, used by blocked-pane recovery paths to name
+	// the unanswered dialog (its matched_rule.id) in a park reason or to
+	// decide whether it is answerable.
+	AgentExplain  func(target string) (herdr.AgentExplainResult, error)
 	AgentWait     func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	AgentSendKeys func(target string, keys ...string) error
 	// AgentRead reads pane's terminal output, used to confirm a submitted
@@ -192,7 +197,8 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		VerifySkill: func(agent AgentKind, skill string) error {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
-		AgentGet: herdr.AgentGet,
+		AgentGet:     herdr.AgentGet,
+		AgentExplain: herdr.AgentExplain,
 		VerifyCodexSession: codexHomeFn(overrides.CodexHome,
 			codexsession.VerifyIdentity,
 			func(cwd, sessionID string) (bool, error) {

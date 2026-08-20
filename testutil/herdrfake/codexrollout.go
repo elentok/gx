@@ -35,6 +35,13 @@ type CodexRolloutOptions struct {
 	InitialUsage   CodexUsage
 	CompactedUsage CodexUsage
 	FinalUsage     CodexUsage
+
+	// RejectPromptWhenBlocked models herdr 0.8.2's agent_blocked guard: when
+	// true, a prompt sent while the agent's status is "blocked" is rejected
+	// with the real error envelope instead of being accepted. Off by default
+	// so existing scenarios (written before herdr enforced this guard) keep
+	// passing unchanged; tickets that need the guard opt in explicitly.
+	RejectPromptWhenBlocked bool
 }
 
 type codexRolloutPhase string
@@ -120,6 +127,11 @@ func (c *CodexRollout) start(state *State, argv []string) (any, Identities, erro
 func (c *CodexRollout) prompt(state *State, argv []string) (any, Identities, error) {
 	if len(argv) < 4 || argv[2] != c.opts.PaneID {
 		return nil, Identities{}, fmt.Errorf("unexpected Codex prompt: %v", argv)
+	}
+	if c.opts.RejectPromptWhenBlocked {
+		if agent := state.Agents[c.opts.AgentID]; agent != nil && agent.Status == "blocked" {
+			return nil, c.identities(), AgentBlockedError(c.opts.AgentName)
+		}
 	}
 	status := "working"
 	switch {

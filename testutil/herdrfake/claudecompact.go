@@ -80,12 +80,14 @@ type ClaudeCompact struct {
 	sessionID   string
 	virtualTime func() time.Duration
 
-	prematureIdle bool
-	pairedTurn    bool
+	prematureIdle     bool
+	pairedTurn        bool
+	rejectWhenBlocked bool
 
 	started         bool
 	boundaryWritten bool
 	startedAt       time.Duration
+	blocked         bool
 }
 
 // ClaudeCompactOption configures a ClaudeCompact at construction. Both options
@@ -110,6 +112,15 @@ func WithPrematureIdlePane() ClaudeCompactOption {
 // opt-in for scenarios that need a fresh occupancy reading to assert on.
 func WithPairedPostCompactionTurn() ClaudeCompactOption {
 	return func(c *ClaudeCompact) { c.pairedTurn = true }
+}
+
+// WithAgentBlockedRejection models herdr 0.8.2's agent_blocked guard: once a
+// scenario marks the pane blocked (SetBlocked(true)), AcceptPrompt refuses a
+// prompt with the real error envelope instead of accepting it. Off by
+// default so existing scenarios (written before herdr enforced this guard)
+// keep passing unchanged; tickets that need the guard opt in explicitly.
+func WithAgentBlockedRejection() ClaudeCompactOption {
+	return func(c *ClaudeCompact) { c.rejectWhenBlocked = true }
 }
 
 // NewClaudeCompact creates the transcript file for a session launched in cwd
@@ -250,6 +261,29 @@ func (c *ClaudeCompact) AcceptFinishUp() error {
 	defer c.mu.Unlock()
 	if !c.boundaryWritten {
 		return fmt.Errorf("herdrfake: finish-up prompt submitted before compact boundary exists")
+	}
+	return nil
+}
+
+// SetBlocked records whether this agent's pane currently shows an unanswered
+// dialog, for AcceptPrompt to consult. It has no effect unless the
+// ClaudeCompact was built WithAgentBlockedRejection.
+func (c *ClaudeCompact) SetBlocked(blocked bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.blocked = blocked
+}
+
+// AcceptPrompt models herdr's "agent prompt" guard: it fails with the real
+// agent_blocked envelope when the pane is blocked and this ClaudeCompact was
+// built WithAgentBlockedRejection, and otherwise succeeds unconditionally —
+// matching herdr's behavior before that guard shipped, which is what every
+// scenario built without the option is modeling.
+func (c *ClaudeCompact) AcceptPrompt(target string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.rejectWhenBlocked && c.blocked {
+		return AgentBlockedError(target)
 	}
 	return nil
 }

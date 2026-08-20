@@ -115,6 +115,40 @@ func TestRun_OtherCLIError_NotAgentNameTaken(t *testing.T) {
 	}
 }
 
+func TestRun_AgentBlockedError_Classified(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"agent_blocked","message":"agent iter-06b is blocked and not accepting prompts"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "prompt", "iter-06b", "hello")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var blocked *AgentBlockedError
+	if !errors.As(err, &blocked) {
+		t.Fatalf("run() error = %v, want an *AgentBlockedError", err)
+	}
+	if blocked.Message != "agent iter-06b is blocked and not accepting prompts" {
+		t.Errorf("Message = %q, want the envelope's message", blocked.Message)
+	}
+	if !strings.Contains(blocked.Error(), "iter-06b") {
+		t.Errorf("Error() = %q, want it to mention the command context", blocked.Error())
+	}
+}
+
+func TestRun_OtherCLIError_NotAgentBlocked(t *testing.T) {
+	withFakeCommand(t, func(args ...string) ([]byte, error) {
+		return []byte(`{"error":{"code":"pane_not_found","message":"no such pane"}}`), errors.New("exit 1")
+	})
+	_, err := run("agent", "prompt", "iter-01", "hello")
+	if err == nil {
+		t.Fatal("run() error = nil, want error")
+	}
+	var blocked *AgentBlockedError
+	if errors.As(err, &blocked) {
+		t.Errorf("run() error = %v, want a plain error (not agent_blocked)", err)
+	}
+}
+
 func TestAppendFlag(t *testing.T) {
 	got := appendFlag([]string{"a"}, "--flag", "")
 	if len(got) != 1 {

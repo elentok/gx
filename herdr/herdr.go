@@ -33,6 +33,20 @@ type AgentNameTakenError struct {
 func (e *AgentNameTakenError) Error() string { return e.wrapped.Error() }
 func (e *AgentNameTakenError) Unwrap() error { return e.wrapped }
 
+// AgentBlockedError is herdr 0.8.2's agent_blocked failure: the target pane
+// is sitting on an unanswered dialog and refused the command outright before
+// touching the runtime. Message is herdr's own description, which names the
+// pane a caller reports to an operator — callers must not paper over this
+// with a "pane run" bypass (see the epic's ticket 01 findings) since a pane
+// showing a dialog is not ready to receive a prompt at all.
+type AgentBlockedError struct {
+	Message string
+	wrapped error
+}
+
+func (e *AgentBlockedError) Error() string { return e.wrapped.Error() }
+func (e *AgentBlockedError) Unwrap() error { return e.wrapped }
+
 // candidateCwdPattern extracts the first candidate's cwd out of an
 // agent_name_taken error's Message, e.g. "...candidates: terminal_id=...
 // pane_id=... cwd=/path/to/worktree status=Working".
@@ -40,8 +54,9 @@ var candidateCwdPattern = regexp.MustCompile(`\bcwd=(\S+)`)
 
 // run shells out to herdr with args and returns its combined output,
 // wrapping a non-zero exit with the command line and output for context. If
-// the failure is herdr's JSON error envelope with code "agent_name_taken",
-// the returned error is an *AgentNameTakenError instead.
+// the failure is herdr's JSON error envelope with code "agent_name_taken" or
+// "agent_blocked", the returned error is an *AgentNameTakenError or
+// *AgentBlockedError instead.
 func run(args ...string) ([]byte, error) {
 	out, err := runCommand(args...)
 	if err != nil {
@@ -52,12 +67,17 @@ func run(args ...string) ([]byte, error) {
 				Message string `json:"message"`
 			} `json:"error"`
 		}
-		if jsonErr := json.Unmarshal(out, &resp); jsonErr == nil && resp.Error != nil && resp.Error.Code == "agent_name_taken" {
-			candidateCwd := ""
-			if m := candidateCwdPattern.FindStringSubmatch(resp.Error.Message); len(m) == 2 {
-				candidateCwd = m[1]
+		if jsonErr := json.Unmarshal(out, &resp); jsonErr == nil && resp.Error != nil {
+			switch resp.Error.Code {
+			case "agent_name_taken":
+				candidateCwd := ""
+				if m := candidateCwdPattern.FindStringSubmatch(resp.Error.Message); len(m) == 2 {
+					candidateCwd = m[1]
+				}
+				return nil, &AgentNameTakenError{Message: resp.Error.Message, CandidateCwd: candidateCwd, wrapped: wrapped}
+			case "agent_blocked":
+				return nil, &AgentBlockedError{Message: resp.Error.Message, wrapped: wrapped}
 			}
-			return nil, &AgentNameTakenError{Message: resp.Error.Message, CandidateCwd: candidateCwd, wrapped: wrapped}
 		}
 		return nil, wrapped
 	}

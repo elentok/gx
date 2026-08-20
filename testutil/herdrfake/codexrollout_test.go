@@ -1,6 +1,7 @@
 package herdrfake
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -178,5 +179,36 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	stats, ok, err := codexsession.ReadStats(cwd, rollout.SessionID())
 	if err != nil || !ok || stats.TotalTokens != 260_000 || stats.PeakContext != 180_001 || !stats.Start.Equal(codexRolloutEpoch) || !stats.End.Equal(codexRolloutEpoch.Add(3*time.Millisecond)) {
 		t.Fatalf("final ReadStats = %+v, %v, %v; want deterministic complete rollout", stats, ok, err)
+	}
+}
+
+func TestCodexRolloutRejectPromptWhenBlocked_SwitchOnRejectsWithAgentBlockedError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CODEX_HOME", t.TempDir())
+	state := NewState(t)
+	RegisterCodexRollout(t, state, CodexRolloutOptions{
+		Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
+		RejectPromptWhenBlocked: true,
+	})
+	StartState(t, state)
+
+	started, err := herdr.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
+	if err != nil {
+		t.Fatalf("AgentStart: %v", err)
+	}
+	if err := herdr.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
+		t.Fatalf("AgentSendKeys: %v", err)
+	}
+	if _, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{"blocked"}}); err != nil {
+		t.Fatalf("AgentWait: %v", err)
+	}
+
+	_, err = herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "hello"})
+	if err == nil {
+		t.Fatal("AgentPrompt into a blocked pane succeeded, want an AgentBlockedError")
+	}
+	var blocked *herdr.AgentBlockedError
+	if !errors.As(err, &blocked) {
+		t.Fatalf("AgentPrompt() error = %v, want *herdr.AgentBlockedError (fake and production classifier must agree)", err)
 	}
 }

@@ -1,6 +1,7 @@
 package herdrfake
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -249,6 +250,44 @@ func TestClaudeCompact_SecondCtrlCOrEnterDuringActiveCompactionFailsImmediately(
 	}
 	if err := c.SendKey("enter"); err != nil {
 		t.Errorf("SendKey(enter) after compaction completed = %v, want nil", err)
+	}
+}
+
+func TestClaudeCompact_AcceptPrompt_SwitchOffAcceptsEvenWhenBlocked(t *testing.T) {
+	c, _ := newTestClaudeCompact(t)
+	c.SetBlocked(true)
+	if err := c.AcceptPrompt("iter-c"); err != nil {
+		t.Errorf("AcceptPrompt() = %v, want nil (switch is off)", err)
+	}
+}
+
+func TestClaudeCompact_AcceptPrompt_SwitchOnAcceptsWhenNotBlocked(t *testing.T) {
+	c, _ := newTestClaudeCompact(t, WithAgentBlockedRejection())
+	if err := c.AcceptPrompt("iter-c"); err != nil {
+		t.Errorf("AcceptPrompt() = %v, want nil (pane not blocked)", err)
+	}
+}
+
+func TestClaudeCompact_AcceptPrompt_SwitchOnRejectsWhenBlocked(t *testing.T) {
+	c, _ := newTestClaudeCompact(t, WithAgentBlockedRejection())
+	c.SetBlocked(true)
+
+	err := c.AcceptPrompt("iter-c")
+	if err == nil {
+		t.Fatal("AcceptPrompt() = nil, want the agent_blocked envelope")
+	}
+
+	var envelope struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if jsonErr := json.Unmarshal([]byte(err.Error()), &envelope); jsonErr != nil {
+		t.Fatalf("AcceptPrompt() error is not the JSON envelope herdr.run classifies: %v", jsonErr)
+	}
+	if envelope.Error.Code != "agent_blocked" {
+		t.Errorf("envelope code = %q, want %q (the code herdr.run's classifier switches on)", envelope.Error.Code, "agent_blocked")
 	}
 }
 
