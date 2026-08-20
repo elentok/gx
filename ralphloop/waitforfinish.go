@@ -910,6 +910,19 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	return parkBlockedAfterCodexQuotaReset(d, p, sessionID)
 }
 
+// matchedRuleID reads a pane's matched_rule.id via Deps.AgentExplain,
+// falling back to "unknown" when the explain call fails, is unset, or
+// returns no rule id.
+func matchedRuleID(d Deps, pane string) string {
+	if d.AgentExplain == nil {
+		return "unknown"
+	}
+	if explain, err := d.AgentExplain(pane); err == nil && explain.MatchedRuleID != "" {
+		return explain.MatchedRuleID
+	}
+	return "unknown"
+}
+
 // parkBlockedAfterCodexQuotaReset handles a Codex pane that comes back
 // blocked once its quota reset: unlike waitForClaudeRateLimitReset's plain
 // "continue" re-prompt, a blocked pane here is sitting on its own dialog, not
@@ -919,14 +932,10 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 // already trusted at launch and gx was asleep for the reset, so the only
 // answerable-dialog case (see ticket 01) can't occur here. This parks for a
 // human instead, naming the unanswered dialog by its matched_rule.id (read
-// via AgentExplain) the same way parkOnBlockedPane does.
+// via AgentExplain) — unlike parkOnBlockedPane, whose park reason names no
+// rule id at all.
 func parkBlockedAfterCodexQuotaReset(d Deps, p launchAndPromptParams, sessionID string) error {
-	ruleID := "unknown"
-	if d.AgentExplain != nil {
-		if explain, err := d.AgentExplain(p.Pane); err == nil && explain.MatchedRuleID != "" {
-			ruleID = explain.MatchedRuleID
-		}
-	}
+	ruleID := matchedRuleID(d, p.Pane)
 	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, ruleID)
 	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason, schema.ParkKindBlockedPane); err != nil {
 		return fmt.Errorf("marking ticket needs-answer after Codex quota reset: %w", err)

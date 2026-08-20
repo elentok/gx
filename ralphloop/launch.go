@@ -339,12 +339,7 @@ func continueLaunch(d Deps, p launchAndPromptParams, startedAgent herdr.Agent) (
 // it; that routes to needs-repair naming the rule id instead, sending no
 // keys to the pane.
 func recoverAgentNotReady(d Deps, p launchAndPromptParams) (string, error) {
-	ruleID := "unknown"
-	if d.AgentExplain != nil {
-		if explain, err := d.AgentExplain(p.Pane); err == nil && explain.MatchedRuleID != "" {
-			ruleID = explain.MatchedRuleID
-		}
-	}
+	ruleID := matchedRuleID(d, p.Pane)
 	if ruleID != "trust_directory" {
 		return "", fmt.Errorf("launching %s: %s is not ready, blocked on dialog %q gx did not raise", p.Agent, p.Label, ruleID)
 	}
