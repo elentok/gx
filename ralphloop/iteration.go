@@ -356,16 +356,11 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// the one place gx writes status: done with no cherry-pick, so it does
 		// so itself here rather than trusting the ticket file to already say
 		// done.
-		current, err := schema.ParseTicket(p.Ticket.Path)
+		commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, tab, sessionID)
 		if err != nil {
-			return fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
+			return err
 		}
-		if current.IsCommitless() && current.IterationStatus == schema.IterationStatusFinished {
-			stampCommitlessMetrics(p, path, sessionID)
-			if err := MarkDone(p.Ticket.Path); err != nil {
-				return fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
-			}
-			p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
+		if commitlessAdopted {
 			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
 		}
 
@@ -385,6 +380,30 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		if retried {
 			ahead = newAhead
 			sessionID = newSessionID
+
+			// The retry's own turn is a second, independent turn: it can end
+			// with its own iteration_status self-report that has nothing to
+			// do with the original glitch (see ADR 0019). Re-run the same
+			// adoption checks that already ran pre-retry so that report isn't
+			// silently dropped into the ordinary zero-commit/land handling
+			// below.
+			adopted, err := adoptNeedsAnswerReport(p, path, pane, tab, sessionID)
+			if err != nil {
+				return err
+			}
+			if adopted {
+				return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, false)
+			}
+
+			if ahead == 0 {
+				commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, tab, sessionID)
+				if err != nil {
+					return err
+				}
+				if commitlessAdopted {
+					return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
+				}
+			}
 		}
 
 		if ahead == 0 {
@@ -487,6 +506,30 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, tab, bas
 		return false, 0, "", fmt.Errorf("counting commits ahead of %s after corrective retry: %w", base, err)
 	}
 	return true, newAhead, retrySessionID, nil
+}
+
+// adoptCommitlessFinish honours a ticket's `gx tickets set --iteration-status
+// finished --commitless true` self-report: the "this was deliberate" signal
+// for a zero-commit finish (see finishIteration's doc for why iteration_status:
+// finished, not just a non-claimed status, is what discriminates this from an
+// ordinary stall). It reads the ticket fresh rather than trusting p.Ticket
+// (populated once at claim time) because the report is written by the agent
+// during the iteration this call is completing. Callers are responsible for
+// only invoking this when ahead == 0 — it does not check commit count itself.
+func adoptCommitlessFinish(p iterationParams, path, pane, tab, sessionID string) (adopted bool, err error) {
+	current, err := schema.ParseTicket(p.Ticket.Path)
+	if err != nil {
+		return false, fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
+	}
+	if !current.IsCommitless() || current.IterationStatus != schema.IterationStatusFinished {
+		return false, nil
+	}
+	stampCommitlessMetrics(p, path, sessionID)
+	if err := MarkDone(p.Ticket.Path); err != nil {
+		return false, fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
+	}
+	p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
+	return true, nil
 }
 
 // adoptNeedsAnswerReport honours an agent's `iteration_status: needs-answer`
