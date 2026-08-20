@@ -93,6 +93,13 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		InitialUsage:   herdrfake.CodexUsage{ContextTokens: smartZone + 1, TotalTokens: smartZone + 5_000},
 		CompactedUsage: herdrfake.CodexUsage{ContextTokens: smartZone / 2, TotalTokens: smartZone + 20_000},
 		FinalUsage:     herdrfake.CodexUsage{ContextTokens: smartZone / 2, TotalTokens: smartZone + 25_000},
+		// Ticket 03's regression lock: herdr 0.8.2's agent_blocked guard stays
+		// on through the whole recovery. A pre-ticket-03 fake that modeled
+		// ctrl+c as landing in a blocked phase would have this guard reject
+		// the "/compact" submission and fail this test; the real contract is
+		// that ctrl+c leaves the pane idle-and-promptable, so the guard never
+		// fires here.
+		RejectPromptWhenBlocked: true,
 	})
 	herdrfake.StartState(t, s)
 

@@ -49,7 +49,6 @@ type codexRolloutPhase string
 const (
 	codexPhaseIdle                codexRolloutPhase = "idle"
 	codexPhaseRunning             codexRolloutPhase = "running"
-	codexPhaseGenericBlocked      codexRolloutPhase = "generic-blocked"
 	codexPhaseCompactConfirmation codexRolloutPhase = "compact-confirmation"
 	codexPhaseCompactContinuation codexRolloutPhase = "compact-continuation"
 	codexPhaseContinuation        codexRolloutPhase = "continuation"
@@ -154,8 +153,6 @@ func (c *CodexRollout) wait(state *State, argv []string) (any, Identities, error
 	switch c.phase {
 	case codexPhaseRunning:
 		return nil, c.identities(), fmt.Errorf("timed out waiting for agent status")
-	case codexPhaseGenericBlocked:
-		return c.agentResult("blocked"), c.identities(), nil
 	case codexPhaseCompactConfirmation:
 		c.phase = codexPhaseCompactContinuation
 		c.setStatus(state, "working")
@@ -190,8 +187,12 @@ func (c *CodexRollout) sendKeys(state *State, argv []string) (any, Identities, e
 	}
 	for _, key := range argv[3:] {
 		if key == "ctrl+c" {
-			c.phase = codexPhaseGenericBlocked
-			c.setStatus(state, "blocked")
+			// A single ctrl+c on a working Codex pane leaves it idle with
+			// "Conversation interrupted" on screen, not blocked (verified
+			// against a live pane; see ticket 03). It never needs the
+			// agent_blocked bypass to accept the next prompt.
+			c.phase = codexPhaseIdle
+			c.setStatus(state, "idle")
 			break
 		}
 	}
