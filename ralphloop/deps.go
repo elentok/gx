@@ -134,6 +134,12 @@ type Deps struct {
 	// running (see waitForBackgroundTasks). Codex has no equivalent transcript
 	// signal, so callers only ever invoke this for AgentClaude.
 	ReadBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error)
+	// ReadUnexecutedToolCall reports whether the Claude Code session's last
+	// turn ended with a text block shaped like an unexecuted tool call
+	// instead of a real tool_use (see transcript.ReadUnexecutedToolCall) —
+	// used by finishIteration's zero-commit path to distinguish that bare
+	// model glitch from a genuine stall before parking needs-answer.
+	ReadUnexecutedToolCall func(cwd, sessionID string) (bool, error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
@@ -278,6 +284,13 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return transcript.BackgroundTaskReading{}, err
 			}
 			return transcript.ReadBackgroundTasks(path, backgroundTaskAgedOutCap, time.Now())
+		},
+		ReadUnexecutedToolCall: func(cwd, sessionID string) (bool, error) {
+			path, err := transcriptPath(overrides.Home, cwd, sessionID)
+			if err != nil {
+				return false, err
+			}
+			return transcript.ReadUnexecutedToolCall(path)
 		},
 		ReadCodexContext: codexHomeFn(overrides.CodexHome,
 			codexsession.LastContextTokens,

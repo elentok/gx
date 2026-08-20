@@ -224,6 +224,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, nil
 		},
+		ReadUnexecutedToolCall: func(cwd, sessionID string) (bool, error) {
+			return false, nil
+		},
 		Sleep: func(time.Duration) {},
 		Now:   time.Now,
 		// A park polls at full speed; a test about the park itself replaces

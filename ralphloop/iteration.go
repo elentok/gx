@@ -369,15 +369,35 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
 		}
 
-		// The agent finished without landing any commits: leave the worktree/
-		// tab in place for inspection instead of silently marking done or
-		// retrying, and let the scheduler move on to other unblocked tickets.
-		if err := MarkNeedsAnswer(p.Ticket.Path, schema.ParkKindZeroCommit); err != nil {
-			return fmt.Errorf("marking ticket needs-answer: %w", err)
+		// A zero-commit finish whose last turn is shaped like ticket 01's
+		// unexecuted-tool-call glitch gets one corrective nudge and re-wait
+		// before this falls to needs-answer — see
+		// retryUnexecutedToolCallOnce. A non-match, a pane that isn't in a
+		// plain finish state any more, or a retry that itself parked on a
+		// blocked pane all skip straight past this unchanged.
+		retried, newAhead, newSessionID, err := retryUnexecutedToolCallOnce(d, p, path, pane, tab, base, branch, sessionID)
+		if err != nil {
+			if errors.Is(err, errBlockedPaneParked) {
+				return nil
+			}
+			return err
 		}
-		p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
-		p.Sink.TicketNeedsHuman(p.Ticket.Identifier, p.FeatureBranch, "needs-answer", "no commits landed")
-		return nil
+		if retried {
+			ahead = newAhead
+			sessionID = newSessionID
+		}
+
+		if ahead == 0 {
+			// The agent finished without landing any commits: leave the worktree/
+			// tab in place for inspection instead of silently marking done or
+			// retrying, and let the scheduler move on to other unblocked tickets.
+			if err := MarkNeedsAnswer(p.Ticket.Path, schema.ParkKindZeroCommit); err != nil {
+				return fmt.Errorf("marking ticket needs-answer: %w", err)
+			}
+			p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
+			p.Sink.TicketNeedsHuman(p.Ticket.Identifier, p.FeatureBranch, "needs-answer", "no commits landed")
+			return nil
+		}
 	}
 
 	// Landing itself (cherry-pick, conflict resolution, mark-done, cleanup) is
@@ -402,6 +422,71 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		tab:       tab,
 		path:      path,
 	}}
+}
+
+// unexecutedToolCallCorrection is the corrective prompt sent to a pane whose
+// last turn ended with a text block shaped like an unexecuted tool call: it
+// names the failure directly so the agent retries the call instead of
+// treating the nudge as a new instruction.
+const unexecutedToolCallCorrection = "Your last turn ended with a tool call written as plain text instead of an " +
+	"actual tool invocation, so it never ran. Please invoke that tool call for real and continue."
+
+// retryUnexecutedToolCallOnce is finishIteration's single bounded retry for
+// ticket 01's unexecuted-tool-call glitch: a zero-commit finish whose
+// transcript ends in a text block shaped like an unexecuted tool call is a
+// bare model glitch a plain nudge reliably clears, not a genuine stall (see
+// ticket 02). It sends one corrective prompt and re-waits for finish, then
+// reports the recounted ahead value for finishIteration to resume its
+// zero-commit handling with.
+//
+// retried is false whenever no corrective prompt was sent — the transcript
+// doesn't match, or the pane's live status is no longer a plain finish state
+// (alreadyFinished) — so finishIteration's caller leaves ahead/sessionID
+// untouched and falls straight to needs-answer, same as before this ticket.
+// A pane that reads blocked at the moment of the check gets no prompt sent
+// at all, honoring the rule that gx never types into a pane sitting on a
+// dialog it did not raise (see parkOnBlockedPane); an err wrapping
+// errBlockedPaneParked reports the retry's own re-wait parking the same way.
+func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) (retried bool, ahead int, newSessionID string, err error) {
+	matched, err := d.ReadUnexecutedToolCall(path, sessionID)
+	if err != nil {
+		return false, 0, "", fmt.Errorf("reading transcript for unexecuted-tool-call detection: %w", err)
+	}
+	if !matched {
+		return false, 0, "", nil
+	}
+
+	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
+	agent, err := d.AgentGet(label)
+	if err != nil {
+		return false, 0, "", fmt.Errorf("reading live agent state for %s before corrective retry: %w", label, err)
+	}
+	if !alreadyFinished(agent.AgentStatus) {
+		return false, 0, "", nil
+	}
+
+	launchParams := p.launchAndPromptParams(label, pane, tab, "", path, "", "")
+	promptedAgent, err := resendPrompt(d, launchParams, unexecutedToolCallCorrection)
+	if err != nil {
+		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
+	}
+	retrySessionID := sessionID
+	if promptedAgent.AgentSession != "" {
+		retrySessionID = promptedAgent.AgentSession
+	}
+
+	if err := waitForFinish(d, launchParams, retrySessionID); err != nil {
+		if errors.Is(err, errBlockedPaneParked) {
+			return false, 0, "", err
+		}
+		return false, 0, "", fmt.Errorf("waiting for %s to finish after corrective retry: %w", label, err)
+	}
+
+	newAhead, err := d.CommitsAhead(path, base, branch)
+	if err != nil {
+		return false, 0, "", fmt.Errorf("counting commits ahead of %s after corrective retry: %w", base, err)
+	}
+	return true, newAhead, retrySessionID, nil
 }
 
 // adoptNeedsAnswerReport honours an agent's `iteration_status: needs-answer`
