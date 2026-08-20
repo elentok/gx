@@ -1,4 +1,10 @@
-# gx ralph-loop
+# ralph-loop (original design plan — superseded)
+
+> **Historical.** This is the original design plan. The CLI surface it proposed was never shipped:
+> there is no `gx ralph-loop` command. A loop is started from the TUI's Queue tab, which calls
+> `ralphloop.Run(...)` in-process. For how the loop actually works today, read
+> [`docs/ralph-loop-queue-orchestrator.md`](../ralph-loop-queue-orchestrator.md). Kept only for the
+> decision rationale below.
 
 A ralph-loop orchestrator, built into `gx`, that drives Claude Code agents through the tickets of a
 `to-tickets`-produced local epic — one iteration worktree per ticket, cherry-picked onto a shared
@@ -17,12 +23,10 @@ gx already owns this domain: the `tickets` package parses the local tracker's
 Building this in `blf` instead would mean duplicating all three. (Decision:
 [01](../../.scratch/ralph-loop/issues/01-host-project-and-location.md))
 
-## CLI surface
+## CLI surface (never shipped)
 
-```
-gx ralph-loop {epic-name} [--skill implement] [--max-parallel 2] [--smart-zone 110000]
-gx ralph-loop report {epic-name}
-```
+A standalone CLI was proposed here and rejected; the loop runs in the TUI process instead. The
+knobs below survived as configuration, not as flags:
 
 - `--skill` (default `implement`) — the skill each iteration invokes as an explicit slash command.
 - `--max-parallel` (default `2`) — concurrently-running iterations.
@@ -45,7 +49,7 @@ One herdr workspace per epic run (`herdr workspace create --label {epic-name}`, 
 - The **feature worktree** (branch `{epic-name}`) gets one tab, mostly idle between merges.
 - Each **running iteration** gets its own tab, named `iter-NN`, up to `--max-parallel`.
 
-The orchestrator process itself is headless — a plain background `gx ralph-loop` process, not a pane
+The orchestrator process itself was to be headless — a background process, not a pane
 in the workspace. (Decision: [02](../../.scratch/ralph-loop/issues/02-herdr-topology.md))
 
 ## Ticket scheduling
@@ -149,7 +153,7 @@ Codex:
    and `run-log.jsonl`, even though nothing is actually blocked.
 
 **On crash/restart** (the process died, not a controlled interruption): a fresh
-`gx ralph-loop {epic-name}` reconciles with **no separate state file**, using only:
+a restarted loop reconciles with **no separate state file**, using only:
 
 - Deterministic naming (`ralph-loop/iter-NN` branch, `iter-NN` tab).
 - The ticket files' own `Status:` (already the source of truth for scheduling).
@@ -205,7 +209,7 @@ buffer past the computed reset before resuming.
   `.scratch/{epic-name}/run-log.jsonl` as it happens. Each event carries at least: ticket number,
   herdr pane/tab id, the `agent_session` UUID (= the Claude Code session id, for jumping straight to
   that iteration's own transcript), and a timestamp.
-- **`gx ralph-loop report {epic-name}`**, runnable any time (including mid-run):
+- **A run report**, runnable any time (including mid-run):
   1. Reads `run-log.jsonl` for the event skeleton (order, concurrency).
   2. Per session UUID, reads that session's Claude Code transcript for: peak context occupancy (the
      per-turn figure from the smart-zone section, not summed), total duration (first/last
