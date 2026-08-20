@@ -603,6 +603,91 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	}
 }
 
+// TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission covers
+// ticket 03's fourth acceptance criterion: a Codex pane that is blocked at
+// the "/compact" submission itself, as opposed to blocked by a stale ctrl+c
+// side effect (ticket 03's other regression, covered by
+// TestRun_ProductionRealGit_CodexCompactsThenCompletes in
+// run_realgit_scheduling_test.go). Unlike that scenario, this one is a real
+// herdr agent_blocked rejection of the
+// "/compact" prompt call, which recoverSmartZoneBreach's err != nil branch
+// (ralphloop/waitforfinish.go) already turns into a reported-but-nonfatal
+// recovery failure — this test only locks that existing behavior in through
+// the production Deps fake, it changes no production logic.
+func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *testing.T) {
+	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
+	// socket path and PATH.
+	const pane = "pane-1"
+	const smartZone = 100
+	cwd := "/repo/iter-09"
+	sessionID := "sess-09"
+
+	s := herdrfake.NewState(t)
+
+	var compactCalls int
+	s.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		target, text := argv[2], argv[3]
+		if text == "/compact" {
+			compactCalls++
+			return nil, herdrfake.Identities{}, herdrfake.AgentBlockedError(target)
+		}
+		return agentResult(target, "working")
+	})
+
+	herdrfake.StartState(t, s)
+
+	scratchDir := t.TempDir()
+	deps := testDeps()
+	deps.Sleep = func(time.Duration) {}
+	deps.Now = func() time.Time { return time.Unix(0, 0) }
+
+	recovered, err := recoverSmartZoneBreach(deps, launchAndPromptParams{
+		Label:      "iter-09",
+		Agent:      AgentCodex,
+		Pane:       pane,
+		SessionCwd: cwd,
+		SmartZone:  smartZone,
+		Gate:       NewGate(),
+		Ticket:     "09",
+		ScratchDir: scratchDir,
+		EpicName:   "epic",
+	}, sessionID, "context occupancy 150 exceeds --smart-zone 100", smartZone)
+	if err != nil {
+		t.Fatalf("recoverSmartZoneBreach() error = %v, want nil: a gated give-up is a failed recovery, not a failed iteration", err)
+	}
+	if recovered {
+		t.Error("recoverSmartZoneBreach() recovered = true, want false: the pane never confirmed compacting")
+	}
+	if compactCalls != 1 {
+		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
+	}
+
+	events, ok, err := ReadEvents(scratchDir, "epic")
+	if err != nil || !ok {
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
+	}
+	var sawFailed, sawNeedsRepair, sawResumed bool
+	for _, e := range events {
+		switch e.Type {
+		case eventSmartZoneRecoveryFailed:
+			sawFailed = true
+		case eventNeedsRepair:
+			sawNeedsRepair = true
+		case eventResumed:
+			sawResumed = true
+		}
+	}
+	if !sawFailed {
+		t.Error("missing smart-zone-recovery-failed event for a pane blocked at /compact submission")
+	}
+	if sawNeedsRepair {
+		t.Error("needs-repair event emitted, want none: a single gated give-up must not abort the run")
+	}
+	if sawResumed {
+		t.Error("resumed event emitted, want none: nothing recovered")
+	}
+}
+
 // compactBoundaryConfirmTick is the "agent wait" dispatch count (counting
 // only compact-completion polls, i.e. those whose --until includes
 // "blocked" — see waitforfinish.go's compactStates) at which this test's
