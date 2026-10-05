@@ -161,37 +161,43 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		reattached = append(reattached, t)
 	}
 
-	// Computed once per run (not per ticket) and threaded into every
-	// classifyDoneTicket call below — a real perf win over the one
-	// TrailerCommitExists shell-out per done ticket this replaced. Only
-	// attempted when there's at least one done ticket to check, so most runs
-	// (nothing done yet) skip the git call entirely. A failure here (e.g. a
-	// transient git error) degrades to an empty map rather than aborting
-	// reconcile: classifyDoneTicket's trailer-based fallback simply
-	// contributes nothing that run, while IsAncestor/PatchesApplied still
-	// resolve the common cases.
-	var landed map[string]bool
+	// Only in-scope done tickets with a commit to land are verified, in one
+	// VerifyEpic call (so the trailer lookup runs once per run, and not at all
+	// when nothing is done yet). A commitless done ticket never had a commit
+	// to land, and an out-of-scope one belongs to a different (or not yet
+	// requested) run — same skip as the claim/needs-repair loop above, so a
+	// scoped run never rewrites a done ticket's status outside what it was
+	// asked to touch.
+	var toVerify []tickets.Ticket
 	for _, t := range epic.Tickets {
-		if t.IsDone() && !t.Commitless {
-			landed, _ = LandedTickets(paths.FeatureWorktree, epic.Name)
-			break
+		if rp.Scope.Contains(t, epic) && t.IsDone() && !t.Commitless {
+			toVerify = append(toVerify, t)
 		}
 	}
+	vd := d.verifyDeps()
+	vd.TabList = func(string) ([]herdr.Tab, error) { return tabs, nil }
+	// A transient git failure on the trailer lookup degrades to "no trailer
+	// evidence" rather than parking the ticket as unknown: the SHA and
+	// patch-id rungs still resolve the common cases, and aborting reconcile
+	// over a fallback rung would be worse than the miss.
+	vd.LandedTickets = func(dir, branch string) (map[string]bool, error) {
+		landed, _ := landedTickets(dir, branch)
+		return landed, nil
+	}
+	verifications, err := VerifyEpic(vd, VerifyParams{
+		Epic:            epic.Name,
+		FeatureWorktree: paths.FeatureWorktree,
+		WorktreeDir:     paths.WorktreeDir,
+		WorkspaceID:     rp.WorkspaceID,
+		Tickets:         toVerify,
+		Events:          events,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("verifying done tickets: %w", err)
+	}
 
-	for _, t := range epic.Tickets {
-		if !rp.Scope.Contains(t, epic) {
-			// Belongs to a different (or not yet requested) run — same
-			// out-of-scope skip as the claim/needs-repair loop above, so a
-			// scoped run never rewrites a done ticket's status outside what it
-			// was asked to touch.
-			continue
-		}
-		// A commitless done ticket (see schema.Ticket.Commitless) never had a
-		// commit to land in the first place — verifying it is skipped here.
-		if !t.IsDone() || t.Commitless {
-			continue
-		}
-		class, err := classifyDoneTicket(d, paths, epic.Name, t, events, live, landed)
+	for i, t := range toVerify {
+		class, err := foldVerification(verifications[i])
 		if err != nil {
 			return nil, fmt.Errorf("verifying done ticket %s: %w", t.Identifier, err)
 		}

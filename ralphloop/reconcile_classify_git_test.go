@@ -229,9 +229,9 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 
 	d := realGitDeps()
 	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
-	landed, err := LandedTickets(dir, "main")
+	landed, err := landedTickets(dir, "main")
 	if err != nil {
-		t.Fatalf("LandedTickets: %v", err)
+		t.Fatalf("landedTickets: %v", err)
 	}
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, landed)
 	if err != nil {

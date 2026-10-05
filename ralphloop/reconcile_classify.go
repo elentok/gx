@@ -1,8 +1,6 @@
 package ralphloop
 
 import (
-	"fmt"
-
 	"github.com/elentok/gx/tickets"
 )
 
@@ -18,10 +16,8 @@ const (
 	doneUnrecoverable
 )
 
-// classifyDoneTicket checks a done ticket's iteration commits against the
-// feature branch's current tip and for leftover iteration state (tab,
-// worktree, or branch never cleaned up), producing one of four
-// classifications:
+// classifyDoneTicket folds a ticket's TicketVerification (see VerifyEpic for
+// the three-rung landing ladder) into one of four classifications:
 //
 //   - doneOK: the commit landed and nothing was left behind.
 //   - doneStaleCleanup: the commit landed, but a tab/worktree/branch is
@@ -32,90 +28,32 @@ const (
 //   - doneUnrecoverable: the commit is missing and no iteration branch is
 //     left to recover it from.
 //
-// Presence is checked first against the SHA recorded on the ticket's most
-// recent cherry-picked event, not the iteration branch's own commits:
-// CherryPickRange creates fresh commits on the feature branch (different
-// hashes than the iteration branch's originals), so the iteration branch's
-// tip is never literally reachable from the feature branch even in the
-// fully-landed case. A done ticket with no recorded event (e.g. a run-log
-// predating this check) starts out treated the same as a missing commit.
-// Either way, if the iteration branch still exists, presence gets a second
-// look via PatchesApplied (patch-id, not hash) before concluding the commit
-// is really missing — the recorded SHA can also go stale harmlessly, e.g.
-// when the feature branch is rebased after landing it, and blindly trusting
-// that would misclassify already-landed work as doneRecoverable and
-// re-cherry-pick it onto the live feature worktree. A third and final check
-// against landed (see LandedTickets) runs regardless of whether the
-// iteration branch survived: presence there means the ticket-identifying
-// trailer landCherryPick stamps on every landed commit was found, the only
-// signal that survives a rebase where the commit was also manually
-// re-resolved during a conflict — that changes both its hash and its
-// patch-id, but never its commit message.
+// A verification whose checks couldn't run leaves the ticket untouched
+// (doneOK) unless a check failed outright, which surfaces as an error.
 func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live map[string]bool, landed map[string]bool) (doneMismatchClass, error) {
-	landedSHA := latestCherryPickedSHA(events, t.Identifier)
+	return foldVerification(verifyTicket(d.verifyDeps(), paths, featureBranch, t, events, live, landed, nil))
+}
 
-	commitsPresent := false
-	if landedSHA != "" {
-		present, err := d.IsAncestor(paths.FeatureWorktree, landedSHA, featureBranch)
-		if err != nil {
-			return doneOK, fmt.Errorf("checking landed commit reachability: %w", err)
+func foldVerification(v TicketVerification) (doneMismatchClass, error) {
+	if v.err != nil {
+		return doneOK, v.err
+	}
+	switch v.Landing {
+	case LandingLanded:
+		if isTrue(v.Leftovers.Tab) || isTrue(v.Leftovers.Worktree) || isTrue(v.Leftovers.Branch) {
+			return doneStaleCleanup, nil
 		}
-		commitsPresent = present
-	}
-
-	branch := iterBranch(featureBranch, t.Identifier)
-	hasBranch := branchExists(d, paths.FeatureWorktree, branch)
-
-	// A missing landedSHA doesn't only mean the commit never landed — it also
-	// happens harmlessly whenever featureBranch was rebased/amended after
-	// landing it (rewriting hashes) or the recording event itself was lost.
-	// Before treating that as a real gap, check whether the iteration
-	// branch's content already made it onto featureBranch under different
-	// hashes: falsely calling this doneRecoverable would re-cherry-pick
-	// already-landed commits straight onto the live feature worktree.
-	if !commitsPresent && hasBranch {
-		base, err := d.MergeBase(paths.FeatureWorktree, branch, featureBranch)
-		if err != nil {
-			return doneOK, fmt.Errorf("resolving merge-base for patch-equivalence check: %w", err)
-		}
-		applied, err := d.PatchesApplied(paths.FeatureWorktree, featureBranch, base, branch)
-		if err != nil {
-			return doneOK, fmt.Errorf("checking patch-equivalent landed commits: %w", err)
-		}
-		commitsPresent = applied
-	}
-
-	// Last resort: neither SHA reachability nor patch-id equivalence can
-	// survive a rebase where the landed commit was also manually re-resolved
-	// during a conflict, since that changes both its hash and its diff. The
-	// trailer landCherryPick stamps on every landed commit (Deps.AppendTrailer)
-	// has neither problem — commit messages ride along through a rebase
-	// untouched — so landed (computed once per run by LandedTickets) is
-	// checked directly against the ticket, independent of whether the
-	// iteration branch itself survived.
-	if !commitsPresent {
-		commitsPresent = landed[t.Identifier]
-	}
-
-	label := iterLabel(featureBranch, t.Identifier)
-	hasWorktree, err := d.WorktreeExists(iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier))
-	if err != nil {
-		return doneOK, fmt.Errorf("checking leftover worktree: %w", err)
-	}
-
-	leftover := live[iterationKey(featureBranch, label)] || hasWorktree || hasBranch
-
-	switch {
-	case commitsPresent && !leftover:
 		return doneOK, nil
-	case commitsPresent:
-		return doneStaleCleanup, nil
-	case hasBranch:
+	case LandingRecoverable:
 		return doneRecoverable, nil
-	default:
+	case LandingUnrecoverable:
 		return doneUnrecoverable, nil
+	default:
+		return doneOK, nil
 	}
 }
+
+func isTrue(b *bool) bool { return b != nil && *b }
 
 // latestCherryPickedSHA returns the SHA recorded on the most recent
 // cherry-picked event logged for identifier (a ticket's Identifier, not
