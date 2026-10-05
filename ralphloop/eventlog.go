@@ -82,6 +82,15 @@ const (
 	eventNotificationSuppressed = "notification-suppressed"
 )
 
+// Event types written by one-shot CLI callers (see AppendEvent), exported
+// because those callers live outside this package.
+const (
+	// EventManualLand marks a ticket landed by hand rather than by the loop.
+	EventManualLand = "manual-land"
+	// EventTicketReset marks a ticket reset back to open by hand.
+	EventTicketReset = "ticket-reset"
+)
+
 // notifyKind* tag which live event triggered a notification-sent/
 // notification-failed line — distinct from the Type field (which is always
 // "notification-sent"/"notification-failed" itself).
@@ -189,6 +198,15 @@ type Event struct {
 	// turn" from "idle because it never left this launch state" (see
 	// stalledSinceLaunch).
 	StateChangeSeq int `json:"state_change_seq,omitempty"`
+	// Outcome (manual-land/ticket-reset only) is what the recovery command
+	// concluded for the ticket.
+	Outcome string `json:"outcome,omitempty"`
+	// TrailerValue (manual-land/ticket-reset only) is the trailer value the
+	// command matched or wrote on the landed commits.
+	TrailerValue string `json:"trailer_value,omitempty"`
+	// AtticRef (manual-land/ticket-reset only) is the ref that preserves the
+	// commits the command set aside.
+	AtticRef string `json:"attic_ref,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each
@@ -237,6 +255,39 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	defer f.Close()
 	_, err = f.Write(data)
 	return err
+}
+
+// maxEventLineBytes is the size cap for one run-log line. POSIX only
+// guarantees an O_APPEND write is not interleaved with another process's write
+// when it is a single write(2) of at most PIPE_BUF-ish size, so AppendEvent
+// takes no on-disk lock and instead relies on that: one write per event, kept
+// under this cap (4096 including the newline).
+const maxEventLineBytes = 4096
+
+// AppendEvent appends ev to epicName's run-log.jsonl for one-shot CLI callers
+// that run alongside (or without) a live ralph-loop process. There is no
+// on-disk lock: concurrent processes rely on O_APPEND atomicity of a single
+// write under maxEventLineBytes, so Reason is truncated to make the line fit.
+func AppendEvent(scratchDir, epicName string, ev Event) error {
+	if ev.Time.IsZero() {
+		ev.Time = time.Now()
+	}
+	data, err := json.Marshal(ev)
+	if err != nil {
+		return err
+	}
+	// A raw Reason byte encodes to between 1 and 6 JSON bytes, so cutting
+	// excess/6 raw bytes never overshoots; re-measure and repeat until the
+	// line fits.
+	for len(data)+1 > maxEventLineBytes && ev.Reason != "" {
+		cut := max((len(data)+1-maxEventLineBytes)/6, 1)
+		keep := max(len(ev.Reason)-cut, 0)
+		ev.Reason = strings.ToValidUTF8(ev.Reason[:keep], "")
+		if data, err = json.Marshal(ev); err != nil {
+			return err
+		}
+	}
+	return logEvent(scratchDir, epicName, ev)
 }
 
 // LogNotificationsConfigured records, once per epic run, which notification

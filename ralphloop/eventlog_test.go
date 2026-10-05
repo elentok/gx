@@ -41,6 +41,64 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 	}
 }
 
+func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	err := AppendEvent(dir, "epic", Event{
+		Type: EventManualLand, Ticket: "04", Outcome: "landed",
+		TrailerValue: "epic/04", AtticRef: "refs/attic/04", Reason: "by hand",
+	})
+	if err != nil {
+		t.Fatalf("AppendEvent: %v", err)
+	}
+	if err := AppendEvent(dir, "epic", Event{Type: EventTicketReset, Ticket: "05"}); err != nil {
+		t.Fatalf("AppendEvent: %v", err)
+	}
+
+	raw, err := os.ReadFile(runLogPath(dir, "epic"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if n := strings.Count(string(raw), "\n"); n != 2 {
+		t.Fatalf("got %d lines, want 2:\n%s", n, raw)
+	}
+	events, ok, err := ReadEvents(dir, "epic")
+	if err != nil || !ok || len(events) != 2 {
+		t.Fatalf("ReadEvents = %v, %v, %v; want 2 events", events, ok, err)
+	}
+	got := events[0]
+	if got.Type != "manual-land" || got.Outcome != "landed" || got.TrailerValue != "epic/04" || got.AtticRef != "refs/attic/04" {
+		t.Errorf("event 0 = %+v, want new fields round-tripped", got)
+	}
+	if events[1].Type != "ticket-reset" || strings.Contains(strings.Split(string(raw), "\n")[1], "outcome") {
+		t.Errorf("event 1 should omit empty new fields: %q", raw)
+	}
+}
+
+func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Multi-byte and escaped characters exercise the encoded-size accounting.
+	reason := strings.Repeat("é\"\n", 5000)
+	if err := AppendEvent(dir, "epic", Event{Type: EventManualLand, Ticket: "04", Reason: reason}); err != nil {
+		t.Fatalf("AppendEvent: %v", err)
+	}
+
+	raw, err := os.ReadFile(runLogPath(dir, "epic"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if len(raw) > maxEventLineBytes {
+		t.Errorf("line is %d bytes, want <= %d", len(raw), maxEventLineBytes)
+	}
+	events, _, _ := ReadEvents(dir, "epic")
+	if len(events) != 1 || events[0].Reason == "" || !strings.HasPrefix(reason, events[0].Reason) {
+		t.Errorf("want one event with a non-empty truncated prefix of Reason, got %+v", events)
+	}
+}
+
 func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
