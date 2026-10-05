@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/transcript"
 )
 
 type landFixture struct {
@@ -281,6 +282,56 @@ func TestRunTicketsLand_WritesManualLandEvent(t *testing.T) {
 	ev := events[0]
 	if ev.Type != ralphloop.EventManualLand || ev.Ticket != "01" || ev.Outcome != "landed" || ev.Reason == "" || ev.AgentSession != "" {
 		t.Errorf("event = %+v", ev)
+	}
+}
+
+// Not parallel: transcript lookup resolves $HOME process-wide.
+func TestRunTicketsLand_StampsMetricsFromRecoveredSession(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	const cwd, session = "/repo/iter-01", "sess-1"
+	path := transcript.PathIn(home, cwd, session)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lines := `{"type":"assistant","timestamp":"2026-08-01T10:00:00Z","message":{"model":"claude-sonnet-5","usage":{"input_tokens":5,"cache_read_input_tokens":100,"output_tokens":50}}}
+{"type":"assistant","timestamp":"2026-08-01T10:01:00Z","message":{"model":"claude-sonnet-5","usage":{"input_tokens":5,"cache_read_input_tokens":200,"output_tokens":50}}}
+`
+	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scratch := filepath.Dir(f.lockDir)
+	started := ralphloop.Event{Type: "iteration-started", Ticket: "01", AgentSession: session, Cwd: cwd}
+	if err := ralphloop.AppendEvent(scratch, "widget-epic", started); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := f.run(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `"metrics_stamped":true`) {
+		t.Errorf("stdout = %s", out)
+	}
+	got := f.ticketText(t)
+	if !strings.Contains(got, "elapsed_time: 60") || strings.Contains(got, "actual_cost: 0\n") {
+		t.Errorf("ticket = %s", got)
+	}
+	events, _, _ := ralphloop.ReadEvents(scratch, "widget-epic")
+	ev := events[len(events)-1]
+	if ev.Type != ralphloop.EventManualLand || ev.AgentSession != session || ev.Reason != "" {
+		t.Errorf("event = %+v", ev)
+	}
+}
+
+func TestTicketsLandHelp_CarriesBothCaveats(t *testing.T) {
+	t.Parallel()
+	long := strings.Join(strings.Fields(newTicketsLandCmd(deps{}).Long), " ")
+	for _, want := range []string{"guard rail, not a boundary", "least trustworthy of the three metrics"} {
+		if !strings.Contains(long, want) {
+			t.Errorf("help lacks %q", want)
+		}
 	}
 }
 
