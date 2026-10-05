@@ -39,6 +39,17 @@ func IterationTabLive(d Deps, epic, identifier string) bool {
 // LandTicket, for `land --continue`.
 func StampLanded(d LandDeps, lp LandParams) (LandResult, error) { return stampLanded(d, lp) }
 
+// IterationAgentAlive reports whether herdr still knows an agent under the
+// iteration's label. A tab with no such agent is stale. Herdr being
+// unreachable reports false, for the same reason as IterationTabLive.
+func IterationAgentAlive(d Deps, epic, identifier string) bool {
+	if d.AgentGet == nil {
+		return false
+	}
+	agent, err := d.AgentGet(iterLabel(epic, identifier))
+	return err == nil && agent.PaneID != ""
+}
+
 // RecoverLandSession reads the run log for what a landing of epic/identifier
 // can recover: the ticket's last iteration session (zero when none was logged)
 // and the SHA of a prior landing (empty when none).
