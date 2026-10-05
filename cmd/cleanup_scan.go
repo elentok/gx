@@ -39,6 +39,25 @@ type CleanupScanResult struct {
 	Epics        []EpicScan       `json:"epics"`
 	Worktrees    []WorktreeScan   `json:"worktrees"`
 	Housekeeping HousekeepingScan `json:"housekeeping"`
+	// AtticRefs lists branches `gx tickets reset` set aside. Report-only: nothing
+	// in gx prunes them, and scan must never learn to.
+	AtticRefs []string `json:"attic_refs"`
+}
+
+const atticRefPrefix = "ralph-loop/attic/"
+
+func scanAtticRefs(repo git.Repo) ([]string, error) {
+	branches, err := git.ListBranches(repo)
+	if err != nil {
+		return nil, err
+	}
+	refs := []string{}
+	for _, b := range branches {
+		if !b.IsRemote && strings.HasPrefix(b.Name, atticRefPrefix) {
+			refs = append(refs, b.Name)
+		}
+	}
+	return refs, nil
 }
 
 // runCleanupScan resolves the current repo, classifies every epic under
@@ -74,6 +93,11 @@ func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	}
 
 	result.Housekeeping, err = scanHousekeeping(*info)
+	if err != nil {
+		return err
+	}
+
+	result.AtticRefs, err = scanAtticRefs(repo)
 	if err != nil {
 		return err
 	}
@@ -211,6 +235,14 @@ func printCleanupScanText(w io.Writer, result CleanupScanResult) {
 			rec = "-"
 		}
 		fmt.Fprintf(w, "  %s: %s active=%t recommendation=%s\n", ws.Branch, detail, ws.Active, rec)
+	}
+
+	fmt.Fprintln(w, "Attic refs:")
+	if len(result.AtticRefs) == 0 {
+		fmt.Fprintln(w, "  (none)")
+	}
+	for _, ref := range result.AtticRefs {
+		fmt.Fprintf(w, "  %s\n", ref)
 	}
 
 	fmt.Fprintln(w, "Housekeeping:")

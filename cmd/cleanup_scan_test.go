@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil"
@@ -90,6 +93,71 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 		HasCodeReviewTicket: false, CodeReviewDone: false,
 	}); got != want {
 		t.Errorf("epic-open-no-review = %+v, want %+v", got, want)
+	}
+}
+
+func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.MustGitExported(t, dir, "branch", "ralph-loop/attic/epic-a/03-1")
+	testutil.MustGitExported(t, dir, "branch", "ralph-loop/attic/epic-a/03-2")
+	testutil.MustGitExported(t, dir, "branch", "unrelated")
+
+	run := func(args ...string) string {
+		var stdout bytes.Buffer
+		d := deps{
+			stdout: &stdout,
+			stderr: bytes.NewBuffer(nil),
+			getwd:  func() (string, error) { return dir, nil },
+		}
+		if err := execute(append([]string{"cleanup", "scan"}, args...), d); err != nil {
+			t.Fatalf("execute cleanup scan %v: %v", args, err)
+		}
+		return stdout.String()
+	}
+
+	var result CleanupScanResult
+	jsonOut := run("--json")
+	if err := json.Unmarshal([]byte(jsonOut), &result); err != nil {
+		t.Fatalf("unmarshal output: %v\noutput: %s", err, jsonOut)
+	}
+	want := []string{"ralph-loop/attic/epic-a/03-1", "ralph-loop/attic/epic-a/03-2"}
+	if !slices.Equal(result.AtticRefs, want) {
+		t.Errorf("AtticRefs = %v, want %v", result.AtticRefs, want)
+	}
+
+	text := run()
+	for _, ref := range want {
+		if !strings.Contains(text, ref) {
+			t.Errorf("text output missing %s:\n%s", ref, text)
+		}
+	}
+
+	out, err := exec.Command("git", "-C", dir, "branch", "--list", "ralph-loop/attic/*").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range want {
+		if !strings.Contains(string(out), ref) {
+			t.Errorf("scan removed %s; branches:\n%s", ref, out)
+		}
+	}
+}
+
+func TestExecute_CleanupScan_NoAtticRefsIsEmptyList(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return dir, nil },
+	}
+	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), `"attic_refs": []`) {
+		t.Errorf("want empty attic_refs array, got:\n%s", stdout.String())
 	}
 }
 
