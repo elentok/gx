@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -136,14 +137,8 @@ func resetTicket(in resetInput, d ralphloop.Deps) (resetResult, error) {
 		return resetResult{}, err
 	}
 
-	if err := tickets.Reset(t.Path, in.Now); err != nil {
+	if err := tickets.Reset(t.Path, in.Now, resetNote(in, attic)); err != nil {
 		return resetResult{}, fmt.Errorf("resetting ticket %s: %w", in.ID, err)
-	}
-	note := resetNote(in, attic)
-	if err := schema.UpdateTicketWithBody(t.Path, func(_ *schema.Ticket, body *string) {
-		*body = schema.AppendComment(*body, note)
-	}); err != nil {
-		return resetResult{}, fmt.Errorf("writing reset note on ticket %s: %w", in.ID, err)
 	}
 
 	res := resetResult{Ticket: in.ID, Status: string(schema.StatusOpen), AtticRef: attic.Ref, Warning: resetLiveRunWarning}
@@ -224,8 +219,11 @@ type atticInfo struct {
 
 func gatherAttic(in resetInput, d ralphloop.Deps, featurePath, epic, branch string) (atticInfo, error) {
 	tip, err := d.RevParse(featurePath, branch)
-	if err != nil {
+	if errors.Is(err, git.ErrRefNotFound) {
 		return atticInfo{}, nil
+	}
+	if err != nil {
+		return atticInfo{}, fmt.Errorf("resolving %s: %w", branch, err)
 	}
 	if in.DeleteBranch {
 		return atticInfo{Tip: tip}, nil
@@ -246,8 +244,12 @@ func gatherAttic(in resetInput, d ralphloop.Deps, featurePath, epic, branch stri
 func nextAtticRef(d ralphloop.Deps, dir, epic, id string) (string, error) {
 	for n := 1; n < 1000; n++ {
 		ref := fmt.Sprintf("ralph-loop/attic/%s/%s-%d", epic, id, n)
-		if _, err := d.RevParse(dir, ref); err != nil {
+		_, err := d.RevParse(dir, ref)
+		if errors.Is(err, git.ErrRefNotFound) {
 			return ref, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("resolving %s: %w", ref, err)
 		}
 	}
 	return "", fmt.Errorf("no free attic ref for ticket %s", id)

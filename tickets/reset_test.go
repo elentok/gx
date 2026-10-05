@@ -43,7 +43,7 @@ Earlier note.
 `)
 
 	now := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
-	if err := Reset(path, now); err != nil {
+	if err := Reset(path, now, ""); err != nil {
 		t.Fatalf("Reset: %v", err)
 	}
 
@@ -81,7 +81,7 @@ func TestReset_RetiresNeedsRepairSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-repair\ntype: task\n---\n\n## Needs Repair\n\nBroke.\n")
 
-	if err := Reset(path, time.Now()); err != nil {
+	if err := Reset(path, time.Now(), ""); err != nil {
 		t.Fatalf("Reset: %v", err)
 	}
 
@@ -89,5 +89,19 @@ func TestReset_RetiresNeedsRepairSection(t *testing.T) {
 	body := schema.ParseBody(string(raw))
 	if strings.Contains(body, "\n## Needs Repair") || !strings.Contains(body, "Broke.") {
 		t.Fatalf("unexpected body:\n%s", body)
+	}
+}
+
+func TestReset_NoteLandsInSameWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "05-thing.md")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: task\n---\n\n# 05 — Thing\n")
+
+	if err := Reset(path, time.Now(), "reset note text\n"); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), "status: open") || !strings.Contains(string(raw), "reset note text") {
+		t.Fatalf("reset and note not both present:\n%s", raw)
 	}
 }

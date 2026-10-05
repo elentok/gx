@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,9 +9,20 @@ import (
 	"strings"
 )
 
-// RevParse resolves ref to its full commit hash in dir.
+// ErrRefNotFound is returned by RevParse when ref does not resolve, as opposed
+// to git itself failing.
+var ErrRefNotFound = errors.New("ref not found")
+
+// RevParse resolves ref to its full commit hash in dir. A ref that does not
+// exist returns ErrRefNotFound; any other failure is returned as is.
 func RevParse(dir, ref string) (string, error) {
-	out, _, err := run(dir, []string{"rev-parse", ref})
+	// --verify --quiet exits 1 with no output for a missing ref; real git
+	// failures (bad repo, corrupt object) exit 128.
+	out, _, err := run(dir, []string{"rev-parse", "--verify", "--quiet", ref})
+	var runErr *RunError
+	if errors.As(err, &runErr) && runErr.Code == 1 {
+		return "", fmt.Errorf("%w: %s", ErrRefNotFound, ref)
+	}
 	return out, err
 }
 

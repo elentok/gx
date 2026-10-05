@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 )
@@ -34,7 +35,7 @@ func newResetFixture(t *testing.T, content string) *resetFixture {
 		WorktreeDir: func(string) (string, error) { return t.TempDir(), nil },
 		RevParse: func(_, ref string) (string, error) {
 			if strings.HasPrefix(ref, "ralph-loop/attic/") || !f.branchOK {
-				return "", errors.New("unknown revision")
+				return "", git.ErrRefNotFound
 			}
 			return "tip123", nil
 		},
@@ -306,5 +307,20 @@ func TestRunTicketsReset_MissingBranchTouchesNoGit(t *testing.T) {
 	}
 	if len(f.calls) != 0 {
 		t.Errorf("calls = %v", f.calls)
+	}
+}
+
+func TestRunTicketsReset_GitErrorIsReturnedAndTicketUntouched(t *testing.T) {
+	t.Parallel()
+	f := newResetFixture(t, ticketWith("claimed", ""))
+	f.deps.RevParse = func(_, _ string) (string, error) { return "", errors.New("fatal: not a git repository") }
+	before := f.ticketText(t)
+	var out, errOut bytes.Buffer
+	f.in.JSON = false
+	if err := runTicketsReset(f.in, f.deps, &out, &errOut); err == nil || !strings.Contains(errOut.String(), "not a git repository") {
+		t.Fatalf("err = %v, stderr = %q", err, errOut.String())
+	}
+	if f.ticketText(t) != before {
+		t.Errorf("ticket changed despite git error:\n%s", f.ticketText(t))
 	}
 }
