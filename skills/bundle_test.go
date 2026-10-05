@@ -137,7 +137,8 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 // value, per gx.md's "Invocation policy" section: gx-implement is
 // explicit-invoke only (claiming/implementing a ticket should never trigger
 // on the model's own reading of a conversation); gx-to-tickets, gx-tdd,
-// gx-resolving-merge-conflicts, and gx-investigate are left model-invocable.
+// gx-resolving-merge-conflicts, gx-investigate, and gx-changelog are left
+// model-invocable (gx-bump invokes gx-changelog as a sub-agent).
 var wantInvocationPolicy = map[string]bool{
 	"gx-to-tickets":                false,
 	"gx-tdd":                       false,
@@ -147,7 +148,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-cleanup":                   true,
 	"gx-merge":                     true,
 	"gx-code-review":               true,
-	"gx-changelog":                 true,
+	"gx-changelog":                 false,
 	"gx-bump":                      true,
 }
 

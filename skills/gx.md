@@ -46,21 +46,20 @@ own reading of a conversation. `gx-cleanup` sets the same flag for the same reas
 and deleting/merging branches is deliberate, explicit-invoke-only housekeeping, never something to
 trigger on the model's own reading of a conversation. `gx-merge` sets the same flag for the same
 reason: merging a branch onto main is deliberate, explicit-invoke-only, never something to trigger on
-the model's own reading of a conversation. `gx-changelog` sets the same flag for the same reason:
-drafting and writing a changelog entry is deliberate, explicit-invoke-only, never something to
-trigger on the model's own reading of a conversation. `gx-bump` sets the same flag for the same
+the model's own reading of a conversation. `gx-bump` sets the same flag for the same
 reason: cutting a release - running tests, committing a changelog entry, tagging and pushing - is
 deliberate, explicit-invoke-only, never something to trigger on the model's own reading of a
-conversation. `gx-to-tickets`, `gx-tdd`, and
-`gx-resolving-merge-conflicts` carry no such flag: it's fine for the model to reach for
+conversation. `gx-to-tickets`, `gx-tdd`,
+`gx-resolving-merge-conflicts`, and `gx-changelog` carry no such flag: it's fine for the model to reach for
 ticket breakdown, TDD guidance, or merge-conflict resolution on its own when a task calls
 for it — e.g. a code-review ticket that needs to spin up follow-up tickets can invoke
-`gx-to-tickets` itself. `gx-investigate` likewise carries no flag: a bug report should
+`gx-to-tickets` itself, and `gx-bump` invokes `gx-changelog` as a sub-agent, which a flagged skill
+would block. `gx-investigate` likewise carries no flag: a bug report should
 reflexively pull in ralph-loop's log/state inventory without a human having to name the skill.
 
 Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
 `/name` invocation, never launched by the model on its own. That's already at least as restrictive as
-`disable-model-invocation: true`, so `gx-implement`, `gx-cleanup`, `gx-merge`, `gx-changelog`, and `gx-bump`
+`disable-model-invocation: true`, so `gx-implement`, `gx-cleanup`, `gx-merge`, and `gx-bump`
 preserve their intended policy under Codex without any extra metadata: their explicit-only intent
 holds as-is, and
 `gx-to-tickets`'s, `gx-tdd`'s, and `gx-resolving-merge-conflicts`' "the model may reach for it" intent

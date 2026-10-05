@@ -3,7 +3,6 @@ name: gx-changelog
 description:
   Draft a CHANGELOG.md entry for the next version by summarizing commits since the last version tag.
   Use when asked to update the changelog.
-disable-model-invocation: true
 ---
 
 # gx Changelog
