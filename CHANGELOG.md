@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.28.17 - 2026-10-05
+
+- Added `gx tickets land`, `verify`, `reset` and `unpark` for recovering stuck ralph-loop tickets:
+  - `land` re-lands a ticket's commits and stamps metrics and trailers. It is idempotent and has `--continue` and `--abort`.
+  - `verify` is a write-free "did it land?" check.
+  - `reset` attics the iteration branch, clears machine-written frontmatter and removes the worktree.
+  - `unpark` resumes a ticket from the CLI.
+  - They share one `--json` contract with machine-readable refusal reasons.
+- Changed the land queue to take an on-disk land lock shared with `gx tickets land`. It defers a contended ticket and retries instead of blocking.
+- Added an "Answer…" item to the ticket `m` menu. It opens `$EDITOR` at `## Needs Answer` and offers to resume the ticket.
+- Added attic refs to the `gx cleanup scan` report.
+- Added `manual-land` and `ticket-reset` run-log events.
+- Changed the `gx-investigate` skill so it may repair ralph-loop state, with your explicit go-ahead.
+- Changed the `gx-changelog` skill so it can be invoked by `gx-bump`.
+- Fixed the e2e idle-while-working test for herdr 0.9.3, which now reports `done` instead of `idle`.
+
 ## v0.28.16 - 2026-08-20
 
 - Fixed loop iterations being parked as failures when an agent ended its turn by *printing* a tool call as text instead of running it: gx now detects that case and sends one corrective re-prompt before falling back to needs-answer, and honors a self-report (needs-answer or commitless finish) coming from that retry turn as well
