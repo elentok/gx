@@ -82,6 +82,12 @@ func (d Deps) verifyDeps() VerifyDeps {
 	}
 }
 
+// DefaultVerifyDeps wires VerifyDeps to the real git and herdr packages, for
+// one-shot CLI callers.
+func DefaultVerifyDeps() VerifyDeps {
+	return DefaultDeps().verifyDeps()
+}
+
 // VerifyParams selects what VerifyEpic checks. Epic is also the feature
 // branch name.
 type VerifyParams struct {
