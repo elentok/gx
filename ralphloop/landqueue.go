@@ -3,12 +3,23 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+// landDeferRetryInterval is how long the worker waits before retrying a land
+// it deferred; a var so tests can shorten it.
+var landDeferRetryInterval = 2 * time.Second
+
+// landLockDir is where an epic's land lock and marker live.
+func landLockDir(scratchDir, epic string) string {
+	return filepath.Join(scratchDir, epic)
+}
 
 // landJob is the in-memory handoff from a build goroutine to the land-queue
 // worker: everything landCherryPick/markDoneStampingCloseMetadata/
@@ -117,6 +128,20 @@ func runLandQueue(d Deps, lp landQueueParams, landJobs map[string]landJob, landJ
 		}
 
 		r := landOne(d, lp, job)
+		if r.landDeferred {
+			// Re-queue and retry on the next tick instead of waiting on the
+			// lock; a fresh build's wake just brings the retry forward.
+			landJobsMu.Lock()
+			landJobs[job.ticket.Identifier] = job
+			landJobsMu.Unlock()
+			select {
+			case <-done:
+				return
+			case <-wake:
+			case <-time.After(landDeferRetryInterval):
+			}
+			continue
+		}
 		select {
 		case landResults <- r:
 		case <-done:
@@ -182,8 +207,22 @@ func pickEligibleLandJob(landJobs map[string]landJob) (landJob, bool) {
 func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 	p := lp.iterationParamsFor(job)
 
+	// The lock is shared with the human land command, whose conflicted land
+	// exits still holding it. Never wait on it: park as deferred, retry next tick.
+	lockDir := landLockDir(p.ScratchDir, p.FeatureBranch)
+	if err := AcquireLandLock(lockDir); err != nil {
+		if errors.Is(err, ErrLandLocked) {
+			return outcome{ticket: job.ticket, landDeferred: true}
+		}
+		return outcome{ticket: job.ticket, err: fmt.Errorf("taking land lock: %w", err)}
+	}
+	defer ReleaseLandLock(lockDir)
+
 	landedSHA, err := landCherryPick(d, p, job.base, job.branch, job.sessionID, job.pane, job.tab)
 	if err != nil {
+		if errors.Is(err, errLandDeferred) {
+			return outcome{ticket: job.ticket, landDeferred: true}
+		}
 		if errors.Is(err, errConflictResolutionUnresolved) {
 			// Already parked needs-repair on the conflict-resolution child
 			// ticket (see errConflictResolutionUnresolved's doc comment);

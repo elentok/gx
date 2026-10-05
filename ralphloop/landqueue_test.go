@@ -139,3 +139,102 @@ func TestRun_ExitsOnlyAfterLastTicketsLandCompletes(t *testing.T) {
 		t.Fatal("Run() never returned after the land finished")
 	}
 }
+
+// TestRun_LandLockHeld_DefersThenLandsOnLaterTick covers a human's pending
+// land: the worker must not wait on the lock or fail the ticket, only retry.
+func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
+	landDeferRetryInterval = 10 * time.Millisecond // not parallel: shared package var
+	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	lockDir := landLockDir(scratchDir, "epic")
+	if err := AcquireLandLock(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	d, _, _ := fakeDeps()
+	var picks atomic.Int32
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
+		picks.Add(1)
+		return nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("Run() returned (err=%v) while the land lock was held", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	if n := picks.Load(); n != 0 {
+		t.Fatalf("CherryPickRange calls = %d while lock held, want 0", n)
+	}
+
+	if err := ReleaseLandLock(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("deferred land never retried after the lock was released")
+	}
+	if n := picks.Load(); n != 1 {
+		t.Errorf("CherryPickRange calls = %d, want 1", n)
+	}
+}
+
+// TestRun_LandMarkerPresent_SkipsStaleAbort: with a marker, in-progress
+// sequencer state is a human's pending conflict, so it must not be aborted.
+func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
+	landDeferRetryInterval = 10 * time.Millisecond
+	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	lockDir := landLockDir(scratchDir, "epic")
+	if err := WriteLandMarker(lockDir, LandMarker{Epic: "epic", Ticket: "01"}); err != nil {
+		t.Fatal(err)
+	}
+	d, _, _ := fakeDeps()
+	var inProgress atomic.Bool
+	inProgress.Store(true)
+	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress.Load(), nil }
+	var aborts atomic.Int32
+	d.AbortCherryPick = func(dir string) error {
+		aborts.Add(1)
+		return nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	}()
+
+	select {
+	case err := <-done:
+		t.Fatalf("Run() returned (err=%v) while a marker was pending", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	if n := aborts.Load(); n != 0 {
+		t.Fatalf("AbortCherryPick calls = %d with a marker, want 0", n)
+	}
+
+	inProgress.Store(false)
+	if err := ClearLand(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("land never completed after the marker cleared")
+	}
+}

@@ -217,6 +217,10 @@ type outcome struct {
 	// failure), so without this flag the results loop can't tell it apart
 	// from a real completed land. Never set on a results (build) outcome.
 	parkedOnChild bool
+	// landDeferred is set by landOne when the land lock was held or a human's
+	// conflict marker is pending; runLandQueue re-queues the job and never
+	// forwards the outcome to landResults.
+	landDeferred bool
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to

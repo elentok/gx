@@ -16,6 +16,9 @@ const (
 // in the recovery JSON envelope is "land_locked".
 var ErrLandLocked = errors.New("land lock is held")
 
+// errLandDeferred means a land must wait: a human's conflict is pending.
+var errLandDeferred = errors.New("land deferred")
+
 // LandMarker records a conflict a land left behind, so a human's pending
 // resolution can be told apart from stale crash state.
 type LandMarker struct {
