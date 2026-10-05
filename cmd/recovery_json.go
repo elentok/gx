@@ -14,6 +14,7 @@ const (
 	ReasonIterationBranchMissing = "iteration_branch_missing"
 	ReasonLiveAgentOnTab         = "live_agent_on_tab"
 	ReasonForkChildren           = "fork_children"
+	ReasonNotParked              = "not_parked"
 	// ReasonError is the fallback for a failure that carries no specific code.
 	ReasonError = "error"
 )
