@@ -17,7 +17,9 @@ import (
 // `terminal_title` field correctly shows the busy spinner glyph the entire
 // time (confirmed hands-on against real herdr 0.8.0 with a fake agent
 // visibly busy for 20s: agent_status read "idle" at every one-second sample
-// until the title reverted). `agent wait --until working` genuinely times
+// until the title reverted). Since herdr 0.9.3 the stuck value reads "done"
+// instead of "idle"; the bug itself (never "working") is unchanged, so this
+// test accepts either. `agent wait --until working` genuinely times
 // out rather than ever firing. The bug is racy rather than deterministic
 // (occasional runs observe a correct "working" sample), so treat an
 // occasional failure here as the bug's own flakiness, not a fixed-and-should-
@@ -35,6 +37,9 @@ import (
 // test starts failing — that failure is the signal to flip it to assert the
 // correct behavior instead of silently drifting.
 func TestIdleWhileWorking_AgentStatusNeverReportsWorking(t *testing.T) {
+	// The stuck, never-"working" status: "idle" on herdr <= 0.9.2, "done" on 0.9.3.
+	stuck := func(status string) bool { return status == "idle" || status == "done" }
+
 	herdrctl.RequireHerdr(t)
 
 	const workingDuration = 6 * time.Second
@@ -53,10 +58,10 @@ func TestIdleWhileWorking_AgentStatusNeverReportsWorking(t *testing.T) {
 			"--duration=" + workingDuration.String(),
 		},
 	})
-	// Bug: AgentStart's own snapshot already reports "idle" even though the
+	// Bug: AgentStart's own snapshot already reports "idle"/"done" even though the
 	// fake has just written its working title.
-	if started.AgentStatus != "idle" {
-		t.Fatalf("agent status right after start = %q, want idle (herdr's known idle-while-working bug appears to be fixed — flip this test to assert the correct \"working\" status instead)", started.AgentStatus)
+	if !stuck(started.AgentStatus) {
+		t.Fatalf("agent status right after start = %q, want idle or done (herdr's known idle-while-working bug appears to be fixed — flip this test to assert the correct \"working\" status instead)", started.AgentStatus)
 	}
 
 	// Sample mid-window: still busy, status should (bug notwithstanding)
@@ -65,8 +70,8 @@ func TestIdleWhileWorking_AgentStatusNeverReportsWorking(t *testing.T) {
 	// with an occasional "working" — the underlying bug is racy, not fixed.)
 	time.Sleep(workingDuration / 2)
 	mid := ws.AgentGet("")
-	if mid.AgentStatus != "idle" {
-		t.Fatalf("agent status mid-window = %q, want idle (herdr's known idle-while-working bug appears to be fixed — flip this test to assert the correct \"working\" status instead)", mid.AgentStatus)
+	if !stuck(mid.AgentStatus) {
+		t.Fatalf("agent status mid-window = %q, want idle or done (herdr's known idle-while-working bug appears to be fixed — flip this test to assert the correct \"working\" status instead)", mid.AgentStatus)
 	}
 
 	// `agent wait --until working` should (bug notwithstanding) never fire
