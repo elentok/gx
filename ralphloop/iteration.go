@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -641,45 +639,14 @@ func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 // tokensTrailerKey/elapsedTrailerKey, all in a single amend
 // (Deps.AppendTrailers) rather than one amend per trailer.
 func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (string, error) {
-	picked, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
+	res, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
 	if err != nil {
 		return "", err
 	}
-	if !picked {
-		landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
-		if err != nil {
-			return "", fmt.Errorf("resolving already-applied commit on %s: %w", p.FeatureBranch, err)
-		}
-		return landedSHA, nil
-	}
-
-	iterationCwd := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
-	contextWindow, elapsedSeconds, cost, hasMetrics, err := writeLandedMetrics(p.Agent, iterationCwd, sessionID, p.Ticket.Path)
-	if err != nil {
-		return "", fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
-	}
-
-	trailers := []git.Trailer{{Key: ticketTrailerKey, Value: ticketTrailerValue(p.FeatureBranch, p.Ticket.Identifier)}}
-	if hasMetrics {
-		trailers = append(trailers,
-			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(contextWindow)},
-			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(elapsedSeconds) + "s"},
-			git.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(cost)},
-		)
-	}
-	if err := d.AppendTrailers(p.FeatureWorktree, trailers...); err != nil {
-		return "", fmt.Errorf("stamping trailers on landed commit: %w", err)
-	}
-
-	landedSHA, err := d.RevParse(p.FeatureWorktree, "HEAD")
-	if err != nil {
-		return "", fmt.Errorf("resolving landed commit on %s: %w", p.FeatureBranch, err)
-	}
 	if resolutionSessionID != "" {
-		p.logTicketEventSHA(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree, "", landedSHA)
+		p.logTicketEventSHA(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree, "", res.SHA)
 	}
-
-	return landedSHA, nil
+	return res.SHA, nil
 }
 
 // finishCleanup removes an iteration's now-redundant worktree and tab, and —
@@ -737,8 +704,10 @@ func branchExists(d Deps, dir, branch string) bool {
 // attach the iteration agent's own session to the conflict-hit event (the
 // resolution agent hasn't launched yet at that point). On resolution it
 // returns that agent's distinct session so landCherryPick can emit
-// conflict-resolved with the final post-trailer SHA.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (picked bool, resolutionSessionID string, resultErr error) {
+// conflict-resolved with the final post-trailer SHA. The returned result is
+// Landed (stamped) or AlreadyApplied, never Conflicted.
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (res LandResult, resolutionSessionID string, resultErr error) {
+	ld, lp := landDepsFor(d), landParamsFor(p, base, branch, sessionID)
 	p.Sink.CherryPickStarted(p.Ticket.Identifier)
 
 	// A previous invocation may have died after starting a cherry-pick but
@@ -755,42 +724,35 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// corruption this guard exists to prevent. Reattach to it instead.
 	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return false, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+		return LandResult{}, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
 		liveTab, found, err := findLiveConflictResolutionTab(d, p)
 		if err != nil {
-			return false, "", err
+			return LandResult{}, "", err
 		}
 		if found {
 			resolutionSessionID, err := reattachLiveConflictResolver(d, p, liveTab)
 			if err != nil {
-				return false, "", err
+				return LandResult{}, "", err
 			}
-			return true, resolutionSessionID, nil
+			res, err := stampLanded(ld, lp)
+			return res, resolutionSessionID, err
 		}
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
-			return false, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+			return LandResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 		}
 	}
 
-	// Concurrent work can make an iteration's entire patch redundant before
-	// it lands. Git stops that as an empty cherry-pick and leaves sequencer
-	// state behind, so recognize the safe no-op before touching the worktree.
-	applied, err := d.PatchesApplied(p.FeatureWorktree, p.FeatureBranch, base, branch)
+	// LandTicket recognizes an iteration whose patch concurrent work already
+	// made redundant (git would stop that as an empty cherry-pick and leave
+	// sequencer state behind) before touching the worktree.
+	res, err = LandTicket(ld, lp)
 	if err != nil {
-		return false, "", fmt.Errorf("checking whether ticket %s is already applied: %w", p.Ticket.Identifier, err)
+		return LandResult{}, "", err
 	}
-	if applied {
-		return false, "", nil
-	}
-
-	conflicted, err := cherryPickCore(d, p, base, branch)
-	if err != nil {
-		return false, "", err
-	}
-	if !conflicted {
-		return true, "", nil
+	if res.Outcome != Conflicted {
+		return res, "", nil
 	}
 	// This call now owns the active sequencer state. Always clean it up on
 	// failure, otherwise the next landing serialized behind this one could
@@ -819,28 +781,33 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// already means the cherry-pick sequence is genuinely clear.
 	resolutionSessionID, err = resolveCherryPickConflict(d, p)
 	if err != nil {
-		return false, "", err
+		return LandResult{}, "", err
 	}
 
-	return true, resolutionSessionID, nil
+	res, err = stampLanded(ld, lp)
+	return res, resolutionSessionID, err
 }
 
-// cherryPickCore picks base..branch onto p.FeatureWorktree and reports whether
-// it stopped on a conflict. On conflict the sequencer state is left intact for
-// the caller to resolve or abort; any other failure is returned as an error.
-func cherryPickCore(d Deps, p iterationParams, base, branch string) (conflicted bool, err error) {
-	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
-	if pickErr == nil {
-		return false, nil
+// landParamsFor maps an iteration's landing onto LandParams. The recorded SHA
+// (ladder rung one) is best-effort: an unreadable run log just skips that rung.
+func landParamsFor(p iterationParams, base, branch, sessionID string) LandParams {
+	recorded := ""
+	if events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch); err == nil && ok {
+		recorded = latestCherryPickedSHA(events, p.Ticket.Identifier)
 	}
-	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
-	if err != nil {
-		return false, fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
+	return LandParams{
+		FeatureWorktree: p.FeatureWorktree,
+		FeatureBranch:   p.FeatureBranch,
+		TicketID:        p.Ticket.Identifier,
+		TicketPath:      p.Ticket.Path,
+		SourceRange:     SourceRange{Base: base, Tip: branch},
+		RecordedSHA:     recorded,
+		Session: LandSession{
+			Agent: p.Agent,
+			Cwd:   iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier),
+			ID:    sessionID,
+		},
 	}
-	if !inProgress {
-		return false, fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
-	}
-	return true, nil
 }
 
 // errConflictResolutionUnresolved is resolveCherryPickConflict's sentinel for

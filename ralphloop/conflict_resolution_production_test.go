@@ -282,12 +282,12 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		Sink:            noopEventSink{},
 	}
 
-	picked, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane", "iter-tab")
+	res, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane", "iter-tab")
 	if err != nil {
 		t.Fatalf("cherryPickWithConflictResolution: %v", err)
 	}
-	if !picked {
-		t.Error("picked = false, want true")
+	if res.Outcome != Landed {
+		t.Errorf("outcome = %q, want %q", res.Outcome, Landed)
 	}
 	if gotResolutionSessionID != resolutionSessionID {
 		t.Errorf("resolution session = %q, want %q", gotResolutionSessionID, resolutionSessionID)
