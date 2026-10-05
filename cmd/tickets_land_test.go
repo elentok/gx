@@ -348,3 +348,112 @@ func TestRunTicketsLand_HumanModeConflictText(t *testing.T) {
 		t.Errorf("stdout = %q", out.String())
 	}
 }
+
+// pendingConflict leaves the fixture as a conflicted land would: marker and
+// lock written, cherry-pick active, HEAD still at the pre-pick SHA.
+func pendingConflict(t *testing.T, f *landFixture) {
+	t.Helper()
+	if err := ralphloop.WriteLandMarker(f.lockDir, ralphloop.LandMarker{Epic: "widget-epic", Ticket: "01", PrePickHead: "pre"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ralphloop.AcquireLandLock(f.lockDir); err != nil {
+		t.Fatal(err)
+	}
+	*f.pickActive = true
+	f.deps.RevParse = func(_, _ string) (string, error) { return "pre", nil }
+}
+
+func TestRunTicketsLand_ContinueRefusedWhileInProgress(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	pendingConflict(t, f)
+	f.in.Continue = true
+	if env := f.refusal(t); env.Reason != ReasonLandConflictPending {
+		t.Errorf("reason = %s", env.Reason)
+	}
+}
+
+func TestRunTicketsLand_ContinueRefusedWhenHeadDidNotMove(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	pendingConflict(t, f)
+	*f.pickActive = false
+	f.in.Continue = true
+	if env := f.refusal(t); env.Reason != ReasonLandNotResolved {
+		t.Errorf("reason = %s", env.Reason)
+	}
+	if strings.Contains(f.ticketText(t), "status: done") {
+		t.Error("status written on refused continue")
+	}
+}
+
+func TestRunTicketsLand_ContinueStampsMarksDoneAndClears(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	pendingConflict(t, f)
+	*f.pickActive = false
+	f.deps.RevParse = func(_, _ string) (string, error) { return "post", nil }
+	stamped := false
+	f.deps.AppendTrailers = func(string, ...git.Trailer) error { stamped = true; return nil }
+	f.in.Continue = true
+	out, err := f.run(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stamped || !strings.Contains(out, `"post"`) {
+		t.Errorf("stamped = %v, stdout = %s", stamped, out)
+	}
+	if !strings.Contains(f.ticketText(t), "status: done") {
+		t.Errorf("status not done:\n%s", f.ticketText(t))
+	}
+	if m, _ := ralphloop.ReadLandMarker(f.lockDir); m != nil {
+		t.Errorf("marker not cleared: %+v", m)
+	}
+	if err := ralphloop.AcquireLandLock(f.lockDir); err != nil {
+		t.Errorf("lock not cleared: %v", err)
+	}
+}
+
+func TestRunTicketsLand_ContinueWithoutPendingLandRefused(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	f.in.Continue = true
+	if env := f.refusal(t); env.Reason != ReasonNoPendingLand {
+		t.Errorf("reason = %s", env.Reason)
+	}
+}
+
+func TestRunTicketsLand_AbortClearsMarkerAndLockOnly(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	pendingConflict(t, f)
+	before := f.ticketText(t)
+	aborted, stamped := false, false
+	f.deps.AbortCherryPick = func(string) error { aborted = true; *f.pickActive = false; return nil }
+	f.deps.AppendTrailers = func(string, ...git.Trailer) error { stamped = true; return nil }
+	f.in.Abort = true
+	if _, err := f.run(t); err != nil {
+		t.Fatal(err)
+	}
+	if !aborted || stamped {
+		t.Errorf("aborted = %v, stamped = %v", aborted, stamped)
+	}
+	if f.ticketText(t) != before {
+		t.Errorf("ticket changed:\n%s", f.ticketText(t))
+	}
+	if m, _ := ralphloop.ReadLandMarker(f.lockDir); m != nil {
+		t.Errorf("marker not cleared: %+v", m)
+	}
+	if err := ralphloop.AcquireLandLock(f.lockDir); err != nil {
+		t.Errorf("lock not cleared: %v", err)
+	}
+}
+
+func TestRunTicketsLand_ContinueAndAbortExclusive(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	f.in.Continue, f.in.Abort = true, true
+	if _, err := f.run(t); err == nil {
+		t.Fatal("expected error")
+	}
+}

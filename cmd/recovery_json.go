@@ -20,6 +20,8 @@ const (
 	ReasonRalphLoopCwd           = "ralph_loop_cwd"
 	ReasonLandConflictPending    = "land_conflict_pending"
 	ReasonLandBlocked            = "land_blocked"
+	ReasonNoPendingLand          = "no_pending_land"
+	ReasonLandNotResolved        = "land_not_resolved"
 	// ReasonError is the fallback for a failure that carries no specific code.
 	ReasonError = "error"
 )

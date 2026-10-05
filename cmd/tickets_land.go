@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,8 @@ type landInput struct {
 	ID            string
 	From, To      string
 	IgnoreLiveTab bool
+	Continue      bool
+	Abort         bool
 	JSON          bool
 	Cwd           string
 	Getwd         func() (string, error)
@@ -40,6 +43,11 @@ The commit range comes from the ticket's iteration branch; --from/--to land an
 explicit range instead (--from is exclusive). Already-landed work is detected
 and only the status is repaired. A conflict exits 0, leaves the cherry-pick in
 progress and writes a land marker; nothing is written to the ticket.
+
+After resolving a conflict, run land --continue: it refuses while the
+cherry-pick is still in progress or the branch has not moved, then stamps the
+commit, marks the ticket done and clears the marker and lock. land --abort
+aborts the cherry-pick and clears the marker and lock; no ticket is touched.
 
 Refuses to run from a ralph-loop/* working directory. This is a guard rail,
 not a boundary: changing directory evades it. It also refuses while the
@@ -71,6 +79,8 @@ func newTicketsLandCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&in.From, "from", "", "exclusive base of an explicit commit range (requires --to)")
 	cmd.Flags().StringVar(&in.To, "to", "", "tip of an explicit commit range (requires --from)")
 	cmd.Flags().BoolVar(&in.IgnoreLiveTab, "ignore-live-tab", false, "land even though the iteration's herdr tab exists")
+	cmd.Flags().BoolVar(&in.Continue, "continue", false, "finish a conflicted land after resolving it: stamp, mark done, clear the marker and lock")
+	cmd.Flags().BoolVar(&in.Abort, "abort", false, "abandon a conflicted land: abort the cherry-pick, clear the marker and lock")
 	cmd.Flags().BoolVar(&in.JSON, "json", false, "emit structured JSON instead of human-readable text")
 	return cmd
 }
@@ -83,6 +93,12 @@ func runTicketsLand(in landInput, d ralphloop.Deps, stdout, stderr io.Writer) er
 func landStuckTicket(in landInput, d ralphloop.Deps) (landResult, string, error) {
 	if branch, ok := isRalphLoopBranch(in.Getwd); ok {
 		return landResult{}, "", &RefusalError{Reason: ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to land from a ralph-loop/* working directory (%s); run from outside the iteration worktree", branch)}
+	}
+	if in.Continue && in.Abort {
+		return landResult{}, "", errors.New("--continue and --abort are mutually exclusive")
+	}
+	if in.Continue || in.Abort {
+		return resolveLand(in, d)
 	}
 	if (in.From == "") != (in.To == "") {
 		return landResult{}, "", errors.New("--from and --to must be given together")
@@ -162,9 +178,17 @@ func landStuckTicket(in landInput, d ralphloop.Deps) (landResult, string, error)
 		return out, fmt.Sprintf("%s: conflict landing %s; resolve it in %s, then --continue or --abort", in.ID, marker.SourceRange, featurePath), nil
 	}
 
-	if parsed.Status != schema.StatusDone {
+	if err := recordLanded(lockDir, epic, t, parsed.Status, res, session); err != nil {
+		return landResult{}, "", err
+	}
+	return out, fmt.Sprintf("%s: %s (%s)", in.ID, jsonOutcome(res.Outcome), res.SHA), nil
+}
+
+// recordLanded writes status: done (unless already) and the manual-land event.
+func recordLanded(lockDir, epic string, t tickets.Ticket, status schema.Status, res ralphloop.LandResult, session ralphloop.LandSession) error {
+	if status != schema.StatusDone {
 		if err := ralphloop.MarkDone(t.Path); err != nil {
-			return landResult{}, "", fmt.Errorf("marking ticket %s done: %w", in.ID, err)
+			return fmt.Errorf("marking ticket %s done: %w", t.Identifier, err)
 		}
 	}
 	ev := ralphloop.Event{
@@ -180,9 +204,86 @@ func landStuckTicket(in landInput, d ralphloop.Deps) (landResult, string, error)
 		ev.Reason = "no recoverable agent session; metrics not stamped"
 	}
 	if err := ralphloop.AppendEvent(filepath.Dir(lockDir), epic, ev); err != nil {
-		return landResult{}, "", fmt.Errorf("logging manual-land: %w", err)
+		return fmt.Errorf("logging manual-land: %w", err)
 	}
-	return out, fmt.Sprintf("%s: %s (%s)", in.ID, jsonOutcome(res.Outcome), res.SHA), nil
+	return nil
+}
+
+// resolveLand finishes (--continue) or abandons (--abort) the conflict a
+// previous land left pending for in.ID.
+func resolveLand(in landInput, d ralphloop.Deps) (landResult, string, error) {
+	if in.From != "" || in.To != "" {
+		return landResult{}, "", errors.New("--from/--to cannot be combined with --continue or --abort")
+	}
+	_, t, err := findEpicTicket(in.EpicPath, in.ID)
+	if err != nil {
+		return landResult{}, "", err
+	}
+	epic := filepath.Base(filepath.Clean(in.EpicPath))
+	lockDir := filepath.Clean(in.EpicPath)
+	marker, err := ralphloop.ReadLandMarker(lockDir)
+	if err != nil {
+		return landResult{}, "", err
+	}
+	if marker == nil || marker.Ticket != in.ID {
+		return landResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", in.ID)}
+	}
+	wtDir, err := d.WorktreeDir(in.Cwd)
+	if err != nil {
+		return landResult{}, "", err
+	}
+	featurePath := filepath.Join(wtDir, epic)
+	inProgress, err := d.CherryPickInProgress(featurePath)
+	if err != nil {
+		return landResult{}, "", fmt.Errorf("checking cherry-pick state: %w", err)
+	}
+
+	if in.Abort {
+		if inProgress {
+			if err := d.AbortCherryPick(featurePath); err != nil {
+				return landResult{}, "", fmt.Errorf("aborting cherry-pick: %w", err)
+			}
+		}
+		if err := ralphloop.ClearLand(lockDir); err != nil {
+			return landResult{}, "", fmt.Errorf("clearing land marker: %w", err)
+		}
+		return landResult{Outcome: "aborted"}, fmt.Sprintf("%s: land aborted", in.ID), nil
+	}
+
+	if inProgress {
+		return landResult{}, "", &RefusalError{Reason: ReasonLandConflictPending, Message: fmt.Sprintf("the cherry-pick for ticket %s is still in progress; resolve it and run `git cherry-pick --continue` first", in.ID)}
+	}
+	head, err := d.RevParse(featurePath, "HEAD")
+	if err != nil {
+		return landResult{}, "", fmt.Errorf("resolving %s HEAD: %w", epic, err)
+	}
+	if head == marker.PrePickHead {
+		return landResult{}, "", &RefusalError{Reason: ReasonLandNotResolved, Message: fmt.Sprintf("%s has not moved since the conflict; nothing was committed (use --abort to give up)", epic)}
+	}
+
+	parsed, err := schema.ParseTicket(t.Path)
+	if err != nil {
+		return landResult{}, "", err
+	}
+	session, _ := ralphloop.RecoverLandSession(filepath.Dir(lockDir), epic, t.Identifier)
+	res, err := ralphloop.StampLanded(ralphloop.LandDepsOf(d), ralphloop.LandParams{
+		FeatureWorktree: featurePath,
+		FeatureBranch:   epic,
+		TicketID:        t.Identifier,
+		TicketPath:      t.Path,
+		Session:         session,
+	})
+	if err != nil {
+		return landResult{}, "", err
+	}
+	if err := recordLanded(lockDir, epic, t, parsed.Status, res, session); err != nil {
+		return landResult{}, "", err
+	}
+	if err := ralphloop.ClearLand(lockDir); err != nil {
+		return landResult{}, "", fmt.Errorf("clearing land marker: %w", err)
+	}
+	out := landResult{Outcome: jsonOutcome(res.Outcome), SHA: res.SHA, TrailerValue: res.TrailerValue, MetricsStamped: res.MetricsStamped}
+	return out, fmt.Sprintf("%s: %s (%s)", in.ID, out.Outcome, res.SHA), nil
 }
 
 // checkLandable applies the status and commitless rules. Commitless is the

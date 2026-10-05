@@ -34,6 +34,11 @@ func IterationTabLive(d Deps, epic, identifier string) bool {
 	return false
 }
 
+// StampLanded stamps the trailers (and metrics, when a session is recoverable)
+// onto the commit a resolved conflict left at HEAD. It is the stamping half of
+// LandTicket, for `land --continue`.
+func StampLanded(d LandDeps, lp LandParams) (LandResult, error) { return stampLanded(d, lp) }
+
 // RecoverLandSession reads the run log for what a landing of epic/identifier
 // can recover: the ticket's last iteration session (zero when none was logged)
 // and the SHA of a prior landing (empty when none).
