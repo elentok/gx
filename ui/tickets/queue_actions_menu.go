@@ -17,7 +17,8 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
-	items := suggestedActionItems(r.epic.RenderedStatus(r.ticket), r.ticket)
+	status := r.epic.RenderedStatus(r.ticket)
+	items := suggestedActionItems(status, r.ticket, ticketPaneLive(status, r.epic.Name, r.ticket.DisplayNumber()))
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
 	}
@@ -39,6 +40,9 @@ func (m QueueModel) handleQueueActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, t
 	}
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
+	}
+	if cmd, ok := answerActionCmd(m.worktreeRoot, m.settings, result); ok {
+		return m, cmd
 	}
 	return m, cmdApplySuggestedAction(result.Path, result.Action, func() tea.Msg { return queueActionAppliedMsg{} })
 }

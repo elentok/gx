@@ -40,9 +40,22 @@ const investigateSkill = "gx-investigate"
 // and unclearable from the Tickets tab.
 const actionUnmuteReopen = "unmute-reopen"
 
+// actionAnswerInPane focuses the parked ticket's still-live iteration tab;
+// answering there lets the existing auto-unpark clear the park. Handled by
+// handleActionsMenuKey/handleQueueActionsMenuKey (it needs the epic name and
+// ticket id), never applySuggestedAction.
+const actionAnswerInPane = "answer-in-pane"
+
+// actionAnswer opens $EDITOR at the ticket's "## Needs Answer" heading, for a
+// park whose pane is gone. Dispatched like actionAnswerInPane (see cmdAnswer).
+const actionAnswer = "answer"
+
 // suggestedActionItems returns ticket's suggested-action menu items, empty
-// when none apply, given its rendered status. resume-answered only applies
-// to needs-answer; investigate is whitelisted to the statuses that signal an
+// when none apply, given its rendered status. The answer items and
+// resume-answered only apply to needs-answer, paneLive picking between
+// "Answer in pane" and "Answer…" (the badge in the row lists pass false: it
+// only needs to know the list is non-empty, and a herdr lookup per rendered
+// row would be wasteful); investigate is whitelisted to the statuses that signal an
 // actual problem (needs-answer, needs-repair, error) rather than excluding
 // the healthy ones — Open/Claimed/Done are healthy, but so are Blocked
 // (waiting on a dependency), Draft (not yet offered to an agent) and
@@ -51,9 +64,14 @@ const actionUnmuteReopen = "unmute-reopen"
 // any status added to the enum later, instead of showing the badge by
 // default. handleSuggestedActionsKey/handleQueueSuggestedActionsKey toast
 // "no suggested actions" rather than opening an empty menu.
-func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket) []components.MenuItem {
+func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive bool) []components.MenuItem {
 	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
+		if paneLive {
+			items = append(items, components.MenuItem{Label: "Answer in pane", Value: actionAnswerInPane})
+		} else {
+			items = append(items, components.MenuItem{Label: "Answer…", Value: actionAnswer})
+		}
 		items = append(items, components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
 	}
 	if status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError {
@@ -68,7 +86,7 @@ func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket) 
 // ticketHasSuggestedActions reports whether ticket's row should carry the
 // "m" suggested-actions badge (ui.IconSet.SuggestedAction).
 func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket) bool {
-	return len(suggestedActionItems(status, ticket)) > 0
+	return len(suggestedActionItems(status, ticket, false)) > 0
 }
 
 // applySuggestedAction performs action's write against the ticket at path.

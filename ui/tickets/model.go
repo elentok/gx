@@ -302,6 +302,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 
+	case answerEditorFinishedMsg:
+		var cmd tea.Cmd
+		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg, func() tea.Msg { return statusChangedMsg{} })
+		return m, cmd
+
 	case checkAddConfirmedMsg:
 		return m.handleCheckAddConfirmed(msg)
 

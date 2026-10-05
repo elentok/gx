@@ -165,6 +165,10 @@ func highlightParkSection(rendered string, status tickets.RenderedStatus) (out s
 	for i := start; i < end; i++ {
 		lines[i] = style.Render(ansi.Strip(lines[i]))
 	}
+	if status == tickets.StatusNeedsAnswer {
+		hint := ui.StyleDim.Render("  " + needsAnswerHint)
+		lines = append(lines[:start+1], append([]string{hint}, lines[start+1:]...)...)
+	}
 	return strings.Join(lines, "\n"), start, true
 }
 

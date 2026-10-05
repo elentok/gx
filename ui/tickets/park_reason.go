@@ -22,6 +22,9 @@ const (
 	needsRepairHeading = "## Needs Repair"
 )
 
+// needsAnswerHint is rendered under the preview's "## Needs Answer" heading.
+const needsAnswerHint = "Press m to answer."
+
 var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 
 // parkReason returns t's park-reason subtext, ellipsized with ellipsisIcon,

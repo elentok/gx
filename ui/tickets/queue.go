@@ -326,6 +326,10 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRunStartConfirmed(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
+	case answerEditorFinishedMsg:
+		var cmd tea.Cmd
+		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg, func() tea.Msg { return queueActionAppliedMsg{} })
+		return m, cmd
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd

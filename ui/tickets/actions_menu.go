@@ -109,7 +109,8 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	}
 	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
-	items := suggestedActionItems(epic.RenderedStatus(ticket), ticket)
+	status := epic.RenderedStatus(ticket)
+	items := suggestedActionItems(status, ticket, ticketPaneLive(status, epic.Name, ticket.DisplayNumber()))
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
 	}
@@ -130,6 +131,9 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
+	}
+	if cmd, ok := answerActionCmd(m.worktreeRoot, m.settings, result); ok {
+		return m, cmd
 	}
 	return m, cmdApplySuggestedAction(result.Path, result.Action, func() tea.Msg { return statusChangedMsg{} })
 }
