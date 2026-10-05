@@ -180,7 +180,7 @@ func parkedTicketHasNewCommits(d Deps, worktreeDir, epicName string, t tickets.T
 func UnparkTicket(path string, now time.Time) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusOpen
-		*body = demoteSection(*body, "## Needs Answer", now)
+		*body = schema.DemoteSection(*body, "## Needs Answer", now)
 	})
 }
 
@@ -199,7 +199,7 @@ func UnmuteTicket(path string, now time.Time) error {
 		if t.Status == schema.StatusNeedsRepair {
 			t.Status = schema.StatusOpen
 		}
-		*body = demoteSection(*body, "## Needs Repair", now)
-		*body = appendComment(*body, fmt.Sprintf("**%s** — unmuted via Suggested Actions", now.Format("2006-01-02")))
+		*body = schema.DemoteSection(*body, "## Needs Repair", now)
+		*body = schema.AppendComment(*body, fmt.Sprintf("**%s** — unmuted via Suggested Actions", now.Format("2006-01-02")))
 	})
 }

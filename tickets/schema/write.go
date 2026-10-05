@@ -13,6 +13,13 @@ import (
 // `gx tickets set` CLI) doesn't need to import ralphloop just to reuse its
 // write path.
 func UpdateTicket(path string, mutate func(*Ticket)) error {
+	return UpdateTicketWithBody(path, func(t *Ticket, _ *string) { mutate(t) })
+}
+
+// UpdateTicketWithBody is UpdateTicket's variant for mutations that also
+// rewrite the ticket's markdown body, with the same validate-then-atomic-write
+// guarantees.
+func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -24,7 +31,7 @@ func UpdateTicket(path string, mutate func(*Ticket)) error {
 	}
 	body := ParseBody(string(raw))
 
-	mutate(&t)
+	mutate(&t, &body)
 
 	if err := Validate(t); err != nil {
 		return err
