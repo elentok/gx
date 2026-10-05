@@ -10,28 +10,33 @@ func IterationBranch(epic, identifier string) string { return iterBranch(epic, i
 // LandDepsOf narrows d to what a landing needs.
 func LandDepsOf(d Deps) LandDeps { return landDepsFor(d) }
 
-// IterationTabLive reports whether the iteration's herdr tab exists. Herdr
-// being unreachable (no workspace, or a failing list) reports false: recovery
-// has to keep working when herdr is down, and a tab outlives its agent anyway.
-func IterationTabLive(d Deps, epic, identifier string) bool {
+// IterationTabID returns the id of the iteration's herdr tab, or "" when there
+// is none. Herdr being unreachable (no workspace, or a failing list) reports
+// "": recovery has to keep working when herdr is down, and a tab outlives its
+// agent anyway.
+func IterationTabID(d Deps, epic, identifier string) string {
 	if d.FindWorkspace == nil || d.TabList == nil {
-		return false
+		return ""
 	}
 	workspaceID, err := d.FindWorkspace(epic)
 	if err != nil || workspaceID == "" {
-		return false
+		return ""
 	}
 	tabs, err := d.TabList(workspaceID)
 	if err != nil {
-		return false
+		return ""
 	}
-	label := iterLabel(epic, identifier)
-	for _, tab := range tabs {
-		if tab.Label == label {
-			return true
-		}
-	}
-	return false
+	return tabIDForLabel(tabs, iterLabel(epic, identifier))
+}
+
+// IterationTabLive reports whether the iteration's herdr tab exists.
+func IterationTabLive(d Deps, epic, identifier string) bool {
+	return IterationTabID(d, epic, identifier) != ""
+}
+
+// IterationWorktreePath is where an iteration of epic/identifier is checked out.
+func IterationWorktreePath(worktreeDir, epic, identifier string) string {
+	return iterationWorktreePath(worktreeDir, epic, identifier)
 }
 
 // StampLanded stamps the trailers (and metrics, when a session is recoverable)

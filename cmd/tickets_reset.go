@@ -29,9 +29,11 @@ type resetInput struct {
 	ID       string
 	Reason   string
 	Force    bool
-	JSON     bool
-	Cwd      string
-	Now      time.Time
+	// DeleteBranch deletes the iteration branch instead of setting it aside.
+	DeleteBranch bool
+	JSON         bool
+	Cwd          string
+	Now          time.Time
 	// Subjects lists the commit subjects on branch since its merge-base with
 	// base, newest first.
 	Subjects func(dir, base, branch string) ([]string, error)
@@ -71,6 +73,7 @@ func newTicketsResetCmd(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&in.Reason, "reason", "", "why the ticket is being reset (required)")
 	cmd.Flags().BoolVar(&in.Force, "force", false, "allow resetting a done ticket")
+	cmd.Flags().BoolVar(&in.DeleteBranch, "delete-branch", false, "delete the iteration branch instead of keeping it under ralph-loop/attic/")
 	cmd.Flags().BoolVar(&in.JSON, "json", false, "emit structured JSON instead of human-readable text")
 	return cmd
 }
@@ -129,6 +132,10 @@ func resetTicket(in resetInput, d ralphloop.Deps) (resetResult, error) {
 		return resetResult{}, err
 	}
 
+	if err := clearIteration(in, d, wtDir, epicName, t.Identifier, branch, attic); err != nil {
+		return resetResult{}, err
+	}
+
 	if err := tickets.Reset(t.Path, in.Now); err != nil {
 		return resetResult{}, fmt.Errorf("resetting ticket %s: %w", in.ID, err)
 	}
@@ -149,6 +156,39 @@ func resetTicket(in resetInput, d ralphloop.Deps) (resetResult, error) {
 		return resetResult{}, fmt.Errorf("logging ticket-reset: %w", err)
 	}
 	return res, nil
+}
+
+// clearIteration removes the iteration worktree and stale tab, then sets the
+// branch aside (or deletes it with --delete-branch). The worktree goes first:
+// git refuses to rename a branch that is checked out. A missing worktree, tab
+// or branch is a normal outcome.
+func clearIteration(in resetInput, d ralphloop.Deps, wtDir, epic, id, branch string, attic atticInfo) error {
+	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
+	if exists, err := d.WorktreeExists(path); err != nil {
+		return fmt.Errorf("checking iteration worktree: %w", err)
+	} else if exists {
+		if err := d.RemoveWorktree(in.Cwd, path, true); err != nil {
+			return fmt.Errorf("removing iteration worktree: %w", err)
+		}
+	}
+	if tabID := ralphloop.IterationTabID(d, epic, id); tabID != "" {
+		if err := d.TabClose(tabID); err != nil {
+			return fmt.Errorf("closing iteration tab: %w", err)
+		}
+	}
+	if attic.Tip == "" {
+		return nil
+	}
+	if in.DeleteBranch {
+		if err := d.DeleteBranch(in.Cwd, branch); err != nil {
+			return fmt.Errorf("deleting %s: %w", branch, err)
+		}
+		return nil
+	}
+	if err := d.RenameBranch(in.Cwd, branch, *attic.Ref); err != nil {
+		return fmt.Errorf("moving %s to %s: %w", branch, *attic.Ref, err)
+	}
+	return nil
 }
 
 // checkResettable applies the status and fork-children rules. Fork children
@@ -172,7 +212,8 @@ func checkResettable(in resetInput, epic tickets.Epic, t tickets.Ticket) error {
 }
 
 // atticInfo describes the iteration branch a reset sets aside. Ref is nil when
-// the branch does not exist, which is a normal outcome.
+// the branch does not exist (a normal outcome, Tip is then empty) or when
+// --delete-branch discards it.
 type atticInfo struct {
 	Ref      *string
 	Tip      string
@@ -183,6 +224,9 @@ func gatherAttic(in resetInput, d ralphloop.Deps, featurePath, epic, branch stri
 	tip, err := d.RevParse(featurePath, branch)
 	if err != nil {
 		return atticInfo{}, nil
+	}
+	if in.DeleteBranch {
+		return atticInfo{Tip: tip}, nil
 	}
 	ref, err := nextAtticRef(d, featurePath, epic, in.ID)
 	if err != nil {
@@ -212,6 +256,10 @@ func nextAtticRef(d ralphloop.Deps, dir, epic, id string) (string, error) {
 func resetNote(in resetInput, a atticInfo) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "**%s** — reset by hand. Reason: %s\n\n", in.Now.Format("2006-01-02"), strings.TrimSpace(in.Reason))
+	if a.Ref == nil && a.Tip != "" {
+		fmt.Fprintf(&b, "The iteration branch (tip `%s`) was deleted with --delete-branch; no earlier work was kept.\n", a.Tip)
+		return b.String()
+	}
 	if a.Ref == nil {
 		b.WriteString("No iteration branch existed, so no earlier work was kept.\n")
 		return b.String()

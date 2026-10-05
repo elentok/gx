@@ -55,6 +55,9 @@ type Deps struct {
 	// commits have landed on the feature branch (as different hashes, via
 	// cherry-pick — never merged, so a non-force delete would refuse it).
 	DeleteBranch func(repoDir, branch string) error
+	// RenameBranch renames a local branch, for setting an iteration branch
+	// aside under an attic name.
+	RenameBranch func(repoDir, oldName, newName string) error
 	TabCreate    func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
 	TabClose     func(tabID string) error
 	TabList      func(workspaceID string) ([]herdr.Tab, error)
@@ -217,6 +220,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		AddWorktree:           addWorktree,
 		RemoveWorktree:        removeWorktree,
 		DeleteBranch:          deleteBranch,
+		RenameBranch:          renameBranch,
 		TabCreate:             herdr.TabCreate,
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
@@ -677,6 +681,15 @@ func deleteBranch(repoDir, branch string) error {
 		return err
 	}
 	return git.DeleteLocalBranch(*repo, branch, true)
+}
+
+// renameBranch implements Deps.RenameBranch against the real git package.
+func renameBranch(repoDir, oldName, newName string) error {
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	return git.RenameBranch(*repo, oldName, newName)
 }
 
 // worktreeExists implements Deps.WorktreeExists: whether an iteration

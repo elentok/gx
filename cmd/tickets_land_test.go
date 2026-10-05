@@ -158,7 +158,7 @@ func TestRunTicketsLand_LiveTabRefusalAndOverride(t *testing.T) {
 	t.Parallel()
 	f := newLandFixture(t, ticketWith("claimed", ""))
 	f.deps.TabList = func(string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "widget-epic-iter-01"}}, nil
+		return []herdr.Tab{{TabID: "tab1", Label: "widget-epic-iter-01"}}, nil
 	}
 	if env := f.refusal(t); env.Reason != ReasonLiveAgentOnTab {
 		t.Errorf("reason = %s", env.Reason)

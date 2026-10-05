@@ -21,6 +21,9 @@ type resetFixture struct {
 	epicPath   string
 	branchOK   bool
 	agentAlive bool
+	wtExists   bool
+	tabLive    bool
+	calls      []string
 }
 
 func newResetFixture(t *testing.T, content string) *resetFixture {
@@ -35,6 +38,24 @@ func newResetFixture(t *testing.T, content string) *resetFixture {
 			}
 			return "tip123", nil
 		},
+		WorktreeExists: func(string) (bool, error) { return f.wtExists, nil },
+		RemoveWorktree: func(_, path string, _ bool) error {
+			f.calls = append(f.calls, "remove-worktree "+filepath.Base(path))
+			return nil
+		},
+		FindWorkspace: func(string) (string, error) { return "ws1", nil },
+		TabList: func(string) ([]herdr.Tab, error) {
+			if !f.tabLive {
+				return nil, nil
+			}
+			return []herdr.Tab{{TabID: "tab1", Label: "widget-epic-iter-01"}}, nil
+		},
+		TabClose: func(id string) error { f.calls = append(f.calls, "close-tab "+id); return nil },
+		RenameBranch: func(_, from, to string) error {
+			f.calls = append(f.calls, "rename "+from+" "+to)
+			return nil
+		},
+		DeleteBranch: func(_, b string) error { f.calls = append(f.calls, "delete "+b); return nil },
 		AgentGet: func(string) (herdr.Agent, error) {
 			if f.agentAlive {
 				return herdr.Agent{PaneID: "p1"}, nil
@@ -212,5 +233,46 @@ func TestRunTicketsReset_WritesEvent(t *testing.T) {
 	ev := events[0]
 	if ev.Type != ralphloop.EventTicketReset || ev.Ticket != "01" || ev.AtticRef != "ralph-loop/attic/widget-epic/01-1" || ev.Reason != "agent went in circles" {
 		t.Errorf("event = %+v", ev)
+	}
+}
+
+func TestRunTicketsReset_ClearsWorktreeTabAndAtticsBranch(t *testing.T) {
+	t.Parallel()
+	f := newResetFixture(t, ticketWith("claimed", ""))
+	f.wtExists, f.tabLive = true, true
+	if _, err := f.run(); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"remove-worktree widget-epic-item-01", "close-tab tab1", "rename ralph-loop/widget-epic-item-01 ralph-loop/attic/widget-epic/01-1"}
+	if strings.Join(f.calls, "|") != strings.Join(want, "|") {
+		t.Errorf("calls = %q", f.calls)
+	}
+}
+
+func TestRunTicketsReset_DeleteBranch(t *testing.T) {
+	t.Parallel()
+	f := newResetFixture(t, ticketWith("claimed", ""))
+	f.in.DeleteBranch = true
+	out, err := f.run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(f.calls, "|"); got != "delete ralph-loop/widget-epic-item-01" {
+		t.Errorf("calls = %q", got)
+	}
+	if !strings.Contains(out, `"attic_ref":null`) || !strings.Contains(f.ticketText(t), "--delete-branch") {
+		t.Errorf("stdout = %s\nticket:\n%s", out, f.ticketText(t))
+	}
+}
+
+func TestRunTicketsReset_MissingBranchTouchesNoGit(t *testing.T) {
+	t.Parallel()
+	f := newResetFixture(t, ticketWith("claimed", ""))
+	f.branchOK = false
+	if _, err := f.run(); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.calls) != 0 {
+		t.Errorf("calls = %v", f.calls)
 	}
 }
