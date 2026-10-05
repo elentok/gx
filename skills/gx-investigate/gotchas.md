@@ -357,3 +357,4 @@ kept as history of what the code did at the time, not as a description of today'
   checked, `02c` reads as immediately unblocked. No scheduler-side race — `ralphloop.claimNext`
   reloads fresh per claim. Diagnosed via `tickets-tree` epic, ticket `02c`'s `needs-answer`; see
   `tickets-tree/issues/08-blocked-by-split-sibling-not-enforced-research.md` (not fixed yet).
+- **A stuck `claimed` ticket had no recovery path but hand-run git.** Commits often already landed with a stale status, and the unpark gesture existed but was hidden in the `m` menu. Now `gx tickets land|verify|reset|unpark` plus this skill's recovery section; see `docs/specs/ticket-land-recovery.md`.

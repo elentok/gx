@@ -4,8 +4,9 @@ description:
   Investigate a reported gx/ralph-loop bug — tickets stuck in the queue, wrong scheduling
   decisions, ticket status or Queue-tab state that looks wrong, a stalled or misbehaving agent
   session. Gives the ralph-loop background and the log/state-file inventory needed to diagnose
-  from evidence instead of guessing. Diagnosis only — never edits code, publishes findings as a
-  research ticket or a report instead.
+  from evidence instead of guessing. Never edits product code; may repair ralph-loop state (land,
+  reset, unpark a stuck ticket) with the human's explicit go-ahead. Publishes findings as a research
+  ticket or a report.
 ---
 
 # gx Investigate
@@ -98,9 +99,69 @@ already be solved.
 After you diagnose (and, elsewhere, fix) a bug through this process, append one line + a pointer
 to gotchas.md yourself. Don't re-explain what the linked commit/ticket already documents.
 
+## Recovering a stuck ticket
+
+Charter: **never edits _product_ code — may repair ralph-loop state.** The repair tools are
+`gx tickets land | verify | reset | unpark`. All four share one `--json` contract: exit 0 with the
+result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`. Branch on `reason`
+(`land_locked`, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
+`commitless`, `land_conflict_pending`, …), never on `message`.
+
+**Go-ahead.** Every write (`land`, `reset`, `unpark`, `land --continue/--abort`, a nudge) needs the
+human's explicit go-ahead in this session. `verify` is read-only and always free. An unattended
+auto-investigate agent has no go-ahead: it diagnoses, proposes the exact command, and stops.
+
+**Completeness is your job, not `land`'s.** `land` always leaves the ticket `done`, so judge first:
+
+- Check each acceptance criterion against the diff of the iteration branch.
+- Run the repo's checks in the iteration worktree.
+- The transcript is advisory only — an agent's account never outweighs the diff.
+- Thin evidence (no worktree, unreadable diff, checks can't run) blocks _your_ autonomy to propose
+  `land`. It never blocks the human's explicit "land it anyway".
+
+**Choose the ending by status first, then completeness.**
+
+- `needs-answer` → never land or reset. Route to answer-then-unpark: the human answers in
+  `## Needs Answer` (`m` menu → "Answer…", or "Answer in pane" if the pane is live), then
+  `gx tickets unpark <epic> <id>` (or `m` → "Resume (I answered)").
+- `claimed` / `needs-repair` (`land` also accepts `done`; `reset` needs `--force` for `done`):
+  - Complete → `gx tickets land <epic> <id> --json`. Commits already landed with a stale status is
+    the common case; `land` just writes `status: done`.
+  - Incomplete → `gx tickets reset <epic> <id> --reason "<why>" --json`. The branch is kept under
+    `ralph-loop/attic/`; the reason is written to Comments as unverified partial work.
+- `draft` / `open` → nothing ran; neither ending applies.
+
+**Every failure stops and reports.** Name the reason code and the human's next gesture, including
+the `m` menu path (`m` on the ticket → Investigate / Answer… / Resume). Examples:
+`fork_children` → reset a child instead; `iteration_branch_missing` → `land --from/--to` with an
+explicit range; `land_conflict_pending` → resolve in the feature worktree, then
+`land --continue` or `--abort`; `land_locked` → retry later. Don't retry around a refusal.
+
+**A live agent on the tab starts an investigation, not a stop.** `live_agent_on_tab` stands — don't
+use `--ignore-live-tab` to get past it. Read iteration status, the run log, the transcript and
+`gx tickets verify <epic> <id>` to answer _why it is not finishing_.
+
+**Interim pane nudge** (sunset: replaced by the auto-recovery effort's own remedy ticket; delete
+this rule then). gx stops nudging once the agent was seen "working", so an agent that wedges later
+gets nothing. You may send **one bare keypress** (never text — you must not answer for a human) only
+if all four hold:
+
+1. The human gave a go-ahead for the nudge.
+2. A live agent is on the tab and the ticket is not `needs-answer`.
+3. The pane shows no question or prompt that needs a human decision.
+4. Two pane reads, spaced apart, show identical output.
+
+Send it once, then re-observe. If still wedged, report; never repeat. A nudge writes no run-log
+event and no ticket note.
+
+**Report at the action, not in the write-up.** `land` and `reset` write their own run-log event
+(`manual-land`, `ticket-reset`). After a landing, add a `## Comments` note on the ticket: what you
+verified, and that recovered elapsed time is the least trustworthy of the three metrics. Do not
+repeat this in the diagnosis ticket.
+
 ## Output
 
-This skill only diagnoses; it never edits code.
+Diagnosis never edits product code. Recoveries are covered above.
 
 Where the diagnosis is published depends on what the bug is *about*, not which epic you were
 looking at when you found it:
