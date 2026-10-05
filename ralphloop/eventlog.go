@@ -21,6 +21,7 @@ const (
 	eventIterationStarted        = "iteration-started"
 	eventIterationFinished       = "iteration-finished"
 	eventCherryPicked            = "cherry-picked"
+	eventLandDeferred            = "land-deferred" // once per contention episode, not per retry tick
 	eventConflictHit             = "conflict-hit"
 	eventConflictResolved        = "conflict-resolved"
 	eventPausedSmartZone         = "paused-smart-zone"

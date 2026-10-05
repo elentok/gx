@@ -77,3 +77,39 @@ func TestClearLand_RemovesMarkerAndLock(t *testing.T) {
 		t.Errorf("clearing twice: %v", err)
 	}
 }
+
+func TestLandLock_RecordsOwner(t *testing.T) {
+	dir := t.TempDir()
+	if o, err := ReadLandLock(dir); err != nil || o != nil {
+		t.Fatalf("no lock: owner = %v, err = %v", o, err)
+	}
+	if err := AcquireLandLockFor(dir, "epic", "07"); err != nil {
+		t.Fatal(err)
+	}
+	o, err := ReadLandLock(dir)
+	if err != nil || o == nil {
+		t.Fatalf("owner = %v, err = %v", o, err)
+	}
+	if o.PID != os.Getpid() || o.Epic != "epic" || o.Ticket != "07" || o.Time.IsZero() || !o.Alive() {
+		t.Errorf("owner = %+v", o)
+	}
+}
+
+func TestOrphanLandLock_NeedsLockAndNoMarker(t *testing.T) {
+	dir := t.TempDir()
+	if o, _ := OrphanLandLock(dir); o != nil {
+		t.Fatal("orphan reported with no lock")
+	}
+	if err := AcquireLandLock(dir); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := OrphanLandLock(dir); o == nil {
+		t.Fatal("lock without marker not reported")
+	}
+	if err := WriteLandMarker(dir, LandMarker{Epic: "e", Ticket: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := OrphanLandLock(dir); o != nil {
+		t.Fatal("lock with marker reported as orphan")
+	}
+}

@@ -110,6 +110,7 @@ func (lp landQueueParams) iterationParamsFor(job landJob) iterationParams {
 // landJob's doc). It blocks on wake between passes that find nothing queued,
 // rather than busy-polling, and exits once done is closed (Run returning).
 func runLandQueue(d Deps, lp landQueueParams, landJobs map[string]landJob, landJobsMu *sync.Mutex, wake <-chan struct{}, done <-chan struct{}, landResults chan<- outcome) {
+	deferredLogged := false // an episode ends when a land is attempted without deferring
 	for {
 		select {
 		case <-done:
@@ -128,7 +129,14 @@ func runLandQueue(d Deps, lp landQueueParams, landJobs map[string]landJob, landJ
 		}
 
 		r := landOne(d, lp, job)
+		if !r.landDeferred {
+			deferredLogged = false
+		}
 		if r.landDeferred {
+			if !deferredLogged {
+				deferredLogged = true
+				logLandDeferred(lp.iterationParamsFor(job))
+			}
 			// Re-queue and retry on the next tick instead of waiting on the
 			// lock; a fresh build's wake just brings the retry forward.
 			landJobsMu.Lock()
@@ -148,6 +156,16 @@ func runLandQueue(d Deps, lp landQueueParams, landJobs map[string]landJob, landJ
 			return
 		}
 	}
+}
+
+// logLandDeferred records why a land is waiting, naming the lock's owner when
+// there is one.
+func logLandDeferred(p iterationParams) {
+	reason := "land lock held or conflict pending"
+	if owner, err := ReadLandLock(landLockDir(p.ScratchDir, p.FeatureBranch)); err == nil && owner != nil {
+		reason = "land lock held by " + owner.Describe()
+	}
+	p.logTicketEventReason(eventLandDeferred, "", "", "", "", reason)
 }
 
 // claimEligibleLandJob picks the lowest-numbered job in landJobs (see
@@ -210,7 +228,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 	// The lock is shared with the human land command, whose conflicted land
 	// exits still holding it. Never wait on it: park as deferred, retry next tick.
 	lockDir := landLockDir(p.ScratchDir, p.FeatureBranch)
-	if err := AcquireLandLock(lockDir); err != nil {
+	if err := AcquireLandLockFor(lockDir, p.FeatureBranch, job.ticket.Identifier); err != nil {
 		if errors.Is(err, ErrLandLocked) {
 			return outcome{ticket: job.ticket, landDeferred: true}
 		}

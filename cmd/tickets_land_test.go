@@ -457,3 +457,56 @@ func TestRunTicketsLand_ContinueAndAbortExclusive(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+// writeDeadLock leaves a lock owned by a pid that cannot be running.
+func writeDeadLock(t *testing.T, dir string) {
+	t.Helper()
+	body := `{"pid":2147483646,"time":"2026-01-02T03:04:05Z","epic":"widget-epic","ticket":"01"}`
+	if err := os.WriteFile(filepath.Join(dir, "land.lock"), []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunTicketsLand_OrphanLockRefusalShowsOwnerAndRemedy(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	writeDeadLock(t, f.lockDir)
+	env := f.refusal(t)
+	if env.Reason != ReasonLandLocked || !strings.Contains(env.Message, "pid 2147483646") || !strings.Contains(env.Message, "--abort") {
+		t.Errorf("envelope = %+v", env)
+	}
+}
+
+func TestRunTicketsLand_AbortClearsOrphanLock(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	writeDeadLock(t, f.lockDir)
+	f.in.Abort = true
+	if _, err := f.run(t); err != nil {
+		t.Fatal(err)
+	}
+	if err := ralphloop.AcquireLandLock(f.lockDir); err != nil {
+		t.Errorf("lock still held after --abort: %v", err)
+	}
+}
+
+func TestRunTicketsLand_AbortRefusesLiveOrphanLock(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	if err := ralphloop.AcquireLandLock(f.lockDir); err != nil { // owned by this test process
+		t.Fatal(err)
+	}
+	f.in.Abort = true
+	if env := f.refusal(t); env.Reason != ReasonLandLocked {
+		t.Errorf("reason = %s", env.Reason)
+	}
+}
+
+func TestRunTicketsLand_AbortWithNoLockOrMarkerRefuses(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	f.in.Abort = true
+	if env := f.refusal(t); env.Reason != ReasonNoPendingLand {
+		t.Errorf("reason = %s", env.Reason)
+	}
+}

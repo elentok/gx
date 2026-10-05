@@ -18,6 +18,9 @@ import (
 type verifyResult struct {
 	Tickets         []ralphloop.TicketVerification `json:"tickets"`
 	LandingInFlight *ralphloop.LandMarker          `json:"landing_in_flight"`
+	// OrphanLandLock is a land lock with no marker: a land mid-flight, or a
+	// crash leftover when its owner is not running.
+	OrphanLandLock *ralphloop.LandLockOwner `json:"orphan_land_lock"`
 }
 
 // verifyRun is everything runTicketsVerify needs besides its flags.
@@ -149,7 +152,11 @@ func gatherVerify(run verifyRun) (verifyResult, error) {
 	if marker != nil && marker.Epic != epicName {
 		marker = nil
 	}
-	return verifyResult{Tickets: verifications, LandingInFlight: marker}, nil
+	orphan, err := ralphloop.OrphanLandLock(epicPath)
+	if err != nil {
+		return verifyResult{}, fmt.Errorf("reading land lock: %w", err)
+	}
+	return verifyResult{Tickets: verifications, LandingInFlight: marker, OrphanLandLock: orphan}, nil
 }
 
 // needsAttention is the human table's filter: anything not landed, plus
@@ -161,6 +168,13 @@ func needsAttention(v ralphloop.TicketVerification) bool {
 func printVerifyTable(w io.Writer, r verifyResult, all bool) {
 	if m := r.LandingInFlight; m != nil {
 		fmt.Fprintf(w, "landing in flight: ticket %s (conflict pending, range %s)\n\n", m.Ticket, m.SourceRange)
+	}
+	if o := r.OrphanLandLock; o != nil {
+		state := "owner not running; clear with `gx tickets land <epic> <id> --abort`"
+		if o.Alive() {
+			state = "owner running"
+		}
+		fmt.Fprintf(w, "land lock with no marker: %s (%s)\n\n", o.Describe(), state)
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ID\tSTATUS\tLANDING\tEVIDENCE\tLEFTOVERS")

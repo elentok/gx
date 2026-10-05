@@ -48,6 +48,8 @@ After resolving a conflict, run land --continue: it refuses while the
 cherry-pick is still in progress or the branch has not moved, then stamps the
 commit, marks the ticket done and clears the marker and lock. land --abort
 aborts the cherry-pick and clears the marker and lock; no ticket is touched.
+With no marker, land --abort clears a lock a crashed land left behind (refused
+while the lock's owning process is still running).
 
 Refuses to run from a ralph-loop/* working directory. This is a guard rail,
 not a boundary: changing directory evades it. It also refuses while the
@@ -135,9 +137,9 @@ func landStuckTicket(in landInput, d ralphloop.Deps) (landResult, string, error)
 	if err := preflightLand(lockDir, epic, in.ID, featurePath, d); err != nil {
 		return landResult{}, "", err
 	}
-	if err := ralphloop.AcquireLandLock(lockDir); err != nil {
+	if err := ralphloop.AcquireLandLockFor(lockDir, epic, in.ID); err != nil {
 		if errors.Is(err, ralphloop.ErrLandLocked) {
-			return landResult{}, "", &RefusalError{Reason: ReasonLandLocked, Message: "another land is in progress (land lock is held)"}
+			return landResult{}, "", landLockedRefusal(lockDir, epic, in.ID)
 		}
 		return landResult{}, "", err
 	}
@@ -184,6 +186,36 @@ func landStuckTicket(in landInput, d ralphloop.Deps) (landResult, string, error)
 	return out, fmt.Sprintf("%s: %s (%s)", in.ID, jsonOutcome(res.Outcome), res.SHA), nil
 }
 
+// landLockedRefusal names the lock's owner and, when no marker explains the
+// lock, how to clear it.
+func landLockedRefusal(lockDir, epic, id string) *RefusalError {
+	msg := "another land is in progress (land lock is held)"
+	owner, err := ralphloop.OrphanLandLock(lockDir)
+	if err == nil && owner != nil {
+		msg = fmt.Sprintf("land lock is held by %s with no conflict pending; if that land crashed, clear it with `gx tickets land %s %s --abort`", owner.Describe(), epic, id)
+	}
+	return &RefusalError{Reason: ReasonLandLocked, Message: msg}
+}
+
+// abortOrphanLock clears a lock that has no marker. It refuses while the
+// owner is still running, since that is a live land, not a crash leftover.
+func abortOrphanLock(lockDir, epic, id string) (landResult, string, error) {
+	owner, err := ralphloop.ReadLandLock(lockDir)
+	if err != nil {
+		return landResult{}, "", err
+	}
+	if owner == nil {
+		return landResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", id)}
+	}
+	if owner.Alive() {
+		return landResult{}, "", &RefusalError{Reason: ReasonLandLocked, Message: fmt.Sprintf("land lock is held by running %s; wait for it to finish", owner.Describe())}
+	}
+	if err := ralphloop.ReleaseLandLock(lockDir); err != nil {
+		return landResult{}, "", fmt.Errorf("clearing land lock: %w", err)
+	}
+	return landResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", id, owner.Describe()), nil
+}
+
 // recordLanded writes status: done (unless already) and the manual-land event.
 func recordLanded(lockDir, epic string, t tickets.Ticket, status schema.Status, res ralphloop.LandResult, session ralphloop.LandSession) error {
 	if status != schema.StatusDone {
@@ -224,6 +256,9 @@ func resolveLand(in landInput, d ralphloop.Deps) (landResult, string, error) {
 	marker, err := ralphloop.ReadLandMarker(lockDir)
 	if err != nil {
 		return landResult{}, "", err
+	}
+	if marker == nil && in.Abort {
+		return abortOrphanLock(lockDir, epic, in.ID)
 	}
 	if marker == nil || marker.Ticket != in.ID {
 		return landResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", in.ID)}

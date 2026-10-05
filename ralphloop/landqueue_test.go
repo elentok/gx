@@ -238,3 +238,50 @@ func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
 		t.Fatal("land never completed after the marker cleared")
 	}
 }
+
+// TestRun_LandLockHeld_LogsDeferredOncePerEpisode: many retry ticks under one
+// contention episode produce a single land-deferred event.
+func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
+	landDeferRetryInterval = 5 * time.Millisecond
+	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+	})
+	lockDir := landLockDir(scratchDir, "epic")
+	if err := AcquireLandLock(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	d, _, _ := fakeDeps()
+	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error { return nil }
+
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	}()
+	time.Sleep(300 * time.Millisecond) // dozens of retry ticks
+	if err := ReleaseLandLock(lockDir); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run() never returned after the lock was released")
+	}
+
+	events, _, err := ReadEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, e := range events {
+		if e.Type == eventLandDeferred {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("land-deferred events = %d, want 1", n)
+	}
+}

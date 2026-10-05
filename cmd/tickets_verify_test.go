@@ -146,3 +146,24 @@ func TestRunTicketsVerify_MissingTicketRefusesInEnvelope(t *testing.T) {
 		t.Errorf("envelope = %q (%v)", out, jerr)
 	}
 }
+
+func TestRunTicketsVerify_ReportsOrphanLock(t *testing.T) {
+	t.Parallel()
+	epicPath := verifyFixture(t)
+	if err := ralphloop.AcquireLandLockFor(epicPath, "widget-epic", "02"); err != nil {
+		t.Fatal(err)
+	}
+	run := verifyRun{EpicPath: epicPath, Deps: verifyDepsFor(t, nil, nil)}
+	out, err := runVerify(t, run, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res verifyResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil || res.OrphanLandLock == nil || res.OrphanLandLock.Ticket != "02" {
+		t.Errorf("orphan lock not reported: %s (err %v)", out, err)
+	}
+	human, _ := runVerify(t, run, false, false)
+	if !strings.Contains(human, "land lock with no marker") {
+		t.Errorf("human output missing orphan lock:\n%s", human)
+	}
+}
