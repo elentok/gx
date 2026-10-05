@@ -785,17 +785,12 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		return false, "", nil
 	}
 
-	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
-	if pickErr == nil {
-		return true, "", nil
-	}
-
-	inProgress, err = d.CherryPickInProgress(p.FeatureWorktree)
+	conflicted, err := cherryPickCore(d, p, base, branch)
 	if err != nil {
-		return false, "", fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
+		return false, "", err
 	}
-	if !inProgress {
-		return false, "", fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
+	if !conflicted {
+		return true, "", nil
 	}
 	// This call now owns the active sequencer state. Always clean it up on
 	// failure, otherwise the next landing serialized behind this one could
@@ -828,6 +823,24 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	}
 
 	return true, resolutionSessionID, nil
+}
+
+// cherryPickCore picks base..branch onto p.FeatureWorktree and reports whether
+// it stopped on a conflict. On conflict the sequencer state is left intact for
+// the caller to resolve or abort; any other failure is returned as an error.
+func cherryPickCore(d Deps, p iterationParams, base, branch string) (conflicted bool, err error) {
+	pickErr := d.CherryPickRange(p.FeatureWorktree, base, branch)
+	if pickErr == nil {
+		return false, nil
+	}
+	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
+	if err != nil {
+		return false, fmt.Errorf("checking cherry-pick state onto %s: %w", p.FeatureBranch, err)
+	}
+	if !inProgress {
+		return false, fmt.Errorf("cherry-picking onto %s: %w", p.FeatureBranch, pickErr)
+	}
+	return true, nil
 }
 
 // errConflictResolutionUnresolved is resolveCherryPickConflict's sentinel for
