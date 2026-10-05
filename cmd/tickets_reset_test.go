@@ -138,6 +138,38 @@ func TestRunTicketsReset_DoneNeedsForce(t *testing.T) {
 	}
 }
 
+func (f *resetFixture) addTicket(t *testing.T, file, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.epicPath, "issues", file), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunTicketsReset_ClaimedWithOpenBlockerAccepted(t *testing.T) {
+	t.Parallel()
+	f := newResetFixture(t, ticketWith("claimed", "blocked_by: [\"02\"]\n"))
+	f.addTicket(t, "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n")
+	if _, err := f.run(); err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(f.ticketText(t), "status: open") {
+		t.Errorf("ticket not reopened:\n%s", f.ticketText(t))
+	}
+}
+
+func TestRunTicketsReset_DoneBlockingDependentsAcceptedWithForce(t *testing.T) {
+	t.Parallel()
+	f := newResetFixture(t, ticketWith("done", ""))
+	f.addTicket(t, "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n")
+	if got := f.refusalReason(t); got != ReasonStatusRefused {
+		t.Errorf("reason = %q", got)
+	}
+	f.in.Force = true
+	if _, err := f.run(); err != nil {
+		t.Fatalf("forced err = %v", err)
+	}
+}
+
 func TestRunTicketsReset_NeedsAnswerAccepted(t *testing.T) {
 	t.Parallel()
 	f := newResetFixture(t, parkedTicket)

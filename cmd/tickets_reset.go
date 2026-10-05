@@ -199,9 +199,11 @@ func checkResettable(in resetInput, epic tickets.Epic, t tickets.Ticket) error {
 			return &RefusalError{Reason: ReasonForkChildren, Message: fmt.Sprintf("ticket %s has fork child %s; reset %s instead", in.ID, other.Identifier, other.Identifier)}
 		}
 	}
-	switch status := epic.RenderedStatus(t); status {
-	case tickets.StatusClaimed, tickets.StatusNeedsRepair, tickets.StatusNeedsAnswer:
-	case tickets.StatusDone:
+	// Raw status, not RenderedStatus: blockers render a claimed ticket
+	// "blocked" and dependents render a done one "waiting-for-children".
+	switch status := schema.Status(t.Status); status {
+	case schema.StatusClaimed, schema.StatusNeedsRepair, schema.StatusNeedsAnswer:
+	case schema.StatusDone:
 		if !in.Force {
 			return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is done and already landed; pass --force to reset it anyway (the landing is not reverted)", in.ID)}
 		}
