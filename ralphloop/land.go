@@ -2,10 +2,12 @@ package ralphloop
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // LandOutcome is what LandTicket did with a ticket's commits.
@@ -94,7 +96,11 @@ func LandTicket(d LandDeps, lp LandParams) (LandResult, error) {
 		if err != nil {
 			return LandResult{}, err
 		}
-		return LandResult{Outcome: AlreadyApplied, SHA: sha, TrailerValue: landTrailerValue(lp)}, nil
+		stamped, err := stampAppliedMetrics(lp)
+		if err != nil {
+			return LandResult{}, err
+		}
+		return LandResult{Outcome: AlreadyApplied, SHA: sha, TrailerValue: landTrailerValue(lp), MetricsStamped: stamped}, nil
 	case Conflicted:
 		return LandResult{Outcome: Conflicted, TrailerValue: landTrailerValue(lp)}, nil
 	}
@@ -149,6 +155,33 @@ func alreadyApplied(d LandDeps, lp LandParams) (bool, error) {
 		return false, nil
 	}
 	return landed[lp.TicketID], nil
+}
+
+// stampAppliedMetrics fills in the ticket's frontmatter metrics when commits
+// were landed by hand, so a zero actual_cost doesn't read as never landed. The
+// landed commit is already trailered, so nothing is amended. A nonzero cost
+// means a prior landing stamped it; no recoverable session means nothing to
+// stamp.
+func stampAppliedMetrics(lp LandParams) (bool, error) {
+	if lp.TicketPath == "" || lp.Session.ID == "" {
+		return false, nil
+	}
+	raw, err := os.ReadFile(lp.TicketPath)
+	if err != nil {
+		return false, fmt.Errorf("reading ticket %s: %w", lp.TicketID, err)
+	}
+	t, err := schema.ParseTicketFromRaw(string(raw), lp.TicketPath)
+	if err != nil {
+		return false, fmt.Errorf("parsing ticket %s: %w", lp.TicketID, err)
+	}
+	if t.ActualCost != 0 {
+		return false, nil
+	}
+	_, _, _, ok, err := writeLandedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	if err != nil {
+		return false, fmt.Errorf("writing landed metrics for ticket %s: %w", lp.TicketID, err)
+	}
+	return ok, nil
 }
 
 func alreadyAppliedSHA(d LandDeps, lp LandParams) (string, error) {

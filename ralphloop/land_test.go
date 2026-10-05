@@ -1,6 +1,11 @@
 package ralphloop
 
 import (
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/elentok/gx/tickets/schema"
 	"os/exec"
 	"strings"
 	"testing"
@@ -137,5 +142,85 @@ func TestLandTicket_Conflict_IsAResultNotAnError(t *testing.T) {
 	}
 	if inProgress, _ := git.CherryPickInProgress(dir); !inProgress {
 		t.Error("sequencer not left in progress after conflict")
+	}
+}
+
+// appliedSessionFixture lands the fixture's commit, then points lp at a ticket
+// file with the given frontmatter cost and a recoverable Claude session.
+func appliedSessionFixture(t *testing.T, cost string) (lp LandParams, d LandDeps, ticketPath string) {
+	t.Helper()
+	setHomeEnv(t, t.TempDir())
+	_, lp = landFixture(t, false)
+	d = landDepsFor(testDeps())
+	if res, err := LandTicket(d, lp); err != nil || res.Outcome != Landed {
+		t.Fatalf("first LandTicket = (%+v, %v), want Landed", res, err)
+	}
+
+	ticketPath = filepath.Join(t.TempDir(), "03-a.md")
+	body := "---\nid: \"03\"\nstatus: claimed\ntype: task\n" + cost + "---\n# A\n"
+	if err := os.WriteFile(ticketPath, []byte(body), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	cwd := iterationWorktreePath("/fake/worktrees", "epic", "03")
+	writeFakeTranscript(t, "", cwd, "sess-applied", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		[3]any{"claude-sonnet-5", 1000, 0},
+		[3]any{"claude-sonnet-5", 2000, 5000},
+	)
+	lp.TicketPath = ticketPath
+	lp.Session = LandSession{Agent: AgentClaude, Cwd: cwd, ID: "sess-applied"}
+	return lp, d, ticketPath
+}
+
+func TestLandTicket_AlreadyApplied_ZeroCostWithSession_StampsMetrics(t *testing.T) {
+	lp, d, ticketPath := appliedSessionFixture(t, "")
+	msg := headMessage(t, lp.FeatureWorktree)
+
+	res, err := LandTicket(d, lp)
+	if err != nil || res.Outcome != AlreadyApplied {
+		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+	}
+	if !res.MetricsStamped {
+		t.Error("MetricsStamped = false, want true")
+	}
+	raw, _ := os.ReadFile(ticketPath)
+	ticket, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil || ticket.ActualCost == 0 {
+		t.Errorf("ActualCost = %v (err %v), want non-zero:\n%s", ticket.ActualCost, err, raw)
+	}
+	if got := headMessage(t, lp.FeatureWorktree); got != msg {
+		t.Errorf("HEAD message changed (trailer re-stamped):\n%s\nwas:\n%s", got, msg)
+	}
+}
+
+func TestLandTicket_AlreadyApplied_NonZeroCost_StampsNothing(t *testing.T) {
+	lp, d, ticketPath := appliedSessionFixture(t, "actual_cost: 1.5\n")
+
+	res, err := LandTicket(d, lp)
+	if err != nil || res.Outcome != AlreadyApplied {
+		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+	}
+	if res.MetricsStamped {
+		t.Error("MetricsStamped = true with non-zero cost, want false")
+	}
+	raw, _ := os.ReadFile(ticketPath)
+	if !strings.Contains(string(raw), "actual_cost: 1.5") {
+		t.Errorf("cost overwritten:\n%s", raw)
+	}
+}
+
+func TestLandTicket_AlreadyApplied_NoSession_StampsNothing(t *testing.T) {
+	lp, d, ticketPath := appliedSessionFixture(t, "")
+	lp.Session = LandSession{}
+
+	res, err := LandTicket(d, lp)
+	if err != nil || res.Outcome != AlreadyApplied {
+		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+	}
+	if res.MetricsStamped {
+		t.Error("MetricsStamped = true with no session, want false")
+	}
+	raw, _ := os.ReadFile(ticketPath)
+	if strings.Contains(string(raw), "actual_cost") {
+		t.Errorf("metrics written without a session:\n%s", raw)
 	}
 }
