@@ -76,7 +76,7 @@ func landDepsFor(d Deps) LandDeps {
 		CherryPickRange:      d.CherryPickRange,
 		CherryPickInProgress: d.CherryPickInProgress,
 		AppendTrailers:       d.AppendTrailers,
-		LandedTickets:        LandedTickets,
+		LandedTickets:        landedTickets,
 	}
 }
 

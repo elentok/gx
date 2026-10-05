@@ -222,6 +222,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(newTicketsSetCmd(d))
 	cmd.AddCommand(newTicketsUnparkCmd(d))
 	cmd.AddCommand(newTicketsVerifyCmd(d))
+	cmd.AddCommand(newTicketsLandCmd(d))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "migrate <path>",
 		Short: "rewrite every ticket under a tracker root into the post-refactor frontmatter shape",

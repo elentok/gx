@@ -743,10 +743,10 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		// conflict, not crash debris: aborting would discard their work.
 		marker, err := ReadLandMarker(landLockDir(p.ScratchDir, p.FeatureBranch))
 		if err != nil {
-			return false, "", fmt.Errorf("reading land marker: %w", err)
+			return LandResult{}, "", fmt.Errorf("reading land marker: %w", err)
 		}
 		if marker != nil {
-			return false, "", errLandDeferred
+			return LandResult{}, "", errLandDeferred
 		}
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
 			return LandResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)

@@ -15,6 +15,11 @@ const (
 	ReasonLiveAgentOnTab         = "live_agent_on_tab"
 	ReasonForkChildren           = "fork_children"
 	ReasonNotParked              = "not_parked"
+	ReasonStatusRefused          = "status_refused"
+	ReasonCommitless             = "commitless"
+	ReasonRalphLoopCwd           = "ralph_loop_cwd"
+	ReasonLandConflictPending    = "land_conflict_pending"
+	ReasonLandBlocked            = "land_blocked"
 	// ReasonError is the fallback for a failure that carries no specific code.
 	ReasonError = "error"
 )

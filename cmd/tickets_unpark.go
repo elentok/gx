@@ -51,25 +51,33 @@ func runTicketsUnpark(epicPath, id string, jsonMode bool, now time.Time, stdout,
 // unparkTarget resolves id in epicPath to a ticket path, refusing unless the
 // ticket is currently parked at needs-answer.
 func unparkTarget(epicPath, id string) (string, error) {
+	epic, t, err := findEpicTicket(epicPath, id)
+	if err != nil {
+		return "", err
+	}
+	if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
+		return "", &RefusalError{Reason: ReasonNotParked, Message: fmt.Sprintf("ticket %s is %v, not needs-answer", id, epic.RenderedStatus(t))}
+	}
+	return t.Path, nil
+}
+
+// findEpicTicket loads the epic at epicPath and returns it with ticket id.
+func findEpicTicket(epicPath, id string) (tickets.Epic, tickets.Ticket, error) {
 	epicPath = filepath.Clean(epicPath)
 	epics, err := tickets.Load(filepath.Dir(epicPath))
 	if err != nil {
-		return "", fmt.Errorf("loading epics under %s: %w", filepath.Dir(epicPath), err)
+		return tickets.Epic{}, tickets.Ticket{}, fmt.Errorf("loading epics under %s: %w", filepath.Dir(epicPath), err)
 	}
 	for _, epic := range epics {
 		if epic.Name != filepath.Base(epicPath) {
 			continue
 		}
 		for _, t := range epic.Tickets {
-			if t.DisplayNumber() != id {
-				continue
+			if t.DisplayNumber() == id {
+				return epic, t, nil
 			}
-			if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
-				return "", &RefusalError{Reason: ReasonNotParked, Message: fmt.Sprintf("ticket %s is %v, not needs-answer", id, epic.RenderedStatus(t))}
-			}
-			return t.Path, nil
 		}
-		return "", fmt.Errorf("ticket %s not found in epic %s", id, epic.Name)
+		return tickets.Epic{}, tickets.Ticket{}, fmt.Errorf("ticket %s not found in epic %s", id, epic.Name)
 	}
-	return "", fmt.Errorf("epic not found: %s", epicPath)
+	return tickets.Epic{}, tickets.Ticket{}, fmt.Errorf("epic not found: %s", epicPath)
 }
