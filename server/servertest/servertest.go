@@ -30,6 +30,8 @@ type Harness struct {
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
+
+	cfg server.Config
 }
 
 // WriteTicket creates <store>/<project>/<epic>/issues/<id>-<slug>.md (and the
@@ -109,17 +111,31 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	})
 	herdrfake.StartState(t, h.Herdr)
 
-	cfg := server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
+	h.cfg = server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	for _, o := range opts {
-		o(&cfg)
+		o(&h.cfg)
 	}
-	srv, err := server.New(cfg)
-	if err == nil {
-		h.TCPAddr = srv.TCPAddr()
+	h.serve(t)
+	return h
+}
+
+// Restart stops the server and starts a new one on the same state dir, as a
+// crash-and-relaunch would.
+func (h *Harness) Restart(t *testing.T) {
+	t.Helper()
+	if err := h.Stop(); err != nil {
+		t.Fatal(err)
 	}
+	h.serve(t)
+}
+
+func (h *Harness) serve(t *testing.T) {
+	t.Helper()
+	srv, err := server.New(h.cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+	h.TCPAddr = srv.TCPAddr()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ctx) }()
@@ -136,5 +152,4 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	})
 
 	h.Client = apiclient.New(server.SocketPath(h.StateDir))
-	return h
 }

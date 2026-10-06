@@ -1,6 +1,6 @@
 // Package server is the orchestrator daemon: HTTP/JSON over a unix socket in
-// the state dir, routes under /v1/. In this stage it is read-only — it never
-// claims or writes tickets, so it can run beside the in-process loop.
+// the state dir, routes under /v1/. It never claims or writes tickets; its only
+// writes are to the server-wide queue in the state dir.
 package server
 
 import (
@@ -49,6 +49,10 @@ type Config struct {
 
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
+	// Orchestrator is config.Orchestrator. Queue writes are refused unless it
+	// is "server": the in-process loop owns claiming otherwise.
+	Orchestrator string
+
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string
@@ -68,6 +72,7 @@ type Server struct {
 	log  *slog.Logger
 	idx  *index
 
+	queued  *queueStore
 	events  *broker
 	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
@@ -93,6 +98,11 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("index ticket store: %w", err)
+	}
+	queued, err := openQueue(cfg.StateDir)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("load queue: %w", err)
 	}
 	sock := SocketPath(cfg.StateDir)
 	// We hold the lock, so any socket file is stale from a crashed server.
@@ -133,6 +143,7 @@ func New(cfg Config) (*Server, error) {
 		log:  slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo})),
 		idx:  idx,
 
+		queued: queued,
 		events: events,
 	}
 	mux := http.NewServeMux()
@@ -145,6 +156,10 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/tickets/explain", s.explain)
 	mux.HandleFunc("GET /v1/iterations", s.iterations)
 	mux.HandleFunc("GET /v1/queue", s.queue)
+	mux.HandleFunc("GET /v1/queue/items", s.queueItems)
+	mux.HandleFunc("POST /v1/queue/add", s.queueWrite(s.queueAdd))
+	mux.HandleFunc("POST /v1/queue/remove", s.queueWrite(s.queueRemove))
+	mux.HandleFunc("POST /v1/queue/move", s.queueWrite(s.queueMove))
 	s.http = &http.Server{Handler: mux}
 	// A down herdr never stops the server; it is reported and retried.
 	s.checkHerdr()

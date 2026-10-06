@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/apiclient"
@@ -88,7 +89,7 @@ func newServerIterationsCmd() *cobra.Command {
 }
 
 func newServerQueueCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "queue", Short: "queue reads", Args: cobra.NoArgs}
+	cmd := &cobra.Command{Use: "queue", Short: "server-wide queue", Args: cobra.NoArgs}
 	var jsonOut bool
 	list := &cobra.Command{
 		Use:   "list",
@@ -102,7 +103,79 @@ func newServerQueueCmd() *cobra.Command {
 	}
 	list.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(list)
+
+	var agent string
+	add := &cobra.Command{
+		Use:   "add <project:epic/NN>",
+		Short: "append a ticket to the server-wide queue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.QueueAdd(ctx, args[0], agent)
+			})
+		},
+	}
+	add.Flags().StringVar(&agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default claude)`)
+	remove := &cobra.Command{
+		Use:   "remove <project:epic/NN>",
+		Short: "remove a ticket from the server-wide queue",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.QueueRemove(ctx, args[0])
+			})
+		},
+	}
+	move := &cobra.Command{
+		Use:   "move <project:epic/NN> <position>",
+		Short: "move a queued ticket to a 1-based position",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			pos, err := strconv.Atoi(args[1])
+			if err != nil {
+				return fmt.Errorf("position %q is not a number", args[1])
+			}
+			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.QueueMove(ctx, args[0], pos)
+			})
+		},
+	}
+	for _, c := range []*cobra.Command{add, remove, move} {
+		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+		cmd.AddCommand(c)
+	}
 	return cmd
+}
+
+// serverQueueWrite runs one queue write. With --json the result or refusal is
+// the output; otherwise a refusal is an error.
+func serverQueueWrite(c *cobra.Command, jsonOut bool, do func(context.Context, *apiclient.Client) (server.QueueResult, error)) error {
+	ctx := c.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cl, err := serverClient()
+	if err != nil {
+		return err
+	}
+	res, err := do(ctx, cl)
+	if err != nil {
+		return fmt.Errorf("server write failed (is `gx server` running?): %w", err)
+	}
+	if jsonOut {
+		enc := json.NewEncoder(c.OutOrStdout())
+		enc.SetIndent("", "  ")
+		return enc.Encode(res)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	for i, it := range res.Queue {
+		if _, err := fmt.Fprintf(c.OutOrStdout(), "%d\t%s\t%s\n", i+1, it.Address, it.Agent); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func printIterations(w io.Writer, its []server.IterationInfo) error {

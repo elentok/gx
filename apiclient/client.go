@@ -4,6 +4,7 @@ package apiclient
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -167,6 +168,56 @@ func (c *Client) Queue(ctx context.Context) ([]server.QueueEntry, error) {
 	var l []server.QueueEntry
 	err := c.get(ctx, "/v1/queue", &l)
 	return l, err
+}
+
+// QueueItems returns the server-wide queue in order.
+func (c *Client) QueueItems(ctx context.Context) ([]server.QueueItem, error) {
+	var l []server.QueueItem
+	err := c.get(ctx, "/v1/queue/items", &l)
+	return l, err
+}
+
+// QueueAdd appends a ticket to the queue; agent "" takes the default.
+func (c *Client) QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "add", server.QueueRequest{Address: address, Agent: agent})
+}
+
+// QueueRemove drops a ticket from the queue.
+func (c *Client) QueueRemove(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "remove", server.QueueRequest{Address: address})
+}
+
+// QueueMove puts a queued ticket at the 1-based position.
+func (c *Client) QueueMove(ctx context.Context, address string, position int) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "move", server.QueueRequest{Address: address, Position: position})
+}
+
+// queueWrite posts one queue write. A refusal is a result (Refused set), not an error.
+func (c *Client) queueWrite(ctx context.Context, verb string, req server.QueueRequest) (server.QueueResult, error) {
+	var res server.QueueResult
+	if err := c.CheckWrite(); err != nil {
+		return res, err
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return res, err
+	}
+	path := "/v1/queue/" + verb
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://gx"+path, bytes.NewReader(body))
+	if err != nil {
+		return res, err
+	}
+	hreq.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(hreq)
+	if err != nil {
+		return res, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return res, fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
+	}
+	return res, json.NewDecoder(resp.Body).Decode(&res)
 }
 
 // Follow keeps a consumer in sync: it takes a snapshot, then streams events
