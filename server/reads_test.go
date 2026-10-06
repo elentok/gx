@@ -2,13 +2,16 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 func TestReads_HistoryLocksAndProjects(t *testing.T) {
@@ -90,5 +93,52 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 	}
 	if _, err := h.Client.Explain(context.Background(), "proj:epic-a/77"); err == nil {
 		t.Error("explain of an unknown ticket should fail")
+	}
+}
+
+func TestReads_IterationsAndQueue(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "status: open", "status: claimed", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if argv[2] != "epic-a-iter-01" {
+			return nil, herdrfake.Identities{}, errors.New("agent not found")
+		}
+		return map[string]any{"agent": map[string]any{
+			"pane_id": "pane-1", "workspace_id": "ws-1", "tab_id": "tab-1", "agent_status": "working",
+			"agent_session": map[string]any{"value": "sess-1"},
+		}}, herdrfake.Identities{}, nil
+	})
+	ctx := context.Background()
+
+	its, err := h.Client.Iterations(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(its) != 1 || its[0].Address != "proj:epic-a/01" || its[0].Pane != "pane-1" ||
+		its[0].Branch != "ralph-loop/epic-a-item-01" || !strings.HasSuffix(its[0].Worktree, "epic-a-item-01") ||
+		!strings.HasSuffix(its[0].Transcript, "sess-1.jsonl") {
+		t.Errorf("iterations = %+v", its)
+	}
+
+	q, err := h.Client.Queue(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, e := range q {
+		got[e.Address] = e.Decision
+	}
+	if got["proj:epic-a/01"] != "claimed" || got["proj:epic-a/02"] != "blocked" {
+		t.Errorf("queue = %+v", q)
 	}
 }

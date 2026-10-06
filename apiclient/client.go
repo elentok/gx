@@ -154,6 +154,20 @@ func (c *Client) Explain(ctx context.Context, address string) (server.Explanatio
 	return e, err
 }
 
+// Iterations returns the live iterations.
+func (c *Client) Iterations(ctx context.Context) ([]server.IterationInfo, error) {
+	var l []server.IterationInfo
+	err := c.get(ctx, "/v1/iterations", &l)
+	return l, err
+}
+
+// Queue returns every ticket with the scheduler's verdict on it.
+func (c *Client) Queue(ctx context.Context) ([]server.QueueEntry, error) {
+	var l []server.QueueEntry
+	err := c.get(ctx, "/v1/queue", &l)
+	return l, err
+}
+
 func (c *Client) get(ctx context.Context, path string, out any) error {
 	// The host is ignored by the unix dialer; it only has to parse.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)

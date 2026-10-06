@@ -69,6 +69,61 @@ func newServerLocksCmd() *cobra.Command {
 	return cmd
 }
 
+func newServerIterationsCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "iterations",
+		Short: "list live iterations with pane, worktree, branch, base and transcript path",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) ([]server.IterationInfo, error) {
+					return cl.Iterations(ctx)
+				},
+				printIterations)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	return cmd
+}
+
+func newServerQueueCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "queue", Short: "queue reads", Args: cobra.NoArgs}
+	var jsonOut bool
+	list := &cobra.Command{
+		Use:   "list",
+		Short: "list every ticket with the scheduler's verdict on it",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) ([]server.QueueEntry, error) { return cl.Queue(ctx) },
+				printQueue)
+		},
+	}
+	list.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(list)
+	return cmd
+}
+
+func printIterations(w io.Writer, its []server.IterationInfo) error {
+	for _, it := range its {
+		if _, err := fmt.Fprintf(w, "%s\tpane %s\t%s\t%s\tbase %s\t%s\n",
+			it.Address, it.Pane, it.Worktree, it.Branch, it.Base, it.Transcript); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printQueue(w io.Writer, entries []server.QueueEntry) error {
+	for _, e := range entries {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", e.Address, e.Decision, e.Reason); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func newServerTicketsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "tickets", Short: "ticket reads", Args: cobra.NoArgs}
 	var jsonOut bool
