@@ -50,7 +50,7 @@ func captureStoppedIterations(t *testing.T) *[]tickets.Ticket {
 	var calls []tickets.Ticket
 	var grace time.Duration
 	previous := stopIterationAndMarkNeedsRepairFn
-	stopIterationAndMarkNeedsRepairFn = func(_ ralphloop.Deps, ticket tickets.Ticket, _, _ string, g time.Duration, _ string) error {
+	stopIterationAndMarkNeedsRepairFn = func(_ ralphloop.Deps, _ ralphloop.EventSink, _, _ string, ticket tickets.Ticket, _, _ string, g time.Duration, _ string) error {
 		mu.Lock()
 		calls = append(calls, ticket)
 		grace = g

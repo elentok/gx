@@ -31,7 +31,7 @@ import (
 // terminal outcome: a nonzero ActualCost read fresh from disk means the
 // iteration landed successfully during the grace period, and that done
 // status is left alone rather than overwritten.
-func StopIterationAndMarkNeedsRepair(d Deps, ticket tickets.Ticket, paneID, tabID string, grace time.Duration, reason string) error {
+func StopIterationAndMarkNeedsRepair(d Deps, sink EventSink, scratchDir, epicName string, ticket tickets.Ticket, paneID, tabID string, grace time.Duration, reason string) error {
 	sendErr := d.AgentSendKeys(paneID, "ctrl+c")
 	d.Sleep(grace)
 	closeErr := d.TabClose(tabID)
@@ -41,7 +41,10 @@ func StopIterationAndMarkNeedsRepair(d Deps, ticket tickets.Ticket, paneID, tabI
 		return errors.Join(sendErr, closeErr, fmt.Errorf("reloading ticket %s to check landed status: %w", ticket.Identifier, parseErr))
 	}
 	if current.ActualCost == 0 {
-		if markErr := MarkNeedsRepairWithReason(ticket.Path, reason, schema.ParkKind(events.BudgetKilled), schema.NeedsRepairState{}); markErr != nil {
+		if _, markErr := park(sink, parkRequest{
+			ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket.Identifier, Path: ticket.Path,
+			Type: events.NeedsRepair, Kind: events.BudgetKilled, Reason: reason,
+		}); markErr != nil {
 			return errors.Join(sendErr, closeErr, fmt.Errorf("marking ticket %s needs-repair: %w", ticket.Identifier, markErr))
 		}
 	}

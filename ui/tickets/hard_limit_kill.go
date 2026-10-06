@@ -82,7 +82,7 @@ func killLiveIterations(snapshot []epicCostSnapshot) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_ = stopIterationAndMarkNeedsRepairFn(deps, t, paneID, tabID, hardLimitGrace, "budget hard limit reached")
+				_ = stopIterationAndMarkNeedsRepairFn(deps, ralphloop.NoopEventSink(), epic.ScratchDir, epic.EpicName, t, paneID, tabID, hardLimitGrace, "budget hard limit reached")
 			}()
 		}
 	}

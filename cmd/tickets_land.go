@@ -216,16 +216,10 @@ func abortOrphanLock(lockDir, epic, id string) (landResult, string, error) {
 	return landResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", id, owner.Describe()), nil
 }
 
-// recordLanded writes status: done (unless already) and the manual-land event.
+// recordLanded writes status: done (unless already) and the manual-land event
+// through the park path.
 func recordLanded(lockDir, epic string, t tickets.Ticket, status schema.Status, res ralphloop.LandResult, session ralphloop.LandSession) error {
-	if status != schema.StatusDone {
-		if err := ralphloop.MarkDone(t.Path); err != nil {
-			return fmt.Errorf("marking ticket %s done: %w", t.Identifier, err)
-		}
-	}
 	ev := ralphloop.Event{
-		Type:         ralphloop.EventManualLand,
-		Ticket:       t.Identifier,
 		Outcome:      string(res.Outcome),
 		SHA:          res.SHA,
 		TrailerValue: res.TrailerValue,
@@ -235,8 +229,8 @@ func recordLanded(lockDir, epic string, t tickets.Ticket, status schema.Status, 
 	if session.ID == "" {
 		ev.Reason = "no recoverable agent session; metrics not stamped"
 	}
-	if err := ralphloop.AppendEvent(filepath.Dir(lockDir), epic, ev); err != nil {
-		return fmt.Errorf("logging manual-land: %w", err)
+	if err := ralphloop.RecordManualLand(filepath.Dir(lockDir), epic, t.Identifier, t.Path, status == schema.StatusDone, ev); err != nil {
+		return fmt.Errorf("marking ticket %s done: %w", t.Identifier, err)
 	}
 	return nil
 }

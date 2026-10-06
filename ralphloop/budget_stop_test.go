@@ -34,9 +34,10 @@ func TestStopIterationAndMarkNeedsRepair_QuietIteration_ClosedAndMarked(t *testi
 	path := writeFrontmatterTicket(t, "claimed")
 	ticket := tickets.Ticket{Identifier: "01", Path: path}
 	d, sentKeys, closedTabs, slept := stopDeps(nil, nil)
+	scratch := t.TempDir()
 
 	grace := 15 * time.Second
-	if err := StopIterationAndMarkNeedsRepair(d, ticket, "pane-1", "tab-1", grace, "budget hard limit reached"); err != nil {
+	if err := StopIterationAndMarkNeedsRepair(d, noopEventSink{}, scratch, "epic", ticket, "pane-1", "tab-1", grace, "budget hard limit reached"); err != nil {
 		t.Fatalf("StopIterationAndMarkNeedsRepair: %v", err)
 	}
 
@@ -52,6 +53,13 @@ func TestStopIterationAndMarkNeedsRepair_QuietIteration_ClosedAndMarked(t *testi
 	if got := mustParse(t, path).Status; got != schema.StatusNeedsRepair {
 		t.Errorf("Status = %q, want %q", got, schema.StatusNeedsRepair)
 	}
+	evs, ok, err := ReadEvents(scratch, "epic")
+	if err != nil || !ok || len(evs) != 1 {
+		t.Fatalf("events = %+v ok=%v err=%v, want one", evs, ok, err)
+	}
+	if evs[0].Type != "needs-repair" || evs[0].Kind != "budget-killed" || evs[0].Ticket != "01" {
+		t.Errorf("event = %+v, want needs-repair/budget-killed for 01", evs[0])
+	}
 }
 
 func TestStopIterationAndMarkNeedsRepair_StuckIteration_ForceClosedAndMarked(t *testing.T) {
@@ -62,7 +70,7 @@ func TestStopIterationAndMarkNeedsRepair_StuckIteration_ForceClosedAndMarked(t *
 	// grace and closes the pane unconditionally.
 	d, _, closedTabs, _ := stopDeps(errors.New("pane never quieted"), nil)
 
-	if err := StopIterationAndMarkNeedsRepair(d, ticket, "pane-1", "tab-1", 15*time.Second, "budget hard limit reached"); err == nil {
+	if err := StopIterationAndMarkNeedsRepair(d, noopEventSink{}, "", "", ticket, "pane-1", "tab-1", 15*time.Second, "budget hard limit reached"); err == nil {
 		t.Fatal("StopIterationAndMarkNeedsRepair: want error surfaced from AgentSendKeys, got nil")
 	}
 
@@ -80,7 +88,7 @@ func TestStopIterationAndMarkNeedsRepair_LandedDuringGrace_ClosedButLeftDone(t *
 	ticket := tickets.Ticket{Identifier: "01", Path: path}
 	d, _, closedTabs, _ := stopDeps(nil, nil)
 
-	if err := StopIterationAndMarkNeedsRepair(d, ticket, "pane-1", "tab-1", 15*time.Second, "budget hard limit reached"); err != nil {
+	if err := StopIterationAndMarkNeedsRepair(d, noopEventSink{}, "", "", ticket, "pane-1", "tab-1", 15*time.Second, "budget hard limit reached"); err != nil {
 		t.Fatalf("StopIterationAndMarkNeedsRepair: %v", err)
 	}
 
