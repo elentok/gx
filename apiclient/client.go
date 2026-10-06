@@ -208,6 +208,12 @@ func (c *Client) TicketPark(ctx context.Context, address, reason string) (server
 	return c.queueWriteTo(ctx, "/v1/tickets/park", server.QueueRequest{Address: address, ParkReason: reason})
 }
 
+// TicketCancel cancels a ticket and its non-terminal fork descendants; stop
+// lets it stop a live pane first.
+func (c *Client) TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/cancel", server.QueueRequest{Address: address, Stop: stop})
+}
+
 // TicketRelaunch starts a fresh iteration of a ticket.
 func (c *Client) TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address})

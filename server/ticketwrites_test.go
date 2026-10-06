@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 func startTicketWrites(t *testing.T) (*servertest.Harness, string) {
@@ -92,5 +94,59 @@ func TestRelaunch_StartsAFreshIterationOfAParkedTicket(t *testing.T) {
 	}
 	if len(*start) == 0 || !strings.Contains(strings.Join(*prompt, " "), "proj:epic-a/01") {
 		t.Errorf("agent start = %v, prompt = %v", *start, *prompt)
+	}
+}
+
+func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
+	h, path := startTicketWrites(t)
+	var closed atomic.Int32
+	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		closed.Add(1)
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Pane: "p1", Tab: "t1"})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false)
+	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
+		t.Fatalf("cancel = %+v, %v; want %s refusal", res, err, server.ReasonTicketLive)
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "status: cancelled") || closed.Load() != 0 {
+		t.Fatalf("refused cancel changed things (closed=%d):\n%s", closed.Load(), data)
+	}
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
+		t.Fatalf("cancel --stop = %+v, %v", res, err)
+	}
+	if data, _ := os.ReadFile(path); !strings.Contains(string(data), "status: cancelled") {
+		t.Errorf("ticket not cancelled:\n%s", data)
+	}
+	if closed.Load() != 1 {
+		t.Errorf("tab close calls = %d, want 1", closed.Load())
+	}
+}
+
+func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
+	h, path := startTicketWrites(t)
+	issues := filepath.Dir(path)
+	child := func(id, status string) string {
+		p := filepath.Join(issues, id+"-kid.md")
+		body := "---\nid: \"" + id + "\"\nstatus: " + status + "\ntype: implement\nparent: \"01\"\n---\n\n# kid\n"
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	open, done := child("02", "open"), child("03", "done")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	for p, want := range map[string]string{path: "cancelled", open: "cancelled", done: "done"} {
+		if data, _ := os.ReadFile(p); !strings.Contains(string(data), "status: "+want) {
+			t.Errorf("%s lacks status %s:\n%s", filepath.Base(p), want, data)
+		}
 	}
 }

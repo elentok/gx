@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -25,6 +26,7 @@ type ticketRef struct {
 	projectDir string
 	repo       string
 	ticket     tickets.Ticket
+	epic       tickets.Epic
 }
 
 func (r ticketRef) root() string { return r.addr.Project + ":" + r.addr.Epic }
@@ -49,7 +51,7 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 		}
 		for _, t := range e.Tickets {
 			if t.Identifier == addr.ID {
-				return ticketRef{addr: addr, projectDir: projectDir, repo: repo, ticket: t}, true, nil
+				return ticketRef{addr: addr, projectDir: projectDir, repo: repo, ticket: t, epic: e}, true, nil
 			}
 		}
 	}
@@ -59,6 +61,17 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 // ticketWrite resolves the request's ticket and applies the refusals every
 // ticket write shares, before do runs.
 func (s *Server) ticketWrite(req QueueRequest, do func(ticketRef) (QueueResult, error)) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+		if s.registry.has(ref.root()) {
+			return refusal(ReasonIterationRunning, "an iteration is running in "+ref.root()), nil
+		}
+		return do(ref)
+	})
+}
+
+// resolvedWrite is ticketWrite without the running-iteration refusal, for
+// writes that judge liveness themselves.
+func (s *Server) resolvedWrite(req QueueRequest, do func(ticketRef) (QueueResult, error)) (QueueResult, error) {
 	addr, bad := canonical(req.Address)
 	if bad != nil {
 		return *bad, nil
@@ -72,9 +85,6 @@ func (s *Server) ticketWrite(req QueueRequest, do func(ticketRef) (QueueResult, 
 	}
 	if !ok {
 		return refusal(ReasonUnknownTicket, "no ticket "+addr), nil
-	}
-	if s.registry.has(ref.root()) {
-		return refusal(ReasonIterationRunning, "an iteration is running in "+ref.root()), nil
 	}
 	return do(ref)
 }
@@ -118,4 +128,59 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		}
 		return QueueResult{}, nil
 	})
+}
+
+// ticketCancel withdraws a ticket and every non-terminal ticket forked from it.
+// A claimed ticket with a live pane refuses ticket-live unless Stop closes the
+// pane first.
+func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+		if ref.ticket.Status == string(schema.StatusDone) {
+			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+		}
+		targets := cancelTargets(ref)
+		var live []Run
+		for _, t := range targets {
+			if run, ok := s.registry.runOf(ref.address(t)); ok {
+				live = append(live, run)
+			}
+		}
+		if len(live) > 0 && !req.Stop {
+			return refusal(ReasonTicketLive, live[0].Address+" has a live pane; use --stop"), nil
+		}
+		for _, run := range live {
+			if err := herdr.TabClose(run.Tab); err != nil {
+				return QueueResult{}, fmt.Errorf("stop %s: %w", run.Address, err)
+			}
+		}
+		for _, t := range targets {
+			if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
+				return QueueResult{}, fmt.Errorf("cancel %s: %w", ref.address(t), err)
+			}
+			s.events.publish(EventTicketCancelled, ref.address(t))
+		}
+		return QueueResult{}, nil
+	})
+}
+
+// cancelTargets is the ticket plus its fork descendants that are not terminal.
+func cancelTargets(ref ticketRef) []tickets.Ticket {
+	forks := ref.epic.ForkParents()
+	targets := []tickets.Ticket{ref.ticket}
+	for i := 0; i < len(targets); i++ {
+		for _, t := range ref.epic.Tickets {
+			if parent, ok := forks.Of(t); ok && parent.Identifier == targets[i].Identifier && !isTerminal(t.Status) {
+				targets = append(targets, t)
+			}
+		}
+	}
+	return targets
+}
+
+func isTerminal(status string) bool {
+	return status == string(schema.StatusDone) || status == string(schema.StatusCancelled)
+}
+
+func (r ticketRef) address(t tickets.Ticket) string {
+	return tickets.Address{Project: r.addr.Project, Epic: r.addr.Epic, ID: t.Identifier}.String()
 }

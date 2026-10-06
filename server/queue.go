@@ -66,6 +66,8 @@ type QueueRequest struct {
 	Items   []QueueItem `json:"items,omitempty"`
 	// ParkReason is the one-line reason a park writes into the ticket.
 	ParkReason string `json:"park_reason,omitempty"`
+	// Stop lets a cancel stop the live pane of a claimed ticket instead of refusing.
+	Stop bool `json:"stop,omitempty"`
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a

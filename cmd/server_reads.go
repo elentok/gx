@@ -338,6 +338,21 @@ func newServerTicketsCmd() *cobra.Command {
 	park.Flags().BoolVar(&parkJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(park)
 
+	var cancelJSON, cancelStop bool
+	cancel := &cobra.Command{
+		Use:   "cancel <project:epic/NN>",
+		Short: "cancel a ticket and its non-terminal descendants",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketCancel(ctx, args[0], cancelStop)
+			})
+		},
+	}
+	cancel.Flags().BoolVar(&cancelStop, "stop", false, "stop the live pane of a claimed ticket first")
+	cancel.Flags().BoolVar(&cancelJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(cancel)
+
 	var relaunchJSON bool
 	relaunch := &cobra.Command{
 		Use:   "relaunch <project:epic/NN>",

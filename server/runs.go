@@ -90,6 +90,18 @@ func (r *runRegistry) has(root string) bool {
 	return ok
 }
 
+// runOf returns the run whose iteration is of the ticket at address.
+func (r *runRegistry) runOf(address string) (Run, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.runs {
+		if t.Address == address {
+			return t.Run, true
+		}
+	}
+	return Run{}, false
+}
+
 func (r *runRegistry) count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()

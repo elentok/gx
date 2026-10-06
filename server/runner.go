@@ -31,6 +31,8 @@ const (
 	EventIterationParked = "iteration-parked"
 	// EventTicketParked streams once a person's park is written to the ticket file.
 	EventTicketParked = "ticket-parked"
+	// EventTicketCancelled streams once per ticket a cancel wrote.
+	EventTicketCancelled = "ticket-cancelled"
 	// EventIterationFailed streams when finishing or landing errored; the ticket stays claimed.
 	EventIterationFailed = "iteration-failed"
 	// EventRootCompleted streams once every ticket of a queued root is done.
