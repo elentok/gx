@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -154,8 +153,8 @@ func printTicketRef(path string, jsonOut bool, w io.Writer) error {
 		_, err := fmt.Fprintln(w, label)
 		return err
 	}
-	return json.NewEncoder(w).Encode(struct {
+	return writeStamped(w, struct {
 		Address string `json:"address"`
 		Path    string `json:"path"`
-	}{label, path})
+	}{label, path}, viaDirect, callerActor(os.Getwd))
 }

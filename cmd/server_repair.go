@@ -96,9 +96,13 @@ func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
+		stamped, err := stampProvenance(res, viaServer, actorRecovery)
+		if err != nil {
+			return err
+		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(res)
+		return enc.Encode(stamped)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

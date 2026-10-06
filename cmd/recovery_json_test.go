@@ -20,7 +20,7 @@ func TestFinishRecovery_SuccessJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
-	if out != "{\"outcome\":\"landed\"}\n" {
+	if out != "{\"actor\":\"recovery\",\"outcome\":\"landed\",\"via\":\"direct\"}\n" {
 		t.Errorf("stdout = %q", out)
 	}
 }
@@ -42,7 +42,7 @@ func TestFinishRecovery_RefusalJSON(t *testing.T) {
 	if jerr := json.Unmarshal([]byte(out), &env); jerr != nil {
 		t.Fatal(jerr)
 	}
-	want := map[string]any{"refused": true, "reason": "land_locked", "message": "locked"}
+	want := map[string]any{"refused": true, "reason": "land_locked", "message": "locked", "via": "direct", "actor": "recovery"}
 	if fmt.Sprint(env) != fmt.Sprint(want) {
 		t.Errorf("envelope = %v, want %v", env, want)
 	}

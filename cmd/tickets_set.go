@@ -95,6 +95,8 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, needs-answer, finished)")
 
+	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
+
 	return cmd
 }
 
@@ -217,6 +219,13 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 	}
 
 	pingServer(path)
+	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
+		return writeStamped(w, struct {
+			Address string   `json:"address"`
+			Path    string   `json:"path"`
+			Updated []string `json:"updated"`
+		}{ticketLabel(path), path, changed}, viaDirect, callerActor(getwd))
+	}
 	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
 	return nil
 }

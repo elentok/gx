@@ -40,11 +40,11 @@ type RefusalError = repair.RefusalError
 // finishRecovery applies the shared recovery-command contract to a run* outcome.
 // Success: exit 0; --json prints result, human mode prints humanText.
 // Failure: exit 1 (*ExitError); --json prints the refusal envelope on stdout,
-// human mode prints the message on stderr.
+// human mode prints the message on stderr. Both JSON shapes carry via/actor.
 func finishRecovery(stdout, stderr io.Writer, jsonMode bool, result any, humanText string, runErr error) error {
 	if runErr == nil {
 		if jsonMode {
-			return writeJSON(stdout, result)
+			return writeStamped(stdout, result, viaDirect, actorRecovery)
 		}
 		if humanText != "" {
 			fmt.Fprintln(stdout, humanText)
@@ -58,13 +58,21 @@ func finishRecovery(stdout, stderr io.Writer, jsonMode bool, result any, humanTe
 		reason = refusal.Reason
 	}
 	if jsonMode {
-		if err := writeJSON(stdout, RefusalEnvelope{Refused: true, Reason: reason, Message: runErr.Error()}); err != nil {
+		if err := writeStamped(stdout, RefusalEnvelope{Refused: true, Reason: reason, Message: runErr.Error()}, viaDirect, actorRecovery); err != nil {
 			return err
 		}
 	} else {
 		fmt.Fprintln(stderr, runErr.Error())
 	}
 	return &ExitError{Code: 1}
+}
+
+func writeStamped(w io.Writer, v any, via, actor string) error {
+	stamped, err := stampProvenance(v, via, actor)
+	if err != nil {
+		return err
+	}
+	return writeJSON(w, stamped)
 }
 
 func writeJSON(w io.Writer, v any) error {

@@ -284,9 +284,13 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
+		stamped, err := stampProvenance(res, viaServer, callerActor(os.Getwd))
+		if err != nil {
+			return err
+		}
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
-		return enc.Encode(res)
+		return enc.Encode(stamped)
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -379,7 +383,7 @@ func newServerTicketsCmd() *cobra.Command {
 				return fmt.Errorf("server ping failed: %w", err)
 			}
 			if changedJSON {
-				return json.NewEncoder(c.OutOrStdout()).Encode(server.ChangedRequest{Address: args[0]})
+				return writeStamped(c.OutOrStdout(), server.ChangedRequest{Address: args[0]}, viaServer, callerActor(os.Getwd))
 			}
 			return nil
 		},
