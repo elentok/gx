@@ -26,7 +26,10 @@ Settable fields:
     it parks.
     Required on every ticket. draft is parked work: it never enters an epic's
     frontier, so no agent is ever handed it.
-  blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03
+  blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03. A bare ID names a ticket in
+    this epic; epic/06 (or project:epic/06 for this project) names one in another epic of the
+    project. To wait on another epic's work, block on it this way — never park the ticket as a
+    stand-in. Another project's prefix and cross-epic cycles are rejected by validate.
   parent (ticket ID, --parent): the ticket this one was produced from. Must name an
     existing ticket in the same epic, and may not point into this ticket's own fork
     subtree (that would make the fork graph cyclic) — both are rejected.

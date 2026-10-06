@@ -61,8 +61,12 @@ Fields:
   that one fork sibling. A token resolves once the ticket it names has stopped blocking — that
   ticket's own status is `done` **and** every ticket in its fork subtree (its `parent` descendants,
   recursively) is done too. A token naming no ticket in the epic never resolves, since nothing can
-  verify it. A `type: code-review` ticket carries no `blocked_by` at all; see its own frontier rule
-  below.
+  verify it. To wait on work in another epic of the same project, qualify the token:
+  `blocked_by: [epic/06]` (`project:epic/06` is accepted for the ticket's own project; another
+  project's prefix fails `gx tickets validate`, cross-project blocking being unsupported). Always
+  block on the other epic's ticket this way — never park the ticket as a stand-in. Cycles, including
+  cross-epic ones, fail `validate`, which reports every edge of the chain. A `type: code-review`
+  ticket carries no `blocked_by` at all; see its own frontier rule below.
 - **`parent`** (ticket ID) — the ticket this one was produced from: a mid-flight fork names the
   ticket it forked off, and a fix ticket opened by a `type: code-review` ticket names that review
   ticket. This is the only fork edge — it lives on the descendant, and nothing is recorded on the

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -22,17 +23,55 @@ func TestExecute_TicketsValidate_DanglingBlockedByFails(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsValidate_QualifiedBlockedByFails(t *testing.T) {
+func TestExecute_TicketsValidate_QualifiedBlockedBy(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		ref  string
+		want string // empty: must pass
+	}{
+		{name: "epic-qualified", ref: "other/06"},
+		{name: "own project prefix", ref: "PROJECT:other/06"},
+		{name: "other project", ref: "elsewhere:other/06", want: `blocked_by "elsewhere:other/06" names another project (cross-project blocking not supported)`},
+		{name: "unknown epic", ref: "nope/06", want: `blocked_by "nope/06" names no ticket in epic "nope"`},
+		{name: "unknown ticket", ref: "other/09", want: `blocked_by "other/09" names no ticket in epic "other"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			writeEpicTicket(t, dir, "other", "06-target.md", ticketFrontmatter("06", ""))
+			ref := strings.ReplaceAll(tt.ref, "PROJECT", filepath.Base(dir))
+			path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \""+ref+"\"\n"))
+
+			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+			err := execute([]string{"tickets", "validate", path}, d)
+			if tt.want == "" {
+				if err != nil {
+					t.Fatalf("validate: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), strings.ReplaceAll(tt.want, "PROJECT", filepath.Base(dir))) {
+				t.Errorf("error = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestExecute_TicketsValidate_CrossEpicCycleReportsEveryEdge(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	path := writeEpicTicket(t, dir, "e", "02-second.md", ticketFrontmatter("02", "blocked_by:\n  - \"other/06\"\n"))
+	path := writeEpicTicket(t, dir, "a", "01-a.md", ticketFrontmatter("01", "blocked_by:\n  - \"b/01\"\n"))
+	writeEpicTicket(t, dir, "b", "01-b.md", ticketFrontmatter("01", "blocked_by:\n  - \"c/01\"\n"))
+	writeEpicTicket(t, dir, "c", "01-c.md", ticketFrontmatter("01", "blocked_by:\n  - \"a/01\"\n"))
 
 	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
 	err := execute([]string{"tickets", "validate", path}, d)
 	if err == nil {
-		t.Fatal("expected an error for a qualified blocked_by, got nil")
+		t.Fatal("expected a cycle error, got nil")
 	}
-	if want := `blocked_by "other/06" is malformed`; !strings.Contains(err.Error(), want) {
+	if want := `blocked_by "b/01" closes a cycle: 01 → b/01 → c/01 → 01`; !strings.Contains(err.Error(), want) {
 		t.Errorf("error = %q, want it to contain %q", err, want)
 	}
 }

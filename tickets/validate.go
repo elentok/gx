@@ -17,6 +17,7 @@ func ValidateProject(projectDir string) error {
 	if err != nil {
 		return err
 	}
+	graph := newProjectGraph(ProjectName(projectDir), epics)
 	var errs []error
 	for _, epic := range epics {
 		for _, t := range epic.Tickets {
@@ -30,10 +31,8 @@ func ValidateProject(projectDir string) error {
 			if t.GraphErr != "" {
 				errs = append(errs, fmt.Errorf("%s: %s", t.Path, t.GraphErr))
 			}
-			for _, check := range []func(Ticket) error{epic.CheckBlockedBy, epic.CheckBlockedByCycles} {
-				if err := check(t); err != nil {
-					errs = append(errs, fmt.Errorf("%s: %w", t.Path, err))
-				}
+			for _, err := range append(graph.checkBlockedBy(epic.Name, t), graph.cycleErrors(epic.Name, t)...) {
+				errs = append(errs, fmt.Errorf("%s: %w", t.Path, err))
 			}
 		}
 	}
