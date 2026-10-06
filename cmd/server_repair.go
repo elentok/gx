@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ func addServerRepairCmds(parent *cobra.Command) {
 				if err != nil {
 					return err
 				}
-				return runServerRepair(c.Context(), cl, c.OutOrStdout(), jsonOut, name, req)
+				return runServerRepair(c.Context(), cl, c.OutOrStdout(), jsonOut, name, req, directRepair)
 			},
 		}
 		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
@@ -63,16 +64,34 @@ func addServerRepairCmds(parent *cobra.Command) {
 	verb("verify", "verify <project:epic[/NN]>", "report whether each ticket's commits landed on the feature branch", cobra.ExactArgs(1), nil)
 }
 
-// runServerRepair never starts the server: a dead socket is a refusal with a
-// `gx server start` hint, like the queue writes.
-func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, verb string, req server.RepairRequest) error {
+const directNotice = "server not running — ran directly under land lock"
+
+// directRepair runs a verb in-process against the configured ticket store.
+func directRepair(verb string, req server.RepairRequest) (server.RepairResult, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return server.RepairResult{}, err
+	}
+	return server.RunRepairDirect(cfg.TicketStore.Path, verb, req)
+}
+
+// runServerRepair never starts the server. The repair verbs are the only
+// server writes with a fallback: a dead socket runs them directly via `direct`,
+// since they must work when the server is what's broken.
+func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, verb string, req server.RepairRequest,
+	direct func(verb string, req server.RepairRequest) (server.RepairResult, error)) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	res, err := cl.Repair(ctx, verb, req)
 	switch {
 	case apiclient.IsNotRunning(err):
-		res = server.RepairResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+		if res, err = direct(verb, req); err != nil {
+			return fmt.Errorf("direct %s failed: %w", verb, err)
+		}
+		if !jsonOut {
+			fmt.Fprintln(w, directNotice)
+		}
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}

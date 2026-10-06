@@ -44,6 +44,36 @@ type RepairResult struct {
 	Refused bool            `json:"refused,omitempty"`
 	Reason  string          `json:"reason,omitempty"`
 	Message string          `json:"message,omitempty"`
+
+	// Via is "direct" when the CLI ran the verb itself because no server was
+	// running; empty when the server served it.
+	Via string `json:"via,omitempty"`
+}
+
+// ViaDirect marks a repair verb the CLI ran without a server.
+const ViaDirect = "direct"
+
+// RunRepairDirect runs a repair verb without a server, for the CLI's
+// server-down fallback. The verbs take the land lock themselves, so a live
+// server and a direct run still exclude each other.
+func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult, error) {
+	s := &Server{cfg: Config{TicketStore: ticketStore}}
+	var do func(RepairRequest) (RepairResult, error)
+	switch verb {
+	case "land":
+		do = s.repairLand
+	case "reset":
+		do = s.repairReset
+	case "unpark":
+		do = s.repairUnpark
+	case "verify":
+		do = s.repairVerify
+	default:
+		return RepairResult{}, fmt.Errorf("unknown repair verb %q", verb)
+	}
+	res, err := do(req)
+	res.Via = ViaDirect
+	return res, err
 }
 
 func repairRefusal(err error) RepairResult {
