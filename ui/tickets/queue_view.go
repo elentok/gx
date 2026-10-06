@@ -94,7 +94,7 @@ func (m QueueModel) completedExecutionProgress() (done, total int) {
 				continue
 			}
 			total++
-			if epic.RenderedStatus(ticket) == tickets.StatusDone {
+			if epic.RenderedStatus(ticket).Terminal() {
 				done++
 			}
 		}
@@ -115,7 +115,7 @@ func (m QueueModel) checkedProgress() (int, int) {
 				continue
 			}
 			total++
-			if epic.RenderedStatus(ticket) == tickets.StatusDone || m.queueStatus[ticket.Path] == queueStatusDone {
+			if epic.RenderedStatus(ticket).Terminal() || m.queueStatus[ticket.Path] == queueStatusDone {
 				done++
 			}
 		}
@@ -289,7 +289,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	}
 	titleStyle := lipgloss.NewStyle()
 	switch {
-	case status == tickets.StatusDone:
+	case status.Terminal():
 		titleStyle = statusDoneStyle
 	case dimmed:
 		titleStyle = dimStyle

@@ -139,7 +139,7 @@ func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
 func checkedTicketIDsForEpic(epic tickets.Epic, checked map[string]bool) []string {
 	var ids []string
 	for _, t := range epic.Tickets {
-		if !checked[t.Path] || epic.RenderedStatus(t) == tickets.StatusDone {
+		if !checked[t.Path] || epic.RenderedStatus(t).Terminal() {
 			continue
 		}
 		ids = append(ids, t.DisplayNumber())
@@ -206,7 +206,7 @@ func (m *Model) isTicketDone(path string) bool {
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
 			if t.Path == path {
-				return epic.RenderedStatus(t) == tickets.StatusDone
+				return epic.RenderedStatus(t).Terminal()
 			}
 		}
 	}

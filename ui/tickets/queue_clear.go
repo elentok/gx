@@ -3,7 +3,6 @@ package tickets
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -41,7 +40,7 @@ func (m QueueModel) doneCheckedPaths() []string {
 			if !m.checked[t.Path] {
 				continue
 			}
-			if epic.RenderedStatus(t) == tickets.StatusDone || m.queueStatus[t.Path] == queueStatusDone {
+			if epic.RenderedStatus(t).Terminal() || m.queueStatus[t.Path] == queueStatusDone {
 				paths = append(paths, t.Path)
 			}
 		}

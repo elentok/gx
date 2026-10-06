@@ -34,7 +34,16 @@ const (
 	// StatusDone is what keeps an epic containing one from counting as
 	// complete, in both Epic.AllDone and ralphloop.allDone.
 	StatusWaitingForChildren
+	// StatusCancelled is a withdrawn ticket: terminal like StatusDone, but the
+	// work was never performed.
+	StatusCancelled
 )
+
+// Terminal reports whether s is a finished state that needs no more work:
+// done or cancelled.
+func (s RenderedStatus) Terminal() bool {
+	return s == StatusDone || s == StatusCancelled
+}
 
 // openStatuses covers raw Status: values meaning "unclaimed, nothing external
 // blocks picking it up". A missing Status: is deliberately absent: status is
@@ -106,6 +115,8 @@ func (t Ticket) baseStatus() RenderedStatus {
 		return StatusDraft
 	case doneStatuses[status]:
 		return StatusDone
+	case cancelledStatuses[status]:
+		return StatusCancelled
 	case claimedStatuses[status]:
 		return StatusClaimed
 	case needsAnswerStatuses[status]:
@@ -206,7 +217,7 @@ func (e Epic) Blocking(t Ticket) bool {
 }
 
 func (e Epic) blocking(t Ticket, forkChildren map[string][]Ticket) bool {
-	if !t.IsDone() {
+	if !t.IsTerminal() {
 		return true
 	}
 	for _, child := range forkChildren[ticketKey(t)] {
@@ -310,7 +321,7 @@ func (e Epic) BlockingTickets(t Ticket) []Ticket {
 		for _, other := range byNumber[num] {
 			_, otherLetters := splitBlockedByToken(other.Identifier)
 			key := siblingKey(other.Number, otherLetters)
-			if other.IsDone() || seen[key] {
+			if other.IsTerminal() || seen[key] {
 				continue
 			}
 			seen[key] = true
@@ -355,6 +366,8 @@ func (s RenderedStatus) Word() string {
 		return "needs-repair"
 	case StatusDone:
 		return "done"
+	case StatusCancelled:
+		return "cancelled"
 	case StatusDraft:
 		return "draft"
 	case StatusWaitingForChildren:

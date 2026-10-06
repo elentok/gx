@@ -976,14 +976,14 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 		ordered := false
 		for _, idx := range sortedTicketIndexes(epic) {
 			ticket := epic.Tickets[idx]
-			if epic.RenderedStatus(ticket) != tickets.StatusDone {
+			if !epic.RenderedStatus(ticket).Terminal() {
 				eligible++
 			}
 			if !checked[ticket.Path] {
 				continue
 			}
 			ticketIDs = append(ticketIDs, ticket.Identifier)
-			if epic.RenderedStatus(ticket) == tickets.StatusDone {
+			if epic.RenderedStatus(ticket).Terminal() {
 				done++
 			}
 			if checkedAt, ok := checkOrder[ticket.Path]; ok && (!ordered || checkedAt < ordinal) {

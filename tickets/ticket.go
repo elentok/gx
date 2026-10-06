@@ -102,6 +102,22 @@ var doneStatuses = map[string]bool{
 	"done": true,
 }
 
+// cancelledStatuses is the raw spelling of the withdrawn terminal state.
+var cancelledStatuses = map[string]bool{
+	"cancelled": true,
+}
+
+// IsCancelled reports whether the ticket's raw Status is cancelled.
+func (t Ticket) IsCancelled() bool {
+	return cancelledStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
+}
+
+// IsTerminal reports whether the ticket is done or cancelled: nothing is left
+// to schedule, and it no longer blocks anything that names it.
+func (t Ticket) IsTerminal() bool {
+	return t.IsDone() || t.IsCancelled()
+}
+
 // IsDone reports whether the ticket's raw Status is done. Used for epic
 // open/total counts; note that a done ticket whose fork subtree is unfinished
 // still renders as StatusWaitingForChildren (see Epic.RenderedStatus).

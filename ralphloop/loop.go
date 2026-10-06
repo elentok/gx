@@ -941,7 +941,7 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 			d.Decision = "claimed"
 		case !scope.Contains(t, epic):
 			d.Decision = "out-of-scope"
-		case status == tickets.StatusDone:
+		case status.Terminal():
 			d.Decision = "done"
 		case isParked(epic, t):
 			d.Decision = "stalled"
@@ -967,7 +967,7 @@ func allDone(e tickets.Epic) bool {
 		return false
 	}
 	for _, t := range e.Tickets {
-		if e.RenderedStatus(t) != tickets.StatusDone {
+		if !e.RenderedStatus(t).Terminal() {
 			return false
 		}
 	}

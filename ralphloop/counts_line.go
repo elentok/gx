@@ -39,7 +39,7 @@ func (s RunScope) Counts(epic tickets.Epic) EpicCounts {
 			continue
 		}
 		switch epic.RenderedStatus(ticket) {
-		case tickets.StatusDone:
+		case tickets.StatusDone, tickets.StatusCancelled:
 			counts.Done++
 		case tickets.StatusClaimed:
 			counts.InProgress++

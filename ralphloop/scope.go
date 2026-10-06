@@ -145,7 +145,7 @@ func (s RunScope) AllDone(epic tickets.Epic) bool {
 		if s.containsID(ticket.DisplayNumber()) {
 			foundRequested++
 		}
-		if epic.RenderedStatus(ticket) != tickets.StatusDone {
+		if !epic.RenderedStatus(ticket).Terminal() {
 			return false
 		}
 	}
@@ -176,7 +176,7 @@ func (s RunScope) DoneCount(epic tickets.Epic) int {
 	}
 	done := 0
 	for _, ticket := range epic.Tickets {
-		if s.Contains(ticket, epic) && epic.RenderedStatus(ticket) == tickets.StatusDone {
+		if s.Contains(ticket, epic) && epic.RenderedStatus(ticket).Terminal() {
 			done++
 		}
 	}

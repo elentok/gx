@@ -78,7 +78,7 @@ func (m Model) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
 
 	visible := make(map[int]bool, len(sorted))
 	for _, idx := range sorted {
-		if m.hideDone && epic.RenderedStatus(epic.Tickets[idx]) == tickets.StatusDone {
+		if m.hideDone && epic.RenderedStatus(epic.Tickets[idx]).Terminal() {
 			continue
 		}
 		visible[idx] = true

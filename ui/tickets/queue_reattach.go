@@ -90,7 +90,7 @@ func planForFullEpic(epic tickets.Epic) checkedEpicPlan {
 	for _, idx := range sortedTicketIndexes(epic) {
 		ticket := epic.Tickets[idx]
 		ticketIDs = append(ticketIDs, ticket.Identifier)
-		if epic.RenderedStatus(ticket) == tickets.StatusDone {
+		if epic.RenderedStatus(ticket).Terminal() {
 			done++
 		}
 	}
@@ -197,7 +197,7 @@ func requeueMaybeStrandedEpics(epics []tickets.Epic, checked map[string]bool, pe
 				continue
 			}
 			hasChecked = true
-			if epic.RenderedStatus(ticket) != tickets.StatusDone {
+			if !epic.RenderedStatus(ticket).Terminal() {
 				allDone = false
 			}
 		}

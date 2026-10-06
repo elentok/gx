@@ -623,3 +623,21 @@ func TestEpic_UnresolvedBlockers_CodeReviewExpansionNotWrittenToTicket(t *testin
 		t.Errorf("reviewTicket.BlockedBy = %v, want unchanged (empty): the expansion must not be written back to the ticket", reviewTicket.BlockedBy)
 	}
 }
+
+func TestEpic_CancelledBlockerResolvesAndEpicCompletes(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Status: "done"},
+		{Number: 2, Status: "cancelled"},
+		{Number: 3, Status: "open", BlockedBy: []string{"2"}},
+	}}
+	if got := epic.UnresolvedBlockers(epic.Tickets[2]); got != nil {
+		t.Errorf("UnresolvedBlockers = %v, want nil", got)
+	}
+	if got := epic.RenderedStatus(epic.Tickets[1]); got != StatusCancelled {
+		t.Errorf("RenderedStatus = %v, want StatusCancelled", got)
+	}
+	epic.Tickets[2].Status = "cancelled"
+	if !epic.AllDone() {
+		t.Error("AllDone = false, want true when remaining tickets are cancelled")
+	}
+}

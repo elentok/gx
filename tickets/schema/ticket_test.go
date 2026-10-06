@@ -78,10 +78,10 @@ func TestTicketID_Valid(t *testing.T) {
 func TestStatus_Valid(t *testing.T) {
 	canonical := []Status{
 		StatusDraft, StatusOpen, StatusClaimed,
-		StatusNeedsAnswer, StatusNeedsRepair, StatusDone,
+		StatusNeedsAnswer, StatusNeedsRepair, StatusDone, StatusCancelled,
 	}
-	if len(canonical) != 6 {
-		t.Fatalf("expected exactly 6 canonical statuses, got %d", len(canonical))
+	if len(canonical) != 7 {
+		t.Fatalf("expected exactly 7 canonical statuses, got %d", len(canonical))
 	}
 	for _, s := range canonical {
 		if !s.Valid() {

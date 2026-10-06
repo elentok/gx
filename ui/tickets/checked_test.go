@@ -195,7 +195,7 @@ func TestModel_SpaceOnEpicRowChecksOnlyNonDoneTickets(t *testing.T) {
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 	for _, ticket := range epic.Tickets {
-		wantChecked := epic.RenderedStatus(ticket) != tickets.StatusDone
+		wantChecked := !epic.RenderedStatus(ticket).Terminal()
 		if m.isChecked(ticket.Path) != wantChecked {
 			t.Fatalf("ticket %s checked=%v, want %v", ticket.Identifier, m.isChecked(ticket.Path), wantChecked)
 		}

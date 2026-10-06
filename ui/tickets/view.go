@@ -199,7 +199,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 
 	matched, _ := m.searchMatch(rowIdx)
 	searchDim := m.search.HasQuery() && !matched
-	doneDim := status == tickets.StatusDone
+	doneDim := status.Terminal()
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
 	if t.ShowsCommitlessSuffix() {
@@ -286,7 +286,7 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketNeedsRepair, statusNeedsRepairStyle
 	case tickets.StatusWaitingForChildren:
 		return icons.TicketWaitingForChildren, statusWaitingForChildrenStyle
-	case tickets.StatusDone:
+	case tickets.StatusDone, tickets.StatusCancelled:
 		return icons.TicketDone, statusDoneStyle
 	default: // tickets.StatusError
 		return icons.TicketError, statusErrorStyle

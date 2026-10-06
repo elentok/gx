@@ -226,7 +226,7 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ticket {
 	filtered := make([]tickets.Ticket, 0, len(ordered))
 	for _, t := range ordered {
-		if epic.RenderedStatus(t) == tickets.StatusDone {
+		if epic.RenderedStatus(t).Terminal() {
 			continue
 		}
 		filtered = append(filtered, t)

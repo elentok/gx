@@ -81,7 +81,7 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 func eligibleEpicTickets(epic tickets.Epic) []tickets.Ticket {
 	var out []tickets.Ticket
 	for _, t := range epic.Tickets {
-		if epic.RenderedStatus(t) != tickets.StatusDone {
+		if !epic.RenderedStatus(t).Terminal() {
 			out = append(out, t)
 		}
 	}
@@ -142,7 +142,7 @@ func (m Model) toggleTicketChecked(r row) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if epic.RenderedStatus(t) == tickets.StatusDone {
+	if epic.RenderedStatus(t).Terminal() {
 		return m, nil
 	}
 

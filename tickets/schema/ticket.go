@@ -51,6 +51,10 @@ const (
 	StatusNeedsAnswer Status = "needs-answer"
 	StatusNeedsRepair Status = "needs-repair"
 	StatusDone        Status = "done"
+	// StatusCancelled is terminal like done, but means the ticket was
+	// withdrawn: it stops counting as outstanding without claiming the work
+	// was performed.
+	StatusCancelled Status = "cancelled"
 )
 
 var validStatuses = map[Status]bool{
@@ -60,6 +64,7 @@ var validStatuses = map[Status]bool{
 	StatusNeedsAnswer: true,
 	StatusNeedsRepair: true,
 	StatusDone:        true,
+	StatusCancelled:   true,
 }
 
 // retiredStatusReplacements names every status spelling this clean cut

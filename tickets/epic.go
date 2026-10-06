@@ -30,7 +30,7 @@ func (e Epic) TotalCount() int {
 func (e Epic) OpenCount() int {
 	open := 0
 	for _, t := range e.Tickets {
-		if e.RenderedStatus(t) != StatusDone {
+		if !e.RenderedStatus(t).Terminal() {
 			open++
 		}
 	}
