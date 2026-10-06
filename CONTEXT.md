@@ -213,6 +213,37 @@ Repair` heading, with markdown markers stripped and ellipsised for display. What
 shows as subtext for a parked ticket, read fresh from disk on every render rather than cached, so
 the row can't go stale between a park and a restart.
 
+## Tickets, the Store, and Addresses
+
+**Ticket** — the one unit of scheduled work. An epic, a fork child and an investigate ticket are all
+tickets. Only top-level tickets are directories (entry file `ticket.md`); everything below one is a
+flat file in its `issues/`, linked by `parent`. _Avoid_: node (Go identifiers only), job.
+
+**Epic** — a top-level ticket with children: a hand-authored set of dependent tickets. Its
+`ticket.md` carries `status`, `blocked_by`, `base:` and timing in frontmatter; the body is optional
+(a plan, or a link to a spec). A forked ticket that has children is still just a ticket.
+
+**Ticket type** (`type` frontmatter) — what kind of work a ticket is. `implement` is the default
+code-writing type. _Avoid_: `task` (retired name; the loader accepts it as an alias until cutover,
+`gx tickets migrate` rewrites it).
+
+**Ticket store** — the one global git-backed directory holding every project's tickets and event
+logs, laid out as `<store>/<project>/<epic>/…`. Markdown is the truth and any server state is an
+index rebuilt from it (ADR 0026). Agents, the CLI and humans never run git in it. _Avoid_: bare
+"store" — it collides with `QueueStore` and the Go `*Store` types.
+
+**Address** — a ticket's canonical name, `project:epic/06` (ADR 0027). Short forms (`06`,
+`epic/06`) are input only and are resolved before anything is stored. _Avoid_: path (agents name
+tickets by address, never by file path).
+
+**Project** / **project name** / **project file** — a registered repo (or `scratch`, which has no
+repo), named by the first address segment and defined by `<ticket store>/<project>/project.json`.
+
+**Event log** — the typed record of a ticket's events, committed to the ticket store beside its
+top-level ticket (one per top-level ticket; `run-log.jsonl` until the file is renamed), plus the
+server event log for events that belong to no ticket. Distinct from `server.log` (process
+diagnostics). _Avoid_: run log.
+
 ## Ticket Forking
 
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
@@ -221,11 +252,12 @@ than its budget or mixes concerns that should land separately. _Avoid_: Split.
 **Parent** — the ticket a forked ticket came from, or the code-review ticket that opened a fix
 ticket. Frontmatter field `parent`, written on the descendant at creation. This is the only
 structural edge between tickets: nothing is recorded on the ticket being pointed at. _Avoid_: Split
-from, Children, the `children` frontmatter field (removed).
+from, the `children` frontmatter field (removed). `parent` means containment, so **children** is the
+accurate word for the tickets that point at it.
 
 **Fork subtree** — a ticket plus every ticket reached by following `parent` reverse-edges down from
 it, at any depth. Derived from `parent` alone; there is no stored child list. What `blocked_by`
-resolution actually asks about. _Avoid_: Children.
+resolution actually asks about.
 
 **Fork suffix** — the letter appended to the parent's number to name each forked child (`04` forks
 into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.
