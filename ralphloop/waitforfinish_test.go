@@ -1933,6 +1933,16 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			if last.Type != eventNeedsAnswer || !strings.Contains(last.Reason, "iter-01") {
 				t.Errorf("park event = %+v, want type needs-answer with reason naming iter-01", last)
 			}
+			// Seam B: exactly one park event, kind matching the frontmatter park_kind.
+			var parks int
+			for _, ev := range events {
+				if ev.Type == eventNeedsAnswer {
+					parks++
+				}
+			}
+			if parks != 1 || last.Kind != string(ticket.ParkKind) || last.Kind != "blocked-pane" || last.Pane != "pane-1" {
+				t.Errorf("parks = %d, last = %+v, want one blocked-pane event matching park_kind with pane context", parks, last)
+			}
 		})
 	}
 }

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -937,11 +937,7 @@ func matchedRuleID(d Deps, pane string) string {
 func parkBlockedAfterCodexQuotaReset(d Deps, p launchAndPromptParams, sessionID string) error {
 	ruleID := matchedRuleID(d, p.Pane)
 	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, ruleID)
-	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason, schema.ParkKindBlockedPane); err != nil {
-		return fmt.Errorf("marking ticket needs-answer after Codex quota reset: %w", err)
-	}
-	p.logAgentEvent(eventNeedsAnswer, sessionID, reason)
-	p.sink().TicketNeedsHuman(p.Ticket, p.EpicName, "needs-answer", reason)
+	p.parkBlockedPane(sessionID, reason)
 	return errBlockedPaneParked
 }
 
@@ -991,12 +987,18 @@ func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parke
 	}
 
 	reason := fmt.Sprintf("%s is blocked on a prompt gx did not send; answer it in the pane", p.Label)
-	if err := MarkNeedsAnswerWithReasonAndStub(p.TicketPath, reason, schema.ParkKindBlockedPane); err != nil {
-		return false, fmt.Errorf("marking ticket needs-answer: %w", err)
-	}
-	p.logAgentEvent(eventNeedsAnswer, sessionID, reason)
-	p.sink().TicketNeedsHuman(p.Ticket, p.EpicName, "needs-answer", reason)
+	p.parkBlockedPane(sessionID, reason)
 	return true, nil
+}
+
+// parkBlockedPane routes a blocked-pane park through the single park path,
+// keeping the agent context on the event.
+func (p launchAndPromptParams) parkBlockedPane(sessionID, reason string) {
+	park(p.sink(), parkRequest{
+		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
+		Type: events.NeedsAnswer, Kind: events.BlockedPane, Reason: reason,
+		Event: Event{Agent: p.Agent, Pane: p.Pane, Tab: p.Tab, AgentSession: sessionID, Cwd: p.SessionCwd},
+	})
 }
 
 // contextOccupancy reads the selected agent's own local session data. A

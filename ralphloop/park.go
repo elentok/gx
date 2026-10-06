@@ -19,6 +19,9 @@ type parkRequest struct {
 	Reason     string
 	// Repair is rendered into the ticket's "## Needs Repair" section.
 	Repair schema.NeedsRepairState
+	// Event carries optional agent context (pane, tab, session, cwd) merged
+	// into the appended event; park overwrites its type, ticket, kind and reason.
+	Event Event
 }
 
 // park is the single park path: it writes the ticket, appends exactly one
@@ -30,17 +33,21 @@ type parkRequest struct {
 // bug this exists to remove.
 func park(sink EventSink, req parkRequest) (reason string) {
 	reason = req.Reason
-	if req.Type != events.NeedsRepair {
+	switch req.Type {
+	case events.NeedsRepair:
+		if err := MarkNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair); err != nil {
+			reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, err)
+		}
+	case events.NeedsAnswer:
+		if err := MarkNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind)); err != nil {
+			reason = fmt.Sprintf("%s (also failed marking needs-answer: %v)", reason, err)
+		}
+	default:
 		reason = fmt.Sprintf("%s (park: unsupported type %q)", reason, req.Type)
-	} else if err := MarkNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair); err != nil {
-		reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, err)
 	}
-	if err := logEvent(req.ScratchDir, req.EpicName, Event{
-		Type:   string(req.Type),
-		Ticket: req.Ticket,
-		Kind:   string(req.Kind),
-		Reason: reason,
-	}); err != nil {
+	ev := req.Event
+	ev.Type, ev.Ticket, ev.Kind, ev.Reason = string(req.Type), req.Ticket, string(req.Kind), reason
+	if err := logEvent(req.ScratchDir, req.EpicName, ev); err != nil {
 		reason = fmt.Sprintf("%s (also failed logging event: %v)", reason, err)
 	}
 	sink.TicketNeedsHuman(req.Ticket, req.EpicName, string(req.Type), reason)
