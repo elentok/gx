@@ -18,7 +18,30 @@ func runTicketsValidate(path string, w io.Writer) error {
 	if err := checkParentGraph(path); err != nil {
 		return err
 	}
+	if err := checkBlockedBy(path); err != nil {
+		return err
+	}
 	fmt.Fprintf(w, "%s: valid ticket (id=%s, status=%s)\n", path, ticket.ID, ticket.Status)
+	return nil
+}
+
+// checkBlockedBy applies the shared blocked_by resolver to path within its
+// epic. Like checkParentGraph, a ticket with no loadable epic is validated on
+// its own frontmatter alone.
+func checkBlockedBy(path string) error {
+	epic, target, unlock, err := lockEpicForTicket(path)
+	if err != nil {
+		return nil
+	}
+	if unlock != nil {
+		defer unlock()
+	}
+	if target == nil {
+		return nil
+	}
+	if err := epic.CheckBlockedBy(*target); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
 	return nil
 }
 
