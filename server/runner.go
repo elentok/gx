@@ -130,6 +130,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	defer ticker.Stop()
 	for {
 		s.claimNext()
+		s.publishVerdictChanges()
 		select {
 		case <-ctx.Done():
 			return
@@ -147,10 +148,7 @@ func (s *Server) claimNext() {
 	if s.herdr.isUnavailable() || s.pause.blocked() {
 		return
 	}
-	limit := s.cfg.MaxConcurrentRoots
-	if limit <= 0 {
-		limit = config.DefaultExecutionQueueConfig().MaxConcurrentEpics
-	}
+	limit := s.concurrencyLimit()
 	running := s.registry.count()
 	for _, item := range s.queued.list() {
 		if running >= limit {
@@ -165,6 +163,13 @@ func (s *Server) claimNext() {
 			running++
 		}
 	}
+}
+
+func (s *Server) concurrencyLimit() int {
+	if s.cfg.MaxConcurrentRoots > 0 {
+		return s.cfg.MaxConcurrentRoots
+	}
+	return config.DefaultExecutionQueueConfig().MaxConcurrentEpics
 }
 
 // claimRoot reports whether it launched an iteration for item's root.

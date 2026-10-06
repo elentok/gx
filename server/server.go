@@ -112,6 +112,7 @@ type Server struct {
 	savedRuns []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused   refusals
 	lands     landGuard
+	verdicts  verdictLog
 	kick      chan struct{} // wakes keepClaiming
 }
 
@@ -291,6 +292,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap := s.idx.snapshot()
 	snap.HerdrUnavailable = s.herdr.isUnavailable()
 	snap.Budget = s.budgetStatus(time.Now())
+	snap.Pending = s.pendingRows()
 	_ = json.NewEncoder(w).Encode(snap)
 }
 

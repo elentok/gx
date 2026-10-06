@@ -73,7 +73,7 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 
 	want := map[string]struct{ verdict, reason string }{
-		"01": {"unknown: in-process scheduler", ""},
+		"01": {"not queued", ""},
 		"02": {"blocked", "01"},
 		"03": {"error", ""},
 		"04": {"stalled", "draft"},

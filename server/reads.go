@@ -43,8 +43,8 @@ type History struct {
 
 // Explanation is the /v1/tickets/explain payload: why the scheduler would or
 // wouldn't pick the ticket. Verdict is the scheduler's own decision word
-// (blocked, error, stalled, done, ...), or UnknownInProcess when only the
-// in-process scheduler's queue and slot state could say.
+// (blocked, error, stalled, done, ...) or one of the queue and slot verdicts
+// in verdicts.go.
 type Explanation struct {
 	Address string `json:"address"`
 	Verdict string `json:"verdict"`
@@ -52,8 +52,7 @@ type Explanation struct {
 }
 
 const (
-	lockKindLand     = "land"
-	UnknownInProcess = "unknown: in-process scheduler"
+	lockKindLand = "land"
 )
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -164,9 +163,8 @@ func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, ex)
 }
 
-// explainTicket runs the scheduler's own verdict on the stored ticket. Queue
-// and slot state live in the scheduler process, so a ticket that would reach
-// them (verdict "unclaimed") is reported as unknown rather than guessed at.
+// explainTicket gives the stored ticket's verdict: the scheduler's own, then
+// the server's queue and slot state for a ticket nothing else holds back.
 func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
@@ -188,18 +186,7 @@ func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
 				if t.DisplayNumber() != addr.ID {
 					continue
 				}
-				d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, false, false)
-				ex := Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Reason}
-				if d.Decision == "stalled" {
-					ex.Reason = d.Status // needs-answer, needs-repair or draft
-				}
-				if d.Decision == "unclaimed" {
-					ex.Verdict, ex.Reason = UnknownInProcess, ""
-					if s.refused.has(addr.String()) {
-						ex.Verdict = VerdictClaimRereadMismatch
-					}
-				}
-				return ex, nil
+				return s.verdictOf(e, t, addr), nil
 			}
 		}
 		return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}

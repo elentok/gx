@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -285,6 +286,77 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	if len(seen) != 6 || !strings.HasPrefix(seen[1], server.EventTicketDone) {
 		t.Errorf("events = %v, want start/done/completed per root, one root at a time", seen)
 	}
+}
+
+func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsWhenTheSlotFrees(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.MaxConcurrentRoots = 1
+	})
+	registerLaunch(h)
+	// The first wait is the launch's; the second is epic-a's iteration, held
+	// until the test frees the slot.
+	release := make(chan struct{})
+	var waits atomic.Int32
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}
+	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		if waits.Add(1) == 2 {
+			<-release
+		}
+		return idle, herdrfake.Identities{}, nil
+	})
+	var once sync.Once
+	free := func() { once.Do(func() { close(release) }) }
+	defer free()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {
+		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", addr, res, err)
+		}
+	}
+	var snap server.Snapshot
+	for {
+		var err error
+		if snap, err = h.Client.Snapshot(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(snap.Pending) == 2 && snap.Pending[1].Verdict == server.VerdictConcurrencyCap {
+			break
+		}
+		if ctx.Err() != nil {
+			t.Fatalf("pending = %+v, want the second root at the cap", snap.Pending)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := snap.Pending[0].Verdict; got != "claimed" {
+		t.Errorf("first pending verdict = %q, want claimed", got)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	free()
+	for ev := range evs {
+		if ev.Type != server.EventExplainVerdictChange || ev.Address != "proj:epic-b/01" {
+			continue
+		}
+		ex, err := h.Client.Explain(ctx, ev.Address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ex.Verdict == server.VerdictConcurrencyCap {
+			t.Errorf("verdict-change event but explain still says %+v", ex)
+		}
+		return
+	}
+	t.Fatal("no verdict-change event for the second root")
 }
 
 // leaveIteration stages what a server that died mid-iteration leaves behind: a

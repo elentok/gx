@@ -39,6 +39,9 @@ type Snapshot struct {
 	// Budget is today's spend, filled in by the handler like HerdrUnavailable.
 	Budget  BudgetStatus `json:"budget"`
 	Tickets []TicketInfo `json:"tickets"`
+	// Pending is every queue entry with its explain verdict, so a client never
+	// asks per row. Filled in by the handler, like HerdrUnavailable.
+	Pending []PendingRow `json:"pending"`
 }
 
 // index is the server's in-memory view of the ticket store.
