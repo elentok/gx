@@ -6,6 +6,7 @@ package events
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -104,12 +105,14 @@ var kinds = map[Kind]bool{
 	DuplicateLive: true,
 }
 
-// Kinds returns every kind in the enum, for publishing via a CLI verb.
+// Kinds returns every kind in the enum, sorted so the CLI verb that publishes
+// them has stable output.
 func Kinds() []Kind {
 	out := make([]Kind, 0, len(kinds))
 	for k := range kinds {
 		out = append(out, k)
 	}
+	slices.Sort(out)
 	return out
 }
 
