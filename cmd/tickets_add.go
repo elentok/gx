@@ -73,6 +73,8 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 		return fmt.Errorf("stub ticket %s failed validation: %w", stubPath, err)
 	}
 
+	// The path, not the address: the caller opens this file next to fill in
+	// its body, and `show` is the only other way to learn where it is.
 	fmt.Fprintln(w, stubPath)
 	return nil
 }

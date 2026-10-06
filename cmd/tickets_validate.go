@@ -21,7 +21,7 @@ func runTicketsValidate(path string, w io.Writer) error {
 	if err := checkBlockedBy(path); err != nil {
 		return err
 	}
-	fmt.Fprintf(w, "%s: valid ticket (id=%s, status=%s)\n", path, ticket.ID, ticket.Status)
+	fmt.Fprintf(w, "%s: valid ticket (id=%s, status=%s)\n", ticketLabel(path), ticket.ID, ticket.Status)
 	return nil
 }
 

@@ -212,11 +212,15 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(&cobra.Command{
-		Use:   "validate <path>",
-		Short: "validate a ticket file's frontmatter",
+		Use:   "validate <addr|path>",
+		Short: "validate a ticket's frontmatter, by address or file path",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsValidate(args[0], c.OutOrStdout())
+			path, err := resolveTicketRef(d.getwd, args[0])
+			if err != nil {
+				return err
+			}
+			return runTicketsValidate(path, c.OutOrStdout())
 		},
 	})
 	var showJSON bool

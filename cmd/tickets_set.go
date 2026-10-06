@@ -73,11 +73,15 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "set <path>",
-		Short: "validated, sparse frontmatter writes to a ticket file",
+		Use:   "set <addr|path>",
+		Short: "validated, sparse frontmatter writes to a ticket, by address or file path",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsSet(c, args[0], c.OutOrStdout(), c.ErrOrStderr(), d.getwd)
+			path, err := resolveTicketRef(d.getwd, args[0])
+			if err != nil {
+				return err
+			}
+			return runTicketsSet(c, path, c.OutOrStdout(), c.ErrOrStderr(), d.getwd)
 		},
 	}
 
@@ -207,7 +211,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 		return err
 	}
 
-	fmt.Fprintf(w, "%s: updated (%s)\n", path, strings.Join(changed, ", "))
+	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
 	return nil
 }
 

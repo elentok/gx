@@ -38,36 +38,11 @@ func currentEpic(cwd string) string {
 // printed; an address that names nothing is refused with an
 // tickets.AddressError carrying a stable code.
 func runTicketsShow(cwd, addr string, jsonOut bool, w io.Writer) error {
-	root, err := ticketRoot(cwd)
+	a, t, err := findTicket(cwd, addr)
 	if err != nil {
 		return err
 	}
-	project := tickets.ProjectName(root)
-	a, err := tickets.ParseAddress(addr, tickets.AddressContext{Project: project, Epic: currentEpic(cwd)})
-	if err != nil {
-		return err
-	}
-	if a.Project != project {
-		return &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: fmt.Sprintf("project %q is not the current project (%q)", a.Project, project)}
-	}
-
-	epics, err := tickets.Load(root)
-	if err != nil {
-		return err
-	}
-	for _, epic := range epics {
-		if epic.Name != a.Epic {
-			continue
-		}
-		for _, t := range epic.Tickets {
-			if t.Identifier != a.ID {
-				continue
-			}
-			return printTicket(a, t, jsonOut, w)
-		}
-		return &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: fmt.Sprintf("no ticket %s in epic %q", a.ID, a.Epic)}
-	}
-	return &tickets.AddressError{Code: tickets.CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q in project %q", a.Epic, a.Project)}
+	return printTicket(a, t, jsonOut, w)
 }
 
 func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer) error {
