@@ -84,6 +84,41 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 	}
 }
 
+// Seam B: finish-time needs-answer parks (zero-commit, self-reported) each write
+// the ticket's park_kind and append one needs-answer event with that kind.
+func TestPark_NeedsAnswerKinds(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []events.Kind{events.ZeroCommit, events.SelfReported} {
+		t.Run(string(kind), func(t *testing.T) {
+			t.Parallel()
+			scratchDir := writeEpic(t, "my-epic", map[string]string{
+				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+			})
+			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			sink := &recordingSink{}
+
+			if _, err := park(sink, parkRequest{
+				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
+				Type: events.NeedsAnswer, Kind: kind, Reason: "why", Event: Event{Pane: "p1"},
+			}); err != nil {
+				t.Fatal(err)
+			}
+
+			got := mustParse(t, path)
+			if got.Status != schema.StatusNeedsAnswer || got.ParkKind != schema.ParkKind(kind) {
+				t.Errorf("ticket = (%q, %q), want needs-answer/%s", got.Status, got.ParkKind, kind)
+			}
+			evs, _, _ := ReadEvents(scratchDir, "my-epic")
+			if len(evs) != 1 || evs[0].Type != "needs-answer" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
+				t.Errorf("events = %+v, want one needs-answer event kind %s", evs, kind)
+			}
+			if calls := sink.snapshot(); len(calls) != 1 || calls[0] != "TicketNeedsHuman" {
+				t.Errorf("sink calls = %v, want one TicketNeedsHuman", calls)
+			}
+		})
+	}
+}
+
 // Seam B: a needs-repair park stamps the event's kind into frontmatter as
 // park_kind; a claim (resume) clears it while the event stays in the log.
 func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {

@@ -25,25 +25,31 @@ type parkRequest struct {
 }
 
 // park is the single park path: it writes the ticket, appends exactly one
-// event and notifies. Only needs-repair is routed here so far; the other
-// status writers move over in later tickets.
+// event and notifies. Needs-repair and needs-answer are routed here; the
+// remaining status writers move over in later tickets.
 //
-// A failed ticket write is folded into the returned reason rather than
-// aborting, so the event and notification still fire — a silent park is the
-// bug this exists to remove.
-func park(sink EventSink, req parkRequest) (reason string) {
+// A failed ticket write is folded into the notified/logged reason so the event
+// and notification still fire — a silent park is the bug this exists to
+// remove — and is also returned, for callers whose flow must not continue past
+// an unwritten park.
+func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch req.Type {
 	case events.NeedsRepair:
-		if err := MarkNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair); err != nil {
-			reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, err)
-		}
+		writeErr = MarkNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair)
 	case events.NeedsAnswer:
-		if err := MarkNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind)); err != nil {
-			reason = fmt.Sprintf("%s (also failed marking needs-answer: %v)", reason, err)
+		// A blocked pane's question lives only in the pane, so its ticket gets a
+		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
+		if req.Kind == events.BlockedPane {
+			writeErr = MarkNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind))
+		} else {
+			writeErr = MarkNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
 		}
 	default:
-		reason = fmt.Sprintf("%s (park: unsupported type %q)", reason, req.Type)
+		writeErr = fmt.Errorf("park: unsupported type %q", req.Type)
+	}
+	if writeErr != nil {
+		reason = fmt.Sprintf("%s (also failed marking %s: %v)", reason, req.Type, writeErr)
 	}
 	ev := req.Event
 	ev.Type, ev.Ticket, ev.Kind, ev.Reason = string(req.Type), req.Ticket, string(req.Kind), reason
@@ -51,5 +57,5 @@ func park(sink EventSink, req parkRequest) (reason string) {
 		reason = fmt.Sprintf("%s (also failed logging event: %v)", reason, err)
 	}
 	sink.TicketNeedsHuman(req.Ticket, req.EpicName, string(req.Type), reason)
-	return reason
+	return reason, writeErr
 }

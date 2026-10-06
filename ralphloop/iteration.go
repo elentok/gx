@@ -409,11 +409,9 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			// The agent finished without landing any commits: leave the worktree/
 			// tab in place for inspection instead of silently marking done or
 			// retrying, and let the scheduler move on to other unblocked tickets.
-			if err := MarkNeedsAnswer(p.Ticket.Path, schema.ParkKindZeroCommit); err != nil {
+			if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no commits landed", pane, tab, sessionID, path); err != nil {
 				return fmt.Errorf("marking ticket needs-answer: %w", err)
 			}
-			p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
-			p.Sink.TicketNeedsHuman(p.Ticket.Identifier, p.FeatureBranch, "needs-answer", "no commits landed")
 			return nil
 		}
 	}
@@ -551,12 +549,20 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string
 		return false, nil
 	}
 
-	if err := MarkNeedsAnswer(p.Ticket.Path, schema.ParkKindSelfReported); err != nil {
+	if _, err := p.parkNeedsAnswer(events.SelfReported, "agent reported needs-answer via iteration_status", pane, tab, sessionID, path); err != nil {
 		return false, fmt.Errorf("adopting needs-answer report: %w", err)
 	}
-	p.logTicketEvent(eventNeedsAnswer, pane, tab, sessionID, path)
-	p.Sink.TicketNeedsHuman(p.Ticket.Identifier, p.FeatureBranch, "needs-answer", "agent reported needs-answer via iteration_status")
 	return true, nil
+}
+
+// parkNeedsAnswer routes a finish-time needs-answer park through the single
+// park path, carrying the iteration's pane/tab/session on the event.
+func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, tab, sessionID, cwd string) (string, error) {
+	return park(p.Sink, parkRequest{
+		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
+		Type: events.NeedsAnswer, Kind: kind, Reason: reason,
+		Event: Event{Agent: p.Agent, Pane: pane, Tab: tab, AgentSession: sessionID, Cwd: cwd},
+	})
 }
 
 // markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
