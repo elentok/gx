@@ -5,17 +5,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
-	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
-
-// unparkResult is the --json success payload of `gx tickets unpark`.
-type unparkResult struct {
-	Ticket string `json:"ticket"`
-	Status string `json:"status"`
-}
 
 func newTicketsUnparkCmd(d deps) *cobra.Command {
 	var jsonOut bool
@@ -35,33 +27,9 @@ func newTicketsUnparkCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-// runTicketsUnpark is a thin wrapper over ralphloop.UnparkTicket, the same
-// write the tickets/queue tabs' suggested-actions menu performs, so both
-// produce the identical ticket file.
+// runTicketsUnpark is a thin wrapper over repair.Unpark.
 func runTicketsUnpark(epicPath, id string, jsonMode bool, now time.Time, stdout, stderr io.Writer) error {
-	path, err := unparkTarget(epicPath, id)
-	if err == nil {
-		err = ralphloop.UnparkTicket(path, now)
-	}
-	return finishRecovery(stdout, stderr, jsonMode,
-		unparkResult{Ticket: id, Status: "open"},
+	res, err := repair.Unpark(epicPath, id, now)
+	return finishRecovery(stdout, stderr, jsonMode, res,
 		fmt.Sprintf("%s: unparked", epicTicketLabel(epicPath, id)), err)
-}
-
-// unparkTarget resolves id in epicPath to a ticket path, refusing unless the
-// ticket is currently parked at needs-answer.
-func unparkTarget(epicPath, id string) (string, error) {
-	epic, t, err := findEpicTicket(epicPath, id)
-	if err != nil {
-		return "", err
-	}
-	if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
-		return "", &RefusalError{Reason: ReasonNotParked, Message: fmt.Sprintf("ticket %s is %v, not needs-answer", id, epic.RenderedStatus(t))}
-	}
-	return t.Path, nil
-}
-
-// findEpicTicket loads the epic at epicPath and returns it with ticket id.
-func findEpicTicket(epicPath, id string) (tickets.Epic, tickets.Ticket, error) {
-	return repair.FindEpicTicket(epicPath, id)
 }
