@@ -243,8 +243,20 @@ func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
 // rely on.
 func stampEpicTiming(scratchDir, epicName string, mutate func(*epicYAML) bool) error {
 	epicPath := filepath.Join(scratchDir, epicName)
-	if raw, err := os.ReadFile(filepath.Join(epicPath, "ticket.md")); err == nil {
-		return stampTicketMDTiming(filepath.Join(epicPath, "ticket.md"), string(raw), mutate)
+	ticketPath := filepath.Join(epicPath, "ticket.md")
+	if _, err := os.Stat(ticketPath); err == nil {
+		// The lock spans the read inside stampTicketMDTiming too, or a
+		// concurrent `set`/`section` write between read and write is lost.
+		unlock, err := schema.LockTicket(ticketPath)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+		raw, err := os.ReadFile(ticketPath)
+		if err != nil {
+			return err
+		}
+		return stampTicketMDTiming(ticketPath, string(raw), mutate)
 	}
 	yamlPath := filepath.Join(epicPath, "epic.yaml")
 
