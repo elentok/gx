@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -43,6 +44,8 @@ type Server struct {
 	lock *serverLock
 	ln   net.Listener
 	http *http.Server
+	logf *rotatingFile
+	log  *slog.Logger
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -73,7 +76,19 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, err
 	}
-	s := &Server{cfg: cfg, lock: lock, ln: ln}
+	logf, err := openRotatingFile(LogPath(cfg.StateDir), logMaxBytes, logMaxFiles)
+	if err != nil {
+		ln.Close()
+		lock.release()
+		return nil, err
+	}
+	s := &Server{
+		cfg:  cfg,
+		lock: lock,
+		ln:   ln,
+		logf: logf,
+		log:  slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo})),
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/handshake", s.handshake)
 	s.http = &http.Server{Handler: mux}
@@ -87,6 +102,7 @@ func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.
 func (s *Server) Serve(ctx context.Context) error {
+	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	errc := make(chan error, 1)
 	go func() { errc <- s.http.Serve(s.ln) }()
 	var err error
@@ -100,6 +116,8 @@ func (s *Server) Serve(ctx context.Context) error {
 		}
 	}
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
+	s.log.Info("server stopped")
+	_ = s.logf.Close()
 	s.lock.release()
 	if err != nil {
 		return fmt.Errorf("serve: %w", err)

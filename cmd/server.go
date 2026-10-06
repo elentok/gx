@@ -47,6 +47,29 @@ func newServerCmd(_ deps) *cobra.Command {
 			return runServerStop(c.Context(), c.OutOrStdout())
 		},
 	})
+	var logOpts serverLogsOpts
+	logs := &cobra.Command{
+		Use:   "logs",
+		Short: "print the server log (server.log)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			stateDir, err := config.StateDir()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			return runServerLogs(ctx, server.LogPath(stateDir), logOpts, c.OutOrStdout())
+		},
+	}
+	logs.Flags().BoolVarP(&logOpts.Follow, "follow", "f", false, "keep printing new lines as they are written")
+	logs.Flags().StringVar(&logOpts.Level, "level", "", "minimum level to show: debug, info, warn or error")
+	logs.Flags().BoolVar(&logOpts.JSON, "json", false, "print raw JSON lines instead of pretty output")
+	cmd.AddCommand(logs)
 	eventsCmd := &cobra.Command{
 		Use:   "events",
 		Short: "run-log event contract",
