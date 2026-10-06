@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 const (
@@ -22,6 +24,15 @@ const (
 	// EventIterationLaunchFailed streams when the launch failed and the claim
 	// was rolled back.
 	EventIterationLaunchFailed = "iteration-launch-failed"
+	// EventTicketDone streams once the ticket's commits are landed and the file says done.
+	EventTicketDone = "ticket-done"
+	// EventIterationParked streams when a finished iteration ended without landing
+	// (needs-answer or zero commits).
+	EventIterationParked = "iteration-parked"
+	// EventIterationFailed streams when finishing or landing errored; the ticket stays claimed.
+	EventIterationFailed = "iteration-failed"
+	// EventRootCompleted streams once every ticket of a queued root is done.
+	EventRootCompleted = "root-completed"
 
 	implementSkill = "gx-implement"
 )
@@ -46,6 +57,12 @@ func (r *runRegistry) has(root string) bool {
 	defer r.mu.Unlock()
 	_, ok := r.runs[root]
 	return ok
+}
+
+func (r *runRegistry) delete(root string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.runs, root)
 }
 
 func (r *runRegistry) put(root string, run Run) {
@@ -182,7 +199,11 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	}
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
-	run, err := s.launch(addr, ticketAddr, repo, agent)
+	one := ralphloop.OneIteration{
+		RepoDir: repo, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t,
+	}
+	deps := ralphloop.DefaultDeps()
+	run, wt, err := s.prepareAndLaunch(deps, &one, addr, ticketAddr)
 	if err != nil {
 		if rerr := ralphloop.SetStatus(t.Path, "open"); rerr != nil {
 			err = errors.Join(err, fmt.Errorf("release claim: %w", rerr))
@@ -192,15 +213,83 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	}
 	s.registry.put(root, run)
 	s.events.publish(EventIterationStarted, ticketAddr)
+	go s.finishRun(deps, root, one, wt, run, ticketAddr)
 	return nil
 }
 
-func (s *Server) launch(addr tickets.Address, ticketAddr, repo string, agent ralphloop.AgentKind) (Run, error) {
-	ws, err := herdr.EnsureWorkspace(addr.Epic, repo)
+// prepareAndLaunch gives the ticket its own worktree, then launches the agent
+// in it. A launch that fails takes the worktree back out so a retry starts clean.
+func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIteration, addr tickets.Address, ticketAddr string) (Run, ralphloop.IterationWorktree, error) {
+	ws, err := herdr.EnsureWorkspace(addr.Epic, one.RepoDir)
 	if err != nil {
-		return Run{}, err
+		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: repo, Label: ticketAddr})
+	one.WorkspaceID = ws
+	wt, err := ralphloop.PrepareIteration(deps, *one)
+	if err != nil {
+		return Run{}, ralphloop.IterationWorktree{}, err
+	}
+	run, err := s.launch(addr, ticketAddr, ws, wt.Path, one.Agent)
+	if err != nil {
+		if derr := ralphloop.DiscardIteration(deps, *one, wt); derr != nil {
+			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
+		}
+		return Run{}, ralphloop.IterationWorktree{}, err
+	}
+	return run, wt, nil
+}
+
+// finishRun waits for the agent to settle, then lands (or parks) the ticket and
+// moves the root on: the next frontier ticket, or the root's completion.
+func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
+	defer s.kickRunner()
+	defer s.registry.delete(root)
+	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
+	if err == nil {
+		err = ralphloop.FinishIteration(deps, one, wt, run.Pane, run.Tab)
+	}
+	if err != nil {
+		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
+		s.events.publish(EventIterationFailed, ticketAddr)
+		return
+	}
+	t, err := schema.ParseTicket(one.Ticket.Path)
+	if err != nil || t.Status != "done" {
+		s.events.publish(EventIterationParked, ticketAddr)
+		return
+	}
+	s.events.publish(EventTicketDone, ticketAddr)
+	s.completeRootIfDone(root, one)
+}
+
+// completeRootIfDone dequeues the root once every ticket in its epic is done.
+func (s *Server) completeRootIfDone(root string, one ralphloop.OneIteration) {
+	project, _, _ := strings.Cut(root, ":")
+	dir, _, err := s.projectOf(project)
+	if err != nil {
+		s.log.Warn("complete root", "root", root, "err", err)
+		return
+	}
+	epics, err := tickets.Load(dir)
+	if err != nil {
+		s.log.Warn("complete root", "root", root, "err", err)
+		return
+	}
+	for _, e := range epics {
+		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
+			continue
+		}
+		for _, item := range s.queued.list() {
+			if a, err := tickets.ParseAddress(item.Address, tickets.AddressContext{}); err == nil && a.Project+":"+a.Epic == root {
+				_, _ = s.queueRemove(QueueRequest{Address: item.Address})
+			}
+		}
+		s.events.publish(EventRootCompleted, root)
+	}
+}
+
+func (s *Server) launch(addr tickets.Address, ticketAddr, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
+	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticketAddr})
 	if err != nil {
 		return Run{}, err
 	}

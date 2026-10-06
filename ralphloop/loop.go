@@ -1019,6 +1019,9 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 	return d
 }
 
+// AllDone is allDone for the server's runner.
+func AllDone(e tickets.Epic) bool { return allDone(e) }
+
 // allDone reports whether every ticket in e is done — the run's one exit
 // condition. A stalled ticket (see isParked) is deliberately not an
 // exit condition: the run parks on it instead, so the agent's question is
