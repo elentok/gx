@@ -257,6 +257,8 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `execution-queue.max-concurrent-tickets-per-epic` | integer (≥1) | `2` | Maximum tickets that may run concurrently within one epic. |
 | `execution-queue.max-concurrent-epics` | integer (≥1) | `2` | Maximum epics that may run concurrently in this `gx` process. |
 | `execution-queue.retry-storm-launches` | integer (≥1) | `3` | Consecutive failed launches of one ticket before it is parked `needs-repair` as `retry-exhausted`. |
+| `execution-queue.spin-cycles` | integer (≥1) | `3` | Park/re-claim cycles of one ticket within `spin-window` before it is quarantined `needs-repair` as `spinning`. |
+| `execution-queue.spin-window` | duration string | `"5m"` | Window for counting `spin-cycles` (Go duration, e.g. `"90s"`). Unparsable or non-positive values keep the default. |
 | `budget.soft-limit`        | dollars (float)                 | `20`      | Estimated API-equivalent-cost soft limit. Set to `0` to disable.                                                                                                                             |
 | `budget.hard-limit`        | dollars (float)                 | `30`      | Estimated API-equivalent-cost hard limit. Set to `0` to disable. Bumped up to `soft-limit` on load if it's set at or below a nonzero `soft-limit`.                                          |
 | `budget.notification-thresholds` | array of dollars (float)  | `[5, 10, 15]` | Estimated API-equivalent-cost thresholds at which a notification fires. Sorted and deduped on load.                                                                                    |

@@ -27,6 +27,12 @@ type parkRequest struct {
 	AlreadyDone bool
 }
 
+// isParkType reports whether t is an event type a park writes for a person to
+// act on (as opposed to manual-land).
+func isParkType(t events.Type) bool {
+	return t == events.NeedsAnswer || t == events.NeedsRepair
+}
+
 // NoopEventSink is the sink for park callers with no live TUI to notify
 // (the CLI, the Queue tab's budget kill, which sends its own notification).
 func NoopEventSink() EventSink { return noopEventSink{} }

@@ -466,23 +466,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 			scanned = epic
 			frontier = scope.Frontier(*epic)
-			for _, candidate := range frontier {
-				if launched[candidate.Identifier] {
-					continue
-				}
-				spinning, err := quarantineIfSpinning(opts, d.Now(), sink, scratchDir, candidate, schema.NeedsRepairState{
-					Label:    iterLabel(opts.EpicName, candidate.Identifier),
-					Branch:   iterBranch(opts.EpicName, candidate.Identifier),
-					Worktree: iterationWorktreePath(wtDir, opts.EpicName, candidate.Identifier),
-				})
-				if err != nil {
-					return err
-				}
-				if spinning {
-					continue
-				}
-				ticket = candidate
-				break
+			ticket, err = firstNonSpinning(opts, d.Now(), sink, scratchDir, wtDir, frontier, func(t tickets.Ticket) bool {
+				return launched[t.Identifier]
+			})
+			if err != nil {
+				return err
 			}
 			if ticket.Path == "" {
 				return nil

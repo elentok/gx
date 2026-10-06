@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets"
 )
 
 // seedParks writes n park events for ticket 01 at the given age, as a prior
@@ -113,5 +114,27 @@ func TestRun_SpinCycles_CustomThresholdQuarantines(t *testing.T) {
 	scratchDir, prompts := runSpinScenario(t, 2, time.Minute, RunOptions{SpinCycles: 2})
 	if len(*prompts) != 0 || len(spinningEvents(t, scratchDir)) != 1 {
 		t.Errorf("prompts = %v, spinning = %+v, want quarantined with SpinCycles=2", *prompts, spinningEvents(t, scratchDir))
+	}
+}
+
+func TestFirstNonSpinning_QuarantinesSpinningCandidatesAndReturnsNextClean(t *testing.T) {
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
+	})
+	seedParks(t, scratchDir, "epic", 3, time.Minute)
+	epic, err := loadNamedEpic(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("loadNamedEpic: %v", err)
+	}
+	got, err := firstNonSpinning(RunOptions{EpicName: "epic"}, time.Now(), noopEventSink{}, scratchDir, t.TempDir(), epic.Tickets, func(tickets.Ticket) bool { return false })
+	if err != nil {
+		t.Fatalf("firstNonSpinning: %v", err)
+	}
+	if got.Identifier != "02" {
+		t.Errorf("picked %q, want 02", got.Identifier)
+	}
+	if n := len(spinningEvents(t, scratchDir)); n != 1 {
+		t.Errorf("spinning events = %d, want 1", n)
 	}
 }

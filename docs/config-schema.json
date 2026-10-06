@@ -76,12 +76,25 @@
           "description": "Consecutive failed launches of one ticket before it is parked needs-repair as retry-exhausted. Default: 3.",
           "minimum": 1,
           "default": 3
+        },
+        "spin-cycles": {
+          "type": "integer",
+          "description": "Park/re-claim cycles of one ticket within spin-window before it is quarantined needs-repair as spinning. Default: 3.",
+          "minimum": 1,
+          "default": 3
+        },
+        "spin-window": {
+          "type": "string",
+          "description": "Go duration string (e.g. \"5m\") bounding the spin-cycles count. Unparsable or non-positive values keep the default. Default: \"5m\".",
+          "default": "5m"
         }
       },
       "default": {
         "max-concurrent-tickets-per-epic": 2,
         "max-concurrent-epics": 2,
-        "retry-storm-launches": 3
+        "retry-storm-launches": 3,
+        "spin-cycles": 3,
+        "spin-window": "5m"
       }
     },
     "budget": {
