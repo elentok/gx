@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
@@ -30,6 +31,14 @@ func startAndCaptureSink(t *testing.T, notifications config.NotificationsConfig)
 		case <-release:
 		default:
 			close(release)
+		}
+		// Wait for the run's goroutine to call finish on this registry before
+		// restoring the previous one — otherwise finish lands on the restored
+		// registry, this one never detaches, and its cost poller leaks into
+		// later tests (zeroing costAgg under them).
+		deadline := time.Now().Add(time.Second)
+		for ralphLoopRegistry.isRunning() && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
 		}
 		runRalphLoop = previousRun
 		ralphLoopRegistry = previousRegistry
