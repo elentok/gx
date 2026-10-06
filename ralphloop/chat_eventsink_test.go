@@ -383,7 +383,7 @@ func newGateChatSink(t *testing.T, scratchDir, epicName string) (*chatEventSink,
 // two of ticket 04's test seams at once: the end-to-end trip (5 identical
 // events within 60s mutes the source and sends exactly one "muting this"
 // notice) and the loop-registry parkTicket wiring (the trip resolves the
-// ticket's real path and reaches MarkNeedsRepairWithReason with a
+// ticket's real path and reaches markNeedsRepairWithReason with a
 // storm-mute reason).
 func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing.T) {
 	t.Parallel()

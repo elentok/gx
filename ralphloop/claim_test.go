@@ -207,8 +207,8 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	if err := Claim(path); err != nil {
 		t.Fatalf("first Claim: %v", err)
 	}
-	if err := MarkNeedsRepairWithReason(path, "second failure", schema.ParkKind(events.IterationError), schema.NeedsRepairState{}); err != nil {
-		t.Fatalf("MarkNeedsRepairWithReason: %v", err)
+	if err := markNeedsRepairWithReason(path, "second failure", schema.ParkKind(events.IterationError), schema.NeedsRepairState{}); err != nil {
+		t.Fatalf("markNeedsRepairWithReason: %v", err)
 	}
 	if err := Claim(path); err != nil {
 		t.Fatalf("second Claim: %v", err)
@@ -353,8 +353,8 @@ func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T
 	path := writeFrontmatterTicket(t, "claimed")
 	reason := "iter-01 is blocked on a prompt gx did not send; answer it in the pane"
 
-	if err := MarkNeedsAnswerWithReasonAndStub(path, reason, schema.ParkKindBlockedPane); err != nil {
-		t.Fatalf("MarkNeedsAnswerWithReasonAndStub: %v", err)
+	if err := markNeedsAnswerWithReasonAndStub(path, reason, schema.ParkKindBlockedPane); err != nil {
+		t.Fatalf("markNeedsAnswerWithReasonAndStub: %v", err)
 	}
 
 	got := mustParse(t, path)

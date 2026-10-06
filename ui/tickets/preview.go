@@ -117,8 +117,8 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 }
 
 // highlightParkSection finds status's park heading ("## Needs Answer"/"##
-// Needs Repair", the literal text MarkNeedsAnswerWithReasonAndStub/
-// MarkNeedsRepairWithReason append — see ralphloop/claim.go) within rendered
+// Needs Repair", the literal text markNeedsAnswerWithReasonAndStub/
+// markNeedsRepairWithReason append — see ralphloop/claim.go) within rendered
 // (glamour output, so headings survive verbatim as their own line — see
 // ticketGlamourStyle's H2 prefix in glamour.go) and re-styles that line
 // through the section's end (the next "## " heading, or content end) in the

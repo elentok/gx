@@ -15,7 +15,7 @@ import (
 const parkReasonMaxRunes = 60
 
 // needsAnswerHeading/needsRepairHeading are the literal headings
-// MarkNeedsAnswerWithReasonAndStub/MarkNeedsRepairWithReason
+// markNeedsAnswerWithReasonAndStub/markNeedsRepairWithReason
 // (ralphloop/claim.go) append to a parked ticket's body.
 const (
 	needsAnswerHeading = "## Needs Answer"

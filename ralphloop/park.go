@@ -53,14 +53,14 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch req.Type {
 	case events.NeedsRepair:
-		writeErr = MarkNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair)
+		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair)
 	case events.NeedsAnswer:
 		// A blocked pane's question lives only in the pane, so its ticket gets a
 		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
 		if req.Kind == events.BlockedPane {
-			writeErr = MarkNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind))
+			writeErr = markNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind))
 		} else {
-			writeErr = MarkNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
+			writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
 		}
 	case events.ManualLand:
 		if !req.AlreadyDone {

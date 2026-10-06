@@ -104,7 +104,7 @@ func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	// UpdateTicket leaves the body untouched; the section append is a
-	// separate concern (ralphloop.MarkNeedsRepairWithReason composes both).
+	// separate concern (ralphloop.markNeedsRepairWithReason composes both).
 	// Simulate that composition here to exercise the full round trip this
 	// ticket's test seam calls for: a fault write produces the documented
 	// shape on disk.

@@ -49,25 +49,25 @@ func MarkBuiltAwaitingLand(path string) error {
 	})
 }
 
-// MarkNeedsAnswer writes status: needs-answer into the ticket file at path,
+// markNeedsAnswer writes status: needs-answer into the ticket file at path,
 // stamping parkKind so a later reader can tell which of the three producers
 // parked it.
-func MarkNeedsAnswer(path string, parkKind schema.ParkKind) error {
+func markNeedsAnswer(path string, parkKind schema.ParkKind) error {
 	return updateTicket(path, func(t *schema.Ticket) {
 		t.Status = schema.StatusNeedsAnswer
 		t.ParkKind = parkKind
 	})
 }
 
-// MarkNeedsAnswerWithReasonAndStub writes status: needs-answer into the
+// markNeedsAnswerWithReasonAndStub writes status: needs-answer into the
 // ticket file, stamps parkKind, and appends reason to the body under a
 // "## Needs Answer" heading, both naming label. This is the pane-answered
 // park (an involuntary prompt the agent didn't choose): the stub distinguishes
-// it from MarkNeedsAnswer's bare write for a ticket-answered zero-commit
+// it from markNeedsAnswer's bare write for a ticket-answered zero-commit
 // finish, since the question here exists only in the pane — a person answers
 // it there, and the stub just gives them (and the TUI's auto-scroll)
 // something to find.
-func MarkNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkKind) error {
+func markNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkKind) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusNeedsAnswer
 		t.ParkKind = parkKind
@@ -75,13 +75,13 @@ func MarkNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkK
 	})
 }
 
-// MarkNeedsRepairWithReason writes status: needs-repair into the ticket file,
+// markNeedsRepairWithReason writes status: needs-repair into the ticket file,
 // stamps parkKind (the same kind the park event carries), and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
 // (summary/detail split from reason, plus state rendered best-effort), so the
 // full failure is readable by opening the ticket file even when the live
 // UI's status subtext truncates it. Fails without writing anything if reason
 // is empty — see FormatNeedsRepairBody's write-conditional validation.
-func MarkNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, state schema.NeedsRepairState) error {
+func markNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, state schema.NeedsRepairState) error {
 	section, err := schema.FormatNeedsRepairBody(reason, state)
 	if err != nil {
 		return err
