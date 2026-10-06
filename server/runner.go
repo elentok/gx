@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -359,7 +360,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 	t, err := schema.ParseTicket(one.Ticket.Path)
 	if err != nil || t.Status != "done" {
 		s.events.publish(EventIterationParked, ticketAddr)
-		s.notifyPark(one, ticketAddr, string(t.Status))
+		s.notifyPark(one, ticketAddr, string(t.Status), events.Kind(t.ParkKind))
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
@@ -368,13 +369,17 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 
 // notifyPark sends the one chat message for a park. Anything that is not an
 // explicit needs-repair reads as a question for a person.
-func (s *Server) notifyPark(one ralphloop.OneIteration, ticketAddr, status string) {
+func (s *Server) notifyPark(one ralphloop.OneIteration, ticketAddr, status string, kind events.Kind) {
 	addr, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{})
 	if err != nil {
 		return
 	}
 	if status != string(schema.StatusNeedsRepair) {
 		status = string(schema.StatusNeedsAnswer)
+	}
+	if kind.CauseHerdr() && s.herdr.isUnavailable() {
+		s.holdPark(addr.Project, addr.Epic, addr.ID, status)
+		return
 	}
 	s.chat.Park(addr.Project, addr.Epic, one.Ticket.Path, addr.ID, status, "iteration ended without landing the ticket")
 }

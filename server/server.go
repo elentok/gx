@@ -108,6 +108,7 @@ type Server struct {
 	costOf      func(IterationInfo) (float64, bool) // swapped in tests
 	events      *broker
 	herdr       herdrWatch
+	parkFold    parkFold
 	rewatch     func() // set by keepFresh when the watch is active
 
 	chat      *ralphloop.ServerChat // nil when no chat destination is configured

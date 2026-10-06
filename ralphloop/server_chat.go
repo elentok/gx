@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/elentok/gx/chatmarkup"
 )
@@ -65,6 +66,18 @@ func (c *ServerChat) Park(project, epic, ticketPath, identifier, status, reason 
 		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, reason, EpicCounts{})
 		prefix := s.style.chatStyle.Escape(fmt.Sprintf("[%s] ", project))
 		s.send(chatmarkup.Join(chatmarkup.Text{}, []chatmarkup.Text{prefix, body}), notifyKindTicketNeedsHuman, ticketPath, identifier)
+	}
+}
+
+// ParkDigest sends one message listing parks that were held back, each line
+// carrying its own project name.
+func (c *ServerChat) ParkDigest(lines []string) {
+	if c == nil || len(lines) == 0 {
+		return
+	}
+	title := fmt.Sprintf("%d parked while herdr was down", len(lines))
+	for _, s := range c.sinks {
+		s.send(s.style.chatStyle.Message("🅿️", title, "", strings.Join(lines, "\n"), s.style.identityLine("server", "")), notifyKindTicketNeedsHuman, serverSource, "")
 	}
 }
 

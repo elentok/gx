@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -122,5 +123,29 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	got := wait(-1)
 	if len(got) != 1 || !strings.Contains(got[0], "daily summary") || !strings.Contains(got[0], "2026-10-06") {
 		t.Fatalf("sends = %v, want one daily summary for 2026-10-06", got)
+	}
+}
+
+func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	s.herdr.unavailable = true
+	one := ralphloop.OneIteration{}
+
+	s.notifyPark(one, "p1:epic/01", "needs-repair", events.AgentNameTaken)
+	s.notifyPark(one, "p2:epic/02", "needs-repair", events.HandleMismatch)
+	s.notifyPark(one, "p3:epic/03", "needs-repair", events.AgentPaneBusy)
+	s.notifyPark(one, "p4:epic/04", "needs-repair", events.ZeroCommit) // not herdr-caused: at once
+	s.herdr.unavailable = false
+	s.flushParkFold()
+
+	s.chat.Close()
+	all := strings.Join(wait(-1), "\n") // the batcher may merge both into one send
+	if n := strings.Count(all, "parked while herdr was down"); n != 1 {
+		t.Fatalf("digests = %d, want 1: %s", n, all)
+	}
+	for _, p := range []string{"p1", "p2", "p3", "p4"} {
+		if strings.Count(all, "["+p+"]") != 1 {
+			t.Errorf("%s not sent exactly once: %s", p, all)
+		}
 	}
 }
