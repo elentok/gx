@@ -9,29 +9,14 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/repair"
 	"github.com/spf13/cobra"
 )
 
-// verifyResult is the --json payload of `gx tickets verify`: always the full,
-// unfiltered list, with a landing in flight reported beside it.
-type verifyResult struct {
-	Tickets         []ralphloop.TicketVerification `json:"tickets"`
-	LandingInFlight *ralphloop.LandMarker          `json:"landing_in_flight"`
-	// OrphanLandLock is a land lock with no marker: a land mid-flight, or a
-	// crash leftover when its owner is not running.
-	OrphanLandLock *ralphloop.LandLockOwner `json:"orphan_land_lock"`
-}
-
-// verifyRun is everything runTicketsVerify needs besides its flags.
-type verifyRun struct {
-	EpicPath        string
-	ID              string // empty verifies the whole epic
-	FeatureWorktree string
-	WorktreeDir     string
-	WorkspaceID     string
-	Deps            ralphloop.VerifyDeps
-}
+type (
+	verifyResult = repair.VerifyResult
+	verifyRun    = repair.VerifyRun
+)
 
 func newTicketsVerifyCmd(d deps) *cobra.Command {
 	var jsonOut, all bool
@@ -85,7 +70,7 @@ func defaultVerifyRun(epicPath, cwd string) (verifyRun, error) {
 // runTicketsVerify is write-free and takes no land lock: reading owns nothing,
 // so it works while a land or a live tab is in flight.
 func runTicketsVerify(run verifyRun, all, jsonMode bool, stdout, stderr io.Writer) error {
-	result, err := gatherVerify(run)
+	result, err := repair.Verify(run)
 	if err != nil {
 		return finishRecovery(stdout, stderr, jsonMode, nil, "", err)
 	}
@@ -94,69 +79,6 @@ func runTicketsVerify(run verifyRun, all, jsonMode bool, stdout, stderr io.Write
 	}
 	printVerifyTable(stdout, result, all)
 	return nil
-}
-
-func gatherVerify(run verifyRun) (verifyResult, error) {
-	epicPath := filepath.Clean(run.EpicPath)
-	epicName := filepath.Base(epicPath)
-	epics, err := tickets.Load(filepath.Dir(epicPath))
-	if err != nil {
-		return verifyResult{}, fmt.Errorf("loading epics under %s: %w", filepath.Dir(epicPath), err)
-	}
-	var epic *tickets.Epic
-	for i := range epics {
-		if epics[i].Name == epicName {
-			epic = &epics[i]
-		}
-	}
-	if epic == nil {
-		return verifyResult{}, fmt.Errorf("epic not found: %s", epicPath)
-	}
-
-	selected := epic.Tickets
-	if run.ID != "" {
-		selected = nil
-		for _, t := range epic.Tickets {
-			if t.DisplayNumber() == run.ID {
-				selected = append(selected, t)
-			}
-		}
-		if len(selected) == 0 {
-			return verifyResult{}, fmt.Errorf("ticket %s not found in epic %s", run.ID, epicName)
-		}
-	}
-
-	events, _, err := ralphloop.ReadEvents(filepath.Dir(epicPath), epicName)
-	if err != nil {
-		return verifyResult{}, fmt.Errorf("reading run log: %w", err)
-	}
-	verifications, err := ralphloop.VerifyEpic(run.Deps, ralphloop.VerifyParams{
-		Epic:            epicName,
-		FeatureWorktree: run.FeatureWorktree,
-		WorktreeDir:     run.WorktreeDir,
-		WorkspaceID:     run.WorkspaceID,
-		Tickets:         selected,
-		Events:          events,
-	})
-	if err != nil {
-		return verifyResult{}, err
-	}
-	if verifications == nil {
-		verifications = []ralphloop.TicketVerification{}
-	}
-
-	marker, err := ralphloop.ReadLandMarker(epicPath)
-	if err != nil {
-		return verifyResult{}, fmt.Errorf("reading land marker: %w", err)
-	}
-	if marker != nil && marker.Epic != epicName {
-		marker = nil
-	}
-	orphan, err := ralphloop.OrphanLandLock(epicPath)
-	if err != nil {
-		return verifyResult{}, fmt.Errorf("reading land lock: %w", err)
-	}
-	return verifyResult{Tickets: verifications, LandingInFlight: marker, OrphanLandLock: orphan}, nil
 }
 
 // needsAttention is the human table's filter: anything not landed, plus
