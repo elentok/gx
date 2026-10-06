@@ -30,10 +30,9 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// The path, not the address: the caller opens this file next to fill in
-	// its body, and `show` is the only other way to learn where it is.
-	fmt.Fprintln(w, path)
-	return nil
+	// The address, like everywhere else the CLI names a ticket: `set` and
+	// `section` accept it to fill the stub in, and `show` gives the path.
+	return printTicketRef(path, false, w)
 }
 
 // runTicketsAddBody is runTicketsAdd for agents: the ticket arrives with its

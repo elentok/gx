@@ -29,9 +29,11 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	}
 
 	wantPath := filepath.Join(issuesDir, "04-do-fourth-thing.md")
-	gotPath := strings.TrimSpace(stdout.String())
-	if gotPath != wantPath {
-		t.Fatalf("stdout = %q, want %q", gotPath, wantPath)
+	if got, want := strings.TrimSpace(stdout.String()), epicTicketLabel(epicPath, "04"); got != want {
+		t.Fatalf("stdout = %q, want canonical address %q", got, want)
+	}
+	if got := addedPath(t, epicPath, stdout.String()); got != wantPath {
+		t.Fatalf("address %q resolves to %q, want %q", stdout.String(), got, wantPath)
 	}
 	ticket, err := schema.ParseTicket(wantPath)
 	if err != nil {
@@ -59,7 +61,7 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
-	gotPath := strings.TrimSpace(stdout.String())
+	gotPath := addedPath(t, epicPath, stdout.String())
 	ticket, err := schema.ParseTicket(gotPath)
 	if err != nil {
 		t.Fatalf("stub ticket failed validation: %v", err)
@@ -106,7 +108,7 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
-	firstPath := strings.TrimSpace(stdout.String())
+	firstPath := addedPath(t, epicPath, stdout.String())
 	if firstPath != filepath.Join(issuesDir, "12a-child-a.md") {
 		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12a-child-a.md"))
 	}
@@ -115,7 +117,7 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	if err := runTicketsAdd(epicPath, "12", "child-b", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
-	secondPath := strings.TrimSpace(stdout.String())
+	secondPath := addedPath(t, epicPath, stdout.String())
 	if secondPath != filepath.Join(issuesDir, "12b-child-b.md") {
 		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b-child-b.md"))
 	}
@@ -135,7 +137,7 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
-	gotPath := strings.TrimSpace(stdout.String())
+	gotPath := addedPath(t, epicPath, stdout.String())
 
 	ticket, err := schema.ParseTicket(gotPath)
 	if err != nil {
@@ -194,7 +196,7 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	if err := runTicketsAdd(epicPath, "12b", "grandchild-1", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
-	firstPath := strings.TrimSpace(stdout.String())
+	firstPath := addedPath(t, epicPath, stdout.String())
 	if firstPath != filepath.Join(issuesDir, "12b1-grandchild-1.md") {
 		t.Fatalf("stdout = %q, want %q", firstPath, filepath.Join(issuesDir, "12b1-grandchild-1.md"))
 	}
@@ -203,7 +205,7 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	if err := runTicketsAdd(epicPath, "12b", "grandchild-2", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
-	secondPath := strings.TrimSpace(stdout.String())
+	secondPath := addedPath(t, epicPath, stdout.String())
 	if secondPath != filepath.Join(issuesDir, "12b2-grandchild-2.md") {
 		t.Fatalf("stdout = %q, want %q", secondPath, filepath.Join(issuesDir, "12b2-grandchild-2.md"))
 	}
@@ -223,7 +225,7 @@ func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	if err := runTicketsAdd(epicPath, "12b1", "sibling", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd(parent=12b1): %v", err)
 	}
-	gotPath := strings.TrimSpace(stdout.String())
+	gotPath := addedPath(t, epicPath, stdout.String())
 	if gotPath != filepath.Join(issuesDir, "12b2-sibling.md") {
 		t.Fatalf("stdout = %q, want %q", gotPath, filepath.Join(issuesDir, "12b2-sibling.md"))
 	}
@@ -266,4 +268,16 @@ func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
 	if len(seen) != n {
 		t.Fatalf("expected %d unique paths, got %d", n, len(seen))
 	}
+}
+
+// addedPath resolves the address `add` printed back to the stub's file.
+func addedPath(t *testing.T, epicPath, out string) string {
+	t.Helper()
+	addr := strings.TrimSpace(out)
+	id := addr[strings.LastIndex(addr, "/")+1:]
+	matches, err := filepath.Glob(filepath.Join(epicPath, "issues", id+"-*.md"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("address %q resolves to files %v (err %v), want exactly one", addr, matches, err)
+	}
+	return matches[0]
 }

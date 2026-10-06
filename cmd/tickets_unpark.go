@@ -45,7 +45,7 @@ func runTicketsUnpark(epicPath, id string, jsonMode bool, now time.Time, stdout,
 	}
 	return finishRecovery(stdout, stderr, jsonMode,
 		unparkResult{Ticket: id, Status: "open"},
-		fmt.Sprintf("%s: unparked", id), err)
+		fmt.Sprintf("%s: unparked", epicTicketLabel(epicPath, id)), err)
 }
 
 // unparkTarget resolves id in epicPath to a ticket path, refusing unless the

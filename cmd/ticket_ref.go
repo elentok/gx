@@ -68,6 +68,17 @@ func resolveTicketRef(getwd func() (string, error), arg string) (string, error) 
 	return t.Path, nil
 }
 
+// epicTicketLabel is the canonical address of ticket id in the epic at
+// epicPath, for commands that know the epic and id but not a ticket path.
+func epicTicketLabel(epicPath, id string) string {
+	epicPath = filepath.Clean(epicPath)
+	abs, err := filepath.Abs(epicPath)
+	if err != nil {
+		abs = epicPath
+	}
+	return tickets.Address{Project: tickets.ProjectName(filepath.Dir(abs)), Epic: filepath.Base(abs), ID: id}.String()
+}
+
 // ticketLabel is how output names the ticket at path: its canonical address
 // when path sits in the tracker's <project>/<epic>/issues/<file>.md layout,
 // the path itself for anything else (ad-hoc files have no address).

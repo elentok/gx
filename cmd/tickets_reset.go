@@ -93,7 +93,7 @@ func gitCommitSubjects(dir, base, branch string) ([]string, error) {
 
 func runTicketsReset(in resetInput, d ralphloop.Deps, stdout, stderr io.Writer) error {
 	res, err := resetTicket(in, d)
-	text := fmt.Sprintf("%s: reset to open (attic: %s)", in.ID, atticLabel(res.AtticRef))
+	text := fmt.Sprintf("%s: reset to open (attic: %s)", epicTicketLabel(in.EpicPath, in.ID), atticLabel(res.AtticRef))
 	if err == nil && !in.JSON {
 		fmt.Fprintln(stderr, "warning: "+resetLiveRunWarning)
 	}

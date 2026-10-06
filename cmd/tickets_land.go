@@ -177,13 +177,13 @@ func landStuckTicket(in landInput, d ralphloop.Deps) (landResult, string, error)
 		if err := ralphloop.WriteLandMarker(lockDir, marker); err != nil {
 			return landResult{}, "", fmt.Errorf("writing land marker: %w", err)
 		}
-		return out, fmt.Sprintf("%s: conflict landing %s; resolve it in %s, then --continue or --abort", in.ID, marker.SourceRange, featurePath), nil
+		return out, fmt.Sprintf("%s: conflict landing %s; resolve it in %s, then --continue or --abort", epicTicketLabel(in.EpicPath, in.ID), marker.SourceRange, featurePath), nil
 	}
 
 	if err := recordLanded(lockDir, epic, t, parsed.Status, res, session); err != nil {
 		return landResult{}, "", err
 	}
-	return out, fmt.Sprintf("%s: %s (%s)", in.ID, jsonOutcome(res.Outcome), res.SHA), nil
+	return out, fmt.Sprintf("%s: %s (%s)", epicTicketLabel(in.EpicPath, in.ID), jsonOutcome(res.Outcome), res.SHA), nil
 }
 
 // landLockedRefusal names the lock's owner and, when no marker explains the
@@ -213,7 +213,7 @@ func abortOrphanLock(lockDir, epic, id string) (landResult, string, error) {
 	if err := ralphloop.ReleaseLandLock(lockDir); err != nil {
 		return landResult{}, "", fmt.Errorf("clearing land lock: %w", err)
 	}
-	return landResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", id, owner.Describe()), nil
+	return landResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", epicTicketLabel(lockDir, id), owner.Describe()), nil
 }
 
 // recordLanded writes status: done (unless already) and the manual-land event
@@ -276,7 +276,7 @@ func resolveLand(in landInput, d ralphloop.Deps) (landResult, string, error) {
 		if err := ralphloop.ClearLand(lockDir); err != nil {
 			return landResult{}, "", fmt.Errorf("clearing land marker: %w", err)
 		}
-		return landResult{Outcome: "aborted"}, fmt.Sprintf("%s: land aborted", in.ID), nil
+		return landResult{Outcome: "aborted"}, fmt.Sprintf("%s: land aborted", epicTicketLabel(in.EpicPath, in.ID)), nil
 	}
 
 	if inProgress {
@@ -312,7 +312,7 @@ func resolveLand(in landInput, d ralphloop.Deps) (landResult, string, error) {
 		return landResult{}, "", fmt.Errorf("clearing land marker: %w", err)
 	}
 	out := landResult{Outcome: jsonOutcome(res.Outcome), SHA: res.SHA, TrailerValue: res.TrailerValue, MetricsStamped: res.MetricsStamped}
-	return out, fmt.Sprintf("%s: %s (%s)", in.ID, out.Outcome, res.SHA), nil
+	return out, fmt.Sprintf("%s: %s (%s)", epicTicketLabel(in.EpicPath, in.ID), out.Outcome, res.SHA), nil
 }
 
 // checkLandable applies the status and commitless rules. Commitless is the
