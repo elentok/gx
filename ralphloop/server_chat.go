@@ -68,6 +68,29 @@ func (c *ServerChat) Park(project, epic, ticketPath, identifier, status, reason 
 	}
 }
 
+// ServerNotice is a server-level event: about the server itself, not a project.
+type ServerNotice struct {
+	Kind   string // notify kind, e.g. "server-started"
+	Emoji  string
+	Title  string
+	Detail string
+}
+
+// serverSource is the gate source for server-level notices; like "cli" it has
+// no ticket to write a mute onto.
+const serverSource = "server"
+
+// Notice sends a server-level event to the global destination only. No project
+// prefix: it belongs to no project.
+func (c *ServerChat) Notice(n ServerNotice) {
+	if c == nil {
+		return
+	}
+	for _, s := range c.sinks {
+		s.send(s.style.chatStyle.Message(n.Emoji, n.Title, "", n.Detail, s.style.identityLine("server", "")), n.Kind, serverSource, "")
+	}
+}
+
 // Close flushes every queued batch, bounded by the transport timeout.
 func (c *ServerChat) Close() {
 	if c == nil {

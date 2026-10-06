@@ -60,10 +60,13 @@ func openLedger(stateDir string) (*budgetLedger, error) {
 }
 
 // today is the total for the budget day containing now.
-func (l *budgetLedger) today(now time.Time) float64 {
+func (l *budgetLedger) today(now time.Time) float64 { return l.day(now.Format(budgetDayLayout)) }
+
+// day is the total for one budget day, keyed as budgetDayLayout.
+func (l *budgetLedger) day(key string) float64 {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.Days[now.Format(budgetDayLayout)]
+	return l.Days[key]
 }
 
 // record folds one iteration's cumulative cost at now into the ledger. The delta
@@ -171,6 +174,7 @@ func (s *Server) pollBudget(now time.Time) {
 	if err := s.ledger.save(now); err != nil {
 		s.log.Error("save budget ledger", "err", err)
 	}
+	s.notifyBudget(now)
 	if s.budgetHardReached(now) {
 		s.killForBudget(now)
 	}

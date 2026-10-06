@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/ralphloop"
 )
 
 const (
@@ -51,6 +52,11 @@ func (s *Server) checkHerdr() {
 	}
 	s.log.Warn("herdr state changed", "event", typ)
 	s.events.publish(typ, "")
+	if typ == EventHerdrUnavailable {
+		s.chat.Notice(ralphloop.ServerNotice{Kind: typ, Emoji: "🔌", Title: "herdr unavailable", Detail: "Agents cannot start until herdr answers again"})
+		return
+	}
+	s.chat.Notice(ralphloop.ServerNotice{Kind: typ, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
 }
 
 // keepHerdrChecked retries herdr until ctx ends, so a herdr that starts late

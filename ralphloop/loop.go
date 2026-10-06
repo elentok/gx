@@ -199,15 +199,15 @@ type RunOptions struct {
 	// (e.g. from config.Load), ralphloop never loads config itself. The zero
 	// value (both fields empty for both agents) reproduces today's launch
 	// argv unchanged.
-	Agents      config.AgentsConfig
+	Agents config.AgentsConfig
 	// Orchestrator is config.Orchestrator; Run refuses to claim anything under
 	// "server". Empty means in-process, so zero-value options keep working.
 	Orchestrator string
-	Skill       string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
-	ScratchDir  string // defaults to the repo's ticket-store project dir
-	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
-	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
-	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	Skill        string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
+	ScratchDir   string // defaults to the repo's ticket-store project dir
+	RepoDir      string // repo root passed as the herdr workspace/worktree cwd
+	MaxParallel  int    // defaults to defaultMaxParallel; how many iterations run concurrently
+	SmartZone    int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
 	// StoreDir, if set, is the ticket store git repo Run commits while it runs
 	// (S1: the in-process loop owns store commits), debounced by
 	// StoreCommitDebounce. Unset means no commits, so callers with no store

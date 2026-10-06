@@ -101,13 +101,14 @@ type Server struct {
 	log  *slog.Logger
 	idx  *index
 
-	queued  *queueStore
-	pause   *pauseState
-	ledger  *budgetLedger
-	costOf  func(IterationInfo) (float64, bool) // swapped in tests
-	events  *broker
-	herdr   herdrWatch
-	rewatch func() // set by keepFresh when the watch is active
+	queued      *queueStore
+	pause       *pauseState
+	ledger      *budgetLedger
+	budgetNotes budgetNotes
+	costOf      func(IterationInfo) (float64, bool) // swapped in tests
+	events      *broker
+	herdr       herdrWatch
+	rewatch     func() // set by keepFresh when the watch is active
 
 	chat      *ralphloop.ServerChat // nil when no chat destination is configured
 	registry  *runRegistry
@@ -353,6 +354,8 @@ const DefaultLandStopTimeout = 30 * time.Second
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.
 func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
+	s.seedBudgetNotes(time.Now())
+	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
 	errc := make(chan error, 2)
 	lns := []net.Listener{s.ln}
 	if s.tcp != nil {
