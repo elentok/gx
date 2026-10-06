@@ -974,28 +974,36 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 
 	decisions := make([]ScanDecision, 0, len(epic.Tickets))
 	for _, t := range epic.Tickets {
-		status := epic.RenderedStatus(t)
-		d := ScanDecision{Ticket: t.Identifier, Status: status.Word()}
-		switch {
-		case claimed.Path != "" && t.Path == claimed.Path:
-			d.Decision = "claimed"
-		case !scope.Contains(t, epic):
-			d.Decision = "out-of-scope"
-		case status.Terminal():
-			d.Decision = "done"
-		case isParked(epic, t):
-			d.Decision = "stalled"
-		case inFrontier[t.Path]:
-			d.Decision = "frontier"
-		case status == tickets.StatusBlocked:
-			d.Decision = "blocked"
-			d.Reason = strings.Join(epic.UnresolvedBlockers(t), ", ")
-		default:
-			d.Decision = "unclaimed"
-		}
-		decisions = append(decisions, d)
+		isClaimed := claimed.Path != "" && t.Path == claimed.Path
+		decisions = append(decisions, ticketVerdict(epic, scope, t, isClaimed, inFrontier[t.Path]))
 	}
 	return decisions
+}
+
+// ticketVerdict is the scheduler's single per-ticket eligibility decision:
+// why t was or wasn't claimed this pass, with the reason a scan line reports.
+// The first matching rule wins, so the order is the precedence.
+func ticketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed, inFrontier bool) ScanDecision {
+	status := epic.RenderedStatus(t)
+	d := ScanDecision{Ticket: t.Identifier, Status: status.Word()}
+	switch {
+	case claimed:
+		d.Decision = "claimed"
+	case !scope.Contains(t, epic):
+		d.Decision = "out-of-scope"
+	case status.Terminal():
+		d.Decision = "done"
+	case isParked(epic, t):
+		d.Decision = "stalled"
+	case inFrontier:
+		d.Decision = "frontier"
+	case status == tickets.StatusBlocked:
+		d.Decision = "blocked"
+		d.Reason = strings.Join(epic.UnresolvedBlockers(t), ", ")
+	default:
+		d.Decision = "unclaimed"
+	}
+	return d
 }
 
 // allDone reports whether every ticket in e is done — the run's one exit
