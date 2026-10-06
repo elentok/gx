@@ -2,6 +2,7 @@ package server
 
 import (
 	"path/filepath"
+	"reflect"
 	"sort"
 	"sync"
 
@@ -35,11 +36,12 @@ type index struct {
 	list []TicketInfo
 }
 
-// buildIndex scans every project in the ticket store.
-func buildIndex(storePath string) (*index, error) {
-	idx := &index{}
+// scanStore reads every project in the ticket store. Always a full read of the
+// files: the index never merges, so the file wins on every rescan.
+func scanStore(storePath string) ([]TicketInfo, error) {
+	list := []TicketInfo{}
 	if storePath == "" {
-		return idx, nil
+		return list, nil
 	}
 	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
@@ -53,12 +55,37 @@ func buildIndex(storePath string) (*index, error) {
 		}
 		for _, e := range epics {
 			for _, t := range e.Tickets {
-				idx.list = append(idx.list, ticketInfo(project, filepath.Base(e.Path), t))
+				list = append(list, ticketInfo(project, filepath.Base(e.Path), t))
 			}
 		}
 	}
-	sort.Slice(idx.list, func(i, j int) bool { return idx.list[i].Address < idx.list[j].Address })
-	return idx, nil
+	sort.Slice(list, func(i, j int) bool { return list[i].Address < list[j].Address })
+	return list, nil
+}
+
+// buildIndex does the initial scan.
+func buildIndex(storePath string) (*index, error) {
+	list, err := scanStore(storePath)
+	if err != nil {
+		return nil, err
+	}
+	return &index{list: list}, nil
+}
+
+// refresh rescans the store and replaces the index. seq only advances when the
+// scan differs from the current state.
+func (i *index) refresh(storePath string) error {
+	list, err := scanStore(storePath)
+	if err != nil {
+		return err
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if !reflect.DeepEqual(i.list, list) {
+		i.list = list
+		i.seq++
+	}
+	return nil
 }
 
 func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {

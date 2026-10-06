@@ -3,9 +3,11 @@ package server_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -109,5 +111,53 @@ func TestServer_SecondServerOnSameStateDirIsRefused(t *testing.T) {
 	}
 	if _, err := h.Client.Handshake(context.Background()); err != nil {
 		t.Errorf("first server stopped answering: %v", err)
+	}
+}
+
+func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		disableWatch bool
+	}{{"watch", false}, {"poll only", true}} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := t.TempDir()
+			servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
+			h := servertest.StartWithStore(t, store, func(c *server.Config) {
+				c.DisableWatch = tc.disableWatch
+				// With the watch on, a long poll proves the watch did the work.
+				c.PollInterval = 100 * time.Millisecond
+				if !tc.disableWatch {
+					c.PollInterval = time.Hour
+				}
+			})
+
+			path := filepath.Join(store, "proj", "epic", "issues", "01-first.md")
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			edited := strings.Replace(string(body), "status: open", "status: done", 1)
+			if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				snap, err := h.Client.Snapshot(context.Background())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if snap.Tickets[0].Status == "done" {
+					if snap.Seq == 0 {
+						t.Error("seq did not advance on change")
+					}
+					return
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("edit never reached the snapshot: %+v", snap.Tickets[0])
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+		})
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
@@ -36,7 +37,10 @@ type Handshake struct {
 type Config struct {
 	StateDir    string
 	Build       string
-	TicketStore string // ticket-store root; scanned once at startup
+	TicketStore string // ticket-store root; kept fresh by watch + poll
+
+	PollInterval time.Duration // zero means the default
+	DisableWatch bool          // poll only
 }
 
 // Server owns the state-dir lock and the listening socket.
@@ -48,6 +52,8 @@ type Server struct {
 	logf *rotatingFile
 	log  *slog.Logger
 	idx  *index
+
+	rewatch func() // set by keepFresh when the watch is active
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -119,6 +125,10 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	errc := make(chan error, 1)
 	go func() { errc <- s.http.Serve(s.ln) }()
+	freshCtx, stopFresh := context.WithCancel(ctx)
+	freshDone := make(chan struct{})
+	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
+	defer func() { stopFresh(); <-freshDone }()
 	var err error
 	select {
 	case <-ctx.Done():

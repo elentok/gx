@@ -59,7 +59,8 @@ func Start(t *testing.T) *Harness {
 }
 
 // StartWithStore is Start over a caller-seeded ticket store.
-func StartWithStore(t *testing.T, store string) *Harness {
+// Options tweak the server config before it starts.
+func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
 	stateDir, err := os.MkdirTemp("", "gxs")
@@ -75,7 +76,11 @@ func StartWithStore(t *testing.T, store string) *Harness {
 	}
 	herdrfake.StartState(t, h.Herdr)
 
-	srv, err := server.New(server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore})
+	cfg := server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	srv, err := server.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
