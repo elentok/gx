@@ -790,9 +790,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// (out of the frontier, so never reclaimed until a human clears
 			// it) and keep scheduling the rest.
 			kind := events.IterationError
+			reason := r.err.Error()
 			var lf *launchFailure
 			if errors.As(r.err, &lf) {
-				kind = lf.Kind
+				kind, reason = retryStormKind(scratchDir, opts.EpicName, r.ticket.Identifier, lf.Kind, reason)
 			}
 			park(sink, parkRequest{
 				ScratchDir: scratchDir,
@@ -801,7 +802,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				Path:       r.ticket.Path,
 				Type:       events.NeedsRepair,
 				Kind:       kind,
-				Reason:     r.err.Error(),
+				Reason:     reason,
 				Repair: schema.NeedsRepairState{
 					Label:    iterLabel(opts.EpicName, r.ticket.Identifier),
 					Branch:   iterBranch(opts.EpicName, r.ticket.Identifier),

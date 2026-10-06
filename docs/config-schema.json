@@ -70,11 +70,18 @@
           "description": "Maximum epics that may run concurrently in this gx process. Default: 2.",
           "minimum": 1,
           "default": 2
+        },
+        "retry-storm-launches": {
+          "type": "integer",
+          "description": "Consecutive failed launches of one ticket before it is parked needs-repair as retry-exhausted. Default: 3.",
+          "minimum": 1,
+          "default": 3
         }
       },
       "default": {
         "max-concurrent-tickets-per-epic": 2,
-        "max-concurrent-epics": 2
+        "max-concurrent-epics": 2,
+        "retry-storm-launches": 3
       }
     },
     "budget": {

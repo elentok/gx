@@ -119,6 +119,7 @@ func Load() (Config, error) {
 		ExecutionQueue        *struct {
 			MaxConcurrentTicketsPerEpic *int `json:"max-concurrent-tickets-per-epic"`
 			MaxConcurrentEpics          *int `json:"max-concurrent-epics"`
+			RetryStormLaunches          *int `json:"retry-storm-launches"`
 		} `json:"execution-queue"`
 		Budget *struct {
 			SoftLimit              *float64  `json:"soft-limit"`
@@ -187,6 +188,9 @@ func Load() (Config, error) {
 		}
 		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
 			cfg.ExecutionQueue.MaxConcurrentEpics = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentEpics)
+		}
+		if raw.ExecutionQueue.RetryStormLaunches != nil {
+			cfg.ExecutionQueue.RetryStormLaunches = clampExecutionQueueLimit(*raw.ExecutionQueue.RetryStormLaunches)
 		}
 	}
 	if raw.Budget != nil {
