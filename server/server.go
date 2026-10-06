@@ -63,6 +63,9 @@ type Config struct {
 	// which runs only when Orchestrator is "server". A zero debounce means 60s.
 	StoreCommitDebounce time.Duration
 	StorePushRemote     string
+	// LandStopTimeout bounds how long a stop waits for a land in flight; zero
+	// means DefaultLandStopTimeout.
+	LandStopTimeout time.Duration
 
 	// MaxConcurrentRoots caps queued roots running at once (config
 	// max-concurrent-epics); zero means the config default.
@@ -98,6 +101,7 @@ type Server struct {
 	registry  *runRegistry
 	savedRuns []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused   refusals
+	lands     landGuard
 	kick      chan struct{} // wakes keepClaiming
 }
 
@@ -324,6 +328,9 @@ func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr()})
 }
 
+// DefaultLandStopTimeout is how long a stop waits for a land in flight.
+const DefaultLandStopTimeout = 30 * time.Second
+
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.
 func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
@@ -338,10 +345,11 @@ func (s *Server) Serve(ctx context.Context) error {
 	if s.cfg.Orchestrator == config.OrchestratorServer {
 		s.reclaimRuns()
 	}
-	if stopCommits, err := s.startStoreCommits(); err != nil {
+	stopCommits := func() {}
+	if stop, err := s.startStoreCommits(); err != nil {
 		s.log.Error("store commit loop failed to start", "err", err)
 	} else {
-		defer stopCommits()
+		stopCommits = stop
 	}
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	freshDone := make(chan struct{})
@@ -352,7 +360,6 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
-	defer func() { stopFresh(); <-freshDone; <-herdrDone; <-claimDone; <-budgetDone }()
 	var err error
 	select {
 	case <-ctx.Done():
@@ -367,6 +374,21 @@ func (s *Server) Serve(ctx context.Context) error {
 		}
 		_ = s.http.Shutdown(context.Background())
 	}
+	// Stop claiming, let a land in flight finish, then flush the store commit
+	// loop, and only then release the lock. Agents in their panes are not touched.
+	stopFresh()
+	<-freshDone
+	<-herdrDone
+	<-claimDone
+	<-budgetDone
+	timeout := s.cfg.LandStopTimeout
+	if timeout <= 0 {
+		timeout = DefaultLandStopTimeout
+	}
+	if !s.lands.closeAndWait(timeout) {
+		s.log.Warn("stopping with a land still in flight", "timeout", timeout)
+	}
+	stopCommits()
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
 	s.log.Info("server stopped")
 	_ = s.logf.Close()

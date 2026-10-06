@@ -69,6 +69,43 @@ func (r *refusals) has(addr string) bool {
 	return r.addr[addr]
 }
 
+// landGuard lets a stop wait for lands in flight and keeps new ones from
+// starting: a land cut off halfway leaves a ticket the store cannot explain.
+type landGuard struct {
+	mu     sync.Mutex
+	closed bool
+	wg     sync.WaitGroup
+}
+
+// begin reports false once the server is stopping; the caller must then not land.
+func (g *landGuard) begin() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed {
+		return false
+	}
+	g.wg.Add(1)
+	return true
+}
+
+func (g *landGuard) end() { g.wg.Done() }
+
+// closeAndWait refuses new lands, then reports whether the running ones
+// finished within timeout.
+func (g *landGuard) closeAndWait(timeout time.Duration) bool {
+	g.mu.Lock()
+	g.closed = true
+	g.mu.Unlock()
+	done := make(chan struct{})
+	go func() { g.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 // kickRunner asks the runner to look at the queue now instead of at its next tick.
 func (s *Server) kickRunner() {
 	select {
@@ -254,6 +291,11 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 	defer s.registry.delete(root)
 	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
 	if err == nil {
+		// A stop that began while the agent settled leaves it for the next server.
+		if !s.lands.begin() {
+			return
+		}
+		defer s.lands.end()
 		err = ralphloop.FinishIteration(deps, one, wt, run.Pane, run.Tab)
 	}
 	if err != nil {

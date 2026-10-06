@@ -374,7 +374,9 @@ func stopServer(ctx context.Context, c *apiclient.Client, w io.Writer, signal fu
 	return fmt.Errorf("server (pid %d) still running after %s", h.Pid, stopTimeout)
 }
 
-const stopTimeout = 10 * time.Second
+// stopTimeout outlasts server.DefaultLandStopTimeout so a stop that waits for a
+// land is not reported as a failure.
+const stopTimeout = server.DefaultLandStopTimeout + 15*time.Second
 
 func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
 	if ctx == nil {
