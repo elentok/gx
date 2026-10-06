@@ -244,6 +244,21 @@ top-level ticket (one per top-level ticket; `run-log.jsonl` until the file is re
 server event log for events that belong to no ticket. Distinct from `server.log` (process
 diagnostics). _Avoid_: run log.
 
+## The Server
+
+**Server** — the long-lived gx process that is the sole scheduler (`gx server …`). The TUI and CLI
+are its clients; they reach it over its API (ADR 0028). _Avoid_: daemon, orchestrator.
+
+**Server lock** — the one flock in the state dir that makes the server a singleton. A second
+`gx server start` fails on it instead of racing the first.
+
+**Snapshot** — the full state a server event stream sends first (`GET /v1/snapshot`), tagged with
+the `seq` it was taken at. A client subscribes to the stream from that `seq`; a gap or reconnect
+means taking a new snapshot.
+
+**Explain** — the scheduler's own verdict on why a ticket is or isn't running
+(`gx server tickets explain`). _Avoid_: diagnose.
+
 ## Ticket Forking
 
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
