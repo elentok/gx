@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -154,6 +155,12 @@ type RunOptions struct {
 	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
 	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
 	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	// StoreDir, if set, is the ticket store git repo Run commits while it runs
+	// (S1: the in-process loop owns store commits), debounced by
+	// StoreCommitDebounce. Unset means no commits, so callers with no store
+	// (tests, the read-only server) are unchanged.
+	StoreDir            string
+	StoreCommitDebounce time.Duration
 	// TicketIDs, if set, restricts scheduling to just these ticket
 	// identifiers (see tickets.Ticket.DisplayNumber) within the epic — Run
 	// exits once every one of them is done, independent of any other open
@@ -262,6 +269,13 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	scratchDir, err := filepath.Abs(scratchDir)
 	if err != nil {
 		return fmt.Errorf("resolving scratch directory: %w", err)
+	}
+	if opts.StoreDir != "" {
+		commits, err := storecommit.Start(opts.StoreDir, opts.StoreCommitDebounce)
+		if err != nil {
+			return fmt.Errorf("starting store commit loop: %w", err)
+		}
+		defer commits.Stop()
 	}
 	maxParallel := opts.MaxParallel
 	if maxParallel <= 0 {

@@ -459,16 +459,22 @@ func buildImplementRunOptionsForTickets(
 	if err != nil {
 		return ralphloop.RunOptions{}, err
 	}
+	cfg, err := config.Load()
+	if err != nil {
+		return ralphloop.RunOptions{}, err
+	}
 	return ralphloop.RunOptions{
-		EpicName:    epicName,
-		Agent:       agent,
-		Agents:      agents,
-		SpinCycles:  queue.SpinCycles,
-		SpinWindow:  queue.SpinWindow,
-		Skill:       skill,
-		RepoDir:     repo.Root,
-		ScratchDir:  scratchDirFor(worktreeRoot),
-		MaxParallel: max(maxParallel, 1),
-		TicketIDs:   ticketIDs,
+		StoreDir:            cfg.TicketStore.Path,
+		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second,
+		EpicName:            epicName,
+		Agent:               agent,
+		Agents:              agents,
+		SpinCycles:          queue.SpinCycles,
+		SpinWindow:          queue.SpinWindow,
+		Skill:               skill,
+		RepoDir:             repo.Root,
+		ScratchDir:          scratchDirFor(worktreeRoot),
+		MaxParallel:         max(maxParallel, 1),
+		TicketIDs:           ticketIDs,
 	}, nil
 }

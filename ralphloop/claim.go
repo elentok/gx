@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -169,7 +170,24 @@ func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) err
 	if err != nil {
 		return fmt.Errorf("marshaling ticket %s: %w", path, err)
 	}
-	return writeFileAtomic(path, out)
+	if err := writeFileAtomic(path, out); err != nil {
+		return err
+	}
+	commitStatusChange(path, t)
+	return nil
+}
+
+// commitStatusChange commits the store right away when t just reached done,
+// cancelled or a park status. Best-effort: a failed commit never fails the
+// ticket write, and the debounced loop picks the change up anyway.
+func commitStatusChange(path string, t schema.Ticket) {
+	switch t.Status {
+	case schema.StatusDone, schema.StatusCancelled, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+	default:
+		return
+	}
+	epic := filepath.Base(filepath.Dir(filepath.Dir(path)))
+	_ = storecommit.Immediate(path, fmt.Sprintf("%s/%s: %s", epic, t.ID, t.Status))
 }
 
 // writeFileAtomic replaces path's content via a same-directory temp file
