@@ -366,6 +366,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		go func() { errc <- s.http.Serve(ln) }()
 	}
 	if s.cfg.Orchestrator == config.OrchestratorServer {
+		s.recoverLands()
 		s.reclaimRuns()
 	}
 	stopCommits := func() {}

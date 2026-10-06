@@ -78,6 +78,16 @@ func ParkHandleMismatch(scratchDir, epicName, ticket, path, reason string) error
 	return err
 }
 
+// ParkAmbiguousLand parks the ticket of a land a crash interrupted when verify
+// cannot say whether its commits landed, through the park path.
+func ParkAmbiguousLand(scratchDir, epicName, ticket, path, reason string) error {
+	_, err := park(noopEventSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
+		Type: events.NeedsRepair, Kind: events.AmbiguousLand, Reason: reason,
+	})
+	return err
+}
+
 // park is the single park path: it writes the ticket, appends exactly one
 // event and notifies. Every status writer is routed here:
 // needs-repair, needs-answer and the CLI land's done write.
