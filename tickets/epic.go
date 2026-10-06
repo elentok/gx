@@ -12,9 +12,17 @@ type Epic struct {
 	MapBody string // map.md's raw content, only set when IsMap
 	Tickets []Ticket
 
-	// StartedAt and CompletedAt come from the epic's optional epic.yaml
-	// sidecar file (see loadEpicTiming). Zero when the epic has no
-	// epic.yaml yet, or the file doesn't set that field.
+	// HasTicketMD is true when the epic uses the store shape: a ticket.md
+	// entry file whose frontmatter supplies Status, BlockedBy, Base and
+	// timing. Old-shape epics (epic.yaml sidecar) leave the first four zero.
+	HasTicketMD bool
+	Status      string
+	BlockedBy   []string
+	Base        string
+
+	// StartedAt and CompletedAt come from ticket.md's frontmatter, or the
+	// old-shape epic.yaml sidecar (see loadEpicTiming). Zero when neither
+	// sets the field.
 	StartedAt   time.Time
 	CompletedAt time.Time
 }

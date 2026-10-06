@@ -47,7 +47,9 @@ func loadEpic(scratchDir, name string) Epic {
 		epic.MapBody = string(raw)
 	}
 
-	epic.StartedAt, epic.CompletedAt = loadEpicTiming(epicPath)
+	if !loadEpicTicketMD(&epic) {
+		epic.StartedAt, epic.CompletedAt = loadEpicTiming(epicPath)
+	}
 
 	issuesDir := filepath.Join(epicPath, "issues")
 	issueEntries, err := os.ReadDir(issuesDir)
@@ -131,6 +133,45 @@ func humanizeSlug(slug string) string {
 		return title
 	}
 	return strings.ToUpper(title[:1]) + title[1:]
+}
+
+// ticketMDYAML is the frontmatter of a top-level ticket's `ticket.md`.
+type ticketMDYAML struct {
+	Status      string     `yaml:"status"`
+	BlockedBy   []string   `yaml:"blocked_by"`
+	Base        string     `yaml:"base"`
+	StartedAt   *time.Time `yaml:"started_at"`
+	CompletedAt *time.Time `yaml:"completed_at"`
+}
+
+// loadEpicTicketMD fills epic from its ticket.md frontmatter and reports
+// whether the epic has one. An unparsable ticket.md still counts as the new
+// shape, so a broken file doesn't silently fall back to epic.yaml.
+func loadEpicTicketMD(epic *Epic) bool {
+	raw, err := os.ReadFile(filepath.Join(epic.Path, "ticket.md"))
+	if err != nil {
+		return false
+	}
+	epic.HasTicketMD = true
+
+	fm, ok := schema.FrontmatterYAML(string(raw))
+	if !ok {
+		return true
+	}
+	var wire ticketMDYAML
+	if err := yaml.Unmarshal([]byte(fm), &wire); err != nil {
+		return true
+	}
+	epic.Status = wire.Status
+	epic.BlockedBy = wire.BlockedBy
+	epic.Base = wire.Base
+	if wire.StartedAt != nil {
+		epic.StartedAt = *wire.StartedAt
+	}
+	if wire.CompletedAt != nil {
+		epic.CompletedAt = *wire.CompletedAt
+	}
+	return true
 }
 
 // epicYAML is the on-disk shape of an epic's optional `epic.yaml` sidecar

@@ -325,3 +325,42 @@ func TestLoad_DiscoversAlphabeticallySuffixedTicketNumbers(t *testing.T) {
 		t.Errorf("ticket identifiers = %v, want %v", got, want)
 	}
 }
+
+func TestLoad_TicketMDFrontmatterSuppliesEpicFields(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "new-epic", "ticket.md"),
+		"---\nstatus: open\nblocked_by:\n  - other\nbase: main\nstarted_at: 2026-01-02T03:04:05Z\ncompleted_at: 2026-01-03T03:04:05Z\n---\nPlan link.\n")
+	writeFile(t, filepath.Join(dir, "new-epic", "issues", "01-first.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 1 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	epic := epics[0]
+	if !epic.HasTicketMD || epic.Status != "open" || epic.Base != "main" ||
+		!reflect.DeepEqual(epic.BlockedBy, []string{"other"}) {
+		t.Errorf("ticket.md fields not read: %+v", epic)
+	}
+	if d, ok := epic.CompletionDuration(); !ok || d != 24*time.Hour {
+		t.Errorf("CompletionDuration = %v, %v", d, ok)
+	}
+	if len(epic.Tickets) != 1 {
+		t.Errorf("want 1 child, got %d", len(epic.Tickets))
+	}
+}
+
+func TestLoad_OldShapeEpicYAMLStillLoads(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "old-epic", "epic.yaml"), "started_at: 2026-01-02T03:04:05Z\n")
+	writeFile(t, filepath.Join(dir, "old-epic", "issues", "01-first.md"),
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 1 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	if epics[0].HasTicketMD || epics[0].StartedAt.IsZero() || len(epics[0].Tickets) != 1 {
+		t.Errorf("old shape not loaded: %+v", epics[0])
+	}
+}

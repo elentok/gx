@@ -176,6 +176,13 @@ func HasFrontmatter(raw string) bool {
 	return hasFM
 }
 
+// FrontmatterYAML returns the raw YAML of raw's leading frontmatter block, for
+// callers whose frontmatter has its own shape (a top-level ticket.md).
+func FrontmatterYAML(raw string) (yamlPart string, ok bool) {
+	yamlPart, _, ok = splitFrontmatter(raw)
+	return yamlPart, ok
+}
+
 // MarshalTicket writes t back out as a "---" delimited YAML frontmatter
 // block followed by body, unchanged, the same shape ParseTicket reads.
 func MarshalTicket(t Ticket, body string) ([]byte, error) {
