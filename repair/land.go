@@ -73,7 +73,10 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 		return LandResult{}, "", err
 	}
 
-	lockDir := filepath.Clean(in.EpicPath)
+	lockDir, err := ralphloop.LandLockDir(in.EpicPath)
+	if err != nil {
+		return LandResult{}, "", err
+	}
 	if err := preflightLand(lockDir, epic, in.ID, featurePath, d); err != nil {
 		return LandResult{}, "", err
 	}
@@ -96,7 +99,7 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	if err != nil {
 		return LandResult{}, "", fmt.Errorf("resolving %s HEAD: %w", epic, err)
 	}
-	session, recorded := ralphloop.RecoverLandSession(filepath.Dir(lockDir), epic, t.Identifier)
+	session, recorded := ralphloop.RecoverLandSession(filepath.Dir(filepath.Clean(in.EpicPath)), epic, t.Identifier)
 	res, err := ralphloop.LandTicket(ralphloop.LandDepsOf(d), ralphloop.LandParams{
 		FeatureWorktree: featurePath,
 		FeatureBranch:   epic,
@@ -120,7 +123,7 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 		return out, fmt.Sprintf("%s: conflict landing %s; resolve it in %s, then --continue or --abort", EpicTicketLabel(in.EpicPath, in.ID), marker.SourceRange, featurePath), nil
 	}
 
-	if err := recordLanded(lockDir, epic, t, parsed.Status, res, session); err != nil {
+	if err := recordLanded(in.EpicPath, epic, t, parsed.Status, res, session); err != nil {
 		return LandResult{}, "", err
 	}
 	return out, fmt.Sprintf("%s: %s (%s)", EpicTicketLabel(in.EpicPath, in.ID), jsonOutcome(res.Outcome), res.SHA), nil
@@ -139,7 +142,7 @@ func landLockedRefusal(lockDir, epic, id string) *RefusalError {
 
 // abortOrphanLock clears a lock that has no marker. It refuses while the
 // owner is still running, since that is a live land, not a crash leftover.
-func abortOrphanLock(lockDir, id string) (LandResult, string, error) {
+func abortOrphanLock(epicPath, lockDir, id string) (LandResult, string, error) {
 	owner, err := ralphloop.ReadLandLock(lockDir)
 	if err != nil {
 		return LandResult{}, "", err
@@ -153,12 +156,12 @@ func abortOrphanLock(lockDir, id string) (LandResult, string, error) {
 	if err := ralphloop.ReleaseLandLock(lockDir); err != nil {
 		return LandResult{}, "", fmt.Errorf("clearing land lock: %w", err)
 	}
-	return LandResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", EpicTicketLabel(lockDir, id), owner.Describe()), nil
+	return LandResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", EpicTicketLabel(epicPath, id), owner.Describe()), nil
 }
 
 // recordLanded writes status: done (unless already) and the manual-land event
 // through the park path.
-func recordLanded(lockDir, epic string, t tickets.Ticket, status schema.Status, res ralphloop.LandResult, session ralphloop.LandSession) error {
+func recordLanded(epicPath, epic string, t tickets.Ticket, status schema.Status, res ralphloop.LandResult, session ralphloop.LandSession) error {
 	ev := ralphloop.Event{
 		Outcome:      string(res.Outcome),
 		SHA:          res.SHA,
@@ -169,7 +172,7 @@ func recordLanded(lockDir, epic string, t tickets.Ticket, status schema.Status, 
 	if session.ID == "" {
 		ev.Reason = "no recoverable agent session; metrics not stamped"
 	}
-	if err := ralphloop.RecordManualLand(filepath.Dir(lockDir), epic, t.Identifier, t.Path, status == schema.StatusDone, ev); err != nil {
+	if err := ralphloop.RecordManualLand(filepath.Dir(filepath.Clean(epicPath)), epic, t.Identifier, t.Path, status == schema.StatusDone, ev); err != nil {
 		return fmt.Errorf("marking ticket %s done: %w", t.Identifier, err)
 	}
 	return nil
@@ -186,13 +189,16 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 		return LandResult{}, "", err
 	}
 	epic := filepath.Base(filepath.Clean(in.EpicPath))
-	lockDir := filepath.Clean(in.EpicPath)
+	lockDir, err := ralphloop.LandLockDir(in.EpicPath)
+	if err != nil {
+		return LandResult{}, "", err
+	}
 	marker, err := ralphloop.ReadLandMarker(lockDir)
 	if err != nil {
 		return LandResult{}, "", err
 	}
 	if marker == nil && in.Abort {
-		return abortOrphanLock(lockDir, in.ID)
+		return abortOrphanLock(in.EpicPath, lockDir, in.ID)
 	}
 	if marker == nil || marker.Ticket != in.ID {
 		return LandResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", in.ID)}
@@ -234,7 +240,7 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	if err != nil {
 		return LandResult{}, "", err
 	}
-	session, _ := ralphloop.RecoverLandSession(filepath.Dir(lockDir), epic, t.Identifier)
+	session, _ := ralphloop.RecoverLandSession(filepath.Dir(filepath.Clean(in.EpicPath)), epic, t.Identifier)
 	res, err := ralphloop.StampLanded(ralphloop.LandDepsOf(d), ralphloop.LandParams{
 		FeatureWorktree: featurePath,
 		FeatureBranch:   epic,
@@ -245,7 +251,7 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	if err != nil {
 		return LandResult{}, "", err
 	}
-	if err := recordLanded(lockDir, epic, t, parsed.Status, res, session); err != nil {
+	if err := recordLanded(in.EpicPath, epic, t, parsed.Status, res, session); err != nil {
 		return LandResult{}, "", err
 	}
 	if err := ralphloop.ClearLand(lockDir); err != nil {

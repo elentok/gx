@@ -8,12 +8,32 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/tickets"
 )
 
 const (
 	landLockFile   = "land.lock"
 	landMarkerFile = "land.marker.json"
 )
+
+// landLockStateDir is a var so this package's tests can keep locks off the
+// machine's real state dir without moving HOME-relative state other tests use.
+var landLockStateDir = config.StateDir
+
+// LandLockDir is where an epic's land lock and marker live: the state dir,
+// keyed by the epic's project and name, so every process landing onto the
+// epic's feature branch (CLI or server) contends for the same lock whichever
+// path it reached the epic by.
+func LandLockDir(epicPath string) (string, error) {
+	state, err := landLockStateDir()
+	if err != nil {
+		return "", fmt.Errorf("resolving land lock dir: %w", err)
+	}
+	epicPath = filepath.Clean(epicPath)
+	return filepath.Join(state, "land-locks", tickets.ProjectName(filepath.Dir(epicPath)), filepath.Base(epicPath)), nil
+}
 
 // ErrLandLocked is returned when the land lock is already held. Its reason code
 // in the recovery JSON envelope is "land_locked".
@@ -93,6 +113,9 @@ func AcquireLandLockFor(dir, epic, ticket string) error {
 // AcquireLandLockAt is AcquireLandLockFor also recording the feature
 // branch's pre-pick HEAD.
 func AcquireLandLockAt(dir, epic, ticket, prePickHead string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
 	f, err := os.OpenFile(filepath.Join(dir, landLockFile), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if errors.Is(err, os.ErrExist) {
 		return ErrLandLocked
@@ -149,6 +172,9 @@ func ReleaseLandLock(dir string) error {
 
 // WriteLandMarker writes the marker beside the lock.
 func WriteLandMarker(dir string, m LandMarker) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
 	b, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return err

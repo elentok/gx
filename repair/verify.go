@@ -80,14 +80,18 @@ func Verify(run VerifyRun) (VerifyResult, error) {
 		verifications = []ralphloop.TicketVerification{}
 	}
 
-	marker, err := ralphloop.ReadLandMarker(epicPath)
+	lockDir, err := ralphloop.LandLockDir(epicPath)
+	if err != nil {
+		return VerifyResult{}, err
+	}
+	marker, err := ralphloop.ReadLandMarker(lockDir)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("reading land marker: %w", err)
 	}
 	if marker != nil && marker.Epic != epicName {
 		marker = nil
 	}
-	orphan, err := ralphloop.OrphanLandLock(epicPath)
+	orphan, err := ralphloop.OrphanLandLock(lockDir)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("reading land lock: %w", err)
 	}

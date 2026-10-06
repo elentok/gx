@@ -55,11 +55,15 @@ func newLandFixture(t *testing.T, content string) *landFixture {
 		FindWorkspace:        func(string) (string, error) { return "ws", nil },
 		TabList:              func(string) ([]herdr.Tab, error) { return nil, nil },
 	}
+	lockDir, err := ralphloop.LandLockDir(epicPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	return &landFixture{
 		in:         landInput{EpicPath: epicPath, ID: "01", Getwd: func() (string, error) { return t.TempDir(), nil }, Cwd: t.TempDir(), JSON: true},
 		deps:       d,
 		ticketPath: ticketPath,
-		lockDir:    epicPath,
+		lockDir:    lockDir,
 		picked:     &picked,
 		pickErr:    &pickErr,
 		pickActive: &pickActive,
@@ -240,11 +244,15 @@ func TestRunTicketsLand_ConflictExitsZeroWithMarkerAndNoStatus(t *testing.T) {
 func TestRunTicketsLand_LockContention(t *testing.T) {
 	t.Parallel()
 	f := newLandFixture(t, ticketWith("claimed", ""))
-	if err := ralphloop.AcquireLandLock(f.lockDir); err != nil {
+	if err := ralphloop.AcquireLandLockFor(f.lockDir, "widget-epic", "07"); err != nil {
 		t.Fatal(err)
 	}
-	if env := f.refusal(t); env.Reason != ReasonLandLocked {
-		t.Errorf("reason = %s", env.Reason)
+	if !strings.HasPrefix(f.lockDir, os.Getenv("XDG_STATE_HOME")) {
+		t.Errorf("lock dir %s is outside the state dir", f.lockDir)
+	}
+	env := f.refusal(t)
+	if env.Reason != ReasonLandLocked || !strings.Contains(env.Message, "widget-epic/07") {
+		t.Errorf("refusal = %s: %s", env.Reason, env.Message)
 	}
 }
 
@@ -276,7 +284,7 @@ func TestRunTicketsLand_WritesManualLandEvent(t *testing.T) {
 	if _, err := f.run(t); err != nil {
 		t.Fatal(err)
 	}
-	evs, ok, err := ralphloop.ReadEvents(filepath.Dir(f.lockDir), "widget-epic")
+	evs, ok, err := ralphloop.ReadEvents(filepath.Dir(f.in.EpicPath), "widget-epic")
 	if err != nil || !ok || len(evs) != 1 {
 		t.Fatalf("events = %+v ok=%v err=%v", evs, ok, err)
 	}
@@ -302,7 +310,7 @@ func TestRunTicketsLand_StampsMetricsFromRecoveredSession(t *testing.T) {
 	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	scratch := filepath.Dir(f.lockDir)
+	scratch := filepath.Dir(f.in.EpicPath)
 	started := ralphloop.Event{Type: "iteration-started", Ticket: "01", AgentSession: session, Cwd: cwd}
 	if err := ralphloop.AppendEvent(scratch, "widget-epic", started); err != nil {
 		t.Fatal(err)
@@ -462,6 +470,9 @@ func TestRunTicketsLand_ContinueAndAbortExclusive(t *testing.T) {
 // writeDeadLock leaves a lock owned by a pid that cannot be running.
 func writeDeadLock(t *testing.T, dir string) {
 	t.Helper()
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
 	body := `{"pid":2147483646,"time":"2026-01-02T03:04:05Z","epic":"widget-epic","ticket":"01"}`
 	if err := os.WriteFile(filepath.Join(dir, "land.lock"), []byte(body), 0644); err != nil {
 		t.Fatal(err)

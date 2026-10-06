@@ -141,6 +141,15 @@ func TestRun_ExitsOnlyAfterLastTicketsLandCompletes(t *testing.T) {
 	}
 }
 
+func mustLandLockDir(t *testing.T, scratchDir, epic string) string {
+	t.Helper()
+	dir, err := landLockDir(scratchDir, epic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 // TestRun_LandLockHeld_DefersThenLandsOnLaterTick covers a human's pending
 // land: the worker must not wait on the lock or fail the ticket, only retry.
 func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
@@ -149,7 +158,7 @@ func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := landLockDir(scratchDir, "epic")
+	lockDir := mustLandLockDir(t, scratchDir, "epic")
 	if err := AcquireLandLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +207,7 @@ func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := landLockDir(scratchDir, "epic")
+	lockDir := mustLandLockDir(t, scratchDir, "epic")
 	if err := WriteLandMarker(lockDir, LandMarker{Epic: "epic", Ticket: "01"}); err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +257,7 @@ func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := landLockDir(scratchDir, "epic")
+	lockDir := mustLandLockDir(t, scratchDir, "epic")
 	if err := AcquireLandLock(lockDir); err != nil {
 		t.Fatal(err)
 	}

@@ -29,7 +29,21 @@ import (
 // unrelated multi-minute package hang.
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	goleak.VerifyTestMain(m)
+	// Land locks live in the state dir; keep tests off the machine's real one.
+	state, err := os.MkdirTemp("", "gx-ralphloop-state")
+	if err != nil {
+		panic(err)
+	}
+	landLockStateDir = func() (string, error) { return state, nil }
+	code := m.Run()
+	os.RemoveAll(state)
+	if code == 0 {
+		if err := goleak.Find(); err != nil {
+			fmt.Fprintf(os.Stderr, "goleak: %v\n", err)
+			code = 1
+		}
+	}
+	os.Exit(code)
 }
 
 // agentResult builds the {"agent": {...}} envelope herdr's runAgentJSON

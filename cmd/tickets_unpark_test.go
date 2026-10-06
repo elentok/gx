@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,9 +14,17 @@ import (
 
 const parkedTicket = "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nneeds a human\n"
 
+// uniqueEpicPath names the project dir after the test: the land lock is keyed
+// by project and epic name, and every t.TempDir() parent is called "001".
+func uniqueEpicPath(t *testing.T) string {
+	t.Helper()
+	project := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
+	return filepath.Join(t.TempDir(), project, "widget-epic")
+}
+
 func unparkFixture(t *testing.T, content string) (epicPath, ticketPath string) {
 	t.Helper()
-	epicPath = filepath.Join(t.TempDir(), "widget-epic")
+	epicPath = uniqueEpicPath(t)
 	issuesDir := filepath.Join(epicPath, "issues")
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatal(err)

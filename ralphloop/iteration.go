@@ -753,7 +753,11 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		}
 		// A land marker means the sequencer state is a human's pending
 		// conflict, not crash debris: aborting would discard their work.
-		marker, err := ReadLandMarker(landLockDir(p.ScratchDir, p.FeatureBranch))
+		lockDir, err := landLockDir(p.ScratchDir, p.FeatureBranch)
+		if err != nil {
+			return LandResult{}, "", err
+		}
+		marker, err := ReadLandMarker(lockDir)
 		if err != nil {
 			return LandResult{}, "", fmt.Errorf("reading land marker: %w", err)
 		}

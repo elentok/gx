@@ -18,8 +18,8 @@ import (
 var landDeferRetryInterval = 2 * time.Second
 
 // landLockDir is where an epic's land lock and marker live.
-func landLockDir(scratchDir, epic string) string {
-	return filepath.Join(scratchDir, epic)
+func landLockDir(scratchDir, epic string) (string, error) {
+	return LandLockDir(filepath.Join(scratchDir, epic))
 }
 
 // landJob is the in-memory handoff from a build goroutine to the land-queue
@@ -163,8 +163,10 @@ func runLandQueue(d Deps, lp landQueueParams, landJobs map[string]landJob, landJ
 // there is one.
 func logLandDeferred(p iterationParams) {
 	reason := "land lock held or conflict pending"
-	if owner, err := ReadLandLock(landLockDir(p.ScratchDir, p.FeatureBranch)); err == nil && owner != nil {
-		reason = "land lock held by " + owner.Describe()
+	if dir, err := landLockDir(p.ScratchDir, p.FeatureBranch); err == nil {
+		if owner, err := ReadLandLock(dir); err == nil && owner != nil {
+			reason = "land lock held by " + owner.Describe()
+		}
 	}
 	p.logTicketEventReason(string(events.LandDeferred), "", "", "", "", reason)
 }
@@ -228,7 +230,10 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 
 	// The lock is shared with the human land command, whose conflicted land
 	// exits still holding it. Never wait on it: park as deferred, retry next tick.
-	lockDir := landLockDir(p.ScratchDir, p.FeatureBranch)
+	lockDir, err := landLockDir(p.ScratchDir, p.FeatureBranch)
+	if err != nil {
+		return outcome{ticket: job.ticket, err: err}
+	}
 	// The pre-pick HEAD lets a restart finish this landing if gx stops
 	// after git does (see recoverInterruptedLanding).
 	head, _ := d.RevParse(p.FeatureWorktree, "HEAD")

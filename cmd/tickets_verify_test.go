@@ -13,7 +13,7 @@ import (
 
 func verifyFixture(t *testing.T) string {
 	t.Helper()
-	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	epicPath := uniqueEpicPath(t)
 	issues := filepath.Join(epicPath, "issues")
 	if err := os.MkdirAll(issues, 0755); err != nil {
 		t.Fatal(err)
@@ -118,7 +118,11 @@ func TestRunTicketsVerify_UnknownExitsZero(t *testing.T) {
 func TestRunTicketsVerify_InFlightLabelAndNoLock(t *testing.T) {
 	t.Parallel()
 	epicPath := verifyFixture(t)
-	if err := ralphloop.WriteLandMarker(epicPath, ralphloop.LandMarker{Epic: "widget-epic", Ticket: "02", SourceRange: "a..b", PrePickHead: "c"}); err != nil {
+	lockDir, err := ralphloop.LandLockDir(epicPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ralphloop.WriteLandMarker(lockDir, ralphloop.LandMarker{Epic: "widget-epic", Ticket: "02", SourceRange: "a..b", PrePickHead: "c"}); err != nil {
 		t.Fatal(err)
 	}
 	run := verifyRun{EpicPath: epicPath, Deps: verifyDepsFor(t, nil, nil)}
@@ -129,7 +133,7 @@ func TestRunTicketsVerify_InFlightLabelAndNoLock(t *testing.T) {
 	if !strings.Contains(out, "landing in flight: ticket 02") {
 		t.Errorf("in-flight label missing:\n%s", out)
 	}
-	if _, err := os.Stat(filepath.Join(epicPath, "land.lock")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(lockDir, "land.lock")); !os.IsNotExist(err) {
 		t.Errorf("verify must not take the land lock (stat err = %v)", err)
 	}
 }
@@ -150,7 +154,11 @@ func TestRunTicketsVerify_MissingTicketRefusesInEnvelope(t *testing.T) {
 func TestRunTicketsVerify_ReportsOrphanLock(t *testing.T) {
 	t.Parallel()
 	epicPath := verifyFixture(t)
-	if err := ralphloop.AcquireLandLockFor(epicPath, "widget-epic", "02"); err != nil {
+	lockDir, err := ralphloop.LandLockDir(epicPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ralphloop.AcquireLandLockFor(lockDir, "widget-epic", "02"); err != nil {
 		t.Fatal(err)
 	}
 	run := verifyRun{EpicPath: epicPath, Deps: verifyDepsFor(t, nil, nil)}

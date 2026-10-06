@@ -25,7 +25,10 @@ const interruptedLandingReason = "interrupted landing recorded on restart"
 // holds it any more. A lock with a marker is a human's pending conflict and a
 // live owner is still landing, so both are left alone.
 func recoverInterruptedLanding(d Deps, rp reconcileParams, epic tickets.Epic) error {
-	lockDir := landLockDir(rp.Paths.ScratchDir, epic.Name)
+	lockDir, err := landLockDir(rp.Paths.ScratchDir, epic.Name)
+	if err != nil {
+		return fmt.Errorf("resolving land lock dir: %w", err)
+	}
 	owner, err := OrphanLandLock(lockDir)
 	if err != nil {
 		return fmt.Errorf("reading land lock: %w", err)
@@ -115,7 +118,10 @@ func recordInterruptedLanding(d Deps, rp reconcileParams, epic tickets.Epic, own
 // land-queue worker and `gx tickets land` take, recording the pre-pick HEAD
 // so a landing cut short can be finished on restart.
 func withLandLock(d Deps, p iterationParams, land func() error) error {
-	lockDir := landLockDir(p.ScratchDir, p.FeatureBranch)
+	lockDir, err := landLockDir(p.ScratchDir, p.FeatureBranch)
+	if err != nil {
+		return err
+	}
 	head, _ := d.RevParse(p.FeatureWorktree, "HEAD")
 	if err := AcquireLandLockAt(lockDir, p.FeatureBranch, p.Ticket.Identifier, head); err != nil {
 		if errors.Is(err, ErrLandLocked) {
