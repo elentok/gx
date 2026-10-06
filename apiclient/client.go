@@ -33,6 +33,13 @@ func (c *Client) Handshake(ctx context.Context) (server.Handshake, error) {
 	return h, err
 }
 
+// Snapshot returns every indexed ticket plus the server-wide sequence number.
+func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
+	var s server.Snapshot
+	err := c.get(ctx, "/v1/snapshot", &s)
+	return s, err
+}
+
 func (c *Client) get(ctx context.Context, path string, out any) error {
 	// The host is ignored by the unix dialer; it only has to parse.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)

@@ -29,6 +29,37 @@ func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {
 	}
 }
 
+func TestSnapshot_ListsStoreTicketsByAddressWithSequence(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
+	servertest.WriteTicket(t, store, "other", "epic-b", "01", "third", "")
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, tk := range snap.Tickets {
+		got = append(got, tk.Address)
+	}
+	want := []string{"other:epic-b/01", "proj:epic-a/01", "proj:epic-a/02"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("addresses = %v, want %v", got, want)
+	}
+	if snap.Tickets[2].Status != "open" || len(snap.Tickets[2].BlockedBy) != 1 {
+		t.Errorf("ticket = %+v", snap.Tickets[2])
+	}
+	again, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Seq != snap.Seq {
+		t.Errorf("seq changed without a store change: %d -> %d", snap.Seq, again.Seq)
+	}
+}
+
 func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
 	h := servertest.Start(t)
 

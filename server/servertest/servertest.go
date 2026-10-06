@@ -28,8 +28,38 @@ type Harness struct {
 	Stop func() error
 }
 
-// Start runs a server until the test ends.
+// WriteTicket creates <store>/<project>/<epic>/issues/<id>-<slug>.md (and the
+// project's project.json) with minimal valid frontmatter. Call it before Start.
+func WriteTicket(t *testing.T, store, project, epic, id, slug, blockedBy string) {
+	t.Helper()
+	projectDir := filepath.Join(store, project)
+	issues := filepath.Join(projectDir, epic, "issues")
+	if err := os.MkdirAll(issues, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "project.json"), []byte(`{"name":"`+project+`"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fm := "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\n"
+	if blockedBy != "" {
+		fm += "blocked_by: [\"" + blockedBy + "\"]\n"
+	}
+	fm += "---\n\n# " + slug + "\n"
+	if err := os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Start runs a server until the test ends. Tickets already written to
+// TicketStore are indexed at startup; since the harness creates TicketStore
+// itself, use StartWithStore to seed it first.
 func Start(t *testing.T) *Harness {
+	t.Helper()
+	return StartWithStore(t, t.TempDir())
+}
+
+// StartWithStore is Start over a caller-seeded ticket store.
+func StartWithStore(t *testing.T, store string) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
 	stateDir, err := os.MkdirTemp("", "gxs")
@@ -41,11 +71,11 @@ func Start(t *testing.T) *Harness {
 	h := &Harness{
 		Herdr:       herdrfake.NewState(t),
 		StateDir:    filepath.Join(stateDir, "state"),
-		TicketStore: t.TempDir(),
+		TicketStore: store,
 	}
 	herdrfake.StartState(t, h.Herdr)
 
-	srv, err := server.New(server.Config{StateDir: h.StateDir, Build: "test-build"})
+	srv, err := server.New(server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore})
 	if err != nil {
 		t.Fatal(err)
 	}

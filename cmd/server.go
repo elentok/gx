@@ -70,6 +70,17 @@ func newServerCmd(_ deps) *cobra.Command {
 	logs.Flags().StringVar(&logOpts.Level, "level", "", "minimum level to show: debug, info, warn or error")
 	logs.Flags().BoolVar(&logOpts.JSON, "json", false, "print raw JSON lines instead of pretty output")
 	cmd.AddCommand(logs)
+	var snapJSON bool
+	snapshot := &cobra.Command{
+		Use:   "snapshot",
+		Short: "print the server's ticket index and sequence number",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerSnapshot(c.Context(), snapJSON, c.OutOrStdout())
+		},
+	}
+	snapshot.Flags().BoolVar(&snapJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(snapshot)
 	eventsCmd := &cobra.Command{
 		Use:   "events",
 		Short: "run-log event contract",
@@ -96,7 +107,11 @@ func runServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion()})
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path})
 	if err != nil {
 		return err
 	}
@@ -163,6 +178,34 @@ func runServerStop(ctx context.Context, w io.Writer) error {
 }
 
 const stopTimeout = 10 * time.Second
+
+func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	c, err := serverClient()
+	if err != nil {
+		return err
+	}
+	snap, err := c.Snapshot(ctx)
+	if err != nil {
+		return fmt.Errorf("server not reachable (is `gx server` running?): %w", err)
+	}
+	if jsonOut {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(snap)
+	}
+	if _, err := fmt.Fprintf(w, "seq: %d\n", snap.Seq); err != nil {
+		return err
+	}
+	for _, t := range snap.Tickets {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", t.Address, t.Status, t.Title); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // runServerEventsKinds prints every event kind, reading Go data only.
 func runServerEventsKinds(jsonOut bool, w io.Writer) error {

@@ -34,8 +34,9 @@ type Handshake struct {
 }
 
 type Config struct {
-	StateDir string
-	Build    string
+	StateDir    string
+	Build       string
+	TicketStore string // ticket-store root; scanned once at startup
 }
 
 // Server owns the state-dir lock and the listening socket.
@@ -46,6 +47,7 @@ type Server struct {
 	http *http.Server
 	logf *rotatingFile
 	log  *slog.Logger
+	idx  *index
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -62,6 +64,11 @@ func New(cfg Config) (*Server, error) {
 	lock, err := acquireLock(filepath.Join(cfg.StateDir, lockFileName))
 	if err != nil {
 		return nil, err
+	}
+	idx, err := buildIndex(cfg.TicketStore)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("index ticket store: %w", err)
 	}
 	sock := SocketPath(cfg.StateDir)
 	// We hold the lock, so any socket file is stale from a crashed server.
@@ -88,11 +95,18 @@ func New(cfg Config) (*Server, error) {
 		ln:   ln,
 		logf: logf,
 		log:  slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		idx:  idx,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/handshake", s.handshake)
+	mux.HandleFunc("GET /v1/snapshot", s.snapshot)
 	s.http = &http.Server{Handler: mux}
 	return s, nil
+}
+
+func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(s.idx.snapshot())
 }
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
