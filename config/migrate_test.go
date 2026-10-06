@@ -112,18 +112,17 @@ func TestWarnOnMigrateFailureWritesWarningWhenRenameFails(t *testing.T) {
 	}
 }
 
-func TestUserStateDirIgnoresXDGStateHome(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", filepath.Join(t.TempDir(), "xdg-state"))
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+func TestUserStateDirHonorsXDGStateHome(t *testing.T) {
+	xdg := filepath.Join(t.TempDir(), "xdg-state")
+	t.Setenv("XDG_STATE_HOME", xdg)
+	t.Setenv("HOME", t.TempDir())
 
 	dir, err := UserStateDir()
 	if err != nil {
 		t.Fatalf("UserStateDir: %v", err)
 	}
-	want := filepath.Join(home, ".local", "state")
-	if dir != want {
-		t.Errorf("UserStateDir() = %q, want %q", dir, want)
+	if dir != xdg {
+		t.Errorf("UserStateDir() = %q, want %q", dir, xdg)
 	}
 }
 

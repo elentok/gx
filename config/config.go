@@ -32,17 +32,12 @@ func UserCacheDir() (string, error) {
 	return filepath.Join(home, ".cache"), nil
 }
 
-// UserStateDir hardcodes ~/.local/state as gx's runtime-state base directory
-// on every platform, mirroring UserConfigDir/UserCacheDir's deliberate
-// bypass of per-OS/XDG resolution. Runtime state (queue-state.json,
+// UserStateDir is the runtime-state base directory: ~/.local/state on every
+// platform, or XDG_STATE_HOME when set. Runtime state (queue-state.json,
 // notifications-state.json) lives here rather than under UserConfigDir,
 // which is reserved for user-edited config (config.json).
 func UserStateDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".local", "state"), nil
+	return xdgBase("XDG_STATE_HOME", ".local", "state")
 }
 
 var userConfigDirFn = UserConfigDir
@@ -65,6 +60,7 @@ type Config struct {
 	Skills                SkillsConfig         `json:"skills"`
 	Agents                AgentsConfig         `json:"agents"`
 	Subscription          SubscriptionConfig   `json:"subscription"`
+	TicketStore           TicketStoreConfig    `json:"ticket-store"`
 }
 
 // Default returns the default configuration.
@@ -81,6 +77,7 @@ func Default() Config {
 		Skills:                DefaultSkillsConfig(),
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
+		TicketStore:           DefaultTicketStoreConfig(),
 	}
 }
 
@@ -152,6 +149,9 @@ func Load() (Config, error) {
 		Subscription *struct {
 			SuppressExtraUsageWarning *bool `json:"suppress-extra-usage-warning"`
 		} `json:"subscription"`
+		TicketStore *struct {
+			Path *string `json:"path"`
+		} `json:"ticket-store"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -236,6 +236,9 @@ func Load() (Config, error) {
 	}
 	if raw.Subscription != nil && raw.Subscription.SuppressExtraUsageWarning != nil {
 		cfg.Subscription.SuppressExtraUsageWarning = *raw.Subscription.SuppressExtraUsageWarning
+	}
+	if raw.TicketStore != nil && raw.TicketStore.Path != nil {
+		cfg.TicketStore.Path = *raw.TicketStore.Path
 	}
 
 	return cfg, nil

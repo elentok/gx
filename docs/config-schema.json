@@ -206,6 +206,17 @@
         }
       }
     },
+    "ticket-store": {
+      "type": "object",
+      "description": "Where the global ticket store lives.",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Absolute path of the ticket store. Default: <data dir>/tickets (~/.local/share/gx/tickets, honoring XDG_DATA_HOME)."
+        }
+      }
+    },
     "skills": {
       "type": "object",
       "description": "Which skill(s) gx-implement-equivalent work and code review run under.",
