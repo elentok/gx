@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.29.0 - 2026-10-06
+
+- Added a global, git-backed ticket store. Tickets now live in `<store>/<project>/<epic>/…` instead of each repo's `.bare/.scratch`:
+  - New config for XDG-aware data/state dirs, `ticket-store.path`, and a per-project `project.json`.
+  - `gx tickets root`/`epics` resolve through the store. On an old-shape repo they refuse with a migrate hint.
+  - gx is the only one that commits the store. A shared commit loop runs in-process, and edits made while gx was down are committed on the next start.
+  - The debug log and other server-owned state moved to the per-OS state dir.
+- Added `gx tickets migrate --to-store` (with `--dry-run`). It copies an old ticket tree into the store, converts `epic.yaml` epics to a top-level `ticket.md`, converts ticket types, and validates the migrated project.
+- Added canonical ticket addresses (`project:epic/06`), and `06` / `epic/06` still work as input:
+  - Added `gx tickets show`, `gx tickets section` and `gx tickets add --body`, all by address.
+  - `gx tickets set`, `validate`, `land`, `reset`, `unpark` and `add` accept addresses and print the canonical form.
+  - Event logs, commit trailers (`Ralph-Loop-Ticket`) and iteration prompts use the canonical address. The old trailer form still parses.
+  - Bundled skills now use `gx tickets` verbs instead of file paths.
+- Changed `gx tickets validate`:
+  - It checks the whole project, and `--all` checks every project.
+  - It detects `blocked_by` cycles across ancestry.
+  - It skips graph checks for terminal tickets.
+  - It shares one `blocked_by` resolver with the loader, which now reports dangling refs as errors.
+- Added a terminal `cancelled` ticket status.
+- Added `type: implement`. `type: task` is still accepted as an alias.
+- Changed every needs-repair park to go through a single park path that stamps a `park_kind`:
+  - zero-commit, needs-answer, blocked-pane, budget kill, CLI land, reconciliation and storm quarantine
+- Added `retry-exhausted` parking after N consecutive launch failures (`execution-queue.retry-storm-launches`, default 3). A `launch-failed` event is logged for each failed attempt.
+- Added `spinning` quarantine for tickets that cycle between park and re-claim too often (`execution-queue.spin-cycles`, default 3, within `execution-queue.spin-window`, default 5m).
+- Added `gx server events kinds`. It is backed by a new events contract package. Events with no ticket address go to a server event log in the store.
+- Added a per-ticket file lock taken by every ticket writer, including the epic `ticket.md` timing stamp.
+- Changed `gx cleanup scan`, ensure-code-review and notify status to read through the ticket store.
+- Changed loop iteration prompts and skills so agents don't edit shell scripts, read from stdin, or leave background shells running. Two iterations had stalled for these reasons.
+- Breaking: renamed the `gx merge` JSON field `base` to `target`.
+- Added CONTEXT.md and ADRs 0026 (ticket store: markdown is truth) and 0027 (canonical ticket addresses).
+
 ## v0.28.17 - 2026-10-05
 
 - Added `gx tickets land`, `verify`, `reset` and `unpark` for recovering stuck ralph-loop tickets:
