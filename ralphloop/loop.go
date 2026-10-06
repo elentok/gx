@@ -190,6 +190,9 @@ type RunOptions struct {
 	// value (both fields empty for both agents) reproduces today's launch
 	// argv unchanged.
 	Agents      config.AgentsConfig
+	// Orchestrator is config.Orchestrator; Run refuses to claim anything under
+	// "server". Empty means in-process, so zero-value options keep working.
+	Orchestrator string
 	Skill       string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
 	ScratchDir  string // defaults to the repo's ticket-store project dir
 	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
@@ -273,6 +276,10 @@ type outcome struct {
 	landDeferred bool
 }
 
+// ErrOrchestratorServer is returned by Run when config's orchestrator switch
+// hands scheduling to the server.
+var ErrOrchestratorServer = errors.New("orchestrator is set to \"server\": the in-process loop does not claim tickets")
+
 // Run drives every unblocked ticket in the named epic to completion, up to
 // MaxParallel running concurrently, each in its own iteration worktree:
 // create the iteration worktree, launch the selected agent, send its initial
@@ -283,6 +290,9 @@ type outcome struct {
 // the epic reaches a done-family status, or immediately if the epic has none
 // to run.
 func Run(opts RunOptions, d Deps, sink EventSink) error {
+	if opts.Orchestrator == config.OrchestratorServer {
+		return ErrOrchestratorServer
+	}
 	ctx := opts.Ctx
 	if ctx == nil {
 		ctx = context.Background()

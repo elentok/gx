@@ -219,6 +219,12 @@
         }
       }
     },
+    "orchestrator": {
+      "type": "string",
+      "enum": ["in-process", "server"],
+      "default": "in-process",
+      "description": "Temporary switch: who schedules tickets. Under \"server\" the in-process loop refuses to claim."
+    },
     "ticket-store": {
       "type": "object",
       "description": "Where the global ticket store lives.",

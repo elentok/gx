@@ -62,7 +62,15 @@ type Config struct {
 	Agents                AgentsConfig         `json:"agents"`
 	Subscription          SubscriptionConfig   `json:"subscription"`
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
+	// Orchestrator is the temporary switch between the in-process ralph-loop
+	// and the orchestrator server. Global only: never a per-project key.
+	Orchestrator string `json:"orchestrator"`
 }
+
+const (
+	OrchestratorInProcess = "in-process"
+	OrchestratorServer    = "server"
+)
 
 // Default returns the default configuration.
 func Default() Config {
@@ -79,6 +87,7 @@ func Default() Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
+		Orchestrator:          OrchestratorInProcess,
 	}
 }
 
@@ -156,6 +165,7 @@ func Load() (Config, error) {
 			Path           *string `json:"path"`
 			CommitDebounce *int    `json:"commit-debounce"`
 		} `json:"ticket-store"`
+		Orchestrator *string `json:"orchestrator"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -254,6 +264,15 @@ func Load() (Config, error) {
 	}
 	if raw.TicketStore != nil && raw.TicketStore.CommitDebounce != nil && *raw.TicketStore.CommitDebounce > 0 {
 		cfg.TicketStore.CommitDebounce = *raw.TicketStore.CommitDebounce
+	}
+	if raw.Orchestrator != nil {
+		switch *raw.Orchestrator {
+		case OrchestratorInProcess, OrchestratorServer:
+			cfg.Orchestrator = *raw.Orchestrator
+		default:
+			return cfg, fmt.Errorf("config %s: orchestrator must be %q or %q, got %q",
+				path, OrchestratorInProcess, OrchestratorServer, *raw.Orchestrator)
+		}
 	}
 
 	return cfg, nil
