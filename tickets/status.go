@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -185,7 +186,10 @@ func (e Epic) parentDone(t Ticket) bool {
 // block each other, since neither is included in the other's expansion.
 func (e Epic) effectiveBlockedBy(t Ticket) []string {
 	if t.Type != typeCodeReview {
-		return t.BlockedBy
+		// Qualified refs name another epic; ExternalBlockers carries them.
+		return slices.DeleteFunc(slices.Clone(t.BlockedBy), func(ref string) bool {
+			return strings.Contains(ref, "/")
+		})
 	}
 	var tokens []string
 	for _, other := range e.Tickets {
@@ -238,12 +242,12 @@ func (e Epic) blocking(t Ticket, forkChildren map[string][]Ticket) bool {
 // counts as unresolved (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
 	blockedBy := e.effectiveBlockedBy(t)
+	unresolved := slices.Clone(t.ExternalBlockers)
 	if len(blockedBy) == 0 {
-		return nil
+		return unresolved
 	}
 	byNumberAndSuffix := e.byNumberAndSuffix()
 	forkChildren := e.forkChildren()
-	var unresolved []string
 	for _, token := range blockedBy {
 		num, letters := splitBlockedByToken(token)
 		other, ok := byNumberAndSuffix[siblingKey(num, letters)]

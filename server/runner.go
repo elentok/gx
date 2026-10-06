@@ -181,11 +181,11 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	epics, err := tickets.Load(projectDir)
+	loaded, err := tickets.Load(projectDir)
 	if err != nil {
 		return false, err
 	}
-	for _, e := range epics {
+	for _, e := range tickets.ResolveCrossEpic(addr.Project, loaded) {
 		if filepath.Base(e.Path) != addr.Epic {
 			continue
 		}

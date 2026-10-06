@@ -89,6 +89,10 @@ type Ticket struct {
 	// BlockedByErr is set when a literal blocked_by ref is malformed or names
 	// no ticket in the epic (see Epic.CheckBlockedBy). Renders as StatusError.
 	BlockedByErr string
+
+	// ExternalBlockers are the qualified refs (the ticket's own and its epic's)
+	// still unresolved, set by ResolveCrossEpic.
+	ExternalBlockers []string
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets

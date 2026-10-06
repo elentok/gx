@@ -149,6 +149,17 @@ func (g *projectGraph) subtree(root string) []string {
 	return keys
 }
 
+// blocking reports whether the ticket at key, or any of its fork descendants,
+// is not yet terminal (the project-wide form of Epic.Blocking).
+func (g *projectGraph) blocking(key string) bool {
+	for _, k := range g.subtree(key) {
+		if !g.tickets[k].IsTerminal() {
+			return true
+		}
+	}
+	return false
+}
+
 // renderChain names tickets of `epic` by number and others as "epic/number".
 func (g *projectGraph) renderChain(chain []string, epic string) string {
 	names := make([]string, len(chain))
