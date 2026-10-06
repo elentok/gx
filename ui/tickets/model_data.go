@@ -239,6 +239,9 @@ type epicsLoadedMsg struct {
 // error is treated as zero rather than surfaced alongside msg.err, since a
 // missing/unreadable ".archive" just means "nothing archived to show".
 func (m Model) cmdLoad() tea.Cmd {
+	if m.serverMode() {
+		return m.cmdServerSnapshot()
+	}
 	scratchDir := m.scratchDir()
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)

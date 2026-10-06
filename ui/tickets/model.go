@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
+	"github.com/elentok/gx/viewmodel"
 )
 
 // focusPane is which of the tickets tab's two panels currently receives key
@@ -177,6 +178,11 @@ type Model struct {
 	// cmdReattachRescan/handleReattachRescan on each OnPageActivated so it
 	// clears once the session it points at is no longer live.
 	reattachPending []ralphloop.ReattachSignal
+
+	// serverAPI is non-nil in server mode (see server_mode.go): vm is then the
+	// only source of rows.
+	serverAPI ServerAPI
+	vm        viewmodel.State
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -257,6 +263,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if next, cmd, ok := m.updateServer(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width

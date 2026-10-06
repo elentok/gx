@@ -956,6 +956,10 @@ func (r *loopRegistry) takeAttachError() error {
 // reconcile.go recovers an interrupted loop on the next run, so there's no
 // correctness reason to prevent quitting outright.
 func (m Model) CanQuit() bool {
+	// In server mode the loops live in the server, not this process.
+	if m.serverMode() {
+		return true
+	}
 	return !ralphLoopRegistry.isRunning()
 }
 
