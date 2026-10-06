@@ -173,9 +173,9 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
 	}
-	shaA := trailers[ticketTrailerValue(epicName, "01")]
-	shaB := trailers[ticketTrailerValue(epicName, "02")]
-	shaC := trailers[ticketTrailerValue(epicName, "03")]
+	shaA := trailers[addressTrailerValue(scratchDir, epicName, "01")]
+	shaB := trailers[addressTrailerValue(scratchDir, epicName, "02")]
+	shaC := trailers[addressTrailerValue(scratchDir, epicName, "03")]
 	if shaA == "" || shaB == "" || shaC == "" {
 		t.Fatalf("landed trailers = %v, want a landed commit for each of A, B, C", trailers)
 	}
@@ -521,7 +521,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	}
 	shas := map[string]string{}
 	for _, id := range []string{"01", "02", "03", "04", "05", "06"} {
-		sha := trailers[ticketTrailerValue(epicName, id)]
+		sha := trailers[addressTrailerValue(scratchDir, epicName, id)]
 		if sha == "" {
 			t.Fatalf("landed trailers = %v, want a landed commit for ticket %s", trailers, id)
 		}
@@ -571,7 +571,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			trailerTokens = contracts[id].trailerTokens
 		}
 		wantTrailers := map[string]string{
-			ticketTrailerKey:  ticketTrailerValue(epicName, id),
+			ticketTrailerKey:  addressTrailerValue(scratchDir, epicName, id),
 			tokensTrailerKey:  strconv.Itoa(trailerTokens),
 			elapsedTrailerKey: strconv.Itoa(contracts[id].elapsed) + "s",
 		}

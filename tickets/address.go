@@ -2,7 +2,9 @@ package tickets
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // Reason codes carried by AddressError. They are the stable, machine-readable
@@ -37,6 +39,35 @@ func (a Address) String() string { return a.Project + ":" + a.Epic + "/" + a.ID 
 type AddressContext struct {
 	Project string
 	Epic    string
+}
+
+// AddressOfPath names the ticket with the given id stored at path, when path
+// sits in the tracker's <project>/<epic>/issues/<file>.md layout. Ad-hoc
+// files outside it have no address.
+func AddressOfPath(path, id string) (Address, bool) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return Address{}, false
+	}
+	issuesDir := filepath.Dir(abs)
+	if filepath.Base(issuesDir) != "issues" {
+		return Address{}, false
+	}
+	epicDir := filepath.Dir(issuesDir)
+	return Address{Project: ProjectName(filepath.Dir(epicDir)), Epic: filepath.Base(epicDir), ID: id}, true
+}
+
+// SplitTrailerValue is the inverse of Address.String for a landing trailer
+// value, tolerating the legacy "epic/id" form that carries no project.
+func SplitTrailerValue(v string) (epic, id string, ok bool) {
+	if i := strings.IndexByte(v, ':'); i >= 0 {
+		v = v[i+1:]
+	}
+	i := strings.LastIndexByte(v, '/')
+	if i < 0 {
+		return "", "", false
+	}
+	return v[:i], v[i+1:], true
 }
 
 var addressRe = regexp.MustCompile(`^(?:(?:([^:/\s]+):)?([^:/\s]+)/)?(\d+[[:alpha:]]?\d*)$`)

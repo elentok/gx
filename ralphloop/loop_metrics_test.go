@@ -258,7 +258,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	} else if !found {
 		t.Errorf("landed commit missing %s: %s trailer", elapsedTrailerKey, wantElapsed)
 	}
-	if found, err := git.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, ticketTrailerValue("epic", "01")); err != nil {
+	if found, err := git.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, addressTrailerValue(scratchDir, "epic", "01")); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", ticketTrailerKey, err)
 	} else if !found {
 		t.Errorf("landed commit missing %s trailer", ticketTrailerKey)

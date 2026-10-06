@@ -216,7 +216,13 @@ func cherryPickCore(d LandDeps, lp LandParams) (conflicted bool, err error) {
 	return true, nil
 }
 
+// landTrailerValue is the ticket's canonical address, so identity survives a
+// retarget; a ticket outside the tracker layout has none and keeps the legacy
+// <featureBranch>/<id> form (landedTickets reads both).
 func landTrailerValue(lp LandParams) string {
+	if a, ok := tickets.AddressOfPath(lp.TicketPath, lp.TicketID); ok {
+		return a.String()
+	}
 	return ticketTrailerValue(lp.FeatureBranch, lp.TicketID)
 }
 

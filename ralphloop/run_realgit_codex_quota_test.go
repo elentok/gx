@@ -240,7 +240,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		t.Fatalf("TrailerMap: %v", err)
 	}
 	for _, id := range []string{"01", "02", "03"} {
-		if trailers[ticketTrailerValue(epicName, id)] == "" {
+		if trailers[addressTrailerValue(scratchDir, epicName, id)] == "" {
 			t.Errorf("landed trailers = %v, want a landed commit for ticket %s", trailers, id)
 		}
 	}
@@ -652,7 +652,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		t.Fatalf("TrailerMap: %v", err)
 	}
 	for _, id := range []string{"01", "02", "03"} {
-		if trailers[ticketTrailerValue(epicName, id)] == "" {
+		if trailers[addressTrailerValue(scratchDir, epicName, id)] == "" {
 			t.Errorf("landed trailers = %v, want a landed commit for ticket %s", trailers, id)
 		}
 	}

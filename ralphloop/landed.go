@@ -1,9 +1,8 @@
 package ralphloop
 
 import (
-	"strings"
-
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 )
 
 // landedTickets reports which tickets have a commit reachable from
@@ -19,11 +18,10 @@ func landedTickets(dir, featureBranch string) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	prefix := featureBranch + "/"
 	landed := make(map[string]bool, len(trailers))
 	for value := range trailers {
-		identifier, ok := strings.CutPrefix(value, prefix)
-		if !ok {
+		epic, identifier, ok := tickets.SplitTrailerValue(value)
+		if !ok || epic != featureBranch {
 			// Unscoped or cross-epic trailer value (see
 			// ticketTrailerValue's epic-scoping rationale) — never counts
 			// as this epic's ticket landing.

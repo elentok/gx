@@ -109,7 +109,7 @@ func TestRunTicketsLand_StatusRules(t *testing.T) {
 			if err := json.Unmarshal([]byte(out), &res); err != nil {
 				t.Fatal(err)
 			}
-			if res["outcome"] != "landed" || res["trailer_value"] != "widget-epic/01" {
+			if res["outcome"] != "landed" || !strings.HasSuffix(res["trailer_value"].(string), ":widget-epic/01") {
 				t.Errorf("result = %v", res)
 			}
 			if !strings.Contains(f.ticketText(t), "status: done") {

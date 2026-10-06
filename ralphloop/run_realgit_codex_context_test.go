@@ -182,7 +182,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
 	}
-	sha := trailers[ticketTrailerValue(epicName, "01")]
+	sha := trailers[addressTrailerValue(scratchDir, epicName, "01")]
 	if sha == "" {
 		t.Fatalf("landed trailers = %v, want a landed commit for ticket 01", trailers)
 	}

@@ -566,7 +566,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	if err != nil {
 		t.Fatalf("TrailerMap: %v", err)
 	}
-	sha := trailers[ticketTrailerValue(epicName, "01")]
+	sha := trailers[addressTrailerValue(scratchDir, epicName, "01")]
 	if sha == "" {
 		t.Fatalf("landed trailers = %v, want a landed commit for ticket 01", trailers)
 	}
@@ -589,7 +589,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	}
 	// Exactly one commit landed for this ticket: cherry-picking twice would
 	// duplicate the trailer/SHA.
-	log := exec.Command("git", "log", "--oneline", "--grep", ticketTrailerKey+": "+ticketTrailerValue(epicName, "01"))
+	log := exec.Command("git", "log", "--oneline", "--grep", ticketTrailerKey+": "+addressTrailerValue(scratchDir, epicName, "01"))
 	log.Dir = featurePath
 	logOut, err := log.Output()
 	if err != nil {

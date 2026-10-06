@@ -76,18 +76,13 @@ func ticketLabel(path string) string {
 	if err != nil {
 		return path
 	}
-	issuesDir := filepath.Dir(abs)
-	if filepath.Base(issuesDir) != "issues" {
-		return path
-	}
 	t, err := schema.ParseTicket(abs)
 	if err != nil {
 		return path
 	}
-	epicDir := filepath.Dir(issuesDir)
-	return tickets.Address{
-		Project: tickets.ProjectName(filepath.Dir(epicDir)),
-		Epic:    filepath.Base(epicDir),
-		ID:      string(t.ID),
-	}.String()
+	a, ok := tickets.AddressOfPath(abs, string(t.ID))
+	if !ok {
+		return path
+	}
+	return a.String()
 }
