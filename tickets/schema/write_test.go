@@ -1,8 +1,10 @@
 package schema
 
 import (
+	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -72,6 +74,34 @@ func TestClearIterationStatus_ClearsFieldLeavesStatusUntouched(t *testing.T) {
 	}
 	if strings.Contains(string(raw), "iteration_status") {
 		t.Errorf("ticket file = %q, want no iteration_status key", string(raw))
+	}
+}
+
+func TestUpdateTicket_ConcurrentWritersAllSurvive(t *testing.T) {
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+
+	const writers = 20
+	var wg sync.WaitGroup
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			err := UpdateTicket(path, func(t *Ticket) {
+				t.SessionIDs = append(t.SessionIDs, fmt.Sprintf("sess-%d", i))
+			})
+			if err != nil {
+				t.Errorf("UpdateTicket: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if len(got.SessionIDs) != writers {
+		t.Errorf("SessionIDs = %v, want %d entries (lost update)", got.SessionIDs, writers)
 	}
 }
 

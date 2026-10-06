@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"os"
 	"strings"
 	"time"
 
@@ -168,21 +167,9 @@ func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (con
 // round-tripping through schema's typed parse/marshal so every other field
 // and the markdown body are carried through unchanged.
 func writeTicketMetrics(ticketPath string, contextWindow, elapsedSeconds int, cost float64) error {
-	raw, err := os.ReadFile(ticketPath)
-	if err != nil {
-		return err
-	}
-	t, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
-	if err != nil {
-		return err
-	}
-	t.ActualContextWindow = contextWindow
-	t.ElapsedTime = elapsedSeconds
-	t.ActualCost = cost
-
-	out, err := schema.MarshalTicket(t, schema.ParseBody(string(raw)))
-	if err != nil {
-		return err
-	}
-	return writeFileAtomic(ticketPath, out)
+	return updateTicket(ticketPath, func(t *schema.Ticket) {
+		t.ActualContextWindow = contextWindow
+		t.ElapsedTime = elapsedSeconds
+		t.ActualCost = cost
+	})
 }

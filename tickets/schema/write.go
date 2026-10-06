@@ -20,6 +20,12 @@ func UpdateTicket(path string, mutate func(*Ticket)) error {
 // rewrite the ticket's markdown body, with the same validate-then-atomic-write
 // guarantees.
 func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
+	unlock, err := LockTicket(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err

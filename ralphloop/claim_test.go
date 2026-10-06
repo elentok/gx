@@ -58,6 +58,40 @@ func TestClaim_RewritesStatus(t *testing.T) {
 	}
 }
 
+// A CLI-style write (schema.UpdateTicket) racing the loop's Claim must never
+// lose `claimed`: both read-modify-writes hold the same per-ticket lock.
+func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
+	t.Parallel()
+	path := writeFrontmatterTicket(t, "open")
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		if err := Claim(path); err != nil {
+			t.Errorf("Claim: %v", err)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
+			tk.SessionIDs = append(tk.SessionIDs, "cli-sess")
+		})
+		if err != nil {
+			t.Errorf("UpdateTicket: %v", err)
+		}
+	}()
+	wg.Wait()
+
+	got := mustParse(t, path)
+	if got.Status != schema.StatusClaimed {
+		t.Errorf("Status = %q, want %q", got.Status, schema.StatusClaimed)
+	}
+	if len(got.SessionIDs) != 1 {
+		t.Errorf("SessionIDs = %v, want the CLI write preserved", got.SessionIDs)
+	}
+}
+
 func TestClaim_ClearsIterationStatus(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# Ticket\n\nBody.\n")

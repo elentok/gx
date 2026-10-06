@@ -146,6 +146,12 @@ func updateTicket(path string, mutate func(*schema.Ticket)) error {
 // need to rewrite the ticket's markdown body (e.g. appending a note),
 // leaving the same atomic-write/torn-read guarantees.
 func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) error {
+	unlock, err := schema.LockTicket(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
