@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -200,5 +201,36 @@ func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
 				time.Sleep(20 * time.Millisecond)
 			}
 		})
+	}
+}
+
+func TestTCP_SameRoutesAnswerOverLoopback(t *testing.T) {
+	h := servertest.StartWithTCP(t)
+
+	resp, err := http.Get("http://" + h.TCPAddr + "/v1/snapshot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("snapshot over TCP: %s", resp.Status)
+	}
+	got, err := h.Client.Handshake(context.Background())
+	if err != nil || got.TCPAddr != h.TCPAddr {
+		t.Errorf("handshake TCPAddr = %q (err %v), want %q", got.TCPAddr, err, h.TCPAddr)
+	}
+}
+
+func TestTCP_OffByDefault(t *testing.T) {
+	got, err := servertest.Start(t).Client.Handshake(context.Background())
+	if err != nil || got.TCPAddr != "" {
+		t.Errorf("handshake TCPAddr = %q (err %v), want empty", got.TCPAddr, err)
+	}
+}
+
+func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
+	_, err := server.New(server.Config{StateDir: t.TempDir(), TicketStore: t.TempDir(), TCPAddr: "0.0.0.0:0"})
+	if err == nil {
+		t.Fatal("expected error for non-loopback address")
 	}
 }

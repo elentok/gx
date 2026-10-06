@@ -8,13 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
-
-func TestMain(m *testing.M) {
-	herdrfake.RunHelperProcess()
-	os.Exit(m.Run())
-}
 
 func TestServerStart_AlreadyRunningReportsPidAndDoesNotSpawn(t *testing.T) {
 	h := servertest.Start(t)

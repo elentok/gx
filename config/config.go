@@ -64,7 +64,14 @@ type Config struct {
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
 	// Orchestrator is the temporary switch between the in-process ralph-loop
 	// and the orchestrator server. Global only: never a per-project key.
-	Orchestrator string `json:"orchestrator"`
+	Orchestrator string       `json:"orchestrator"`
+	Server       ServerConfig `json:"server"`
+}
+
+// ServerConfig configures the orchestrator server.
+type ServerConfig struct {
+	// TCPListen adds a loopback-only, unauthenticated TCP listener.
+	TCPListen bool `json:"tcp-listen"`
 }
 
 const (
@@ -166,6 +173,9 @@ func Load() (Config, error) {
 			CommitDebounce *int    `json:"commit-debounce"`
 		} `json:"ticket-store"`
 		Orchestrator *string `json:"orchestrator"`
+		Server       *struct {
+			TCPListen *bool `json:"tcp-listen"`
+		} `json:"server"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -264,6 +274,9 @@ func Load() (Config, error) {
 	}
 	if raw.TicketStore != nil && raw.TicketStore.CommitDebounce != nil && *raw.TicketStore.CommitDebounce > 0 {
 		cfg.TicketStore.CommitDebounce = *raw.TicketStore.CommitDebounce
+	}
+	if raw.Server != nil && raw.Server.TCPListen != nil {
+		cfg.Server.TCPListen = *raw.Server.TCPListen
 	}
 	if raw.Orchestrator != nil {
 		switch *raw.Orchestrator {

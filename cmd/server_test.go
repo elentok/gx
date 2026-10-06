@@ -3,10 +3,13 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"os/exec"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server"
 )
 
 func TestServerEventsKinds_TextListsEveryKind(t *testing.T) {
@@ -57,5 +60,29 @@ func TestServerEventsKinds_ViaRootCommand(t *testing.T) {
 	}
 	if !json.Valid(out.Bytes()) {
 		t.Errorf("not JSON: %s", out.String())
+	}
+}
+
+func TestStatusWarnings(t *testing.T) {
+	remote := t.TempDir()
+	if err := exec.Command("git", "init", "-q", remote).Run(); err != nil {
+		t.Fatal(err)
+	}
+	noRemote := statusWarnings(apiclient.Negotiation{}, remote)
+	if len(noRemote) != 1 || !strings.Contains(noRemote[0], "no push remote") {
+		t.Fatalf("no-remote warnings = %q", noRemote)
+	}
+	if err := exec.Command("git", "-C", remote, "remote", "add", "origin", "x:y").Run(); err != nil {
+		t.Fatal(err)
+	}
+	if got := statusWarnings(apiclient.Negotiation{}, remote); len(got) != 0 {
+		t.Fatalf("clean warnings = %q", got)
+	}
+	n := apiclient.Negotiation{Handshake: server.Handshake{TCPAddr: "127.0.0.1:1"}, Hint: "server is an older build"}
+	all := strings.Join(statusWarnings(n, remote), "\n")
+	for _, want := range []string{"TCP listener is on", "older build"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("missing %q in %q", want, all)
+		}
 	}
 }

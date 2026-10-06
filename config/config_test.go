@@ -864,3 +864,17 @@ func TestLoadExecutionQueueSpinKeys(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadServerTCPListen(t *testing.T) {
+	for body, want := range map[string]bool{`{}`: false, `{"server":{"tcp-listen":true}}`: true} {
+		tmp := t.TempDir()
+		prev := userConfigDirFn
+		userConfigDirFn = func() (string, error) { return tmp, nil }
+		t.Cleanup(func() { userConfigDirFn = prev })
+		writeBudgetConfig(t, tmp, body)
+		cfg, err := Load()
+		if err != nil || cfg.Server.TCPListen != want {
+			t.Errorf("%s: TCPListen = %v (err %v), want %v", body, cfg.Server.TCPListen, err, want)
+		}
+	}
+}

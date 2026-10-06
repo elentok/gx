@@ -33,6 +33,8 @@ type Handshake struct {
 	APIVersion int    `json:"api_version"`
 	Build      string `json:"build"`
 	Pid        int    `json:"pid"`
+	// TCPAddr is the loopback address of the opt-in TCP listener; empty when off.
+	TCPAddr string `json:"tcp_addr,omitempty"`
 }
 
 type Config struct {
@@ -44,19 +46,27 @@ type Config struct {
 	DisableWatch bool          // poll only
 
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
+
+	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
+	// handler as the socket. No auth: loopback is the only protection.
+	TCPAddr string
 }
+
+// DefaultTCPAddr is where the opt-in TCP listener binds.
+const DefaultTCPAddr = "127.0.0.1:7421"
 
 // Server owns the state-dir lock and the listening socket.
 type Server struct {
 	cfg  Config
 	lock *serverLock
 	ln   net.Listener
+	tcp  net.Listener // nil unless Config.TCPAddr is set
 	http *http.Server
 	logf *rotatingFile
 	log  *slog.Logger
 	idx  *index
 
-	events *broker
+	events  *broker
 	rewatch func() // set by keepFresh when the watch is active
 }
 
@@ -94,9 +104,20 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, err
 	}
+	var tcp net.Listener
+	if cfg.TCPAddr != "" {
+		if tcp, err = listenLoopback(cfg.TCPAddr); err != nil {
+			ln.Close()
+			lock.release()
+			return nil, err
+		}
+	}
 	logf, err := openRotatingFile(LogPath(cfg.StateDir), logMaxBytes, logMaxFiles)
 	if err != nil {
 		ln.Close()
+		if tcp != nil {
+			tcp.Close()
+		}
 		lock.release()
 		return nil, err
 	}
@@ -104,6 +125,7 @@ func New(cfg Config) (*Server, error) {
 		cfg:  cfg,
 		lock: lock,
 		ln:   ln,
+		tcp:  tcp,
 		logf: logf,
 		log:  slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo})),
 		idx:  idx,
@@ -116,6 +138,27 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/events", s.streamEvents)
 	s.http = &http.Server{Handler: mux}
 	return s, nil
+}
+
+// listenLoopback refuses any address that isn't a loopback IP, since the TCP
+// listener has no auth.
+func listenLoopback(addr string) (net.Listener, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
+		return nil, fmt.Errorf("tcp listener %q: host must be a loopback IP", addr)
+	}
+	return net.Listen("tcp", addr)
+}
+
+// TCPAddr is the bound TCP listener address, or "" when TCP is off.
+func (s *Server) TCPAddr() string {
+	if s.tcp == nil {
+		return ""
+	}
+	return s.tcp.Addr().String()
 }
 
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
@@ -169,14 +212,20 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid()})
+	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr()})
 }
 
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.
 func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
-	errc := make(chan error, 1)
-	go func() { errc <- s.http.Serve(s.ln) }()
+	errc := make(chan error, 2)
+	lns := []net.Listener{s.ln}
+	if s.tcp != nil {
+		lns = append(lns, s.tcp)
+	}
+	for _, ln := range lns {
+		go func() { errc <- s.http.Serve(ln) }()
+	}
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	freshDone := make(chan struct{})
 	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
@@ -186,11 +235,14 @@ func (s *Server) Serve(ctx context.Context) error {
 	case <-ctx.Done():
 		s.events.close() // open streams would otherwise hold Shutdown
 		err = s.http.Shutdown(context.Background())
-		<-errc
+		for range lns {
+			<-errc
+		}
 	case err = <-errc:
 		if errors.Is(err, http.ErrServerClosed) {
 			err = nil
 		}
+		_ = s.http.Shutdown(context.Background())
 	}
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
 	s.log.Info("server stopped")

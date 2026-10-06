@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -134,7 +135,11 @@ func runServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path})
+	var tcpAddr string
+	if cfg.Server.TCPListen {
+		tcpAddr = server.DefaultTCPAddr
+	}
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr})
 	if err != nil {
 		return err
 	}
@@ -170,10 +175,37 @@ func runServerStatus(ctx context.Context, w io.Writer) error {
 	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", n.Pid, n.Build); err != nil {
 		return err
 	}
-	if n.Hint != "" {
-		_, err = fmt.Fprintln(w, n.Hint)
+	cfg, err := config.Load()
+	if err != nil {
+		return err
 	}
-	return err
+	for _, warning := range statusWarnings(n, cfg.TicketStore.Path) {
+		if _, err = fmt.Fprintln(w, "warning: "+warning); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// statusWarnings lists what `gx server status` flags. n.Hint covers the
+// binary-on-disk-vs-running-build mismatch (and API mismatch).
+func statusWarnings(n apiclient.Negotiation, storePath string) []string {
+	var out []string
+	if n.TCPAddr != "" {
+		out = append(out, fmt.Sprintf("TCP listener is on (%s): any local process can use the API, no auth", n.TCPAddr))
+	}
+	if n.Hint != "" {
+		out = append(out, n.Hint)
+	}
+	if !hasPushRemote(storePath) {
+		out = append(out, "ticket store has no push remote configured; tickets are not backed up")
+	}
+	return out
+}
+
+func hasPushRemote(storePath string) bool {
+	out, err := exec.Command("git", "-C", storePath, "remote").Output()
+	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 
 // spawnFunc launches a detached server and returns once it exits or the

@@ -225,6 +225,17 @@
       "default": "in-process",
       "description": "Temporary switch: who schedules tickets. Under \"server\" the in-process loop refuses to claim."
     },
+    "server": {
+      "type": "object",
+      "description": "Orchestrator server settings.",
+      "properties": {
+        "tcp-listen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also listen on loopback TCP (127.0.0.1:7421), serving the same routes as the socket. No auth."
+        }
+      }
+    },
     "ticket-store": {
       "type": "object",
       "description": "Where the global ticket store lives.",

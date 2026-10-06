@@ -23,6 +23,7 @@ type Harness struct {
 	Herdr       *herdrfake.State
 	StateDir    string
 	TicketStore string
+	TCPAddr     string // empty unless started with StartWithTCP
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -62,6 +63,18 @@ func Start(t *testing.T) *Harness {
 // Options tweak the server config before it starts.
 func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
+	return startWith(t, store, "", opts...)
+}
+
+// StartWithTCP is Start with the loopback TCP listener on a free port;
+// Harness.TCPAddr is where it bound.
+func StartWithTCP(t *testing.T) *Harness {
+	t.Helper()
+	return startWith(t, t.TempDir(), "127.0.0.1:0")
+}
+
+func startWith(t *testing.T, store, tcpAddr string, opts ...func(*server.Config)) *Harness {
+	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
 	stateDir, err := os.MkdirTemp("", "gxs")
 	if err != nil {
@@ -76,11 +89,14 @@ func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *H
 	}
 	herdrfake.StartState(t, h.Herdr)
 
-	cfg := server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore}
+	cfg := server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	for _, o := range opts {
 		o(&cfg)
 	}
 	srv, err := server.New(cfg)
+	if err == nil {
+		h.TCPAddr = srv.TCPAddr()
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
