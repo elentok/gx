@@ -25,6 +25,9 @@ type scopeData struct {
 	ticketIDs map[string]struct{}
 }
 
+// WholeEpicScope is the unrestricted scope: every ticket in the epic is in it.
+func WholeEpicScope() RunScope { return RunScope{wholeEpic: true} }
+
 func ResolveRunScope(epic tickets.Epic, requestedIDs []string) (RunScope, error) {
 	if len(requestedIDs) == 0 {
 		return RunScope{wholeEpic: true}, nil

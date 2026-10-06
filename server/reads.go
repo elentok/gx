@@ -41,7 +41,20 @@ type History struct {
 	Events  []ralphloop.Event `json:"events"`
 }
 
-const lockKindLand = "land"
+// Explanation is the /v1/tickets/explain payload: why the scheduler would or
+// wouldn't pick the ticket. Verdict is the scheduler's own decision word
+// (blocked, error, stalled, done, ...), or UnknownInProcess when only the
+// in-process scheduler's queue and slot state could say.
+type Explanation struct {
+	Address string `json:"address"`
+	Verdict string `json:"verdict"`
+	Reason  string `json:"reason,omitempty"`
+}
+
+const (
+	lockKindLand     = "land"
+	UnknownInProcess = "unknown: in-process scheduler"
+)
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -135,6 +148,60 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, History{Address: addr.String(), Events: events})
+}
+
+func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
+	addr, err := tickets.ParseAddress(r.URL.Query().Get("address"), tickets.AddressContext{})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ex, err := s.explainTicket(addr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	writeJSON(w, ex)
+}
+
+// explainTicket runs the scheduler's own verdict on the stored ticket. Queue
+// and slot state live in the scheduler process, so a ticket that would reach
+// them (verdict "unclaimed") is reported as unknown rather than guessed at.
+func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
+	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	if err != nil {
+		return Explanation{}, err
+	}
+	for _, dir := range dirs {
+		if tickets.ProjectName(dir) != addr.Project {
+			continue
+		}
+		epics, err := tickets.Load(dir)
+		if err != nil {
+			return Explanation{}, err
+		}
+		for _, e := range epics {
+			if e.Name != addr.Epic {
+				continue
+			}
+			for _, t := range e.Tickets {
+				if t.DisplayNumber() != addr.ID {
+					continue
+				}
+				d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, false, false)
+				ex := Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Reason}
+				if d.Decision == "stalled" {
+					ex.Reason = d.Status // needs-answer, needs-repair or draft
+				}
+				if d.Decision == "unclaimed" {
+					ex.Verdict, ex.Reason = UnknownInProcess, ""
+				}
+				return ex, nil
+			}
+		}
+		return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}
+	}
+	return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + addr.Project}
 }
 
 func (s *Server) readHistory(addr tickets.Address) ([]ralphloop.Event, error) {

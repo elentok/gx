@@ -975,15 +975,15 @@ func scanDecisions(epic tickets.Epic, scope RunScope, frontier []tickets.Ticket,
 	decisions := make([]ScanDecision, 0, len(epic.Tickets))
 	for _, t := range epic.Tickets {
 		isClaimed := claimed.Path != "" && t.Path == claimed.Path
-		decisions = append(decisions, ticketVerdict(epic, scope, t, isClaimed, inFrontier[t.Path]))
+		decisions = append(decisions, TicketVerdict(epic, scope, t, isClaimed, inFrontier[t.Path]))
 	}
 	return decisions
 }
 
-// ticketVerdict is the scheduler's single per-ticket eligibility decision:
+// TicketVerdict is the scheduler's single per-ticket eligibility decision:
 // why t was or wasn't claimed this pass, with the reason a scan line reports.
 // The first matching rule wins, so the order is the precedence.
-func ticketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed, inFrontier bool) ScanDecision {
+func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed, inFrontier bool) ScanDecision {
 	status := epic.RenderedStatus(t)
 	d := ScanDecision{Ticket: t.Identifier, Status: status.Word()}
 	switch {
@@ -993,6 +993,9 @@ func ticketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 		d.Decision = "out-of-scope"
 	case status.Terminal():
 		d.Decision = "done"
+	case status == tickets.StatusError:
+		d.Decision = "error"
+		d.Reason = cmp.Or(t.ReadErr, t.GraphErr, t.BlockedByErr, "unrecognized status "+t.Status)
 	case isParked(epic, t):
 		d.Decision = "stalled"
 	case inFrontier:

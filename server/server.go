@@ -139,6 +139,7 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/projects", s.projects)
 	mux.HandleFunc("GET /v1/locks", s.locks)
 	mux.HandleFunc("GET /v1/tickets/history", s.history)
+	mux.HandleFunc("GET /v1/tickets/explain", s.explain)
 	s.http = &http.Server{Handler: mux}
 	return s, nil
 }

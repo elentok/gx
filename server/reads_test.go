@@ -54,3 +54,41 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 		t.Errorf("projects = %+v", projects)
 	}
 }
+
+func TestExplain_StoreDerivableVerdicts(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "03", "dangling", "99")
+	issues := filepath.Join(store, "proj", "epic-a", "issues")
+	for name, status := range map[string]string{"04-draft.md": "draft", "05-asking.md": "needs-answer"} {
+		body := "---\nid: \"" + name[:2] + "\"\nstatus: " + status + "\ntype: implement\n---\n\n# x\n"
+		if err := os.WriteFile(filepath.Join(issues, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h := servertest.StartWithStore(t, store)
+
+	want := map[string]struct{ verdict, reason string }{
+		"01": {"unknown: in-process scheduler", ""},
+		"02": {"blocked", "01"},
+		"03": {"error", ""},
+		"04": {"stalled", "draft"},
+		"05": {"stalled", "needs-answer"},
+	}
+	for id, w := range want {
+		ex, err := h.Client.Explain(context.Background(), "proj:epic-a/"+id)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		if ex.Verdict != w.verdict || (w.reason != "" && ex.Reason != w.reason) {
+			t.Errorf("%s: explain = %+v, want %+v", id, ex, w)
+		}
+		if id == "03" && ex.Reason == "" {
+			t.Error("error verdict should carry its reason")
+		}
+	}
+	if _, err := h.Client.Explain(context.Background(), "proj:epic-a/77"); err == nil {
+		t.Error("explain of an unknown ticket should fail")
+	}
+}

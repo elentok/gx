@@ -86,7 +86,32 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	history.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(history)
+
+	var explainJSON bool
+	explain := &cobra.Command{
+		Use:   "explain <project:epic/NN>",
+		Short: "explain why the scheduler would or wouldn't pick a ticket",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverRead(c.Context(), explainJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (server.Explanation, error) {
+					return cl.Explain(ctx, args[0])
+				},
+				printExplanation)
+		},
+	}
+	explain.Flags().BoolVar(&explainJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(explain)
 	return cmd
+}
+
+func printExplanation(w io.Writer, e server.Explanation) error {
+	line := e.Verdict
+	if e.Reason != "" {
+		line += ": " + e.Reason
+	}
+	_, err := fmt.Fprintln(w, line)
+	return err
 }
 
 func printProjects(w io.Writer, projects []server.ProjectInfo) error {

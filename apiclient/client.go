@@ -147,6 +147,13 @@ func (c *Client) History(ctx context.Context, address string) (server.History, e
 	return h, err
 }
 
+// Explain returns the scheduler's verdict on one ticket, by its full address.
+func (c *Client) Explain(ctx context.Context, address string) (server.Explanation, error) {
+	var e server.Explanation
+	err := c.get(ctx, "/v1/tickets/explain?address="+url.QueryEscape(address), &e)
+	return e, err
+}
+
 func (c *Client) get(ctx context.Context, path string, out any) error {
 	// The host is ignored by the unix dialer; it only has to parse.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
