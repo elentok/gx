@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -414,6 +415,75 @@ func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("no scheduler-scan event scanned ticket 02; events = %+v", events)
+	}
+}
+
+// TestRun_SchedulerScan_SplitsBigEpicAcrossLines covers a 77-ticket epic
+// whose one-line scan was over events.MaxLineBytes: the log error failed the
+// run on its first claim. The scan must instead split across lines that each
+// fit, and one pass's lines (same Time) must still cover every ticket once.
+func TestRun_SchedulerScan_SplitsBigEpicAcrossLines(t *testing.T) {
+	t.Parallel()
+	files := map[string]string{}
+	for i := 1; i <= 120; i++ {
+		id := fmt.Sprintf("%02d", i)
+		files[id+"-ticket.md"] = "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\n---\n# T\n"
+	}
+	scratchDir := writeEpic(t, "my-epic", files)
+	d, _, _ := fakeDeps()
+
+	if err := Run(RunOptions{
+		EpicName:   "my-epic",
+		Skill:      "implement",
+		ScratchDir: scratchDir,
+		RepoDir:    "/fake/repo",
+		TicketIDs:  []string{"01"},
+	}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(runLogPath(scratchDir, "my-epic"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		if len(line)+1 > eventsc.MaxLineBytes {
+			t.Errorf("line %d is %d bytes, over the %d cap", i, len(line)+1, eventsc.MaxLineBytes)
+		}
+	}
+
+	evs, _, err := ReadEvents(scratchDir, "my-epic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var first time.Time
+	lines := 0
+	seen := map[string]int{}
+	for _, ev := range evs {
+		if ev.Type != string(eventsc.SchedulerScan) {
+			continue
+		}
+		if first.IsZero() {
+			first = ev.Time
+		}
+		if !ev.Time.Equal(first) {
+			continue
+		}
+		lines++
+		for _, d := range ev.Scan {
+			seen[d.Ticket]++
+		}
+	}
+	if lines < 2 {
+		t.Errorf("first pass logged %d scan lines, want it split across several", lines)
+	}
+	if len(seen) != 120 {
+		t.Errorf("first pass scanned %d distinct tickets, want 120", len(seen))
+	}
+	for id, n := range seen {
+		if n != 1 {
+			t.Errorf("ticket %s appears %d times in one pass, want 1", id, n)
+		}
 	}
 }
 

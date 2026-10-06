@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -514,15 +515,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		})
 		// scanned is nil when the gate wasn't running (claimIfRunning never
 		// invoked the closure, e.g. paused) — nothing was actually scanned,
-		// so there's nothing useful to log.
+		// so there's nothing useful to log. A failed log is only debug-logged:
+		// the ticket is already claimed, so failing the run here would strand
+		// it claimed with no iteration behind it.
 		if scanned != nil {
-			logErr := logEvent(scratchDir, opts.EpicName, Event{
-				Type:  string(events.SchedulerScan),
-				Agent: agent,
-				Scan:  scanDecisions(*scanned, scope, frontier, ticket),
-			})
-			if logErr != nil && err == nil {
-				err = fmt.Errorf("logging scheduler scan: %w", logErr)
+			if logErr := logSchedulerScan(scratchDir, opts.EpicName, agent, scanDecisions(*scanned, scope, frontier, ticket)); logErr != nil {
+				logger.Debug("logging scheduler scan: %v\n", logErr)
 			}
 		}
 		if err != nil {

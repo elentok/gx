@@ -180,6 +180,52 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	return appendLine(runLogPath(scratchDir, epicName), data)
 }
 
+// logSchedulerScan appends one claimNext pass's scan as scheduler-scan events.
+// A big epic's scan doesn't fit one events.MaxLineBytes line, so it is split
+// across as many lines as needed; every line of one pass shares one Time.
+func logSchedulerScan(scratchDir, epicName string, agent AgentKind, scan []ScanDecision) error {
+	ev := Event{Type: string(events.SchedulerScan), Agent: agent, Time: time.Now()}
+	for _, chunk := range splitScan(ev, scan) {
+		ev.Scan = chunk
+		if err := logEvent(scratchDir, epicName, ev); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// splitScan packs scan, in order, into the fewest chunks whose ev line stays
+// under events.MaxLineBytes. A decision too big to fit alone gets a chunk of
+// its own, which logEvent then rejects.
+func splitScan(ev Event, scan []ScanDecision) [][]ScanDecision {
+	// A JSON array is its elements joined by commas, so a chunk's line is the
+	// line with one empty decision, minus that decision, plus its own
+	// decisions and the commas between them.
+	ev.Scan = []ScanDecision{{}}
+	line, _ := json.Marshal(ev)
+	empty, _ := json.Marshal(ScanDecision{})
+	base := len(line) + 1 - len(empty) // +1: the newline
+
+	var chunks [][]ScanDecision
+	start, size := 0, base
+	for i, d := range scan {
+		data, _ := json.Marshal(d)
+		if i > start {
+			if size+1+len(data) > events.MaxLineBytes {
+				chunks = append(chunks, scan[start:i])
+				start, size = i, base
+			} else {
+				size++ // the comma
+			}
+		}
+		size += len(data)
+	}
+	if start < len(scan) {
+		chunks = append(chunks, scan[start:])
+	}
+	return chunks
+}
+
 // encodeEvent stamps ev's Time, validates its type/kind and marshals it to one
 // log line that fits events.MaxLineBytes.
 func encodeEvent(ev *Event) ([]byte, error) {
