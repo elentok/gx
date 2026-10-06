@@ -398,7 +398,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "02-open.md") {
+	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "epic/02") {
 		t.Errorf("prompts = %v, want only the newly scheduled second ticket", *prompts)
 	}
 	mu.Lock()

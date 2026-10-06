@@ -21,17 +21,18 @@ This skill never edits code. Its only output is new tickets — each one carryin
 ticket's id>`, the sole edge between them — plus its own ticket's body and closing status. Nothing
 about the tickets it opens is recorded on this ticket.
 
-Before starting, run `gx tickets validate <path>` on the ticket you're about to claim. If it fails,
+Before starting, run `gx tickets validate <addr>` on the ticket you're about to claim. If it fails,
 stop and fix the ticket's frontmatter before doing anything else.
 
 ## 1. Claim the ticket
 
-`gx tickets set <path> --status claimed`, same as gx-implement.
+`gx tickets set <addr> --status claimed`, same as gx-implement.
 
 ## 2. Resolve the epic diff and its spec
 
-- The epic directory is the ticket's `issues/` parent's parent: `<root>/<epic-slug>/`. Derive it from
-  the claimed ticket's own path — don't reconstruct it via `gx tickets root` plus a guessed epic slug.
+- The epic slug is the middle part of the ticket address (`project:<epic-slug>/NN`). Read the ticket
+  with `gx tickets show <addr>` and the epic's other tickets by address too
+  (`gx tickets epics` lists epics) — never open ticket files by path.
 - The epic's branch is the current branch (every ralph-loop worktree runs on a `ralph-loop/`-prefixed
   branch, one per epic — see gx-implement).
 - Capture the diff scope once, the same way `code-review` does it: `git merge-base main HEAD` for the
@@ -40,7 +41,8 @@ stop and fix the ticket's frontmatter before doing anything else.
   diff is empty.
 - The epic's spec is the first of these that exists: `docs/specs/<epic-slug>.md` from the repo root,
   then `<epic-dir>/spec.md` (legacy location). When neither does, the epic's ticket bodies are the
-  spec: every `<epic-dir>/issues/*.md` except this code-review ticket, read in full. Either way the
+  spec: every other ticket in the epic except this code-review ticket, each read in full with
+  `gx tickets show <addr>`. Either way the
   spec resolves — the Spec axis always runs.
 
 ## 3. Read the configured review skills
@@ -68,10 +70,10 @@ read/git access to the worktree, so it runs the diff itself.
 **Spec subagent** (exactly one, whatever the configured skill list holds) also gets:
 
 - The path of the spec resolved in step 2 — `docs/specs/<epic-slug>.md` (or the legacy `spec.md`), or
-  the list of ticket file paths that stand in for it.
+  the list of ticket addresses that stand in for it.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
-  the implementation looks wrong. Quote the spec line — or the ticket path and line — for each
+  the implementation looks wrong. Quote the spec line — or the ticket address and line — for each
   finding. Under 400 words."
 
 Collect every subagent's raw findings verbatim; don't summarize or filter them yourself here.
@@ -111,7 +113,7 @@ If the consultant approved zero findings, skip this step entirely; there's nothi
 
 ## 7. Close out
 
-- For every ticket `gx-to-tickets` created in step 6, `gx tickets set <new-ticket-path> --parent
+- For every ticket `gx-to-tickets` created in step 6, `gx tickets set <new-ticket-addr> --parent
   <this-ticket-id>` — this is what makes the new ticket a scheduling/UI child of this one (the
   scheduler's scope resolution and the Queue tab's tree nesting both walk the child's own `parent:`
   field, the only edge there is; nothing is recorded on this ticket). Do this before the next step,
@@ -120,7 +122,7 @@ If the consultant approved zero findings, skip this step entirely; there's nothi
   - **Raw findings**, per axis and reviewer skill, verbatim from step 4.
   - **Consultant triage**, verbatim from step 5.
   - **Final disposition** of each finding: which ticket it became, or why it was rejected/deferred.
-- `gx tickets set <path> --iteration-status finished --commitless true` — this skill never commits
+- `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits
   code of its own, so `commitless: true` is always correct here, not just the no-findings case.
   `--status done` will be refused on a `ralph-loop/*` branch (landing status is gx's alone to set);
   `iteration_status: finished` is the self-report ralph-loop's landing logic actually watches for on

@@ -91,15 +91,27 @@ func ValidateAgentKind(agent AgentKind) error {
 	return nil
 }
 
-func skillPrompt(agent AgentKind, skill, ticketPath string) string {
+// ticketAddress is the canonical "project:epic/NN" address of the ticket
+// file at ticketPath (<root>/<epic>/issues/NN-<slug>.md), the only form
+// iteration prompts hand to agents.
+func ticketAddress(t tickets.Ticket) string {
+	epicDir := filepath.Dir(filepath.Dir(t.Path))
+	return tickets.Address{
+		Project: tickets.ProjectName(filepath.Dir(epicDir)),
+		Epic:    filepath.Base(epicDir),
+		ID:      t.Identifier,
+	}.String()
+}
+
+func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
 	prefix := "/"
 	if agent == AgentCodex {
 		prefix = "$"
 	}
-	if ticketPath == "" {
+	if ticketAddr == "" {
 		return prefix + skill
 	}
-	return fmt.Sprintf("%s%s %s", prefix, skill, ticketPath)
+	return fmt.Sprintf("%s%s %s", prefix, skill, ticketAddr)
 }
 
 func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []string {

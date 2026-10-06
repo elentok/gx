@@ -24,9 +24,9 @@ scheduler launches the iteration with `/gx-code-review` directly instead of `/gx
 Skill-tool call from inside a running session. If you're reading this document against a
 `type: code-review` ticket anyway (e.g. invoked by hand), stop — don't implement it and don't
 try to invoke gx-code-review yourself via the Skill tool; ask the user to run
-`/gx-code-review <path>` instead.
+`/gx-code-review <addr>` instead.
 
-Before starting work on the ticket you're about to claim, run `gx tickets validate <path>` on it. If
+Before starting work on the ticket you're about to claim, run `gx tickets validate <addr>` on it. If
 it fails, stop and fix the ticket's frontmatter (or hand it back) before doing anything else — do
 not begin implementation against a ticket that fails validation.
 
@@ -37,7 +37,7 @@ it is reading, not writing.
 
 Before the first edit:
 
-1. Read the ticket. **Only** the ticket. Go to the spec/map for a named section, never in full - one
+1. Read the ticket with `gx tickets show <addr>` — never open its file by path. **Only** the ticket. Go to the spec/map for a named section, never in full - one
    naive read of a spec is most of a window.
 2. Write the seams down ([gx-tdd](../gx-tdd/SKILL.md)) and, from them, **list the files you will
    touch**. Skipping this turns a plan into a sequence of rediscoveries.
@@ -96,20 +96,22 @@ When either trigger fires:
    `<id>-<slug>.md` (`--slug` is required, so there's no separate rename step to remember), and
    writes the child's `parent`, which is the only edge a fork produces: give the new ticket no
    `blocked_by` naming the original, and record nothing about it on the original. The stub lands
-   `draft`; fill in its body, then `gx tickets set <new-path> --status open` to hand it over — this
+   `draft` and is printed by address; fill in its body with `gx tickets section <new-addr> <heading>
+   <content|->` per section, then `gx tickets set <new-addr> --status open` to hand it over — this
    is the one `--status` write an iteration agent ever makes, since a fresh fork must be handed
-   over and nothing else can do it. This chain is uncapped — each fork narrows what's left, so it's
+   over and nothing else can do it. (Or pass `--body -` to `gx tickets add` to write the body and
+   open the ticket in one call.) This chain is uncapped — each fork narrows what's left, so it's
    self-limiting. Move any not-yet-finished acceptance criteria off the original ticket onto the new
    one(s). Do this **autonomously** — no pause for user approval; this exists to keep the outer loop
    unattended.
-4. **Close the original**, with `gx tickets set <path> --iteration-status finished` and a body note
+4. **Close the original**, with `gx tickets set <addr> --iteration-status finished` and a body note
    of the token count from the last budget check (e.g. `Tokens used: ~85K`) — so it can be matched
    against the ticket's `expected_context_window` later. (`actual_context_window` itself is
    gx-written at cherry-pick time, not by the agent; so is landing `status: done` — the report can
    only start a landing, never conclude one, gx's own commit count decides that.) Nothing about the
    new tickets is recorded on the original; their own `parent` is the whole edge. If step 1 had
    nothing to commit (design/exploration only, no diff), also pass `--commitless true`:
-   `gx tickets set <path> --iteration-status finished --commitless true`. Without it, ralph-loop's
+   `gx tickets set <addr> --iteration-status finished --commitless true`. Without it, ralph-loop's
    stalled-agent detection flags the forked original `needs-repair` instead of adopting it as done.
 
 ## When only a person can answer
@@ -138,7 +140,7 @@ Run typechecking regularly, single test files regularly, and the full test suite
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 
-Once done, run `gx tickets set <path> --iteration-status finished`. This report can only _start_ a
+Once done, run `gx tickets set <addr> --iteration-status finished`. This report can only _start_ a
 landing, never conclude one: gx adopts it and decides `status: done` itself from its own commit
 count and cherry-pick outcome — never write `--status done` yourself, even paired with
 `--iteration-status finished`; landing status is gx's alone to set (the one exception is the
@@ -147,7 +149,7 @@ not per-ticket — do not invoke it from here.
 
 If you conclude this ticket needs **no commit** — e.g. exploration shows the behavior already
 exists, or the ticket only needed a fork with no code changes of its own — report finished plus
-`commitless: true` in one call: `gx tickets set <path> --iteration-status finished --commitless
+`commitless: true` in one call: `gx tickets set <addr> --iteration-status finished --commitless
 true`, explaining why in the ticket body. Without `commitless: true`, ralph-loop treats a
 zero-commit finish as a stalled agent and flags the ticket `needs-repair` for a human to check.
 

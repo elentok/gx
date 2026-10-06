@@ -66,15 +66,15 @@ func ticketIDFromImplementPrompt(text string) (id string, ok bool) {
 	if !strings.HasPrefix(text, "/") && !strings.HasPrefix(text, "$") {
 		return "", false
 	}
-	_, path, found := strings.Cut(text, " ")
+	_, addr, found := strings.Cut(text, " ")
 	if !found {
 		return "", false
 	}
-	base := filepath.Base(path)
-	if len(base) < 2 {
+	_, id, found = strings.Cut(addr, "/")
+	if !found || len(id) < 2 {
 		return "", false
 	}
-	return base[:2], true
+	return id[:2], true
 }
 
 // commitIterationWork simulates a finished agent turn: it writes and commits

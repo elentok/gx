@@ -35,6 +35,12 @@ func writeEpic(t *testing.T, epicName string, tickets map[string]string) string 
 	return scratchDir
 }
 
+// ticketAddr is the address iteration prompts name for ticket id in the
+// fixture epic under scratchDir.
+func ticketAddr(scratchDir, epicName, id string) string {
+	return tickets.ProjectName(scratchDir) + ":" + epicName + "/" + id
+}
+
 // testDeps is DefaultDeps for a test: real behavior everywhere except that a
 // park polls at full speed rather than on the wall clock, so a test that parks
 // unexpectedly surfaces as its own failure instead of a multi-minute wait.
@@ -251,8 +257,8 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	}
 
 	wantPrompts := []string{
-		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"),
-		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md"),
+		"/implement " + ticketAddr(scratchDir, "my-epic", "01"),
+		"/implement " + ticketAddr(scratchDir, "my-epic", "02"),
 	}
 	if len(*prompts) != 2 || (*prompts)[0] != wantPrompts[0] || (*prompts)[1] != wantPrompts[1] {
 		t.Fatalf("prompts = %v, want %v", *prompts, wantPrompts)
@@ -738,8 +744,8 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 	}
 
 	wantPrompts := []string{
-		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"),
-		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md"),
+		"/implement " + ticketAddr(scratchDir, "my-epic", "01"),
+		"/implement " + ticketAddr(scratchDir, "my-epic", "02"),
 	}
 	// 01 and 02 have no blocked_by relation, so they run concurrently
 	// (defaultMaxParallel) and can finish in either order.
@@ -1110,7 +1116,7 @@ func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 		t.Fatalf("Run() error = %v, want the unselected needs-repair ticket 01 to not block scheduling ticket 02", err)
 	}
 
-	wantPrompt := "/implement " + filepath.Join(scratchDir, "my-epic", "issues", "02-second.md")
+	wantPrompt := "/implement " + ticketAddr(scratchDir, "my-epic", "02")
 	if len(*prompts) != 1 || (*prompts)[0] != wantPrompt {
 		t.Fatalf("prompts = %v, want [%q]", *prompts, wantPrompt)
 	}
@@ -1302,8 +1308,8 @@ func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *te
 	}
 
 	wantPrompts := []string{
-		"/implement " + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"),
-		"/implement " + ticketPath,
+		"/implement " + ticketAddr(scratchDir, "my-epic", "01"),
+		"/implement " + ticketAddr(scratchDir, "my-epic", "02"),
 	}
 	if len(*prompts) != 2 || (*prompts)[0] != wantPrompts[0] || (*prompts)[1] != wantPrompts[1] {
 		t.Fatalf("prompts = %v, want %v — the exact membership and order PlanWaves showed", *prompts, wantPrompts)

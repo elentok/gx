@@ -27,16 +27,12 @@ func fullTicketIDFromImplementPrompt(text string) (id string, ok bool) {
 	if !strings.HasPrefix(text, "/") && !strings.HasPrefix(text, "$") {
 		return "", false
 	}
-	_, path, found := strings.Cut(text, " ")
+	_, addr, found := strings.Cut(text, " ")
 	if !found {
 		return "", false
 	}
-	base := filepath.Base(path)
-	idx := strings.Index(base, "-")
-	if idx <= 0 {
-		return "", false
-	}
-	return base[:idx], true
+	_, id, found = strings.Cut(addr, "/")
+	return id, found && id != ""
 }
 
 // writeChildTicket writes a fresh open child ticket file (filename

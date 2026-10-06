@@ -67,7 +67,7 @@ of it.
 ### 1. Gather context
 
 Work from whatever is already in the conversation context. If the user passes a reference (a spec
-path, a ticket path) as an argument, read its full body.
+path, a ticket address) as an argument, read its full body (`gx tickets show <addr>` for a ticket).
 
 ### 2. Explore the codebase (optional)
 
@@ -171,9 +171,9 @@ what was decided.
 
 ### 6. Publish the tickets
 
-Write one file per ticket under `$(gx tickets root)/<epic-slug>/issues/<NN>-<slug>.md` (see
-[gx-local-tracker.md](../gx-local-tracker.md) for how the root is resolved), numbered from `01` in
-dependency order (blockers first). Each file's `blocked_by` lists the ticket IDs it depends on. Use
+Create one ticket per call with `gx tickets add <epic-slug> --slug <slug> --body -` (see
+[gx-local-tracker.md](../gx-local-tracker.md)), in dependency order (blockers first); it allocates
+the ID and prints the ticket's address. Each file's `blocked_by` lists the ticket IDs it depends on. Use
 the per-ticket template below — one ticket per file, never a single combined file.
 
 Work the **frontier** (see [gx-local-tracker.md](../gx-local-tracker.md)): any ticket whose blockers
@@ -188,7 +188,7 @@ epic's own `issues/`. A map's tickets are decisions its author resolves by hand,
 of `status` for the whole epic it runs. Putting both kinds in one directory puts two writers on the
 same status field.
 
-Before considering any ticket published, run `gx tickets validate <path>` on it. Fix any reported
+Before considering any ticket published, run `gx tickets validate <addr>` on it. Fix any reported
 error and re-validate until it passes — do not publish a ticket that fails validation.
 
 Tickets can also be forked off **mid-flight**, by `gx-implement`, when a ticket outgrows its budget
@@ -234,9 +234,9 @@ implementation list.
 
 See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are
 published as `open` unless instructed otherwise, with `blocked_by: []` when nothing gates them —
-writing the file directly lands the body and the status in one write, so there's no window where an
-empty ticket is schedulable. If you allocate an ID with `gx tickets add` instead, its stub lands
-`draft`; fill in the body first, then `gx tickets set <path> --status open` to publish it.
+`gx tickets add --body` lands the body and the status in one write, so there's no window where an
+empty ticket is schedulable. Without `--body`, the stub lands
+`draft`; fill in the body first, then `gx tickets set <addr> --status open` to publish it.
 
 `parent` is only for descendants — a mid-flight fork or a code-review fix ticket — and is written on
 the descendant alone; a ticket published from a plan or spec has no `parent` and records nothing

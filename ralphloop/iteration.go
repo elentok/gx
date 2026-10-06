@@ -86,7 +86,7 @@ func runIteration(d Deps, p iterationParams) error {
 	if p.Ticket.IsCodeReview() {
 		skill = codeReviewSkill
 	}
-	prompt := skillPrompt(p.Agent, skill, p.Ticket.Path)
+	prompt := skillPrompt(p.Agent, skill, ticketAddress(p.Ticket))
 
 	var tab herdr.CreatedTab
 	var sessionID string

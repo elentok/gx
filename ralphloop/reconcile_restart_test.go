@@ -49,7 +49,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "01-a.md") {
+	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "epic/01") {
 		t.Fatalf("prompts = %v, want ticket 01 run fresh", *prompts)
 	}
 

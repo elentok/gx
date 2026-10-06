@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets"
 )
 
 func TestRun_CodexLaunchPreflight(t *testing.T) {
@@ -348,7 +349,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 					}
 				}
 			}
-			wantPrompt := tc.wantPrefix + filepath.Join(scratchDir, "my-epic", "issues", "01-first.md")
+			wantPrompt := tc.wantPrefix + tickets.ProjectName(scratchDir) + ":my-epic/01"
 			if len(*prompts) != 1 || (*prompts)[0] != wantPrompt {
 				t.Errorf("prompts = %v, want %q", *prompts, wantPrompt)
 			}
@@ -478,7 +479,7 @@ func TestRun_MaxParallelOne_RunsSerially(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	wantOrder := []string{"01-a.md", "02-b.md", "03-c.md"}
+	wantOrder := []string{"epic/01", "epic/02", "epic/03"}
 	if len(*prompts) != len(wantOrder) {
 		t.Fatalf("prompts = %v, want %d prompts", *prompts, len(wantOrder))
 	}

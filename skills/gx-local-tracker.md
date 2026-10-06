@@ -92,16 +92,22 @@ conversation history.
 
 ## Reading, writing, and validating
 
-- **Validate a ticket**: `gx tickets validate <path>` — parses the frontmatter and reports whether
+- **Validate a ticket**: `gx tickets validate <addr>` — parses the frontmatter and reports whether
   it's well-formed. Run this on every ticket before considering it published, and again on any ticket
   about to be claimed; fix and re-validate until it passes.
 - **Read the full field/enum reference**: `gx tickets schema` — prints the settable and read-only
   frontmatter fields verbatim, useful when composing a `set` call from memory.
-- **Update fields**: `gx tickets set <path> --status <value> [--blocked-by ...] [...]` — a sparse,
+- **Update fields**: `gx tickets set <addr> --status <value> [--blocked-by ...] [...]` — a sparse,
   validated write. Only the flags passed are changed; every other field is left exactly as it was.
   Never hand-edit frontmatter YAML directly when a `set` flag exists for the field.
-- **Create a ticket**: write the file directly, following the frontmatter shape above and the
-  per-ticket template your skill defines. Then validate it.
+- **Create a ticket**: `gx tickets add <epic> --slug <slug> --body -` (body on stdin) writes the
+  ticket `open` and prints its address. Follow the frontmatter shape above and the per-ticket
+  template your skill defines, then validate it.
+- **Address a ticket**: agents name a ticket by its address, `project:epic/NN` (`epic/NN` or `NN`
+  work as input when the epic is implied). Read it with `gx tickets show <addr>`, change a body
+  section with `gx tickets section <addr> <heading> <content|->`, change fields with `gx tickets
+  set <addr>`. Never read or write a ticket file by path — `gx tickets root` / `gx tickets epics`
+  are for humans and scripts.
 - **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
   the stub straight to `<id>-<slug>.md`.
@@ -111,11 +117,10 @@ conversation history.
 `gx tickets add` writes its stub `status: draft` on purpose: a freshly allocated ticket has an empty
 body, and `draft` never enters the frontier, so the window between allocating the ID and writing the
 real content can't hand an empty ticket to an agent. Promoting it is a deliberate, separate step —
-fill in the body first, then `gx tickets set <path> --status open`. That `set` call is the handoff:
+fill in the body first, then `gx tickets set <addr> --status open`. That `set` call is the handoff:
 before it, the ticket belongs to its author; after it, the scheduler may claim it at any moment, so
-nothing about it should still be in flux. A ticket written directly as a file (rather than via
-`gx tickets add`) can be authored `open` in one write, since its body lands in the same write as its
-status.
+nothing about it should still be in flux. A ticket created with `gx tickets add --body` is
+written `open` in one write, since its body lands in the same write as its status.
 
 ## Frontier
 
@@ -131,7 +136,7 @@ A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes e
 
 ## Claiming
 
-Before starting work on a frontier ticket, claim it: `gx tickets set <path> --status claimed`. This
+Before starting work on a frontier ticket, claim it: `gx tickets set <addr> --status claimed`. This
 must happen before any implementation work, not after — an unattended run that crashes mid-ticket
 should leave the ticket visibly claimed, not silently open, so a restart doesn't double-pick it.
 
@@ -142,12 +147,12 @@ hand-driven epic, where a person or script claims a ticket directly.
 
 ## Resolution
 
-When a ticket's work lands, set a terminal status: `gx tickets set <path> --status done`. A ticket
+When a ticket's work lands, set a terminal status: `gx tickets set <addr> --status done`. A ticket
 closed by a mid-flight fork rather than by landing its own work (see below) is also `done`, with
 `commitless: true` since it never had commits of its own.
 
 Under ralph-loop, landing `status: done` is gx's alone to write — an iteration agent reports
-`gx tickets set <path> --iteration-status finished [--commitless true]` instead, and gx adopts that
+`gx tickets set <addr> --iteration-status finished [--commitless true]` instead, and gx adopts that
 report into `status: done` only after checking its own commit count and cherry-pick outcome; the
 report can start a landing, never conclude one. The CLI refuses `--status done` from a
 `ralph-loop/*` branch outright, even paired with `--iteration-status finished`. As with claiming,
@@ -235,7 +240,7 @@ to mix a plumbing/infra concern with a feature-on-top concern. `parent` is the w
    and `--parent` writes the child's `parent` frontmatter at creation.
 2. Fill in the new ticket's body, moving any not-yet-finished acceptance criteria off the original
    onto it — don't leave a criterion sitting on a ticket that's about to close. Then promote it with
-   `gx tickets set <path> --status open`.
+   `gx tickets set <addr> --status open`.
 3. The original is closed as `done`, with `commitless: true` if it lands zero commits of its own.
 
 Nothing else is written. In particular a fork child gets **no** `blocked_by` naming the original, and

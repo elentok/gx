@@ -75,7 +75,7 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
 2. Run `gx tickets filter-run-log <epic> --ticket <id>`, filtered to the ticket(s) in question. The
    most recent `scheduler-scan` entry's `scan` list gives every ticket's decision and reason as of
    that pass.
-3. Read the affected ticket's frontmatter directly and check it against gx-local-tracker.md's
+3. Read the affected ticket with `gx tickets show <addr>` and check it against gx-local-tracker.md's
    field reference — most "queued but stuck" reports are a frontmatter field (`parent`,
    `blocked_by`, `status`) not doing what the UI implies, not a scheduler logic bug.
 4. If the discrepancy is between the Queue tab and the tickets themselves, check
