@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -104,6 +107,19 @@ func newServerQueueCmd() *cobra.Command {
 	list.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(list)
 
+	items := &cobra.Command{
+		Use:   "items",
+		Short: "list the queued tickets in order",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) ([]server.QueueItem, error) { return cl.QueueItems(ctx) },
+				printQueueItems)
+		},
+	}
+	items.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(items)
+
 	var agent string
 	add := &cobra.Command{
 		Use:   "add <project:epic/NN>",
@@ -197,6 +213,15 @@ func printQueue(w io.Writer, entries []server.QueueEntry) error {
 	return nil
 }
 
+func printQueueItems(w io.Writer, items []server.QueueItem) error {
+	for _, it := range items {
+		if _, err := fmt.Fprintf(w, "%s\t%s\n", it.Address, it.Agent); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func newServerTicketsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "tickets", Short: "ticket reads", Args: cobra.NoArgs}
 	var jsonOut bool
@@ -230,6 +255,28 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	explain.Flags().BoolVar(&explainJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(explain)
+
+	var followJSON bool
+	follow := &cobra.Command{
+		Use:   "follow <addr>",
+		Short: "stream changes to one ticket until interrupted",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			client, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runServerTicketsFollow(ctx, client, args[0], followJSON, c.OutOrStdout())
+		},
+	}
+	follow.Flags().BoolVar(&followJSON, "json", false, "emit one JSON object per line instead of human-readable text")
+	cmd.AddCommand(follow)
 	return cmd
 }
 

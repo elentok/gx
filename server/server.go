@@ -147,23 +147,43 @@ func New(cfg Config) (*Server, error) {
 		events: events,
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /v1/handshake", s.handshake)
-	mux.HandleFunc("GET /v1/snapshot", s.snapshot)
-	mux.HandleFunc("GET /v1/events", s.streamEvents)
-	mux.HandleFunc("GET /v1/projects", s.projects)
-	mux.HandleFunc("GET /v1/locks", s.locks)
-	mux.HandleFunc("GET /v1/tickets/history", s.history)
-	mux.HandleFunc("GET /v1/tickets/explain", s.explain)
-	mux.HandleFunc("GET /v1/iterations", s.iterations)
-	mux.HandleFunc("GET /v1/queue", s.queue)
-	mux.HandleFunc("GET /v1/queue/items", s.queueItems)
-	mux.HandleFunc("POST /v1/queue/add", s.queueWrite(s.queueAdd))
-	mux.HandleFunc("POST /v1/queue/remove", s.queueWrite(s.queueRemove))
-	mux.HandleFunc("POST /v1/queue/move", s.queueWrite(s.queueMove))
+	for _, r := range routeTable {
+		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
+	}
 	s.http = &http.Server{Handler: mux}
 	// A down herdr never stops the server; it is reported and retried.
 	s.checkHerdr()
 	return s, nil
+}
+
+// routeTable is the single list of endpoints. cmd's parity test diffs it
+// against the CLI command tree, so every route needs a `--json` verb.
+var routeTable = []struct {
+	pattern string
+	handler func(*Server, http.ResponseWriter, *http.Request)
+}{
+	{"GET /v1/handshake", (*Server).handshake},
+	{"GET /v1/snapshot", (*Server).snapshot},
+	{"GET /v1/events", (*Server).streamEvents},
+	{"GET /v1/projects", (*Server).projects},
+	{"GET /v1/locks", (*Server).locks},
+	{"GET /v1/tickets/history", (*Server).history},
+	{"GET /v1/tickets/explain", (*Server).explain},
+	{"GET /v1/iterations", (*Server).iterations},
+	{"GET /v1/queue", (*Server).queue},
+	{"GET /v1/queue/items", (*Server).queueItems},
+	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueAdd)(w, r) }},
+	{"POST /v1/queue/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueRemove)(w, r) }},
+	{"POST /v1/queue/move", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueMove)(w, r) }},
+}
+
+// RoutePatterns lists every registered "METHOD /path" pattern.
+func RoutePatterns() []string {
+	out := make([]string, len(routeTable))
+	for i, r := range routeTable {
+		out[i] = r.pattern
+	}
+	return out
 }
 
 // listenLoopback refuses any address that isn't a loopback IP, since the TCP

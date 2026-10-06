@@ -40,7 +40,7 @@ func TestServerTicketsFollow_PrintsOnlyTheNamedTicketsEvents(t *testing.T) {
 
 	var out lockedBuffer
 	done := make(chan error, 1)
-	go func() { done <- runServerTicketsFollow(ctx, h.Client, "proj:epic/02", &out) }()
+	go func() { done <- runServerTicketsFollow(ctx, h.Client, "proj:epic/02", false, &out) }()
 
 	// The initial snapshot line proves the follower is subscribed from a known seq.
 	waitFor(t, ctx, func() bool { return strings.Contains(out.String(), "proj:epic/02\topen") })

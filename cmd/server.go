@@ -36,7 +36,17 @@ func newServerCmd(_ deps) *cobra.Command {
 			return runServer(c.Context())
 		},
 	}
-	cmd.AddCommand(&cobra.Command{
+	var statusJSON bool
+	status := &cobra.Command{
+		Use:   "status",
+		Short: "show whether the server is running, with its pid and build",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerStatus(c.Context(), statusJSON, c.OutOrStdout())
+		},
+	}
+	status.Flags().BoolVar(&statusJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(status, &cobra.Command{
 		Use:   "install",
 		Short: "register a launchd agent that starts the server at login and after a crash (macOS)",
 		Args:  cobra.NoArgs,
@@ -56,13 +66,6 @@ func newServerCmd(_ deps) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runServerRestart(c.Context(), c.OutOrStdout())
-		},
-	}, &cobra.Command{
-		Use:   "status",
-		Short: "show whether the server is running, with its pid and build",
-		Args:  cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerStatus(c.Context(), c.OutOrStdout())
 		},
 	}, &cobra.Command{
 		Use:   "stop",
@@ -106,30 +109,6 @@ func newServerCmd(_ deps) *cobra.Command {
 	}
 	snapshot.Flags().BoolVar(&snapJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(snapshot)
-	ticketsCmd := &cobra.Command{
-		Use:   "tickets",
-		Short: "ticket commands served by the orchestrator",
-		Args:  cobra.NoArgs,
-	}
-	ticketsCmd.AddCommand(&cobra.Command{
-		Use:   "follow <addr>",
-		Short: "stream changes to one ticket until interrupted",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
-			}
-			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-			defer stop()
-			client, err := serverClient()
-			if err != nil {
-				return err
-			}
-			return runServerTicketsFollow(ctx, client, args[0], c.OutOrStdout())
-		},
-	})
-	cmd.AddCommand(ticketsCmd)
 	eventsCmd := &cobra.Command{
 		Use:   "events",
 		Short: "run-log event contract",
@@ -184,7 +163,15 @@ func serverClient() (*apiclient.Client, error) {
 	return apiclient.New(server.SocketPath(stateDir)), nil
 }
 
-func runServerStatus(ctx context.Context, w io.Writer) error {
+// StatusInfo is the `gx server status --json` payload.
+type StatusInfo struct {
+	Running  bool     `json:"running"`
+	Pid      int      `json:"pid,omitempty"`
+	Build    string   `json:"build,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -192,19 +179,28 @@ func runServerStatus(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	info := StatusInfo{}
 	n, err := c.Negotiate(ctx, getVersion())
-	if err != nil {
+	if err == nil {
+		cfg, cerr := config.Load()
+		if cerr != nil {
+			return cerr
+		}
+		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
+	}
+	if jsonOut {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(info)
+	}
+	if !info.Running {
 		_, werr := fmt.Fprintln(w, "not running")
 		return werr
 	}
-	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", n.Pid, n.Build); err != nil {
+	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", info.Pid, info.Build); err != nil {
 		return err
 	}
-	cfg, err := config.Load()
-	if err != nil {
-		return err
-	}
-	for _, warning := range statusWarnings(n, cfg.TicketStore.Path) {
+	for _, warning := range info.Warnings {
 		if _, err = fmt.Fprintln(w, "warning: "+warning); err != nil {
 			return err
 		}
@@ -409,30 +405,37 @@ func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
 
 // runServerTicketsFollow prints addr's state on every (re-)snapshot where it
 // changed, and each event naming addr. Other tickets' events are dropped.
-func runServerTicketsFollow(ctx context.Context, c *apiclient.Client, addr string, w io.Writer) error {
+// With jsonOut each output line is one JSON object (events, and ticket state
+// or {"address":...,"absent":true}).
+func runServerTicketsFollow(ctx context.Context, c *apiclient.Client, addr string, jsonOut bool, w io.Writer) error {
 	var last string
 	var werr error
-	print := func(format string, a ...any) {
-		if werr == nil {
-			_, werr = fmt.Fprintf(w, format, a...)
+	print := func(text string, v any) {
+		if werr != nil {
+			return
 		}
+		if jsonOut {
+			werr = json.NewEncoder(w).Encode(v)
+			return
+		}
+		_, werr = fmt.Fprintln(w, text)
 	}
 	err := c.Follow(ctx, func(s *server.Snapshot, ev *server.Event) {
 		if ev != nil {
 			if ev.Address == addr {
-				print("%d\t%s\t%s\n", ev.Seq, ev.Type, ev.Address)
+				print(fmt.Sprintf("%d\t%s\t%s", ev.Seq, ev.Type, ev.Address), ev)
 			}
 			return
 		}
-		line := "absent"
+		line, state := "absent", any(map[string]any{"address": addr, "absent": true})
 		for _, t := range s.Tickets {
 			if t.Address == addr {
-				line = fmt.Sprintf("%s\t%s\t%s", t.Address, t.Status, t.Title)
+				line, state = fmt.Sprintf("%s\t%s\t%s", t.Address, t.Status, t.Title), t
 			}
 		}
 		if line != last {
 			last = line
-			print("%s\n", line)
+			print(line, state)
 		}
 	})
 	if werr != nil {
