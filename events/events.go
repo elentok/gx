@@ -87,6 +87,9 @@ const (
 	AllParked      Kind = "all-parked"
 	BlockedCycle   Kind = "blocked-cycle"
 	DuplicateLive  Kind = "duplicate-live"
+	// IterationError is the loop's catch-all: an iteration or land failed
+	// with an error no more specific kind names.
+	IterationError Kind = "iteration-error"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -102,7 +105,7 @@ var kinds = map[Kind]bool{
 	AgentNameTaken: true, AgentPaneBusy: true, ZeroCommit: true, BlockedPane: true,
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
-	DuplicateLive: true,
+	DuplicateLive: true, IterationError: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

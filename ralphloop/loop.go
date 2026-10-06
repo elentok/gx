@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -788,17 +789,21 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// restarting the loop. Flag just this ticket needs-repair
 			// (out of the frontier, so never reclaimed until a human clears
 			// it) and keep scheduling the rest.
-			reason := r.err.Error()
-			state := schema.NeedsRepairState{
-				Label:    iterLabel(opts.EpicName, r.ticket.Identifier),
-				Branch:   iterBranch(opts.EpicName, r.ticket.Identifier),
-				Worktree: iterationWorktreePath(wtDir, opts.EpicName, r.ticket.Identifier),
-			}
-			if markErr := MarkNeedsRepairWithReason(r.ticket.Path, reason, state); markErr != nil {
-				reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, markErr)
-			}
+			park(sink, parkRequest{
+				ScratchDir: scratchDir,
+				EpicName:   opts.EpicName,
+				Ticket:     r.ticket.Identifier,
+				Path:       r.ticket.Path,
+				Type:       events.NeedsRepair,
+				Kind:       events.IterationError,
+				Reason:     r.err.Error(),
+				Repair: schema.NeedsRepairState{
+					Label:    iterLabel(opts.EpicName, r.ticket.Identifier),
+					Branch:   iterBranch(opts.EpicName, r.ticket.Identifier),
+					Worktree: iterationWorktreePath(wtDir, opts.EpicName, r.ticket.Identifier),
+				},
+			})
 			delete(launched, r.ticket.Identifier)
-			sink.TicketNeedsHuman(r.ticket.Identifier, opts.EpicName, "needs-repair", reason)
 			continue
 		}
 
