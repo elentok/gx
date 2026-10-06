@@ -143,7 +143,7 @@ func runServer(ctx context.Context) error {
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, Orchestrator: cfg.Orchestrator})
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, Orchestrator: cfg.Orchestrator, MaxConcurrentRoots: cfg.ExecutionQueue.MaxConcurrentEpics})
 	if err != nil {
 		return err
 	}

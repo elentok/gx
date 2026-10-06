@@ -54,6 +54,10 @@ type Config struct {
 	// is "server": the in-process loop owns claiming otherwise.
 	Orchestrator string
 
+	// MaxConcurrentRoots caps queued roots running at once (config
+	// max-concurrent-epics); zero means the config default.
+	MaxConcurrentRoots int
+
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string

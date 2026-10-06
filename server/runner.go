@@ -59,6 +59,12 @@ func (r *runRegistry) has(root string) bool {
 	return ok
 }
 
+func (r *runRegistry) count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.runs)
+}
+
 func (r *runRegistry) delete(root string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -116,21 +122,30 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	}
 }
 
-// claimNext claims and launches the frontier ticket of the first queued root
-// that has one and no iteration running. It does nothing while herdr is down:
+// claimNext backfills free slots in queue order: it claims and launches the
+// frontier ticket of each queued root that has one and no iteration running,
+// until the concurrency limit is reached. It does nothing while herdr is down:
 // a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
 	if s.herdr.isUnavailable() {
 		return
 	}
+	limit := s.cfg.MaxConcurrentRoots
+	if limit <= 0 {
+		limit = config.DefaultExecutionQueueConfig().MaxConcurrentEpics
+	}
+	running := s.registry.count()
 	for _, item := range s.queued.list() {
+		if running >= limit {
+			return
+		}
 		launched, err := s.claimRoot(item)
 		if err != nil {
 			s.log.Warn("claim queued root", "root", item.Address, "err", err)
 			continue
 		}
 		if launched {
-			return
+			running++
 		}
 	}
 }

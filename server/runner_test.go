@@ -154,3 +154,56 @@ func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 		t.Errorf("feature branch lacks the agent's commit: %q, %v", out, err)
 	}
 }
+
+func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.MaxConcurrentRoots = 1
+	})
+	_, _, cwd := registerLaunch(h)
+	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
+		testutil.WriteFile(t, *cwd, "agent.txt", "work")
+		testutil.CommitAll(t, *cwd, "agent work")
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {
+		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", addr, res, err)
+		}
+	}
+
+	var seen []string
+	completed := 0
+	for ev := range evs {
+		switch ev.Type {
+		case server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted:
+			seen = append(seen, ev.Type+" "+ev.Address)
+		case server.EventIterationFailed, server.EventIterationParked:
+			t.Fatalf("unexpected %s for %s", ev.Type, ev.Address)
+		}
+		if ev.Type == server.EventRootCompleted {
+			if completed++; completed == 2 {
+				break
+			}
+		}
+	}
+	// With one slot, root B starts only after root A's ticket is done.
+	if len(seen) != 6 || !strings.HasPrefix(seen[1], server.EventTicketDone) {
+		t.Errorf("events = %v, want start/done/completed per root, one root at a time", seen)
+	}
+}
