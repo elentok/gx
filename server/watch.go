@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io/fs"
+	"net/http"
 	"path/filepath"
 	"time"
 
@@ -65,6 +67,25 @@ func (s *Server) keepFresh(ctx context.Context) {
 			s.rescan()
 		}
 	}
+}
+
+// ChangedRequest is the body of POST /v1/tickets/changed: a direct write's
+// "address changed" ping.
+type ChangedRequest struct {
+	Address string `json:"address"`
+}
+
+// ticketChanged answers a direct write's ping with an immediate rescan, so the
+// stream doesn't wait for the watch or the poll. The file stays the truth: the
+// address is informational, the rescan reads every file.
+func (s *Server) ticketChanged(w http.ResponseWriter, r *http.Request) {
+	var req ChangedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.rescan()
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) rescan() {

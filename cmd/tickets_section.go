@@ -17,6 +17,7 @@ func runTicketsSection(path, heading, content string, jsonOut bool, w io.Writer)
 	if err != nil {
 		return err
 	}
+	pingServer(path)
 	return printTicketRef(path, jsonOut, w)
 }
 

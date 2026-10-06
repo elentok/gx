@@ -198,6 +198,31 @@ func (c *Client) QueueMove(ctx context.Context, address string, position int) (s
 	return c.queueWrite(ctx, "move", server.QueueRequest{Address: address, Position: position})
 }
 
+// TicketChanged pings the server that a direct write changed address's file.
+func (c *Client) TicketChanged(ctx context.Context, address string) error {
+	if err := c.CheckWrite(); err != nil {
+		return err
+	}
+	body, err := json.Marshal(server.ChangedRequest{Address: address})
+	if err != nil {
+		return err
+	}
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://gx/v1/tickets/changed", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	hreq.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(hreq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("server returned %s for /v1/tickets/changed", resp.Status)
+	}
+	return nil
+}
+
 // queueWrite posts one queue write. A refusal is a result (Refused set), not an error.
 func (c *Client) queueWrite(ctx context.Context, verb string, req server.QueueRequest) (server.QueueResult, error) {
 	var res server.QueueResult

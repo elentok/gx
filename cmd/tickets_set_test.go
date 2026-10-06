@@ -74,11 +74,11 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
-	err := execute([]string{"tickets", "set", path, "--status=claimed", "--blocked-by=01,03"}, d)
+	err := execute([]string{"tickets", "set", path, "--status=draft", "--blocked-by=01,03"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
-	if !strings.Contains(stdout.String(), "updated (status=claimed, blocked_by=01,03)") {
+	if !strings.Contains(stdout.String(), "updated (status=draft, blocked_by=01,03)") {
 		t.Errorf("stdout = %q, want it to list the changed fields", stdout.String())
 	}
 
@@ -86,8 +86,8 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading ticket back: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: claimed") {
-		t.Errorf("ticket file = %q, want status: claimed", string(raw))
+	if !strings.Contains(string(raw), "status: draft") {
+		t.Errorf("ticket file = %q, want status: draft", string(raw))
 	}
 	if !strings.Contains(string(raw), `blocked_by:`) {
 		t.Errorf("ticket file = %q, want blocked_by written", string(raw))
@@ -210,7 +210,7 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
-	err := execute([]string{"tickets", "set", path, "--status=done", "--commitless=true"}, d)
+	err := execute([]string{"tickets", "set", path, "--commitless=true"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v", err)
 	}
@@ -224,82 +224,27 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_StatusDoneRefusedWithUnresolvedBlocker(t *testing.T) {
+// Seam C: with no server running, the direct verbs still work and the
+// orchestration statuses are refused without touching the file.
+func TestExecute_TicketsSet_OrchestrationStatusesRefused(t *testing.T) {
 	t.Parallel()
-	epicPath := filepath.Join(t.TempDir(), "widget-epic")
-	issuesDir := filepath.Join(epicPath, "issues")
-	if err := os.MkdirAll(issuesDir, 0755); err != nil {
-		t.Fatalf("mkdir issues: %v", err)
-	}
-	blockerPath := filepath.Join(issuesDir, "01-blocker.md")
-	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
-	targetPath := filepath.Join(issuesDir, "02-target.md")
-	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: implement\n---\nBody.\n")
+	for _, status := range []string{"claimed", "done", "needs-answer", "needs-repair", "cancelled"} {
+		t.Run(status, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "04b-ticket.md")
+			original := "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n"
+			writeTicketFile(t, path, original)
 
-	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
-
-	err := execute([]string{"tickets", "set", targetPath, "--status=done"}, d)
-	if err == nil {
-		t.Fatal("expected an error, got nil")
-	}
-	if !strings.Contains(err.Error(), "unresolved blocked_by") || !strings.Contains(err.Error(), "01") {
-		t.Errorf("error = %q, want it to mention unresolved blocked_by (01)", err.Error())
-	}
-
-	raw, err := os.ReadFile(targetPath)
-	if err != nil {
-		t.Fatalf("reading ticket back: %v", err)
-	}
-	if !strings.Contains(string(raw), "status: claimed") {
-		t.Errorf("ticket file changed despite refused write: %q", string(raw))
-	}
-}
-
-func TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns(t *testing.T) {
-	t.Parallel()
-	epicPath := filepath.Join(t.TempDir(), "widget-epic")
-	issuesDir := filepath.Join(epicPath, "issues")
-	if err := os.MkdirAll(issuesDir, 0755); err != nil {
-		t.Fatalf("mkdir issues: %v", err)
-	}
-	blockerPath := filepath.Join(issuesDir, "01-blocker.md")
-	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
-	targetPath := filepath.Join(issuesDir, "02-target.md")
-	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: implement\n---\nBody.\n")
-
-	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
-
-	err := execute([]string{"tickets", "set", targetPath, "--status=done", "--force"}, d)
-	if err != nil {
-		t.Fatalf("execute tickets set --force: %v", err)
-	}
-	if !strings.Contains(stderr.String(), "warning") || !strings.Contains(stderr.String(), "01") {
-		t.Errorf("stderr = %q, want a warning mentioning the unresolved blocker (01)", stderr.String())
-	}
-
-	raw, err := os.ReadFile(targetPath)
-	if err != nil {
-		t.Fatalf("reading ticket back: %v", err)
-	}
-	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket file = %q, want status: done written despite forced unresolved blocker", string(raw))
-	}
-}
-
-func TestExecute_TicketsSet_StatusDoneUnaffectedByBlockerOutsideIssuesLayout(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: implement\n---\nBody.\n")
-
-	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
-
-	err := execute([]string{"tickets", "set", path, "--status=done"}, d)
-	if err != nil {
-		t.Fatalf("execute tickets set: %v, want no gate outside the <epic>/issues/ layout", err)
+			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
+			if err == nil || !strings.Contains(err.Error(), "orchestration status") {
+				t.Fatalf("error = %v, want an orchestration-status refusal", err)
+			}
+			raw, _ := os.ReadFile(path)
+			if string(raw) != original {
+				t.Errorf("ticket changed despite refusal: %q", raw)
+			}
+		})
 	}
 }
 
@@ -476,32 +421,6 @@ func TestExecute_TicketsSet_IterationStatusFinishedWithCommitlessAccepted(t *tes
 	}
 }
 
-func TestExecute_TicketsSet_IterationStatusFinishedWithStatusDoneAccepted(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
-
-	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
-
-	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--status=done"}, d)
-	if err != nil {
-		t.Fatalf("execute tickets set: %v", err)
-	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("reading ticket back: %v", err)
-	}
-	if !strings.Contains(string(raw), "iteration_status: finished") {
-		t.Errorf("ticket file = %q, want iteration_status: finished written", string(raw))
-	}
-	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket file = %q, want status: done written", string(raw))
-	}
-}
-
 func TestExecute_TicketsSet_IterationStatusFinishedAlreadyCommitlessOnDiskAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -565,7 +484,7 @@ func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 
 func TestExecute_TicketsSet_AgentBranch_NonPromotionStatusRefused(t *testing.T) {
 	t.Parallel()
-	for _, status := range []string{"claimed", "done", "draft"} {
+	for _, status := range []string{"draft"} {
 		t.Run(status, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
@@ -667,7 +586,7 @@ func TestExecute_TicketsSet_UnrecognisedBranch_StatusAccepted(t *testing.T) {
 	// otherwise refuse for an iteration agent.
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "widget-hand-driven")}
 
-	err := execute([]string{"tickets", "set", path, "--status=claimed"}, d)
+	err := execute([]string{"tickets", "set", path, "--status=draft"}, d)
 	if err != nil {
 		t.Fatalf("execute tickets set: %v, want an unrecognised branch to never be refused", err)
 	}
@@ -676,7 +595,7 @@ func TestExecute_TicketsSet_UnrecognisedBranch_StatusAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading ticket back: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: claimed") {
-		t.Errorf("ticket file = %q, want status: claimed", string(raw))
+	if !strings.Contains(string(raw), "status: draft") {
+		t.Errorf("ticket file = %q, want status: draft", string(raw))
 	}
 }

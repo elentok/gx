@@ -179,6 +179,7 @@ var routeTable = []struct {
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/iterations", (*Server).iterations},
+	{"POST /v1/tickets/changed", (*Server).ticketChanged},
 	{"GET /v1/queue", (*Server).queue},
 	{"GET /v1/queue/items", (*Server).queueItems},
 	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueAdd)(w, r) }},

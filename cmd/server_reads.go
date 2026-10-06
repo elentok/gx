@@ -265,6 +265,32 @@ func newServerTicketsCmd() *cobra.Command {
 	explain.Flags().BoolVar(&explainJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(explain)
 
+	var changedJSON bool
+	changed := &cobra.Command{
+		Use:   "changed <project:epic/NN>",
+		Short: "tell the server a ticket file changed so the stream updates at once",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			if err := cl.TicketChanged(ctx, args[0]); err != nil {
+				return fmt.Errorf("server ping failed: %w", err)
+			}
+			if changedJSON {
+				return json.NewEncoder(c.OutOrStdout()).Encode(server.ChangedRequest{Address: args[0]})
+			}
+			return nil
+		},
+	}
+	changed.Flags().BoolVar(&changedJSON, "json", false, "emit the acknowledged address as JSON")
+	cmd.AddCommand(changed)
+
 	var followJSON bool
 	follow := &cobra.Command{
 		Use:   "follow <addr>",

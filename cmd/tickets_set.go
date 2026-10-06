@@ -21,9 +21,9 @@ import (
 const ticketsSchemaText = `Ticket frontmatter fields:
 
 Settable fields:
-  status (enum, --status): draft, open, claimed, done. needs-answer and needs-repair are
-    machine-written only and not settable here — gx marks a ticket that way itself when
-    it parks.
+  status (enum, --status): draft, open. Orchestration statuses (claimed, done,
+    needs-answer, needs-repair, cancelled) are the server's alone and refused here — gx
+    claims, parks and lands a ticket itself.
     Required on every ticket. draft is parked work: it never enters an epic's
     frontier, so no agent is ever handed it.
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03. A bare ID names a ticket in
@@ -72,7 +72,6 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 		expectedContextWindow string
 		commitless            string
 		iterationStatus       string
-		force                 bool
 	)
 
 	cmd := &cobra.Command{
@@ -95,7 +94,6 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, needs-answer, finished)")
-	cmd.Flags().BoolVar(&force, "force", false, "allow --status done despite unresolved blocked_by")
 
 	return cmd
 }
@@ -152,23 +150,27 @@ func parseCSVIDs(value string) []schema.TicketID {
 	return ids
 }
 
+// orchestrationStatuses are the statuses `set` no longer writes: claims, parks,
+// landing and cancellation belong to the server's orchestration path.
+var orchestrationStatuses = map[schema.Status]bool{
+	schema.StatusClaimed:     true,
+	schema.StatusDone:        true,
+	schema.StatusNeedsAnswer: true,
+	schema.StatusNeedsRepair: true,
+	schema.StatusCancelled:   true,
+}
+
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
 func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error)) error {
 	if c.Flags().Changed("status") {
 		status, _ := c.Flags().GetString("status")
-		if schema.Status(status) == schema.StatusNeedsAnswer || schema.Status(status) == schema.StatusNeedsRepair {
-			return fmt.Errorf("%s: --status %s is machine-written only; gx parks a ticket that way itself, it is not settable via `tickets set`", path, status)
+		if orchestrationStatuses[schema.Status(status)] {
+			return fmt.Errorf("%s: --status %s is an orchestration status; the server owns it, `tickets set` only moves a ticket between draft and open", path, status)
 		}
 		if err := checkAgentStatusGuard(path, schema.Status(status), getwd); err != nil {
 			return err
-		}
-		if schema.Status(status) == schema.StatusDone {
-			force, _ := c.Flags().GetBool("force")
-			if err := checkBlockersBeforeDone(path, force, stderr); err != nil {
-				return err
-			}
 		}
 		if schema.Status(status) == schema.StatusOpen {
 			if err := checkBodyBeforeOpen(path); err != nil {
@@ -214,6 +216,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 		return err
 	}
 
+	pingServer(path)
 	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
 	return nil
 }
@@ -348,47 +351,5 @@ func checkBodyBeforeOpen(path string) error {
 	if strings.TrimSpace(body) == "" {
 		return fmt.Errorf("%s has an empty body; refusing to set status=open on a ticket with no content", path)
 	}
-	return nil
-}
-
-// checkBlockersBeforeDone refuses a --status done write for a ticket whose
-// own blocked_by isn't actually resolved, unless force is set — closing the
-// gap where an agent could mark a ticket done without ever going through the
-// scheduler's own claim-time blocker check (ralphloop's claimNext), which is
-// how a mid-flight-fork placeholder can be born already-done with an
-// unverified blocker (see gx-investigate/gotchas.md and
-// tickets/status.go's Epic.Blocking / Epic.UnresolvedBlockers doc
-// comments). Only enforced for tickets
-// living under the tracker's <epic>/issues/<file>.md layout — anything else
-// (ad-hoc files) is left unchecked, since there's no epic to resolve
-// blockers against.
-func checkBlockersBeforeDone(path string, force bool, stderr io.Writer) error {
-	epic, target, unlock, err := lockEpicForTicket(path)
-	if err != nil {
-		return fmt.Errorf("checking blockers before marking done: %w", err)
-	}
-	if unlock != nil {
-		defer unlock()
-	}
-	if target == nil {
-		return nil
-	}
-
-	unresolved := epic.UnresolvedBlockers(*target)
-	if len(unresolved) == 0 {
-		return nil
-	}
-
-	if !force {
-		return fmt.Errorf(
-			"%s has unresolved blocked_by (%s); refusing to mark done without --force",
-			path, strings.Join(unresolved, ", "),
-		)
-	}
-
-	fmt.Fprintf(stderr,
-		"warning: %s forced done with unresolved blocked_by (%s) — anything blocked on it will trust this status without the blocker having actually finished\n",
-		path, strings.Join(unresolved, ", "),
-	)
 	return nil
 }

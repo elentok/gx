@@ -104,6 +104,50 @@ func TestEvents_SnapshotThenSubscribeSeesTicketEditAsOneEventWithNextSeq(t *test
 	}
 }
 
+// Seam A: with the watch off and a slow poll, only the ping can make a direct
+// write's event arrive in time.
+func TestEvents_TicketChangedPingPublishesAtOnce(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.PollInterval = time.Hour
+		c.DisableWatch = true
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(store, "proj", "epic", "issues", "01-first.md")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(string(body), "status: open", "status: draft", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Client.TicketChanged(ctx, "proj:epic/01"); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case ev := <-events:
+		want := server.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/01"}
+		if ev != want {
+			t.Errorf("event = %+v, want %+v", ev, want)
+		}
+	case <-ctx.Done():
+		t.Fatal("no event after the ping")
+	}
+}
+
 func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
 	h := servertest.Start(t)
 

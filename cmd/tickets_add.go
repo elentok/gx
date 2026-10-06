@@ -30,6 +30,7 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	pingServer(path)
 	// The address, like everywhere else the CLI names a ticket: `set` and
 	// `section` accept it to fill the stub in, and `show` gives the path.
 	return printTicketRef(path, false, w)
@@ -46,6 +47,7 @@ func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w io.W
 	if err != nil {
 		return err
 	}
+	pingServer(path)
 	return printTicketRef(path, jsonOut, w)
 }
 
