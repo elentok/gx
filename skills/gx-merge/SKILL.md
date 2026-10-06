@@ -31,11 +31,11 @@ Branch it three ways on `status`:
 
 ## Step 2: rebase
 
-The result carries `branch`, `base`, and `worktree_path`. `git rebase`
+The result carries `branch`, `target`, and `worktree_path`. `git rebase`
 requires a working tree, so this step only runs when one is checked out for
 `branch`:
 
-- **`worktree_path` is non-empty** — run `git rebase <base>` there, then
+- **`worktree_path` is non-empty** — run `git rebase <target>` there, then
   continue below.
 - **`worktree_path` is empty** — no worktree is checked out for `branch`, and
   none may be created or checked out to run the rebase in: doing so risks
@@ -54,7 +54,7 @@ matching `gx-cleanup`'s Step 7 convention for this same step.
 ## Step 3: pause for review
 
 Once the rebase is clean (conflicts resolved or none arose), **pause and show
-the rebased diff** (the rebased branch vs `base`) before doing anything
+the rebased diff** (the rebased branch vs `target`) before doing anything
 further. Do not proceed to checks or the merge until it's been reviewed.
 
 ## Step 4: run checks
@@ -71,7 +71,7 @@ format) the same way `gx-resolving-merge-conflicts` does in its own
 ## Step 5: final merge
 
 Re-invoke `gx merge <branch>` (the original arg, not the resolved
-`base`/`branch` pair) for the final ff-only merge now that the rebase brought
+`target`/`branch` pair) for the final ff-only merge now that the rebase brought
 it up to date. Report the outcome.
 
 Never push to a remote at any point in this flow — pushing stays an explicit,

@@ -87,8 +87,8 @@ func TestRunMerge_Diverged(t *testing.T) {
 	if result.Branch != "feature" {
 		t.Errorf("Branch = %q, want feature", result.Branch)
 	}
-	if result.Base != "main" {
-		t.Errorf("Base = %q, want main", result.Base)
+	if result.Target != "main" {
+		t.Errorf("Target = %q, want main", result.Target)
 	}
 	if result.WorktreePath != filepath.Join(repoDir, "feature") {
 		t.Errorf("WorktreePath = %q, want %q", result.WorktreePath, filepath.Join(repoDir, "feature"))

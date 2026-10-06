@@ -12,7 +12,7 @@ import (
 type MergeResult struct {
 	Status       string `json:"status"` // "merged" or "needs_rebase"
 	Branch       string `json:"branch,omitempty"`
-	Base         string `json:"base,omitempty"`
+	Target       string `json:"target,omitempty"`
 	WorktreePath string `json:"worktree_path"`
 }
 
@@ -48,7 +48,7 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 		result = MergeResult{
 			Status:       "needs_rebase",
 			Branch:       branch,
-			Base:         repo.MainBranch,
+			Target:       repo.MainBranch,
 			WorktreePath: worktreePathForBranch(branch, worktrees),
 		}
 	}
@@ -109,7 +109,7 @@ func printMergeText(w io.Writer, result MergeResult) {
 	case "merged":
 		fmt.Fprintln(w, "merged")
 	case "needs_rebase":
-		fmt.Fprintf(w, "needs rebase: %s onto %s\n", result.Branch, result.Base)
+		fmt.Fprintf(w, "needs rebase: %s onto %s\n", result.Branch, result.Target)
 		if result.WorktreePath != "" {
 			fmt.Fprintf(w, "worktree: %s\n", result.WorktreePath)
 		}
