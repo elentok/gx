@@ -35,6 +35,13 @@ func newServerCmd(_ deps) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(&cobra.Command{
+		Use:   "install",
+		Short: "register a launchd agent that starts the server at login and after a crash (macOS)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerInstall(c.OutOrStdout())
+		},
+	}, &cobra.Command{
 		Use:   "start",
 		Short: "start the server detached from this terminal (no-op if already running)",
 		Args:  cobra.NoArgs,
@@ -220,6 +227,32 @@ func spawnDetached(stateDir string) spawnFunc {
 	}
 }
 
+// installedService returns the OS supervisor when `gx server install` has been
+// run, nil otherwise. Once installed it is the only way to start the server.
+func installedService(stateDir string) serviceManager {
+	a, err := newLaunchdAgent(stateDir)
+	if err != nil || !a.Installed() {
+		return nil
+	}
+	return a
+}
+
+func runServerInstall(w io.Writer) error {
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return err
+	}
+	a, err := newLaunchdAgent(stateDir)
+	if err != nil {
+		return err
+	}
+	if err := a.Install(); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, "installed %s\n", a.plistPath())
+	return err
+}
+
 func runServerStartCmd(ctx context.Context, w io.Writer) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -232,7 +265,11 @@ func runServerStartCmd(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return runServerStart(ctx, c, w, spawnDetached(stateDir))
+	spawn := spawnDetached(stateDir)
+	if svc := installedService(stateDir); svc != nil {
+		spawn = svc.Start
+	}
+	return runServerStart(ctx, c, w, spawn)
 }
 
 func runServerRestart(ctx context.Context, w io.Writer) error {
@@ -242,22 +279,34 @@ func runServerRestart(ctx context.Context, w io.Writer) error {
 	return runServerStartCmd(ctx, w)
 }
 
-// runServerStop SIGTERMs the server and returns once it stops answering,
-// which happens after Serve has released the lock.
 func runServerStop(ctx context.Context, w io.Writer) error {
-	if ctx == nil {
-		ctx = context.Background()
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return err
 	}
 	c, err := serverClient()
 	if err != nil {
 		return err
+	}
+	sig := func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) }
+	if svc := installedService(stateDir); svc != nil {
+		sig = func(int) error { return svc.Stop() }
+	}
+	return stopServer(ctx, c, w, sig)
+}
+
+// stopServer signals the server and returns once it stops answering, which
+// happens after Serve has released the lock.
+func stopServer(ctx context.Context, c *apiclient.Client, w io.Writer, signal func(pid int) error) error {
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	h, err := c.Handshake(ctx)
 	if err != nil {
 		_, werr := fmt.Fprintln(w, "not running")
 		return werr
 	}
-	if err := syscall.Kill(h.Pid, syscall.SIGTERM); err != nil {
+	if err := signal(h.Pid); err != nil {
 		return fmt.Errorf("signal server (pid %d): %w", h.Pid, err)
 	}
 	deadline := time.Now().Add(stopTimeout)
