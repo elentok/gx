@@ -259,9 +259,41 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	if err != nil {
 		return err
 	}
-	data = append(data, '\n')
+	return appendLine(runLogPath(scratchDir, epicName), data)
+}
 
-	path := runLogPath(scratchDir, epicName)
+// serverLogPath returns the server event log: one log per store, outside any
+// project, for events that have no address.
+func serverLogPath(storeDir string) string {
+	return filepath.Join(storeDir, "server-log.jsonl")
+}
+
+// AppendServerEvent appends an address-less event (herdr availability, budget
+// latches, server crash/restart) to the store's server event log. Epic events
+// never go through here: an event naming a ticket belongs in its epic's log.
+func AppendServerEvent(storeDir string, ev Event) error {
+	if storeDir == "" {
+		return nil
+	}
+	if ev.Ticket != "" || ev.Address != "" {
+		return fmt.Errorf("event %q has an address; it belongs in an epic's log", ev.Type)
+	}
+	if ev.Time.IsZero() {
+		ev.Time = time.Now()
+	}
+	if err := events.Validate(events.Type(ev.Type), events.Kind(ev.Kind)); err != nil {
+		return err
+	}
+	data, err := events.Fit(func() ([]byte, error) { return json.Marshal(ev) }, &ev.Reason, &ev.Body)
+	if err != nil {
+		return err
+	}
+	return appendLine(serverLogPath(storeDir), data)
+}
+
+// appendLine writes data plus a newline to path, creating its directory.
+func appendLine(path string, data []byte) error {
+	data = append(data, '\n')
 
 	eventLogMu.Lock()
 	defer eventLogMu.Unlock()
@@ -538,7 +570,16 @@ func lastIterationSession(events []Event, identifier string) (agentSession, cwd 
 // (a run-log written by a process killed mid-write may have a torn final
 // line). ok is false if the log doesn't exist yet.
 func ReadEvents(scratchDir, epicName string) (events []Event, ok bool, err error) {
-	raw, err := os.ReadFile(runLogPath(scratchDir, epicName))
+	return readEventsFile(runLogPath(scratchDir, epicName))
+}
+
+// ReadServerEvents reads the store's server event log, like ReadEvents.
+func ReadServerEvents(storeDir string) (events []Event, ok bool, err error) {
+	return readEventsFile(serverLogPath(storeDir))
+}
+
+func readEventsFile(path string) (events []Event, ok bool, err error) {
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, false, nil
