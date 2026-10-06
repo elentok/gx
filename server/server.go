@@ -78,6 +78,7 @@ type Server struct {
 	idx  *index
 
 	queued  *queueStore
+	pause   *pauseState
 	events  *broker
 	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
@@ -111,6 +112,11 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load queue: %w", err)
+	}
+	pause, err := openPause(cfg.StateDir)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("load queue pause: %w", err)
 	}
 	sock := SocketPath(cfg.StateDir)
 	// We hold the lock, so any socket file is stale from a crashed server.
@@ -152,6 +158,7 @@ func New(cfg Config) (*Server, error) {
 		idx:  idx,
 
 		queued: queued,
+		pause:  pause,
 		events: events,
 		kick:   make(chan struct{}, 1),
 	}
@@ -185,6 +192,9 @@ var routeTable = []struct {
 	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueAdd)(w, r) }},
 	{"POST /v1/queue/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueRemove)(w, r) }},
 	{"POST /v1/queue/move", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueMove)(w, r) }},
+	{"POST /v1/queue/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queuePause)(w, r) }},
+	{"POST /v1/queue/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueResume)(w, r) }},
+	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueDrain)(w, r) }},
 	{"POST /v1/tickets/land", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairLand)(w, r) }},
 	{"POST /v1/tickets/reset", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairReset)(w, r) }},
 	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairUnpark)(w, r) }},

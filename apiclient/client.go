@@ -233,6 +233,21 @@ func (c *Client) TicketChanged(ctx context.Context, address string) error {
 	return nil
 }
 
+// QueuePause stops new roots from starting, persisted across restarts.
+func (c *Client) QueuePause(ctx context.Context) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "pause", server.QueueRequest{})
+}
+
+// QueueResume lifts a pause or drain.
+func (c *Client) QueueResume(ctx context.Context) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "resume", server.QueueRequest{})
+}
+
+// QueueDrain stops new roots from starting and lets live runs finish.
+func (c *Client) QueueDrain(ctx context.Context) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "drain", server.QueueRequest{})
+}
+
 // queueWrite posts one queue write. A refusal is a result (Refused set), not an error.
 func (c *Client) queueWrite(ctx context.Context, verb string, req server.QueueRequest) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/queue/"+verb, req)

@@ -156,7 +156,22 @@ func newServerQueueCmd() *cobra.Command {
 			})
 		},
 	}
-	for _, c := range []*cobra.Command{add, remove, move} {
+	mode := func(use, short string, do func(*apiclient.Client, context.Context) (server.QueueResult, error)) *cobra.Command {
+		return &cobra.Command{
+			Use:   use,
+			Short: short,
+			Args:  cobra.NoArgs,
+			RunE: func(c *cobra.Command, _ []string) error {
+				return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+					return do(cl, ctx)
+				})
+			},
+		}
+	}
+	pause := mode("pause", "stop starting queued roots until resumed (survives a restart)", (*apiclient.Client).QueuePause)
+	resume := mode("resume", "start queued roots again after a pause or drain", (*apiclient.Client).QueueResume)
+	drain := mode("drain", "stop starting queued roots and let live runs finish", (*apiclient.Client).QueueDrain)
+	for _, c := range []*cobra.Command{add, remove, move, pause, resume, drain} {
 		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 		cmd.AddCommand(c)
 	}

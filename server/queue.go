@@ -41,10 +41,12 @@ type QueueItem struct {
 // QueueResult is what every queue write returns: the queue after the write, or
 // a refusal (the queue is then untouched).
 type QueueResult struct {
-	Queue   []QueueItem `json:"queue,omitempty"`
-	Refused bool        `json:"refused,omitempty"`
-	Reason  string      `json:"reason,omitempty"`
-	Message string      `json:"message,omitempty"`
+	Queue []QueueItem `json:"queue,omitempty"`
+	// Mode is set by pause, resume and drain: running, paused or draining.
+	Mode    string `json:"mode,omitempty"`
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 func refusal(reason, msg string) QueueResult {
