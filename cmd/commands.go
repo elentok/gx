@@ -292,15 +292,48 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return err
 		},
 	})
-	var addParent, addSlug string
-	addCmd := newEpicScopedCmd(d, "add <epic>",
-		"atomically allocate the next ticket ID and stamp out a stub file",
-		func(epicPath string, _ []string, out io.Writer) error {
-			return runTicketsAdd(epicPath, addParent, addSlug, out)
+	var addParent, addSlug, addBody string
+	var addJSON bool
+	addCmd := newEpicScopedCmd(d, "add <epic|parent-addr>",
+		"atomically allocate the next ticket ID and stamp out a ticket (a draft stub, or open with --body)",
+		func(arg string, _ []string, out io.Writer) error {
+			epicPath, parent, err := resolveAddTarget(d, arg, addParent)
+			if err != nil {
+				return err
+			}
+			if addBody == "" {
+				return runTicketsAdd(epicPath, parent, addSlug, out)
+			}
+			body, err := readBodyArg(d, addBody)
+			if err != nil {
+				return err
+			}
+			return runTicketsAddBody(epicPath, parent, addSlug, body, addJSON, out)
 		})
 	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
 	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; stub lands at <id>-<slug>.md)")
+	addCmd.Flags().StringVar(&addBody, "body", "", "ticket body, or - to read it from stdin; the ticket is written open and printed by address")
+	addCmd.Flags().BoolVar(&addJSON, "json", false, "with --body, emit {address, path} JSON")
 	cmd.AddCommand(addCmd)
+	var sectionJSON bool
+	sectionCmd := &cobra.Command{
+		Use:   "section <addr|path> <heading> <content|->",
+		Short: "replace or append one ## section of a ticket's body, content from the argument or stdin (-)",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(c *cobra.Command, args []string) error {
+			path, err := resolveTicketRef(d.getwd, args[0])
+			if err != nil {
+				return err
+			}
+			content, err := readBodyArg(d, args[2])
+			if err != nil {
+				return err
+			}
+			return runTicketsSection(path, args[1], content, sectionJSON, c.OutOrStdout())
+		},
+	}
+	sectionCmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
+	cmd.AddCommand(sectionCmd)
 	var filterTicket string
 	var filterEvents []string
 	filterRunLogCmd := newEpicScopedCmd(d, "filter-run-log <epic>",
