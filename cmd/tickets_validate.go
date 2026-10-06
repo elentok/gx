@@ -42,6 +42,9 @@ func checkBlockedBy(path string) error {
 	if err := epic.CheckBlockedBy(*target); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
+	if err := epic.CheckBlockedByCycles(*target); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
 	return nil
 }
 

@@ -26,6 +26,14 @@ func (e Epic) CheckBlockedBy(t Ticket) error {
 	return errors.Join(errs...)
 }
 
+// CheckBlockedByCycles reports each of t's blocked_by refs that closes a wait
+// cycle (see blockedByCycleErrors). It is `gx tickets validate`'s alone: the
+// loader doesn't flag cycles, so the queue still lists cyclic tickets and
+// reports "no unblocked tickets left" instead of hiding them behind StatusError.
+func (e Epic) CheckBlockedByCycles(t Ticket) error {
+	return errors.Join(e.blockedByCycleErrors(t)...)
+}
+
 // flagDanglingBlockers records CheckBlockedBy's verdict on each ticket that
 // fails it (BlockedByErr, which renders as StatusError). The ticket keeps its
 // BlockedBy so the message and `validate` stay in step; StatusError is never
