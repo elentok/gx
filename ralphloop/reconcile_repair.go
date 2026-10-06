@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"github.com/elentok/gx/events"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -129,7 +130,7 @@ func markDoneTicketUnrecoverable(paths reconcilePaths, featureBranch string, t t
 		Branch:   branch,
 		Worktree: iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier),
 	}
-	if err := MarkNeedsRepairWithReason(t.Path, reason, state); err != nil {
+	if err := MarkNeedsRepairWithReason(t.Path, reason, schema.ParkKind(events.AmbiguousLand), state); err != nil {
 		return "", fmt.Errorf("marking ticket needs-repair: %w", err)
 	}
 	if err := logEvent(paths.ScratchDir, featureBranch, Event{Type: eventNeedsRepair, Ticket: t.Identifier, Reason: reason}); err != nil {

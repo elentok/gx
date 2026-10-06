@@ -32,7 +32,7 @@ func park(sink EventSink, req parkRequest) (reason string) {
 	reason = req.Reason
 	if req.Type != events.NeedsRepair {
 		reason = fmt.Sprintf("%s (park: unsupported type %q)", reason, req.Type)
-	} else if err := MarkNeedsRepairWithReason(req.Path, reason, req.Repair); err != nil {
+	} else if err := MarkNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair); err != nil {
 		reason = fmt.Sprintf("%s (also failed marking needs-repair: %v)", reason, err)
 	}
 	if err := logEvent(req.ScratchDir, req.EpicName, Event{

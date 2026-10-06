@@ -83,3 +83,32 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 		t.Errorf("sink calls = %v, want one TicketNeedsHuman", calls)
 	}
 }
+
+// Seam B: a needs-repair park stamps the event's kind into frontmatter as
+// park_kind; a claim (resume) clears it while the event stays in the log.
+func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+	})
+	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+
+	park(&recordingSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
+		Type: events.NeedsRepair, Kind: events.BudgetKilled, Reason: "boom",
+	})
+	if got := mustParse(t, path); got.ParkKind != schema.ParkKind(events.BudgetKilled) {
+		t.Fatalf("ParkKind = %q, want budget-killed", got.ParkKind)
+	}
+
+	if err := Claim(path); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustParse(t, path); got.ParkKind != "" {
+		t.Errorf("ParkKind after claim = %q, want cleared", got.ParkKind)
+	}
+	evs, _, _ := ReadEvents(scratchDir, "my-epic")
+	if len(evs) != 1 || evs[0].Kind != "budget-killed" {
+		t.Errorf("events = %+v, want the park event kept", evs)
+	}
+}

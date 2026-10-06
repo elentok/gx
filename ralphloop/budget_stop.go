@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/events"
 	"time"
 
 	"github.com/elentok/gx/tickets"
@@ -40,7 +41,7 @@ func StopIterationAndMarkNeedsRepair(d Deps, ticket tickets.Ticket, paneID, tabI
 		return errors.Join(sendErr, closeErr, fmt.Errorf("reloading ticket %s to check landed status: %w", ticket.Identifier, parseErr))
 	}
 	if current.ActualCost == 0 {
-		if markErr := MarkNeedsRepairWithReason(ticket.Path, reason, schema.NeedsRepairState{}); markErr != nil {
+		if markErr := MarkNeedsRepairWithReason(ticket.Path, reason, schema.ParkKind(events.BudgetKilled), schema.NeedsRepairState{}); markErr != nil {
 			return errors.Join(sendErr, closeErr, fmt.Errorf("marking ticket %s needs-repair: %w", ticket.Identifier, markErr))
 		}
 	}

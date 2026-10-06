@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+
+	"github.com/elentok/gx/events"
 )
 
 // TicketID is a validated ticket identifier, e.g. "04", "06b", or "06b1":
@@ -137,32 +139,23 @@ func (s IterationStatus) Valid() bool {
 	return validIterationStatuses[s]
 }
 
-// ParkKind records which of ralph-loop's three needs-answer producers parked
-// a ticket: ParkKindBlockedPane (a genuinely blocked interactive prompt, pane
-// left live), ParkKindSelfReported (the agent's own iteration_status:
-// needs-answer report, pane/worktree/tab already released), or
-// ParkKindZeroCommit (finishIteration's zero-commit fallback, pane left alive
-// for inspection). Like IterationStatus, the empty string is valid: it means
-// no park has stamped this ticket, not an error.
+// ParkKind records why a ticket was parked: it is the park event's kind (see
+// events.Kind), copied into the frontmatter as current state. The frontmatter
+// copy is cleared on resume/claim; the event keeps the history. The three
+// constants are the needs-answer producers' kinds; a needs-repair park carries
+// any other kind in the events enum. Like IterationStatus, the empty string is
+// valid: it means no park has stamped this ticket, not an error.
 type ParkKind string
 
 const (
-	ParkKindBlockedPane  ParkKind = "blocked-pane"
-	ParkKindSelfReported ParkKind = "self-reported"
-	ParkKindZeroCommit   ParkKind = "zero-commit"
+	ParkKindBlockedPane  ParkKind = ParkKind(events.BlockedPane)
+	ParkKindSelfReported ParkKind = ParkKind(events.SelfReported)
+	ParkKindZeroCommit   ParkKind = ParkKind(events.ZeroCommit)
 )
 
-var validParkKinds = map[ParkKind]bool{
-	"":                   true,
-	ParkKindBlockedPane:  true,
-	ParkKindSelfReported: true,
-	ParkKindZeroCommit:   true,
-}
-
-// Valid reports whether k is one of the three named values or the empty
-// "absent" value.
+// Valid reports whether k is an events kind or the empty "absent" value.
 func (k ParkKind) Valid() bool {
-	return validParkKinds[k]
+	return k == "" || events.Kind(k).Valid()
 }
 
 // Ticket is the in-memory, typed frontmatter of one ticket file's YAML

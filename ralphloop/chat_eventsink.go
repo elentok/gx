@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"context"
 	"fmt"
+	"github.com/elentok/gx/events"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -473,7 +474,7 @@ func ResolveTicketPath(scratchDir, epicName, identifier string) string {
 // MarkNeedsRepairWithReason with a reason identifying the trip as a storm
 // mute.
 func (s *chatEventSink) parkTicket(source, reason string) error {
-	return MarkNeedsRepairWithReason(source, reason, schema.NeedsRepairState{})
+	return MarkNeedsRepairWithReason(source, reason, schema.ParkKind(events.IterationError), schema.NeedsRepairState{})
 }
 
 // gate runs source through NotificationGate (or, under test, an injected

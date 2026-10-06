@@ -161,14 +161,14 @@ ticket and flip its status by hand, or new commits to appear on its branch while
 Not `resume` — the pause `Gate` already owns that verb — and not `clear` — the Queue tab's
 clear-checked/-complete keymaps already own that verb, and mean deleting tickets from the queue.
 
-**Park kind** (`park_kind` frontmatter field, `needs-answer` parks only) — which of three things
+**Park kind** (`park_kind` frontmatter field, `needs-answer` and `needs-repair` parks; value is the park event's kind) — which of three things
 caused a `needs-answer` park: `blocked-pane` (a genuinely blocked interactive prompt — pane stays
 live), `self-reported` (the agent itself asked a real question via `iteration_status:
 needs-answer` — its pane/worktree/tab is already released by this point, unlike the other two),
 or `zero-commit` (gx's own uncertain guess: no commits, no self-report, pane left alive for
 inspection). A ticket parked before this field existed carries no `park_kind` and is treated as
-`zero-commit` — the conservative default. Not written for `needs-repair`/`draft` parks, which keep
-their own liveness-only unpark rule untouched. _Avoid_: "gate park", "announce-and-stop park"
+`zero-commit` — the conservative default. A `needs-repair` park also stamps it (any events kind), but unpark keeps its
+liveness-only rule for it, ignoring the field. Cleared on claim; the event keeps the history. _Avoid_: "gate park", "announce-and-stop park"
 (retired informal names — collided with the already-established `Gate` type and its `.gates()`
 verb).
 

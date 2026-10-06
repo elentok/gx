@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/events"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -206,7 +207,7 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	if err := Claim(path); err != nil {
 		t.Fatalf("first Claim: %v", err)
 	}
-	if err := MarkNeedsRepairWithReason(path, "second failure", schema.NeedsRepairState{}); err != nil {
+	if err := MarkNeedsRepairWithReason(path, "second failure", schema.ParkKind(events.IterationError), schema.NeedsRepairState{}); err != nil {
 		t.Fatalf("MarkNeedsRepairWithReason: %v", err)
 	}
 	if err := Claim(path); err != nil {

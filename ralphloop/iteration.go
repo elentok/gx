@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/events"
 	"log"
 	"strings"
 	"sync"
@@ -1024,9 +1025,9 @@ func parkConflictResolutionChildNeedsRepair(p iterationParams, childPath, childI
 		Branch:   p.FeatureBranch,
 		Worktree: p.FeatureWorktree,
 	}
-	if markErr := MarkNeedsRepairWithReason(childPath, reason, state); markErr != nil {
-		return fmt.Errorf("%s (also failed marking conflict-resolution ticket %s needs-repair: %v)", reason, childPath, markErr)
-	}
-	p.Sink.TicketNeedsHuman(childID, p.FeatureBranch, "needs-repair", reason)
+	park(p.Sink, parkRequest{
+		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: childID, Path: childPath,
+		Type: events.NeedsRepair, Kind: events.IterationError, Reason: reason, Repair: state,
+	})
 	return errConflictResolutionUnresolved
 }

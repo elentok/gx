@@ -75,19 +75,20 @@ func MarkNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkK
 	})
 }
 
-// MarkNeedsRepairWithReason writes status: needs-repair into the ticket file
-// and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
+// MarkNeedsRepairWithReason writes status: needs-repair into the ticket file,
+// stamps parkKind (the same kind the park event carries), and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
 // (summary/detail split from reason, plus state rendered best-effort), so the
 // full failure is readable by opening the ticket file even when the live
 // UI's status subtext truncates it. Fails without writing anything if reason
 // is empty — see FormatNeedsRepairBody's write-conditional validation.
-func MarkNeedsRepairWithReason(path, reason string, state schema.NeedsRepairState) error {
+func MarkNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, state schema.NeedsRepairState) error {
 	section, err := schema.FormatNeedsRepairBody(reason, state)
 	if err != nil {
 		return err
 	}
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusNeedsRepair
+		t.ParkKind = parkKind
 		*body += section
 	})
 }
