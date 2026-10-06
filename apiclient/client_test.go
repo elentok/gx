@@ -82,3 +82,71 @@ func TestNegotiate_APIVersionMismatchGoesReadOnly(t *testing.T) {
 		t.Errorf("CheckWrite = %v, want ErrReadOnly", err)
 	}
 }
+
+// followServer serves /v1/snapshot with an incrementing seq and replays
+// scripted event streams, one per /v1/events call.
+func followServer(t *testing.T, streams [][]server.Event) (*apiclient.Client, *int) {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "gxc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "s.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snaps, evCalls := 0, 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/snapshot", func(w http.ResponseWriter, _ *http.Request) {
+		snaps++
+		_ = json.NewEncoder(w).Encode(server.Snapshot{Seq: uint64(snaps * 10)})
+	})
+	mux.HandleFunc("GET /v1/events", func(w http.ResponseWriter, r *http.Request) {
+		i := evCalls
+		evCalls++
+		if i >= len(streams) {
+			<-r.Context().Done()
+			return
+		}
+		for _, ev := range streams[i] {
+			b, _ := json.Marshal(ev)
+			_, _ = w.Write([]byte("data: " + string(b) + "\n\n"))
+		}
+	})
+	srv := &http.Server{Handler: mux}
+	go srv.Serve(ln)
+	t.Cleanup(func() { srv.Close() })
+	return apiclient.New(sock), &snaps
+}
+
+func TestFollow_ResnapshotsOnStreamEndAndOnSeqGap(t *testing.T) {
+	c, snaps := followServer(t, [][]server.Event{
+		{{Seq: 11, Type: "ticket-changed", Address: "a"}}, // then the stream drops
+		{{Seq: 25, Type: "ticket-changed", Address: "b"}}, // gap: snapshot was at 20
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var got []string
+	err := c.Follow(ctx, func(s *server.Snapshot, ev *server.Event) {
+		if s != nil {
+			got = append(got, "snap")
+		} else {
+			got = append(got, ev.Address)
+		}
+		if len(got) == 4 {
+			cancel()
+		}
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Follow = %v, want context.Canceled", err)
+	}
+	// gap event "b" is never delivered; it forces a third snapshot.
+	if want := "snap a snap snap"; strings.Join(got, " ") != want {
+		t.Fatalf("got %v, want %q", got, want)
+	}
+	if *snaps != 3 {
+		t.Fatalf("snapshots = %d, want 3", *snaps)
+	}
+}

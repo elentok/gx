@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -105,6 +106,30 @@ func newServerCmd(_ deps) *cobra.Command {
 	}
 	snapshot.Flags().BoolVar(&snapJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(snapshot)
+	ticketsCmd := &cobra.Command{
+		Use:   "tickets",
+		Short: "ticket commands served by the orchestrator",
+		Args:  cobra.NoArgs,
+	}
+	ticketsCmd.AddCommand(&cobra.Command{
+		Use:   "follow <addr>",
+		Short: "stream changes to one ticket until interrupted",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			client, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runServerTicketsFollow(ctx, client, args[0], c.OutOrStdout())
+		},
+	})
+	cmd.AddCommand(ticketsCmd)
 	eventsCmd := &cobra.Command{
 		Use:   "events",
 		Short: "run-log event contract",
@@ -380,6 +405,43 @@ func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// runServerTicketsFollow prints addr's state on every (re-)snapshot where it
+// changed, and each event naming addr. Other tickets' events are dropped.
+func runServerTicketsFollow(ctx context.Context, c *apiclient.Client, addr string, w io.Writer) error {
+	var last string
+	var werr error
+	print := func(format string, a ...any) {
+		if werr == nil {
+			_, werr = fmt.Fprintf(w, format, a...)
+		}
+	}
+	err := c.Follow(ctx, func(s *server.Snapshot, ev *server.Event) {
+		if ev != nil {
+			if ev.Address == addr {
+				print("%d\t%s\t%s\n", ev.Seq, ev.Type, ev.Address)
+			}
+			return
+		}
+		line := "absent"
+		for _, t := range s.Tickets {
+			if t.Address == addr {
+				line = fmt.Sprintf("%s\t%s\t%s", t.Address, t.Status, t.Title)
+			}
+		}
+		if line != last {
+			last = line
+			print("%s\n", line)
+		}
+	})
+	if werr != nil {
+		return werr
+	}
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
+	return err
 }
 
 // runServerEventsKinds prints every event kind, reading Go data only.

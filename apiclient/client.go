@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/server"
 )
@@ -166,6 +167,51 @@ func (c *Client) Queue(ctx context.Context) ([]server.QueueEntry, error) {
 	var l []server.QueueEntry
 	err := c.get(ctx, "/v1/queue", &l)
 	return l, err
+}
+
+// Follow keeps a consumer in sync: it takes a snapshot, then streams events
+// from that snapshot's seq. Any stream end or seq gap (and any error while
+// reconnecting) triggers a fresh snapshot, so the consumer never has to
+// reason about missed events. Exactly one of the callback's arguments is
+// non-nil. It returns only when ctx is done.
+func (c *Client) Follow(ctx context.Context, fn func(*server.Snapshot, *server.Event)) error {
+	for {
+		if err := c.followOnce(ctx, fn); err != nil && ctx.Err() == nil {
+			select {
+			case <-time.After(followRetry):
+			case <-ctx.Done():
+			}
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
+}
+
+const followRetry = time.Second
+
+// followOnce runs one snapshot+stream round and returns when it must restart.
+func (c *Client) followOnce(ctx context.Context, fn func(*server.Snapshot, *server.Event)) error {
+	snap, err := c.Snapshot(ctx)
+	if err != nil {
+		return err
+	}
+	fn(&snap, nil)
+	sctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	evs, err := c.Events(sctx, snap.Seq)
+	if err != nil {
+		return err
+	}
+	next := snap.Seq + 1
+	for ev := range evs {
+		if ev.Seq != next {
+			return nil
+		}
+		next++
+		fn(nil, &ev)
+	}
+	return nil
 }
 
 func (c *Client) get(ctx context.Context, path string, out any) error {
