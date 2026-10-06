@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // registerLaunch answers the herdr commands a launch makes and records the
@@ -281,23 +283,11 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	}
 }
 
-func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle"}}
-	for _, verb := range []string{"get", "wait"} {
-		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-			return idle, herdrfake.Identities{}, nil
-		})
-	}
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-
-	// What a server that died mid-iteration leaves behind: a claimed ticket, its
-	// worktree with the agent's commit, and the persisted handle.
+// leaveIteration stages what a server that died mid-iteration leaves behind: a
+// claimed ticket, its worktree with the agent's commit, and the persisted
+// handle. It returns the worktree path and the ticket file.
+func leaveIteration(t *testing.T, h *servertest.Harness, store, repo string) (string, string) {
+	t.Helper()
 	epics, err := tickets.Load(filepath.Join(store, "proj"))
 	if err != nil {
 		t.Fatal(err)
@@ -324,6 +314,77 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.StateDir, "runs.json"), handle, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	return wt.Path, tk.Path
+}
+
+func registerLiveAgent(h *servertest.Harness) {
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle"}}
+	for _, verb := range []string{"get", "wait"} {
+		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+			return idle, herdrfake.Identities{}, nil
+		})
+	}
+	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+}
+
+func TestRunner_RestartParksAHandleWhoseWorktreeIsGone(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	registerLiveAgent(h)
+	wtPath, ticketPath := leaveIteration(t, h, store, repo)
+	if err := os.RemoveAll(wtPath); err != nil {
+		t.Fatal(err)
+	}
+
+	h.Restart(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for ev := range evs {
+		if ev.Type == server.EventTicketParked {
+			break
+		}
+	}
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKind(events.HandleMismatch) {
+		t.Errorf("status=%q park_kind=%q, want needs-repair/handle-mismatch", tk.Status, tk.ParkKind)
+	}
+	body, _ := os.ReadFile(ticketPath)
+	if !strings.Contains(string(body), "## Needs Repair") {
+		t.Errorf("ticket has no Needs Repair section:\n%s", body)
+	}
+	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, ev := range logged {
+		if ev.Kind == string(events.HandleMismatch) {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("handle-mismatch events = %d, want 1 (%v)", n, logged)
+	}
+}
+
+func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	registerLiveAgent(h)
+	leaveIteration(t, h, store, repo)
 
 	h.Restart(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -139,20 +140,45 @@ func (s *Server) Runs() []Run {
 // out of the registry.
 func (s *Server) reclaimRuns() {
 	for _, t := range s.savedRuns {
-		if err := s.reclaim(t); err != nil {
-			s.log.Info("not reclaiming iteration", "ticket", t.Address, "reason", err)
+		err := s.reclaim(t)
+		if err == nil {
+			continue
+		}
+		s.log.Info("not reclaiming iteration", "ticket", t.Address, "reason", err)
+		if errors.Is(err, errHandleMismatch) {
+			s.parkMismatch(t, err)
 		}
 	}
 	s.savedRuns = nil
 }
 
+// errHandleMismatch marks a persisted handle whose pane, agent or worktree is gone.
+var errHandleMismatch = errors.New("handle mismatch")
+
+// parkMismatch parks the ticket of a handle that cannot be reclaimed, so a
+// person sees it instead of it staying claimed forever.
+func (s *Server) parkMismatch(t trackedRun, cause error) {
+	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
+	if err == nil {
+		var dir string
+		if dir, _, err = s.projectOf(addr.Project); err == nil {
+			err = ralphloop.ParkHandleMismatch(dir, addr.Epic, addr.ID, t.TicketPath, "cannot reclaim iteration after restart: "+cause.Error())
+		}
+	}
+	if err != nil {
+		s.log.Warn("park handle mismatch", "ticket", t.Address, "err", err)
+		return
+	}
+	s.events.publish(EventTicketParked, t.Address)
+}
+
 func (s *Server) reclaim(t trackedRun) error {
 	agent, err := herdr.AgentGet(t.Address)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
 	}
 	if agent.PaneID == "" {
-		return errors.New("no pane")
+		return fmt.Errorf("%w: no pane", errHandleMismatch)
 	}
 	one, wt, err := s.resume(t)
 	if err != nil {
@@ -197,7 +223,7 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 		return one, wt, err
 	}
 	if _, err := os.Stat(wt.Path); err != nil {
-		return one, wt, err
+		return one, wt, fmt.Errorf("%w: worktree: %v", errHandleMismatch, err)
 	}
 	return one, wt, nil
 }

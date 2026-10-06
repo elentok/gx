@@ -58,6 +58,16 @@ func ParkNeedsRepair(scratchDir, epicName, ticket, path, reason string) error {
 	return err
 }
 
+// ParkHandleMismatch parks the ticket of a persisted iteration handle that a
+// restarted server cannot reclaim, through the park path.
+func ParkHandleMismatch(scratchDir, epicName, ticket, path, reason string) error {
+	_, err := park(noopEventSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
+		Type: events.NeedsRepair, Kind: events.HandleMismatch, Reason: reason,
+	})
+	return err
+}
+
 // park is the single park path: it writes the ticket, appends exactly one
 // event and notifies. Every status writer is routed here:
 // needs-repair, needs-answer and the CLI land's done write.
