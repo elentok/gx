@@ -51,6 +51,8 @@ type Config struct {
 
 	HerdrRetryInterval time.Duration // zero means the default
 
+	BudgetPollInterval time.Duration // zero means the default
+
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
 	// Orchestrator is config.Orchestrator. Queue writes are refused unless it
@@ -87,6 +89,8 @@ type Server struct {
 
 	queued  *queueStore
 	pause   *pauseState
+	ledger  *budgetLedger
+	costOf  func(IterationInfo) (float64, bool) // swapped in tests
 	events  *broker
 	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
@@ -127,6 +131,11 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load queue pause: %w", err)
+	}
+	ledger, err := openLedger(cfg.StateDir)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("load budget ledger: %w", err)
 	}
 	sock := SocketPath(cfg.StateDir)
 	// We hold the lock, so any socket file is stale from a crashed server.
@@ -183,6 +192,8 @@ func New(cfg Config) (*Server, error) {
 
 		queued: queued,
 		pause:  pause,
+		ledger: ledger,
+		costOf: iterationCost,
 		events: events,
 		kick:   make(chan struct{}, 1),
 	}
@@ -339,7 +350,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
-	defer func() { stopFresh(); <-freshDone; <-herdrDone; <-claimDone }()
+	budgetDone := make(chan struct{})
+	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
+	defer func() { stopFresh(); <-freshDone; <-herdrDone; <-claimDone; <-budgetDone }()
 	var err error
 	select {
 	case <-ctx.Done():
