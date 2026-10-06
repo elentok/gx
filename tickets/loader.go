@@ -105,6 +105,7 @@ func loadEpic(scratchDir, name string) Epic {
 	}
 
 	epic.quarantineInvalidParents()
+	epic.flagDanglingBlockers()
 
 	return epic
 }

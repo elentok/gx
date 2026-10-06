@@ -25,3 +25,15 @@ func (e Epic) CheckBlockedBy(t Ticket) error {
 	}
 	return errors.Join(errs...)
 }
+
+// flagDanglingBlockers records CheckBlockedBy's verdict on each ticket that
+// fails it (BlockedByErr, which renders as StatusError). The ticket keeps its
+// BlockedBy so the message and `validate` stay in step; StatusError is never
+// runnable, so the loop can't claim it.
+func (e *Epic) flagDanglingBlockers() {
+	for i := range e.Tickets {
+		if err := e.CheckBlockedBy(e.Tickets[i]); err != nil {
+			e.Tickets[i].BlockedByErr = err.Error()
+		}
+	}
+}

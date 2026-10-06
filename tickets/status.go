@@ -106,7 +106,7 @@ func (t Ticket) ShowsCommitlessSuffix() bool {
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {
-	if t.ReadErr != "" || t.GraphErr != "" {
+	if t.ReadErr != "" || t.GraphErr != "" || t.BlockedByErr != "" {
 		return StatusError
 	}
 	status := strings.ToLower(strings.TrimSpace(t.Status))

@@ -81,6 +81,10 @@ type Ticket struct {
 	// records the reason here; like ReadErr it renders as StatusError, but it
 	// stays a separate field because the file itself is readable and valid.
 	GraphErr string
+
+	// BlockedByErr is set when a literal blocked_by ref is malformed or names
+	// no ticket in the epic (see Epic.CheckBlockedBy). Renders as StatusError.
+	BlockedByErr string
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets
