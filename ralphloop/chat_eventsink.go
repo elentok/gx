@@ -471,10 +471,24 @@ func ResolveTicketPath(scratchDir, epicName, identifier string) string {
 // parkTicket is the ParkFunc the gate calls when it trips a per-source mute
 // on a ticket-backed source: source is already the ticket's file path (the
 // gate never calls this for a ticket-less source), so parking it is just
-// MarkNeedsRepairWithReason with a reason identifying the trip as a storm
-// mute.
+// a park with a reason identifying the trip as a storm mute. It parks through
+// the inner sink: the chat sink would re-enter the gate this callback runs
+// inside of.
 func (s *chatEventSink) parkTicket(source, reason string) error {
-	return MarkNeedsRepairWithReason(source, reason, schema.ParkKind(events.IterationError), schema.NeedsRepairState{})
+	identifier := filepath.Base(source)
+	if t, err := schema.ParseTicket(source); err == nil {
+		identifier = string(t.ID)
+	}
+	_, err := park(s.EventSink, parkRequest{
+		ScratchDir: s.scratchDir,
+		EpicName:   s.epicName,
+		Ticket:     identifier,
+		Path:       source,
+		Type:       events.NeedsRepair,
+		Kind:       events.IterationError,
+		Reason:     reason,
+	})
+	return err
 }
 
 // gate runs source through NotificationGate (or, under test, an injected

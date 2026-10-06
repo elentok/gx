@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/events"
 	"os"
 	"path/filepath"
 	"strings"
@@ -424,6 +425,21 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 	}
 	if !strings.Contains(string(raw), "storm mute") {
 		t.Errorf("ticket body = %q, want it to name the storm-mute reason", raw)
+	}
+
+	// Seam B: the quarantine writes exactly one park event.
+	evs, _, err := ReadEvents(scratchDir, epicName)
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	var parks []Event
+	for _, ev := range evs {
+		if ev.Type == string(events.NeedsRepair) {
+			parks = append(parks, ev)
+		}
+	}
+	if len(parks) != 1 || parks[0].Kind != string(events.IterationError) || parks[0].Address != "04" {
+		t.Errorf("park events = %+v, want one of kind iteration-error for 04", parks)
 	}
 }
 

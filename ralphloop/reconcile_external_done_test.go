@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"github.com/elentok/gx/events"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,6 +96,15 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	}
 	if !hasEvent(sink, LiveEventTicketUnrecoverable, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
 		t.Errorf("events = %+v, want an unrecoverable-mismatch event naming ticket 03", sink.Events())
+	}
+
+	// Seam B: the park writes exactly one event, carrying its kind.
+	evs, _, err := ReadEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	if len(evs) != 1 || evs[0].Type != string(events.NeedsRepair) || evs[0].Kind != string(events.AmbiguousLand) || evs[0].Address != "03" {
+		t.Errorf("events = %+v, want one needs-repair event of kind ambiguous-land for 03", evs)
 	}
 }
 

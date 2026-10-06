@@ -215,12 +215,9 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 				return nil, fmt.Errorf("repairing done ticket %s: %w", t.Identifier, err)
 			}
 		case doneUnrecoverable:
-			reason, err := markDoneTicketUnrecoverable(paths, epic.Name, t)
-			if err != nil {
+			if err := markDoneTicketUnrecoverable(sink, paths, epic.Name, t); err != nil {
 				return nil, fmt.Errorf("flagging unrecoverable done ticket %s: %w", t.Identifier, err)
 			}
-			sink.TicketUnrecoverable(t.Identifier, epic.Name)
-			sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", reason)
 		}
 	}
 
