@@ -16,6 +16,9 @@ type TicketStoreConfig struct {
 	// CommitDebounce is the quiet period, in seconds, the store commit loop
 	// waits after a change before committing.
 	CommitDebounce int `json:"commit-debounce"`
+	// PushRemote is a git remote of the store pushed to after each commit,
+	// best effort. Empty means no push.
+	PushRemote string `json:"push-remote"`
 }
 
 // DefaultCommitDebounceSeconds is ticket-store.commit-debounce's default.

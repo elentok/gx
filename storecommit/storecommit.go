@@ -1,6 +1,7 @@
 // Package storecommit commits the ticket store (a git repo) as tickets change:
 // debounced after the last change, immediately on done/cancelled/park.
-// S1 runs it in the in-process loop; S3 moves it into the server. The S2
+// The in-process loop runs it, or the server when the orchestrator switch says
+// "server". The S2
 // read-only server never starts one.
 package storecommit
 
@@ -70,6 +71,23 @@ type Loop struct {
 	mu       sync.Mutex // serializes commits
 	stop     chan struct{}
 	done     chan struct{}
+
+	// pushRemote is empty when pushing is off. Pushes run on their own
+	// goroutine so a slow or dead remote never delays a commit.
+	pushRemote string
+	onError    func(error)
+	pushKick   chan struct{}
+	pushStop   chan struct{}
+	pushDone   chan struct{}
+}
+
+// Options configures StartWith.
+type Options struct {
+	Debounce time.Duration
+	// PushRemote, when set, is pushed to (best effort) after each commit.
+	PushRemote string
+	// OnError receives push failures; they never block or fail a commit.
+	OnError func(error)
 }
 
 var (
@@ -80,7 +98,13 @@ var (
 // Start makes dir a git repo and starts the debounced commit loop on it. The
 // loop is also registered so Immediate can find it from any path inside dir.
 func Start(dir string, debounce time.Duration) (*Loop, error) {
-	return start(dir, debounce, pollFor(debounce))
+	return StartWith(dir, Options{Debounce: debounce})
+}
+
+// StartWith is Start with a push remote. When a loop already runs for dir its
+// options are kept.
+func StartWith(dir string, o Options) (*Loop, error) {
+	return startWith(dir, o, pollFor(o.Debounce))
 }
 
 func pollFor(debounce time.Duration) time.Duration {
@@ -88,6 +112,10 @@ func pollFor(debounce time.Duration) time.Duration {
 }
 
 func start(dir string, debounce, poll time.Duration) (*Loop, error) {
+	return startWith(dir, Options{Debounce: debounce}, poll)
+}
+
+func startWith(dir string, o Options, poll time.Duration) (*Loop, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, err
@@ -103,9 +131,11 @@ func start(dir string, debounce, poll time.Duration) (*Loop, error) {
 		l.refs++
 		return l, nil
 	}
-	l := &Loop{dir: dir, debounce: debounce, poll: poll, refs: 1, stop: make(chan struct{}), done: make(chan struct{})}
+	l := &Loop{dir: dir, debounce: o.Debounce, poll: poll, refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
+		pushRemote: o.PushRemote, onError: o.OnError, pushKick: make(chan struct{}, 1), pushStop: make(chan struct{}), pushDone: make(chan struct{})}
 	reg[dir] = l
 	go l.run()
+	go l.runPush()
 	return l, nil
 }
 
@@ -123,6 +153,39 @@ func (l *Loop) Stop() {
 	close(l.stop)
 	<-l.done
 	_ = l.commit("")
+	close(l.pushStop)
+	<-l.pushDone
+}
+
+// Flush commits any pending change now. A server calls it on start to commit
+// edits made while it was down.
+func (l *Loop) Flush() error { return l.commit("") }
+
+// runPush pushes once per burst of commits; kicks arriving mid-push coalesce.
+// After Stop it pushes once more if a kick is pending, then exits.
+func (l *Loop) runPush() {
+	defer close(l.pushDone)
+	push := func() {
+		if l.pushRemote == "" {
+			return
+		}
+		if _, err := git(l.dir, "push", l.pushRemote, "HEAD"); err != nil && l.onError != nil {
+			l.onError(err)
+		}
+	}
+	for {
+		select {
+		case <-l.pushKick:
+			push()
+		case <-l.pushStop:
+			select {
+			case <-l.pushKick:
+				push()
+			default:
+			}
+			return
+		}
+	}
 }
 
 func (l *Loop) run() {
@@ -168,8 +231,14 @@ func (l *Loop) commit(msg string) error {
 	if _, err := git(l.dir, "add", "-A"); err != nil {
 		return err
 	}
-	_, err = git(l.dir, "commit", "-q", "-m", msg)
-	return err
+	if _, err = git(l.dir, "commit", "-q", "-m", msg); err != nil {
+		return err
+	}
+	select {
+	case l.pushKick <- struct{}{}:
+	default:
+	}
+	return nil
 }
 
 // Immediate commits now with msg if a loop is running for the store holding

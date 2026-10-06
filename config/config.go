@@ -171,6 +171,7 @@ func Load() (Config, error) {
 		TicketStore *struct {
 			Path           *string `json:"path"`
 			CommitDebounce *int    `json:"commit-debounce"`
+			PushRemote     *string `json:"push-remote"`
 		} `json:"ticket-store"`
 		Orchestrator *string `json:"orchestrator"`
 		Server       *struct {
@@ -274,6 +275,9 @@ func Load() (Config, error) {
 	}
 	if raw.TicketStore != nil && raw.TicketStore.CommitDebounce != nil && *raw.TicketStore.CommitDebounce > 0 {
 		cfg.TicketStore.CommitDebounce = *raw.TicketStore.CommitDebounce
+	}
+	if raw.TicketStore != nil && raw.TicketStore.PushRemote != nil {
+		cfg.TicketStore.PushRemote = *raw.TicketStore.PushRemote
 	}
 	if raw.Server != nil && raw.Server.TCPListen != nil {
 		cfg.Server.TCPListen = *raw.Server.TCPListen

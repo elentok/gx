@@ -16,6 +16,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/storecommit"
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
@@ -53,6 +56,11 @@ type Config struct {
 	// Orchestrator is config.Orchestrator. Queue writes are refused unless it
 	// is "server": the in-process loop owns claiming otherwise.
 	Orchestrator string
+
+	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
+	// which runs only when Orchestrator is "server". A zero debounce means 60s.
+	StoreCommitDebounce time.Duration
+	StorePushRemote     string
 
 	// MaxConcurrentRoots caps queued roots running at once (config
 	// max-concurrent-epics); zero means the config default.
@@ -300,6 +308,11 @@ func (s *Server) Serve(ctx context.Context) error {
 	for _, ln := range lns {
 		go func() { errc <- s.http.Serve(ln) }()
 	}
+	if stopCommits, err := s.startStoreCommits(); err != nil {
+		s.log.Error("store commit loop failed to start", "err", err)
+	} else {
+		defer stopCommits()
+	}
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	freshDone := make(chan struct{})
 	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
@@ -330,4 +343,28 @@ func (s *Server) Serve(ctx context.Context) error {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+// startStoreCommits makes the server the store's committer when it is the
+// selected scheduler, and commits edits made while it was down.
+func (s *Server) startStoreCommits() (stop func(), err error) {
+	if s.cfg.Orchestrator != config.OrchestratorServer || s.cfg.TicketStore == "" {
+		return func() {}, nil
+	}
+	debounce := s.cfg.StoreCommitDebounce
+	if debounce <= 0 {
+		debounce = time.Duration(config.DefaultCommitDebounceSeconds) * time.Second
+	}
+	loop, err := storecommit.StartWith(s.cfg.TicketStore, storecommit.Options{
+		Debounce:   debounce,
+		PushRemote: s.cfg.StorePushRemote,
+		OnError:    func(err error) { s.log.Warn("store push failed", "err", err) },
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := loop.Flush(); err != nil {
+		s.log.Warn("committing down-time store edits failed", "err", err)
+	}
+	return loop.Stop, nil
 }
