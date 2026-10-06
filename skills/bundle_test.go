@@ -266,7 +266,7 @@ id: "01"
 status: open
 blocked_by: []
 split: []
-type: task
+type: implement
 expected_context_window: 20000
 ---
 # 01 — Example ticket

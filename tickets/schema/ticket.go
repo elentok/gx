@@ -87,9 +87,11 @@ func (s Status) Valid() bool {
 type TicketType string
 
 const (
-	TypeResearch   TicketType = "research"
-	TypeGrilling   TicketType = "grilling"
-	TypePrototype  TicketType = "prototype"
+	TypeResearch  TicketType = "research"
+	TypeGrilling  TicketType = "grilling"
+	TypePrototype TicketType = "prototype"
+	TypeImplement TicketType = "implement"
+	// TypeTask is the legacy spelling of TypeImplement, accepted until cutover.
 	TypeTask       TicketType = "task"
 	TypeCodeReview TicketType = "code-review"
 	// TypeConflictResolution is system-generated only: gx forks one as a
@@ -104,6 +106,7 @@ var validTypes = map[TicketType]bool{
 	TypeResearch:           true,
 	TypeGrilling:           true,
 	TypePrototype:          true,
+	TypeImplement:          true,
 	TypeTask:               true,
 	TypeCodeReview:         true,
 	TypeConflictResolution: true,

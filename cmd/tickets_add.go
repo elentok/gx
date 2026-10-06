@@ -45,7 +45,7 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 	stub := schema.Ticket{
 		ID:     schema.TicketID(id),
 		Status: schema.StatusDraft,
-		Type:   schema.TypeTask,
+		Type:   schema.TypeImplement,
 	}
 	if parent != "" {
 		parentID := schema.TicketID(parent)

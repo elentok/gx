@@ -11,6 +11,14 @@ func TestStatus_DraftIsValid(t *testing.T) {
 	}
 }
 
+func TestType_ImplementAndTaskAliasAreValid(t *testing.T) {
+	for _, ty := range []TicketType{TypeImplement, TypeTask} {
+		if err := Validate(Ticket{ID: "01", Status: StatusDraft, Type: ty}); err != nil {
+			t.Errorf("Validate(type %q) = %v, want nil", ty, err)
+		}
+	}
+}
+
 func validTicket() Ticket {
 	return Ticket{
 		ID:                    "04b",

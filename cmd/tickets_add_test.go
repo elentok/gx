@@ -40,6 +40,9 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	if ticket.ID != "04" {
 		t.Errorf("stub ticket id = %q, want %q", ticket.ID, "04")
 	}
+	if ticket.Type != schema.TypeImplement {
+		t.Errorf("stub ticket type = %q, want %q", ticket.Type, schema.TypeImplement)
+	}
 }
 
 func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {

@@ -205,7 +205,7 @@ running it only if the user has explicitly asked for a second code-review ticket
 
 ---
 
-id: "&lt;NN&gt;" status: open blocked_by: [] type: task
+id: "&lt;NN&gt;" status: open blocked_by: [] type: implement
 expected_context_window: 20000
 ---
 
