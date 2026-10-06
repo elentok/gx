@@ -7,21 +7,37 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// storeFile is one file to write into the project: content already converted
+// to the store shape, plus the old file it came from (for error messages and
+// the claimed check).
+type storeFile struct {
+	src  string
+	rel  string
+	data []byte
+}
+
 // MigrateIntoStore copies the old .scratch tree at oldRoot (archive and event
-// logs included) into projectDir, creating project.json when missing. It only
-// reads oldRoot, which stays as a backup until cutover.
+// logs included) into projectDir, creating project.json when missing, and
+// converts it to the store shape on the way: epic.yaml / map.md become the
+// epic's ticket.md, and every ticket gets the legacy frontmatter fixes and
+// `type: task` rewritten to `type: implement`. It only reads oldRoot, which
+// stays as a backup until cutover.
 //
 // It is all-or-nothing: any claimed ticket in the old tree, or any file or
 // ticket address that already exists in the project, refuses the whole copy
 // before a byte is written. That makes a re-run refuse rather than overwrite.
-// Returns the number of files copied.
+// Returns the number of files written.
 func MigrateIntoStore(oldRoot, projectDir, name, repo string) (int, error) {
-	var files []string
+	var files []storeFile
 	var problems []error
 
 	err := filepath.WalkDir(oldRoot, func(path string, d fs.DirEntry, err error) error {
@@ -35,13 +51,30 @@ func MigrateIntoStore(oldRoot, projectDir, name, repo string) (int, error) {
 		if err != nil {
 			return err
 		}
-		files = append(files, rel)
 		problems = append(problems, migrateFileProblems(path, filepath.Join(projectDir, rel))...)
+		if isEpicSidecar(rel) {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files = append(files, storeFile{src: path, rel: rel, data: convertTicketFile(path, raw)})
 		return nil
 	})
 	if err != nil {
 		return 0, fmt.Errorf("reading old tree %s: %w", oldRoot, err)
 	}
+
+	epicFiles, err := convertEpics(oldRoot)
+	if err != nil {
+		return 0, err
+	}
+	for _, f := range epicFiles {
+		problems = append(problems, migrateFileProblems(f.src, filepath.Join(projectDir, f.rel))...)
+	}
+	files = append(files, epicFiles...)
+
 	if err := errors.Join(problems...); err != nil {
 		return 0, err
 	}
@@ -49,12 +82,102 @@ func MigrateIntoStore(oldRoot, projectDir, name, repo string) (int, error) {
 	if err := ensureProjectFile(projectDir, name, repo); err != nil {
 		return 0, err
 	}
-	for _, rel := range files {
-		if err := copyFileInto(filepath.Join(oldRoot, rel), filepath.Join(projectDir, rel)); err != nil {
+	for _, f := range files {
+		if err := writeStoreFile(f, filepath.Join(projectDir, f.rel)); err != nil {
 			return 0, err
 		}
 	}
 	return len(files), nil
+}
+
+// isEpicSidecar reports whether rel is an epic.yaml or map.md directly under
+// an epic directory: the old-shape files that ticket.md replaces.
+func isEpicSidecar(rel string) bool {
+	dir, base := filepath.Split(rel)
+	if dir == "" || strings.Contains(strings.Trim(dir, string(filepath.Separator)), string(filepath.Separator)) {
+		return false
+	}
+	return base == "epic.yaml" || base == "map.md"
+}
+
+// convertTicketFile returns raw with the legacy fixes applied and type: task
+// rewritten, or raw untouched when path isn't a ticket, doesn't parse, or
+// already has the new shape.
+func convertTicketFile(path string, raw []byte) []byte {
+	if _, _, _, ok := parseTicketFilename(filepath.Base(path)); !ok {
+		return raw
+	}
+	if parent := filepath.Base(filepath.Dir(path)); parent != "issues" && parent != ".archive" {
+		return raw
+	}
+	old, err := schema.ParseTicketRaw(string(raw), path)
+	if err != nil {
+		return raw
+	}
+	t, notes := migrateTicket(old)
+	if t.Type == schema.TypeTask {
+		t.Type = schema.TypeImplement
+		notes = append(notes, "type: task -> implement")
+	}
+	if len(notes) == 0 {
+		return raw
+	}
+	out, err := schema.MarshalTicket(t, schema.ParseBody(string(raw)))
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
+// convertEpics builds a ticket.md for every epic that still has an epic.yaml
+// or map.md and no ticket.md yet. The map's text becomes the body; the
+// sidecar's timestamps carry over, and a completed epic is marked done.
+func convertEpics(oldRoot string) ([]storeFile, error) {
+	entries, err := os.ReadDir(oldRoot)
+	if err != nil {
+		return nil, err
+	}
+	var out []storeFile
+	for _, e := range entries {
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		dir := filepath.Join(oldRoot, e.Name())
+		if _, err := os.Stat(filepath.Join(dir, "ticket.md")); err == nil {
+			continue
+		}
+		sidecar, sidecarErr := os.ReadFile(filepath.Join(dir, "epic.yaml"))
+		body, bodyErr := os.ReadFile(filepath.Join(dir, "map.md"))
+		if sidecarErr != nil && bodyErr != nil {
+			continue
+		}
+		data, err := epicTicketMD(sidecar, body)
+		if err != nil {
+			return nil, fmt.Errorf("converting epic %s: %w", dir, err)
+		}
+		out = append(out, storeFile{src: dir, rel: filepath.Join(e.Name(), "ticket.md"), data: data})
+	}
+	return out, nil
+}
+
+func epicTicketMD(sidecar, body []byte) ([]byte, error) {
+	var wire epicYAML
+	if err := yaml.Unmarshal(sidecar, &wire); err != nil {
+		return nil, err
+	}
+	fm := struct {
+		Status      string     `yaml:"status"`
+		StartedAt   *time.Time `yaml:"started_at,omitempty"`
+		CompletedAt *time.Time `yaml:"completed_at,omitempty"`
+	}{Status: string(schema.StatusOpen), StartedAt: wire.StartedAt, CompletedAt: wire.CompletedAt}
+	if wire.CompletedAt != nil {
+		fm.Status = string(schema.StatusDone)
+	}
+	head, err := yaml.Marshal(fm)
+	if err != nil {
+		return nil, err
+	}
+	return []byte("---\n" + string(head) + "---\n" + string(body)), nil
 }
 
 // migrateFileProblems lists why src can't be copied to dst: dst already
@@ -98,16 +221,12 @@ func ensureProjectFile(projectDir, name, repo string) error {
 	return writeFileAtomic(filepath.Join(projectDir, config.ProjectFileName), append(data, '\n'))
 }
 
-func copyFileInto(src, dst string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
+func writeStoreFile(f storeFile, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	if err := writeFileAtomic(dst, data); err != nil {
-		return fmt.Errorf("copying %s: %w", src, err)
+	if err := writeFileAtomic(dst, f.data); err != nil {
+		return fmt.Errorf("copying %s: %w", f.src, err)
 	}
 	return nil
 }

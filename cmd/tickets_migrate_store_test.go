@@ -68,7 +68,13 @@ func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T)
 		if err != nil {
 			t.Fatalf("copied file %s: %v", relPath, err)
 		}
-		if string(got) != want {
+		if strings.Contains(want, "type: task") {
+			// Tickets are converted on the way in; the shape is checked in the
+			// conversion test.
+			if !strings.Contains(string(got), "type: implement") {
+				t.Errorf("%s not converted: %q", relPath, got)
+			}
+		} else if string(got) != want {
 			t.Errorf("%s = %q, want %q", relPath, got, want)
 		}
 	}
@@ -94,6 +100,73 @@ func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T)
 				t.Errorf("old tree file %s changed", p)
 			}
 		}
+	}
+}
+
+func TestExecute_TicketsMigrateToStore_ConvertsEpicShapeAndTypes(t *testing.T) {
+	store := isolateTicketStore(t)
+	repo := testutil.TempRepo(t)
+	root := filepath.Join(t.TempDir(), ".scratch")
+	files := map[string]string{
+		"sidecar/epic.yaml":          "started_at: 2026-01-02T03:04:05Z\ncompleted_at: 2026-01-03T03:04:05Z\n",
+		"sidecar/issues/01-first.md": "---\nid: \"01\"\nstatus: ready-for-agent\ntype: task\n---\nBody.\n",
+		"sidecar/.archive/00-old.md": "---\nid: \"00\"\nstatus: done\ntype: task\n---\nOld.\n",
+		"mapped/map.md":              "# The map\n\nPlans.\n",
+		"mapped/issues/01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n",
+		"already/ticket.md":          "---\nstatus: open\n---\nKept.\n",
+		"already/issues/01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n",
+	}
+	for rel, content := range files {
+		dir := filepath.Join(root, filepath.Dir(rel))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.WriteFile(t, dir, filepath.Base(rel), content)
+	}
+
+	if _, err := runIn(t, repo, "tickets", "migrate", "--to-store", "--project", "mine", root); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	project := filepath.Join(store, "mine")
+	read := func(rel string) string {
+		t.Helper()
+		got, err := os.ReadFile(filepath.Join(project, rel))
+		if err != nil {
+			t.Fatalf("%s: %v", rel, err)
+		}
+		return string(got)
+	}
+
+	for _, gone := range []string{"sidecar/epic.yaml", "mapped/map.md"} {
+		if _, err := os.Stat(filepath.Join(project, gone)); !os.IsNotExist(err) {
+			t.Errorf("%s should not be copied: %v", gone, err)
+		}
+	}
+	sidecar := read("sidecar/ticket.md")
+	for _, want := range []string{"status: done", "started_at: 2026-01-02T03:04:05Z", "completed_at: 2026-01-03T03:04:05Z"} {
+		if !strings.Contains(sidecar, want) {
+			t.Errorf("sidecar ticket.md missing %q:\n%s", want, sidecar)
+		}
+	}
+	mapped := read("mapped/ticket.md")
+	if !strings.Contains(mapped, "status: open") || !strings.HasSuffix(mapped, "# The map\n\nPlans.\n") {
+		t.Errorf("mapped ticket.md = %q", mapped)
+	}
+	if got := read("already/ticket.md"); got != files["already/ticket.md"] {
+		t.Errorf("existing ticket.md rewritten: %q", got)
+	}
+
+	for _, rel := range []string{"sidecar/issues/01-first.md", "sidecar/.archive/00-old.md", "mapped/issues/01-first.md"} {
+		got := read(rel)
+		if !strings.Contains(got, "type: implement") || strings.Contains(got, "type: task") {
+			t.Errorf("%s type not converted:\n%s", rel, got)
+		}
+	}
+	if got := read("sidecar/issues/01-first.md"); !strings.Contains(got, "status: open") || strings.Contains(got, "ready-for-agent") {
+		t.Errorf("legacy status not fixed:\n%s", got)
+	}
+	if got := read("already/issues/01-first.md"); got != files["already/issues/01-first.md"] {
+		t.Errorf("already-converted ticket rewritten: %q", got)
 	}
 }
 
