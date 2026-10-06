@@ -198,6 +198,16 @@ func (c *Client) QueueMove(ctx context.Context, address string, position int) (s
 	return c.queueWrite(ctx, "move", server.QueueRequest{Address: address, Position: position})
 }
 
+// TicketPark parks a ticket needs-repair with a required one-line reason.
+func (c *Client) TicketPark(ctx context.Context, address, reason string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/park", server.QueueRequest{Address: address, ParkReason: reason})
+}
+
+// TicketRelaunch starts a fresh iteration of a ticket.
+func (c *Client) TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address})
+}
+
 // TicketChanged pings the server that a direct write changed address's file.
 func (c *Client) TicketChanged(ctx context.Context, address string) error {
 	if err := c.CheckWrite(); err != nil {
@@ -225,8 +235,12 @@ func (c *Client) TicketChanged(ctx context.Context, address string) error {
 
 // queueWrite posts one queue write. A refusal is a result (Refused set), not an error.
 func (c *Client) queueWrite(ctx context.Context, verb string, req server.QueueRequest) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/queue/"+verb, req)
+}
+
+func (c *Client) queueWriteTo(ctx context.Context, path string, req server.QueueRequest) (server.QueueResult, error) {
 	var res server.QueueResult
-	err := c.post(ctx, "/v1/queue/"+verb, req, &res)
+	err := c.post(ctx, path, req, &res)
 	return res, err
 }
 

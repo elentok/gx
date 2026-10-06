@@ -232,7 +232,7 @@ func printQueueItems(w io.Writer, items []server.QueueItem) error {
 }
 
 func newServerTicketsCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "tickets", Short: "ticket reads", Args: cobra.NoArgs}
+	cmd := &cobra.Command{Use: "tickets", Short: "ticket reads and writes", Args: cobra.NoArgs}
 	var jsonOut bool
 	history := &cobra.Command{
 		Use:   "history <project:epic/NN>",
@@ -290,6 +290,36 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	changed.Flags().BoolVar(&changedJSON, "json", false, "emit the acknowledged address as JSON")
 	cmd.AddCommand(changed)
+
+	var parkJSON bool
+	var parkReason string
+	park := &cobra.Command{
+		Use:   "park <project:epic/NN>",
+		Short: "park a ticket needs-repair with a required reason",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, parkJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketPark(ctx, args[0], parkReason)
+			})
+		},
+	}
+	park.Flags().StringVar(&parkReason, "reason", "", "one-line reason written into the ticket (required)")
+	park.Flags().BoolVar(&parkJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(park)
+
+	var relaunchJSON bool
+	relaunch := &cobra.Command{
+		Use:   "relaunch <project:epic/NN>",
+		Short: "start a fresh iteration of a ticket",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, relaunchJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketRelaunch(ctx, args[0])
+			})
+		},
+	}
+	relaunch.Flags().BoolVar(&relaunchJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(relaunch)
 
 	var followJSON bool
 	follow := &cobra.Command{

@@ -47,6 +47,17 @@ func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone boo
 	return err
 }
 
+// ParkNeedsRepair parks the ticket needs-repair with a person's reason through
+// the park path: one status write (with the "## Needs Repair" section) and one
+// event. A blank reason is refused before anything is written.
+func ParkNeedsRepair(scratchDir, epicName, ticket, path, reason string) error {
+	_, err := park(noopEventSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
+		Type: events.NeedsRepair, Kind: events.ManualPark, Reason: reason,
+	})
+	return err
+}
+
 // park is the single park path: it writes the ticket, appends exactly one
 // event and notifies. Every status writer is routed here:
 // needs-repair, needs-answer and the CLI land's done write.

@@ -24,12 +24,12 @@ const (
 	ReasonSchedulerNotSelected = "scheduler-not-selected"
 	// ReasonServerNotRunning is produced by the CLI, never the server.
 	ReasonServerNotRunning = "server-not-running"
-	ReasonUnknownTicket        = "unknown-ticket"
-	ReasonInvalidAddress       = "invalid-address"
-	ReasonInvalidAgent         = "invalid-agent"
-	ReasonAlreadyQueued        = "already-queued"
-	ReasonNotQueued            = "not-queued"
-	ReasonBadPosition          = "bad-position"
+	ReasonUnknownTicket    = "unknown-ticket"
+	ReasonInvalidAddress   = "invalid-address"
+	ReasonInvalidAgent     = "invalid-agent"
+	ReasonAlreadyQueued    = "already-queued"
+	ReasonNotQueued        = "not-queued"
+	ReasonBadPosition      = "bad-position"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.
@@ -57,6 +57,8 @@ type QueueRequest struct {
 	Agent   string `json:"agent,omitempty"`
 	// Position is the 1-based slot a move puts the ticket in.
 	Position int `json:"position,omitempty"`
+	// ParkReason is the one-line reason a park writes into the ticket.
+	ParkReason string `json:"park_reason,omitempty"`
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a
