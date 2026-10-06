@@ -131,6 +131,16 @@ func startStoreCommits(opts RunOptions) (stop func(), err error) {
 	return commits.Stop, nil
 }
 
+// SkillPrompt and AgentArgs expose the launch shape to the server's runner so
+// both orchestrators start agents identically.
+func SkillPrompt(agent AgentKind, skill, ticketAddr string) string {
+	return skillPrompt(agent, skill, ticketAddr)
+}
+
+func AgentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []string {
+	return agentArgs(agent, scratchDir, epicName, model, effort)
+}
+
 func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
 	prefix := "/"
 	if agent == AgentCodex {

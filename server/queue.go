@@ -130,6 +130,7 @@ func (s *Server) writeQueue(address string, mutate func(items []QueueItem) ([]Qu
 		return QueueResult{}, err
 	}
 	s.events.publish(EventQueueChanged, address)
+	s.kickRunner()
 	return QueueResult{Queue: append([]QueueItem{}, next...)}, nil
 }
 

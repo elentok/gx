@@ -1,6 +1,7 @@
 // Package server is the orchestrator daemon: HTTP/JSON over a unix socket in
-// the state dir, routes under /v1/. It never claims or writes tickets; its only
-// writes are to the server-wide queue in the state dir.
+// the state dir, routes under /v1/. Its writes are the server-wide queue in the
+// state dir and, when the orchestrator switch says "server", the claim of a
+// queued root's frontier ticket.
 package server
 
 import (
@@ -76,6 +77,9 @@ type Server struct {
 	events  *broker
 	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
+
+	registry runRegistry
+	kick     chan struct{} // wakes keepClaiming
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -145,6 +149,7 @@ func New(cfg Config) (*Server, error) {
 
 		queued: queued,
 		events: events,
+		kick:   make(chan struct{}, 1),
 	}
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
@@ -279,7 +284,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
 	herdrDone := make(chan struct{})
 	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
-	defer func() { stopFresh(); <-freshDone; <-herdrDone }()
+	claimDone := make(chan struct{})
+	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
+	defer func() { stopFresh(); <-freshDone; <-herdrDone; <-claimDone }()
 	var err error
 	select {
 	case <-ctx.Done():

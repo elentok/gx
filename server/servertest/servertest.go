@@ -22,6 +22,7 @@ import (
 // Harness is a running test server.
 type Harness struct {
 	Client      *apiclient.Client
+	Server      *server.Server // for reading the run registry; drive everything else through Client
 	Herdr       *herdrfake.State
 	StateDir    string
 	TicketStore string
@@ -52,6 +53,16 @@ func WriteTicket(t *testing.T, store, project, epic, id, slug, blockedBy string)
 	}
 	fm += "---\n\n# " + slug + "\n"
 	if err := os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// SetProjectRepo points the project at the repo its agents run in. Call it
+// after WriteTicket, before Start.
+func SetProjectRepo(t *testing.T, store, project, repo string) {
+	t.Helper()
+	body := `{"name":"` + project + `","repo":"` + repo + `"}`
+	if err := os.WriteFile(filepath.Join(store, project, "project.json"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -135,6 +146,7 @@ func (h *Harness) serve(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	h.Server = srv
 	h.TCPAddr = srv.TCPAddr()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
