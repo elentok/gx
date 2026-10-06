@@ -1,6 +1,9 @@
 package ralphloop
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +51,42 @@ func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
 	}
 	if !epic.CompletedAt.Equal(fixedNow) {
 		t.Errorf("CompletedAt = %v, want %v", epic.CompletedAt, fixedNow)
+	}
+}
+
+// TestRun_EpicWithTicketMD_StampsTimingIntoTicketMD: an epic that has a
+// ticket.md gets its stamps there, keeps its other frontmatter and body, and
+// never grows an epic.yaml.
+func TestRun_EpicWithTicketMD_StampsTimingIntoTicketMD(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+	})
+	ticketMD := filepath.Join(scratchDir, "my-epic", "ticket.md")
+	if err := os.WriteFile(ticketMD, []byte("---\nstatus: open\nbase: main\n---\n# Epic body\n"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	d, _, _ := fakeDeps()
+	fixedNow := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	d.Now = func() time.Time { return fixedNow }
+
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	epic := loadEpicByName(t, scratchDir, "my-epic")
+	if !epic.StartedAt.Equal(fixedNow) || !epic.CompletedAt.Equal(fixedNow) {
+		t.Errorf("timing = %v / %v, want both %v", epic.StartedAt, epic.CompletedAt, fixedNow)
+	}
+	if epic.Base != "main" {
+		t.Errorf("Base = %q, want main preserved", epic.Base)
+	}
+	if _, err := os.Stat(filepath.Join(scratchDir, "my-epic", "epic.yaml")); !os.IsNotExist(err) {
+		t.Errorf("epic.yaml should not exist for a ticket.md epic, stat err = %v", err)
+	}
+	raw, _ := os.ReadFile(ticketMD)
+	if !strings.HasSuffix(string(raw), "---\n# Epic body\n") {
+		t.Errorf("body not preserved:\n%s", raw)
 	}
 }
 

@@ -183,6 +183,12 @@ func FrontmatterYAML(raw string) (yamlPart string, ok bool) {
 	return yamlPart, ok
 }
 
+// SplitFrontmatter is the exported splitFrontmatter, for callers that edit a
+// frontmatter block in place and must keep the body byte-for-byte.
+func SplitFrontmatter(raw string) (yamlPart, body string, hasFM bool) {
+	return splitFrontmatter(raw)
+}
+
 // MarshalTicket writes t back out as a "---" delimited YAML frontmatter
 // block followed by body, unchanged, the same shape ParseTicket reads.
 func MarshalTicket(t Ticket, body string) ([]byte, error) {

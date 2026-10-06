@@ -242,6 +242,9 @@ func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
 // rely on.
 func stampEpicTiming(scratchDir, epicName string, mutate func(*epicYAML) bool) error {
 	epicPath := filepath.Join(scratchDir, epicName)
+	if raw, err := os.ReadFile(filepath.Join(epicPath, "ticket.md")); err == nil {
+		return stampTicketMDTiming(filepath.Join(epicPath, "ticket.md"), string(raw), mutate)
+	}
 	yamlPath := filepath.Join(epicPath, "epic.yaml")
 
 	var wire epicYAML
@@ -265,6 +268,55 @@ func stampEpicTiming(scratchDir, epicName string, mutate func(*epicYAML) bool) e
 		return err
 	}
 	return writeFileAtomic(yamlPath, out)
+}
+
+// stampTicketMDTiming applies mutate to the timing fields of ticket.md's
+// frontmatter. It edits the YAML node tree rather than re-marshaling a struct,
+// so the epic's other frontmatter keys and its body survive untouched.
+func stampTicketMDTiming(path, raw string, mutate func(*epicYAML) bool) error {
+	fm, body, ok := schema.SplitFrontmatter(raw)
+	if !ok {
+		return fmt.Errorf("%s: no frontmatter to stamp timing into", path)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(fm), &doc); err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("%s: frontmatter is not a mapping", path)
+	}
+	var wire epicYAML
+	if err := doc.Content[0].Decode(&wire); err != nil {
+		return fmt.Errorf("parsing %s: %w", path, err)
+	}
+	before := wire
+	if !mutate(&wire) {
+		return nil
+	}
+	if wire.StartedAt != before.StartedAt {
+		setMappingTime(doc.Content[0], "started_at", *wire.StartedAt)
+	}
+	if wire.CompletedAt != before.CompletedAt {
+		setMappingTime(doc.Content[0], "completed_at", *wire.CompletedAt)
+	}
+	out, err := yaml.Marshal(doc.Content[0])
+	if err != nil {
+		return fmt.Errorf("marshaling %s: %w", path, err)
+	}
+	return writeFileAtomic(path, []byte("---\n"+string(out)+"---\n"+body))
+}
+
+// setMappingTime sets key to t in mapping, appending the key when absent.
+func setMappingTime(mapping *yaml.Node, key string, t time.Time) {
+	var val yaml.Node
+	_ = val.Encode(t)
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content[i+1] = &val
+			return
+		}
+	}
+	mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
 }
 
 // writeFileAtomic replaces path's content via a same-directory temp file
