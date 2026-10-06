@@ -176,5 +176,18 @@ Run without a command to open the status UI.`,
 		newVersionCmd(d),
 	)
 
+	root.AddGroup(
+		&cobra.Group{ID: groupTicketContent, Title: "Ticket content (direct):"},
+		&cobra.Group{ID: groupServer, Title: "Server:"},
+	)
+	for _, c := range root.Commands() {
+		switch c.Name() {
+		case "tickets":
+			c.GroupID = groupTicketContent
+		case "server":
+			c.GroupID = groupServer
+		}
+	}
+
 	return root
 }
