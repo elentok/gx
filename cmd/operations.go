@@ -514,11 +514,11 @@ func runNotifyStatus(d deps) error {
 	if err != nil {
 		return err
 	}
-	info, err := git.IdentifyDir(cwd)
+	root, err := ticketRoot(cwd)
 	if err != nil {
-		return fmt.Errorf("not inside a git repo: %w", err)
+		return err
 	}
-	epics, err := tickets.Load(info.Repo.ScratchRoot())
+	epics, err := tickets.Load(root)
 	if err != nil {
 		return err
 	}

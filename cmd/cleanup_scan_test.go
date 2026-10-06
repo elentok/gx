@@ -13,9 +13,16 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-func writeCleanupScanTicket(t *testing.T, dir, epic, filename, id, status, ticketType string) {
+// storeProjectFor isolates the ticket store and registers repoDir as a project
+// in it, returning the project directory that holds its epics.
+func storeProjectFor(t *testing.T, repoDir string) string {
 	t.Helper()
-	path := filepath.Join(dir, ".scratch", epic, "issues", filename)
+	return addProject(t, isolateTicketStore(t), "mine", repoDir)
+}
+
+func writeCleanupScanTicket(t *testing.T, projectDir, epic, filename, id, status, ticketType string) {
+	t.Helper()
+	path := filepath.Join(projectDir, epic, "issues", filename)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -26,24 +33,20 @@ func writeCleanupScanTicket(t *testing.T, dir, epic, filename, id, status, ticke
 }
 
 func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
-	t.Parallel()
 	dir := testutil.TempRepo(t)
+	project := storeProjectFor(t, dir)
 
 	// epic-done-merged-review-done: all tickets done, branch merged (no
 	// extra commits so it's trivially an ancestor of main), has a done
 	// code-review ticket.
-	writeCleanupScanTicket(t, dir, "epic-done-merged-review-done", "01-work.md", "01", "done", "implement")
-	writeCleanupScanTicket(t, dir, "epic-done-merged-review-done", "02-review.md", "02", "done", "code-review")
+	writeCleanupScanTicket(t, project, "epic-done-merged-review-done", "01-work.md", "01", "done", "implement")
+	writeCleanupScanTicket(t, project, "epic-done-merged-review-done", "02-review.md", "02", "done", "code-review")
 	testutil.MustGitExported(t, dir, "branch", "epic-done-merged-review-done")
 
 	// epic-done-unmerged-review-pending: all tickets done except the
 	// code-review ticket; branch has an unmerged commit.
-	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "01-work.md", "01", "done", "implement")
-	writeCleanupScanTicket(t, dir, "epic-done-unmerged-review-pending", "02-review.md", "02", "open", "code-review")
-	// Stage and commit only unmerged.txt (not "git add ." / CommitAll) so the
-	// untracked .scratch ticket fixtures never get swept into the commit —
-	// committing them would delete them from disk on the checkout back to
-	// main, since main's tree doesn't have them.
+	writeCleanupScanTicket(t, project, "epic-done-unmerged-review-pending", "01-work.md", "01", "done", "implement")
+	writeCleanupScanTicket(t, project, "epic-done-unmerged-review-pending", "02-review.md", "02", "open", "code-review")
 	testutil.MustGitExported(t, dir, "checkout", "-b", "epic-done-unmerged-review-pending")
 	testutil.WriteFile(t, dir, "unmerged.txt", "wip")
 	testutil.MustGitExported(t, dir, "add", "unmerged.txt")
@@ -51,7 +54,7 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	// epic-open-no-review: has an open ticket and no code-review ticket at all.
-	writeCleanupScanTicket(t, dir, "epic-open-no-review", "01-work.md", "01", "open", "implement")
+	writeCleanupScanTicket(t, project, "epic-open-no-review", "01-work.md", "01", "open", "implement")
 
 	var stdout bytes.Buffer
 	d := deps{
@@ -97,8 +100,8 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 }
 
 func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
-	t.Parallel()
 	dir := testutil.TempRepo(t)
+	storeProjectFor(t, dir)
 	testutil.MustGitExported(t, dir, "branch", "ralph-loop/attic/epic-a/03-1")
 	testutil.MustGitExported(t, dir, "branch", "ralph-loop/attic/epic-a/03-2")
 	testutil.MustGitExported(t, dir, "branch", "unrelated")
@@ -145,8 +148,8 @@ func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
 }
 
 func TestExecute_CleanupScan_NoAtticRefsIsEmptyList(t *testing.T) {
-	t.Parallel()
 	dir := testutil.TempRepo(t)
+	storeProjectFor(t, dir)
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
@@ -162,8 +165,8 @@ func TestExecute_CleanupScan_NoAtticRefsIsEmptyList(t *testing.T) {
 }
 
 func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(t *testing.T) {
-	t.Parallel()
 	dir := testutil.TempRepo(t)
+	storeProjectFor(t, dir)
 	testutil.Mkdir(t, filepath.Join(dir, ".scratch", "stray-epic"))
 	testutil.WriteFile(t, dir, ".scratch/stray-epic/leaked.txt", "oops, this got committed")
 	testutil.CommitAll(t, dir, "accidentally commit .scratch")
@@ -197,8 +200,8 @@ func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(
 }
 
 func TestExecute_CleanupScan_HousekeepingSkippedAtBareRootWithNoWorktree(t *testing.T) {
-	t.Parallel()
 	dir := testutil.TempBareRepo(t)
+	storeProjectFor(t, dir)
 
 	var stdout bytes.Buffer
 	d := deps{

@@ -13,7 +13,7 @@ disable-model-invocation: true
 
 ## Background
 
-A repo driven by ralph-loop accumulates epics under `.scratch/` and the branches/worktrees it
+A repo driven by ralph-loop accumulates epics in the ticket store (`gx tickets root`) and the branches/worktrees it
 created for them long after they stop being useful: epics fully done and already merged, epics
 fully done but never merged, and iteration/feature/other branches whose commits already landed
 elsewhere. `gx cleanup scan` classifies all of this deterministically from git and ticket state.
@@ -33,7 +33,7 @@ gx cleanup scan --json
 
 The result has three parts:
 
-- **`epics`** — one entry per non-`.archive` directory under `.scratch/`: `all_done`,
+- **`epics`** — one entry per non-`.archive` directory under the ticket store root (`gx tickets root`): `all_done`,
   `merged_to_main`, `has_code_review_ticket`, `code_review_done`.
 - **`worktrees`** — one entry per local branch other than the main branch: `kind`
   (`"iteration"` | `"feature"` | `"other"`), `active` (recent commit or uncommitted changes —
@@ -41,8 +41,8 @@ The result has three parts:
   branches only), `merged_to_main` (feature/other branches only), and `recommendation`
   (`"delete"`, `"merge"`, or `""` when the scan itself can't call it — always `""` when `active`
   is true).
-- **`housekeeping`** — tracked files that leaked under `.scratch` and whether `.gitignore` covers
-  it.
+- **`housekeeping`** — a legacy-only check: tracked files that leaked under the old `.scratch`
+  tree and whether `.gitignore` covers it. Epics no longer live there.
 
 ## Step 2: classify
 
@@ -112,7 +112,7 @@ Build:
   (archive/merge/delete/rebase/skip), a confidence/risk tag (`safe` / `needs-rebase` / `unclear`),
   and for case-2.2 epics the picked path from Step 4.
 - **Full investigation detail** — every sub-agent's evidence, diffs, and drafted commands —
-  written to a scratch file *outside* the `.scratch` tracker root (it isn't a ticket and
+  written to a scratch file *outside* the ticket store root (it isn't a ticket and
   `gx cleanup scan` would otherwise pick up a stray directory there as an "epic"); a plain temp
   file is fine. Reference it by path in the summary — never inline the detail.
 
@@ -124,8 +124,9 @@ On confirm, run the mechanically-safe actions below directly — no further per-
 ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick for case-2.2) is
 **not** executed here — it's queued and executed next, in Step 7, off this same confirm.
 
-- **Archive** (`all_done && merged_to_main` epics): `mv .scratch/<epic> .scratch/.archive/<epic>`
-  — a plain filesystem move, no git staging or commit, since `.scratch` is gitignored/untracked.
+- **Archive** (`all_done && merged_to_main` epics): `root=$(gx tickets root); mv "$root/<epic>" "$root/.archive/<epic>"`
+  (create `$root/.archive` first if missing) — a plain filesystem move inside the store, no git
+  staging or commit in the repo.
 - **Safe deletes** (branches/worktrees with `recommendation == "delete"`, or investigated as "safe
   to delete" in Step 3): run `git branch -d <branch>`, then `git worktree remove <path>` if the
   entry has a `path`. Never pass `--force` to either. If git refuses (not fully merged — the
@@ -136,7 +137,8 @@ ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick 
 - **Case-2.2 "add review ticket" picks**: run `gx tickets ensure-code-review <epic>`, then flag
   the epic as needs-review in the end-of-run report. Do not attempt to merge it in this run.
 - **Housekeeping**: if `housekeeping.TrackedFiles` is non-empty, `git rm --cached <file>` for each.
-  If `housekeeping.GitignoreHasScratch` is false, append a `.scratch/` entry to `.gitignore`.
+  If `housekeeping.GitignoreHasScratch` is false, append a `.scratch/` entry to `.gitignore`
+  (legacy guard against the old tree being committed).
 
 Work through archive, safe-delete, case-2.2, then housekeeping, collecting failures as you go
 rather than stopping the whole run on the first one. End with a short report: what ran, the failure

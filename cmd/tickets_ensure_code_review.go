@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -14,11 +13,11 @@ import (
 // completeEpicNames lists the current epic directory names under cwd's repo,
 // read live off disk, for the ensure-code-review command's shell completion.
 func completeEpicNames(cwd string) ([]string, error) {
-	repo, err := git.FindRepo(cwd)
+	root, err := ticketRoot(cwd)
 	if err != nil {
 		return nil, err
 	}
-	epics, err := tickets.Load(repo.ScratchRoot())
+	epics, err := tickets.Load(root)
 	if err != nil {
 		return nil, err
 	}
@@ -31,15 +30,14 @@ func completeEpicNames(cwd string) ([]string, error) {
 
 // resolveEpicArg resolves the ensure-code-review command's single argument to
 // an epic path. arg is tried first as a bare epic name against the current
-// repo's default scratch root (`gx tickets root`); if that directory doesn't
-// exist, arg is returned unchanged so a full scratch-relative path (the
-// command's original argument form) still works.
+// repo's ticket-store root (`gx tickets root`); if that directory doesn't
+// exist, arg is returned unchanged so a full path still works.
 func resolveEpicArg(arg, cwd string) string {
-	repo, err := git.FindRepo(cwd)
+	root, err := ticketRoot(cwd)
 	if err != nil {
 		return arg
 	}
-	candidate := filepath.Join(repo.ScratchRoot(), arg)
+	candidate := filepath.Join(root, arg)
 	if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 		return candidate
 	}

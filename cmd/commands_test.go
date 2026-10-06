@@ -12,9 +12,8 @@ import (
 )
 
 func TestNewEpicScopedCmd_ResolvesEpicArgAndInvokesRun(t *testing.T) {
-	t.Parallel()
 	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
+	epicDir := filepath.Join(storeProjectFor(t, repoDir), "widget-epic")
 	testutil.Mkdir(t, epicDir)
 
 	var gotEpicPath string
@@ -80,10 +79,10 @@ func TestNewEpicScopedCmd_RequiresExactlyOneArg(t *testing.T) {
 }
 
 func TestNewEpicScopedCmd_ValidArgsFunctionListsEpicNames(t *testing.T) {
-	t.Parallel()
 	repoDir := testutil.TempRepo(t)
-	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "widget-epic"))
-	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "bugs-05"))
+	project := storeProjectFor(t, repoDir)
+	testutil.Mkdir(t, filepath.Join(project, "widget-epic"))
+	testutil.Mkdir(t, filepath.Join(project, "bugs-05"))
 
 	d := deps{getwd: func() (string, error) { return repoDir, nil }}
 	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })

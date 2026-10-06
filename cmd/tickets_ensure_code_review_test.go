@@ -12,25 +12,27 @@ import (
 )
 
 func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
-	t.Parallel()
+	store := isolateTicketStore(t)
 	repoDir := testutil.TempRepo(t)
-	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
+	project := addProject(t, store, "mine", repoDir)
+	epicDir := filepath.Join(project, "widget-epic")
 	testutil.Mkdir(t, epicDir)
 
 	bareResolved := resolveEpicArg("widget-epic", repoDir)
-	fullResolved := resolveEpicArg(filepath.Join(".scratch", "widget-epic"), repoDir)
+	fullResolved := resolveEpicArg(epicDir, repoDir)
 
 	if bareResolved != epicDir {
 		t.Errorf("resolveEpicArg(bare name) = %q, want %q", bareResolved, epicDir)
 	}
-	if fullResolved != filepath.Join(".scratch", "widget-epic") {
+	if fullResolved != epicDir {
 		t.Errorf("resolveEpicArg(full path) = %q, want it returned unchanged", fullResolved)
 	}
 }
 
 func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
-	t.Parallel()
+	store := isolateTicketStore(t)
 	repoDir := testutil.TempRepo(t)
+	addProject(t, store, "mine", repoDir)
 
 	resolved := resolveEpicArg("no-such-epic", repoDir)
 
@@ -40,11 +42,12 @@ func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
 }
 
 func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
-	t.Parallel()
+	store := isolateTicketStore(t)
 	repoDir := testutil.TempRepo(t)
-	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "bugs-05"))
-	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", "widget-epic"))
-	testutil.Mkdir(t, filepath.Join(repoDir, ".scratch", ".archive"))
+	project := addProject(t, store, "mine", repoDir)
+	testutil.Mkdir(t, filepath.Join(project, "bugs-05"))
+	testutil.Mkdir(t, filepath.Join(project, "widget-epic"))
+	testutil.Mkdir(t, filepath.Join(project, ".archive"))
 
 	names, err := completeEpicNames(repoDir)
 	if err != nil {
@@ -119,6 +122,26 @@ func TestRunTicketsEnsureCodeReview_CreatesValidStubWhenNoneExists(t *testing.T)
 	}
 	if ticket.ID != "04" {
 		t.Errorf("stub ticket id = %q, want next sequential id 04", ticket.ID)
+	}
+}
+
+func TestExecute_TicketsEnsureCodeReview_StubLandsInStore(t *testing.T) {
+	store := isolateTicketStore(t)
+	repoDir := testutil.TempRepo(t)
+	project := addProject(t, store, "mine", repoDir)
+	issuesDir := filepath.Join(project, "widget-epic", "issues")
+	testutil.Mkdir(t, issuesDir)
+	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
+
+	if _, err := runIn(t, repoDir, "tickets", "ensure-code-review", "widget-epic"); err != nil {
+		t.Fatalf("ensure-code-review: %v", err)
+	}
+
+	if _, err := schema.ParseTicket(filepath.Join(issuesDir, "02-code-review.md")); err != nil {
+		t.Fatalf("stub not written inside the store: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, ".scratch")); !os.IsNotExist(err) {
+		t.Errorf("legacy .scratch dir was touched: %v", err)
 	}
 }
 

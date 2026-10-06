@@ -71,7 +71,11 @@ func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	}
 	repo := info.Repo
 
-	epics, err := tickets.Load(repo.ScratchRoot())
+	root, err := ticketRoot(cwd)
+	if err != nil {
+		return err
+	}
+	epics, err := tickets.Load(root)
 	if err != nil {
 		return err
 	}

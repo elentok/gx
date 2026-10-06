@@ -11,7 +11,8 @@ import (
 )
 
 func TestExecute_Notify_Enable_ClearsTransportMuteAndReportsIt(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	repo := testutil.TempRepo(t)
+	storeProjectFor(t, repo)
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -30,7 +31,7 @@ func TestExecute_Notify_Enable_ClearsTransportMuteAndReportsIt(t *testing.T) {
 
 	var status bytes.Buffer
 	d.stdout = &status
-	d.getwd = func() (string, error) { return testutil.TempRepo(t), nil }
+	d.getwd = func() (string, error) { return repo, nil }
 	if err := execute([]string{"notify", "--status"}, d); err != nil {
 		t.Fatalf("execute notify --status: %v", err)
 	}
@@ -40,13 +41,14 @@ func TestExecute_Notify_Enable_ClearsTransportMuteAndReportsIt(t *testing.T) {
 }
 
 func TestExecute_Notify_Disable_TripsTransportMuteAndReportsIt(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	repo := testutil.TempRepo(t)
+	storeProjectFor(t, repo)
 
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
-		getwd:  func() (string, error) { return testutil.TempRepo(t), nil },
+		getwd:  func() (string, error) { return repo, nil },
 	}
 
 	if err := execute([]string{"notify", "--disable", "slack"}, d); err != nil {
@@ -80,10 +82,9 @@ func TestExecute_Notify_EnableDisable_UnknownTransportRejected(t *testing.T) {
 }
 
 func TestExecute_Notify_Status_ReportsTicketsWithMutes(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-
 	dir := testutil.TempRepo(t)
-	writeMutedTicket(t, dir, "an-epic", "01-work.md", "01", `
+	project := storeProjectFor(t, dir)
+	writeMutedTicket(t, project, "an-epic", "01-work.md", "01", `
   - event_type: gate-tripped
     tripped_at: 2026-08-01T00:00:00Z`)
 
@@ -119,9 +120,9 @@ func TestExecute_Notify_MessageWithEnableRejected(t *testing.T) {
 	}
 }
 
-func writeMutedTicket(t *testing.T, dir, epic, filename, id, mutesYAML string) {
+func writeMutedTicket(t *testing.T, projectDir, epic, filename, id, mutesYAML string) {
 	t.Helper()
-	path := filepath.Join(dir, ".scratch", epic, "issues", filename)
+	path := filepath.Join(projectDir, epic, "issues", filename)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
