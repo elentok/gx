@@ -49,6 +49,27 @@ func TestRenderTicketRow_DoneHasMetricsLine(t *testing.T) {
 	}
 }
 
+func TestRenderTicketRow_CancelledRendersAsTerminal(t *testing.T) {
+	t.Parallel()
+	icons := ui.Icons(false)
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
+		{Identifier: "01", Title: "Cancelled ticket", Status: "cancelled"},
+	}}
+	m := newModelForTicketRowTests(epic)
+
+	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
+	if len(lines) != 1 {
+		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
+	}
+	if !strings.Contains(lines[0], "Cancelled ticket") || !strings.Contains(lines[0], icons.TicketDone) {
+		t.Fatalf("row line = %q, want title and terminal icon", lines[0])
+	}
+	icon, style := statusIconAndStyle(icons, tickets.StatusCancelled)
+	if icon != icons.TicketDone || style.GetForeground() != statusDoneStyle.GetForeground() {
+		t.Fatalf("StatusCancelled = (%q, %v), want done icon and style", icon, style.GetForeground())
+	}
+}
+
 // TestRenderTicketRow_NonDoneWithMetricsShowsLine covers ticket 03: a
 // non-done ticket (e.g. parked needs-answer/needs-repair) can already carry
 // non-zero elapsed_time/actual_context_window from a prior run, and that

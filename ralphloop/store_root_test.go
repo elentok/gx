@@ -26,7 +26,7 @@ func TestRun_DefaultTicketDirIsTheStoreProject(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(project, "project.json"), data, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(issues, "01-first.md"), []byte("---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(issues, "01-first.md"), []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
