@@ -3,10 +3,10 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -63,21 +63,5 @@ func unparkTarget(epicPath, id string) (string, error) {
 
 // findEpicTicket loads the epic at epicPath and returns it with ticket id.
 func findEpicTicket(epicPath, id string) (tickets.Epic, tickets.Ticket, error) {
-	epicPath = filepath.Clean(epicPath)
-	epics, err := tickets.Load(filepath.Dir(epicPath))
-	if err != nil {
-		return tickets.Epic{}, tickets.Ticket{}, fmt.Errorf("loading epics under %s: %w", filepath.Dir(epicPath), err)
-	}
-	for _, epic := range epics {
-		if epic.Name != filepath.Base(epicPath) {
-			continue
-		}
-		for _, t := range epic.Tickets {
-			if t.DisplayNumber() == id {
-				return epic, t, nil
-			}
-		}
-		return tickets.Epic{}, tickets.Ticket{}, fmt.Errorf("ticket %s not found in epic %s", id, epic.Name)
-	}
-	return tickets.Epic{}, tickets.Ticket{}, fmt.Errorf("epic not found: %s", epicPath)
+	return repair.FindEpicTicket(epicPath, id)
 }

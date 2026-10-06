@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
@@ -327,22 +327,9 @@ func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
 }
 
 // isRalphLoopBranch is the shared branch-detection logic behind
-// checkAgentStatusGuard: getwd being nil or failing, or the branch not
-// matching "ralph-loop/*", all mean "not on a guarded branch" rather than a
-// false positive.
+// checkAgentStatusGuard.
 func isRalphLoopBranch(getwd func() (string, error)) (branch string, ok bool) {
-	if getwd == nil {
-		return "", false
-	}
-	cwd, err := getwd()
-	if err != nil {
-		return "", false
-	}
-	branch, err = git.CurrentBranch(cwd)
-	if err != nil || !strings.HasPrefix(branch, "ralph-loop/") {
-		return "", false
-	}
-	return branch, true
+	return repair.IsRalphLoopBranch(getwd)
 }
 
 // checkBodyBeforeOpen refuses a --status open write for a ticket whose body

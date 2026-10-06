@@ -5,26 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/elentok/gx/repair"
 )
 
-// Stable machine-readable refusal codes shared by the recovery commands
-// (land, verify, reset, unpark). Callers branch on these, never on message text.
+// Refusal codes and error type live in the shared repair package.
 const (
-	ReasonLandLocked             = "land_locked"
-	ReasonIterationBranchMissing = "iteration_branch_missing"
-	ReasonLiveAgentOnTab         = "live_agent_on_tab"
-	ReasonForkChildren           = "fork_children"
-	ReasonNotParked              = "not_parked"
-	ReasonStatusRefused          = "status_refused"
-	ReasonCommitless             = "commitless"
-	ReasonRalphLoopCwd           = "ralph_loop_cwd"
-	ReasonLandConflictPending    = "land_conflict_pending"
-	ReasonLandBlocked            = "land_blocked"
-	ReasonNoPendingLand          = "no_pending_land"
-	ReasonLandNotResolved        = "land_not_resolved"
-	ReasonReasonRequired         = "reason_required"
-	// ReasonError is the fallback for a failure that carries no specific code.
-	ReasonError = "error"
+	ReasonLandLocked             = repair.ReasonLandLocked
+	ReasonIterationBranchMissing = repair.ReasonIterationBranchMissing
+	ReasonLiveAgentOnTab         = repair.ReasonLiveAgentOnTab
+	ReasonForkChildren           = repair.ReasonForkChildren
+	ReasonNotParked              = repair.ReasonNotParked
+	ReasonStatusRefused          = repair.ReasonStatusRefused
+	ReasonCommitless             = repair.ReasonCommitless
+	ReasonRalphLoopCwd           = repair.ReasonRalphLoopCwd
+	ReasonLandConflictPending    = repair.ReasonLandConflictPending
+	ReasonLandBlocked            = repair.ReasonLandBlocked
+	ReasonNoPendingLand          = repair.ReasonNoPendingLand
+	ReasonLandNotResolved        = repair.ReasonLandNotResolved
+	ReasonReasonRequired         = repair.ReasonReasonRequired
+	ReasonError                  = repair.ReasonError
 )
 
 // RefusalEnvelope is the JSON written on stdout when a recovery command refuses or fails.
@@ -35,12 +35,7 @@ type RefusalEnvelope struct {
 }
 
 // RefusalError is returned by a recovery command's run* function to refuse with a reason code.
-type RefusalError struct {
-	Reason  string
-	Message string
-}
-
-func (e *RefusalError) Error() string { return e.Message }
+type RefusalError = repair.RefusalError
 
 // finishRecovery applies the shared recovery-command contract to a run* outcome.
 // Success: exit 0; --json prints result, human mode prints humanText.
