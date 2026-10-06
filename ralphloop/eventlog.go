@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/logger"
+	"github.com/elentok/gx/tickets"
 )
 
 // Event type strings recorded in an epic's run-log.jsonl.
@@ -171,8 +172,8 @@ type Event struct {
 	Kind string `json:"kind,omitempty"`
 	// Label is the iteration label (launch-failed events).
 	Label string `json:"label,omitempty"`
-	// Address (failure events) identifies what failed: the ticket id until
-	// canonical addresses arrive. Filled from Ticket when empty.
+	// Address is the ticket's canonical address ("project:epic/06"), filled by
+	// logEvent from Ticket when empty.
 	Address string `json:"address,omitempty"`
 	// Iteration/Attempt are set only when known/applicable, never as
 	// placeholders.
@@ -251,8 +252,8 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	if err := events.Validate(events.Type(ev.Type), events.Kind(ev.Kind)); err != nil {
 		return err
 	}
-	if ev.Kind != "" && ev.Address == "" {
-		ev.Address = ev.Ticket
+	if ev.Ticket != "" && ev.Address == "" {
+		ev.Address = tickets.Address{Project: tickets.ProjectName(scratchDir), Epic: epicName, ID: ev.Ticket}.String()
 	}
 	data, err := events.Fit(func() ([]byte, error) { return json.Marshal(ev) }, &ev.Reason, &ev.Body)
 	if err != nil {

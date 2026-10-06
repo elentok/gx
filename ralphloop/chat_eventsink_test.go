@@ -438,7 +438,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 			parks = append(parks, ev)
 		}
 	}
-	if len(parks) != 1 || parks[0].Kind != string(events.IterationError) || parks[0].Address != "04" {
+	if len(parks) != 1 || parks[0].Kind != string(events.IterationError) || parks[0].Address != canonicalAddr(scratchDir, epicName, "04") {
 		t.Errorf("park events = %+v, want one of kind iteration-error for 04", parks)
 	}
 }

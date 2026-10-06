@@ -541,6 +541,28 @@ func TestLogEvent_FailureEventWithoutKindIsRejected(t *testing.T) {
 	}
 }
 
+// canonicalAddr is the address logEvent stamps for ticket id in epic under
+// scratchDir (no project.json in tests, so the project is the dir name).
+func canonicalAddr(scratchDir, epic, id string) string {
+	return filepath.Base(scratchDir) + ":" + epic + "/" + id
+}
+
+func TestLogEvent_EveryTicketEventCarriesCanonicalAddressInEpicLog(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	if err := logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: "05"}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	evs, ok, err := ReadEvents(dir, "epic")
+	if err != nil || !ok || len(evs) != 1 {
+		t.Fatalf("ReadEvents = %v, %v, %v; want one event in the epic's store dir", evs, ok, err)
+	}
+	if want := canonicalAddr(dir, "epic", "05"); evs[0].Address != want {
+		t.Errorf("address = %q, want %q", evs[0].Address, want)
+	}
+}
+
 func TestLogEvent_FailureEventCarriesAddressAndTruncatedReason(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -557,7 +579,7 @@ func TestLogEvent_FailureEventCarriesAddressAndTruncatedReason(t *testing.T) {
 		t.Errorf("line is %d bytes, want <= %d", len(raw), eventsc.MaxLineBytes)
 	}
 	line := string(raw)
-	for _, want := range []string{`"kind":"agent_name_taken"`, `"address":"07"`, `"attempt":2`} {
+	for _, want := range []string{`"kind":"agent_name_taken"`, `"address":"` + canonicalAddr(dir, "epic", "07") + `"`, `"attempt":2`} {
 		if !strings.Contains(line, want) {
 			t.Errorf("line missing %s: %.200s", want, line)
 		}

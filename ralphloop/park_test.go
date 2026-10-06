@@ -53,7 +53,7 @@ func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
 		t.Fatalf("needs-repair events = %d, want 1 (%v)", len(repairs), evs)
 	}
 	ev := repairs[0]
-	if ev.Kind != string(events.IterationError) || ev.Address != "01" || !strings.Contains(ev.Reason, "simulated git hiccup") {
+	if ev.Kind != string(events.IterationError) || ev.Address != canonicalAddr(scratchDir, "my-epic", "01") || !strings.Contains(ev.Reason, "simulated git hiccup") {
 		t.Errorf("event = %+v, want kind iteration-error, address 01, reason naming the error", ev)
 	}
 }
