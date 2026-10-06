@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,10 +11,12 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets"
 )
 
 // registerLaunch answers the herdr commands a launch makes and records the
@@ -275,5 +278,74 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	// With one slot, root B starts only after root A's ticket is done.
 	if len(seen) != 6 || !strings.HasPrefix(seen[1], server.EventTicketDone) {
 		t.Errorf("events = %v, want start/done/completed per root, one root at a time", seen)
+	}
+}
+
+func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle"}}
+	for _, verb := range []string{"get", "wait"} {
+		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+			return idle, herdrfake.Identities{}, nil
+		})
+	}
+	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+
+	// What a server that died mid-iteration leaves behind: a claimed ticket, its
+	// worktree with the agent's commit, and the persisted handle.
+	epics, err := tickets.Load(filepath.Join(store, "proj"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk := epics[0].Tickets[0]
+	if err := ralphloop.Claim(tk.Path); err != nil {
+		t.Fatal(err)
+	}
+	wt, err := ralphloop.PrepareIteration(ralphloop.DefaultDeps(), ralphloop.OneIteration{
+		RepoDir: repo, Epic: "epic-a", ScratchDir: store, Agent: ralphloop.AgentClaude, Ticket: tk,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, wt.Path, "agent.txt", "work")
+	testutil.CommitAll(t, wt.Path, "agent work")
+	handle, err := json.Marshal([]map[string]string{{
+		"address": "proj:epic-a/01", "agent": "claude", "pane": "p1", "tab": "t1", "root": "proj:epic-a",
+		"repo": repo, "workspace": "w1", "base": wt.Base(), "ticket_path": tk.Path,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h.StateDir, "runs.json"), handle, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	h.Restart(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var seen []string
+	for ev := range evs {
+		switch ev.Type {
+		case server.EventReclaimed, server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted,
+			server.EventIterationFailed, server.EventIterationParked:
+			seen = append(seen, ev.Type)
+		}
+		if ev.Type == server.EventRootCompleted || ev.Type == server.EventIterationFailed {
+			break
+		}
+	}
+	want := []string{server.EventReclaimed, server.EventTicketDone, server.EventRootCompleted}
+	if strings.Join(seen, ",") != strings.Join(want, ",") {
+		log, _ := os.ReadFile(server.LogPath(h.StateDir))
+		t.Fatalf("events = %v, want %v\nserver log:\n%s", seen, want, log)
 	}
 }

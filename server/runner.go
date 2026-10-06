@@ -39,49 +39,6 @@ const (
 	implementSkill = "gx-implement"
 )
 
-// Run is one launched iteration in the server's run registry.
-type Run struct {
-	Address string `json:"address"`
-	Agent   string `json:"agent"`
-	Pane    string `json:"pane"`
-	Tab     string `json:"tab"`
-}
-
-// runRegistry is the server's own record of launched iterations, keyed by
-// project:epic (one running iteration per root). Independent of the TUI's.
-type runRegistry struct {
-	mu   sync.Mutex
-	runs map[string]Run
-}
-
-func (r *runRegistry) has(root string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	_, ok := r.runs[root]
-	return ok
-}
-
-func (r *runRegistry) count() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.runs)
-}
-
-func (r *runRegistry) delete(root string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.runs, root)
-}
-
-func (r *runRegistry) put(root string, run Run) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.runs == nil {
-		r.runs = map[string]Run{}
-	}
-	r.runs[root] = run
-}
-
 // VerdictClaimRereadMismatch is the explain verdict for a ticket whose file
 // changed since the index saw it, so the last claim pass skipped it.
 const VerdictClaimRereadMismatch = "claim re-read mismatch"
@@ -110,17 +67,6 @@ func (r *refusals) has(addr string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.addr[addr]
-}
-
-// Runs lists the registry, for tests and later reads.
-func (s *Server) Runs() []Run {
-	s.registry.mu.Lock()
-	defer s.registry.mu.Unlock()
-	out := make([]Run, 0, len(s.registry.runs))
-	for _, r := range s.registry.runs {
-		out = append(out, r)
-	}
-	return out
 }
 
 // kickRunner asks the runner to look at the queue now instead of at its next tick.
@@ -271,7 +217,9 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
 		return fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
-	s.registry.put(root, run)
+	s.registry.put(trackedRun{
+		Run: run, Root: root, Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path,
+	})
 	s.events.publish(EventIterationStarted, ticketAddr)
 	go s.finishRun(deps, root, one, wt, run, ticketAddr)
 	return nil

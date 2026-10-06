@@ -91,9 +91,10 @@ type Server struct {
 	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
 
-	registry runRegistry
-	refused  refusals
-	kick     chan struct{} // wakes keepClaiming
+	registry  *runRegistry
+	savedRuns []trackedRun // handles the previous server left; consumed by reclaimRuns
+	refused   refusals
+	kick      chan struct{} // wakes keepClaiming
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -157,14 +158,28 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, err
 	}
+	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	registry, savedRuns, err := openRuns(cfg.StateDir, log)
+	if err != nil {
+		ln.Close()
+		if tcp != nil {
+			tcp.Close()
+		}
+		_ = logf.Close()
+		lock.release()
+		return nil, fmt.Errorf("load runs: %w", err)
+	}
 	s := &Server{
 		cfg:  cfg,
 		lock: lock,
 		ln:   ln,
 		tcp:  tcp,
 		logf: logf,
-		log:  slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		log:  log,
 		idx:  idx,
+
+		registry:  registry,
+		savedRuns: savedRuns,
 
 		queued: queued,
 		pause:  pause,
@@ -308,6 +323,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 	for _, ln := range lns {
 		go func() { errc <- s.http.Serve(ln) }()
+	}
+	if s.cfg.Orchestrator == config.OrchestratorServer {
+		s.reclaimRuns()
 	}
 	if stopCommits, err := s.startStoreCommits(); err != nil {
 		s.log.Error("store commit loop failed to start", "err", err)

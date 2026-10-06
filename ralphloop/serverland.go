@@ -63,6 +63,24 @@ func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
 	}, nil
 }
 
+// Base is the feature tip the iteration branched from. A server that restarts
+// mid-iteration persists it and hands it back to ResumeIteration.
+func (w IterationWorktree) Base() string { return w.base }
+
+// ResumeIteration rebuilds the handle PrepareIteration made for a ticket whose
+// worktree already exists, without touching git.
+func ResumeIteration(d Deps, o OneIteration, base string) (IterationWorktree, error) {
+	wtDir, err := d.WorktreeDir(o.RepoDir)
+	if err != nil {
+		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
+	}
+	return IterationWorktree{
+		Path: iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier), Branch: iterBranch(o.Epic, o.Ticket.Identifier),
+		Label: iterLabel(o.Epic, o.Ticket.Identifier),
+		base:  base, featureWorktree: filepath.Join(wtDir, o.Epic), worktreeDir: wtDir,
+	}, nil
+}
+
 // DiscardIteration removes a prepared iteration's worktree and branch, for a
 // launch that failed before the agent produced anything.
 func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
