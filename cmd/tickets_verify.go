@@ -3,11 +3,8 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"text/tabwriter"
 
-	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
 	"github.com/spf13/cobra"
@@ -29,7 +26,7 @@ func newTicketsVerifyCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			run, err := defaultVerifyRun(resolveEpicArg(args[0], cwd), cwd)
+			run, err := repair.DefaultVerifyRun(resolveEpicArg(args[0], cwd), cwd)
 			if err != nil {
 				return finishRecovery(c.OutOrStdout(), c.ErrOrStderr(), jsonOut, nil, "", err)
 			}
@@ -42,29 +39,6 @@ func newTicketsVerifyCmd(d deps) *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the full unfiltered list as JSON")
 	cmd.Flags().BoolVar(&all, "all", false, "show every ticket, not just those needing attention")
 	return cmd
-}
-
-// defaultVerifyRun wires the real git/herdr dependencies. Herdr is optional:
-// without a workspace the tab leftovers are reported as unknown.
-func defaultVerifyRun(epicPath, cwd string) (verifyRun, error) {
-	repo, err := git.FindRepo(cwd)
-	if err != nil {
-		return verifyRun{}, fmt.Errorf("not inside a git repo: %w", err)
-	}
-	epicPath = filepath.Clean(epicPath)
-	vd := ralphloop.DefaultVerifyDeps()
-	run := verifyRun{
-		EpicPath:        epicPath,
-		FeatureWorktree: filepath.Join(repo.WorktreeDir, filepath.Base(epicPath)),
-		WorktreeDir:     repo.WorktreeDir,
-		Deps:            vd,
-	}
-	if ws, err := herdr.FindWorkspace(filepath.Base(epicPath)); err == nil {
-		run.WorkspaceID = ws
-	} else {
-		run.Deps.TabList = nil
-	}
-	return run, nil
 }
 
 // runTicketsVerify is write-free and takes no land lock: reading owns nothing,

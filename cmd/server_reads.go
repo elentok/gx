@@ -286,6 +286,7 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	follow.Flags().BoolVar(&followJSON, "json", false, "emit one JSON object per line instead of human-readable text")
 	cmd.AddCommand(follow)
+	addServerRepairCmds(cmd)
 	return cmd
 }
 

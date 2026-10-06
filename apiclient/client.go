@@ -201,29 +201,41 @@ func (c *Client) QueueMove(ctx context.Context, address string, position int) (s
 // queueWrite posts one queue write. A refusal is a result (Refused set), not an error.
 func (c *Client) queueWrite(ctx context.Context, verb string, req server.QueueRequest) (server.QueueResult, error) {
 	var res server.QueueResult
+	err := c.post(ctx, "/v1/queue/"+verb, req, &res)
+	return res, err
+}
+
+// Repair runs a repair verb ("land", "reset", "unpark" or "verify"). A refusal
+// is a result (Refused set), not an error.
+func (c *Client) Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
+	var res server.RepairResult
+	err := c.post(ctx, "/v1/tickets/"+verb, req, &res)
+	return res, err
+}
+
+func (c *Client) post(ctx context.Context, path string, req, res any) error {
 	if err := c.CheckWrite(); err != nil {
-		return res, err
+		return err
 	}
 	body, err := json.Marshal(req)
 	if err != nil {
-		return res, err
+		return err
 	}
-	path := "/v1/queue/" + verb
 	hreq, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://gx"+path, bytes.NewReader(body))
 	if err != nil {
-		return res, err
+		return err
 	}
 	hreq.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(hreq)
 	if err != nil {
-		return res, err
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return res, fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
+		return fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
 	}
-	return res, json.NewDecoder(resp.Body).Decode(&res)
+	return json.NewDecoder(resp.Body).Decode(res)
 }
 
 // Follow keeps a consumer in sync: it takes a snapshot, then streams events
