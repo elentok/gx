@@ -13,26 +13,27 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/logger"
 )
 
 // Event type strings recorded in an epic's run-log.jsonl.
 const (
-	eventIterationStarted        = "iteration-started"
-	eventIterationFinished       = "iteration-finished"
-	eventCherryPicked            = "cherry-picked"
-	eventLandDeferred            = "land-deferred" // once per contention episode, not per retry tick
-	eventConflictHit             = "conflict-hit"
-	eventConflictResolved        = "conflict-resolved"
-	eventPausedSmartZone         = "paused-smart-zone"
-	eventSmartZoneRecoveryFailed = "smart-zone-recovery-failed"
+	eventIterationStarted        = string(events.IterationStarted)
+	eventIterationFinished       = string(events.IterationFinished)
+	eventCherryPicked            = string(events.CherryPicked)
+	eventLandDeferred            = string(events.LandDeferred) // once per contention episode, not per retry tick
+	eventConflictHit             = string(events.ConflictHit)
+	eventConflictResolved        = string(events.ConflictResolved)
+	eventPausedSmartZone         = string(events.PausedSmartZone)
+	eventSmartZoneRecoveryFailed = string(events.SmartZoneRecoveryFailed)
 	// eventSmartZoneWaitExpired marks a compact-recovery wait that expired
 	// past smartZoneCompactTimeoutMs without herdr's pane-status wait ever
 	// confirming completion, but where the transcript's compaction-boundary
 	// signal showed compaction actually finished anyway — a slower-than-usual
 	// compact, not a failure, and deliberately distinct from
 	// eventSmartZoneRecoveryFailed so it isn't misread as one.
-	eventSmartZoneWaitExpired = "smart-zone-wait-expired"
+	eventSmartZoneWaitExpired = string(events.SmartZoneWaitExpired)
 	// eventSmartZoneGateReleased marks the other route to a confirmed
 	// compaction: the pane reported completion straight away, the
 	// compaction-boundary gate refused to believe it, and the boundary landed
@@ -40,22 +41,22 @@ const (
 	// not share eventSmartZoneWaitExpired's name — telling "Claude Code
 	// reported idle mid-compaction" apart from "compaction genuinely took more
 	// than five minutes" is exactly what run-log.jsonl is read for.
-	eventSmartZoneGateReleased = "smart-zone-gate-released"
+	eventSmartZoneGateReleased = string(events.SmartZoneGateReleased)
 	// eventBackgroundTaskGateHeld/Released/Expired mark waitForBackgroundTasks
 	// holding confirmFinished's conclusion open for one outstanding-fresh
 	// backgrounded-shell-command marker: Held once when first observed
 	// outstanding (never once per poll tick), Released once its
 	// task-notification lands, Expired once it ages out past
 	// backgroundTaskAgedOutCap and the gate stops holding on it instead.
-	eventBackgroundTaskGateHeld     = "background-task-gate-held"
-	eventBackgroundTaskGateReleased = "background-task-gate-released"
-	eventBackgroundTaskGateExpired  = "background-task-gate-expired"
-	eventPausedRateLimit            = "paused-rate-limit"
-	eventResumed                    = "resumed"
-	eventNeedsAnswer                = "needs-answer"
-	eventCommitless                 = "commitless"
-	eventNeedsRepair                = "needs-repair"
-	eventDepsInstalled              = "deps-installed"
+	eventBackgroundTaskGateHeld     = string(events.BackgroundTaskGateHeld)
+	eventBackgroundTaskGateReleased = string(events.BackgroundTaskGateReleased)
+	eventBackgroundTaskGateExpired  = string(events.BackgroundTaskGateExpired)
+	eventPausedRateLimit            = string(events.PausedRateLimit)
+	eventResumed                    = string(events.Resumed)
+	eventNeedsAnswer                = string(events.NeedsAnswer)
+	eventCommitless                 = string(events.Commitless)
+	eventNeedsRepair                = string(events.NeedsRepair)
+	eventDepsInstalled              = string(events.DepsInstalled)
 	// eventSchedulerScan marks one claimNext pass: every ticket the epic
 	// currently has, and why the scheduler did or didn't claim it. Added to
 	// debug tickets that appear queued (e.g. a code-review ticket's freshly
@@ -63,33 +64,33 @@ const (
 	// ticket falling outside the run's RunScope (see ScanDecision's
 	// "out-of-scope"), which the ticket-level events above never surface
 	// since they only ever fire for a ticket the scheduler already claimed.
-	eventSchedulerScan = "scheduler-scan"
+	eventSchedulerScan = string(events.SchedulerScan)
 
-	eventNotificationsConfigured = "notifications-configured"
-	eventNotificationSent        = "notification-sent"
-	eventNotificationFailed      = "notification-failed"
+	eventNotificationsConfigured = string(events.NotificationsConfigured)
+	eventNotificationSent        = string(events.NotificationSent)
+	eventNotificationFailed      = string(events.NotificationFailed)
 	// eventNotificationDegraded marks a send that only succeeded via
 	// telegramTransport.sendSync's plain-text fallback (a MarkdownV2 parse
 	// rejection on the first attempt) — deliberately distinct from
 	// eventNotificationSent so a formatting downgrade, which signals the
 	// chatmarkup escaper has a hole worth investigating, doesn't blend into
 	// the ordinary-send count.
-	eventNotificationDegraded = "notification-degraded"
+	eventNotificationDegraded = string(events.NotificationDegraded)
 	// eventNotificationSuppressed marks a close-time batch flush (see
 	// chatEventSink.closeFlush) that was dropped rather than sent because the
 	// transport was already globally muted — the one case a queued batch
 	// never reaches chat at all, so the run-log line is what keeps the
 	// outcome recoverable.
-	eventNotificationSuppressed = "notification-suppressed"
+	eventNotificationSuppressed = string(events.NotificationSuppressed)
 )
 
 // Event types written by one-shot CLI callers (see AppendEvent), exported
 // because those callers live outside this package.
 const (
 	// EventManualLand marks a ticket landed by hand rather than by the loop.
-	EventManualLand = "manual-land"
+	EventManualLand = string(events.ManualLand)
 	// EventTicketReset marks a ticket reset back to open by hand.
-	EventTicketReset = "ticket-reset"
+	EventTicketReset = string(events.TicketReset)
 )
 
 // notifyKind* tag which live event triggered a notification-sent/
@@ -165,6 +166,16 @@ type Event struct {
 	// session-data lookup key alongside AgentSession.
 	Cwd    string `json:"cwd,omitempty"`
 	Reason string `json:"reason,omitempty"`
+	// Kind (failure and recovery events) is the closed-enum cause from the
+	// events package; required on the types events.KindRequired names.
+	Kind string `json:"kind,omitempty"`
+	// Address (failure events) identifies what failed: the ticket id until
+	// canonical addresses arrive. Filled from Ticket when empty.
+	Address string `json:"address,omitempty"`
+	// Iteration/Attempt are set only when known/applicable, never as
+	// placeholders.
+	Iteration int `json:"iteration,omitempty"`
+	Attempt   int `json:"attempt,omitempty"`
 	// SHA is the feature branch's tip commit right after a cherry-picked
 	// event landed a ticket's iteration. Recorded because CherryPickRange
 	// creates fresh commits (different hashes than the iteration branch's
@@ -235,7 +246,13 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	if ev.Time.IsZero() {
 		ev.Time = time.Now()
 	}
-	data, err := json.Marshal(ev)
+	if err := events.Validate(events.Type(ev.Type), events.Kind(ev.Kind)); err != nil {
+		return err
+	}
+	if ev.Kind != "" && ev.Address == "" {
+		ev.Address = ev.Ticket
+	}
+	data, err := events.Fit(func() ([]byte, error) { return json.Marshal(ev) }, &ev.Reason, &ev.Body)
 	if err != nil {
 		return err
 	}
@@ -258,36 +275,11 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	return err
 }
 
-// maxEventLineBytes is the size cap for one run-log line. POSIX only
-// guarantees an O_APPEND write is not interleaved with another process's write
-// when it is a single write(2) of at most PIPE_BUF-ish size, so AppendEvent
-// takes no on-disk lock and instead relies on that: one write per event, kept
-// under this cap (4096 including the newline).
-const maxEventLineBytes = 4096
-
 // AppendEvent appends ev to epicName's run-log.jsonl for one-shot CLI callers
 // that run alongside (or without) a live ralph-loop process. There is no
 // on-disk lock: concurrent processes rely on O_APPEND atomicity of a single
-// write under maxEventLineBytes, so Reason is truncated to make the line fit.
+// write under events.MaxLineBytes, which logEvent enforces for every append.
 func AppendEvent(scratchDir, epicName string, ev Event) error {
-	if ev.Time.IsZero() {
-		ev.Time = time.Now()
-	}
-	data, err := json.Marshal(ev)
-	if err != nil {
-		return err
-	}
-	// A raw Reason byte encodes to between 1 and 6 JSON bytes, so cutting
-	// excess/6 raw bytes never overshoots; re-measure and repeat until the
-	// line fits.
-	for len(data)+1 > maxEventLineBytes && ev.Reason != "" {
-		cut := max((len(data)+1-maxEventLineBytes)/6, 1)
-		keep := max(len(ev.Reason)-cut, 0)
-		ev.Reason = strings.ToValidUTF8(ev.Reason[:keep], "")
-		if data, err = json.Marshal(ev); err != nil {
-			return err
-		}
-	}
 	return logEvent(scratchDir, epicName, ev)
 }
 

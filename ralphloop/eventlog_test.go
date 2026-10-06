@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	eventsc "github.com/elentok/gx/events"
 )
 
 func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
@@ -90,8 +92,8 @@ func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if len(raw) > maxEventLineBytes {
-		t.Errorf("line is %d bytes, want <= %d", len(raw), maxEventLineBytes)
+	if len(raw) > eventsc.MaxLineBytes {
+		t.Errorf("line is %d bytes, want <= %d", len(raw), eventsc.MaxLineBytes)
 	}
 	events, _, _ := ReadEvents(dir, "epic")
 	if len(events) != 1 || events[0].Reason == "" || !strings.HasPrefix(reason, events[0].Reason) {
@@ -523,5 +525,44 @@ func TestSendWithRetry_DeadlineShorterThanRetryAfter_SkipsRetry(t *testing.T) {
 	}
 	if elapsed >= time.Duration(retryAfter)*time.Second {
 		t.Errorf("elapsed = %v, want well under retry_after (%ds) — should not have waited it out", elapsed, retryAfter)
+	}
+}
+
+func TestLogEvent_FailureEventWithoutKindIsRejected(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	err := logEvent(dir, "epic", Event{Type: string(eventsc.LaunchFailed), Ticket: "01", Reason: "free text only"})
+	if err == nil {
+		t.Fatal("logEvent accepted a launch-failed event without a kind")
+	}
+	if _, statErr := os.Stat(runLogPath(dir, "epic")); !os.IsNotExist(statErr) {
+		t.Errorf("rejected event still reached the log (stat err %v)", statErr)
+	}
+}
+
+func TestLogEvent_FailureEventCarriesAddressAndTruncatedReason(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	err := logEvent(dir, "epic", Event{
+		Type: string(eventsc.LaunchFailed), Kind: string(eventsc.AgentNameTaken), Ticket: "07",
+		Attempt: 2, Reason: strings.Repeat("x", 10000),
+	})
+	if err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	raw, _ := os.ReadFile(runLogPath(dir, "epic"))
+	if len(raw) > eventsc.MaxLineBytes {
+		t.Errorf("line is %d bytes, want <= %d", len(raw), eventsc.MaxLineBytes)
+	}
+	line := string(raw)
+	for _, want := range []string{`"kind":"agent_name_taken"`, `"address":"07"`, `"attempt":2`} {
+		if !strings.Contains(line, want) {
+			t.Errorf("line missing %s: %.200s", want, line)
+		}
+	}
+	if strings.Contains(line, `"iteration"`) {
+		t.Errorf("unknown iteration must be omitted, not a placeholder: %.200s", line)
 	}
 }
