@@ -233,11 +233,11 @@ type EventSink interface {
 // tests exercising pause/resume plumbing) without wiring up a real sink.
 type noopEventSink struct{}
 
-func (noopEventSink) EpicStarted(epicName string, done, total int)                            {}
-func (noopEventSink) TicketReverted(identifier string)                                        {}
-func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)               {}
-func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string)            {}
-func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                                     {}
+func (noopEventSink) EpicStarted(epicName string, done, total int)                 {}
+func (noopEventSink) TicketReverted(identifier string)                             {}
+func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)    {}
+func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {}
+func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                          {}
 func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
 }
 func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}

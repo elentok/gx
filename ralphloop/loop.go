@@ -789,13 +789,18 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// restarting the loop. Flag just this ticket needs-repair
 			// (out of the frontier, so never reclaimed until a human clears
 			// it) and keep scheduling the rest.
+			kind := events.IterationError
+			var lf *launchFailure
+			if errors.As(r.err, &lf) {
+				kind = lf.Kind
+			}
 			park(sink, parkRequest{
 				ScratchDir: scratchDir,
 				EpicName:   opts.EpicName,
 				Ticket:     r.ticket.Identifier,
 				Path:       r.ticket.Path,
 				Type:       events.NeedsRepair,
-				Kind:       events.IterationError,
+				Kind:       kind,
 				Reason:     r.err.Error(),
 				Repair: schema.NeedsRepairState{
 					Label:    iterLabel(opts.EpicName, r.ticket.Identifier),

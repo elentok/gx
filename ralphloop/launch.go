@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -233,6 +235,43 @@ func (p launchAndPromptParams) sink() EventSink {
 		return noopEventSink{}
 	}
 	return p.Sink
+}
+
+// launchFailure carries the events kind of a failed launch up to the loop's
+// catch-all park, so the park event matches the launch-failed events.
+type launchFailure struct {
+	Kind events.Kind
+	Err  error
+}
+
+func (e *launchFailure) Error() string { return e.Err.Error() }
+func (e *launchFailure) Unwrap() error { return e.Err }
+
+// classifyLaunchError names a launch error's herdr code. Most herdr errors
+// reach us as plain text, so only agent_name_taken has a typed error.
+func classifyLaunchError(err error) events.Kind {
+	var nameTaken *herdr.AgentNameTakenError
+	switch {
+	case errors.As(err, &nameTaken):
+		return events.AgentNameTaken
+	case errors.Is(err, errStuckSubmission), strings.Contains(err.Error(), string(events.AgentPromptStalled)):
+		return events.AgentPromptStalled
+	case strings.Contains(err.Error(), string(events.AgentPaneBusy)):
+		return events.AgentPaneBusy
+	}
+	return events.IterationError
+}
+
+// logLaunchFailed appends one launch-failed event for a failed attempt.
+func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.Kind, err error) {
+	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
+		Type:    string(events.LaunchFailed),
+		Ticket:  p.Ticket.Identifier,
+		Kind:    string(kind),
+		Label:   label,
+		Attempt: attempt,
+		Reason:  err.Error(),
+	})
 }
 
 // launchAndPrompt runs the shared agent lifecycle protocol: launch the agent in

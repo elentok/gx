@@ -102,6 +102,11 @@ func runIteration(d Deps, p iterationParams) error {
 
 		launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
 		sessionID, err = launchAndPrompt(d, launchParams)
+		if err != nil && !errors.Is(err, errBlockedPaneParked) {
+			kind := classifyLaunchError(err)
+			p.logLaunchFailed(label, attempt, kind, err)
+			err = &launchFailure{Kind: kind, Err: err}
+		}
 		if !errors.Is(err, errStuckSubmission) || attempt >= maxLaunchAttempts {
 			break
 		}

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -162,5 +163,38 @@ func TestRunIteration_UnrelatedFailure_NeverRetriesOrClosesTab(t *testing.T) {
 	}
 	if len(*closedTabIDs) != 0 {
 		t.Errorf("TabClose called %d times, want 0 (this failure mode's pane is left for needs-repair inspection, as before)", len(*closedTabIDs))
+	}
+}
+
+func TestRunIteration_LaunchFailures_LogOneEventPerAttempt(t *testing.T) {
+	t.Parallel()
+	d, _, _ := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
+		return herdr.Agent{}, errStuckSubmission
+	})
+	p := testIterationParams()
+	p.ScratchDir = t.TempDir()
+
+	err := runIteration(d, p)
+	var lf *launchFailure
+	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
+		t.Fatalf("runIteration() error = %v, want launchFailure of kind %q", err, events.AgentPromptStalled)
+	}
+	evs, ok, rerr := ReadEvents(p.ScratchDir, p.FeatureBranch)
+	if !ok || rerr != nil {
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, rerr)
+	}
+	var failed []Event
+	for _, ev := range evs {
+		if ev.Type == string(events.LaunchFailed) {
+			failed = append(failed, ev)
+		}
+	}
+	if len(failed) != maxLaunchAttempts {
+		t.Fatalf("launch-failed events = %d, want %d", len(failed), maxLaunchAttempts)
+	}
+	for i, ev := range failed {
+		if ev.Kind != string(events.AgentPromptStalled) || ev.Attempt != i+1 || ev.Label == "" {
+			t.Errorf("event %d = kind %q attempt %d label %q", i, ev.Kind, ev.Attempt, ev.Label)
+		}
 	}
 }

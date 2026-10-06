@@ -76,17 +76,20 @@ type Kind string
 const (
 	AgentNameTaken Kind = "agent_name_taken"
 	AgentPaneBusy  Kind = "agent_pane_busy"
-	ZeroCommit     Kind = "zero-commit"
-	BlockedPane    Kind = "blocked-pane"
-	SelfReported   Kind = "self-reported"
-	HandleMismatch Kind = "handle-mismatch"
-	RetryExhausted Kind = "retry-exhausted"
-	Spinning       Kind = "spinning"
-	BudgetKilled   Kind = "budget-killed"
-	AmbiguousLand  Kind = "ambiguous-land"
-	AllParked      Kind = "all-parked"
-	BlockedCycle   Kind = "blocked-cycle"
-	DuplicateLive  Kind = "duplicate-live"
+	// AgentPromptStalled is herdr's agent_prompt_stalled: the initial prompt
+	// never reached the pane.
+	AgentPromptStalled Kind = "agent_prompt_stalled"
+	ZeroCommit         Kind = "zero-commit"
+	BlockedPane        Kind = "blocked-pane"
+	SelfReported       Kind = "self-reported"
+	HandleMismatch     Kind = "handle-mismatch"
+	RetryExhausted     Kind = "retry-exhausted"
+	Spinning           Kind = "spinning"
+	BudgetKilled       Kind = "budget-killed"
+	AmbiguousLand      Kind = "ambiguous-land"
+	AllParked          Kind = "all-parked"
+	BlockedCycle       Kind = "blocked-cycle"
+	DuplicateLive      Kind = "duplicate-live"
 	// IterationError is the loop's catch-all: an iteration or land failed
 	// with an error no more specific kind names.
 	IterationError Kind = "iteration-error"
@@ -102,7 +105,7 @@ var kindCauseHerdr = map[Kind]bool{
 
 // kinds is the closed set; Valid checks membership.
 var kinds = map[Kind]bool{
-	AgentNameTaken: true, AgentPaneBusy: true, ZeroCommit: true, BlockedPane: true,
+	AgentNameTaken: true, AgentPaneBusy: true, AgentPromptStalled: true, ZeroCommit: true, BlockedPane: true,
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true,

@@ -211,7 +211,9 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 		fire func(sink *chatEventSink)
 	}{
 		{"EpicStarted", func(s *chatEventSink) { s.EpicStarted("epic", 0, 3) }},
-		{"IterationStarted", func(s *chatEventSink) { s.IterationStarted(ticket, "iter-04", "/repo", "sess-1", AgentKind("claude"), "pane-1", "tab-1") }},
+		{"IterationStarted", func(s *chatEventSink) {
+			s.IterationStarted(ticket, "iter-04", "/repo", "sess-1", AgentKind("claude"), "pane-1", "tab-1")
+		}},
 		{"IterationPaused", func(s *chatEventSink) { s.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited") }},
 		{"IterationResumed", func(s *chatEventSink) { s.IterationResumed("04", "iter-04", PauseRateLimit) }},
 		{"IterationFinished", func(s *chatEventSink) { s.IterationFinished(ticket, "epic", stats) }},
