@@ -5,6 +5,7 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,7 +14,47 @@ import (
 )
 
 type Client struct {
-	http *http.Client
+	http     *http.Client
+	readOnly bool
+}
+
+// ErrReadOnly is returned by CheckWrite after Negotiate found an API version
+// mismatch: the wire contract can't be trusted for writes.
+var ErrReadOnly = errors.New("server API version differs from this client; run `gx server restart`")
+
+// Negotiation is the outcome of comparing client and server versions.
+type Negotiation struct {
+	server.Handshake
+	ReadOnly bool
+	// Hint is a user-facing remedy; empty when versions agree.
+	Hint string
+}
+
+// Negotiate handshakes and compares versions. An API mismatch makes the client
+// read-only; a build-only mismatch just yields a hint.
+func (c *Client) Negotiate(ctx context.Context, build string) (Negotiation, error) {
+	h, err := c.Handshake(ctx)
+	if err != nil {
+		return Negotiation{}, err
+	}
+	n := Negotiation{Handshake: h}
+	switch {
+	case h.APIVersion != server.APIVersion:
+		n.ReadOnly = true
+		n.Hint = fmt.Sprintf("read-only: server API v%d, client API v%d; run `gx server restart`", h.APIVersion, server.APIVersion)
+	case h.Build != build:
+		n.Hint = fmt.Sprintf("server is an older build (%s, client %s); run `gx server restart` to upgrade", h.Build, build)
+	}
+	c.readOnly = n.ReadOnly
+	return n, nil
+}
+
+// CheckWrite must be called before any request that mutates server state.
+func (c *Client) CheckWrite() error {
+	if c.readOnly {
+		return ErrReadOnly
+	}
+	return nil
 }
 
 // New returns a client for the server listening on the unix socket.

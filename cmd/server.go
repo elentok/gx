@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -33,6 +35,20 @@ func newServerCmd(_ deps) *cobra.Command {
 		},
 	}
 	cmd.AddCommand(&cobra.Command{
+		Use:   "start",
+		Short: "start the server detached from this terminal (no-op if already running)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerStartCmd(c.Context(), c.OutOrStdout())
+		},
+	}, &cobra.Command{
+		Use:   "restart",
+		Short: "stop the server and start it again (use after upgrading gx)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerRestart(c.Context(), c.OutOrStdout())
+		},
+	}, &cobra.Command{
 		Use:   "status",
 		Short: "show whether the server is running, with its pid and build",
 		Args:  cobra.NoArgs,
@@ -139,13 +155,91 @@ func runServerStatus(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	h, err := c.Handshake(ctx)
+	n, err := c.Negotiate(ctx, getVersion())
 	if err != nil {
 		_, werr := fmt.Fprintln(w, "not running")
 		return werr
 	}
-	_, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", h.Pid, h.Build)
+	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", n.Pid, n.Build); err != nil {
+		return err
+	}
+	if n.Hint != "" {
+		_, err = fmt.Fprintln(w, n.Hint)
+	}
 	return err
+}
+
+// spawnFunc launches a detached server and returns once it exits or the
+// caller no longer needs it; its error is the launch failure.
+type spawnFunc func() error
+
+// runServerStart is idempotent: a server that already answers is left alone.
+func runServerStart(ctx context.Context, c *apiclient.Client, w io.Writer, spawn spawnFunc) error {
+	if h, err := c.Handshake(ctx); err == nil {
+		_, werr := fmt.Fprintf(w, "already running (pid %d)\n", h.Pid)
+		return werr
+	}
+	if err := spawn(); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(stopTimeout)
+	for time.Now().Before(deadline) {
+		if h, err := c.Handshake(ctx); err == nil {
+			_, werr := fmt.Fprintf(w, "started (pid %d)\n", h.Pid)
+			return werr
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return fmt.Errorf("server did not answer within %s", stopTimeout)
+}
+
+// spawnDetached re-executes this binary as `gx server` in its own session with
+// no terminal, so closing the launching terminal cannot stop it. exec.Cmd
+// already closes every fd except stdio, and stdio is /dev/null plus the log.
+func spawnDetached(stateDir string) spawnFunc {
+	return func() error {
+		exe, err := os.Executable()
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(stateDir, 0o700); err != nil {
+			return err
+		}
+		logf, err := os.OpenFile(filepath.Join(stateDir, "server.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+		if err != nil {
+			return err
+		}
+		defer logf.Close()
+		child := exec.Command(exe, "server")
+		child.Stdout, child.Stderr = logf, logf // Stdin nil = /dev/null
+		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		if err := child.Start(); err != nil {
+			return fmt.Errorf("start server: %w", err)
+		}
+		return child.Process.Release()
+	}
+}
+
+func runServerStartCmd(ctx context.Context, w io.Writer) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return err
+	}
+	c, err := serverClient()
+	if err != nil {
+		return err
+	}
+	return runServerStart(ctx, c, w, spawnDetached(stateDir))
+}
+
+func runServerRestart(ctx context.Context, w io.Writer) error {
+	if err := runServerStop(ctx, w); err != nil {
+		return err
+	}
+	return runServerStartCmd(ctx, w)
 }
 
 // runServerStop SIGTERMs the server and returns once it stops answering,
