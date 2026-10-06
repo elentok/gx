@@ -1,11 +1,17 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +26,9 @@ func newServerCmd(_ deps) *cobra.Command {
 		Use:   "server",
 		Short: "orchestrator daemon commands",
 		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServer(c.Context())
+		},
 	}
 	eventsCmd := &cobra.Command{
 		Use:   "events",
@@ -39,6 +48,24 @@ func newServerCmd(_ deps) *cobra.Command {
 	eventsCmd.AddCommand(kinds)
 	cmd.AddCommand(eventsCmd)
 	return cmd
+}
+
+// runServer runs the foreground server until interrupted.
+func runServer(ctx context.Context) error {
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return err
+	}
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion()})
+	if err != nil {
+		return err
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return srv.Serve(ctx)
 }
 
 // runServerEventsKinds prints every event kind, reading Go data only.
