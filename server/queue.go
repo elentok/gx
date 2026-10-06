@@ -22,6 +22,8 @@ const queueFileName = "queue.json"
 // Refusal reasons of the queue writes. Stable: clients switch on them.
 const (
 	ReasonSchedulerNotSelected = "scheduler-not-selected"
+	// ReasonServerNotRunning is produced by the CLI, never the server.
+	ReasonServerNotRunning = "server-not-running"
 	ReasonUnknownTicket        = "unknown-ticket"
 	ReasonInvalidAddress       = "invalid-address"
 	ReasonInvalidAgent         = "invalid-agent"

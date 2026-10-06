@@ -174,12 +174,21 @@ func serverQueueWrite(c *cobra.Command, jsonOut bool, do func(context.Context, *
 	if err != nil {
 		return err
 	}
+	return runServerQueueWrite(ctx, cl, c.OutOrStdout(), jsonOut, do)
+}
+
+// runServerQueueWrite never starts the server: a dead socket is a refusal
+// with a `gx server start` hint.
+func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, do func(context.Context, *apiclient.Client) (server.QueueResult, error)) error {
 	res, err := do(ctx, cl)
-	if err != nil {
-		return fmt.Errorf("server write failed (is `gx server` running?): %w", err)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = server.QueueResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		enc := json.NewEncoder(c.OutOrStdout())
+		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(res)
 	}
@@ -187,7 +196,7 @@ func serverQueueWrite(c *cobra.Command, jsonOut bool, do func(context.Context, *
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
 	for i, it := range res.Queue {
-		if _, err := fmt.Fprintf(c.OutOrStdout(), "%d\t%s\t%s\n", i+1, it.Address, it.Agent); err != nil {
+		if _, err := fmt.Fprintf(w, "%d\t%s\t%s\n", i+1, it.Address, it.Agent); err != nil {
 			return err
 		}
 	}

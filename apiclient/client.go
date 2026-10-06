@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/elentok/gx/server"
@@ -61,6 +62,11 @@ func (c *Client) CheckWrite() error {
 		return ErrReadOnly
 	}
 	return nil
+}
+
+// IsNotRunning reports whether err means nothing listens on the socket.
+func IsNotRunning(err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ENOENT)
 }
 
 // New returns a client for the server listening on the unix socket.
