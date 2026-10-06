@@ -308,10 +308,24 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 	t, err := schema.ParseTicket(one.Ticket.Path)
 	if err != nil || t.Status != "done" {
 		s.events.publish(EventIterationParked, ticketAddr)
+		s.notifyPark(one, ticketAddr, string(t.Status))
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
 	s.completeRootIfDone(root, one)
+}
+
+// notifyPark sends the one chat message for a park. Anything that is not an
+// explicit needs-repair reads as a question for a person.
+func (s *Server) notifyPark(one ralphloop.OneIteration, ticketAddr, status string) {
+	addr, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{})
+	if err != nil {
+		return
+	}
+	if status != string(schema.StatusNeedsRepair) {
+		status = string(schema.StatusNeedsAnswer)
+	}
+	s.chat.Park(addr.Project, addr.Epic, one.Ticket.Path, addr.ID, status, "iteration ended without landing the ticket")
 }
 
 // completeRootIfDone dequeues the root once every ticket in its epic is done.

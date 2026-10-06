@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/storecommit"
 )
 
@@ -79,6 +80,9 @@ type Config struct {
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string
+
+	// Chat names the chat destinations the server notifies; empty means none.
+	Chat ralphloop.ServerChatConfig
 }
 
 // DefaultTCPAddr is where the opt-in TCP listener binds.
@@ -103,6 +107,7 @@ type Server struct {
 	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
 
+	chat      *ralphloop.ServerChat // nil when no chat destination is configured
 	registry  *runRegistry
 	savedRuns []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused   refusals
@@ -196,6 +201,7 @@ func New(cfg Config) (*Server, error) {
 		log:  log,
 		idx:  idx,
 
+		chat:      ralphloop.NewServerChat(cfg.Chat),
 		registry:  registry,
 		savedRuns: savedRuns,
 
@@ -398,6 +404,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		s.log.Warn("stopping with a land still in flight", "timeout", timeout)
 	}
 	stopCommits()
+	s.chat.Close()
 	_ = os.Remove(SocketPath(s.cfg.StateDir))
 	s.log.Info("server stopped")
 	_ = s.logf.Close()

@@ -3,10 +3,14 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -408,5 +412,72 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	if strings.Join(seen, ",") != strings.Join(want, ",") {
 		log, _ := os.ReadFile(server.LogPath(h.StateDir))
 		t.Fatalf("events = %v, want %v\nserver log:\n%s", seen, want, log)
+	}
+}
+
+func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	var mu sync.Mutex
+	var bodies []string
+	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+	}))
+	defer chat.Close()
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}
+	})
+	registerLaunch(h) // the agent finishes without committing, so the ticket parks
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var streams []<-chan server.Event
+	for range 2 { // two connected clients
+		evs, err := h.Client.Events(ctx, snap.Seq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		streams = append(streams, evs)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	for _, evs := range streams {
+		for ev := range evs {
+			if ev.Type == server.EventIterationParked {
+				break
+			}
+		}
+	}
+
+	waitFor := func(n int) {
+		t.Helper()
+		for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			mu.Lock()
+			got := len(bodies)
+			mu.Unlock()
+			if got >= n {
+				return
+			}
+		}
+	}
+	waitFor(1)
+	time.Sleep(time.Second)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(bodies) != 1 {
+		t.Fatalf("chat sends = %d, want exactly 1: %v", len(bodies), bodies)
+	}
+	if !strings.Contains(bodies[0], "[proj] ") {
+		t.Errorf("message lacks the project prefix: %s", bodies[0])
 	}
 }

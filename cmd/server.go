@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
@@ -145,7 +146,11 @@ func runServer(ctx context.Context) error {
 	}
 	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, Orchestrator: cfg.Orchestrator, MaxConcurrentRoots: cfg.ExecutionQueue.MaxConcurrentEpics,
 		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
-		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second, StorePushRemote: cfg.TicketStore.PushRemote})
+		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second, StorePushRemote: cfg.TicketStore.PushRemote,
+		Chat: ralphloop.ServerChatConfig{
+			TelegramBotToken: cfg.Notifications.Telegram.BotToken, TelegramChatID: cfg.Notifications.Telegram.ChatID,
+			SlackWebhookURL: cfg.Notifications.Slack.WebhookURL,
+		}})
 	if err != nil {
 		return err
 	}
