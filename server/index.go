@@ -31,9 +31,9 @@ type Snapshot struct {
 
 // index is the server's in-memory view of the ticket store.
 type index struct {
-	mu   sync.RWMutex
-	seq  uint64
-	list []TicketInfo
+	mu     sync.RWMutex
+	events *broker
+	list   []TicketInfo
 }
 
 // scanStore reads every project in the ticket store. Always a full read of the
@@ -64,16 +64,17 @@ func scanStore(storePath string) ([]TicketInfo, error) {
 }
 
 // buildIndex does the initial scan.
-func buildIndex(storePath string) (*index, error) {
+func buildIndex(storePath string, events *broker) (*index, error) {
 	list, err := scanStore(storePath)
 	if err != nil {
 		return nil, err
 	}
-	return &index{list: list}, nil
+	return &index{list: list, events: events}, nil
 }
 
-// refresh rescans the store and replaces the index. seq only advances when the
-// scan differs from the current state.
+// refresh rescans the store and replaces the index, publishing one
+// ticket-changed event per ticket that differs. Publishing happens under the
+// lock so a snapshot's seq always matches the list it carries.
 func (i *index) refresh(storePath string) error {
 	list, err := scanStore(storePath)
 	if err != nil {
@@ -81,11 +82,33 @@ func (i *index) refresh(storePath string) error {
 	}
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	if !reflect.DeepEqual(i.list, list) {
-		i.list = list
-		i.seq++
+	for _, addr := range changedAddresses(i.list, list) {
+		i.events.publish(EventTicketChanged, addr)
 	}
+	i.list = list
 	return nil
+}
+
+// changedAddresses lists, in address order, tickets added, removed or edited
+// between two address-sorted lists.
+func changedAddresses(old, next []TicketInfo) []string {
+	byAddr := make(map[string]TicketInfo, len(old))
+	for _, t := range old {
+		byAddr[t.Address] = t
+	}
+	var changed []string
+	for _, t := range next {
+		prev, ok := byAddr[t.Address]
+		if !ok || !reflect.DeepEqual(prev, t) {
+			changed = append(changed, t.Address)
+		}
+		delete(byAddr, t.Address)
+	}
+	for addr := range byAddr {
+		changed = append(changed, addr)
+	}
+	sort.Strings(changed)
+	return changed
 }
 
 func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
@@ -106,5 +129,5 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 func (i *index) snapshot() Snapshot {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	return Snapshot{Seq: i.seq, Tickets: append([]TicketInfo{}, i.list...)}
+	return Snapshot{Seq: i.events.currentSeq(), Tickets: append([]TicketInfo{}, i.list...)}
 }

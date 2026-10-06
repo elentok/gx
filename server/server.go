@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -41,6 +42,8 @@ type Config struct {
 
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only
+
+	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 }
 
 // Server owns the state-dir lock and the listening socket.
@@ -53,6 +56,7 @@ type Server struct {
 	log  *slog.Logger
 	idx  *index
 
+	events *broker
 	rewatch func() // set by keepFresh when the watch is active
 }
 
@@ -71,7 +75,8 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	idx, err := buildIndex(cfg.TicketStore)
+	events := newBroker(cfg.SubscriberBuffer)
+	idx, err := buildIndex(cfg.TicketStore, events)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("index ticket store: %w", err)
@@ -102,10 +107,13 @@ func New(cfg Config) (*Server, error) {
 		logf: logf,
 		log:  slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo})),
 		idx:  idx,
+
+		events: events,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/handshake", s.handshake)
 	mux.HandleFunc("GET /v1/snapshot", s.snapshot)
+	mux.HandleFunc("GET /v1/events", s.streamEvents)
 	s.http = &http.Server{Handler: mux}
 	return s, nil
 }
@@ -113,6 +121,50 @@ func New(cfg Config) (*Server, error) {
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(s.idx.snapshot())
+}
+
+// streamEvents is SSE: every event with seq > ?since, then live events until
+// the client leaves or is dropped for lagging. 410 means re-snapshot.
+func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
+	var since uint64
+	if v := r.URL.Query().Get("since"); v != "" {
+		n, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			http.Error(w, "bad since", http.StatusBadRequest)
+			return
+		}
+		since = n
+	}
+	ch, cancel, err := s.events.subscribe(since)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusGone)
+		return
+	}
+	defer cancel()
+	flusher, _ := w.(http.Flusher)
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+	if flusher != nil {
+		flusher.Flush()
+	}
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(ev)
+			if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", ev.Seq, ev.Type, data); err != nil {
+				return
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+	}
 }
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
@@ -132,6 +184,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	var err error
 	select {
 	case <-ctx.Done():
+		s.events.close() // open streams would otherwise hold Shutdown
 		err = s.http.Shutdown(context.Background())
 		<-errc
 	case err = <-errc:

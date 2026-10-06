@@ -62,6 +62,47 @@ func TestSnapshot_ListsStoreTicketsByAddressWithSequence(t *testing.T) {
 	}
 }
 
+func TestEvents_SnapshotThenSubscribeSeesTicketEditAsOneEventWithNextSeq(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic", "02", "second", "")
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(store, "proj", "epic", "issues", "02-second.md")
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(body), "status: open", "status: done", 1)
+	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case ev := <-events:
+		want := server.Event{Seq: snap.Seq + 1, Type: server.EventTicketChanged, Address: "proj:epic/02"}
+		if ev != want {
+			t.Errorf("event = %+v, want %+v", ev, want)
+		}
+	case <-ctx.Done():
+		t.Fatal("no event for the edit")
+	}
+	if _, err := h.Client.Events(ctx, snap.Seq+100); err == nil {
+		t.Error("subscribing from an unknown seq succeeded")
+	}
+}
+
 func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
 	h := servertest.Start(t)
 

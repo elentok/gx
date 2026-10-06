@@ -3,12 +3,14 @@
 package apiclient
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/elentok/gx/server"
 )
@@ -79,6 +81,47 @@ func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
 	var s server.Snapshot
 	err := c.get(ctx, "/v1/snapshot", &s)
 	return s, err
+}
+
+// Events subscribes to the event stream from seq since (use Snapshot's Seq).
+// The channel closes when the stream ends: the server dropped this client for
+// lagging, stopped, or ctx was cancelled. Re-snapshot and resubscribe then.
+func (c *Client) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
+	path := fmt.Sprintf("/v1/events?since=%d", since)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("server returned %s for %s", resp.Status, path)
+	}
+	out := make(chan server.Event)
+	go func() {
+		defer close(out)
+		defer resp.Body.Close()
+		sc := bufio.NewScanner(resp.Body)
+		for sc.Scan() {
+			data, ok := strings.CutPrefix(sc.Text(), "data: ")
+			if !ok {
+				continue
+			}
+			var ev server.Event
+			if json.Unmarshal([]byte(data), &ev) != nil {
+				return
+			}
+			select {
+			case out <- ev:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, nil
 }
 
 func (c *Client) get(ctx context.Context, path string, out any) error {
