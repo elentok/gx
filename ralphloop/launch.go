@@ -477,12 +477,12 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 	if agentSession == "" {
 		return false
 	}
-	events, ok, err := ReadEvents(scratchDir, epicName)
+	evs, ok, err := ReadEvents(scratchDir, epicName)
 	if !ok || err != nil {
 		return false
 	}
-	for _, ev := range events {
-		if ev.Type == eventIterationStarted && ev.AgentSession == agentSession && ev.StateChangeSeq != 0 {
+	for _, ev := range evs {
+		if ev.Type == string(events.IterationStarted) && ev.AgentSession == agentSession && ev.StateChangeSeq != 0 {
 			return currentSeq == ev.StateChangeSeq
 		}
 	}

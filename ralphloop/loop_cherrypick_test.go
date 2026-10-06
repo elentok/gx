@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 )
@@ -171,14 +172,14 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 	for i, ev := range events {
 		gotTypes = append(gotTypes, ev.Type)
 		switch ev.Type {
-		case eventConflictHit:
+		case string(eventsc.ConflictHit):
 			conflictHit = &events[i]
-		case eventConflictResolved:
+		case string(eventsc.ConflictResolved):
 			conflictResolved = &events[i]
 		}
 	}
 	if conflictHit == nil || conflictResolved == nil {
-		t.Fatalf("event types = %v, want both %q and %q", gotTypes, eventConflictHit, eventConflictResolved)
+		t.Fatalf("event types = %v, want both %q and %q", gotTypes, string(eventsc.ConflictHit), string(eventsc.ConflictResolved))
 	}
 	if conflictHit.AgentSession == "" {
 		t.Errorf("conflict-hit event = %+v, want a non-empty AgentSession (the iteration agent's own session)", conflictHit)

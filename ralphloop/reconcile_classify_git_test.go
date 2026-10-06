@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"testing"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -61,7 +62,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main-item-03")
 
 	d := realGitDeps()
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: landedSHA}}
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
@@ -149,7 +150,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 	// ralph-loop/iter-03 was never cleaned up, still pointing at the
 	// pre-rebase original.
 	d := realGitDeps()
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: landedSHA}}
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
@@ -228,7 +229,7 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main-item-03")
 
 	d := realGitDeps()
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: landedSHA}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: landedSHA}}
 	landed, err := landedTickets(dir, "main")
 	if err != nil {
 		t.Fatalf("landedTickets: %v", err)

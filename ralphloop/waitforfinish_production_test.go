@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets/schema"
@@ -220,9 +221,9 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	var sawResumed, sawFailed bool
 	for _, e := range events {
 		switch e.Type {
-		case eventResumed:
+		case string(eventsc.Resumed):
 			sawResumed = true
-		case eventSmartZoneRecoveryFailed:
+		case string(eventsc.SmartZoneRecoveryFailed):
 			sawFailed = true
 		}
 	}
@@ -434,17 +435,17 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	for _, e := range events {
 		seen[e.Type] = true
 	}
-	if !seen[eventResumed] {
+	if !seen[string(eventsc.Resumed)] {
 		t.Error("missing resumed event after smart-zone recovery")
 	}
-	if seen[eventSmartZoneRecoveryFailed] {
+	if seen[string(eventsc.SmartZoneRecoveryFailed)] {
 		t.Error("smart-zone-recovery-failed event emitted, want none")
 	}
-	if !seen[eventSmartZoneGateReleased] {
-		t.Errorf("missing %s event — a premature-idle pane's completion must be attributed to the gate holding until the boundary landed", eventSmartZoneGateReleased)
+	if !seen[string(eventsc.SmartZoneGateReleased)] {
+		t.Errorf("missing %s event — a premature-idle pane's completion must be attributed to the gate holding until the boundary landed", string(eventsc.SmartZoneGateReleased))
 	}
-	if seen[eventSmartZoneWaitExpired] {
-		t.Errorf("%s logged for a gated completion, want it reserved for the pane-timeout route", eventSmartZoneWaitExpired)
+	if seen[string(eventsc.SmartZoneWaitExpired)] {
+		t.Errorf("%s logged for a gated completion, want it reserved for the pane-timeout route", string(eventsc.SmartZoneWaitExpired))
 	}
 }
 
@@ -598,10 +599,10 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	for _, e := range events {
 		seen[e.Type] = true
 	}
-	if !seen[eventSmartZoneRecoveryFailed] {
-		t.Errorf("missing %s event for a compaction that never confirmed", eventSmartZoneRecoveryFailed)
+	if !seen[string(eventsc.SmartZoneRecoveryFailed)] {
+		t.Errorf("missing %s event for a compaction that never confirmed", string(eventsc.SmartZoneRecoveryFailed))
 	}
-	if seen[eventResumed] {
+	if seen[string(eventsc.Resumed)] {
 		t.Error("resumed event emitted, want none: nothing recovered")
 	}
 }
@@ -672,11 +673,11 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	var sawFailed, sawNeedsRepair, sawResumed bool
 	for _, e := range events {
 		switch e.Type {
-		case eventSmartZoneRecoveryFailed:
+		case string(eventsc.SmartZoneRecoveryFailed):
 			sawFailed = true
-		case eventNeedsRepair:
+		case string(eventsc.NeedsRepair):
 			sawNeedsRepair = true
-		case eventResumed:
+		case string(eventsc.Resumed):
 			sawResumed = true
 		}
 	}
@@ -899,11 +900,11 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	var sawResumed, sawFailed, sawWaitExpired bool
 	for _, e := range events {
 		switch e.Type {
-		case eventResumed:
+		case string(eventsc.Resumed):
 			sawResumed = true
-		case eventSmartZoneRecoveryFailed:
+		case string(eventsc.SmartZoneRecoveryFailed):
 			sawFailed = true
-		case eventSmartZoneWaitExpired:
+		case string(eventsc.SmartZoneWaitExpired):
 			sawWaitExpired = true
 		}
 	}

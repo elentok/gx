@@ -399,7 +399,7 @@ func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
 // would reintroduce the race this comment is warning about.
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
-	p.logAgentEvent(eventPausedSmartZone, sessionID, reason)
+	p.logAgentEvent(string(events.PausedSmartZone), sessionID, reason)
 
 	baseline := newStickyBaseline(d, p, sessionID)
 
@@ -438,7 +438,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	}
 	if err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
-		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
+		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("compacting %s after smart-zone breach: %v", p.Label, err))
 		if errors.Is(err, errCompactNeverConfirmed) {
 			return false, err
 		}
@@ -446,14 +446,14 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	}
 	switch completion {
 	case compactTimeoutConfirmed:
-		p.logAgentEvent(eventSmartZoneWaitExpired, sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
+		p.logAgentEvent(string(events.SmartZoneWaitExpired), sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
 	case compactGateConfirmed:
-		p.logAgentEvent(eventSmartZoneGateReleased, sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary landed", p.Label))
+		p.logAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary landed", p.Label))
 	}
 
 	if err := confirmCompactSubmittedWithRetry(d, p.Pane); err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
-		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("confirming /compact submitted for %s: %v", p.Label, err))
+		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("confirming /compact submitted for %s: %v", p.Label, err))
 		return false, nil
 	}
 
@@ -473,12 +473,12 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		TimeoutMs: smartZoneRecoveryTimeoutMs,
 	}); err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
-		p.logAgentEvent(eventSmartZoneRecoveryFailed, sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
+		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
 		return false, nil
 	}
 
 	p.sink().SmartZoneRecovered(p.Ticket)
-	p.logLifecycleEvent(eventResumed, sessionID)
+	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	return true, nil
 }
 
@@ -815,17 +815,17 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 				if !held[m.TaskID] {
 					held[m.TaskID] = true
 					gated = true
-					p.logAgentEvent(eventBackgroundTaskGateHeld, sessionID, fmt.Sprintf("background task %s", m.TaskID))
+					p.logAgentEvent(string(events.BackgroundTaskGateHeld), sessionID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskResolved:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.logAgentEvent(eventBackgroundTaskGateReleased, sessionID, fmt.Sprintf("background task %s", m.TaskID))
+					p.logAgentEvent(string(events.BackgroundTaskGateReleased), sessionID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskOutstandingAgedOut:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.logAgentEvent(eventBackgroundTaskGateExpired, sessionID, fmt.Sprintf("background task %s", m.TaskID))
+					p.logAgentEvent(string(events.BackgroundTaskGateExpired), sessionID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			}
 		}
@@ -866,10 +866,10 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID, token st
 	}
 	p.Gate.pause(p.Label, reason)
 	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
-	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
+	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
 	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.Pane, token)
 	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
-	p.logLifecycleEvent(eventResumed, sessionID)
+	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	p.Gate.ForceResume(p.Label)
 
 	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
@@ -890,10 +890,10 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	}
 	p.Gate.pause(p.Label, reason)
 	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
-	p.logAgentEvent(eventPausedRateLimit, sessionID, reason)
+	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
 	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
 	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
-	p.logLifecycleEvent(eventResumed, sessionID)
+	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	p.Gate.ForceResume(p.Label)
 
 	agent, err := d.AgentWait(herdr.AgentWaitOptions{

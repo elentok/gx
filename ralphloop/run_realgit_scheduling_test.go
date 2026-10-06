@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -629,24 +630,24 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	conflictResolvedSessionID := ""
 	lifecycleEventCount := 0
 	for i, event := range events {
-		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair {
+		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
-		if event.Type == eventSmartZoneRecoveryFailed {
+		if event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected smart-zone recovery failure: %+v", event)
 		}
 		key := event.Type + "/" + event.Ticket
 		switch event.Type {
-		case eventIterationStarted, eventIterationFinished, eventCherryPicked:
+		case string(eventsc.IterationStarted), string(eventsc.IterationFinished), string(eventsc.CherryPicked):
 			lifecycleEventCount++
 			eventCounts[key]++
 			eventPositions[key] = i
-			if event.Type == eventCherryPicked {
+			if event.Type == string(eventsc.CherryPicked) {
 				cherrySHAs[event.Ticket] = event.SHA
 			}
-		case eventConflictHit, eventConflictResolved:
+		case string(eventsc.ConflictHit), string(eventsc.ConflictResolved):
 			conflictCounts[key]++
-			if event.Type == eventConflictResolved && event.Ticket == "04" {
+			if event.Type == string(eventsc.ConflictResolved) && event.Ticket == "04" {
 				conflictResolvedSHA = event.SHA
 				conflictResolvedSessionID = event.AgentSession
 			}
@@ -656,9 +657,9 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		t.Errorf("lifecycle event count = %d, want exactly one start, finish, and cherry-pick per ticket", lifecycleEventCount)
 	}
 	for id := range contracts {
-		started := eventIterationStarted + "/" + id
-		finished := eventIterationFinished + "/" + id
-		cherryPicked := eventCherryPicked + "/" + id
+		started := string(eventsc.IterationStarted) + "/" + id
+		finished := string(eventsc.IterationFinished) + "/" + id
+		cherryPicked := string(eventsc.CherryPicked) + "/" + id
 		for _, key := range []string{started, finished, cherryPicked} {
 			if eventCounts[key] != 1 {
 				t.Errorf("event %s count = %d, want exactly one", key, eventCounts[key])
@@ -671,7 +672,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			t.Errorf("ticket %s cherry-picked SHA = %q, want landed SHA %q", id, cherrySHAs[id], shas[id])
 		}
 	}
-	for _, eventType := range []string{eventConflictHit, eventConflictResolved} {
+	for _, eventType := range []string{string(eventsc.ConflictHit), string(eventsc.ConflictResolved)} {
 		key := eventType + "/04"
 		if conflictCounts[key] != 1 {
 			t.Errorf("event %s count = %d, want exactly one", key, conflictCounts[key])
@@ -687,8 +688,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		t.Errorf("D conflict-resolved session = %q, want resolver session %q", conflictResolvedSessionID, wantConflictResolutionSessionID)
 	}
 	for _, edge := range [][2]string{{"01", "02"}, {"01", "03"}, {"02", "04"}, {"03", "04"}, {"02", "05"}, {"03", "05"}, {"04", "06"}, {"05", "06"}} {
-		blockerCherry := eventPositions[eventCherryPicked+"/"+edge[0]]
-		dependentStart := eventPositions[eventIterationStarted+"/"+edge[1]]
+		blockerCherry := eventPositions[string(eventsc.CherryPicked)+"/"+edge[0]]
+		dependentStart := eventPositions[string(eventsc.IterationStarted)+"/"+edge[1]]
 		if blockerCherry >= dependentStart {
 			t.Errorf("dependency lifecycle %s -> %s = cherry:%d start:%d", edge[0], edge[1], blockerCherry, dependentStart)
 		}
@@ -1090,13 +1091,13 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
+	wantEventOrder := []string{string(eventsc.PausedSmartZone), string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked)}
 	var gotEventOrder []string
 	for _, event := range events {
 		switch event.Type {
-		case eventNeedsAnswer, eventNeedsRepair, eventSmartZoneRecoveryFailed:
+		case string(eventsc.NeedsAnswer), string(eventsc.NeedsRepair), string(eventsc.SmartZoneRecoveryFailed):
 			t.Errorf("unexpected recovery residue event: %+v", event)
-		case eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked:
+		case string(eventsc.PausedSmartZone), string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked):
 			gotEventOrder = append(gotEventOrder, event.Type)
 		}
 	}

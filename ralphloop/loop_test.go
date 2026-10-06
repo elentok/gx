@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -333,12 +334,12 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	// and position.
 	var events []Event
 	for _, ev := range rawEvents {
-		if ev.Type != eventSchedulerScan {
+		if ev.Type != string(eventsc.SchedulerScan) {
 			events = append(events, ev)
 		}
 	}
 
-	wantTypes := []string{eventDepsInstalled, eventIterationStarted, eventIterationFinished, eventCherryPicked}
+	wantTypes := []string{string(eventsc.DepsInstalled), string(eventsc.IterationStarted), string(eventsc.IterationFinished), string(eventsc.CherryPicked)}
 	if len(events) != len(wantTypes) {
 		t.Fatalf("events = %+v, want %d events (%v)", events, len(wantTypes), wantTypes)
 	}
@@ -368,7 +369,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 }
 
 // TestRun_SchedulerScan_LogsOutOfScopeTicket covers the case that motivated
-// eventSchedulerScan: a ticket present in the epic but outside the run's
+// string(eventsc.SchedulerScan): a ticket present in the epic but outside the run's
 // RunScope (here, ticket 02 has no parent: pointing back into the requested
 // "01", so RunScope.Contains never picks it up) looks, from the Queue tab,
 // like it's just sitting there unclaimed — the scheduler-scan log line is
@@ -399,7 +400,7 @@ func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 
 	var found bool
 	for _, ev := range events {
-		if ev.Type != eventSchedulerScan {
+		if ev.Type != string(eventsc.SchedulerScan) {
 			continue
 		}
 		for _, d := range ev.Scan {
@@ -501,10 +502,10 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 	var needsAnswer *Event
 	for i, ev := range events {
-		if ev.Type == eventNeedsAnswer && ev.Ticket == "01" {
+		if ev.Type == string(eventsc.NeedsAnswer) && ev.Ticket == "01" {
 			needsAnswer = &events[i]
 		}
-		if ev.Type == eventCherryPicked {
+		if ev.Type == string(eventsc.CherryPicked) {
 			t.Errorf("events = %+v, want no cherry-picked event for a zero-commit iteration", events)
 		}
 	}
@@ -581,10 +582,10 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 	}
 	var commitless *Event
 	for i, ev := range events {
-		if ev.Type == eventCommitless && ev.Ticket == "01" {
+		if ev.Type == string(eventsc.Commitless) && ev.Ticket == "01" {
 			commitless = &events[i]
 		}
-		if ev.Type == eventNeedsAnswer {
+		if ev.Type == string(eventsc.NeedsAnswer) {
 			t.Errorf("events = %+v, want no needs-answer event for a declared-commitless iteration", events)
 		}
 	}

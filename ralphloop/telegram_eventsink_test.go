@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	eventsc "github.com/elentok/gx/events"
 )
 
 // telegramRequest captures one decoded call to the fake Telegram API's
@@ -190,7 +192,7 @@ func waitForRunLogEvent(t *testing.T, dir, epicName string) []Event {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		events, _, _ = ReadEvents(dir, epicName)
-		if len(events) > 0 && events[0].Type == eventNotificationFailed {
+		if len(events) > 0 && events[0].Type == string(eventsc.NotificationFailed) {
 			return events
 		}
 		time.Sleep(5 * time.Millisecond)
@@ -494,7 +496,7 @@ func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t 
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationDegraded || events[0].Channel != "telegram" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationDegraded) || events[0].Channel != "telegram" {
 		t.Fatalf("run-log events = %#v, want one notification-degraded/telegram", events)
 	}
 
@@ -530,7 +532,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "telegram" || events[0].NotifyKind != notifyKindBatch {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationSent) || events[0].Channel != "telegram" || events[0].NotifyKind != notifyKindBatch {
 		t.Fatalf("run-log events = %#v, want one notification-sent/telegram/batch", events)
 	}
 }
@@ -558,7 +560,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "telegram" || events[0].Reason == "" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationFailed) || events[0].Channel != "telegram" || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed/telegram with a non-empty reason", events)
 	}
 
@@ -598,7 +600,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *tes
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Reason == "" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationFailed) || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed with a non-empty reason", events)
 	}
 	if strings.Contains(events[0].Reason, secretToken) {

@@ -2,7 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
-	"github.com/elentok/gx/events"
+	eventsc "github.com/elentok/gx/events"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +49,7 @@ func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t 
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: "03"},
+		{Type: string(eventsc.IterationStarted), Ticket: "03"},
 	}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
@@ -103,7 +103,7 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	if err != nil {
 		t.Fatalf("ReadEvents: %v", err)
 	}
-	if len(evs) != 1 || evs[0].Type != string(events.NeedsRepair) || evs[0].Kind != string(events.AmbiguousLand) || evs[0].Address != canonicalAddr(scratchDir, "epic", "03") {
+	if len(evs) != 1 || evs[0].Type != string(eventsc.NeedsRepair) || evs[0].Kind != string(eventsc.AmbiguousLand) || evs[0].Address != canonicalAddr(scratchDir, "epic", "03") {
 		t.Errorf("events = %+v, want one needs-repair event of kind ambiguous-land for 03", evs)
 	}
 }
@@ -283,7 +283,7 @@ func TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded(t *test
 
 	// A human/auditing agent confirmed 03's work landed at this SHA and
 	// backfilled the missing record.
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "confirmed-landed-sha"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "confirmed-landed-sha"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
@@ -346,7 +346,7 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 	if err := SetStatus(filepath.Join(scratchDir, "my-epic", "issues", "02-b.md"), "done"); err != nil {
 		t.Fatalf("SetStatus: %v", err)
 	}
-	if err := logEvent(scratchDir, "my-epic", Event{Type: eventCherryPicked, Ticket: "02", SHA: "confirmed-landed-sha-02"}); err != nil {
+	if err := logEvent(scratchDir, "my-epic", Event{Type: string(eventsc.CherryPicked), Ticket: "02", SHA: "confirmed-landed-sha-02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 

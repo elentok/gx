@@ -11,7 +11,7 @@ func failedLaunch(ticket string, attempt int) Event {
 }
 
 func TestConsecutiveLaunchFailures(t *testing.T) {
-	started := Event{Type: eventIterationStarted, Ticket: "11"}
+	started := Event{Type: string(events.IterationStarted), Ticket: "11"}
 	evs := []Event{
 		failedLaunch("11", 1), failedLaunch("11", 1),
 		started,
@@ -42,7 +42,7 @@ func TestRetryStormKind_ParksAtLimit(t *testing.T) {
 		}
 	}
 
-	_ = logEvent(scratch, "epic", Event{Type: eventIterationStarted, Ticket: "11"})
+	_ = logEvent(scratch, "epic", Event{Type: string(events.IterationStarted), Ticket: "11"})
 	if kind, _ := retryStormKind(scratch, "epic", "11", events.IterationError, "boom"); kind != events.IterationError {
 		t.Fatalf("after a successful launch kind = %q, want the original kind", kind)
 	}

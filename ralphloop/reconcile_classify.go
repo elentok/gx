@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -59,10 +60,10 @@ func isTrue(b *bool) bool { return b != nil && *b }
 // cherry-picked event logged for identifier (a ticket's Identifier, not
 // Number, so lettered split siblings sharing a Number aren't
 // cross-attributed), or "" if none was ever logged.
-func latestCherryPickedSHA(events []Event, identifier string) string {
+func latestCherryPickedSHA(evs []Event, identifier string) string {
 	sha := ""
-	for _, ev := range events {
-		if ev.Type == eventCherryPicked && ev.Ticket == identifier && ev.SHA != "" {
+	for _, ev := range evs {
+		if ev.Type == string(events.CherryPicked) && ev.Ticket == identifier && ev.SHA != "" {
 			sha = ev.SHA
 		}
 	}

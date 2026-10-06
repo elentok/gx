@@ -95,12 +95,39 @@ func ValidateAgentKind(agent AgentKind) error {
 // file at ticketPath (<root>/<epic>/issues/NN-<slug>.md), the only form
 // iteration prompts hand to agents.
 func ticketAddress(t tickets.Ticket) string {
-	epicDir := filepath.Dir(filepath.Dir(t.Path))
-	return tickets.Address{
-		Project: tickets.ProjectName(filepath.Dir(epicDir)),
-		Epic:    filepath.Base(epicDir),
-		ID:      t.Identifier,
-	}.String()
+	a, _ := tickets.AddressOfPath(t.Path, t.Identifier)
+	return a.String()
+}
+
+// resolveScratchDir is the absolute ticket root for opts: ScratchDir, or the
+// repo's project directory in the ticket store when unset.
+func resolveScratchDir(opts RunOptions) (string, error) {
+	scratchDir := opts.ScratchDir
+	if scratchDir == "" {
+		root, err := tickets.RootFor(cmp.Or(opts.RepoDir, "."))
+		if err != nil {
+			return "", fmt.Errorf("resolving ticket root: %w", err)
+		}
+		scratchDir = root
+	}
+	scratchDir, err := filepath.Abs(scratchDir)
+	if err != nil {
+		return "", fmt.Errorf("resolving scratch directory: %w", err)
+	}
+	return scratchDir, nil
+}
+
+// startStoreCommits starts the store commit loop when opts names a store and
+// returns its stop func (a no-op otherwise).
+func startStoreCommits(opts RunOptions) (stop func(), err error) {
+	if opts.StoreDir == "" {
+		return func() {}, nil
+	}
+	commits, err := storecommit.Start(opts.StoreDir, opts.StoreCommitDebounce)
+	if err != nil {
+		return nil, fmt.Errorf("starting store commit loop: %w", err)
+	}
+	return commits.Stop, nil
 }
 
 func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
@@ -269,26 +296,15 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	agentConfig := resolvedAgentConfig(opts.Agents, agent)
 	runStart := d.Now()
 
-	scratchDir := opts.ScratchDir
-	if scratchDir == "" {
-		// Unset means the repo's project directory in the ticket store.
-		root, err := tickets.RootFor(cmp.Or(opts.RepoDir, "."))
-		if err != nil {
-			return fmt.Errorf("resolving ticket root: %w", err)
-		}
-		scratchDir = root
-	}
-	scratchDir, err := filepath.Abs(scratchDir)
+	scratchDir, err := resolveScratchDir(opts)
 	if err != nil {
-		return fmt.Errorf("resolving scratch directory: %w", err)
+		return err
 	}
-	if opts.StoreDir != "" {
-		commits, err := storecommit.Start(opts.StoreDir, opts.StoreCommitDebounce)
-		if err != nil {
-			return fmt.Errorf("starting store commit loop: %w", err)
-		}
-		defer commits.Stop()
+	stopCommits, err := startStoreCommits(opts)
+	if err != nil {
+		return err
 	}
+	defer stopCommits()
 	maxParallel := opts.MaxParallel
 	if maxParallel <= 0 {
 		maxParallel = defaultMaxParallel
@@ -501,7 +517,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// so there's nothing useful to log.
 		if scanned != nil {
 			logErr := logEvent(scratchDir, opts.EpicName, Event{
-				Type:  eventSchedulerScan,
+				Type:  string(events.SchedulerScan),
 				Agent: agent,
 				Scan:  scanDecisions(*scanned, scope, frontier, ticket),
 			})

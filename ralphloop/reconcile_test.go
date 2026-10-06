@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -211,7 +212,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
-		Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude,
+		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude,
 		AgentSession: "sess-1", Cwd: "/repo/epic-iter-01",
 	}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -412,10 +413,10 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	}
 	foundResumed := false
 	for _, event := range events {
-		if event.Type == eventResumed && event.Ticket == "01" && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
+		if event.Type == string(eventsc.Resumed) && event.Ticket == "01" && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
 			t.Errorf("resumed attribution = %+v, want original pane/tab/cwd/session", event)
 		}
-		foundResumed = foundResumed || event.Type == eventResumed && event.Ticket == "01"
+		foundResumed = foundResumed || event.Type == string(eventsc.Resumed) && event.Ticket == "01"
 	}
 	if !foundResumed {
 		t.Errorf("events = %v, want resumed event for reattached ticket", events)

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -21,7 +22,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -63,7 +64,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 	}
 	sawRepairCherryPick := false
 	for _, ev := range events {
-		if ev.Type == eventCherryPicked && ev.Ticket == "03" && ev.SHA == "deadbeef" {
+		if ev.Type == string(eventsc.CherryPicked) && ev.Ticket == "03" && ev.SHA == "deadbeef" {
 			sawRepairCherryPick = true
 		}
 	}
@@ -84,7 +85,7 @@ func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *te
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -131,7 +132,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -187,7 +188,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 		"03-c.md":                    "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 		"03a-conflict-resolution.md": "---\nid: \"03a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"03\"\n---\n# Conflict resolution for 03\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -259,7 +260,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -309,7 +310,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -379,7 +380,7 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -108,7 +109,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 		Prompt:     "go",
 		SessionCwd: "/repo/iter-09",
 		Ticket:     "09",
-		StartEvent: eventIterationStarted,
+		StartEvent: string(events.IterationStarted),
 		Sink:       sink,
 	})
 	if err != nil {
@@ -170,7 +171,7 @@ func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t 
 		Prompt:     "go",
 		SessionCwd: "/repo/iter-01",
 		Ticket:     "01",
-		StartEvent: eventIterationStarted,
+		StartEvent: string(events.IterationStarted),
 		Sink:       sink,
 	})
 	if err != nil {
@@ -266,7 +267,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt(t *test
 	epicName := "fix-spinner"
 
 	if err := logEvent(scratchDir, epicName, Event{
-		Type:           eventIterationStarted,
+		Type:           string(events.IterationStarted),
 		Ticket:         "03",
 		AgentSession:   "sess-live",
 		StateChangeSeq: 946,
@@ -306,7 +307,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt(t *test
 		Ticket:     "03",
 		ScratchDir: scratchDir,
 		EpicName:   epicName,
-		StartEvent: eventIterationStarted,
+		StartEvent: string(events.IterationStarted),
 		Sink:       sink,
 	})
 	if err != nil {
@@ -331,7 +332,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_GenuinelyFinishedStaysFinished(t *tes
 	epicName := "fix-spinner"
 
 	if err := logEvent(scratchDir, epicName, Event{
-		Type:           eventIterationStarted,
+		Type:           string(events.IterationStarted),
 		Ticket:         "03",
 		AgentSession:   "sess-live",
 		StateChangeSeq: 946,
@@ -368,7 +369,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_GenuinelyFinishedStaysFinished(t *tes
 		Ticket:     "03",
 		ScratchDir: scratchDir,
 		EpicName:   epicName,
-		StartEvent: eventIterationStarted,
+		StartEvent: string(events.IterationStarted),
 		Sink:       sink,
 	})
 	if err != nil {
@@ -382,7 +383,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_GenuinelyFinishedStaysFinished(t *tes
 	}
 }
 
-// TestNoActivitySinceLaunch covers ticket 07: a matching eventIterationStarted
+// TestNoActivitySinceLaunch covers ticket 07: a matching string(events.IterationStarted)
 // with a zero/unset StateChangeSeq (as written by attachToLiveAgent's own
 // collision-path logLifecycleEvent call, which never stamps a seq) is never
 // treated as a real launch-time baseline — the scan must keep looking past it
@@ -395,7 +396,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		scratchDir := t.TempDir()
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
-			Type:         eventIterationStarted,
+			Type:         string(events.IterationStarted),
 			AgentSession: "sess-live",
 		}); err != nil {
 			t.Fatalf("logEvent: %v", err)
@@ -411,7 +412,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		scratchDir := t.TempDir()
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
-			Type:         eventIterationStarted,
+			Type:         string(events.IterationStarted),
 			AgentSession: "sess-other",
 		}); err != nil {
 			t.Fatalf("logEvent: %v", err)
@@ -427,7 +428,7 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		scratchDir := t.TempDir()
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
-			Type:           eventIterationStarted,
+			Type:           string(events.IterationStarted),
 			AgentSession:   "sess-live",
 			StateChangeSeq: 946,
 		}); err != nil {
@@ -447,13 +448,13 @@ func TestNoActivitySinceLaunch(t *testing.T) {
 		scratchDir := t.TempDir()
 		epicName := "fix-spinner"
 		if err := logEvent(scratchDir, epicName, Event{
-			Type:         eventIterationStarted,
+			Type:         string(events.IterationStarted),
 			AgentSession: "sess-live",
 		}); err != nil {
 			t.Fatalf("logEvent: %v", err)
 		}
 		if err := logEvent(scratchDir, epicName, Event{
-			Type:           eventIterationStarted,
+			Type:           string(events.IterationStarted),
 			AgentSession:   "sess-live",
 			StateChangeSeq: 946,
 		}); err != nil {
@@ -540,7 +541,7 @@ func TestLaunchAndPrompt_AgentNotReady_TrustDirectory_DismissesAndProceeds(t *te
 		Prompt:     "go",
 		SessionCwd: "/repo/iter-06",
 		Ticket:     "06",
-		StartEvent: eventIterationStarted,
+		StartEvent: string(events.IterationStarted),
 		Sink:       sink,
 	})
 	if err != nil {

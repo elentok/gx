@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
@@ -313,18 +314,18 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("landed commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, "main")
+	evs, ok, err := ReadEvents(scratchDir, "main")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var conflictHit *Event
-	for i, e := range events {
-		if e.Type == eventConflictHit {
-			conflictHit = &events[i]
+	for i, e := range evs {
+		if e.Type == string(events.ConflictHit) {
+			conflictHit = &evs[i]
 		}
 	}
 	if conflictHit == nil {
-		t.Fatalf("events = %+v, want %q", events, eventConflictHit)
+		t.Fatalf("events = %+v, want %q", evs, string(events.ConflictHit))
 	}
 	if conflictHit.AgentSession != iterationSessionID {
 		t.Errorf("conflict-hit session = %q, want the iteration agent's session %q", conflictHit.AgentSession, iterationSessionID)

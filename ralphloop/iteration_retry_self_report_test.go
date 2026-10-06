@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -192,10 +193,10 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	}
 	var commitless *Event
 	for i, ev := range events {
-		if ev.Type == eventCommitless && ev.Ticket == "01" {
+		if ev.Type == string(eventsc.Commitless) && ev.Ticket == "01" {
 			commitless = &events[i]
 		}
-		if ev.Type == eventNeedsAnswer {
+		if ev.Type == string(eventsc.NeedsAnswer) {
 			t.Errorf("events = %+v, want no needs-answer event for the retry's declared-commitless self-report", events)
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -327,7 +328,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindBatch {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationSent) || events[0].Channel != "slack" || events[0].NotifyKind != notifyKindBatch {
 		t.Fatalf("run-log events = %#v, want one notification-sent/slack/batch", events)
 	}
 }
@@ -354,7 +355,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Channel != "slack" || events[0].Reason == "" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationFailed) || events[0].Channel != "slack" || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed/slack with a non-empty reason", events)
 	}
 }
@@ -386,7 +387,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *t
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Reason == "" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationFailed) || events[0].Reason == "" {
 		t.Fatalf("run-log events = %#v, want one notification-failed with a non-empty reason", events)
 	}
 	if strings.Contains(events[0].Reason, secretPath) {

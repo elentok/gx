@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -64,7 +65,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 			if err != nil {
 				return fmt.Errorf("re-cherry-picking orphaned claim %s: %w", t.Identifier, err)
 			}
-			p.logTicketEventSHA(eventCherryPicked, "", "", "", path, "", landedSHA)
+			p.logTicketEventSHA(string(events.CherryPicked), "", "", "", path, "", landedSHA)
 
 			if err := markDoneStampingCloseMetadata(d, p, path, ""); err != nil {
 				return fmt.Errorf("marking recovered ticket %s done: %w", t.Identifier, err)

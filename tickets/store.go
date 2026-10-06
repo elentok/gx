@@ -16,62 +16,66 @@ var ErrNoProject = errors.New("no ticket-store project for this repo; run `gx ti
 // ProjectDir finds the project directory in the ticket store whose
 // project.json names repoRoot as its repo.
 func ProjectDir(storePath, repoRoot string) (string, error) {
-	if storePath == "" {
-		return "", errors.New("ticket-store.path is not set")
-	}
-	entries, err := os.ReadDir(storePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return "", ErrNoProject
-		}
-		return "", fmt.Errorf("read ticket store %s: %w", storePath, err)
-	}
 	want := canonicalPath(repoRoot)
-	for _, e := range entries {
-		dir := filepath.Join(storePath, e.Name())
-		if !e.IsDir() {
-			continue
-		}
-		pf, err := config.ReadProjectFile(dir)
-		if os.IsNotExist(err) {
-			continue
-		}
-		if err != nil {
-			return "", err
-		}
+	found := ""
+	err := forEachProject(storePath, func(dir string, pf config.ProjectFile) bool {
 		if pf.Repo != nil && canonicalPath(*pf.Repo) == want {
-			return dir, nil
+			found = dir
+			return true
 		}
+		return false
+	})
+	if err != nil {
+		return "", err
 	}
-	return "", ErrNoProject
+	if found == "" {
+		return "", ErrNoProject
+	}
+	return found, nil
 }
 
 // ProjectDirs lists every project directory in the ticket store: each
 // subdirectory holding a project.json. A missing store has no projects.
 func ProjectDirs(storePath string) ([]string, error) {
+	var dirs []string
+	err := forEachProject(storePath, func(dir string, _ config.ProjectFile) bool {
+		dirs = append(dirs, dir)
+		return false
+	})
+	return dirs, err
+}
+
+// forEachProject calls fn for each subdirectory of storePath holding a
+// project.json, stopping early when fn returns true. A missing store has no
+// projects.
+func forEachProject(storePath string, fn func(dir string, pf config.ProjectFile) (stop bool)) error {
 	if storePath == "" {
-		return nil, errors.New("ticket-store.path is not set")
+		return errors.New("ticket-store.path is not set")
 	}
 	entries, err := os.ReadDir(storePath)
 	if os.IsNotExist(err) {
-		return nil, nil
+		return nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read ticket store %s: %w", storePath, err)
+		return fmt.Errorf("read ticket store %s: %w", storePath, err)
 	}
-	var dirs []string
 	for _, e := range entries {
-		dir := filepath.Join(storePath, e.Name())
 		if !e.IsDir() {
 			continue
 		}
-		if _, err := config.ReadProjectFile(dir); err == nil {
-			dirs = append(dirs, dir)
-		} else if !os.IsNotExist(err) {
-			return nil, err
+		dir := filepath.Join(storePath, e.Name())
+		pf, err := config.ReadProjectFile(dir)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if fn(dir, pf) {
+			return nil
 		}
 	}
-	return dirs, nil
+	return nil
 }
 
 // RootFor resolves dir's repo to its project directory in the configured

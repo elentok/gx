@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
@@ -271,7 +272,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 	if ok {
 		for _, event := range events {
 			switch event.Type {
-			case eventIterationStarted, eventIterationFinished, eventCherryPicked, eventNeedsAnswer:
+			case string(eventsc.IterationStarted), string(eventsc.IterationFinished), string(eventsc.CherryPicked), string(eventsc.NeedsAnswer):
 				t.Errorf("unexpected success/finish-family event after launch failure: %+v", event)
 			}
 		}
@@ -642,16 +643,16 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	for _, event := range events {
-		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed || event.Type == eventPausedSmartZone {
+		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) || event.Type == string(eventsc.PausedSmartZone) {
 			t.Errorf("unexpected recovery/failure residue event (this scenario is restart/reattach only): %+v", event)
 		}
 	}
 	var gotFinish, gotCherryPick int
 	for _, event := range events {
 		switch event.Type {
-		case eventIterationFinished:
+		case string(eventsc.IterationFinished):
 			gotFinish++
-		case eventCherryPicked:
+		case string(eventsc.CherryPicked):
 			gotCherryPick++
 			if event.SHA != sha {
 				t.Errorf("cherry-picked SHA = %q, want landed SHA %q", event.SHA, sha)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -142,7 +143,7 @@ func resetTicket(in resetInput, d ralphloop.Deps) (resetResult, error) {
 	}
 
 	res := resetResult{Ticket: in.ID, Status: string(schema.StatusOpen), AtticRef: attic.Ref, Warning: resetLiveRunWarning}
-	ev := ralphloop.Event{Type: ralphloop.EventTicketReset, Ticket: t.Identifier, Outcome: "reset", Reason: in.Reason}
+	ev := ralphloop.Event{Type: string(events.TicketReset), Ticket: t.Identifier, Outcome: "reset", Reason: in.Reason}
 	if attic.Ref != nil {
 		ev.AtticRef = *attic.Ref
 		ev.SHA = attic.Tip

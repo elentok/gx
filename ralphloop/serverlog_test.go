@@ -9,7 +9,7 @@ import (
 func TestAppendServerEvent_BudgetEventLandsInServerLogNotEpicLog(t *testing.T) {
 	store := t.TempDir()
 
-	if err := AppendEvent(store, "epic-a", Event{Type: eventResumed, Ticket: "01"}); err != nil {
+	if err := AppendEvent(store, "epic-a", Event{Type: string(events.Resumed), Ticket: "01"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := AppendServerEvent(store, Event{Type: string(events.BudgetSoftLimitPaused)}); err != nil {
@@ -28,14 +28,14 @@ func TestAppendServerEvent_BudgetEventLandsInServerLogNotEpicLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(epic) != 1 || epic[0].Type != eventResumed {
+	if len(epic) != 1 || epic[0].Type != string(events.Resumed) {
 		t.Fatalf("epic log = %+v, want only the resumed event", epic)
 	}
 }
 
 func TestAppendServerEvent_RejectsAddressedEvent(t *testing.T) {
 	store := t.TempDir()
-	if err := AppendServerEvent(store, Event{Type: eventResumed, Ticket: "01"}); err == nil {
+	if err := AppendServerEvent(store, Event{Type: string(events.Resumed), Ticket: "01"}); err == nil {
 		t.Fatal("want error for an event that names a ticket")
 	}
 	if _, ok, _ := ReadServerEvents(store); ok {

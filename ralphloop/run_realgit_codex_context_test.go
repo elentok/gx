@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -230,16 +231,16 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
+	wantEventOrder := []string{string(eventsc.PausedSmartZone), string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked)}
 	var gotEventOrder []string
 	for _, event := range events {
-		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed {
+		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		if slices.Contains(wantEventOrder, event.Type) {
 			gotEventOrder = append(gotEventOrder, event.Type)
 		}
-		if event.Type == eventCherryPicked && event.SHA != sha {
+		if event.Type == string(eventsc.CherryPicked) && event.SHA != sha {
 			t.Errorf("cherry-picked SHA = %q, want landed SHA %q", event.SHA, sha)
 		}
 	}
@@ -457,16 +458,16 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var pausedReason string
-	wantEventOrder := []string{eventPausedSmartZone, eventResumed, eventIterationFinished, eventCherryPicked}
+	wantEventOrder := []string{string(eventsc.PausedSmartZone), string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked)}
 	var gotEventOrder []string
 	for _, event := range events {
 		switch event.Type {
-		case eventNeedsAnswer, eventNeedsRepair, eventSmartZoneRecoveryFailed:
+		case string(eventsc.NeedsAnswer), string(eventsc.NeedsRepair), string(eventsc.SmartZoneRecoveryFailed):
 			t.Errorf("unexpected recovery residue event: %+v", event)
-		case eventPausedSmartZone:
+		case string(eventsc.PausedSmartZone):
 			pausedReason = event.Reason
 			gotEventOrder = append(gotEventOrder, event.Type)
-		case eventResumed, eventIterationFinished, eventCherryPicked:
+		case string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked):
 			gotEventOrder = append(gotEventOrder, event.Type)
 		}
 	}
@@ -632,20 +633,20 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	var sawPaused, sawRecoveryFailed, sawFinished, sawCherryPicked, sawNeedsAnswer bool
 	for _, event := range events {
 		switch event.Type {
-		case eventPausedSmartZone:
+		case string(eventsc.PausedSmartZone):
 			sawPaused = true
 			if !strings.Contains(event.Reason, "Codex context exhaustion detected") {
 				t.Errorf("paused-smart-zone reason = %q, want it to name the native context exhaustion", event.Reason)
 			}
-		case eventSmartZoneRecoveryFailed:
+		case string(eventsc.SmartZoneRecoveryFailed):
 			sawRecoveryFailed = true
-		case eventIterationFinished:
+		case string(eventsc.IterationFinished):
 			sawFinished = true
-		case eventCherryPicked:
+		case string(eventsc.CherryPicked):
 			sawCherryPicked = true
-		case eventNeedsAnswer:
+		case string(eventsc.NeedsAnswer):
 			sawNeedsAnswer = true
-		case eventResumed:
+		case string(eventsc.Resumed):
 			t.Error("unexpected resumed event: recovery never succeeded")
 		}
 	}

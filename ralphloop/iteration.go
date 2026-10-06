@@ -80,7 +80,7 @@ func runIteration(d Deps, p iterationParams) error {
 	if err != nil {
 		return fmt.Errorf("installing dependencies in %s: %w", path, err)
 	}
-	p.logTicketEventReason(eventDepsInstalled, "", "", "", path, command)
+	p.logTicketEventReason(string(events.DepsInstalled), "", "", "", path, command)
 
 	skill := p.Skill
 	if p.Ticket.IsCodeReview() {
@@ -100,7 +100,7 @@ func runIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("opening iteration tab: %w", err)
 		}
 
-		launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, eventIterationStarted, eventIterationFinished)
+		launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, string(events.IterationStarted), string(events.IterationFinished))
 		sessionID, err = launchAndPrompt(d, launchParams)
 		if err != nil && !errors.Is(err, errBlockedPaneParked) {
 			kind := classifyLaunchError(err)
@@ -223,7 +223,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 
 	// StartEvent remains empty because reattachment must not imply a fresh
 	// launch; all later events use the recovered native session identity.
-	launchParams := p.launchAndPromptParams(label, agent.PaneID, tabID, "", path, "", eventIterationFinished)
+	launchParams := p.launchAndPromptParams(label, agent.PaneID, tabID, "", path, "", string(events.IterationFinished))
 	finished := false
 	if alreadyFinished(agent.AgentStatus) {
 		// An idle pane at reattach gets the same debounce and background-task
@@ -278,7 +278,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
-		launchParams.logLifecycleEvent(eventResumed, agent.AgentSession)
+		launchParams.logLifecycleEvent(string(events.Resumed), agent.AgentSession)
 		p.Gate.ForceResume(label)
 	}
 
@@ -530,7 +530,7 @@ func adoptCommitlessFinish(p iterationParams, path, pane, tab, sessionID string)
 	if err := MarkDone(p.Ticket.Path); err != nil {
 		return false, fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
 	}
-	p.logTicketEvent(eventCommitless, pane, tab, sessionID, path)
+	p.logTicketEvent(string(events.Commitless), pane, tab, sessionID, path)
 	return true, nil
 }
 
@@ -656,7 +656,7 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 		return "", err
 	}
 	if resolutionSessionID != "" {
-		p.logTicketEventSHA(eventConflictResolved, "", "", resolutionSessionID, p.FeatureWorktree, "", res.SHA)
+		p.logTicketEventSHA(string(events.ConflictResolved), "", "", resolutionSessionID, p.FeatureWorktree, "", res.SHA)
 	}
 	return res.SHA, nil
 }
@@ -794,7 +794,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 			resultErr = fmt.Errorf("%w (also failed aborting owned cherry-pick: %v)", resultErr, abortErr)
 		}
 	}()
-	p.logTicketEvent(eventConflictHit, pane, tab, sessionID, p.FeatureWorktree)
+	p.logTicketEvent(string(events.ConflictHit), pane, tab, sessionID, p.FeatureWorktree)
 	p.Sink.ConflictResolutionStarted(p.Ticket.Identifier)
 
 	// resolveCherryPickConflict itself corroborates against the sequencer

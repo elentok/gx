@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -39,7 +40,7 @@ func doneTicket() tickets.Ticket {
 }
 
 func pickedEvent() []Event {
-	return []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
+	return []Event{{Type: string(events.CherryPicked), Ticket: "03", SHA: "abc123"}}
 }
 
 func TestVerifyEpic_SHARung(t *testing.T) {

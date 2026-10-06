@@ -20,10 +20,10 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	if err := logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: "01", Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01", Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
-	if err := logEvent(dir, "epic", Event{Type: eventIterationFinished, Ticket: "01"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationFinished), Ticket: "01"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 
@@ -48,13 +48,13 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 	dir := t.TempDir()
 
 	err := AppendEvent(dir, "epic", Event{
-		Type: EventManualLand, Ticket: "04", Outcome: "landed",
+		Type: string(eventsc.ManualLand), Ticket: "04", Outcome: "landed",
 		TrailerValue: "epic/04", AtticRef: "refs/attic/04", Reason: "by hand",
 	})
 	if err != nil {
 		t.Fatalf("AppendEvent: %v", err)
 	}
-	if err := AppendEvent(dir, "epic", Event{Type: EventTicketReset, Ticket: "05"}); err != nil {
+	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.TicketReset), Ticket: "05"}); err != nil {
 		t.Fatalf("AppendEvent: %v", err)
 	}
 
@@ -84,7 +84,7 @@ func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 
 	// Multi-byte and escaped characters exercise the encoded-size accounting.
 	reason := strings.Repeat("é\"\n", 5000)
-	if err := AppendEvent(dir, "epic", Event{Type: EventManualLand, Ticket: "04", Reason: reason}); err != nil {
+	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.ManualLand), Ticket: "04", Reason: reason}); err != nil {
 		t.Fatalf("AppendEvent: %v", err)
 	}
 
@@ -105,7 +105,7 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	before := time.Now()
-	if err := logEvent(dir, "epic", Event{Type: eventNeedsAnswer, Ticket: "02"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: string(eventsc.NeedsAnswer), Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	events, ok, err := ReadEvents(dir, "epic")
@@ -122,10 +122,10 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 
 func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
 	t.Parallel()
-	if err := logEvent("", "epic", Event{Type: eventNeedsAnswer}); err != nil {
+	if err := logEvent("", "epic", Event{Type: string(eventsc.NeedsAnswer)}); err != nil {
 		t.Errorf("logEvent(scratchDir=\"\") error = %v, want nil no-op", err)
 	}
-	if err := logEvent(t.TempDir(), "", Event{Type: eventNeedsAnswer}); err != nil {
+	if err := logEvent(t.TempDir(), "", Event{Type: string(eventsc.NeedsAnswer)}); err != nil {
 		t.Errorf("logEvent(epicName=\"\") error = %v, want nil no-op", err)
 	}
 }
@@ -161,7 +161,7 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	if len(events) != 1 || events[0].Type != eventIterationStarted {
+	if len(events) != 1 || events[0].Type != string(eventsc.IterationStarted) {
 		t.Errorf("events = %+v, want only the well-formed first line", events)
 	}
 }
@@ -169,11 +169,11 @@ func TestReadEvents_SkipsMalformedTrailingLine(t *testing.T) {
 func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 	t.Parallel()
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
-		{Type: eventIterationFinished, Ticket: "01"},
-		{Type: eventNeedsAnswer, Ticket: "01"},
-		{Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
-		{Type: eventIterationStarted, Ticket: "02", Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
+		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
+		{Type: string(eventsc.IterationFinished), Ticket: "01"},
+		{Type: string(eventsc.NeedsAnswer), Ticket: "01"},
+		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
+		{Type: string(eventsc.IterationStarted), Ticket: "02", Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
 	}
 
 	session, cwd, agent, ok := lastIterationSession(events, "01")
@@ -188,7 +188,7 @@ func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 	t.Parallel()
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: "01", AgentSession: "sess-1"},
+		{Type: string(eventsc.IterationStarted), Ticket: "01", AgentSession: "sess-1"},
 	}
 	_, _, agent, ok := lastIterationSession(events, "01")
 	if !ok {
@@ -202,8 +202,8 @@ func TestLastIterationSession_DefaultsAgentForHistoricalLogs(t *testing.T) {
 func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
 	t.Parallel()
 	events := []Event{
-		{Type: eventIterationStarted, Ticket: "02", AgentSession: "sess-2"},
-		{Type: eventIterationStarted, Ticket: "01", AgentSession: ""},
+		{Type: string(eventsc.IterationStarted), Ticket: "02", AgentSession: "sess-2"},
+		{Type: string(eventsc.IterationStarted), Ticket: "01", AgentSession: ""},
 	}
 	_, _, _, ok := lastIterationSession(events, "01")
 	if ok {
@@ -219,7 +219,7 @@ func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			_ = logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: fmt.Sprintf("%02d", n)})
+			_ = logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: fmt.Sprintf("%02d", n)})
 		}(i)
 	}
 	wg.Wait()
@@ -269,8 +269,8 @@ func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T)
 		t.Fatalf("ReadEvents: events=%#v ok=%v err=%v", events, ok, err)
 	}
 	ev := events[0]
-	if ev.Type != eventNotificationsConfigured {
-		t.Errorf("Type = %q, want %q", ev.Type, eventNotificationsConfigured)
+	if ev.Type != string(eventsc.NotificationsConfigured) {
+		t.Errorf("Type = %q, want %q", ev.Type, string(eventsc.NotificationsConfigured))
 	}
 	if ev.Telegram == nil || *ev.Telegram != true {
 		t.Errorf("Telegram = %v, want true", ev.Telegram)
@@ -291,10 +291,10 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 		t.Fatalf("ReadEvents: events=%#v ok=%v err=%v", events, ok, err)
 	}
 	sent, failed := events[0], events[1]
-	if sent.Type != eventNotificationSent || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete || sent.Body != "epic complete!" {
+	if sent.Type != string(eventsc.NotificationSent) || sent.Channel != "telegram" || sent.NotifyKind != notifyKindEpicComplete || sent.Body != "epic complete!" {
 		t.Errorf("sent event = %#v", sent)
 	}
-	if failed.Type != eventNotificationFailed || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" || failed.Body != "iteration paused" {
+	if failed.Type != string(eventsc.NotificationFailed) || failed.Channel != "slack" || failed.NotifyKind != notifyKindIterationPaused || failed.Reason != "post failed: 500" || failed.Body != "iteration paused" {
 		t.Errorf("failed event = %#v", failed)
 	}
 }
@@ -322,7 +322,7 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationSent || events[0].Body != "epic complete!" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationSent) || events[0].Body != "epic complete!" {
 		t.Fatalf("run-log events = %#v, want exactly one notification-sent with body", events)
 	}
 	if got := attempts.Load(); got != 2 {
@@ -358,7 +358,7 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if len(events) != 1 || events[0].Type != eventNotificationFailed || events[0].Body != "epic complete!" {
+	if len(events) != 1 || events[0].Type != string(eventsc.NotificationFailed) || events[0].Body != "epic complete!" {
 		t.Fatalf("run-log events = %#v, want exactly one notification-failed with body", events)
 	}
 	if got := attempts.Load(); got != 2 {
@@ -551,7 +551,7 @@ func TestLogEvent_EveryTicketEventCarriesCanonicalAddressInEpicLog(t *testing.T)
 	t.Parallel()
 	dir := t.TempDir()
 
-	if err := logEvent(dir, "epic", Event{Type: eventIterationStarted, Ticket: "05"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "05"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	evs, ok, err := ReadEvents(dir, "epic")

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -70,7 +71,7 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 		t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 	}
 	last := events[len(events)-1]
-	if last.Type != eventNeedsAnswer {
+	if last.Type != string(eventsc.NeedsAnswer) {
 		t.Fatalf("last event type = %q, want needs-answer", last.Type)
 	}
 	if !strings.Contains(last.Reason, "trust_directory") {

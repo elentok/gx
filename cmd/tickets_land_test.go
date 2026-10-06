@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -275,12 +276,12 @@ func TestRunTicketsLand_WritesManualLandEvent(t *testing.T) {
 	if _, err := f.run(t); err != nil {
 		t.Fatal(err)
 	}
-	events, ok, err := ralphloop.ReadEvents(filepath.Dir(f.lockDir), "widget-epic")
-	if err != nil || !ok || len(events) != 1 {
-		t.Fatalf("events = %+v ok=%v err=%v", events, ok, err)
+	evs, ok, err := ralphloop.ReadEvents(filepath.Dir(f.lockDir), "widget-epic")
+	if err != nil || !ok || len(evs) != 1 {
+		t.Fatalf("events = %+v ok=%v err=%v", evs, ok, err)
 	}
-	ev := events[0]
-	if ev.Type != ralphloop.EventManualLand || ev.Ticket != "01" || ev.Outcome != "landed" || ev.Reason == "" || ev.AgentSession != "" {
+	ev := evs[0]
+	if ev.Type != string(events.ManualLand) || ev.Ticket != "01" || ev.Outcome != "landed" || ev.Reason == "" || ev.AgentSession != "" {
 		t.Errorf("event = %+v", ev)
 	}
 }
@@ -318,9 +319,9 @@ func TestRunTicketsLand_StampsMetricsFromRecoveredSession(t *testing.T) {
 	if !strings.Contains(got, "elapsed_time: 60") || strings.Contains(got, "actual_cost: 0\n") {
 		t.Errorf("ticket = %s", got)
 	}
-	events, _, _ := ralphloop.ReadEvents(scratch, "widget-epic")
-	ev := events[len(events)-1]
-	if ev.Type != ralphloop.EventManualLand || ev.AgentSession != session || ev.Reason != "" {
+	evs, _, _ := ralphloop.ReadEvents(scratch, "widget-epic")
+	ev := evs[len(evs)-1]
+	if ev.Type != string(events.ManualLand) || ev.AgentSession != session || ev.Reason != "" {
 		t.Errorf("event = %+v", ev)
 	}
 }

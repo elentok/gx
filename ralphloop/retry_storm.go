@@ -29,7 +29,7 @@ func consecutiveLaunchFailures(evs []Event, ticket string) int {
 		if ev.Ticket != ticket {
 			continue
 		}
-		if ev.Type == eventIterationStarted {
+		if ev.Type == string(events.IterationStarted) {
 			break
 		}
 		if ev.Type == string(events.LaunchFailed) && ev.Attempt == 1 {

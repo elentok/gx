@@ -18,82 +18,6 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// Event type strings recorded in an epic's run-log.jsonl.
-const (
-	eventIterationStarted        = string(events.IterationStarted)
-	eventIterationFinished       = string(events.IterationFinished)
-	eventCherryPicked            = string(events.CherryPicked)
-	eventLandDeferred            = string(events.LandDeferred) // once per contention episode, not per retry tick
-	eventConflictHit             = string(events.ConflictHit)
-	eventConflictResolved        = string(events.ConflictResolved)
-	eventPausedSmartZone         = string(events.PausedSmartZone)
-	eventSmartZoneRecoveryFailed = string(events.SmartZoneRecoveryFailed)
-	// eventSmartZoneWaitExpired marks a compact-recovery wait that expired
-	// past smartZoneCompactTimeoutMs without herdr's pane-status wait ever
-	// confirming completion, but where the transcript's compaction-boundary
-	// signal showed compaction actually finished anyway — a slower-than-usual
-	// compact, not a failure, and deliberately distinct from
-	// eventSmartZoneRecoveryFailed so it isn't misread as one.
-	eventSmartZoneWaitExpired = string(events.SmartZoneWaitExpired)
-	// eventSmartZoneGateReleased marks the other route to a confirmed
-	// compaction: the pane reported completion straight away, the
-	// compaction-boundary gate refused to believe it, and the boundary landed
-	// a few poll ticks later. Nothing expired there, so it deliberately does
-	// not share eventSmartZoneWaitExpired's name — telling "Claude Code
-	// reported idle mid-compaction" apart from "compaction genuinely took more
-	// than five minutes" is exactly what run-log.jsonl is read for.
-	eventSmartZoneGateReleased = string(events.SmartZoneGateReleased)
-	// eventBackgroundTaskGateHeld/Released/Expired mark waitForBackgroundTasks
-	// holding confirmFinished's conclusion open for one outstanding-fresh
-	// backgrounded-shell-command marker: Held once when first observed
-	// outstanding (never once per poll tick), Released once its
-	// task-notification lands, Expired once it ages out past
-	// backgroundTaskAgedOutCap and the gate stops holding on it instead.
-	eventBackgroundTaskGateHeld     = string(events.BackgroundTaskGateHeld)
-	eventBackgroundTaskGateReleased = string(events.BackgroundTaskGateReleased)
-	eventBackgroundTaskGateExpired  = string(events.BackgroundTaskGateExpired)
-	eventPausedRateLimit            = string(events.PausedRateLimit)
-	eventResumed                    = string(events.Resumed)
-	eventNeedsAnswer                = string(events.NeedsAnswer)
-	eventCommitless                 = string(events.Commitless)
-	eventNeedsRepair                = string(events.NeedsRepair)
-	eventDepsInstalled              = string(events.DepsInstalled)
-	// eventSchedulerScan marks one claimNext pass: every ticket the epic
-	// currently has, and why the scheduler did or didn't claim it. Added to
-	// debug tickets that appear queued (e.g. a code-review ticket's freshly
-	// published children) but never get picked up — the usual cause is a
-	// ticket falling outside the run's RunScope (see ScanDecision's
-	// "out-of-scope"), which the ticket-level events above never surface
-	// since they only ever fire for a ticket the scheduler already claimed.
-	eventSchedulerScan = string(events.SchedulerScan)
-
-	eventNotificationsConfigured = string(events.NotificationsConfigured)
-	eventNotificationSent        = string(events.NotificationSent)
-	eventNotificationFailed      = string(events.NotificationFailed)
-	// eventNotificationDegraded marks a send that only succeeded via
-	// telegramTransport.sendSync's plain-text fallback (a MarkdownV2 parse
-	// rejection on the first attempt) — deliberately distinct from
-	// eventNotificationSent so a formatting downgrade, which signals the
-	// chatmarkup escaper has a hole worth investigating, doesn't blend into
-	// the ordinary-send count.
-	eventNotificationDegraded = string(events.NotificationDegraded)
-	// eventNotificationSuppressed marks a close-time batch flush (see
-	// chatEventSink.closeFlush) that was dropped rather than sent because the
-	// transport was already globally muted — the one case a queued batch
-	// never reaches chat at all, so the run-log line is what keeps the
-	// outcome recoverable.
-	eventNotificationSuppressed = string(events.NotificationSuppressed)
-)
-
-// Event types written by one-shot CLI callers (see AppendEvent), exported
-// because those callers live outside this package.
-const (
-	// EventManualLand marks a ticket landed by hand rather than by the loop.
-	EventManualLand = string(events.ManualLand)
-	// EventTicketReset marks a ticket reset back to open by hand.
-	EventTicketReset = string(events.TicketReset)
-)
-
 // notifyKind* tag which live event triggered a notification-sent/
 // notification-failed line — distinct from the Type field (which is always
 // "notification-sent"/"notification-failed" itself).
@@ -246,20 +170,26 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	if scratchDir == "" || epicName == "" {
 		return nil
 	}
-	if ev.Time.IsZero() {
-		ev.Time = time.Now()
-	}
-	if err := events.Validate(events.Type(ev.Type), events.Kind(ev.Kind)); err != nil {
-		return err
-	}
 	if ev.Ticket != "" && ev.Address == "" {
 		ev.Address = tickets.Address{Project: tickets.ProjectName(scratchDir), Epic: epicName, ID: ev.Ticket}.String()
 	}
-	data, err := events.Fit(func() ([]byte, error) { return json.Marshal(ev) }, &ev.Reason, &ev.Body)
+	data, err := encodeEvent(&ev)
 	if err != nil {
 		return err
 	}
 	return appendLine(runLogPath(scratchDir, epicName), data)
+}
+
+// encodeEvent stamps ev's Time, validates its type/kind and marshals it to one
+// log line that fits events.MaxLineBytes.
+func encodeEvent(ev *Event) ([]byte, error) {
+	if ev.Time.IsZero() {
+		ev.Time = time.Now()
+	}
+	if err := events.Validate(events.Type(ev.Type), events.Kind(ev.Kind)); err != nil {
+		return nil, err
+	}
+	return events.Fit(func() ([]byte, error) { return json.Marshal(ev) }, &ev.Reason, &ev.Body)
 }
 
 // serverLogPath returns the server event log: one log per store, outside any
@@ -278,13 +208,7 @@ func AppendServerEvent(storeDir string, ev Event) error {
 	if ev.Ticket != "" || ev.Address != "" {
 		return fmt.Errorf("event %q has an address; it belongs in an epic's log", ev.Type)
 	}
-	if ev.Time.IsZero() {
-		ev.Time = time.Now()
-	}
-	if err := events.Validate(events.Type(ev.Type), events.Kind(ev.Kind)); err != nil {
-		return err
-	}
-	data, err := events.Fit(func() ([]byte, error) { return json.Marshal(ev) }, &ev.Reason, &ev.Body)
+	data, err := encodeEvent(&ev)
 	if err != nil {
 		return err
 	}
@@ -325,7 +249,7 @@ func AppendEvent(scratchDir, epicName string, ev Event) error {
 // logNotificationSent/logNotificationFailed).
 func LogNotificationsConfigured(scratchDir, epicName string, telegram, slack bool) error {
 	return logEvent(scratchDir, epicName, Event{
-		Type:     eventNotificationsConfigured,
+		Type:     string(events.NotificationsConfigured),
 		Telegram: &telegram,
 		Slack:    &slack,
 	})
@@ -338,22 +262,22 @@ func LogNotificationsConfigured(scratchDir, epicName string, telegram, slack boo
 // shouldn't compound the failure it was trying to record.
 func logNotificationSent(scratchDir, epicName, channel, notifyKind, body string) {
 	_ = logEvent(scratchDir, epicName, Event{
-		Type: eventNotificationSent, Channel: channel, NotifyKind: notifyKind, Body: body,
+		Type: string(events.NotificationSent), Channel: channel, NotifyKind: notifyKind, Body: body,
 	})
 }
 
 func logNotificationFailed(scratchDir, epicName, channel, notifyKind, reason, body string) {
 	_ = logEvent(scratchDir, epicName, Event{
-		Type: eventNotificationFailed, Channel: channel, NotifyKind: notifyKind, Reason: reason, Body: body,
+		Type: string(events.NotificationFailed), Channel: channel, NotifyKind: notifyKind, Reason: reason, Body: body,
 	})
 }
 
 // logNotificationDegraded records a send that only succeeded via
 // telegramTransport.sendSync's plain-text fallback — see
-// eventNotificationDegraded.
+// string(events.NotificationDegraded).
 func logNotificationDegraded(scratchDir, epicName, channel, notifyKind, body string) {
 	_ = logEvent(scratchDir, epicName, Event{
-		Type: eventNotificationDegraded, Channel: channel, NotifyKind: notifyKind, Body: body,
+		Type: string(events.NotificationDegraded), Channel: channel, NotifyKind: notifyKind, Body: body,
 	})
 }
 
@@ -371,7 +295,7 @@ func degradedReason(description string) string {
 // kinds so the outcome stays recoverable from the run log alone.
 func logNotificationSuppressed(scratchDir, epicName, channel, reason string) {
 	_ = logEvent(scratchDir, epicName, Event{
-		Type: eventNotificationSuppressed, Channel: channel, NotifyKind: notifyKindBatch, Reason: reason,
+		Type: string(events.NotificationSuppressed), Channel: channel, NotifyKind: notifyKindBatch, Reason: reason,
 	})
 }
 
@@ -550,10 +474,10 @@ func sanitizeSendError(err error) error {
 // 06a), since the reattaching run never captured a fresh session of its own.
 // Agent defaults to AgentClaude for historical logs that omitted it (see
 // Event.Agent).
-func lastIterationSession(events []Event, identifier string) (agentSession, cwd string, agent AgentKind, ok bool) {
-	for i := len(events) - 1; i >= 0; i-- {
-		ev := events[i]
-		if ev.Ticket != identifier || ev.Type != eventIterationStarted || ev.AgentSession == "" {
+func lastIterationSession(evs []Event, identifier string) (agentSession, cwd string, agent AgentKind, ok bool) {
+	for i := len(evs) - 1; i >= 0; i-- {
+		ev := evs[i]
+		if ev.Ticket != identifier || ev.Type != string(events.IterationStarted) || ev.AgentSession == "" {
 			continue
 		}
 		agent = ev.Agent

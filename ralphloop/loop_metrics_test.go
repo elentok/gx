@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
@@ -397,7 +398,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 	}
 	var found *Event
 	for i, ev := range events {
-		if ev.Type == eventDepsInstalled {
+		if ev.Type == string(eventsc.DepsInstalled) {
 			found = &events[i]
 		}
 	}

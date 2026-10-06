@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
@@ -74,7 +75,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	if err != nil || !ok || len(events) == 0 {
 		t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 	}
-	if events[0].Type != eventPausedSmartZone || !strings.Contains(events[0].Reason, "input exceeds the context window") {
+	if events[0].Type != string(eventsc.PausedSmartZone) || !strings.Contains(events[0].Reason, "input exceeds the context window") {
 		t.Errorf("recovery event = %+v, want native failure evidence", events[0])
 	}
 }
@@ -406,11 +407,11 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 	var sawFailed, sawExpired, sawResumed bool
 	for _, e := range events {
 		switch e.Type {
-		case eventSmartZoneRecoveryFailed:
+		case string(eventsc.SmartZoneRecoveryFailed):
 			sawFailed = true
-		case eventSmartZoneWaitExpired:
+		case string(eventsc.SmartZoneWaitExpired):
 			sawExpired = true
-		case eventResumed:
+		case string(eventsc.Resumed):
 			sawResumed = true
 		}
 	}
@@ -475,7 +476,7 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 	}
 	var sawFailed bool
 	for _, e := range events {
-		if e.Type == eventSmartZoneRecoveryFailed {
+		if e.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			sawFailed = true
 		}
 	}
@@ -936,11 +937,11 @@ func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 	}
 
 	seen := compactCompletionEvents(t, scratchDir)
-	if !seen[eventSmartZoneGateReleased] {
-		t.Errorf("missing %s event for a gated-then-confirmed completion", eventSmartZoneGateReleased)
+	if !seen[string(eventsc.SmartZoneGateReleased)] {
+		t.Errorf("missing %s event for a gated-then-confirmed completion", string(eventsc.SmartZoneGateReleased))
 	}
-	if seen[eventSmartZoneWaitExpired] {
-		t.Errorf("%s logged for a gated completion, want it reserved for the genuine timeout route", eventSmartZoneWaitExpired)
+	if seen[string(eventsc.SmartZoneWaitExpired)] {
+		t.Errorf("%s logged for a gated completion, want it reserved for the genuine timeout route", string(eventsc.SmartZoneWaitExpired))
 	}
 }
 
@@ -980,11 +981,11 @@ func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing
 	}
 
 	seen := compactCompletionEvents(t, scratchDir)
-	if !seen[eventSmartZoneWaitExpired] {
-		t.Errorf("missing %s event for a timeout-then-confirmed completion", eventSmartZoneWaitExpired)
+	if !seen[string(eventsc.SmartZoneWaitExpired)] {
+		t.Errorf("missing %s event for a timeout-then-confirmed completion", string(eventsc.SmartZoneWaitExpired))
 	}
-	if seen[eventSmartZoneGateReleased] {
-		t.Errorf("%s logged for a timeout completion, want it reserved for a gate that actually held", eventSmartZoneGateReleased)
+	if seen[string(eventsc.SmartZoneGateReleased)] {
+		t.Errorf("%s logged for a timeout completion, want it reserved for a gate that actually held", string(eventsc.SmartZoneGateReleased))
 	}
 }
 
@@ -1025,7 +1026,7 @@ func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testi
 	}
 
 	seen := compactCompletionEvents(t, scratchDir)
-	if seen[eventSmartZoneWaitExpired] || seen[eventSmartZoneGateReleased] {
+	if seen[string(eventsc.SmartZoneWaitExpired)] || seen[string(eventsc.SmartZoneGateReleased)] {
 		t.Errorf("events = %v, want neither completion-route event for a pane-confirmed compaction", seen)
 	}
 }
@@ -1664,7 +1665,7 @@ func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
 	}
 	var sawFailed bool
 	for _, e := range events {
-		if e.Type == eventSmartZoneRecoveryFailed {
+		if e.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			sawFailed = true
 		}
 	}
@@ -1930,13 +1931,13 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 				t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 			}
 			last := events[len(events)-1]
-			if last.Type != eventNeedsAnswer || !strings.Contains(last.Reason, "iter-01") {
+			if last.Type != string(eventsc.NeedsAnswer) || !strings.Contains(last.Reason, "iter-01") {
 				t.Errorf("park event = %+v, want type needs-answer with reason naming iter-01", last)
 			}
 			// Seam B: exactly one park event, kind matching the frontmatter park_kind.
 			var parks int
 			for _, ev := range events {
-				if ev.Type == eventNeedsAnswer {
+				if ev.Type == string(eventsc.NeedsAnswer) {
 					parks++
 				}
 			}
@@ -2720,12 +2721,12 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 	var held, released int
 	for _, ev := range events {
 		switch ev.Type {
-		case eventBackgroundTaskGateHeld:
+		case string(eventsc.BackgroundTaskGateHeld):
 			held++
 			if !strings.Contains(ev.Reason, "task-1") {
 				t.Errorf("gate-held reason = %q, want it to name the task id", ev.Reason)
 			}
-		case eventBackgroundTaskGateReleased:
+		case string(eventsc.BackgroundTaskGateReleased):
 			released++
 		}
 	}
@@ -2768,9 +2769,9 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 	var expired, released int
 	for _, ev := range events {
 		switch ev.Type {
-		case eventBackgroundTaskGateExpired:
+		case string(eventsc.BackgroundTaskGateExpired):
 			expired++
-		case eventBackgroundTaskGateReleased:
+		case string(eventsc.BackgroundTaskGateReleased):
 			released++
 		}
 	}
@@ -2836,9 +2837,9 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	var held, released int
 	for _, ev := range events {
 		switch ev.Type {
-		case eventBackgroundTaskGateHeld:
+		case string(eventsc.BackgroundTaskGateHeld):
 			held++
-		case eventBackgroundTaskGateReleased:
+		case string(eventsc.BackgroundTaskGateReleased):
 			released++
 		}
 	}

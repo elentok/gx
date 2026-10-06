@@ -572,13 +572,13 @@ func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *t
 		t.Errorf("sent = %v, want none — transport is globally muted", got)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, epicName)
+	evs, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var suppressed []Event
-	for _, ev := range events {
-		if ev.Type == eventNotificationSuppressed {
+	for _, ev := range evs {
+		if ev.Type == string(events.NotificationSuppressed) {
 			suppressed = append(suppressed, ev)
 		}
 	}
@@ -741,13 +741,13 @@ func TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression(t *testing.T) {
 		t.Errorf("queue after closed requeue = %d entries, want 0 (should be skipped, not queued)", queueLen)
 	}
 
-	events, ok, err := ReadEvents(scratchDir, epicName)
+	evs, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
 	var suppressed []Event
-	for _, ev := range events {
-		if ev.Type == eventNotificationSuppressed {
+	for _, ev := range evs {
+		if ev.Type == string(events.NotificationSuppressed) {
 			suppressed = append(suppressed, ev)
 		}
 	}

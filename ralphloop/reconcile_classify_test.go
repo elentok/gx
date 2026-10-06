@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -25,7 +26,7 @@ func TestClassifyDoneTicket_CommitLandedNoLeftover_OK(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
@@ -42,7 +43,7 @@ func TestClassifyDoneTicket_CommitLandedButBranchLeftover_StaleCleanup(t *testin
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil } // iteration branch still exists
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
@@ -59,7 +60,7 @@ func TestClassifyDoneTicket_CommitMissingBranchStillHasIt_Recoverable(t *testing
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
@@ -76,7 +77,7 @@ func TestClassifyDoneTicket_CommitMissingNoBranch_Unrecoverable(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
@@ -141,8 +142,8 @@ func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *te
 	}
 
 	events := []Event{
-		{Type: eventCherryPicked, Ticket: "04a", SHA: "sha-04a"},
-		{Type: eventCherryPicked, Ticket: "04b", SHA: "sha-04b"},
+		{Type: string(eventsc.CherryPicked), Ticket: "04a", SHA: "sha-04a"},
+		{Type: string(eventsc.CherryPicked), Ticket: "04b", SHA: "sha-04b"},
 	}
 	paths := reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}
 
@@ -169,7 +170,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
-	events := []Event{{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{iterationKey("epic", iterLabel("epic", "03")): true}, map[string]bool{})
 	if err != nil {
@@ -194,7 +195,7 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
-	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
+	if err := logEvent(scratchDir, "epic", Event{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	epics, err := tickets.Load(scratchDir)
@@ -237,7 +238,7 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	}
 	var attentionEvent *Event
 	for i := range events {
-		if events[i].Type == eventNeedsRepair && events[i].Ticket == "03" {
+		if events[i].Type == string(eventsc.NeedsRepair) && events[i].Ticket == "03" {
 			attentionEvent = &events[i]
 		}
 	}

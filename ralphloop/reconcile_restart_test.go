@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
@@ -129,10 +130,10 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 	foundFinish := false
 	for _, event := range events {
-		if event.Type == eventIterationFinished && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
+		if event.Type == string(eventsc.IterationFinished) && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
 			t.Errorf("iteration-finished attribution = %+v, want original pane/tab/cwd/session", event)
 		}
-		foundFinish = foundFinish || event.Type == eventIterationFinished
+		foundFinish = foundFinish || event.Type == string(eventsc.IterationFinished)
 	}
 	if !foundFinish {
 		t.Errorf("events = %v, want iteration-finished", events)
@@ -322,12 +323,12 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 	}
 	foundFinish := false
 	for _, e := range events {
-		if e.Type == eventIterationFinished && e.Ticket == "01" {
+		if e.Type == string(eventsc.IterationFinished) && e.Ticket == "01" {
 			foundFinish = true
 		}
 	}
 	if !foundFinish {
-		t.Errorf("events = %v, want an %s event logged for ticket 1 despite skipping the wait", events, eventIterationFinished)
+		t.Errorf("events = %v, want an %s event logged for ticket 1 despite skipping the wait", events, string(eventsc.IterationFinished))
 	}
 }
 
@@ -383,7 +384,7 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
-		Type:         eventIterationStarted,
+		Type:         string(eventsc.IterationStarted),
 		Ticket:       "01",
 		Agent:        AgentClaude,
 		AgentSession: "sess-original",
@@ -468,10 +469,10 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 	}
 	foundCommitless := false
 	for _, e := range events {
-		if e.Type == eventCherryPicked {
+		if e.Type == string(eventsc.CherryPicked) {
 			t.Errorf("events = %v, want no cherry-picked event for a commitless close", events)
 		}
-		if e.Type == eventCommitless && e.Ticket == "01" {
+		if e.Type == string(eventsc.Commitless) && e.Ticket == "01" {
 			foundCommitless = true
 		}
 	}
@@ -568,7 +569,7 @@ func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *
 	}
 	var held bool
 	for _, e := range events {
-		if e.Type == eventBackgroundTaskGateHeld {
+		if e.Type == string(eventsc.BackgroundTaskGateHeld) {
 			held = true
 		}
 	}
@@ -659,7 +660,7 @@ func TestRun_ReattachAlreadyIdle_EmptySessionAndNoSessionIDs_FallsBackToRunLog(t
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
-		Type:         eventIterationStarted,
+		Type:         string(eventsc.IterationStarted),
 		Ticket:       "01",
 		Agent:        AgentClaude,
 		AgentSession: "sess-from-log",

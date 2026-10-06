@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -259,12 +260,12 @@ func TestRunTicketsReset_WritesEvent(t *testing.T) {
 	if _, err := f.run(); err != nil {
 		t.Fatal(err)
 	}
-	events, ok, err := ralphloop.ReadEvents(filepath.Dir(f.epicPath), "widget-epic")
-	if err != nil || !ok || len(events) != 1 {
-		t.Fatalf("events = %v ok=%v err=%v", events, ok, err)
+	evs, ok, err := ralphloop.ReadEvents(filepath.Dir(f.epicPath), "widget-epic")
+	if err != nil || !ok || len(evs) != 1 {
+		t.Fatalf("events = %v ok=%v err=%v", evs, ok, err)
 	}
-	ev := events[0]
-	if ev.Type != ralphloop.EventTicketReset || ev.Ticket != "01" || ev.AtticRef != "ralph-loop/attic/widget-epic/01-1" || ev.Reason != "agent went in circles" {
+	ev := evs[0]
+	if ev.Type != string(events.TicketReset) || ev.Ticket != "01" || ev.AtticRef != "ralph-loop/attic/widget-epic/01-1" || ev.Reason != "agent went in circles" {
 		t.Errorf("event = %+v", ev)
 	}
 }

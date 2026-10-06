@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -289,17 +290,17 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	}
 	pausedIdx, resumedIdx, started03Idx, finished03Idx := -1, -1, -1, -1
 	for i, event := range events {
-		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed {
+		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		switch {
-		case event.Type == eventPausedRateLimit && event.Ticket == "01" && pausedIdx == -1:
+		case event.Type == string(eventsc.PausedRateLimit) && event.Ticket == "01" && pausedIdx == -1:
 			pausedIdx = i
-		case event.Type == eventResumed && event.Ticket == "01" && resumedIdx == -1:
+		case event.Type == string(eventsc.Resumed) && event.Ticket == "01" && resumedIdx == -1:
 			resumedIdx = i
-		case event.Type == eventIterationStarted && event.Ticket == "03" && started03Idx == -1:
+		case event.Type == string(eventsc.IterationStarted) && event.Ticket == "03" && started03Idx == -1:
 			started03Idx = i
-		case event.Type == eventIterationFinished && event.Ticket == "03" && finished03Idx == -1:
+		case event.Type == string(eventsc.IterationFinished) && event.Ticket == "03" && finished03Idx == -1:
 			finished03Idx = i
 		}
 	}
@@ -323,7 +324,7 @@ func waitForPausedRateLimitEvent(t *testing.T, scratchDir, epicName, ticketID st
 		events, ok, err := ReadEvents(scratchDir, epicName)
 		if err == nil && ok {
 			for _, event := range events {
-				if event.Type == eventPausedRateLimit && event.Ticket == ticketID {
+				if event.Type == string(eventsc.PausedRateLimit) && event.Ticket == ticketID {
 					return
 				}
 			}
@@ -712,23 +713,23 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	pausedRateLimit02, resumed02 := -1, -1
 	started03, finished03 := -1, -1
 	for i, event := range events {
-		if event.Type == eventNeedsAnswer || event.Type == eventNeedsRepair || event.Type == eventSmartZoneRecoveryFailed {
+		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		switch {
-		case event.Type == eventPausedSmartZone && event.Ticket == "01" && pausedSmartZone01 == -1:
+		case event.Type == string(eventsc.PausedSmartZone) && event.Ticket == "01" && pausedSmartZone01 == -1:
 			pausedSmartZone01 = i
-		case event.Type == eventResumed && event.Ticket == "01" && resumed01 == -1:
+		case event.Type == string(eventsc.Resumed) && event.Ticket == "01" && resumed01 == -1:
 			resumed01 = i
-		case event.Type == eventIterationFinished && event.Ticket == "01" && finished01 == -1:
+		case event.Type == string(eventsc.IterationFinished) && event.Ticket == "01" && finished01 == -1:
 			finished01 = i
-		case event.Type == eventPausedRateLimit && event.Ticket == "02" && pausedRateLimit02 == -1:
+		case event.Type == string(eventsc.PausedRateLimit) && event.Ticket == "02" && pausedRateLimit02 == -1:
 			pausedRateLimit02 = i
-		case event.Type == eventResumed && event.Ticket == "02" && resumed02 == -1:
+		case event.Type == string(eventsc.Resumed) && event.Ticket == "02" && resumed02 == -1:
 			resumed02 = i
-		case event.Type == eventIterationStarted && event.Ticket == "03" && started03 == -1:
+		case event.Type == string(eventsc.IterationStarted) && event.Ticket == "03" && started03 == -1:
 			started03 = i
-		case event.Type == eventIterationFinished && event.Ticket == "03" && finished03 == -1:
+		case event.Type == string(eventsc.IterationFinished) && event.Ticket == "03" && finished03 == -1:
 			finished03 = i
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -204,15 +205,15 @@ func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing
 		}
 	}
 
-	events, ok, err := ReadEvents(scratchDir, epicName)
+	evs, ok, err := ReadEvents(scratchDir, epicName)
 	if err != nil {
 		t.Fatalf("ReadEvents: %v", err)
 	}
 	if !ok {
 		t.Fatalf("ReadEvents ok = false, want run-log.jsonl to exist")
 	}
-	for _, ev := range events {
-		if ev.Type == eventNotificationFailed {
+	for _, ev := range evs {
+		if ev.Type == string(events.NotificationFailed) {
 			t.Errorf("unexpected notification-failed event: %+v", ev)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -277,7 +278,7 @@ func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 	}
 	n := 0
 	for _, e := range events {
-		if e.Type == eventLandDeferred {
+		if e.Type == string(eventsc.LandDeferred) {
 			n++
 		}
 	}
