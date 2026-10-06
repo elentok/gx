@@ -22,9 +22,9 @@ import (
 func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
-		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# C\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# C\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -150,7 +150,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 

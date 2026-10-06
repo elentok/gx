@@ -84,7 +84,7 @@ func TestFormatNeedsRepairBody_NoHandoffSection(t *testing.T) {
 }
 
 func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
-	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	section, err := FormatNeedsRepairBody("agent stalled\n\nfull trace", NeedsRepairState{
 		Label: "epic-04b", Branch: "epic/04b", Worktree: "/tmp/wt/epic-04b",
@@ -136,7 +136,7 @@ func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 }
 
 func TestParseTicket_HandAuthoredFileWithoutNeedsRepairSection_StillLoads(t *testing.T) {
-	path := writeTemp(t, "05-ticket.md", "---\nid: \"05\"\nstatus: needs-repair\ntype: task\n---\nNo section here, just a note in prose.\n")
+	path := writeTemp(t, "05-ticket.md", "---\nid: \"05\"\nstatus: needs-repair\ntype: implement\n---\nNo section here, just a note in prose.\n")
 
 	if _, err := ParseTicket(path); err != nil {
 		t.Errorf("ParseTicket: %v, want a hand-authored needs-repair ticket without the section to still load (validation is write-conditional, not at rest)", err)

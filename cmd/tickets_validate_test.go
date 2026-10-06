@@ -37,7 +37,7 @@ func TestExecute_TicketsValidate_ValidNewFormat(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -54,7 +54,7 @@ func TestExecute_TicketsValidate_InvalidTicketExitsNonZero(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: bogus-status\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: bogus-status\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}

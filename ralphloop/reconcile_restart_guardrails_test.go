@@ -22,7 +22,7 @@ import (
 func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -87,7 +87,7 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -163,7 +163,7 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {

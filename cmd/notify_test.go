@@ -125,7 +125,7 @@ func writeMutedTicket(t *testing.T, dir, epic, filename, id, mutesYAML string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
-	content := "---\nid: \"" + id + "\"\nstatus: open\ntype: task\nmutes:" + mutesYAML + "\n---\nBody.\n"
+	content := "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\nmutes:" + mutesYAML + "\n---\nBody.\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}

@@ -15,7 +15,7 @@ import (
 func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, _, _ := fakeDeps()
@@ -61,7 +61,7 @@ func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
 func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	sink := &recordingSink{}
@@ -92,7 +92,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
-				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
@@ -124,7 +124,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 

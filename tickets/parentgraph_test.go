@@ -102,9 +102,9 @@ func TestQuarantineInvalidParents_DropsEdgeAndFlagsTicket(t *testing.T) {
 func TestLoad_CyclicParentGraphIsNeverExposed(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "01-a.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: task\nparent: \"02\"\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n")
 	writeFile(t, filepath.Join(dir, "epic", "issues", "02-b.md"),
-		"---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\nBody.\n")
+		"---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -127,7 +127,7 @@ func TestLoad_CyclicParentGraphIsNeverExposed(t *testing.T) {
 func TestLoad_DanglingParentIsNeverExposed(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "01-a.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: task\nparent: \"09\"\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"09\"\n---\nBody.\n")
 
 	epics, err := Load(dir)
 	if err != nil {

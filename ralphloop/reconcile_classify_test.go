@@ -192,7 +192,7 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)

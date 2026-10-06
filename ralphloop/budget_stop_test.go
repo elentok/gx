@@ -84,7 +84,7 @@ func TestStopIterationAndMarkNeedsRepair_StuckIteration_ForceClosedAndMarked(t *
 
 func TestStopIterationAndMarkNeedsRepair_LandedDuringGrace_ClosedButLeftDone(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: done\nactual_cost: 0.42\ntype: task\n---\n# Ticket\n\nBody text.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: done\nactual_cost: 0.42\ntype: implement\n---\n# Ticket\n\nBody text.\n")
 	ticket := tickets.Ticket{Identifier: "01", Path: path}
 	d, _, closedTabs, _ := stopDeps(nil, nil)
 

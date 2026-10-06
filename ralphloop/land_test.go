@@ -157,7 +157,7 @@ func appliedSessionFixture(t *testing.T, cost string) (lp LandParams, d LandDeps
 	}
 
 	ticketPath = filepath.Join(t.TempDir(), "03-a.md")
-	body := "---\nid: \"03\"\nstatus: claimed\ntype: task\n" + cost + "---\n# A\n"
+	body := "---\nid: \"03\"\nstatus: claimed\ntype: implement\n" + cost + "---\n# A\n"
 	if err := os.WriteFile(ticketPath, []byte(body), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}

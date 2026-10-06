@@ -26,7 +26,7 @@ func writeTicket(t *testing.T, content string) string {
 // status and returns its path.
 func writeFrontmatterTicket(t *testing.T, status string) string {
 	t.Helper()
-	return writeTicket(t, "---\nid: \"01\"\nstatus: "+status+"\ntype: task\n---\n# Ticket\n\nBody text.\n")
+	return writeTicket(t, "---\nid: \"01\"\nstatus: "+status+"\ntype: implement\n---\n# Ticket\n\nBody text.\n")
 }
 
 func mustRead(t *testing.T, path string) string {
@@ -94,7 +94,7 @@ func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
 
 func TestClaim_ClearsIterationStatus(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestClaim_ClearsIterationStatus(t *testing.T) {
 
 func TestClaim_ClearsParkKind(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-answer\npark_kind: zero-commit\ntype: task\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-answer\npark_kind: zero-commit\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestClaim_ClearsParkKind(t *testing.T) {
 
 func TestClaim_PreservesOtherFrontmatterFieldsAndBody(t *testing.T) {
 	t.Parallel()
-	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: task\n---\n" +
+	original := "---\nid: \"01\"\nstatus: open\nblocked_by: [\"02\", \"03\"]\ntype: implement\n---\n" +
 		"# Ticket\n\n- [ ] some criterion\n- [ ] another **bold** criterion\n\nTrailing prose with `code`.\n"
 	path := writeTicket(t, original)
 	if err := Claim(path); err != nil {
@@ -179,7 +179,7 @@ func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 // dated "## Comments" sub-entry and removes the "## Needs Repair" heading.
 func TestClaim_DemotesNeedsRepairIntoDatedComments(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
 	if err := Claim(path); err != nil {
@@ -208,7 +208,7 @@ func TestClaim_DemotesNeedsRepairIntoDatedComments(t *testing.T) {
 // entry.
 func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
 
 	if err := Claim(path); err != nil {
@@ -235,7 +235,7 @@ func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
 // one "## Comments" heading, not two "## Comments" headings.
 func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nfirst failure\n")
 
 	if err := Claim(path); err != nil {
@@ -263,7 +263,7 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 // ticket should still see what they were told, right up until it's claimed.
 func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n"+
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
 	if err := SetStatus(path, "open"); err != nil {
@@ -284,7 +284,7 @@ func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
 // retiring here would fire repeatedly instead of exactly once at claim.
 func TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: task\n---\n"+
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
 
 	if err := schema.ClearIterationStatus(path); err != nil {
@@ -299,7 +299,7 @@ func TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair(t *testing.T) {
 
 func TestAppendSessionID_AppendsWithoutOverwriting(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nsession_ids: [\"sess-1\"]\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nsession_ids: [\"sess-1\"]\n---\n# Ticket\n\nBody.\n")
 
 	if err := AppendSessionID(path, "sess-2"); err != nil {
 		t.Fatalf("AppendSessionID: %v", err)
@@ -359,7 +359,7 @@ func TestClaim_MissingFileReturnsError(t *testing.T) {
 // line that no longer matches the "status" key).
 func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T
 // window:/Session: lines inside the YAML block.
 func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: task\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
 	if err := MarkDoneWithMetadata(path, 42000, 0, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *tes
 // frontmatter-format ticket.
 func TestClaimThenMarkDone_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Ticket\n\nBody.\n")
 
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)

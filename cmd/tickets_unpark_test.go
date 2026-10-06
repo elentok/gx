@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 )
 
-const parkedTicket = "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nneeds a human\n"
+const parkedTicket = "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nneeds a human\n"
 
 func unparkFixture(t *testing.T, content string) (epicPath, ticketPath string) {
 	t.Helper()
@@ -65,7 +65,7 @@ func TestRunTicketsUnpark_JSONSuccess(t *testing.T) {
 
 func TestRunTicketsUnpark_RefusesNotParked(t *testing.T) {
 	t.Parallel()
-	epicPath, ticketPath := unparkFixture(t, "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n")
+	epicPath, ticketPath := unparkFixture(t, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n")
 	before, _ := os.ReadFile(ticketPath)
 
 	var stdout, stderr bytes.Buffer

@@ -21,37 +21,37 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 	}{
 		{
 			name: "children field",
-			raw:  "---\nid: \"04\"\nstatus: open\ntype: task\nchildren:\n  - 04a\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\nstatus: open\ntype: implement\nchildren:\n  - 04a\n---\nBody.\n",
 			want: "children",
 		},
 		{
 			name: "needs-triage status",
-			raw:  "---\nid: \"04\"\nstatus: needs-triage\ntype: task\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\nstatus: needs-triage\ntype: implement\n---\nBody.\n",
 			want: "needs-triage",
 		},
 		{
 			name: "ready-for-agent status",
-			raw:  "---\nid: \"04\"\nstatus: ready-for-agent\ntype: task\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\nstatus: ready-for-agent\ntype: implement\n---\nBody.\n",
 			want: "ready-for-agent",
 		},
 		{
 			name: "ready-for-human status",
-			raw:  "---\nid: \"04\"\nstatus: ready-for-human\ntype: task\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\nstatus: ready-for-human\ntype: implement\n---\nBody.\n",
 			want: "ready-for-human",
 		},
 		{
 			name: "needs-info status",
-			raw:  "---\nid: \"04\"\nstatus: needs-info\ntype: task\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\nstatus: needs-info\ntype: implement\n---\nBody.\n",
 			want: "needs-answer",
 		},
 		{
 			name: "needs-attention status",
-			raw:  "---\nid: \"04\"\nstatus: needs-attention\ntype: task\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\nstatus: needs-attention\ntype: implement\n---\nBody.\n",
 			want: "needs-repair",
 		},
 		{
 			name: "missing status",
-			raw:  "---\nid: \"04\"\ntype: task\n---\nBody.\n",
+			raw:  "---\nid: \"04\"\ntype: implement\n---\nBody.\n",
 			want: "status",
 		},
 	}
@@ -77,7 +77,7 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04a-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-answer\ntype: task\nparent: \"04\"\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-answer\ntype: implement\nparent: \"04\"\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	if err := execute([]string{"tickets", "validate", path}, deps{stdout: &stdout, stderr: &stderr}); err != nil {
@@ -90,7 +90,7 @@ func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 func TestExecute_TicketsSet_NoChildrenFlag(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	err := execute([]string{"tickets", "set", path, "--children=04c"}, deps{stdout: &stdout, stderr: &stderr})

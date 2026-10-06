@@ -69,7 +69,7 @@ func ticketPath(scratchDir, epicName, file string) string {
 func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	// The park has no timeout: only the scripted clearing hand ends it.
@@ -100,7 +100,7 @@ func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stub.md": "---\nid: \"01\"\nstatus: draft\ntype: task\n---\n# Stub\n",
+		"01-stub.md": "---\nid: \"01\"\nstatus: draft\ntype: implement\n---\n# Stub\n",
 	})
 	d, prompts, _ := fakeDeps()
 	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stub.md"), "open")
@@ -135,7 +135,7 @@ func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
 func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, prompts, _ := fakeDeps()
@@ -192,7 +192,7 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, prompts, removed := fakeDeps()
@@ -276,8 +276,8 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-cycle-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\nblocked_by: [\"02\"]\n---\n# A\n",
-		"02-cycle-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n",
+		"01-cycle-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by: [\"02\"]\n---\n# A\n",
+		"02-cycle-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# B\n",
 	})
 	d, _, _ := fakeDeps()
 	sink := &recordingSink{}
@@ -300,7 +300,7 @@ func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, _, _ := fakeDeps()
 	polled := make(chan struct{})
@@ -358,7 +358,7 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 func TestRun_EpicParked_ZeroCommitParkReportsNotReattachable(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }

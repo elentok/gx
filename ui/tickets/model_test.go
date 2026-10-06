@@ -1106,7 +1106,7 @@ func LegacyTicketToFrontmatter(filename, content string) string {
 		id = id[:idx]
 	}
 
-	status, typ := "open", "task"
+	status, typ := "open", "implement"
 	var blockedBy []string
 	lines := strings.Split(content, "\n")
 	bodyStart := 0

@@ -28,7 +28,7 @@ func writeParkedFrontmatterTicket(t *testing.T, root, epic, filename, id, status
 		t.Fatal(err)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: task\n", id, status)
+	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: implement\n", id, status)
 	if parent != "" {
 		fmt.Fprintf(&b, "parent: %q\n", parent)
 	}

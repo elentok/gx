@@ -77,7 +77,7 @@ func TestClearableParkedTicket(t *testing.T) {
 				parkKindLine = "park_kind: " + tt.parkKind + "\n"
 			}
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
-				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: task\n" + parkKindLine + "---\n# A\n",
+				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: implement\n" + parkKindLine + "---\n# A\n",
 			})
 			d, _, _ := fakeDeps()
 			tt.setupDeps(&d)
@@ -115,7 +115,7 @@ func wholeScope(t *testing.T, epic tickets.Epic) RunScope {
 func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nmy-epic-iter-01 is blocked on a prompt gx did not send; answer it in the pane\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nmy-epic-iter-01 is blocked on a prompt gx did not send; answer it in the pane\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, _, _ := fakeDeps()
@@ -159,7 +159,7 @@ func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nunanswered\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nunanswered\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, _, _ := fakeDeps() // TabList returns no tabs by default: the pane is already released
@@ -192,7 +192,7 @@ func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
 func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# A\n\n## Needs Answer\n\nstill waiting\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nstill waiting\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, _, _ := fakeDeps()
@@ -238,8 +238,8 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	// contention of running alongside many other parallel tests, the removal
 	// can lag behind and flake the assertion.
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	path01 := ticketPath(scratchDir, "my-epic", "01-a.md")
 	path02 := ticketPath(scratchDir, "my-epic", "02-b.md")
@@ -329,7 +329,7 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 // own unmute audit note.
 func TestUnmuteTicket_Parked_ClearsMutesDemotesReopens(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: task\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\n## Needs Repair\n\nnotification storm tripped a mute\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\n## Needs Repair\n\nnotification storm tripped a mute\n")
 
 	if err := UnmuteTicket(path, time.Now()); err != nil {
 		t.Fatalf("UnmuteTicket: %v", err)
@@ -361,7 +361,7 @@ func TestUnmuteTicket_Parked_ClearsMutesDemotesReopens(t *testing.T) {
 // Mutes (plus the audit note) is the whole action.
 func TestUnmuteTicket_Unparked_ClearsMutesLeavesStatus(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: task\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\nBody text.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\nBody text.\n")
 
 	if err := UnmuteTicket(path, time.Now()); err != nil {
 		t.Fatalf("UnmuteTicket: %v", err)

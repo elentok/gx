@@ -70,7 +70,7 @@ func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
 func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, removed := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -220,7 +220,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 func TestRun_AlreadyAppliedIteration_CompletesWithoutCherryPickOrResolver(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) {
@@ -260,7 +260,7 @@ func TestRun_AlreadyAppliedIteration_CompletesWithoutCherryPickOrResolver(t *tes
 func TestRun_StaleCherryPick_IsAbortedBeforeLandingCurrentTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	stale := true
@@ -290,8 +290,8 @@ func TestRun_StaleCherryPick_IsAbortedBeforeLandingCurrentTicket(t *testing.T) {
 func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	d, _, _ := fakeDeps()
 	active := false
@@ -331,7 +331,7 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutAbortingRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -396,7 +396,7 @@ func findConflictResolutionChild(t *testing.T, scratchDir, epicName string) stri
 func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_ParksOnChildNotParent(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -448,7 +448,7 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 func TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -521,7 +521,7 @@ func TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab(t *testing
 func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	d, _, _ := fakeDeps()
@@ -619,7 +619,7 @@ func (e *fakeConflictErr) Error() string { return "cherry-pick conflict" }
 func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -665,8 +665,8 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -712,7 +712,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 
@@ -761,7 +761,7 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 func TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 

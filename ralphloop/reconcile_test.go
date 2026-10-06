@@ -31,7 +31,7 @@ func testReconcileParams(workspaceID string, paths reconcilePaths, sink EventSin
 func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -79,7 +79,7 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -123,7 +123,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -160,7 +160,7 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBefor
 func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -208,7 +208,7 @@ func (s *reattachSink) TicketReattached(identifier, label, cwd, sessionID string
 func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
 		Type: eventIterationStarted, Ticket: "01", Agent: AgentClaude,
@@ -253,7 +253,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -281,7 +281,7 @@ func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
 func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -319,7 +319,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -349,8 +349,8 @@ func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# Attention\n",
-		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# Attention\n",
+		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
@@ -376,8 +376,8 @@ func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing
 func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# Attention\n",
-		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Open\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# Attention\n",
+		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -432,7 +432,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	epics, err := tickets.Load(scratchDir)
@@ -476,7 +476,7 @@ func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *test
 func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	epics, err := tickets.Load(scratchDir)
@@ -515,8 +515,8 @@ func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *t
 func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: implement\n---\n# B\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {

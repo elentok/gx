@@ -81,7 +81,7 @@ exit 1
 			const epicName = "epic"
 			repoDir := testutil.TempRepo(t)
 			scratchDir := writeEpic(t, epicName, map[string]string{
-				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 			})
 			home := t.TempDir()
 			pathEnv := pathExcluding("codex", "herdr")
@@ -144,7 +144,7 @@ func TestRun_ProductionRealGit_MissingSkillFailsBeforeClaim(t *testing.T) {
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	home := t.TempDir()
 
@@ -187,7 +187,7 @@ func TestRun_ProductionRealGit_CodexLaunchFailureAfterClaimNeedsRepair(t *testin
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	home := t.TempDir()
 
@@ -306,7 +306,7 @@ func TestRun_ProductionRealGit_CodexRestartReattachesAndLandsOnce(t *testing.T) 
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-restart.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Restart\n",
+		"01-restart.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Restart\n",
 	})
 
 	home := t.TempDir()

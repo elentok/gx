@@ -42,7 +42,7 @@ func reportIterationStatus(t *testing.T, path, target, value string) func(herdr.
 func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, _, removed := fakeDeps()
@@ -101,7 +101,7 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 func TestRun_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, _, _ := fakeDeps()

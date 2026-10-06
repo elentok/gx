@@ -69,7 +69,7 @@ func TestTicketFrontmatterFields_ActualContextWindowReplacesExpectedOnceLanded(t
 func TestRenderFrontmatterBlock_WrapsLongValueToWidth(t *testing.T) {
 	t.Parallel()
 	tk := tickets.Ticket{
-		Type:      "task",
+		Type:      "implement",
 		BlockedBy: []string{"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"},
 	}
 
@@ -91,7 +91,7 @@ func TestRenderFrontmatterBlock_WrapsLongValueToWidth(t *testing.T) {
 // unchanged by the added wrapping.
 func TestRenderFrontmatterBlock_NoRegressionForShortValues(t *testing.T) {
 	t.Parallel()
-	tk := tickets.Ticket{Type: "task"}
+	tk := tickets.Ticket{Type: "implement"}
 
 	out := renderFrontmatterBlock(tk, tickets.StatusOpen, 80)
 	lines := strings.Split(out, "\n")

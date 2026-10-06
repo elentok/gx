@@ -69,7 +69,7 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
@@ -98,7 +98,7 @@ func TestExecute_TicketsSet_Parent(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -124,7 +124,7 @@ func TestExecute_TicketsSet_SplitAliasFlagsRemoved(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -142,7 +142,7 @@ func TestExecute_TicketsSet_CodeReviewFixesFlagRemoved(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -160,7 +160,7 @@ func TestExecute_TicketsSet_RefusedFieldUnknownFlag(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -178,7 +178,7 @@ func TestExecute_TicketsSet_ValidationFailureWritesNothing(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	original := "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n"
+	original := "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n"
 	writeTicketFile(t, path, original)
 
 	var stdout bytes.Buffer
@@ -205,7 +205,7 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
@@ -232,9 +232,9 @@ func TestExecute_TicketsSet_StatusDoneRefusedWithUnresolvedBlocker(t *testing.T)
 		t.Fatalf("mkdir issues: %v", err)
 	}
 	blockerPath := filepath.Join(issuesDir, "01-blocker.md")
-	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 	targetPath := filepath.Join(issuesDir, "02-target.md")
-	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
@@ -264,9 +264,9 @@ func TestExecute_TicketsSet_StatusDoneForcedWithUnresolvedBlockerWarns(t *testin
 		t.Fatalf("mkdir issues: %v", err)
 	}
 	blockerPath := filepath.Join(issuesDir, "01-blocker.md")
-	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, blockerPath, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 	targetPath := filepath.Join(issuesDir, "02-target.md")
-	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, targetPath, "---\nid: \"02\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
@@ -292,7 +292,7 @@ func TestExecute_TicketsSet_StatusDoneUnaffectedByBlockerOutsideIssuesLayout(t *
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\nblocked_by: [\"01\"]\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
@@ -307,7 +307,7 @@ func TestExecute_TicketsSet_StatusOpenRefusedWithEmptyBody(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\n")
 
 	var stdout, stderr bytes.Buffer
 	d := deps{stdout: &stdout, stderr: &stderr, getwd: nonAgentGetwd(t)}
@@ -333,7 +333,7 @@ func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
@@ -356,7 +356,7 @@ func TestExecute_TicketsSet_NeedsRepairToOpenAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-repair\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-repair\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
@@ -379,7 +379,7 @@ func TestExecute_TicketsValidate_AcceptsBodylessDraft(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -393,7 +393,7 @@ func TestExecute_TicketsSet_IterationStatusWorkingAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -416,7 +416,7 @@ func TestExecute_TicketsSet_IterationStatusInvalidRejected(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -434,7 +434,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -457,7 +457,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedWithCommitlessAccepted(t *tes
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -480,7 +480,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedWithStatusDoneAccepted(t *tes
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
@@ -506,7 +506,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedAlreadyCommitlessOnDiskAccept
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ncommitless: true\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ncommitless: true\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -521,7 +521,7 @@ func TestExecute_TicketsSet_IterationStatusNeedsAnswerBareAccepted(t *testing.T)
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -544,7 +544,7 @@ func TestExecute_TicketsSet_ClearingListField(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\nblocked_by: [\"01\", \"03\"]\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\nblocked_by: [\"01\", \"03\"]\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -570,7 +570,7 @@ func TestExecute_TicketsSet_AgentBranch_NonPromotionStatusRefused(t *testing.T) 
 			t.Parallel()
 			dir := t.TempDir()
 			path := filepath.Join(dir, "04b-ticket.md")
-			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 			var stdout, stderr bytes.Buffer
 			d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
@@ -601,7 +601,7 @@ func TestExecute_TicketsSet_AgentBranch_DraftToOpenAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
@@ -624,7 +624,7 @@ func TestExecute_TicketsSet_AgentBranch_AlreadyOpenToOpenRefused(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout, stderr bytes.Buffer
 	d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
@@ -642,7 +642,7 @@ func TestExecute_TicketsSet_AgentBranch_NeedsAnswerAndNeedsRepairRefused(t *test
 			t.Parallel()
 			dir := t.TempDir()
 			path := filepath.Join(dir, "04b-ticket.md")
-			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+			writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 			var stdout, stderr bytes.Buffer
 			d := deps{stdout: &stdout, stderr: &stderr, getwd: agentGetwd(t, "ralph-loop/widget-item-04b")}
@@ -659,7 +659,7 @@ func TestExecute_TicketsSet_UnrecognisedBranch_StatusAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	// "main" isn't a ralph-loop/* branch, so a hand-driven caller working on

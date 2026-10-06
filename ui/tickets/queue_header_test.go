@@ -185,8 +185,8 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 12000\nelapsed_time: 754\ncompactions: 2\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: task\nactual_context_window: 8000\nelapsed_time: 100\ncompactions: 1\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\nelapsed_time: 754\ncompactions: 2\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nactual_context_window: 8000\nelapsed_time: 100\ncompactions: 1\n---\n\nBody.\n")
 
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "01-first.md"):  true,
@@ -357,8 +357,8 @@ func TestQueueEpicHeaderAppendsSummedCostForCompletedEpic(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nelapsed_time: 60\nactual_cost: 30\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: task\nelapsed_time: 60\nactual_cost: 13\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nelapsed_time: 60\nactual_cost: 30\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nelapsed_time: 60\nactual_cost: 13\n---\n\nBody.\n")
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "01-first.md"): true,
 		ticketPath(root, "alpha", "02-second.md"): true,

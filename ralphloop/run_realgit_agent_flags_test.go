@@ -62,7 +62,7 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 			realGitTimeoutWatchdog(t, realGitTestTimeout)
 			repoDir := testutil.TempRepo(t)
 			scratchDir := writeEpic(t, epicName, map[string]string{
-				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 			})
 			home := t.TempDir()
 

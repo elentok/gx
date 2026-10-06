@@ -26,7 +26,7 @@ type landFixture struct {
 }
 
 func ticketWith(status, extra string) string {
-	return "---\nid: \"01\"\nstatus: " + status + "\ntype: task\n" + extra + "---\n# A\n"
+	return "---\nid: \"01\"\nstatus: " + status + "\ntype: implement\n" + extra + "---\n# A\n"
 }
 
 func newLandFixture(t *testing.T, content string) *landFixture {
@@ -139,7 +139,7 @@ func TestRunTicketsLand_RefusesExplicitCommitlessOnly(t *testing.T) {
 	}
 
 	// A research ticket is commitless by type, not by flag: it still lands.
-	g := newLandFixture(t, strings.Replace(ticketWith("claimed", ""), "type: task", "type: research", 1))
+	g := newLandFixture(t, strings.Replace(ticketWith("claimed", ""), "type: implement", "type: research", 1))
 	if _, err := g.run(t); err != nil {
 		t.Errorf("type-derived commitless refused: %v", err)
 	}

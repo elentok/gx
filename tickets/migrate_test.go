@@ -9,7 +9,7 @@ import (
 func TestMigrate_IterationStatusRoundTripsUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md")
-	original := "---\nid: \"01\"\nstatus: done\ntype: task\niteration_status: working\n---\nBody.\n"
+	original := "---\nid: \"01\"\nstatus: done\ntype: implement\niteration_status: working\n---\nBody.\n"
 	writeFile(t, path, original)
 
 	result, err := Migrate(dir)

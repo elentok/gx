@@ -26,19 +26,19 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	issuesDir := writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
 		// Malformed fork chain: 01 lists both its direct fork (01a) and its
 		// grandchild (01b, actually 01a's child) as children.
-		"01-root.md":         "---\nid: \"01\"\nstatus: open\ntype: task\nchildren: [\"01a\", \"01b\"]\n---\nBody.\n",
-		"01a-fork.md":        "---\nid: \"01a\"\nstatus: open\ntype: task\nparent: \"01\"\n---\nBody.\n",
-		"01b-grandchild.md":  "---\nid: \"01b\"\nstatus: open\ntype: task\nparent: \"01a\"\n---\nBody.\n",
-		"02-handed-back.md":  "---\nid: \"02\"\nstatus: ready-for-human\ntype: task\n---\nBody.\n",
-		"03-no-status.md":    "---\nid: \"03\"\ntype: task\n---\nBody.\n",
-		"04-already-new.md":  "---\nid: \"04\"\nstatus: draft\ntype: task\n---\nBody.\n",
-		"05-self-blocked.md": "---\nid: \"05\"\nstatus: open\ntype: task\nparent: \"01\"\nblocked_by: [\"01\", \"02\"]\n---\nBody.\n",
+		"01-root.md":         "---\nid: \"01\"\nstatus: open\ntype: implement\nchildren: [\"01a\", \"01b\"]\n---\nBody.\n",
+		"01a-fork.md":        "---\nid: \"01a\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
+		"01b-grandchild.md":  "---\nid: \"01b\"\nstatus: open\ntype: implement\nparent: \"01a\"\n---\nBody.\n",
+		"02-handed-back.md":  "---\nid: \"02\"\nstatus: ready-for-human\ntype: implement\n---\nBody.\n",
+		"03-no-status.md":    "---\nid: \"03\"\ntype: implement\n---\nBody.\n",
+		"04-already-new.md":  "---\nid: \"04\"\nstatus: draft\ntype: implement\n---\nBody.\n",
+		"05-self-blocked.md": "---\nid: \"05\"\nstatus: open\ntype: implement\nparent: \"01\"\nblocked_by: [\"01\", \"02\"]\n---\nBody.\n",
 		// A children value that never parsed as a list of IDs is still the
 		// retired shape, and still has to be stripped and reported.
-		"06-scalar-children.md": "---\nid: \"06\"\nstatus: open\ntype: task\nchildren: 06a\n---\nBody.\n",
+		"06-scalar-children.md": "---\nid: \"06\"\nstatus: open\ntype: implement\nchildren: 06a\n---\nBody.\n",
 		// The no-silent-stalls rename's own legacy park spellings.
-		"07-legacy-needs-info.md":      "---\nid: \"07\"\nstatus: needs-info\ntype: task\n---\nBody.\n",
-		"08-legacy-needs-attention.md": "---\nid: \"08\"\nstatus: needs-attention\ntype: task\n---\nBody.\n",
+		"07-legacy-needs-info.md":      "---\nid: \"07\"\nstatus: needs-info\ntype: implement\n---\nBody.\n",
+		"08-legacy-needs-attention.md": "---\nid: \"08\"\nstatus: needs-attention\ntype: implement\n---\nBody.\n",
 	})
 	alreadyNewPath := filepath.Join(issuesDir, "04-already-new.md")
 	alreadyNewBefore, err := os.ReadFile(alreadyNewPath)
@@ -150,8 +150,8 @@ func TestExecute_TicketsMigrate_InvalidResultWritesNothing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	issuesDir := writeMigrateFixtureEpic(t, root, "cyclic-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\nparent: \"02\"\n---\nBody.\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\nBody.\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
 
 	before := map[string][]byte{}

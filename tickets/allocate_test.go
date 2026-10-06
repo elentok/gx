@@ -10,11 +10,11 @@ import (
 func TestNextTicketID_FlatSibling(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02-second.md"),
-		"---\nid: \"02\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"02\"\nstatus: done\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "03-third.md"),
-		"---\nid: \"03\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"03\"\nstatus: done\ntype: implement\n---\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -43,7 +43,7 @@ func TestNextTicketID_EmptyEpicStartsAt01(t *testing.T) {
 func TestNextTicketID_LetteredChildOfBareParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12-parent.md"),
-		"---\nid: \"12\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"12\"\nstatus: done\ntype: implement\n---\n")
 	epics, err := Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -61,9 +61,9 @@ func TestNextTicketID_LetteredChildOfBareParent(t *testing.T) {
 func TestNextTicketID_LetteredChildSkipsExisting(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12-parent.md"),
-		"---\nid: \"12\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"12\"\nstatus: done\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12a-child.md"),
-		"---\nid: \"12a\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"12a\"\nstatus: done\ntype: implement\n---\n")
 	epics, err := Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -81,7 +81,7 @@ func TestNextTicketID_LetteredChildSkipsExisting(t *testing.T) {
 func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12b-child.md"),
-		"---\nid: \"12b\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"12b\"\nstatus: done\ntype: implement\n---\n")
 	epics, err := Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -96,7 +96,7 @@ func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 	}
 
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "12b1-grandchild.md"),
-		"---\nid: \"12b1\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"12b1\"\nstatus: done\ntype: implement\n---\n")
 	epics, err = Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -113,11 +113,11 @@ func TestNextTicketID_NumericLevelPastLetteredParent(t *testing.T) {
 func TestNextTicketID_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e-parent.md"),
-		"---\nid: \"02e\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"02e\"\nstatus: done\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e1-child.md"),
-		"---\nid: \"02e1\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"02e1\"\nstatus: done\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02e2-child.md"),
-		"---\nid: \"02e2\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"02e2\"\nstatus: done\ntype: implement\n---\n")
 	epics, err := Load(dir)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -144,7 +144,7 @@ func TestLoadLockedEpic_ValidPath(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "my-epic")
 	writeFile(t, filepath.Join(epicPath, "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\n")
 
 	epic, unlock, err := LoadLockedEpic(epicPath)
 	if err != nil {
@@ -237,7 +237,7 @@ func TestLockEpic_SerializesConcurrentAllocation(t *testing.T) {
 			}
 			ids[i] = id
 			path := filepath.Join(epicPath, "issues", id+"-stub.md")
-			content := "---\nid: \"" + id + "\"\nstatus: open\ntype: task\n---\n"
+			content := "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\n---\n"
 			errs[i] = os.WriteFile(path, []byte(content), 0644)
 		}(i)
 	}

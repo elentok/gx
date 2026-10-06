@@ -120,7 +120,7 @@ func TestChatMembershipVerdicts_FailsOnUnmappedMethod(t *testing.T) {
 func TestEpicComplete_ChatSinkIsNotificationOnly(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# A\n",
 	})
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 

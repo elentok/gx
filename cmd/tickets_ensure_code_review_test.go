@@ -70,7 +70,7 @@ func TestRunTicketsEnsureCodeReview_NoopWhenCodeReviewTicketExists(t *testing.T)
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
 	writeTicket(t, filepath.Join(issuesDir, "02-review.md"), "02", "open", "code-review")
 
 	var stdout bytes.Buffer
@@ -98,8 +98,8 @@ func TestRunTicketsEnsureCodeReview_CreatesValidStubWhenNoneExists(t *testing.T)
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "task")
-	writeTicket(t, filepath.Join(issuesDir, "03-do-other-thing.md"), "03", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
+	writeTicket(t, filepath.Join(issuesDir, "03-do-other-thing.md"), "03", "done", "implement")
 
 	var stdout bytes.Buffer
 	if err := runTicketsEnsureCodeReview(epicPath, &stdout); err != nil {

@@ -81,8 +81,8 @@ func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing
 	wtDir := testWorktreeDir(t, repoDir)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# B\n",
 	})
 
 	home := t.TempDir()

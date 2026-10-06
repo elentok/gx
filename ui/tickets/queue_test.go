@@ -115,7 +115,7 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
 	writeTicket(t, root, "alpha", "03-other.md", "Status: open\n\nBody.\n")
 
 	checked := map[string]bool{
@@ -381,7 +381,7 @@ func TestQueueModelEnterOnExpandedParentFocusesPreview(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-parent.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-child.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n\nBody.\n")
 
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "01-parent.md"): true,
@@ -613,9 +613,9 @@ func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T
 	m.runningEpics = map[string]bool{"beta": true}
 	m.executionTickets = map[string]bool{"alpha/01": true, "alpha/02": true, "beta/01": true}
 
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 12000\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: task\nactual_context_window: 7000\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "beta", "01-third.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 5000\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nactual_context_window: 7000\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "beta", "01-third.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 5000\n---\n\nBody.\n")
 
 	updated, cmd := m.Update(implementPollMsg{epicName: "beta"})
 	m = deliverQueueCommands(t, updated.(QueueModel), cmd)
@@ -754,7 +754,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("completed", func(t *testing.T) {
 		completedRoot := t.TempDir()
 		writeTicket(t, completedRoot, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
-		writeRawQueueTicket(t, completedRoot, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\nactual_context_window: 12000\n---\n\nBody.\n")
+		writeRawQueueTicket(t, completedRoot, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\n---\n\nBody.\n")
 		checked := map[string]bool{ticketPath(completedRoot, "alpha", "01-first.md"): true}
 		m := loadQueueModel(t, NewQueueModel(completedRoot, ui.Settings{}, checked, keys.Manager{}))
 		completedAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
@@ -829,8 +829,8 @@ func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-open.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-done.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: task\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "beta", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "beta", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
 	open := ticketPath(root, "alpha", "01-open.md")
 	alphaDone := ticketPath(root, "alpha", "02-done.md")
 	betaDone := ticketPath(root, "beta", "01-done.md")
@@ -871,7 +871,7 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\nBlocked by: 01\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
 	first := ticketPath(root, "alpha", "01-first.md")
 	second := ticketPath(root, "alpha", "02-second.md")
 	checked := map[string]bool{first: true, second: true}
@@ -921,7 +921,7 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
 	done := ticketPath(root, "alpha", "01-done.md")
 	open := ticketPath(root, "alpha", "02-open.md")
@@ -1769,7 +1769,7 @@ func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-foundation.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-dependent.md", "Status: open\nBlocked by: 01\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "03-done.md", "---\nid: \"03\"\nstatus: done\ntype: task\nactual_context_window: 12000\nelapsed_time: 754\n---\n\nDone.\n")
+	writeRawQueueTicket(t, root, "alpha", "03-done.md", "---\nid: \"03\"\nstatus: done\ntype: implement\nactual_context_window: 12000\nelapsed_time: 754\n---\n\nDone.\n")
 
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "01-foundation.md"): true,
@@ -2452,7 +2452,7 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: task\n---\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-open.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-open.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{

@@ -239,8 +239,8 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# Second\n",
 	})
 	d, prompts, removed := fakeDeps()
 
@@ -284,7 +284,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d, _, _ := fakeDeps()
 	var deletedBranches []string
@@ -305,7 +305,7 @@ func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -371,8 +371,8 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -417,7 +417,7 @@ func TestRun_SchedulerScan_LogsOutOfScopeTicket(t *testing.T) {
 func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -450,7 +450,7 @@ func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
 func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -476,7 +476,7 @@ func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -513,7 +513,7 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -544,7 +544,7 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
@@ -602,7 +602,7 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.InstallDeps = func(path string) (string, error) {
@@ -629,7 +629,7 @@ func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingR
 func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# First\n",
 	})
 	d, prompts, removed := fakeDeps()
 
@@ -720,9 +720,9 @@ func TestAllDone_WaitingForChildrenNotDone(t *testing.T) {
 func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
-		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
+		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# Third\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -780,9 +780,9 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 // is both the only and the last sink call here.
 func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
-		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
+		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# Third\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -874,7 +874,7 @@ func countCalls(calls []string, name string) int {
 // ever claiming the ticket that's sitting open and unblocked.
 func TestRun_Drain_ZeroInFlight_EndsImmediately(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -924,7 +924,7 @@ func TestRun_Drain_ZeroInFlight_EndsImmediately(t *testing.T) {
 // come — the exact operator-walks-away scenario drain exists to serve.
 func TestRun_Drain_WakesRunParkedInWaitForResume(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -985,8 +985,8 @@ func TestRun_Drain_WakesRunParkedInWaitForResume(t *testing.T) {
 func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -1059,8 +1059,8 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, _, _ := fakeDeps()
 	sink := &recordingSink{}
@@ -1094,8 +1094,8 @@ func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
 func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -1131,8 +1131,8 @@ func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()
 
@@ -1166,8 +1166,8 @@ func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
 func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	ticket01Path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
@@ -1190,7 +1190,7 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		if opts.Target == label02 {
 			clobberOnce.Do(func() {
-				if err := os.WriteFile(ticket01Path, []byte("---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n"), 0644); err != nil {
+				if err := os.WriteFile(ticket01Path, []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n"), 0644); err != nil {
 					t.Errorf("simulating external clobber of ticket 01: %v", err)
 				}
 			})
@@ -1248,9 +1248,9 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
-		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# Second\n",
+		"03-third.md":  "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# Third\n",
 	})
 	requested := []string{"01", "02"} // mirrors checked.go's blocker cascade at selection time, before 03 ever enters the picture
 
@@ -1270,7 +1270,7 @@ func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *te
 	// Edit 02's blockers to require 03 too — a dependency this run's
 	// selection never picked up. The plan must surface this as stuck, not a
 	// misleading runnable wave, once 01 lands.
-	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\", \"03\"]\n---\n# Second\n"), 0644); err != nil {
+	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\", \"03\"]\n---\n# Second\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	if _, err := planFor(); err == nil {
@@ -1279,7 +1279,7 @@ func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *te
 
 	// Edit again, dropping the unselected blocker — the plan should now
 	// resolve into the two waves 01's-then-02's chain always implied.
-	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n"), 0644); err != nil {
+	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# Second\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	waves, err := planFor()

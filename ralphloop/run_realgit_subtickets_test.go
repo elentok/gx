@@ -44,7 +44,7 @@ func fullTicketIDFromImplementPrompt(text string) (id string, ok bool) {
 // fake agent's stand-in for a real implement skill turn that decides to split
 // its ticket into subtickets mid-run.
 func writeChildTicket(issuesDir, id, parentID string) error {
-	content := fmt.Sprintf("---\nid: %q\nstatus: open\ntype: task\nparent: %q\n---\n# Child %s\n", id, parentID, id)
+	content := fmt.Sprintf("---\nid: %q\nstatus: open\ntype: implement\nparent: %q\n---\n# Child %s\n", id, parentID, id)
 	return os.WriteFile(filepath.Join(issuesDir, id+"-child.md"), []byte(content), 0644)
 }
 
@@ -241,7 +241,7 @@ func TestRun_ProductionRealGit_TicketCreatesSubtickets(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
+		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Parent\n",
 	})
 	issuesDir := filepath.Join(scratchDir, epicName, "issues")
 
@@ -314,7 +314,7 @@ func TestRun_ProductionRealGit_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-implement.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Implement\n",
+		"01-implement.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Implement\n",
 		"02-review.md":    "---\nid: \"02\"\nstatus: open\ntype: code-review\n---\n# Review\n",
 	})
 	issuesDir := filepath.Join(scratchDir, epicName, "issues")

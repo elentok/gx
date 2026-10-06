@@ -9,7 +9,7 @@ import (
 )
 
 func TestUpdateTicket_MutatesAndWrites(t *testing.T) {
-	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	err := UpdateTicket(path, func(t *Ticket) {
 		t.Status = StatusClaimed
@@ -31,7 +31,7 @@ func TestUpdateTicket_MutatesAndWrites(t *testing.T) {
 }
 
 func TestUpdateTicket_AppendsToSessionIDsWithoutOverwriting(t *testing.T) {
-	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: task\nsession_ids: [\"sess-1\"]\n---\nBody.\n")
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nsession_ids: [\"sess-1\"]\n---\nBody.\n")
 
 	err := UpdateTicket(path, func(t *Ticket) {
 		t.SessionIDs = append(t.SessionIDs, "sess-2")
@@ -51,7 +51,7 @@ func TestUpdateTicket_AppendsToSessionIDsWithoutOverwriting(t *testing.T) {
 }
 
 func TestClearIterationStatus_ClearsFieldLeavesStatusUntouched(t *testing.T) {
-	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: task\niteration_status: finished\n---\nBody.\n")
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: implement\niteration_status: finished\n---\nBody.\n")
 
 	if err := ClearIterationStatus(path); err != nil {
 		t.Fatalf("ClearIterationStatus: %v", err)
@@ -78,7 +78,7 @@ func TestClearIterationStatus_ClearsFieldLeavesStatusUntouched(t *testing.T) {
 }
 
 func TestUpdateTicket_ConcurrentWritersAllSurvive(t *testing.T) {
-	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n")
+	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	const writers = 20
 	var wg sync.WaitGroup
@@ -106,7 +106,7 @@ func TestUpdateTicket_ConcurrentWritersAllSurvive(t *testing.T) {
 }
 
 func TestUpdateTicket_ValidationFailureWritesNothing(t *testing.T) {
-	original := "---\nid: \"04b\"\nstatus: open\ntype: task\n---\nBody.\n"
+	original := "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n"
 	path := writeTemp(t, "04b-ticket.md", original)
 
 	err := UpdateTicket(path, func(t *Ticket) {

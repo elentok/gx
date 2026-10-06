@@ -17,7 +17,7 @@ func TestReset_ParkedTicketReturnsToFreshOpen(t *testing.T) {
 id: "05"
 status: needs-answer
 blocked_by: ["03"]
-type: task
+type: implement
 expected_context_window: 25000
 actual_context_window: 90000
 elapsed_time: 120
@@ -59,7 +59,7 @@ Earlier note.
 		ID:                    "05",
 		Status:                schema.StatusOpen,
 		BlockedBy:             []schema.TicketID{"03"},
-		Type:                  schema.TypeTask,
+		Type:                  schema.TypeImplement,
 		ExpectedContextWindow: 25000,
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -79,7 +79,7 @@ Earlier note.
 
 func TestReset_RetiresNeedsRepairSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-repair\ntype: task\n---\n\n## Needs Repair\n\nBroke.\n")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-repair\ntype: implement\n---\n\n## Needs Repair\n\nBroke.\n")
 
 	if err := Reset(path, time.Now(), ""); err != nil {
 		t.Fatalf("Reset: %v", err)
@@ -94,7 +94,7 @@ func TestReset_RetiresNeedsRepairSection(t *testing.T) {
 
 func TestReset_NoteLandsInSameWrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: task\n---\n\n# 05 — Thing\n")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
 
 	if err := Reset(path, time.Now(), "reset note text\n"); err != nil {
 		t.Fatalf("Reset: %v", err)

@@ -19,7 +19,7 @@ import (
 func TestRun_UnexecutedToolCallDetected_RetryLandsCommits(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()
@@ -70,7 +70,7 @@ func TestRun_UnexecutedToolCallDetected_RetryLandsCommits(t *testing.T) {
 func TestRun_UnexecutedToolCallNotDetected_GoesStraightToNeedsAnswer(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()
@@ -107,7 +107,7 @@ func TestRun_UnexecutedToolCallNotDetected_GoesStraightToNeedsAnswer(t *testing.
 func TestRun_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToNeedsAnswer(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()
@@ -145,7 +145,7 @@ func TestRun_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToNeedsAnswer
 func TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()

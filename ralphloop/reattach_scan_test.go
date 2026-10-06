@@ -11,7 +11,7 @@ import (
 func TestScanForReattachable_ClaimedWithLiveTab_ProducesSignal(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -49,7 +49,7 @@ func TestScanForReattachable_ClaimedWithLiveTab_ProducesSignal(t *testing.T) {
 func TestScanForReattachable_NeedsRepairWithLiveTab_ProducesSignal(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -73,7 +73,7 @@ func TestScanForReattachable_NeedsRepairWithLiveTab_ProducesSignal(t *testing.T)
 func TestScanForReattachable_ClaimedWithNoLiveTab_ProducesNothing(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -95,7 +95,7 @@ func TestScanForReattachable_ClaimedWithNoLiveTab_ProducesNothing(t *testing.T) 
 func TestScanForReattachable_NoWorkspace_ProducesNothingAndSkipsTabList(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -124,8 +124,8 @@ func TestScanForReattachable_NoWorkspace_ProducesNothingAndSkipsTabList(t *testi
 func TestScanForReattachable_NoClaimedOrNeedsRepairTickets_ProducesNothing(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-a.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-a.md": "---\nid: \"02\"\nstatus: done\ntype: implement\n---\n# B\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -154,7 +154,7 @@ func TestScanForReattachable_NoClaimedOrNeedsRepairTickets_ProducesNothing(t *te
 func TestScanForReattachable_FindWorkspaceError_Propagates(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {

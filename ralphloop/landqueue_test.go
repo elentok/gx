@@ -19,8 +19,8 @@ import (
 func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -79,8 +79,8 @@ func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing
 func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -108,7 +108,7 @@ func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
 func TestRun_ExitsOnlyAfterLastTicketsLandCompletes(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -146,7 +146,7 @@ func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
 	landDeferRetryInterval = 10 * time.Millisecond // not parallel: shared package var
 	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	lockDir := landLockDir(scratchDir, "epic")
 	if err := AcquireLandLock(lockDir); err != nil {
@@ -195,7 +195,7 @@ func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
 	landDeferRetryInterval = 10 * time.Millisecond
 	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	lockDir := landLockDir(scratchDir, "epic")
 	if err := WriteLandMarker(lockDir, LandMarker{Epic: "epic", Ticket: "01"}); err != nil {
@@ -245,7 +245,7 @@ func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 	landDeferRetryInterval = 5 * time.Millisecond
 	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	lockDir := landLockDir(scratchDir, "epic")
 	if err := AcquireLandLock(lockDir); err != nil {

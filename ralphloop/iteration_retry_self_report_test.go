@@ -40,7 +40,7 @@ func retryTurnSelfReport(t *testing.T, path string, base func(herdr.AgentPromptO
 func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()
@@ -97,7 +97,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *te
 func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()
@@ -158,7 +158,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()

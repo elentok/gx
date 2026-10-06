@@ -97,14 +97,14 @@ func TestRun_TwoEpicsSameIterationNumber_DontCollideOnWorktreePath(t *testing.T)
 	}
 
 	scratchA := writeEpic(t, "epic-a", map[string]string{
-		"04-x.md": "---\nid: \"04\"\nstatus: open\ntype: task\n---\n# X\n",
+		"04-x.md": "---\nid: \"04\"\nstatus: open\ntype: implement\n---\n# X\n",
 	})
 	if err := Run(RunOptions{EpicName: "epic-a", Skill: "implement", ScratchDir: scratchA, RepoDir: "/fake/repo"}, instrumented(), noopEventSink{}); err != nil {
 		t.Fatalf("Run(epic-a) error = %v", err)
 	}
 
 	scratchB := writeEpic(t, "epic-b", map[string]string{
-		"04-y.md": "---\nid: \"04\"\nstatus: open\ntype: task\n---\n# Y\n",
+		"04-y.md": "---\nid: \"04\"\nstatus: open\ntype: implement\n---\n# Y\n",
 	})
 	if err := Run(RunOptions{EpicName: "epic-b", Skill: "implement", ScratchDir: scratchB, RepoDir: "/fake/repo"}, instrumented(), noopEventSink{}); err != nil {
 		t.Fatalf("Run(epic-b) error = %v", err)

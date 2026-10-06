@@ -141,7 +141,7 @@ func (s *recordingSink) SmartZoneRecovered(identifier string)   { s.record("Smar
 func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -200,7 +200,7 @@ func TestRun_EventSink_NoTicketsFound(t *testing.T) {
 func TestRun_EventSink_AlreadyCompleteEpic_EmitsExactlyOneEpicStarted(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 

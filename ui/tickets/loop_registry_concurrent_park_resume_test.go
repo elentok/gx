@@ -26,7 +26,7 @@ func writeParkResumeEpic(t *testing.T, epicName string) (scratchDir, ticketPath 
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	ticketPath = filepath.Join(issuesDir, "01-stuck.md")
-	content := "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n"
+	content := "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n"
 	if err := os.WriteFile(ticketPath, []byte(content), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}

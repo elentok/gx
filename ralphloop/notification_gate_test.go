@@ -15,7 +15,7 @@ func writeGateTicket(t *testing.T, dir, id string) string {
 	marshaled, err := schema.MarshalTicket(schema.Ticket{
 		ID:     schema.TicketID(id),
 		Status: schema.StatusClaimed,
-		Type:   schema.TypeTask,
+		Type:   schema.TypeImplement,
 	}, "body\n")
 	if err != nil {
 		t.Fatalf("MarshalTicket: %v", err)

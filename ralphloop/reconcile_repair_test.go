@@ -19,7 +19,7 @@ import (
 func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -82,7 +82,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -129,7 +129,7 @@ func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *te
 func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -184,7 +184,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutReforking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md":                    "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md":                    "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 		"03a-conflict-resolution.md": "---\nid: \"03a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"03\"\n---\n# Conflict resolution for 03\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
@@ -257,7 +257,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -307,7 +307,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -377,7 +377,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{Type: eventCherryPicked, Ticket: "03", SHA: "abc123"}); err != nil {
 		t.Fatalf("logEvent: %v", err)

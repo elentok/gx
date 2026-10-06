@@ -31,8 +31,8 @@ func loadEpicByName(t *testing.T, scratchDir, name string) tickets.Epic {
 func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# Second\n",
 	})
 	d, _, _ := fakeDeps()
 	fixedNow := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -58,7 +58,7 @@ func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
 func TestRun_ReRunOnAlreadyCompleteEpic_DoesNotOverwriteTimestamps(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d, _, _ := fakeDeps()
 	firstRun := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -90,8 +90,8 @@ func TestRun_ReRunOnAlreadyCompleteEpic_DoesNotOverwriteTimestamps(t *testing.T)
 func TestRun_TicketSubset_LeavesCompletedAtUnset(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Second\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, _, _ := fakeDeps()
 

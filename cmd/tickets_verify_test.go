@@ -19,7 +19,7 @@ func verifyFixture(t *testing.T) string {
 		t.Fatal(err)
 	}
 	for name, status := range map[string]string{"01-a.md": "done", "02-b.md": "claimed", "03-c.md": "done"} {
-		body := "---\nid: \"" + name[:2] + "\"\nstatus: " + status + "\ntype: task\n---\n# T\n"
+		body := "---\nid: \"" + name[:2] + "\"\nstatus: " + status + "\ntype: implement\n---\n# T\n"
 		if err := os.WriteFile(filepath.Join(issues, name), []byte(body), 0644); err != nil {
 			t.Fatal(err)
 		}

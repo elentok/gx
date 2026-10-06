@@ -31,9 +31,9 @@ func TestCountArchivedEpics_EmptyArchiveDirReturnsZero(t *testing.T) {
 func TestCountArchivedEpics_CountsEpicDirectories(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(ArchiveDir(dir), "epic-one", "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
 	writeFile(t, filepath.Join(ArchiveDir(dir), "epic-two", "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
 
 	count, err := CountArchivedEpics(dir)
 	if err != nil {
@@ -70,9 +70,9 @@ func TestLoadArchived_EmptyArchiveDirReturnsEmpty(t *testing.T) {
 func TestLoadArchived_DiscoversEpicsAndTicketsMatchingCount(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(ArchiveDir(dir), "my-epic", "issues", "01-first-ticket.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
 	writeFile(t, filepath.Join(ArchiveDir(dir), "my-epic", "issues", "02-second-ticket.md"),
-		"---\nid: \"02\"\nstatus: open\ntype: task\n---\nBody.\n")
+		"---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	epics, err := LoadArchived(dir)
 	if err != nil {

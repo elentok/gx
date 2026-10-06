@@ -44,9 +44,9 @@ func TestLoad_EmptyScratchDirReturnsEmpty(t *testing.T) {
 func TestLoad_DiscoversEpicsAndTickets(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "02-second-ticket.md"),
-		"---\nid: \"02\"\nstatus: open\ntype: task\n---\nBody.\n")
+		"---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -85,7 +85,7 @@ func TestLoad_DiscoversEpicsAndTickets(t *testing.T) {
 func TestLoad_MirrorsMutes(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-ticket.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: task\nmutes:\n  - event_type: iteration-stalled\n    tripped_at: 2026-08-13T10:00:00Z\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: open\ntype: implement\nmutes:\n  - event_type: iteration-stalled\n    tripped_at: 2026-08-13T10:00:00Z\n---\nBody.\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -120,11 +120,11 @@ func TestLoad_EpicWithMapMdIsFlagged(t *testing.T) {
 func TestLoad_ExcludesDotPrefixedDirectories(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "real-epic", "issues", "01-first-ticket.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 	writeFile(t, filepath.Join(dir, ".archive", "old-epic", "issues", "01-old-ticket.md"),
-		"---\nid: \"01\"\nstatus: done\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
 	writeFile(t, filepath.Join(dir, ".scratch-tmp", "issues", "01-tmp-ticket.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -186,7 +186,7 @@ func TestLoad_UnreadableTicketFileShowsErrorRow(t *testing.T) {
 func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "01-a-ticket.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: task\n---\n")
+		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "epic", "issues", "README.md"), "not a ticket\n")
 
 	epics, err := Load(dir)
@@ -201,9 +201,9 @@ func TestLoad_IgnoresNonTicketFilesInIssuesDir(t *testing.T) {
 func TestLoad_SurfacesParent(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03-original.md"),
-		"---\nid: \"03\"\nstatus: done\ntype: task\n---\n")
+		"---\nid: \"03\"\nstatus: done\ntype: implement\n---\n")
 	writeFile(t, filepath.Join(dir, "epic", "issues", "03a-first-half.md"),
-		"---\nid: \"03a\"\nstatus: open\ntype: task\nparent: \"03\"\n---\n")
+		"---\nid: \"03a\"\nstatus: open\ntype: implement\nparent: \"03\"\n---\n")
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -234,9 +234,9 @@ func TestLoad_SurfacesParent(t *testing.T) {
 // shape can't come back through a compatibility path.
 func TestLoad_RejectsPreContractionShape(t *testing.T) {
 	cases := map[string]string{
-		"01-children.md":    "---\nid: \"01\"\nstatus: open\ntype: task\nchildren: [\"01a\"]\n---\n",
-		"02-no-status.md":   "---\nid: \"02\"\ntype: task\n---\n",
-		"03-dead-status.md": "---\nid: \"03\"\nstatus: ready-for-human\ntype: task\n---\n",
+		"01-children.md":    "---\nid: \"01\"\nstatus: open\ntype: implement\nchildren: [\"01a\"]\n---\n",
+		"02-no-status.md":   "---\nid: \"02\"\ntype: implement\n---\n",
+		"03-dead-status.md": "---\nid: \"03\"\nstatus: ready-for-human\ntype: implement\n---\n",
 	}
 	dir := t.TempDir()
 	for name, content := range cases {
@@ -309,7 +309,7 @@ func TestLoad_DiscoversAlphabeticallySuffixedTicketNumbers(t *testing.T) {
 	for _, name := range []string{"10a-first.md", "10b-second.md", "10c-third.md"} {
 		id := name[:3]
 		writeFile(t, filepath.Join(dir, "epic", "issues", name),
-			"---\nid: \""+id+"\"\nstatus: open\ntype: task\n---\n")
+			"---\nid: \""+id+"\"\nstatus: open\ntype: implement\n---\n")
 	}
 
 	epics, err := Load(dir)

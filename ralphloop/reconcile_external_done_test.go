@@ -70,7 +70,7 @@ func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t 
 func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -117,7 +117,7 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: task\ncommitless: true\n---\n# C\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\ncommitless: true\n---\n# C\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -231,8 +231,8 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -306,8 +306,8 @@ func TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded(t *test
 func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: task\n---\n# B\n",
-		"03-d.md": "---\nid: \"03\"\nstatus: open\ntype: task\nblocked_by: [\"02\"]\n---\n# D\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: done\ntype: implement\n---\n# B\n",
+		"03-d.md": "---\nid: \"03\"\nstatus: open\ntype: implement\nblocked_by: [\"02\"]\n---\n# D\n",
 	})
 
 	d, _, _ := fakeDeps()

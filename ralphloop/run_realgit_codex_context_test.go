@@ -43,7 +43,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-context.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Context recovery\n",
+		"01-context.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Context recovery\n",
 	})
 
 	// RegisterCodexRollout below reads CODEX_HOME from the real process env
@@ -285,7 +285,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 	repoDir = testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir = writeEpic(t, epicName, map[string]string{
-		"01-native.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Native context recovery\n",
+		"01-native.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Native context recovery\n",
 	})
 
 	home = t.TempDir()

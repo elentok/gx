@@ -28,7 +28,7 @@ func seedParks(t *testing.T, scratchDir, epic string, n int, age time.Duration) 
 func runSpinScenario(t *testing.T, parks int, age time.Duration, opts RunOptions) (scratchDir string, prompts *[]string) {
 	t.Helper()
 	scratchDir = writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	seedParks(t, scratchDir, "epic", parks, age)
 	d, prompts, _ := fakeDeps()
@@ -89,7 +89,7 @@ func TestRun_SpinCycles_BelowThresholdOrOutsideWindow_StillClaims(t *testing.T) 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			scratchDir := writeEpic(t, "epic", map[string]string{
-				"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+				"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 			})
 			seedParks(t, scratchDir, "epic", tc.parks, tc.age)
 			d, prompts, _ := fakeDeps()

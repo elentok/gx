@@ -149,7 +149,7 @@ func (f *resetFixture) addTicket(t *testing.T, file, content string) {
 func TestRunTicketsReset_ClaimedWithOpenBlockerAccepted(t *testing.T) {
 	t.Parallel()
 	f := newResetFixture(t, ticketWith("claimed", "blocked_by: [\"02\"]\n"))
-	f.addTicket(t, "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n")
+	f.addTicket(t, "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n")
 	if _, err := f.run(); err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -161,7 +161,7 @@ func TestRunTicketsReset_ClaimedWithOpenBlockerAccepted(t *testing.T) {
 func TestRunTicketsReset_DoneBlockingDependentsAcceptedWithForce(t *testing.T) {
 	t.Parallel()
 	f := newResetFixture(t, ticketWith("done", ""))
-	f.addTicket(t, "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n")
+	f.addTicket(t, "02-b.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# B\n")
 	if got := f.refusalReason(t); got != ReasonStatusRefused {
 		t.Errorf("reason = %q", got)
 	}
@@ -191,7 +191,7 @@ func TestRunTicketsReset_MissingReason(t *testing.T) {
 func TestRunTicketsReset_ForkChildrenRefusedEvenForced(t *testing.T) {
 	t.Parallel()
 	f := newResetFixture(t, ticketWith("claimed", ""))
-	child := "---\nid: \"02\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n# B\n"
+	child := "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n# B\n"
 	if err := os.WriteFile(filepath.Join(filepath.Dir(f.ticketPath), "02-b.md"), []byte(child), 0644); err != nil {
 		t.Fatal(err)
 	}

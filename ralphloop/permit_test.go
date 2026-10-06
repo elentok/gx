@@ -34,7 +34,7 @@ func (p *fakePermit) Release() {
 func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
@@ -60,7 +60,7 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: task\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
@@ -121,7 +121,7 @@ func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 func TestRun_Permit_BlocksClaimUntilAcquireReturns(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -174,7 +174,7 @@ func TestRun_Permit_BlocksClaimUntilAcquireReturns(t *testing.T) {
 func TestRun_EpicStarted_FiresAfterPermitAcquireReturns(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
@@ -217,7 +217,7 @@ func TestRun_EpicStarted_FiresAfterPermitAcquireReturns(t *testing.T) {
 func TestRun_Permit_AcquiredBeforeReattachLaunch(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {

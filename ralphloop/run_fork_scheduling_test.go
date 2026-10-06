@@ -52,7 +52,7 @@ func indexOf(order []string, id string) int {
 func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
+		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Parent\n",
 	})
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
@@ -99,7 +99,7 @@ func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
 func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
+		"01-parent.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Parent\n",
 	})
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
@@ -144,8 +144,8 @@ func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-parent.md":    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
-		"02-dependent.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Dependent\n",
+		"01-parent.md":    "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Parent\n",
+		"02-dependent.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# Dependent\n",
 	})
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
@@ -190,8 +190,8 @@ func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-parent.md":    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Parent\n",
-		"02-dependent.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01a\"]\n---\n# Dependent\n",
+		"01-parent.md":    "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Parent\n",
+		"02-dependent.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01a\"]\n---\n# Dependent\n",
 	})
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
@@ -303,9 +303,9 @@ func (s *unblockingSink) TicketClaimed(ticket tickets.Ticket) {
 func TestRun_EpicWithWaitingForChildrenTicket_DoesNotReportComplete(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-parent.md":    "---\nid: \"01\"\nstatus: done\ntype: task\n---\n# Parent\n",
-		"01a-child.md":    "---\nid: \"01a\"\nstatus: open\ntype: task\nparent: \"01\"\n---\n# Child A\n",
-		"02-unrelated.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Unrelated\n",
+		"01-parent.md":    "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# Parent\n",
+		"01a-child.md":    "---\nid: \"01a\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\n# Child A\n",
+		"02-unrelated.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Unrelated\n",
 	})
 	d, _, _ := fakeDeps()
 

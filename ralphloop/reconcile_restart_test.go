@@ -24,7 +24,7 @@ import (
 func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -77,7 +77,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -152,7 +152,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutReforking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                    "---\nid: \"01\"\nstatus: needs-repair\ntype: task\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	d, _, _ := fakeDeps()
@@ -246,7 +246,7 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
@@ -281,7 +281,7 @@ func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
 func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -345,7 +345,7 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			scratchDir := writeEpic(t, "epic", map[string]string{
-				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			d, prompts, removed := fakeDeps()
 			d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -380,7 +380,7 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
 		Type:         eventIterationStarted,
@@ -428,7 +428,7 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ncommitless: true\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ncommitless: true\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -487,7 +487,7 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
@@ -535,7 +535,7 @@ func idleReattachDeps(t *testing.T, agentSession string) (Deps, *[]string) {
 func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, removed := idleReattachDeps(t, "session-epic-iter-01")
 	var reads int
@@ -587,7 +587,7 @@ func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *
 func TestRun_ReattachAlreadyIdle_NoBackgroundTask_DebouncesBeforeShortCircuit(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, removed := idleReattachDeps(t, "session-epic-iter-01")
 	var waitCalls int
@@ -627,7 +627,7 @@ func TestRun_ReattachAlreadyIdle_NoBackgroundTask_DebouncesBeforeShortCircuit(t 
 func TestRun_ReattachAlreadyIdle_EmptySession_FallsBackToTicketSessionIDs(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\nsession_ids:\n    - \"sess-older\"\n    - \"sess-prior\"\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\nsession_ids:\n    - \"sess-older\"\n    - \"sess-prior\"\n---\n# A\n",
 	})
 	d, removed := idleReattachDeps(t, "")
 	var gotSessionID string
@@ -656,7 +656,7 @@ func TestRun_ReattachAlreadyIdle_EmptySession_FallsBackToTicketSessionIDs(t *tes
 func TestRun_ReattachAlreadyIdle_EmptySessionAndNoSessionIDs_FallsBackToRunLog(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	if err := logEvent(scratchDir, "epic", Event{
 		Type:         eventIterationStarted,

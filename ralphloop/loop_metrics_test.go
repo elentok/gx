@@ -44,7 +44,7 @@ func setHomeEnv(t *testing.T, dir string) {
 func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -78,7 +78,7 @@ func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -119,7 +119,7 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
@@ -151,7 +151,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
@@ -205,7 +205,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
@@ -281,8 +281,8 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# B\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 
 	d, _, _ := fakeDeps()
@@ -380,7 +380,7 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 	d.InstallDeps = func(path string) (string, error) {

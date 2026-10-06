@@ -40,9 +40,9 @@ func TestRun_ProductionRealGit_AThenBAndCConcurrently(t *testing.T) {
 	wtDir := testWorktreeDir(t, repoDir)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n",
-		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# C\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# C\n",
 	})
 
 	home := t.TempDir()
@@ -252,12 +252,12 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	}
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# B\n",
-		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# C\n",
-		"04-d.md": "---\nid: \"04\"\nstatus: open\ntype: task\nblocked_by: [\"02\", \"03\"]\n---\n# D\n",
-		"05-e.md": "---\nid: \"05\"\nstatus: open\ntype: task\nblocked_by: [\"02\", \"03\"]\n---\n# E\n",
-		"06-f.md": "---\nid: \"06\"\nstatus: open\ntype: task\nblocked_by: [\"04\", \"05\"]\n---\n# F\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# B\n",
+		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# C\n",
+		"04-d.md": "---\nid: \"04\"\nstatus: open\ntype: implement\nblocked_by: [\"02\", \"03\"]\n---\n# D\n",
+		"05-e.md": "---\nid: \"05\"\nstatus: open\ntype: implement\nblocked_by: [\"02\", \"03\"]\n---\n# E\n",
+		"06-f.md": "---\nid: \"06\"\nstatus: open\ntype: implement\nblocked_by: [\"04\", \"05\"]\n---\n# F\n",
 	})
 
 	// NewClaudeCompact below always writes its transcript via the real $HOME
@@ -609,7 +609,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		if len(parts) != 3 {
 			t.Fatalf("ticket %s lost its frontmatter boundaries", id)
 		}
-		if fmt.Sprint(frontmatter.ID) != id || fmt.Sprint(frontmatter.Type) != "task" || fmt.Sprint(frontmatter.Status) != "done" || parts[2] != contract.body || !slices.Equal(blockedBy, contract.blockedBy) {
+		if fmt.Sprint(frontmatter.ID) != id || fmt.Sprint(frontmatter.Type) != "implement" || fmt.Sprint(frontmatter.Status) != "done" || parts[2] != contract.body || !slices.Equal(blockedBy, contract.blockedBy) {
 			t.Errorf("ticket %s = %+v with body %q, want preserved id/type/dependencies/body and done status", id, frontmatter, parts[2])
 		}
 		if frontmatter.ActualContextWindow != contract.tokens || frontmatter.ElapsedTime != contract.elapsed || frontmatter.Compactions != contract.compactions {
@@ -750,7 +750,7 @@ func TestRun_ProductionRealGit_ParkThenResumeReusesBranch(t *testing.T) {
 	featurePath := filepath.Join(wtDir, epicName)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, epicName, "issues", "01-a.md")
 	iterationPath := iterationWorktreePath(wtDir, epicName, "01")
@@ -893,7 +893,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-compact.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Compact recovery\n",
+		"01-compact.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Compact recovery\n",
 	})
 
 	home := t.TempDir()

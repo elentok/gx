@@ -359,7 +359,7 @@ func writeChatGateTicket(t *testing.T, scratchDir, epicName, identifier string) 
 	marshaled, err := schema.MarshalTicket(schema.Ticket{
 		ID:     schema.TicketID(identifier),
 		Status: schema.StatusClaimed,
-		Type:   schema.TypeTask,
+		Type:   schema.TypeImplement,
 	}, "body\n")
 	if err != nil {
 		t.Fatalf("MarshalTicket: %v", err)

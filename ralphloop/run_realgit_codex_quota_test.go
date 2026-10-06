@@ -37,9 +37,9 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	wtDir := testWorktreeDir(t, repoDir)
 
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-quota.md":    "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Quota\n",
-		"02-filler.md":   "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Filler\n",
-		"03-backfill.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Backfill\n",
+		"01-quota.md":    "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Quota\n",
+		"02-filler.md":   "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Filler\n",
+		"03-backfill.md": "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# Backfill\n",
 	})
 
 	home := t.TempDir()
@@ -360,9 +360,9 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	repoDir := testutil.TempRepo(t)
 	wtDir := testWorktreeDir(t, repoDir)
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-context.md":  "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# Context\n",
-		"02-quota.md":    "---\nid: \"02\"\nstatus: open\ntype: task\n---\n# Quota\n",
-		"03-backfill.md": "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Backfill\n",
+		"01-context.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Context\n",
+		"02-quota.md":    "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Quota\n",
+		"03-backfill.md": "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# Backfill\n",
 	})
 
 	home := t.TempDir()

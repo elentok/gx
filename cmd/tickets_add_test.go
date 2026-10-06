@@ -19,9 +19,9 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "task")
-	writeTicket(t, filepath.Join(issuesDir, "02-do-other-thing.md"), "02", "done", "task")
-	writeTicket(t, filepath.Join(issuesDir, "03-do-third-thing.md"), "03", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
+	writeTicket(t, filepath.Join(issuesDir, "02-do-other-thing.md"), "02", "done", "implement")
+	writeTicket(t, filepath.Join(issuesDir, "03-do-third-thing.md"), "03", "done", "implement")
 
 	var stdout bytes.Buffer
 	if err := runTicketsAdd(epicPath, "", "do-fourth-thing", &stdout); err != nil {
@@ -100,7 +100,7 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
 	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
@@ -129,7 +129,7 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
 	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
@@ -159,7 +159,7 @@ func TestRunTicketsAdd_LeavesParentUntouched(t *testing.T) {
 		t.Fatalf("mkdir issues: %v", err)
 	}
 	parentPath := filepath.Join(issuesDir, "12-parent.md")
-	writeTicket(t, parentPath, "12", "done", "task")
+	writeTicket(t, parentPath, "12", "done", "implement")
 
 	before, err := os.ReadFile(parentPath)
 	if err != nil {
@@ -188,7 +188,7 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12b-child.md"), "12b", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "12b-child.md"), "12b", "done", "implement")
 
 	var stdout bytes.Buffer
 	if err := runTicketsAdd(epicPath, "12b", "grandchild-1", &stdout); err != nil {
@@ -217,7 +217,7 @@ func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
-	writeTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "task")
+	writeTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "implement")
 
 	var stdout bytes.Buffer
 	if err := runTicketsAdd(epicPath, "12b1", "sibling", &stdout); err != nil {

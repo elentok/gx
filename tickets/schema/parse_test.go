@@ -22,7 +22,7 @@ const newFormatFixture = `---
 id: "04b"
 status: open
 blocked_by: ["01", "03"]
-type: task
+type: implement
 expected_context_window: 20000
 actual_context_window: 45230
 elapsed_time: 3612
@@ -44,7 +44,7 @@ func TestParseTicket_NewFormat(t *testing.T) {
 		ID:                    "04b",
 		Status:                StatusOpen,
 		BlockedBy:             []TicketID{"01", "03"},
-		Type:                  TypeTask,
+		Type:                  TypeImplement,
 		ExpectedContextWindow: 20000,
 		ActualContextWindow:   45230,
 		ElapsedTime:           3612,
@@ -55,7 +55,7 @@ func TestParseTicket_NewFormat(t *testing.T) {
 }
 
 func TestParseTicket_RetiredCodeReviewFixesKeyIsIgnored(t *testing.T) {
-	content := "---\nid: \"04b\"\nstatus: open\ntype: task\ncode_review_fixes: none\n---\nBody.\n"
+	content := "---\nid: \"04b\"\nstatus: open\ntype: implement\ncode_review_fixes: none\n---\nBody.\n"
 	path := writeTemp(t, "04b-retired-crf.md", content)
 
 	got, err := ParseTicket(path)
@@ -107,7 +107,7 @@ func TestParseTicket_RejectsRetiredChildrenField(t *testing.T) {
 		"null":       ``,
 	} {
 		t.Run(name, func(t *testing.T) {
-			content := "---\nid: \"04\"\nstatus: open\ntype: task\nchildren:" + value + "\n---\nbody\n"
+			content := "---\nid: \"04\"\nstatus: open\ntype: implement\nchildren:" + value + "\n---\nbody\n"
 			path := writeTemp(t, "04-with-children.md", content)
 
 			if _, err := ParseTicket(path); err == nil || !strings.Contains(err.Error(), "children") {
@@ -118,7 +118,7 @@ func TestParseTicket_RejectsRetiredChildrenField(t *testing.T) {
 }
 
 func TestParseTicket_RejectsMissingStatus(t *testing.T) {
-	path := writeTemp(t, "04-no-status.md", "---\nid: \"04\"\ntype: task\n---\nbody\n")
+	path := writeTemp(t, "04-no-status.md", "---\nid: \"04\"\ntype: implement\n---\nbody\n")
 
 	if _, err := ParseTicket(path); err == nil || !strings.Contains(err.Error(), "status") {
 		t.Fatalf("ParseTicket() error = %v, want one naming the missing status", err)
@@ -129,7 +129,7 @@ func TestParseTicket_RoundTrip_Parent(t *testing.T) {
 	orig := Ticket{
 		ID:     "04b",
 		Status: StatusClaimed,
-		Type:   TypeTask,
+		Type:   TypeImplement,
 	}
 	parent := TicketID("04")
 	orig.Parent = &parent
@@ -150,7 +150,7 @@ func TestParseTicket_RoundTrip_Parent(t *testing.T) {
 }
 
 func TestParseTicket_LegacySplitKeysIgnored(t *testing.T) {
-	content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\nsplit: [\"04c\", \"04d\"]\nsplit_from: \"04\"\n---\nbody\n"
+	content := "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nsplit: [\"04c\", \"04d\"]\nsplit_from: \"04\"\n---\nbody\n"
 	path := writeTemp(t, "04b-legacy-split.md", content)
 
 	got, err := ParseTicket(path)
@@ -161,7 +161,7 @@ func TestParseTicket_LegacySplitKeysIgnored(t *testing.T) {
 	want := Ticket{
 		ID:     "04b",
 		Status: StatusClaimed,
-		Type:   TypeTask,
+		Type:   TypeImplement,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ParseTicket() = %+v, want %+v (legacy split/split_from keys should be ignored)", got, want)
@@ -169,7 +169,7 @@ func TestParseTicket_LegacySplitKeysIgnored(t *testing.T) {
 }
 
 func TestParseTicket_CommitlessRoundTrip(t *testing.T) {
-	content := "---\nid: \"04b\"\nstatus: done\ntype: task\ncommitless: true\n---\nbody\n"
+	content := "---\nid: \"04b\"\nstatus: done\ntype: implement\ncommitless: true\n---\nbody\n"
 	path := writeTemp(t, "04b-commitless.md", content)
 
 	got, err := ParseTicket(path)
@@ -193,7 +193,7 @@ func TestParseTicket_RoundTrip_SessionIDs(t *testing.T) {
 	orig := Ticket{
 		ID:         "04b",
 		Status:     StatusClaimed,
-		Type:       TypeTask,
+		Type:       TypeImplement,
 		SessionIDs: []string{"sess-1", "sess-2", "sess-3"},
 	}
 
@@ -216,7 +216,7 @@ func TestParseTicket_RoundTrip_Mutes(t *testing.T) {
 	orig := Ticket{
 		ID:     "04b",
 		Status: StatusClaimed,
-		Type:   TypeTask,
+		Type:   TypeImplement,
 		Mutes: []MuteRecord{
 			{EventType: "iteration-stalled", TrippedAt: time.Date(2026, 8, 13, 10, 0, 0, 0, time.UTC)},
 			{EventType: "needs-answer", TrippedAt: time.Date(2026, 8, 13, 11, 30, 0, 0, time.UTC)},
@@ -246,7 +246,7 @@ func TestParseTicket_RoundTrip_Mutes(t *testing.T) {
 func TestParseTicket_IterationStatusRoundTrip(t *testing.T) {
 	for _, status := range []IterationStatus{IterationStatusWorking, IterationStatusNeedsAnswer, IterationStatusFinished} {
 		t.Run(string(status), func(t *testing.T) {
-			content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\niteration_status: " + string(status) + "\n---\nbody\n"
+			content := "---\nid: \"04b\"\nstatus: claimed\ntype: implement\niteration_status: " + string(status) + "\n---\nbody\n"
 			path := writeTemp(t, "04b-iteration-status.md", content)
 
 			got, err := ParseTicket(path)
@@ -269,7 +269,7 @@ func TestParseTicket_IterationStatusRoundTrip(t *testing.T) {
 }
 
 func TestParseTicket_AbsentIterationStatusLoadsEmpty(t *testing.T) {
-	content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\n---\nbody\n"
+	content := "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nbody\n"
 	path := writeTemp(t, "04b-no-iteration-status.md", content)
 
 	got, err := ParseTicket(path)
@@ -290,7 +290,7 @@ func TestParseTicket_AbsentIterationStatusLoadsEmpty(t *testing.T) {
 }
 
 func TestParseTicket_UnrecognizedIterationStatusLoadsWithoutError(t *testing.T) {
-	content := "---\nid: \"04b\"\nstatus: claimed\ntype: task\niteration_status: bogus\n---\nbody\n"
+	content := "---\nid: \"04b\"\nstatus: claimed\ntype: implement\niteration_status: bogus\n---\nbody\n"
 	path := writeTemp(t, "04b-bogus-iteration-status.md", content)
 
 	got, err := ParseTicket(path)
@@ -325,7 +325,7 @@ func TestParseTicket_FrontmatterValidateErrorSurfaced(t *testing.T) {
 	content := `---
 id: "04b"
 status: bogus-status
-type: task
+type: implement
 ---
 body
 `

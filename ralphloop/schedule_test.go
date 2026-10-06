@@ -108,12 +108,12 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 	}
 
 	files := map[string]string{
-		"01-first.md":       "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
-		"02-second.md":      "---\nid: \"02\"\nstatus: open\ntype: task\nblocked_by: [\"01\"]\n---\n# Second\n",
-		"03-third.md":       "---\nid: \"03\"\nstatus: open\ntype: task\n---\n# Third\n",
-		"04-fourth.md":      "---\nid: \"04\"\nstatus: claimed\ntype: task\n---\n# Fourth\n",
-		"05-fifth.md":       "---\nid: \"05\"\nstatus: done\ntype: task\n---\n# Fifth\n",
-		"06-blocked-off.md": "---\nid: \"06\"\nstatus: open\ntype: task\nblocked_by: [\"04\"]\n---\n# Blocked off\n",
+		"01-first.md":       "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
+		"02-second.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# Second\n",
+		"03-third.md":       "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# Third\n",
+		"04-fourth.md":      "---\nid: \"04\"\nstatus: claimed\ntype: implement\n---\n# Fourth\n",
+		"05-fifth.md":       "---\nid: \"05\"\nstatus: done\ntype: implement\n---\n# Fifth\n",
+		"06-blocked-off.md": "---\nid: \"06\"\nstatus: open\ntype: implement\nblocked_by: [\"04\"]\n---\n# Blocked off\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(issuesDir, name), []byte(content), 0644); err != nil {

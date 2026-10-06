@@ -23,7 +23,7 @@ func writeEpicTicket(t *testing.T, scratchDir, epic, filename, content string) s
 }
 
 func ticketFrontmatter(id, extra string) string {
-	return "---\nid: \"" + id + "\"\nstatus: open\ntype: task\n" + extra + "---\nBody.\n"
+	return "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\n" + extra + "---\nBody.\n"
 }
 
 func TestExecute_TicketsSet_ParentAcceptedForExistingTicket(t *testing.T) {
@@ -106,7 +106,7 @@ func TestExecute_TicketsValidate_AcceptsDraftStatus(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-first.md")
-	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: draft\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
@@ -122,7 +122,7 @@ func TestExecute_TicketsSet_AcceptsDraftStatus(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "01-first.md")
-	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: task\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 	if err := execute([]string{"tickets", "set", path, "--status=draft"}, d); err != nil {

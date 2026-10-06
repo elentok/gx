@@ -83,7 +83,7 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	t.Parallel()
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d := stuckCompactionDeps(func() error { return nil })
 
@@ -117,7 +117,7 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	t.Parallel()
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: task\n---\n# First\n",
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d := stuckCompactionDeps(func() error { return errors.New("herdr pane vanished") })
 
