@@ -23,7 +23,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{StateDir: stateDir,TicketStore: t.TempDir(), BudgetSoftLimit: 300, BudgetHardLimit: 350})
+	s, err := New(Config{StateDir: stateDir, TicketStore: t.TempDir(), BudgetSoftLimit: 300, BudgetHardLimit: 350})
 	if err != nil {
 		t.Fatal(err)
 	}

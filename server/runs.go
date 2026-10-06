@@ -103,6 +103,16 @@ func (r *runRegistry) runOf(address string) (Run, bool) {
 	return Run{}, false
 }
 
+func (r *runRegistry) list() []trackedRun {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]trackedRun, 0, len(r.runs))
+	for _, t := range r.runs {
+		out = append(out, t)
+	}
+	return out
+}
+
 func (r *runRegistry) count() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()

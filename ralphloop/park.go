@@ -58,6 +58,16 @@ func ParkNeedsRepair(scratchDir, epicName, ticket, path, reason string) error {
 	return err
 }
 
+// ParkBudgetKilled parks the ticket of an iteration the budget's hard limit
+// stopped, through the park path.
+func ParkBudgetKilled(scratchDir, epicName, ticket, path, reason string) error {
+	_, err := park(noopEventSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
+		Type: events.NeedsRepair, Kind: events.BudgetKilled, Reason: reason,
+	})
+	return err
+}
+
 // ParkHandleMismatch parks the ticket of a persisted iteration handle that a
 // restarted server cannot reclaim, through the park path.
 func ParkHandleMismatch(scratchDir, epicName, ticket, path, reason string) error {

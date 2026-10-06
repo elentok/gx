@@ -59,6 +59,8 @@ type Config struct {
 	BudgetSoftLimit float64
 	BudgetHardLimit float64
 
+	BudgetKillGrace time.Duration // wait between ctrl+c and closing a pane; zero means the default
+
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
 	// Orchestrator is config.Orchestrator. Queue writes are refused unless it

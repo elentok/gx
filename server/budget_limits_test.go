@@ -1,0 +1,98 @@
+package server_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/herdrfake"
+)
+
+func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.BudgetSoftLimit = 5
+	})
+	registerLaunch(h)
+	h.Server.RecordSpend("spent", 6)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if runs := h.Server.Runs(); len(runs) != 0 {
+		t.Fatalf("runs = %+v, want none past the soft limit", runs)
+	}
+}
+
+func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.BudgetHardLimit = 5
+		c.BudgetKillGrace = time.Millisecond
+		c.BudgetPollInterval = time.Hour
+	})
+	registerLaunch(h)
+	live := map[string]any{"agent": map[string]any{
+		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
+		"agent_session": map[string]any{"value": "sess"},
+	}}
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return live, herdrfake.Identities{}, nil
+	})
+	var sent, closed []string
+	h.Herdr.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		sent = append(sent, strings.Join(argv, " "))
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		closed = append(closed, strings.Join(argv, " "))
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	// Cost rises on every read, so the pane never goes quiet after ctrl+c.
+	cost := 0.0
+	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { cost += 3; return cost, true })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	for len(h.Server.Runs()) == 0 && ctx.Err() == nil {
+		time.Sleep(20 * time.Millisecond)
+	}
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	for ctx.Err() == nil {
+		h.Server.PollBudget()
+		data, _ := os.ReadFile(path)
+		if strings.Contains(string(data), "budget-killed") {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "status: needs-repair") || !strings.Contains(string(data), "budget-killed") {
+		t.Fatalf("ticket not parked budget-killed:\n%s", data)
+	}
+	if len(sent) == 0 || !strings.Contains(sent[0], "ctrl+c") {
+		t.Errorf("send-keys = %v, want ctrl+c", sent)
+	}
+	if len(closed) == 0 {
+		t.Error("pane was not closed")
+	}
+}

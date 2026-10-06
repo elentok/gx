@@ -145,7 +145,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 // until the concurrency limit is reached. It does nothing while herdr is down:
 // a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
-	if s.herdr.isUnavailable() || s.pause.blocked() {
+	if s.herdr.isUnavailable() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
 		return
 	}
 	limit := s.concurrencyLimit()

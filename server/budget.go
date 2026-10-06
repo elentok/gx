@@ -10,14 +10,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 )
 
 const (
-	ledgerFileName      = "budget-ledger.json"
-	defaultBudgetPoll   = 30 * time.Second
-	ledgerSeenRetention = 48 * time.Hour
-	budgetDayLayout     = "2006-01-02"
+	defaultBudgetKillGrace = 15 * time.Second
+	ledgerFileName         = "budget-ledger.json"
+	defaultBudgetPoll      = 30 * time.Second
+	ledgerSeenRetention    = 48 * time.Hour
+	budgetDayLayout        = "2006-01-02"
 )
 
 // seenCost is an iteration's cumulative cost at its last poll. It is persisted so
@@ -168,6 +171,73 @@ func (s *Server) pollBudget(now time.Time) {
 	if err := s.ledger.save(now); err != nil {
 		s.log.Error("save budget ledger", "err", err)
 	}
+	if s.budgetHardReached(now) {
+		s.killForBudget(now)
+	}
+}
+
+// budgetSoftReached holds new starts back; the hard limit implies it.
+func (s *Server) budgetSoftReached(now time.Time) bool {
+	total := s.ledger.today(now)
+	return s.cfg.BudgetSoftLimit > 0 && total >= s.cfg.BudgetSoftLimit || s.budgetHardReached(now)
+}
+
+func (s *Server) budgetHardReached(now time.Time) bool {
+	return s.cfg.BudgetHardLimit > 0 && s.ledger.today(now) >= s.cfg.BudgetHardLimit
+}
+
+// killForBudget stops every live pane: ctrl+c, a grace period, then it closes
+// and parks the panes whose cost still rose. A pane that went quiet is left to
+// its own finish.
+func (s *Server) killForBudget(now time.Time) {
+	grace := s.cfg.BudgetKillGrace
+	if grace <= 0 {
+		grace = defaultBudgetKillGrace
+	}
+	runs := s.registry.list()
+	before := map[string]float64{}
+	for _, t := range runs {
+		before[t.Address] = s.liveCost(t.Address)
+		if err := herdr.AgentSendKeys(t.Pane, "ctrl+c"); err != nil {
+			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
+		}
+	}
+	time.Sleep(grace)
+	for _, t := range runs {
+		if s.liveCost(t.Address) <= before[t.Address] {
+			continue
+		}
+		if err := s.parkBudgetKilled(t); err != nil {
+			s.log.Error("budget kill", "ticket", t.Address, "err", err)
+		}
+	}
+}
+
+func (s *Server) liveCost(address string) float64 {
+	it, ok := s.liveIteration(address)
+	if !ok {
+		return 0
+	}
+	cost, _ := s.costOf(it)
+	return cost
+}
+
+// parkBudgetKilled closes the pane, then parks the ticket needs-repair.
+func (s *Server) parkBudgetKilled(t trackedRun) error {
+	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	dir, _, err := s.projectOf(addr.Project)
+	if err != nil {
+		return err
+	}
+	closeErr := herdr.TabClose(t.Tab)
+	parkErr := ralphloop.ParkBudgetKilled(dir, addr.Epic, addr.ID, t.TicketPath, "daily budget hard limit reached")
+	if parkErr == nil {
+		s.events.publish(EventTicketParked, t.Address)
+	}
+	return errors.Join(closeErr, parkErr)
 }
 
 func (s *Server) keepBudgetPolled(ctx context.Context) {
