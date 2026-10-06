@@ -92,6 +92,7 @@ type Server struct {
 	rewatch func() // set by keepFresh when the watch is active
 
 	registry runRegistry
+	refused  refusals
 	kick     chan struct{} // wakes keepClaiming
 }
 

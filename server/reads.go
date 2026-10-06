@@ -195,6 +195,9 @@ func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
 				}
 				if d.Decision == "unclaimed" {
 					ex.Verdict, ex.Reason = UnknownInProcess, ""
+					if s.refused.has(addr.String()) {
+						ex.Verdict = VerdictClaimRereadMismatch
+					}
 				}
 				return ex, nil
 			}

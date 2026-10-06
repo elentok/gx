@@ -82,6 +82,36 @@ func (r *runRegistry) put(root string, run Run) {
 	r.runs[root] = run
 }
 
+// VerdictClaimRereadMismatch is the explain verdict for a ticket whose file
+// changed since the index saw it, so the last claim pass skipped it.
+const VerdictClaimRereadMismatch = "claim re-read mismatch"
+
+// refusals holds the tickets the last claim pass refused for a changed file,
+// until a claim or a later pass that finds the file unchanged clears them.
+type refusals struct {
+	mu   sync.Mutex
+	addr map[string]bool
+}
+
+func (r *refusals) set(addr string, refused bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.addr == nil {
+		r.addr = map[string]bool{}
+	}
+	if refused {
+		r.addr[addr] = true
+	} else {
+		delete(r.addr, addr)
+	}
+}
+
+func (r *refusals) has(addr string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.addr[addr]
+}
+
 // Runs lists the registry, for tests and later reads.
 func (s *Server) Runs() []Run {
 	s.registry.mu.Lock()
@@ -178,7 +208,20 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		if len(frontier) == 0 {
 			return false, nil
 		}
-		return true, s.claimAndLaunch(root, addr, frontier[0], repo, ralphloop.AgentKind(item.Agent))
+		t := frontier[0]
+		ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
+		// A missed watch event can leave the index behind the file; claiming
+		// on that view could schedule the wrong thing, so wait for the index.
+		onDisk, err := fileSum(t.Path)
+		if err != nil {
+			return false, err
+		}
+		if seen, _ := s.idx.sumOf(ticketAddr); seen != onDisk {
+			s.refused.set(ticketAddr, true)
+			return false, nil
+		}
+		s.refused.set(ticketAddr, false)
+		return true, s.claimAndLaunch(root, addr, t, repo, ralphloop.AgentKind(item.Agent))
 	}
 	return false, nil
 }

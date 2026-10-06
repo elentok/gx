@@ -1,6 +1,9 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -19,6 +22,10 @@ type TicketInfo struct {
 	BlockedBy []string `json:"blocked_by,omitempty"`
 	// Parent is the address of the ticket this one was forked from.
 	Parent string `json:"parent,omitempty"`
+
+	// sum fingerprints the file the index read, so a claim can tell the file
+	// moved on since. Unexported: it is not part of the API.
+	sum string
 }
 
 // Snapshot is the /v1/snapshot payload: tickets sorted by address (so each
@@ -126,7 +133,30 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)
 	}
+	info.sum, _ = fileSum(t.Path)
 	return info
+}
+
+// fileSum fingerprints a ticket file's bytes. An unreadable file has no sum,
+// which never equals a readable one's.
+func fileSum(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:]), nil
+}
+
+// sumOf is the fingerprint the index holds for addr.
+func (i *index) sumOf(addr string) (string, bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	n := sort.Search(len(i.list), func(n int) bool { return i.list[n].Address >= addr })
+	if n < len(i.list) && i.list[n].Address == addr {
+		return i.list[n].sum, true
+	}
+	return "", false
 }
 
 func (i *index) snapshot() Snapshot {

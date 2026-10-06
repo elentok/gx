@@ -100,6 +100,76 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 	}
 }
 
+func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextPass(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.DisableWatch = true // a missed watch event: only the poll catches the edit up
+		c.PollInterval = time.Hour
+	})
+	registerLaunch(h)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// A pass that finds herdr unprobed claims nothing, which would hide the refusal.
+	for {
+		snap, err := h.Client.Snapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !snap.HerdrUnavailable {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	// The server rescans once right after start; let that finish so the edit lands after it.
+	time.Sleep(300 * time.Millisecond)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(data, "\nedited after the index saw it\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	for {
+		ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ex.Verdict == server.VerdictClaimRereadMismatch {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got, _ := os.ReadFile(path); !strings.Contains(string(got), "status: open") {
+		t.Fatalf("ticket was claimed on a stale index view:\n%s", got)
+	}
+
+	// A restart is the next pass over a fresh index: it sees the edit and claims.
+	h.Restart(t)
+	for !strings.Contains(readFile(t, path), "status: claimed") && !strings.Contains(readFile(t, path), "status: done") {
+		if ctx.Err() != nil {
+			t.Fatal("ticket was not claimed after the index caught up")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
