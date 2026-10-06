@@ -349,7 +349,7 @@ func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, don
 	return cmdStartImplement(
 		m.worktreeRoot, epicName, agent, done, total,
 		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications, m.settings.ImplementSkill(),
-		m.settings.ResolvedAgents(),
+		m.settings.ResolvedAgents(), m.settings.ExecutionQueue,
 	)
 }
 
@@ -363,6 +363,7 @@ func cmdStartImplement(
 	notifications config.NotificationsConfig,
 	skill string,
 	agents config.AgentsConfig,
+	queue config.ExecutionQueueConfig,
 ) tea.Cmd {
 	return func() tea.Msg {
 		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total, scratchDirFor(worktreeRoot))
@@ -384,7 +385,7 @@ func cmdStartImplement(
 			ralphLoopRegistry.setFailureNotifier(epicName, reporter)
 		}
 		ralphLoopRegistry.setAgent(epicName, agent)
-		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill, agents)
+		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill, agents, queue)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)
 			return implementFailedMsg{err: err}
@@ -441,7 +442,7 @@ func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.Age
 	return buildImplementRunOptionsForTickets(
 		worktreeRoot, epicName, agent,
 		settings.MaxConcurrentTicketsPerEpic(), nil, settings.ImplementSkill(),
-		settings.ResolvedAgents(),
+		settings.ResolvedAgents(), settings.ExecutionQueue,
 	)
 }
 
@@ -452,6 +453,7 @@ func buildImplementRunOptionsForTickets(
 	ticketIDs []string,
 	skill string,
 	agents config.AgentsConfig,
+	queue config.ExecutionQueueConfig,
 ) (ralphloop.RunOptions, error) {
 	repo, err := git.FindRepo(worktreeRoot)
 	if err != nil {
@@ -461,6 +463,8 @@ func buildImplementRunOptionsForTickets(
 		EpicName:    epicName,
 		Agent:       agent,
 		Agents:      agents,
+		SpinCycles:  queue.SpinCycles,
+		SpinWindow:  queue.SpinWindow,
 		Skill:       skill,
 		RepoDir:     repo.Root,
 		ScratchDir:  repo.ScratchRoot(),

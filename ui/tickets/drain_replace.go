@@ -186,7 +186,7 @@ func (m Model) launchDrainedReplace(worktreeRoot string, agent ralphloop.AgentKi
 		cmds = append(cmds, cmdStartImplement(
 			worktreeRoot, plan.epic.Name, agent, plan.done, len(plan.ticketIDs),
 			m.settings.MaxConcurrentTicketsPerEpic(), runTicketIDs, m.settings.Notifications,
-			m.settings.ImplementSkill(), m.settings.ResolvedAgents(),
+			m.settings.ImplementSkill(), m.settings.ResolvedAgents(), m.settings.ExecutionQueue,
 		))
 	}
 	cmds = append(cmds, cmdOpenQueueTab(worktreeRoot))

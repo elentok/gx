@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDefaultLogConfig(t *testing.T) {
@@ -801,5 +802,38 @@ func TestInitFailsIfConfigExists(t *testing.T) {
 	}
 	if _, err := Init(); err == nil {
 		t.Fatal("expected error on second Init, got nil")
+	}
+}
+
+func TestLoadExecutionQueueSpinKeys(t *testing.T) {
+	for name, tc := range map[string]struct {
+		json       string
+		wantCycles int
+		wantWindow time.Duration
+	}{
+		"defaults":   {`{}`, 3, 5 * time.Minute},
+		"overridden": {`{"execution-queue":{"spin-cycles":5,"spin-window":"90s"}}`, 5, 90 * time.Second},
+		"bad window": {`{"execution-queue":{"spin-window":"soon"}}`, 3, 5 * time.Minute},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tmp := t.TempDir()
+			prev := userConfigDirFn
+			userConfigDirFn = func() (string, error) { return tmp, nil }
+			t.Cleanup(func() { userConfigDirFn = prev })
+			dir := filepath.Join(tmp, "gx")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(tc.json), 0644); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.ExecutionQueue.SpinCycles != tc.wantCycles || cfg.ExecutionQueue.SpinWindow != tc.wantWindow {
+				t.Fatalf("spin = %d/%s, want %d/%s", cfg.ExecutionQueue.SpinCycles, cfg.ExecutionQueue.SpinWindow, tc.wantCycles, tc.wantWindow)
+			}
+		})
 	}
 }

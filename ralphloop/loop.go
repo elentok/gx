@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
@@ -168,6 +169,10 @@ type RunOptions struct {
 	// sharing this process with Run. Headless callers leave this nil and get
 	// today's behavior unchanged.
 	Gate *Gate
+	// SpinCycles parks within SpinWindow quarantine a ticket as needs-repair
+	// "spinning" instead of re-claiming it; zero values mean the defaults.
+	SpinCycles int
+	SpinWindow time.Duration
 	// OnScopeResolved, if set, is called synchronously with the RunScope Run
 	// resolves from TicketIDs, before the ticket loop starts — the caller's
 	// way to keep a reference for later out-of-band widening (RunScope.Add),
@@ -434,10 +439,22 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			scanned = epic
 			frontier = scope.Frontier(*epic)
 			for _, candidate := range frontier {
-				if !launched[candidate.Identifier] {
-					ticket = candidate
-					break
+				if launched[candidate.Identifier] {
+					continue
 				}
+				spinning, err := quarantineIfSpinning(opts, d.Now(), sink, scratchDir, candidate, schema.NeedsRepairState{
+					Label:    iterLabel(opts.EpicName, candidate.Identifier),
+					Branch:   iterBranch(opts.EpicName, candidate.Identifier),
+					Worktree: iterationWorktreePath(wtDir, opts.EpicName, candidate.Identifier),
+				})
+				if err != nil {
+					return err
+				}
+				if spinning {
+					continue
+				}
+				ticket = candidate
+				break
 			}
 			if ticket.Path == "" {
 				return nil
@@ -712,6 +729,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				// caller explicitly asking to stop anyway.
 				gate.waitForResume(ctx)
 				continue
+			}
+			// claimNext may have quarantined a ticket after this pass loaded
+			// epic, so judge deadlock against the statuses on disk now.
+			if fresh, err := loadNamedEpic(scratchDir, opts.EpicName); err == nil && fresh != nil {
+				epic = fresh
 			}
 			stalled := stalledTickets(*epic, scope)
 			if len(stalled) == 0 {

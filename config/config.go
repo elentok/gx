@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // UserConfigDir hardcodes ~/.config as gx's config base directory on every
@@ -114,9 +115,11 @@ func Load() (Config, error) {
 		NameAliases           map[string]string `json:"name-aliases"`
 		Log                   *LogConfig        `json:"log"`
 		ExecutionQueue        *struct {
-			MaxConcurrentTicketsPerEpic *int `json:"max-concurrent-tickets-per-epic"`
-			MaxConcurrentEpics          *int `json:"max-concurrent-epics"`
-			RetryStormLaunches          *int `json:"retry-storm-launches"`
+			MaxConcurrentTicketsPerEpic *int    `json:"max-concurrent-tickets-per-epic"`
+			MaxConcurrentEpics          *int    `json:"max-concurrent-epics"`
+			RetryStormLaunches          *int    `json:"retry-storm-launches"`
+			SpinCycles                  *int    `json:"spin-cycles"`
+			SpinWindow                  *string `json:"spin-window"`
 		} `json:"execution-queue"`
 		Budget *struct {
 			SoftLimit              *float64  `json:"soft-limit"`
@@ -191,6 +194,14 @@ func Load() (Config, error) {
 		}
 		if raw.ExecutionQueue.RetryStormLaunches != nil {
 			cfg.ExecutionQueue.RetryStormLaunches = clampExecutionQueueLimit(*raw.ExecutionQueue.RetryStormLaunches)
+		}
+		if raw.ExecutionQueue.SpinCycles != nil {
+			cfg.ExecutionQueue.SpinCycles = clampExecutionQueueLimit(*raw.ExecutionQueue.SpinCycles)
+		}
+		if raw.ExecutionQueue.SpinWindow != nil {
+			if d, err := time.ParseDuration(*raw.ExecutionQueue.SpinWindow); err == nil && d > 0 {
+				cfg.ExecutionQueue.SpinWindow = d
+			}
 		}
 	}
 	if raw.Budget != nil {

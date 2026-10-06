@@ -34,7 +34,7 @@ func startAndCaptureSink(t *testing.T, notifications config.NotificationsConfig)
 		ralphLoopRegistry = previousRegistry
 	})
 
-	cmd := cmdStartImplement(root, "alpha", ralphloop.AgentClaude, 0, 1, 1, nil, notifications, "gx-implement", config.AgentsConfig{})
+	cmd := cmdStartImplement(root, "alpha", ralphloop.AgentClaude, 0, 1, 1, nil, notifications, "gx-implement", config.AgentsConfig{}, config.ExecutionQueueConfig{})
 	if msg, ok := cmd().(implementFailedMsg); ok {
 		t.Fatalf("cmdStartImplement failed: %v", msg.err)
 	}
