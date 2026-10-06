@@ -121,6 +121,19 @@ instead of one, blocked in sequence:
 This keeps each ticket within budget and avoids one session paying for both wide exploration and
 implementation.
 
+An explore ticket stays `type: task`. **Never publish a `type: research` ticket into an epic this
+skill produces.** A loop-driven epic contains work ralph-loop claims and closes; `research` is a
+diagnosis or a decision handed to a *person* to plan, which is why `gx-investigate` files one as
+`draft` — deliberately not schedulable. Publishing one `open` inside an epic makes a hand-driven
+decision schedulable and hands a design question to an unattended agent that cannot ask you
+anything.
+
+When the work needs a decision rather than a fact, it belongs in a charting session (`/wayfinder`,
+`/myway`) *before* this skill runs — that's where grilling lives, and grilling must never end up
+inside an implementation ticket. Bounded fact-finding that genuinely belongs inside the epic is an
+explore ticket, typed `task`. A diagnosis for a person to plan goes to `follow-ups` as
+`type: research, status: draft`.
+
 ### 4. Declare each ticket's test seams
 
 Every ticket must declare its **approved public test seams** under a `## Test seams` heading — the
