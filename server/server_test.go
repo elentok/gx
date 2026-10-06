@@ -24,8 +24,28 @@ func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.APIVersion != server.APIVersion || got.Build != "test-build" {
+	if got.APIVersion != server.APIVersion || got.Build != "test-build" || got.Pid != os.Getpid() {
 		t.Errorf("handshake = %+v", got)
+	}
+}
+
+func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
+	h := servertest.Start(t)
+
+	if err := h.Stop(); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if _, err := h.Client.Handshake(context.Background()); err == nil {
+		t.Error("stopped server still answers")
+	}
+	next, err := server.New(server.Config{StateDir: h.StateDir})
+	if err != nil {
+		t.Fatalf("new server on same state dir: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := next.Serve(ctx); err != nil {
+		t.Errorf("second server: %v", err)
 	}
 }
 

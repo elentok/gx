@@ -29,6 +29,7 @@ func SocketPath(stateDir string) string { return filepath.Join(stateDir, socketF
 type Handshake struct {
 	APIVersion int    `json:"api_version"`
 	Build      string `json:"build"`
+	Pid        int    `json:"pid"`
 }
 
 type Config struct {
@@ -81,7 +82,7 @@ func New(cfg Config) (*Server, error) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build})
+	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid()})
 }
 
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.

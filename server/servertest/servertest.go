@@ -9,6 +9,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
@@ -22,6 +23,9 @@ type Harness struct {
 	Herdr       *herdrfake.State
 	StateDir    string
 	TicketStore string
+	// Stop does what SIGTERM does to the real server: shut down, release the
+	// lock, and return Serve's result. Safe to call more than once.
+	Stop func() error
 }
 
 // Start runs a server until the test ends.
@@ -48,9 +52,14 @@ func Start(t *testing.T) *Harness {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ctx) }()
+	var once sync.Once
+	h.Stop = func() error {
+		var err error
+		once.Do(func() { cancel(); err = <-done })
+		return err
+	}
 	t.Cleanup(func() {
-		cancel()
-		if err := <-done; err != nil {
+		if err := h.Stop(); err != nil {
 			t.Errorf("server: %v", err)
 		}
 	})
