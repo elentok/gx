@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -37,6 +38,23 @@ type budgetLedger struct {
 	path string
 	Days map[string]float64  `json:"days"`
 	Seen map[string]seenCost `json:"seen"`
+	// Latch holds the limit state of one budget day. It is persisted so a restart
+	// does not forget a reached limit, and it is dropped when the day changes.
+	Latch budgetLatch `json:"latch"`
+}
+
+// budgetLatch is sticky: once a limit is reached it stays reached until an
+// override or midnight, even if the limit is later raised.
+type budgetLatch struct {
+	Day  string `json:"day"`
+	Soft bool   `json:"soft,omitempty"`
+	Hard bool   `json:"hard,omitempty"`
+	// Override is the day's total at the last override. Limits count spend
+	// beyond it, so an override buys a fresh allowance rather than silencing
+	// the limit for the rest of the day.
+	Override float64 `json:"override,omitempty"`
+	// Notified is the highest level (1 soft, 2 hard) already announced.
+	Notified int `json:"notified,omitempty"`
 }
 
 func openLedger(stateDir string) (*budgetLedger, error) {
@@ -98,22 +116,100 @@ func (l *budgetLedger) record(key string, cost float64, now time.Time) {
 	}
 }
 
+// latches rolls the latch to now's day, sets any limit that spend since the
+// override has reached, and returns the result. Limits of zero are off.
+func (l *budgetLedger) latches(now time.Time, soft, hard float64) budgetLatch {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	day := now.Format(budgetDayLayout)
+	if l.Latch.Day != day {
+		l.Latch = budgetLatch{Day: day}
+	}
+	spent := l.Days[day] - l.Latch.Override
+	if hard > 0 && spent >= hard {
+		l.Latch.Hard = true
+	}
+	if soft > 0 && spent >= soft || l.Latch.Hard {
+		l.Latch.Soft = true
+	}
+	return l.Latch
+}
+
+// override clears the latches and moves the override point to today's total.
+func (l *budgetLedger) override(now time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	day := now.Format(budgetDayLayout)
+	l.Latch = budgetLatch{Day: day, Override: l.Days[day], Notified: l.Latch.Notified}
+}
+
 // BudgetStatus is today's spend against the configured limits, in dollars. A
 // zero limit means that limit is off. Shared by /v1/budget and the snapshot.
+// BudgetPaused is the budget's hold on new starts; it is independent of the
+// operator's queue pause.
 type BudgetStatus struct {
-	Day       string  `json:"day"`
-	Total     float64 `json:"total"`
-	SoftLimit float64 `json:"soft_limit"`
-	HardLimit float64 `json:"hard_limit"`
+	Day          string  `json:"day"`
+	Total        float64 `json:"total"`
+	SoftLimit    float64 `json:"soft_limit"`
+	HardLimit    float64 `json:"hard_limit"`
+	BudgetPaused bool    `json:"budget_paused"`
+	HardLatched  bool    `json:"hard_latched"`
 }
 
 func (s *Server) budgetStatus(now time.Time) BudgetStatus {
+	latch := s.budgetLatches(now)
 	return BudgetStatus{
-		Day:       now.Format(budgetDayLayout),
-		Total:     s.ledger.today(now),
-		SoftLimit: s.cfg.BudgetSoftLimit,
-		HardLimit: s.cfg.BudgetHardLimit,
+		Day:          now.Format(budgetDayLayout),
+		Total:        s.ledger.today(now),
+		SoftLimit:    s.cfg.BudgetSoftLimit,
+		HardLimit:    s.cfg.BudgetHardLimit,
+		BudgetPaused: latch.Soft,
+		HardLatched:  latch.Hard,
 	}
+}
+
+func (s *Server) budgetLatches(now time.Time) budgetLatch {
+	return s.ledger.latches(now, s.cfg.BudgetSoftLimit, s.cfg.BudgetHardLimit)
+}
+
+// BudgetResult is the outcome of a budget write: the status after it, or a
+// refusal.
+type BudgetResult struct {
+	Budget  *BudgetStatus `json:"budget,omitempty"`
+	Refused bool          `json:"refused,omitempty"`
+	Reason  string        `json:"reason,omitempty"`
+	Message string        `json:"message,omitempty"`
+}
+
+// ReasonNothingLatched refuses an override when no limit is holding anything.
+const ReasonNothingLatched = "nothing-latched"
+
+// budgetOverride lifts the latches so work may resume. The ledger is saved
+// before it returns, so a restart cannot bring the latch back.
+func (s *Server) budgetOverride(now time.Time) (BudgetResult, error) {
+	if s.cfg.Orchestrator != config.OrchestratorServer {
+		return BudgetResult{Refused: true, Reason: ReasonSchedulerNotSelected, Message: `orchestrator is not "server"`}, nil
+	}
+	if !s.budgetLatches(now).Soft {
+		return BudgetResult{Refused: true, Reason: ReasonNothingLatched, Message: "no budget limit is reached"}, nil
+	}
+	s.ledger.override(now)
+	if err := s.ledger.save(now); err != nil {
+		return BudgetResult{}, err
+	}
+	s.events.publish(EventQueueChanged, "")
+	s.kickRunner()
+	status := s.budgetStatus(now)
+	return BudgetResult{Budget: &status}, nil
+}
+
+func (s *Server) budgetOverrideWrite(w http.ResponseWriter, _ *http.Request) {
+	res, err := s.budgetOverride(time.Now())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
 }
 
 func (s *Server) budget(w http.ResponseWriter, _ *http.Request) {
@@ -171,24 +267,20 @@ func (s *Server) pollBudget(now time.Time) {
 			s.ledger.record(it.Address+"@"+it.Session, cost, now)
 		}
 	}
+	hard := s.budgetLatches(now).Hard
 	if err := s.ledger.save(now); err != nil {
 		s.log.Error("save budget ledger", "err", err)
 	}
 	s.notifyBudget(now)
-	if s.budgetHardReached(now) {
+	if hard {
 		s.killForBudget(now)
 	}
 }
 
 // budgetSoftReached holds new starts back; the hard limit implies it.
-func (s *Server) budgetSoftReached(now time.Time) bool {
-	total := s.ledger.today(now)
-	return s.cfg.BudgetSoftLimit > 0 && total >= s.cfg.BudgetSoftLimit || s.budgetHardReached(now)
-}
+func (s *Server) budgetSoftReached(now time.Time) bool { return s.budgetLatches(now).Soft }
 
-func (s *Server) budgetHardReached(now time.Time) bool {
-	return s.cfg.BudgetHardLimit > 0 && s.ledger.today(now) >= s.cfg.BudgetHardLimit
-}
+func (s *Server) budgetHardReached(now time.Time) bool { return s.budgetLatches(now).Hard }
 
 // killForBudget stops every live pane: ctrl+c, a grace period, then it closes
 // and parks the panes whose cost still rose. A pane that went quiet is left to

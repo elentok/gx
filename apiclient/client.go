@@ -277,6 +277,14 @@ func (c *Client) queueWriteTo(ctx context.Context, path string, req server.Queue
 	return res, err
 }
 
+// BudgetOverride lifts the budget latches. A refusal is a result (Refused set),
+// not an error.
+func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error) {
+	var res server.BudgetResult
+	err := c.post(ctx, "/v1/budget/override", struct{}{}, &res)
+	return res, err
+}
+
 // Repair runs a repair verb ("land", "reset", "unpark" or "verify"). A refusal
 // is a result (Refused set), not an error.
 func (c *Client) Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {

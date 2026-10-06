@@ -238,6 +238,7 @@ var routeTable = []struct {
 	{"GET /v1/projects", (*Server).projects},
 	{"GET /v1/locks", (*Server).locks},
 	{"GET /v1/budget", (*Server).budget},
+	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/iterations", (*Server).iterations},

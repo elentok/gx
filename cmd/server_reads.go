@@ -72,7 +72,49 @@ func newBudgetCmd(_ deps) *cobra.Command {
 	}
 	status.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(status)
+
+	var overrideJSON bool
+	override := &cobra.Command{
+		Use:   "override",
+		Short: "lift the budget latches so new work can start (asks the server)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runBudgetOverride(c, overrideJSON)
+		},
+	}
+	override.Flags().BoolVar(&overrideJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(override)
 	return cmd
+}
+
+// runBudgetOverride mirrors runServerQueueWrite: with --json the result or
+// refusal is the output; otherwise a refusal is an error.
+func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
+	ctx := c.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cl, err := serverClient()
+	if err != nil {
+		return err
+	}
+	res, err := cl.BudgetOverride(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = server.BudgetResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	w := c.OutOrStdout()
+	if jsonOut {
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(res)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	return printBudget(w, *res.Budget)
 }
 
 func printBudget(w io.Writer, b server.BudgetStatus) error {
@@ -80,7 +122,7 @@ func printBudget(w io.Writer, b server.BudgetStatus) error {
 	return err
 }
 
-func newServerLocksCmd()*cobra.Command {
+func newServerLocksCmd() *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "locks",
