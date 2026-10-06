@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/elentok/gx/server"
@@ -124,6 +126,27 @@ func (c *Client) Events(ctx context.Context, since uint64) (<-chan server.Event,
 	return out, nil
 }
 
+// Projects returns every project in the server's ticket store with its state.
+func (c *Client) Projects(ctx context.Context) ([]server.ProjectInfo, error) {
+	var p []server.ProjectInfo
+	err := c.get(ctx, "/v1/projects", &p)
+	return p, err
+}
+
+// Locks returns every held lock with its owner.
+func (c *Client) Locks(ctx context.Context) ([]server.LockInfo, error) {
+	var l []server.LockInfo
+	err := c.get(ctx, "/v1/locks", &l)
+	return l, err
+}
+
+// History returns the events logged for one ticket, by its full address.
+func (c *Client) History(ctx context.Context, address string) (server.History, error) {
+	var h server.History
+	err := c.get(ctx, "/v1/tickets/history?address="+url.QueryEscape(address), &h)
+	return h, err
+}
+
 func (c *Client) get(ctx context.Context, path string, out any) error {
 	// The host is ignored by the unix dialer; it only has to parse.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
@@ -136,7 +159,8 @@ func (c *Client) get(ctx context.Context, path string, out any) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned %s for %s", resp.Status, path)
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("server returned %s for %s: %s", resp.Status, path, strings.TrimSpace(string(msg)))
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
 }

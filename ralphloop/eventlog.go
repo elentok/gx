@@ -158,7 +158,10 @@ var eventLogMu sync.Mutex
 
 // runLogPath returns the append-only event log path for epicName under
 // scratchDir.
-func runLogPath(scratchDir, epicName string) string {
+func runLogPath(scratchDir, epicName string) string { return RunLogPath(scratchDir, epicName) }
+
+// RunLogPath is runLogPath for readers outside the package.
+func RunLogPath(scratchDir, epicName string) string {
 	return filepath.Join(scratchDir, epicName, "run-log.jsonl")
 }
 
