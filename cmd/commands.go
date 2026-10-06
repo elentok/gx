@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 
 	"github.com/spf13/cobra"
@@ -211,18 +212,33 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return d.runTickets()
 		},
 	}
-	cmd.AddCommand(&cobra.Command{
-		Use:   "validate <addr|path>",
-		Short: "validate a ticket's frontmatter, by address or file path",
-		Args:  cobra.ExactArgs(1),
+	var validateAll bool
+	validateCmd := &cobra.Command{
+		Use:   "validate <addr|path> | --all",
+		Short: "validate a ticket and its whole project, by address or file path; --all walks the store",
+		Args: func(_ *cobra.Command, args []string) error {
+			if validateAll {
+				return cobra.NoArgs(nil, args)
+			}
+			return cobra.ExactArgs(1)(nil, args)
+		},
 		RunE: func(c *cobra.Command, args []string) error {
+			if validateAll {
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				return runTicketsValidateAll(cfg.TicketStore.Path, c.OutOrStdout())
+			}
 			path, err := resolveTicketRef(d.getwd, args[0])
 			if err != nil {
 				return err
 			}
 			return runTicketsValidate(path, c.OutOrStdout())
 		},
-	})
+	}
+	validateCmd.Flags().BoolVar(&validateAll, "all", false, "validate every project in the ticket store")
+	cmd.AddCommand(validateCmd)
 	var showJSON bool
 	showCmd := &cobra.Command{
 		Use:   "show <addr>",

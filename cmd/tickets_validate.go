@@ -1,69 +1,66 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // runTicketsValidate parses path via schema.ParseTicket and reports whether
 // it's well-formed. A parse/validation failure is returned as an error (for
 // a non-zero exit code via cobra's RunE); success prints a confirmation to w.
+//
+// A ticket in the tracker's <project>/<epic>/issues/ layout is validated
+// against its whole project, so an error in a sibling ticket or epic fails it
+// too; an ad-hoc file is validated on its own frontmatter alone.
 func runTicketsValidate(path string, w io.Writer) error {
 	ticket, err := schema.ParseTicket(path)
 	if err != nil {
 		return err
 	}
-	if err := checkParentGraph(path); err != nil {
-		return err
-	}
-	if err := checkBlockedBy(path); err != nil {
-		return err
+	if projectDir, ok := projectDirOfTicket(path); ok {
+		if err := tickets.ValidateProject(projectDir); err != nil {
+			return err
+		}
 	}
 	fmt.Fprintf(w, "%s: valid ticket (id=%s, status=%s)\n", ticketLabel(path), ticket.ID, ticket.Status)
 	return nil
 }
 
-// checkBlockedBy applies the shared blocked_by resolver to path within its
-// epic. Like checkParentGraph, a ticket with no loadable epic is validated on
-// its own frontmatter alone.
-func checkBlockedBy(path string) error {
-	epic, target, unlock, err := lockEpicForTicket(path)
+// runTicketsValidateAll validates every project in the ticket store, reporting
+// the errors of all of them at once.
+func runTicketsValidateAll(storePath string, w io.Writer) error {
+	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
-		return nil
+		return err
 	}
-	if unlock != nil {
-		defer unlock()
+	var errs []error
+	for _, dir := range dirs {
+		if err := tickets.ValidateProject(dir); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	if target == nil {
-		return nil
+	if err := errors.Join(errs...); err != nil {
+		return err
 	}
-	if err := epic.CheckBlockedBy(*target); err != nil {
-		return fmt.Errorf("%s: %w", path, err)
-	}
-	if err := epic.CheckBlockedByCycles(*target); err != nil {
-		return fmt.Errorf("%s: %w", path, err)
-	}
+	fmt.Fprintf(w, "%d projects valid\n", len(dirs))
 	return nil
 }
 
-// checkParentGraph reports path's parent edge as invalid when the epic around
-// it says so — dangling, or closing a cycle. Neither is visible to
-// schema.Validate, which sees one file with no epic around it; the loader
-// records the verdict on the ticket it drops the edge from (Ticket.GraphErr).
-// A ticket with no loadable epic (an ad-hoc file, or an epic that can't be
-// read) is validated on its own frontmatter alone.
-func checkParentGraph(path string) error {
-	_, target, unlock, err := lockEpicForTicket(path)
+// projectDirOfTicket is the project directory above path when it sits in the
+// <project>/<epic>/issues/<file>.md layout.
+func projectDirOfTicket(path string) (string, bool) {
+	abs, err := filepath.Abs(path)
 	if err != nil {
-		return nil
+		return "", false
 	}
-	if unlock != nil {
-		defer unlock()
+	issuesDir := filepath.Dir(abs)
+	if filepath.Base(issuesDir) != "issues" {
+		return "", false
 	}
-	if target == nil || target.GraphErr == "" {
-		return nil
-	}
-	return fmt.Errorf("%s: %s", path, target.GraphErr)
+	return filepath.Dir(filepath.Dir(issuesDir)), true
 }

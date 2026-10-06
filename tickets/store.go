@@ -46,6 +46,34 @@ func ProjectDir(storePath, repoRoot string) (string, error) {
 	return "", ErrNoProject
 }
 
+// ProjectDirs lists every project directory in the ticket store: each
+// subdirectory holding a project.json. A missing store has no projects.
+func ProjectDirs(storePath string) ([]string, error) {
+	if storePath == "" {
+		return nil, errors.New("ticket-store.path is not set")
+	}
+	entries, err := os.ReadDir(storePath)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read ticket store %s: %w", storePath, err)
+	}
+	var dirs []string
+	for _, e := range entries {
+		dir := filepath.Join(storePath, e.Name())
+		if !e.IsDir() {
+			continue
+		}
+		if _, err := config.ReadProjectFile(dir); err == nil {
+			dirs = append(dirs, dir)
+		} else if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+	return dirs, nil
+}
+
 // RootFor resolves dir's repo to its project directory in the configured
 // ticket store. It is the one way callers find the ticket root.
 func RootFor(dir string) (string, error) {
