@@ -1,6 +1,43 @@
 package tickets
 
-import "testing"
+import (
+	"errors"
+	"slices"
+	"testing"
+)
+
+func TestDeriveLeafBase(t *testing.T) {
+	sib := func(n int, id, status string, commitless bool) Ticket {
+		return Ticket{Number: n, Identifier: id, Status: status, Commitless: commitless}
+	}
+	leaf := func(blockedBy ...string) Ticket {
+		return Ticket{Number: 3, Identifier: "03", Status: "open", BlockedBy: blockedBy}
+	}
+	for name, tc := range map[string]struct {
+		tickets   []Ticket
+		leaf      Ticket
+		want      string
+		ambiguous []string
+	}{
+		"unlanded sibling is the base":   {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: leaf("01"), want: "01"},
+		"landed sibling gives the tip":   {tickets: []Ticket{sib(1, "01", "done", false)}, leaf: leaf("01")},
+		"commitless sibling is ignored":  {tickets: []Ticket{sib(1, "01", "open", true)}, leaf: leaf("01")},
+		"commitless ticket reads at tip": {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: func() Ticket { l := leaf("01"); l.Commitless = true; return l }()},
+		"explicit base opts out":         {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: func() Ticket { l := leaf("01"); l.Base = "x"; return l }()},
+		"two unlanded siblings are ambiguous": {
+			tickets: []Ticket{sib(1, "01", "open", false), sib(2, "02", "claimed", false)}, leaf: leaf("01", "02"), ambiguous: []string{"01", "02"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			epics := []Epic{{Name: "a", Tickets: append(slices.Clone(tc.tickets), tc.leaf)}}
+			got, err := DeriveLeafBase("p", epics, "a", tc.leaf)
+			var amb *AmbiguousBaseError
+			if errors.As(err, &amb) != (tc.ambiguous != nil) || (amb != nil && !slices.Equal(amb.Blockers, tc.ambiguous)) || (amb == nil && err != nil) || got != tc.want {
+				t.Errorf("got (%q, %v), want (%q, ambiguous=%v)", got, err, tc.want, tc.ambiguous)
+			}
+		})
+	}
+}
 
 func baseEpics(blockerStatus string) []Epic {
 	return []Epic{

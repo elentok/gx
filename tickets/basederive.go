@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"cmp"
-	"fmt"
 	"slices"
 	"strings"
 )
@@ -47,7 +46,45 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket) (string
 	case 1:
 		return branches[0], nil
 	}
-	return "", fmt.Errorf("ambiguous base: unlanded blockers on %s", strings.Join(branches, ", "))
+	return "", &AmbiguousBaseError{Blockers: branches}
+}
+
+// AmbiguousBaseError means two or more unlanded commitful blockers could each
+// be the base and the ticket names none with base:. Blockers are what the
+// person has to choose between.
+type AmbiguousBaseError struct{ Blockers []string }
+
+func (e *AmbiguousBaseError) Error() string {
+	return "ambiguous base: unlanded blockers " + strings.Join(e.Blockers, ", ")
+}
+
+// DeriveLeafBase returns the identifier of the sibling whose iteration branch
+// the leaf t starts from; "" means the epic's feature branch tip, which is
+// also where a commitless ticket reads. Only same-epic blockers count: an
+// unlanded commitful one is the base, and two or more are ambiguous. An
+// explicit base: on the ticket opts out of derivation.
+func DeriveLeafBase(project string, epics []Epic, epic string, t Ticket) (string, error) {
+	if t.Commitless || t.Base != "" {
+		return "", nil
+	}
+	g := newProjectGraph(project, epics)
+	var siblings []string
+	for _, ref := range t.BlockedBy {
+		key, err := g.resolve(epic, ref)
+		if err != nil || !strings.HasPrefix(key, epic+"/") || g.tickets[key].Commitless || !g.blocking(key) {
+			continue
+		}
+		if id := g.tickets[key].Identifier; !slices.Contains(siblings, id) {
+			siblings = append(siblings, id)
+		}
+	}
+	switch len(siblings) {
+	case 0:
+		return "", nil
+	case 1:
+		return siblings[0], nil
+	}
+	return "", &AmbiguousBaseError{Blockers: siblings}
 }
 
 // unlandedBranch is the feature branch of the epic holding key, or "" once

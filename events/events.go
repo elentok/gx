@@ -95,6 +95,9 @@ const (
 	IterationError Kind = "iteration-error"
 	// ManualPark is a person parking a ticket through `gx server tickets park`.
 	ManualPark Kind = "manual-park"
+	// AmbiguousBase is a claim that found two or more unlanded blockers and no
+	// base: to choose between them.
+	AmbiguousBase Kind = "ambiguous-base"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -110,7 +113,7 @@ var kinds = map[Kind]bool{
 	AgentNameTaken: true, AgentPaneBusy: true, AgentPromptStalled: true, ZeroCommit: true, BlockedPane: true,
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
-	DuplicateLive: true, IterationError: true, ManualPark: true,
+	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

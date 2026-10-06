@@ -245,7 +245,15 @@ func (s *Server) projectOf(project string) (dir, repo string, err error) {
 // the ticket back rather than leaving a claim with no agent behind it.
 func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind) error {
 	ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
-	rootBase, resolvedBase, err := s.resolveRootBase(addr, t, repo)
+	rootBase, resolvedBase, leafBase, err := s.resolveBase(addr, t, repo)
+	var ambiguous *tickets.AmbiguousBaseError
+	if errors.As(err, &ambiguous) {
+		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
+		if perr := ralphloop.ParkAmbiguousBase(s.cfg.TicketStore, addr.Epic, t.Identifier, t.Path, reason); perr != nil {
+			return fmt.Errorf("park %s: %w", ticketAddr, perr)
+		}
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("base for %s: %w", ticketAddr, err)
 	}
@@ -255,7 +263,7 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
 	one := ralphloop.OneIteration{
-		RepoDir: repo, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase,
+		RepoDir: repo, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 	}
 	deps := ralphloop.DefaultDeps()
 	run, wt, err := s.prepareAndLaunch(deps, &one, addr, ticketAddr)
@@ -274,33 +282,37 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	return nil
 }
 
-// resolveRootBase derives the base of t's root epic and returns it as the ref
-// to branch from plus the "ref@sha" claim stamp. A commitless ticket has no
-// base, so both come back empty.
-func (s *Server) resolveRootBase(addr tickets.Address, t tickets.Ticket, repo string) (ref, stamp string, err error) {
+// resolveBase derives where t starts from. ref is the branch the root epic's
+// feature branch is created from, with its "ref@sha" claim stamp; leaf is the
+// unlanded sibling whose branch t starts from instead of the feature tip. A
+// commitless ticket reads at the feature tip, so everything comes back empty.
+func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string) (ref, stamp, leaf string, err error) {
 	if t.Commitless {
-		return "", "", nil
+		return "", "", "", nil
 	}
 	dir, _, err := s.projectOf(addr.Project)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	epics, err := tickets.Load(dir)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
+	}
+	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
+		return "", "", "", err
 	}
 	ref, err = tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if ref == "" {
 		ref = git.RemoteDefaultBranch(repo)
 	}
 	sha, err := git.RevParse(repo, ref)
 	if err != nil {
-		return "", "", fmt.Errorf("resolve %s: %w", ref, err)
+		return "", "", "", fmt.Errorf("resolve %s: %w", ref, err)
 	}
-	return ref, ref + "@" + sha, nil
+	return ref, ref + "@" + sha, leaf, nil
 }
 
 // prepareAndLaunch gives the ticket its own worktree, then launches the agent

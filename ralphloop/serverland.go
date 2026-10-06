@@ -22,6 +22,9 @@ type OneIteration struct {
 	// RootBase is the ref the epic's feature branch is created from when it
 	// does not exist yet; "" starts it at the repo's HEAD.
 	RootBase string
+	// LeafBase is the identifier of the unlanded sibling whose iteration branch
+	// the ticket starts from; "" starts it at the feature tip.
+	LeafBase string
 }
 
 // IterationWorktree is what PrepareIteration made for one ticket.
@@ -52,9 +55,13 @@ func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
 	branch := iterBranch(o.Epic, o.Ticket.Identifier)
-	base, err := d.RevParse(featurePath, o.Epic)
+	baseRef := o.Epic
+	if o.LeafBase != "" {
+		baseRef = iterBranch(o.Epic, o.LeafBase)
+	}
+	base, err := d.RevParse(featurePath, baseRef)
 	if err != nil {
-		return IterationWorktree{}, fmt.Errorf("resolving %s tip: %w", o.Epic, err)
+		return IterationWorktree{}, fmt.Errorf("resolving %s tip: %w", baseRef, err)
 	}
 	path := iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier)
 	if err := d.AddWorktree(o.RepoDir, path, branch, base); err != nil {

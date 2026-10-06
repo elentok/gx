@@ -58,6 +58,16 @@ func ParkNeedsRepair(scratchDir, epicName, ticket, path, reason string) error {
 	return err
 }
 
+// ParkAmbiguousBase parks a ticket needs-answer at claim, its "## Needs Answer"
+// section naming the blockers to choose between.
+func ParkAmbiguousBase(scratchDir, epicName, ticket, path, reason string) error {
+	_, err := park(noopEventSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
+		Type: events.NeedsAnswer, Kind: events.AmbiguousBase, Reason: reason,
+	})
+	return err
+}
+
 // ParkBudgetKilled parks the ticket of an iteration the budget's hard limit
 // stopped, through the park path.
 func ParkBudgetKilled(scratchDir, epicName, ticket, path, reason string) error {
@@ -104,7 +114,7 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	case events.NeedsAnswer:
 		// A blocked pane's question lives only in the pane, so its ticket gets a
 		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
-		if req.Kind == events.BlockedPane {
+		if req.Kind == events.BlockedPane || req.Kind == events.AmbiguousBase {
 			writeErr = markNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind))
 		} else {
 			writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
