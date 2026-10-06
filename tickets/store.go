@@ -60,6 +60,15 @@ func RootFor(dir string) (string, error) {
 	return ProjectDir(cfg.TicketStore.Path, repo.Root)
 }
 
+// ProjectName is the name addresses carry for projectDir: project.json's
+// name, falling back to the directory name.
+func ProjectName(projectDir string) string {
+	if pf, err := config.ReadProjectFile(projectDir); err == nil && pf.Name != nil && *pf.Name != "" {
+		return *pf.Name
+	}
+	return filepath.Base(projectDir)
+}
+
 // canonicalPath makes equal directories compare equal across symlinks (e.g.
 // macOS /var vs /private/var) and trailing slashes.
 func canonicalPath(p string) string {

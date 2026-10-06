@@ -219,6 +219,21 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return runTicketsValidate(args[0], c.OutOrStdout())
 		},
 	})
+	var showJSON bool
+	showCmd := &cobra.Command{
+		Use:   "show <addr>",
+		Short: "print a ticket by address (project:epic/06, epic/06 or 06)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runTicketsShow(cwd, args[0], showJSON, c.OutOrStdout())
+		},
+	}
+	showCmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
+	cmd.AddCommand(showCmd)
 	cmd.AddCommand(newTicketsSetCmd(d))
 	cmd.AddCommand(newTicketsUnparkCmd(d))
 	cmd.AddCommand(newTicketsVerifyCmd(d))
