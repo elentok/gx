@@ -243,14 +243,26 @@ func newTicketsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(newTicketsVerifyCmd(d))
 	cmd.AddCommand(newTicketsLandCmd(d))
 	cmd.AddCommand(newTicketsResetCmd(d))
-	cmd.AddCommand(&cobra.Command{
+	var migrateToStore bool
+	var migrateProject string
+	migrateCmd := &cobra.Command{
 		Use:   "migrate <path>",
-		Short: "rewrite every ticket under a tracker root into the post-refactor frontmatter shape",
+		Short: "rewrite every ticket under a tracker root into the post-refactor frontmatter shape, or (--to-store) copy it into the ticket store",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsMigrate(args[0], c.OutOrStdout())
+			if !migrateToStore {
+				return runTicketsMigrate(args[0], c.OutOrStdout())
+			}
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			return runTicketsMigrateToStore(cwd, args[0], migrateProject, c.OutOrStdout())
 		},
-	})
+	}
+	migrateCmd.Flags().BoolVar(&migrateToStore, "to-store", false, "copy the old tree into the ticket store (old tree is left untouched)")
+	migrateCmd.Flags().StringVar(&migrateProject, "project", "", "project name in the store (default: the repo directory name)")
+	cmd.AddCommand(migrateCmd)
 	cmd.AddCommand(&cobra.Command{
 		Use:   "root",
 		Short: "print the canonical .scratch root for the current repo",

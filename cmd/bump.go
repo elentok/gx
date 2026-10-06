@@ -180,4 +180,3 @@ func (m bumpPickerModel) View() tea.View {
 	b.WriteString("\n")
 	return tea.NewView(b.String())
 }
-
