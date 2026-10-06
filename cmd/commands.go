@@ -228,13 +228,13 @@ func newTicketsCmd(d deps) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				return runTicketsValidateAll(cfg.TicketStore.Path, c.OutOrStdout())
+				return runTicketsValidateAll(cfg.TicketStore.Path, c.OutOrStdout(), c.ErrOrStderr())
 			}
 			path, err := resolveTicketRef(d.getwd, args[0])
 			if err != nil {
 				return err
 			}
-			return runTicketsValidate(path, c.OutOrStdout())
+			return runTicketsValidate(path, c.OutOrStdout(), c.ErrOrStderr())
 		},
 	}
 	validateCmd.Flags().BoolVar(&validateAll, "all", false, "validate every project in the ticket store")

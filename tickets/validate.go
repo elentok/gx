@@ -4,8 +4,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+func isVCSNone(projectDir string) bool {
+	pf, err := config.ReadProjectFile(projectDir)
+	return err == nil && pf.VCS != nil && *pf.VCS == config.VCSNone
+}
 
 // ValidateProject loads every epic under projectDir and reports each ticket's
 // problems at once: its own frontmatter (every ticket, so archived history is
@@ -18,6 +24,7 @@ func ValidateProject(projectDir string) error {
 		return err
 	}
 	graph := newProjectGraph(ProjectName(projectDir), epics)
+	vcsNone := isVCSNone(projectDir)
 	var errs []error
 	for _, epic := range epics {
 		for _, t := range epic.Tickets {
@@ -27,6 +34,9 @@ func ValidateProject(projectDir string) error {
 			}
 			if t.IsTerminal() {
 				continue
+			}
+			if vcsNone && t.Base != "" {
+				errs = append(errs, fmt.Errorf("%s: base: not allowed in a vcs: none project (there is no branch to base)", t.Path))
 			}
 			if t.GraphErr != "" {
 				errs = append(errs, fmt.Errorf("%s: %s", t.Path, t.GraphErr))

@@ -29,6 +29,8 @@ type ticketYAML struct {
 	IterationStatus       string       `yaml:"iteration_status,omitempty"`
 	ParkKind              string       `yaml:"park_kind,omitempty"`
 	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
+	Base                  string       `yaml:"base,omitempty"`
+	ResolvedBase          string       `yaml:"resolved_base,omitempty"`
 
 	// Children is the retired field, declared here and nowhere else: the wire
 	// struct is the only place that has to recognize it (yaml.v3 silently
@@ -63,6 +65,8 @@ func (w ticketYAML) toTicket() Ticket {
 		IterationStatus:       IterationStatus(w.IterationStatus),
 		ParkKind:              ParkKind(w.ParkKind),
 		Mutes:                 copyMutes(w.Mutes),
+		Base:                  w.Base,
+		ResolvedBase:          w.ResolvedBase,
 	}
 	if w.Parent != "" {
 		id := TicketID(w.Parent)
@@ -87,6 +91,8 @@ func ticketToYAML(t Ticket) ticketYAML {
 		IterationStatus:       string(t.IterationStatus),
 		ParkKind:              string(t.ParkKind),
 		Mutes:                 copyMutes(t.Mutes),
+		Base:                  t.Base,
+		ResolvedBase:          t.ResolvedBase,
 	}
 	if t.Parent != nil {
 		w.Parent = string(*t.Parent)

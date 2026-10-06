@@ -17,13 +17,16 @@ import (
 // A ticket in the tracker's <project>/<epic>/issues/ layout is validated
 // against its whole project, so an error in a sibling ticket or epic fails it
 // too; an ad-hoc file is validated on its own frontmatter alone.
-func runTicketsValidate(path string, w io.Writer) error {
+func runTicketsValidate(path string, w, stderr io.Writer) error {
 	ticket, err := schema.ParseTicket(path)
 	if err != nil {
 		return err
 	}
 	if projectDir, ok := projectDirOfTicket(path); ok {
 		if err := tickets.ValidateProject(projectDir); err != nil {
+			return err
+		}
+		if err := printProjectWarnings(projectDir, stderr); err != nil {
 			return err
 		}
 	}
@@ -33,7 +36,7 @@ func runTicketsValidate(path string, w io.Writer) error {
 
 // runTicketsValidateAll validates every project in the ticket store, reporting
 // the errors of all of them at once.
-func runTicketsValidateAll(storePath string, w io.Writer) error {
+func runTicketsValidateAll(storePath string, w, stderr io.Writer) error {
 	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
 		return err
@@ -42,12 +45,28 @@ func runTicketsValidateAll(storePath string, w io.Writer) error {
 	for _, dir := range dirs {
 		if err := tickets.ValidateProject(dir); err != nil {
 			errs = append(errs, err)
+			continue
+		}
+		if err := printProjectWarnings(dir, stderr); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
 	fmt.Fprintf(w, "%d projects valid\n", len(dirs))
+	return nil
+}
+
+// printProjectWarnings writes projectDir's non-fatal findings to w.
+func printProjectWarnings(projectDir string, w io.Writer) error {
+	warnings, err := tickets.ProjectWarnings(projectDir)
+	if err != nil {
+		return err
+	}
+	for _, warning := range warnings {
+		fmt.Fprintf(w, "warning: %s\n", warning)
+	}
 	return nil
 }
 

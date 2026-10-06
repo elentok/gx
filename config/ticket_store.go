@@ -36,7 +36,12 @@ func DefaultTicketStoreConfig() TicketStoreConfig {
 type ProjectFile struct {
 	Name *string `json:"name"`
 	Repo *string `json:"repo"`
+	// VCS is "none" for a repo-less project (the built-in scratch project).
+	VCS *string `json:"vcs"`
 }
+
+// VCSNone is the project.json vcs value for a project with no repository.
+const VCSNone = "none"
 
 // ReadProjectFile reads <projectDir>/project.json.
 func ReadProjectFile(projectDir string) (ProjectFile, error) {

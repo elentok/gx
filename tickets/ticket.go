@@ -68,6 +68,10 @@ type Ticket struct {
 	// tripped a throttle for this ticket, oldest first.
 	Mutes []schema.MuteRecord
 
+	// Base and ResolvedBase mirror schema.Ticket's fields of the same names.
+	Base         string
+	ResolvedBase string
+
 	// ReadErr is set when the loader found the file (its name matched
 	// "NN-<slug>.md") but couldn't read its contents (I/O error). Non-empty
 	// means Type/BlockedBy/Status/Body are all zero-valued - there was no

@@ -110,6 +110,9 @@ type Event struct {
 	// check for reachability from the feature branch's later tip — the
 	// iteration branch itself isn't guaranteed to still exist by then.
 	SHA string `json:"sha,omitempty"`
+	// ResolvedBase (iteration-started only) is the base (ref + SHA) the claim
+	// resolved; `gx tickets validate` compares it with the ticket's stamp.
+	ResolvedBase string `json:"resolved_base,omitempty"`
 	// Scan (scheduler-scan events only) is every ticket's disposition for
 	// this claimNext pass — see ScanDecision.
 	Scan []ScanDecision `json:"scan,omitempty"`

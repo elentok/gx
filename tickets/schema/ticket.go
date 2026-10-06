@@ -220,6 +220,12 @@ type Ticket struct {
 	// write-conditional (enforced by whatever later writes it), never checked
 	// by Validate, same as IterationStatus.
 	Mutes []MuteRecord
+	// Base is the author's optional override of the derived base: a branch name
+	// or a ticket reference. The target is always derived, never stored.
+	Base string
+	// ResolvedBase is the base (ref + SHA) gx stamped at the last claim.
+	// Read-only for authors; never checked by Validate.
+	ResolvedBase string
 }
 
 // MuteRecord is one tripped notification throttle: the event type that
@@ -289,6 +295,9 @@ func Validate(t Ticket) error {
 	}
 	if t.Parent != nil && *t.Parent == t.ID {
 		errs = append(errs, fmt.Errorf("parent: self-reference %q", *t.Parent))
+	}
+	if t.Base != "" && t.IsCommitless() {
+		errs = append(errs, fmt.Errorf("base: not allowed on a commitless ticket (it has no branch to base)"))
 	}
 
 	return errors.Join(errs...)

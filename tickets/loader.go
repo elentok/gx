@@ -101,6 +101,8 @@ func loadEpic(scratchDir, name string) Epic {
 		ticket.Commitless = parsed.IsCommitless()
 		ticket.ParkKind = parsed.ParkKind
 		ticket.Mutes = parsed.Mutes
+		ticket.Base = parsed.Base
+		ticket.ResolvedBase = parsed.ResolvedBase
 		epic.Tickets = append(epic.Tickets, ticket)
 	}
 
