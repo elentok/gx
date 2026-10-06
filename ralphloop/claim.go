@@ -23,9 +23,16 @@ import (
 // moment a ticket starts a new life. Doing this here rather than at reattach
 // means a ticket that reattaches several times within one claim never
 // re-fires the demotion.
-func Claim(path string) error {
+func Claim(path string) error { return ClaimWithBase(path, "") }
+
+// ClaimWithBase is Claim that also stamps resolvedBase (ref + SHA) on the
+// ticket; "" leaves the previous stamp alone.
+func ClaimWithBase(path, resolvedBase string) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusClaimed
+		if resolvedBase != "" {
+			t.ResolvedBase = resolvedBase
+		}
 		t.IterationStatus = ""
 		t.ParkKind = ""
 		*body = schema.DemoteSection(*body, "## Needs Repair", time.Now())

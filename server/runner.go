@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -244,13 +245,17 @@ func (s *Server) projectOf(project string) (dir, repo string, err error) {
 // the ticket back rather than leaving a claim with no agent behind it.
 func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind) error {
 	ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
-	if err := ralphloop.Claim(t.Path); err != nil {
+	rootBase, resolvedBase, err := s.resolveRootBase(addr, t, repo)
+	if err != nil {
+		return fmt.Errorf("base for %s: %w", ticketAddr, err)
+	}
+	if err := ralphloop.ClaimWithBase(t.Path, resolvedBase); err != nil {
 		return fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
 	one := ralphloop.OneIteration{
-		RepoDir: repo, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t,
+		RepoDir: repo, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase,
 	}
 	deps := ralphloop.DefaultDeps()
 	run, wt, err := s.prepareAndLaunch(deps, &one, addr, ticketAddr)
@@ -267,6 +272,35 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	s.events.publish(EventIterationStarted, ticketAddr)
 	go s.finishRun(deps, root, one, wt, run, ticketAddr)
 	return nil
+}
+
+// resolveRootBase derives the base of t's root epic and returns it as the ref
+// to branch from plus the "ref@sha" claim stamp. A commitless ticket has no
+// base, so both come back empty.
+func (s *Server) resolveRootBase(addr tickets.Address, t tickets.Ticket, repo string) (ref, stamp string, err error) {
+	if t.Commitless {
+		return "", "", nil
+	}
+	dir, _, err := s.projectOf(addr.Project)
+	if err != nil {
+		return "", "", err
+	}
+	epics, err := tickets.Load(dir)
+	if err != nil {
+		return "", "", err
+	}
+	ref, err = tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t)
+	if err != nil {
+		return "", "", err
+	}
+	if ref == "" {
+		ref = git.RemoteDefaultBranch(repo)
+	}
+	sha, err := git.RevParse(repo, ref)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve %s: %w", ref, err)
+	}
+	return ref, ref + "@" + sha, nil
 }
 
 // prepareAndLaunch gives the ticket its own worktree, then launches the agent

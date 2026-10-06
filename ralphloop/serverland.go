@@ -19,6 +19,9 @@ type OneIteration struct {
 	ScratchDir  string
 	Agent       AgentKind
 	Ticket      tickets.Ticket
+	// RootBase is the ref the epic's feature branch is created from when it
+	// does not exist yet; "" starts it at the repo's HEAD.
+	RootBase string
 }
 
 // IterationWorktree is what PrepareIteration made for one ticket.
@@ -45,7 +48,7 @@ func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
 	featurePath := filepath.Join(wtDir, o.Epic)
 	worktreeLock.Lock()
 	defer worktreeLock.Unlock()
-	if err := d.AddWorktree(o.RepoDir, featurePath, o.Epic, ""); err != nil {
+	if err := d.AddWorktree(o.RepoDir, featurePath, o.Epic, o.RootBase); err != nil {
 		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
 	branch := iterBranch(o.Epic, o.Ticket.Identifier)

@@ -58,6 +58,19 @@ func TestClaim_RewritesStatus(t *testing.T) {
 	}
 }
 
+func TestClaimWithBase_StampsEveryClaim(t *testing.T) {
+	t.Parallel()
+	path := writeFrontmatterTicket(t, "open")
+	for _, stamp := range []string{"a@111", "main@222"} {
+		if err := ClaimWithBase(path, stamp); err != nil {
+			t.Fatalf("ClaimWithBase: %v", err)
+		}
+		if got := mustParse(t, path).ResolvedBase; got != stamp {
+			t.Errorf("ResolvedBase = %q, want %q", got, stamp)
+		}
+	}
+}
+
 // A CLI-style write (schema.UpdateTicket) racing the loop's Claim must never
 // lose `claimed`: both read-modify-writes hold the same per-ticket lock.
 func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
