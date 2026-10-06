@@ -148,6 +148,13 @@ func (c *Client) Locks(ctx context.Context) ([]server.LockInfo, error) {
 	return l, err
 }
 
+// Budget returns today's spend and the configured limits.
+func (c *Client) Budget(ctx context.Context) (server.BudgetStatus, error) {
+	var b server.BudgetStatus
+	err := c.get(ctx, "/v1/budget", &b)
+	return b, err
+}
+
 // History returns the events logged for one ticket, by its full address.
 func (c *Client) History(ctx context.Context, address string) (server.History, error) {
 	var h server.History

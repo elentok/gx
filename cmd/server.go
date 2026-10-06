@@ -144,6 +144,7 @@ func runServer(ctx context.Context) error {
 		tcpAddr = server.DefaultTCPAddr
 	}
 	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, Orchestrator: cfg.Orchestrator, MaxConcurrentRoots: cfg.ExecutionQueue.MaxConcurrentEpics,
+		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
 		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second, StorePushRemote: cfg.TicketStore.PushRemote})
 	if err != nil {
 		return err

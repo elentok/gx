@@ -1,7 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"math"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -11,6 +14,40 @@ func near(t *testing.T, got, want float64) {
 	if math.Abs(got-want) > 1e-9 {
 		t.Fatalf("got %v, want %v", got, want)
 	}
+}
+
+func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
+	// A short path: the test name would push the unix socket path past its limit.
+	stateDir, err := os.MkdirTemp("", "gx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(stateDir) })
+	s, err := New(Config{StateDir: stateDir,TicketStore: t.TempDir(), BudgetSoftLimit: 300, BudgetHardLimit: 350})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.ledger.record("a", 4.25, time.Now())
+
+	var snap Snapshot
+	rec := httptest.NewRecorder()
+	s.snapshot(rec, httptest.NewRequest("GET", "/v1/snapshot", nil))
+	if err := json.Unmarshal(rec.Body.Bytes(), &snap); err != nil {
+		t.Fatal(err)
+	}
+	var status BudgetStatus
+	rec = httptest.NewRecorder()
+	s.budget(rec, httptest.NewRequest("GET", "/v1/budget", nil))
+	if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+		t.Fatal(err)
+	}
+
+	if snap.Budget != status {
+		t.Fatalf("snapshot budget %+v != budget route %+v", snap.Budget, status)
+	}
+	near(t, status.Total, 4.25)
+	near(t, status.SoftLimit, 300)
+	near(t, status.HardLimit, 350)
 }
 
 func TestLedger_PollsAddDeltasToToday(t *testing.T) {

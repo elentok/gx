@@ -53,6 +53,11 @@ type Config struct {
 
 	BudgetPollInterval time.Duration // zero means the default
 
+	// BudgetSoftLimit and BudgetHardLimit are config.Budget's daily limits in
+	// dollars, reported in the budget status; zero means off.
+	BudgetSoftLimit float64
+	BudgetHardLimit float64
+
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
 	// Orchestrator is config.Orchestrator. Queue writes are refused unless it
@@ -222,6 +227,7 @@ var routeTable = []struct {
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},
 	{"GET /v1/locks", (*Server).locks},
+	{"GET /v1/budget", (*Server).budget},
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/iterations", (*Server).iterations},
@@ -278,6 +284,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	snap := s.idx.snapshot()
 	snap.HerdrUnavailable = s.herdr.isUnavailable()
+	snap.Budget = s.budgetStatus(time.Now())
 	_ = json.NewEncoder(w).Encode(snap)
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -89,6 +90,28 @@ func (l *budgetLedger) record(key string, cost float64, now time.Time) {
 		l.Days[from.Format(budgetDayLayout)] += delta * float64(to.Sub(from)) / float64(total)
 		from = to
 	}
+}
+
+// BudgetStatus is today's spend against the configured limits, in dollars. A
+// zero limit means that limit is off. Shared by /v1/budget and the snapshot.
+type BudgetStatus struct {
+	Day       string  `json:"day"`
+	Total     float64 `json:"total"`
+	SoftLimit float64 `json:"soft_limit"`
+	HardLimit float64 `json:"hard_limit"`
+}
+
+func (s *Server) budgetStatus(now time.Time) BudgetStatus {
+	return BudgetStatus{
+		Day:       now.Format(budgetDayLayout),
+		Total:     s.ledger.today(now),
+		SoftLimit: s.cfg.BudgetSoftLimit,
+		HardLimit: s.cfg.BudgetHardLimit,
+	}
+}
+
+func (s *Server) budget(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, s.budgetStatus(time.Now()))
 }
 
 func nextMidnight(t time.Time) time.Time {

@@ -57,7 +57,30 @@ func newProjectCmd(_ deps) *cobra.Command {
 	return cmd
 }
 
-func newServerLocksCmd() *cobra.Command {
+func newBudgetCmd(_ deps) *cobra.Command {
+	cmd := &cobra.Command{Use: "budget", Short: "daily budget", Args: cobra.NoArgs}
+	var jsonOut bool
+	status := &cobra.Command{
+		Use:   "status",
+		Short: "show today's total spend and the budget limits (asks the server)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (server.BudgetStatus, error) { return cl.Budget(ctx) },
+				printBudget)
+		},
+	}
+	status.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(status)
+	return cmd
+}
+
+func printBudget(w io.Writer, b server.BudgetStatus) error {
+	_, err := fmt.Fprintf(w, "%s\t$%.2f\tsoft $%.2f\thard $%.2f\n", b.Day, b.Total, b.SoftLimit, b.HardLimit)
+	return err
+}
+
+func newServerLocksCmd()*cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "locks",

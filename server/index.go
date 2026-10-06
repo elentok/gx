@@ -35,8 +35,10 @@ type Snapshot struct {
 	Seq uint64 `json:"seq"`
 	// HerdrUnavailable is set while herdr isn't answering; the server's own
 	// view, filled in by the handler rather than the index.
-	HerdrUnavailable bool         `json:"herdr_unavailable,omitempty"`
-	Tickets          []TicketInfo `json:"tickets"`
+	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
+	// Budget is today's spend, filled in by the handler like HerdrUnavailable.
+	Budget  BudgetStatus `json:"budget"`
+	Tickets []TicketInfo `json:"tickets"`
 }
 
 // index is the server's in-memory view of the ticket store.
