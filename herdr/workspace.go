@@ -70,3 +70,9 @@ func EnsureWorkspace(label, cwd string) (string, error) {
 	}
 	return result.Workspace.WorkspaceID, nil
 }
+
+// Ping reports whether herdr answers, via the cheapest read-only command.
+func Ping() error {
+	_, err := run("workspace", "list")
+	return err
+}

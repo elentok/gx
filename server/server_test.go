@@ -234,3 +234,47 @@ func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
 		t.Fatal("expected error for non-loopback address")
 	}
 }
+
+func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T) {
+	h := servertest.StartHerdrDown(t, func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snap.HerdrUnavailable {
+		t.Fatal("snapshot does not report herdr unavailable")
+	}
+	events, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := func() server.Event {
+		select {
+		case ev := <-events:
+			return ev
+		case <-ctx.Done():
+			t.Fatal("event missing")
+			return server.Event{}
+		}
+	}
+	if ev := next(); ev.Type != server.EventHerdrUnavailable {
+		t.Fatalf("first event = %+v", ev)
+	}
+
+	// Several failed retries must not repeat the event.
+	time.Sleep(100 * time.Millisecond)
+	h.SetHerdrDown(false)
+	if ev := next(); ev.Type != server.EventHerdrAvailable {
+		t.Fatalf("second event = %+v, want herdr-available", ev)
+	}
+	after, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.HerdrUnavailable || after.Seq != 2 {
+		t.Errorf("after recovery: %+v", after)
+	}
+}

@@ -25,8 +25,11 @@ type TicketInfo struct {
 // epic's fork tree reads top-down via Parent) and the sequence number of the
 // index state they were read at.
 type Snapshot struct {
-	Seq     uint64       `json:"seq"`
-	Tickets []TicketInfo `json:"tickets"`
+	Seq uint64 `json:"seq"`
+	// HerdrUnavailable is set while herdr isn't answering; the server's own
+	// view, filled in by the handler rather than the index.
+	HerdrUnavailable bool         `json:"herdr_unavailable,omitempty"`
+	Tickets          []TicketInfo `json:"tickets"`
 }
 
 // index is the server's in-memory view of the ticket store.

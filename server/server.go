@@ -45,6 +45,8 @@ type Config struct {
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only
 
+	HerdrRetryInterval time.Duration // zero means the default
+
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
@@ -67,6 +69,7 @@ type Server struct {
 	idx  *index
 
 	events  *broker
+	herdr   herdrWatch
 	rewatch func() // set by keepFresh when the watch is active
 }
 
@@ -143,6 +146,8 @@ func New(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/iterations", s.iterations)
 	mux.HandleFunc("GET /v1/queue", s.queue)
 	s.http = &http.Server{Handler: mux}
+	// A down herdr never stops the server; it is reported and retried.
+	s.checkHerdr()
 	return s, nil
 }
 
@@ -169,7 +174,9 @@ func (s *Server) TCPAddr() string {
 
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s.idx.snapshot())
+	snap := s.idx.snapshot()
+	snap.HerdrUnavailable = s.herdr.isUnavailable()
+	_ = json.NewEncoder(w).Encode(snap)
 }
 
 // streamEvents is SSE: every event with seq > ?since, then live events until
@@ -235,7 +242,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	freshDone := make(chan struct{})
 	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
-	defer func() { stopFresh(); <-freshDone }()
+	herdrDone := make(chan struct{})
+	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
+	defer func() { stopFresh(); <-freshDone; <-herdrDone }()
 	var err error
 	select {
 	case <-ctx.Done():

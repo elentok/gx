@@ -7,9 +7,11 @@ package servertest
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
@@ -24,6 +26,7 @@ type Harness struct {
 	StateDir    string
 	TicketStore string
 	TCPAddr     string // empty unless started with StartWithTCP
+	herdrDown   atomic.Bool
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -51,6 +54,15 @@ func WriteTicket(t *testing.T, store, project, epic, id, slug, blockedBy string)
 	}
 }
 
+// SetHerdrDown makes the fake herdr fail (or answer again) from now on.
+func (h *Harness) SetHerdrDown(down bool) { h.herdrDown.Store(down) }
+
+// StartHerdrDown is Start with herdr failing from before the server starts.
+func StartHerdrDown(t *testing.T, opts ...func(*server.Config)) *Harness {
+	t.Helper()
+	return startWith(t, t.TempDir(), "", true, opts...)
+}
+
 // Start runs a server until the test ends. Tickets already written to
 // TicketStore are indexed at startup; since the harness creates TicketStore
 // itself, use StartWithStore to seed it first.
@@ -63,17 +75,17 @@ func Start(t *testing.T) *Harness {
 // Options tweak the server config before it starts.
 func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return startWith(t, store, "", opts...)
+	return startWith(t, store, "", false, opts...)
 }
 
 // StartWithTCP is Start with the loopback TCP listener on a free port;
 // Harness.TCPAddr is where it bound.
 func StartWithTCP(t *testing.T) *Harness {
 	t.Helper()
-	return startWith(t, t.TempDir(), "127.0.0.1:0")
+	return startWith(t, t.TempDir(), "127.0.0.1:0", false)
 }
 
-func startWith(t *testing.T, store, tcpAddr string, opts ...func(*server.Config)) *Harness {
+func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
 	stateDir, err := os.MkdirTemp("", "gxs")
@@ -87,6 +99,14 @@ func startWith(t *testing.T, store, tcpAddr string, opts ...func(*server.Config)
 		StateDir:    filepath.Join(stateDir, "state"),
 		TicketStore: store,
 	}
+	h.herdrDown.Store(herdrDown)
+	// The server's herdr probe is `workspace list`; answer it unless told to fail.
+	h.Herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		if h.herdrDown.Load() {
+			return nil, herdrfake.Identities{}, errors.New("herdr unavailable")
+		}
+		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
+	})
 	herdrfake.StartState(t, h.Herdr)
 
 	cfg := server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
