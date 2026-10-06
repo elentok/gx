@@ -259,7 +259,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(newTicketsVerifyCmd(d))
 	cmd.AddCommand(newTicketsLandCmd(d))
 	cmd.AddCommand(newTicketsResetCmd(d))
-	var migrateToStore bool
+	var migrateToStore, migrateDryRun bool
 	var migrateProject string
 	migrateCmd := &cobra.Command{
 		Use:   "migrate <path>",
@@ -273,10 +273,11 @@ func newTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsMigrateToStore(cwd, args[0], migrateProject, c.OutOrStdout())
+			return runTicketsMigrateToStore(cwd, args[0], migrateProject, migrateDryRun, c.OutOrStdout())
 		},
 	}
 	migrateCmd.Flags().BoolVar(&migrateToStore, "to-store", false, "copy the old tree into the ticket store (old tree is left untouched)")
+	migrateCmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "with --to-store: convert and validate without writing to the store")
 	migrateCmd.Flags().StringVar(&migrateProject, "project", "", "project name in the store (default: the repo directory name)")
 	cmd.AddCommand(migrateCmd)
 	cmd.AddCommand(&cobra.Command{

@@ -35,8 +35,11 @@ type storeFile struct {
 // It is all-or-nothing: any claimed ticket in the old tree, or any file or
 // ticket address that already exists in the project, refuses the whole copy
 // before a byte is written. That makes a re-run refuse rather than overwrite.
-// Returns the number of files written.
-func MigrateIntoStore(oldRoot, projectDir, name, repo string) (int, error) {
+// The converted result is validated project-wide (see ValidateProject) in a
+// temp dir before anything is written, so an invalid ticket refuses the whole
+// copy. With dryRun it stops there and never touches projectDir.
+// Returns the number of files written (or that would be written).
+func MigrateIntoStore(oldRoot, projectDir, name, repo string, dryRun bool) (int, error) {
 	var files []storeFile
 	var problems []error
 
@@ -79,6 +82,13 @@ func MigrateIntoStore(oldRoot, projectDir, name, repo string) (int, error) {
 		return 0, err
 	}
 
+	if err := validateStaged(files, projectDir, name, repo); err != nil {
+		return 0, err
+	}
+	if dryRun {
+		return len(files), nil
+	}
+
 	if err := ensureProjectFile(projectDir, name, repo); err != nil {
 		return 0, err
 	}
@@ -88,6 +98,29 @@ func MigrateIntoStore(oldRoot, projectDir, name, repo string) (int, error) {
 		}
 	}
 	return len(files), nil
+}
+
+// validateStaged writes files into a temp project and validates it. Errors
+// name tickets by the path they would have in projectDir, not the temp dir.
+func validateStaged(files []storeFile, projectDir, name, repo string) error {
+	tmp, err := os.MkdirTemp("", "gx-migrate-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+
+	if err := ensureProjectFile(tmp, name, repo); err != nil {
+		return err
+	}
+	for _, f := range files {
+		if err := writeStoreFile(f, filepath.Join(tmp, f.rel)); err != nil {
+			return err
+		}
+	}
+	if err := ValidateProject(tmp); err != nil {
+		return errors.New(strings.ReplaceAll(err.Error(), tmp, projectDir))
+	}
+	return nil
 }
 
 // isEpicSidecar reports whether rel is an epic.yaml or map.md directly under

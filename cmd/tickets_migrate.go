@@ -16,7 +16,7 @@ import (
 // ticket store as the project for the repo at cwd (see
 // tickets.MigrateIntoStore). The project is named projectFlag, else after the
 // repo directory: for a bare layout, the directory holding .bare.
-func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, w io.Writer) error {
+func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, dryRun bool, w io.Writer) error {
 	repo, err := git.FindRepo(cwd)
 	if err != nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
@@ -38,9 +38,13 @@ func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, w io.Writer) err
 		name = filepath.Base(dir)
 	}
 
-	n, err := tickets.MigrateIntoStore(oldRoot, filepath.Join(cfg.TicketStore.Path, name), name, repo.Root)
+	n, err := tickets.MigrateIntoStore(oldRoot, filepath.Join(cfg.TicketStore.Path, name), name, repo.Root, dryRun)
 	if err != nil {
 		return err
+	}
+	if dryRun {
+		fmt.Fprintf(w, "dry run: would copy %d file(s) into project %q; all tickets valid\n", n, name)
+		return nil
 	}
 	fmt.Fprintf(w, "copied %d file(s) into project %q\n", n, name)
 	return nil

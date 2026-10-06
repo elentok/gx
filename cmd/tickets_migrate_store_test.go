@@ -217,3 +217,45 @@ func TestExecute_TicketsMigrateToStore_RefusesWhileTicketClaimed(t *testing.T) {
 		t.Errorf("store written despite refusal: %v", statErr)
 	}
 }
+
+func writeInvalidTicket(t *testing.T, old string) {
+	t.Helper()
+	dir := filepath.Join(old, "widget", "issues")
+	testutil.WriteFile(t, dir, "02-broken.md", "---\nid: \"02\"\nstatus: bogus\ntype: task\n---\nBroken.\n")
+}
+
+func TestExecute_TicketsMigrateToStore_InvalidTicketRefusesNamingAddress(t *testing.T) {
+	store := isolateTicketStore(t)
+	repo := testutil.TempRepo(t)
+	old := writeOldTree(t, "open")
+	writeInvalidTicket(t, old)
+
+	_, err := runIn(t, repo, "tickets", "migrate", "--to-store", "--project", "mine", old)
+	want := filepath.Join(store, "mine", "widget", "issues", "02-broken.md")
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("err = %v, want it to name %s", err, want)
+	}
+	if _, statErr := os.Stat(filepath.Join(store, "mine")); !os.IsNotExist(statErr) {
+		t.Errorf("store written despite invalid ticket: %v", statErr)
+	}
+}
+
+func TestExecute_TicketsMigrateToStore_DryRunValidatesWithoutWriting(t *testing.T) {
+	store := isolateTicketStore(t)
+	repo := testutil.TempRepo(t)
+	old := writeOldTree(t, "open")
+
+	out, err := runIn(t, repo, "tickets", "migrate", "--to-store", "--dry-run", "--project", "mine", old)
+	if err != nil || !strings.Contains(out, "dry run") {
+		t.Fatalf("out = %q, err = %v", out, err)
+	}
+	if _, statErr := os.Stat(filepath.Join(store, "mine")); !os.IsNotExist(statErr) {
+		t.Errorf("dry run wrote to the store: %v", statErr)
+	}
+
+	writeInvalidTicket(t, old)
+	_, err = runIn(t, repo, "tickets", "migrate", "--to-store", "--dry-run", "--project", "mine", old)
+	if err == nil || !strings.Contains(err.Error(), "02-broken.md") {
+		t.Fatalf("err = %v, want it to name 02-broken.md", err)
+	}
+}
