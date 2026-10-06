@@ -25,6 +25,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/queue/add":        "server queue add",
 	"POST /v1/queue/remove":     "server queue remove",
 	"POST /v1/queue/move":       "server queue move",
+	"POST /v1/queue/replace":    "server queue replace",
 	"POST /v1/queue/pause":      "server queue pause",
 	"POST /v1/queue/resume":     "server queue resume",
 	"POST /v1/queue/drain":      "server queue drain",

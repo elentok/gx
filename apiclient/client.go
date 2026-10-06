@@ -193,6 +193,11 @@ func (c *Client) QueueRemove(ctx context.Context, address string) (server.QueueR
 	return c.queueWrite(ctx, "remove", server.QueueRequest{Address: address})
 }
 
+// QueueReplace swaps one project's pending entries for items.
+func (c *Client) QueueReplace(ctx context.Context, project string, items []server.QueueItem) (server.QueueResult, error) {
+	return c.queueWrite(ctx, "replace", server.QueueRequest{Project: project, Items: items})
+}
+
 // QueueMove puts a queued ticket at the 1-based position.
 func (c *Client) QueueMove(ctx context.Context, address string, position int) (server.QueueResult, error) {
 	return c.queueWrite(ctx, "move", server.QueueRequest{Address: address, Position: position})

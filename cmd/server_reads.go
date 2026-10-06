@@ -142,6 +142,22 @@ func newServerQueueCmd() *cobra.Command {
 			})
 		},
 	}
+	var replaceAgent string
+	replace := &cobra.Command{
+		Use:   "replace <project> [<project:epic/NN>...]",
+		Short: "replace one project's queued tickets with the listed ones",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			items := make([]server.QueueItem, 0, len(args)-1)
+			for _, a := range args[1:] {
+				items = append(items, server.QueueItem{Address: a, Agent: replaceAgent})
+			}
+			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.QueueReplace(ctx, args[0], items)
+			})
+		},
+	}
+	replace.Flags().StringVar(&replaceAgent, "agent", "", `agent to run the tickets under: "claude" or "codex" (default claude)`)
 	move := &cobra.Command{
 		Use:   "move <project:epic/NN> <position>",
 		Short: "move a queued ticket to a 1-based position",
@@ -171,7 +187,7 @@ func newServerQueueCmd() *cobra.Command {
 	pause := mode("pause", "stop starting queued roots until resumed (survives a restart)", (*apiclient.Client).QueuePause)
 	resume := mode("resume", "start queued roots again after a pause or drain", (*apiclient.Client).QueueResume)
 	drain := mode("drain", "stop starting queued roots and let live runs finish", (*apiclient.Client).QueueDrain)
-	for _, c := range []*cobra.Command{add, remove, move, pause, resume, drain} {
+	for _, c := range []*cobra.Command{add, remove, replace, move, pause, resume, drain} {
 		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 		cmd.AddCommand(c)
 	}

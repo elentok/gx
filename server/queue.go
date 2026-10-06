@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/config"
@@ -30,6 +31,7 @@ const (
 	ReasonAlreadyQueued    = "already-queued"
 	ReasonNotQueued        = "not-queued"
 	ReasonBadPosition      = "bad-position"
+	ReasonTicketLive       = "ticket-live"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.
@@ -59,6 +61,9 @@ type QueueRequest struct {
 	Agent   string `json:"agent,omitempty"`
 	// Position is the 1-based slot a move puts the ticket in.
 	Position int `json:"position,omitempty"`
+	// Project and Items are what a replace swaps in.
+	Project string      `json:"project,omitempty"`
+	Items   []QueueItem `json:"items,omitempty"`
 	// ParkReason is the one-line reason a park writes into the ticket.
 	ParkReason string `json:"park_reason,omitempty"`
 }
@@ -190,14 +195,118 @@ func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {
 		return *bad, nil
 	}
 	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
-		for i, it := range items {
-			if it.Address == addr {
-				return append(items[:i], items[i+1:]...), nil
+		if indexOfAddr(items, addr) < 0 {
+			r := refusal(ReasonNotQueued, addr+" is not queued")
+			return nil, &r
+		}
+		subtree := s.subtree(addr)
+		if live := s.liveIn(subtree); live != "" {
+			r := refusal(ReasonTicketLive, live+" has a live iteration")
+			return nil, &r
+		}
+		return dropAddresses(items, subtree), nil
+	})
+}
+
+// queueReplace swaps one project's pending entries for req.Items, leaving the
+// other projects' entries where they are. The new entries go at the end.
+func (s *Server) queueReplace(req QueueRequest) (QueueResult, error) {
+	items := make([]QueueItem, 0, len(req.Items))
+	seen := map[string]bool{}
+	for _, it := range req.Items {
+		addr, bad := canonical(it.Address)
+		if bad != nil {
+			return *bad, nil
+		}
+		agent := ralphloop.AgentKind(it.Agent)
+		if it.Agent == "" {
+			agent = ralphloop.AgentClaude
+		}
+		if err := ralphloop.ValidateAgentKind(agent); err != nil {
+			return refusal(ReasonInvalidAgent, err.Error()), nil
+		}
+		if projectOfAddress(addr) != req.Project {
+			return refusal(ReasonInvalidAddress, addr+" is not in project "+req.Project), nil
+		}
+		if seen[addr] {
+			return refusal(ReasonAlreadyQueued, addr+" is listed twice"), nil
+		}
+		seen[addr] = true
+		items = append(items, QueueItem{Address: addr, Agent: string(agent)})
+	}
+	return s.writeQueue("", func(cur []QueueItem) ([]QueueItem, *QueueResult) {
+		for _, it := range items {
+			if !s.hasTicket(it.Address) {
+				r := refusal(ReasonUnknownTicket, "no ticket "+it.Address)
+				return nil, &r
 			}
 		}
-		r := refusal(ReasonNotQueued, addr+" is not queued")
-		return nil, &r
+		next := make([]QueueItem, 0, len(cur)+len(items))
+		for _, it := range cur {
+			if projectOfAddress(it.Address) != req.Project {
+				next = append(next, it)
+				continue
+			}
+			// A dropped entry must not have a live run under it.
+			if !seen[it.Address] {
+				if live := s.liveIn(s.subtree(it.Address)); live != "" {
+					r := refusal(ReasonTicketLive, live+" has a live iteration")
+					return nil, &r
+				}
+			}
+		}
+		return append(next, items...), nil
 	})
+}
+
+func projectOfAddress(addr string) string {
+	project, _, _ := strings.Cut(addr, ":")
+	return project
+}
+
+func indexOfAddr(items []QueueItem, addr string) int {
+	for i, it := range items {
+		if it.Address == addr {
+			return i
+		}
+	}
+	return -1
+}
+
+// subtree is addr plus every ticket forked from it, directly or not.
+func (s *Server) subtree(addr string) map[string]bool {
+	all := s.idx.snapshot().Tickets
+	in := map[string]bool{addr: true}
+	for grew := true; grew; {
+		grew = false
+		for _, t := range all {
+			if t.Parent != "" && in[t.Parent] && !in[t.Address] {
+				in[t.Address] = true
+				grew = true
+			}
+		}
+	}
+	return in
+}
+
+// liveIn returns the address of a live run inside set, or "".
+func (s *Server) liveIn(set map[string]bool) string {
+	for _, r := range s.Runs() {
+		if set[r.Address] {
+			return r.Address
+		}
+	}
+	return ""
+}
+
+func dropAddresses(items []QueueItem, drop map[string]bool) []QueueItem {
+	out := items[:0]
+	for _, it := range items {
+		if !drop[it.Address] {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 func (s *Server) queueMove(req QueueRequest) (QueueResult, error) {
