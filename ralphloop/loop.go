@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -14,10 +15,6 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
-
-// defaultScratchDir is the ticket tracker directory used when
-// RunOptions.ScratchDir is unset.
-const defaultScratchDir = ".scratch"
 
 // ticketTrailerKey is the commit-message trailer landCherryPick stamps onto
 // every landed commit (see Deps.AppendTrailer) and classifyDoneTicket's last-
@@ -153,7 +150,7 @@ type RunOptions struct {
 	// argv unchanged.
 	Agents      config.AgentsConfig
 	Skill       string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
-	ScratchDir  string // defaults to ".scratch"
+	ScratchDir  string // defaults to the repo's ticket-store project dir
 	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
 	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
 	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
@@ -255,7 +252,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 
 	scratchDir := opts.ScratchDir
 	if scratchDir == "" {
-		scratchDir = defaultScratchDir
+		// Unset means the repo's project directory in the ticket store.
+		root, err := tickets.RootFor(cmp.Or(opts.RepoDir, "."))
+		if err != nil {
+			return fmt.Errorf("resolving ticket root: %w", err)
+		}
+		scratchDir = root
 	}
 	scratchDir, err := filepath.Abs(scratchDir)
 	if err != nil {

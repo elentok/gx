@@ -2,6 +2,7 @@ package tickets_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,9 +18,9 @@ import (
 )
 
 func TestTicketsTUI_ImplementKeyNoopsWithNothingChecked(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
-	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
+	scratch := storeProject(t, root)
+	if err := os.MkdirAll(filepath.Join(scratch, "my-epic", "issues"), 0755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,12 +44,12 @@ func TestTicketsTUI_ImplementKeyNoopsWithNothingChecked(t *testing.T) {
 // verified separately at the Model level (implement_test.go), since this
 // isolated harness has no app shell to route it.
 func TestTicketsTUI_ImplementKeyOpensQueueDirectlyWithNoActiveLoop(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
-	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic", "issues"), 0755); err != nil {
+	scratch := storeProject(t, root)
+	if err := os.MkdirAll(filepath.Join(scratch, "my-epic", "issues"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".scratch", "my-epic", "issues", "01-first.md"), []byte("Status: open\n\nBody.\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(scratch, "my-epic", "issues", "01-first.md"), []byte("Status: open\n\nBody.\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -70,6 +71,24 @@ func TestTicketsTUI_ImplementKeyOpensQueueDirectlyWithNoActiveLoop(t *testing.T)
 	if bytes.Contains(frame, []byte("Choose the agent")) {
 		t.Fatalf("expected no agent picker on the plain 'i' path: %s", frame)
 	}
+}
+
+// storeProject registers repoRoot as a project in a temp ticket store and
+// returns the project dir. Not parallel-safe (sets env).
+func storeProject(t *testing.T, repoRoot string) string {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+	project := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
+	if err := os.MkdirAll(project, 0755); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(map[string]string{"name": "p", "repo": repoRoot})
+	if err := os.WriteFile(filepath.Join(project, "project.json"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	return project
 }
 
 func waitForTicketsText(t *testing.T, tm *teatest.TestModel, text string) {

@@ -37,8 +37,8 @@ func TestTicketProgressSpinnerFillsAndDrainsAtDocumentedCodepoints(t *testing.T)
 }
 
 func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	opts, err := buildImplementRunOptions(root, "my-epic", ralphloop.AgentCodex)
 	if err != nil {
 		t.Fatal(err)
@@ -49,8 +49,8 @@ func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
 }
 
 func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil, "gx-implement", config.AgentsConfig{}, config.ExecutionQueueConfig{})
 	if err != nil {
 		t.Fatal(err)
@@ -61,8 +61,8 @@ func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
 }
 
 func TestBuildImplementRunOptionsForTicketsPassesResolvedAgentsConfig(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	agents := config.AgentsConfig{Claude: config.AgentConfig{Model: "opus", Effort: "high"}}
 	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentClaude, 1, nil, "gx-implement", agents, config.ExecutionQueueConfig{})
 	if err != nil {

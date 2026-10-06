@@ -153,7 +153,8 @@ func Load() (Config, error) {
 			SuppressExtraUsageWarning *bool `json:"suppress-extra-usage-warning"`
 		} `json:"subscription"`
 		TicketStore *struct {
-			Path *string `json:"path"`
+			Path           *string `json:"path"`
+			CommitDebounce *int    `json:"commit-debounce"`
 		} `json:"ticket-store"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -250,6 +251,9 @@ func Load() (Config, error) {
 	}
 	if raw.TicketStore != nil && raw.TicketStore.Path != nil {
 		cfg.TicketStore.Path = *raw.TicketStore.Path
+	}
+	if raw.TicketStore != nil && raw.TicketStore.CommitDebounce != nil && *raw.TicketStore.CommitDebounce > 0 {
+		cfg.TicketStore.CommitDebounce = *raw.TicketStore.CommitDebounce
 	}
 
 	return cfg, nil

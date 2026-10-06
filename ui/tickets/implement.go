@@ -467,7 +467,7 @@ func buildImplementRunOptionsForTickets(
 		SpinWindow:  queue.SpinWindow,
 		Skill:       skill,
 		RepoDir:     repo.Root,
-		ScratchDir:  repo.ScratchRoot(),
+		ScratchDir:  scratchDirFor(worktreeRoot),
 		MaxParallel: max(maxParallel, 1),
 		TicketIDs:   ticketIDs,
 	}, nil

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 )
 
 // ErrNoProject means no project in the ticket store points at the repo.
@@ -43,6 +44,20 @@ func ProjectDir(storePath, repoRoot string) (string, error) {
 		}
 	}
 	return "", ErrNoProject
+}
+
+// RootFor resolves dir's repo to its project directory in the configured
+// ticket store. It is the one way callers find the ticket root.
+func RootFor(dir string) (string, error) {
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repo: %w", err)
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return "", err
+	}
+	return ProjectDir(cfg.TicketStore.Path, repo.Root)
 }
 
 // canonicalPath makes equal directories compare equal across symlinks (e.g.

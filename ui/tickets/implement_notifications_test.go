@@ -13,6 +13,7 @@ import (
 func startAndCaptureSink(t *testing.T, notifications config.NotificationsConfig) ralphloop.EventSink {
 	t.Helper()
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 
 	previousRun := runRalphLoop
 	previousRegistry := ralphLoopRegistry

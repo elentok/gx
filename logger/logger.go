@@ -7,23 +7,18 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/config"
 )
 
-// logFile resolves gx.log's path via Repo.ScratchRoot(), so debug logging
-// lands in the canonical `.scratch` regardless of which linked worktree of a
-// bare-repo checkout the command was run from. Falls back to the old
-// cwd-relative path if the cwd isn't inside a git repo.
+// logFile puts gx.log in the state dir, never inside the ticket store where
+// it would get committed. Falls back to a cwd-relative path if the state dir
+// can't be resolved.
 func logFile() string {
-	cwd, err := os.Getwd()
+	dir, err := config.StateDir()
 	if err != nil {
-		return ".scratch/gx.log"
+		return "gx.log"
 	}
-	repo, err := git.FindRepo(cwd)
-	if err != nil {
-		return ".scratch/gx.log"
-	}
-	return filepath.Join(repo.ScratchRoot(), "gx.log")
+	return filepath.Join(dir, "gx.log")
 }
 
 func Debug(format string, args ...any) {

@@ -69,6 +69,7 @@ func TestOpenRunStartModal_SingleAvailableAgentAsksYesNo(t *testing.T) {
 	t.Cleanup(func() { codexOnPath = previous })
 
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
@@ -93,6 +94,7 @@ func TestOpenRunStartModal_EscapeAbortsSingleAgentConfirmWithoutStartingRun(t *t
 	t.Cleanup(func() { codexOnPath = previous })
 
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
@@ -119,6 +121,7 @@ func TestOpenRunStartModal_EscapeAbortsSingleAgentConfirmWithoutStartingRun(t *t
 
 func TestOpenRunStartModal_MultipleAvailableAgentsShowsPickListWithCancel(t *testing.T) {
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 

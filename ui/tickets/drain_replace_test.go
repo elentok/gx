@@ -212,6 +212,7 @@ func TestCmdConfirmDrainReplaceDrainsRegisteredGate(t *testing.T) {
 // than waiting on real tea.Tick timers (implementPollMsg tests' approach).
 func TestModel_DrainReplacePollFlowLaunchesReplacementWithCapturedAgent(t *testing.T) {
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	alphaPath := filepath.Join(root, ".scratch", "alpha", "issues", "01-first.md")
 	betaPath := filepath.Join(root, ".scratch", "beta", "issues", "01-first.md")
 	alpha := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{

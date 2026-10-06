@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -985,6 +986,7 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "03-unchecked.md", "Status: open\n\nBody.\n")
@@ -1059,6 +1061,7 @@ func TestQueueModelEnterChoosesAgentAndStartsOneEpicSubset(t *testing.T) {
 func TestQueueModelEnterStartsFullEligibleSelectionDynamic(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "03-done.md", "Status: done\n\nBody.\n")
@@ -1120,6 +1123,7 @@ func TestQueueModelEnterStartsFullEligibleSelectionDynamic(t *testing.T) {
 func TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "gamma", "01-first.md", "Status: open\n\nBody.\n")
@@ -1265,6 +1269,7 @@ func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing
 func TestQueueModelReactivationBackfillsPendingEpicAfterMissedCompletion(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
 	alpha := ticketPath(root, "alpha", "01-first.md")
@@ -1438,6 +1443,7 @@ func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", "01-first.md")
 
@@ -1499,6 +1505,7 @@ func TestQueueModelPersistsRunningThenDoneStatusThroughStore(t *testing.T) {
 func TestQueueModelPersistsErroredStatusOnFailure(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", "01-first.md")
 
@@ -1554,6 +1561,7 @@ func TestQueueModelPersistsErroredStatusOnFailure(t *testing.T) {
 func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	path := ticketPath(root, "alpha", "01-first.md")
 
@@ -1609,6 +1617,7 @@ func TestQueueModelPauseDoesNotRewriteRunningStatus(t *testing.T) {
 func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/runRalphLoop singletons
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "beta", "01-later.md", "Status: open\n\nBody.\n")
@@ -1672,8 +1681,8 @@ func TestQueueModelMidRunSelectionChangeDoesNotRewriteProgressTotals(t *testing.
 // (as a prior process session would have left it) must be fully reflected in
 // a freshly constructed QueueModel with no prior Tickets-tab visit.
 func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-pending.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "02-running.md", "Status: open\n\nBody.\n")
 	writeTicket(t, root, "alpha", "03-done.md", "Status: open\n\nBody.\n")
@@ -1720,8 +1729,8 @@ func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
 // tabs read the same QueueStore, so a Tickets-first-then-Queue construction
 // and a Queue-first-then-Tickets construction must agree.
 func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.T) {
-	t.Parallel()
 	root := testutil.TempRepo(t)
+	linkStoreProject(t, root)
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	queuedPath := ticketPath(root, "alpha", "01-first.md")
 
@@ -2485,8 +2494,47 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	}
 }
 
+// linkStoreProject registers repoRoot as a ticket-store project in a temp
+// store and symlinks repoRoot/.scratch to the project dir, so fixtures that
+// write under .scratch land in the store. Not parallel-safe (sets env).
+func linkStoreProject(t *testing.T, repoRoot string) {
+	t.Helper()
+	project := addStoreProject(t, repoRoot)
+	if err := os.Symlink(project, filepath.Join(repoRoot, ".scratch")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// addStoreProject isolates HOME/XDG into temp dirs and registers repoRoot as a
+// project in the temp ticket store, returning the project dir.
+func addStoreProject(t *testing.T, repoRoot string) string {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+	project := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
+	if err := os.MkdirAll(project, 0755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(map[string]string{"name": "p", "repo": repoRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "project.json"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	return project
+}
+
 func ticketPath(root, epic, name string) string {
-	return filepath.Join(root, ".scratch", epic, "issues", name)
+	scratch := filepath.Join(root, ".scratch")
+	if info, err := os.Lstat(scratch); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		// linkStoreProject: the loader reports store paths, not the link's.
+		if target, err := os.Readlink(scratch); err == nil {
+			scratch = target
+		}
+	}
+	return filepath.Join(scratch, epic, "issues", name)
 }
 
 func writeRawQueueTicket(t *testing.T, root, epic, name, content string) {

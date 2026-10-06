@@ -12,25 +12,19 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-// TestModel_ScratchDirDelegatesToRepoScratchRoot asserts scratchDir() defers
-// to Repo.ScratchRoot() rather than reconstructing the path itself (ticket
-// queue-preview-focus-and-scratch-root/07).
-func TestModel_ScratchDirDelegatesToRepoScratchRoot(t *testing.T) {
-	t.Parallel()
+// TestModel_ScratchDirResolvesThroughStore asserts scratchDir() is the repo's
+// project directory in the ticket store. Not parallel-safe (sets env).
+func TestModel_ScratchDirResolvesThroughStore(t *testing.T) {
 	root := testutil.TempRepo(t)
+	project := addStoreProject(t, root)
 	sub := filepath.Join(root, "sub")
 	if err := os.Mkdir(sub, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	repo, err := git.FindRepo(sub)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
 	m := NewModel(sub, ui.Settings{}, keys.New(nil))
-	if got, want := m.scratchDir(), repo.ScratchRoot(); got != want {
-		t.Errorf("scratchDir() = %q, want %q (Repo.ScratchRoot())", got, want)
+	if got := m.scratchDir(); got != project {
+		t.Errorf("scratchDir() = %q, want %q (store project)", got, project)
 	}
 }
 
@@ -39,7 +33,6 @@ func TestModel_ScratchDirDelegatesToRepoScratchRoot(t *testing.T) {
 // resolve the same canonical `.scratch` regardless of which linked worktree
 // of a bare-repo checkout they're scoped to.
 func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
-	t.Parallel()
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature", "other")
 	featureWt := filepath.Join(outer, "feature")
 	otherWt := filepath.Join(outer, "other")
@@ -48,7 +41,7 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IdentifyDir: %v", err)
 	}
-	wantScratchRoot := info.Repo.ScratchRoot()
+	wantScratchRoot := addStoreProject(t, info.Repo.Root)
 
 	ticketPath := filepath.Join(wantScratchRoot, "alpha", "issues", "01-first.md")
 	if err := os.MkdirAll(filepath.Dir(ticketPath), 0755); err != nil {

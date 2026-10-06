@@ -13,16 +13,22 @@ const ProjectFileName = "project.json"
 // TicketStoreConfig locates the global ticket store.
 type TicketStoreConfig struct {
 	Path string `json:"path"`
+	// CommitDebounce is the quiet period, in seconds, the store commit loop
+	// waits after a change before committing.
+	CommitDebounce int `json:"commit-debounce"`
 }
+
+// DefaultCommitDebounceSeconds is ticket-store.commit-debounce's default.
+const DefaultCommitDebounceSeconds = 60
 
 // DefaultTicketStoreConfig puts the store at <data dir>/tickets. If the data
 // dir can't be resolved the path is left empty and callers must refuse.
 func DefaultTicketStoreConfig() TicketStoreConfig {
-	dir, err := DataDir()
-	if err != nil {
-		return TicketStoreConfig{}
+	cfg := TicketStoreConfig{CommitDebounce: DefaultCommitDebounceSeconds}
+	if dir, err := DataDir(); err == nil {
+		cfg.Path = filepath.Join(dir, "tickets")
 	}
-	return TicketStoreConfig{Path: filepath.Join(dir, "tickets")}
+	return cfg
 }
 
 // ProjectFile is a project's project.json. Pointer fields so an absent key

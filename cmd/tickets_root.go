@@ -4,22 +4,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 )
 
 // ticketRoot resolves cwd's repo to its project directory in the ticket store.
 func ticketRoot(cwd string) (string, error) {
-	repo, err := git.FindRepo(cwd)
-	if err != nil {
-		return "", fmt.Errorf("not inside a git repo: %w", err)
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		return "", err
-	}
-	return tickets.ProjectDir(cfg.TicketStore.Path, repo.Root)
+	return tickets.RootFor(cwd)
 }
 
 // runTicketsRoot prints the cwd repo's ticket root (its project directory in

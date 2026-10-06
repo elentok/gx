@@ -88,3 +88,35 @@ func TestTicketStorePath_DefaultAndOverride(t *testing.T) {
 		t.Errorf("ticket-store.path = %q, want %q", cfg.TicketStore.Path, custom)
 	}
 }
+
+func TestTicketStoreCommitDebounce_DefaultAndOverride(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TicketStore.CommitDebounce != 60 {
+		t.Errorf("default ticket-store.commit-debounce = %d, want 60", cfg.TicketStore.CommitDebounce)
+	}
+
+	path, err := FilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"ticket-store":{"commit-debounce":5}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TicketStore.CommitDebounce != 5 {
+		t.Errorf("ticket-store.commit-debounce = %d, want 5", cfg.TicketStore.CommitDebounce)
+	}
+}

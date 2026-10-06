@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,9 +17,20 @@ import (
 )
 
 func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
-	t.Parallel()
+	// not parallel-safe: points XDG_DATA_HOME at a temp ticket store
 	repoDir := testutil.TempRepo(t)
-	issuesDir := filepath.Join(repoDir, ".scratch", "my-epic", "issues")
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+	project := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pf, _ := json.Marshal(map[string]string{"name": "p", "repo": repoDir})
+	if err := os.WriteFile(filepath.Join(project, "project.json"), pf, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	issuesDir := filepath.Join(project, "my-epic", "issues")
 	if err := os.MkdirAll(issuesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

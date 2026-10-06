@@ -500,17 +500,21 @@ func (m Model) scratchDir() string {
 	return scratchDirFor(m.worktreeRoot)
 }
 
-// scratchDirFor resolves worktreeRoot's canonical `.scratch` via
-// Repo.ScratchRoot(), so a bare-repo checkout's linked worktrees all share
-// the same tracker regardless of which one a command runs from. Falls back
-// to the plain join when worktreeRoot isn't inside a git repo (e.g. test
-// fixtures that use a bare temp dir).
+// scratchDirFor resolves worktreeRoot's repo to its project directory in the
+// ticket store, so every linked worktree shares one tracker. Falls back to
+// the plain join when worktreeRoot isn't inside a git repo (e.g. test
+// fixtures that use a bare temp dir). A repo with no store project gets a
+// path that doesn't exist, which renders the empty state rather than reading
+// the legacy `.scratch`.
 func scratchDirFor(worktreeRoot string) string {
-	repo, err := git.FindRepo(worktreeRoot)
-	if err != nil {
+	if _, err := git.FindRepo(worktreeRoot); err != nil {
 		return filepath.Join(worktreeRoot, ".scratch")
 	}
-	return repo.ScratchRoot()
+	root, err := tickets.RootFor(worktreeRoot)
+	if err != nil {
+		return filepath.Join(worktreeRoot, ".gx-no-ticket-project")
+	}
+	return root
 }
 
 func (m Model) View() tea.View {
