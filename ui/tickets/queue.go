@@ -813,6 +813,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			case m.paused:
 				prompt = "Resume the queue?"
 				acceptCmd = cmdConfirmQueueResume()
+			case ralphLoopRegistry.rateLimitPausedCount() > 0:
+				prompt = fmt.Sprintf("Resume %d agent(s) paused for a rate limit?", ralphLoopRegistry.rateLimitPausedCount())
+				acceptCmd = cmdConfirmQueueResume()
 			default:
 				prompt = "Pause the queue?"
 				acceptCmd = cmdConfirmQueuePause()

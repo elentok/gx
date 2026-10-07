@@ -931,6 +931,33 @@ func TestPauseStopsAllRunGatesAndNewStartsUntilResume(t *testing.T) {
 	}
 }
 
+func TestResumeClearsRateLimitPauses(t *testing.T) {
+	t.Parallel()
+	r := newLoopRegistry(2)
+	if _, ok := r.tryStart("epic-a", 0, 2); !ok {
+		t.Fatal("tryStart epic-a: want ok")
+	}
+	run := r.runs["epic-a"]
+	run.gate.Pause("iter-01", "rate limit detected, resets 6:49 PM")
+	run.gate.Pause("iter-02", "smart zone")
+	r.mu.Lock()
+	run.tickets["01"] = RunTicketSnapshot{Identifier: "01", Label: "iter-01", Paused: true, PauseKind: ralphloop.PauseRateLimit}
+	run.tickets["02"] = RunTicketSnapshot{Identifier: "02", Label: "iter-02", Paused: true, PauseKind: ralphloop.PauseNeedsRepair}
+	r.mu.Unlock()
+
+	if got := r.rateLimitPausedCount(); got != 1 {
+		t.Fatalf("rateLimitPausedCount = %d, want 1", got)
+	}
+
+	r.resume()
+	if run.gate.ForceResume("iter-01") {
+		t.Fatal("resume left the rate-limit pause on iter-01")
+	}
+	if !run.gate.ForceResume("iter-02") {
+		t.Fatal("resume cleared iter-02, which isn't a rate-limit pause")
+	}
+}
+
 func TestRegistryDrainsRunEventsBeforeFinish(t *testing.T) {
 	t.Parallel()
 	r := newLoopRegistry(1)

@@ -771,8 +771,36 @@ func (r *loopRegistry) pause() {
 	r.setPauseReason(ralphloop.QueuePauseLabel, "queue paused", true)
 }
 
+// resume clears the queue pause and every agent's rate-limit pause. A
+// rate-limit pause otherwise holds until the reset time read from the pane,
+// which can be wrong (or already past), so resume is the operator's way out.
 func (r *loopRegistry) resume() {
 	r.setPauseReason(ralphloop.QueuePauseLabel, "", false)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, run := range r.runs {
+		for _, ticket := range run.tickets {
+			if ticket.Paused && ticket.PauseKind == ralphloop.PauseRateLimit {
+				run.gate.ForceResume(ticket.Label)
+			}
+		}
+	}
+}
+
+// rateLimitPausedCount reports how many running agents are waiting out a
+// rate limit.
+func (r *loopRegistry) rateLimitPausedCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := 0
+	for _, run := range r.runs {
+		for _, ticket := range run.tickets {
+			if ticket.Paused && ticket.PauseKind == ralphloop.PauseRateLimit {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func (r *loopRegistry) isPaused() bool {

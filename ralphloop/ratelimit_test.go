@@ -15,9 +15,9 @@ func TestDetectRateLimit_MatchesKnownMessageVariants(t *testing.T) {
 		wantToken string
 	}{
 		{
-			name:      "session limit hit with reset time",
+			name:      "session limit hit with reset time and zone",
 			text:      "You've hit your session limit · resets 10:10am (UTC)",
-			wantToken: "10:10am",
+			wantToken: "10:10am (UTC)",
 		},
 		{
 			name:      "usage limit reached, no reset time",
@@ -25,9 +25,19 @@ func TestDetectRateLimit_MatchesKnownMessageVariants(t *testing.T) {
 			wantToken: "",
 		},
 		{
-			name:      "reset-first phrasing",
-			text:      "session limit resets at 3pm",
+			name:      "usage limit reached, reset later in the line",
+			text:      "Claude usage limit reached. Your limit will reset at 3pm (America/New_York).",
+			wantToken: "3pm (America/New_York)",
+		},
+		{
+			name:      "hour limit reached",
+			text:      "5-hour limit reached ∙ resets 3pm",
 			wantToken: "3pm",
+		},
+		{
+			name:      "reset time comes from the hit line, not an earlier clock time",
+			text:      "✻ Cogitated for 2m 42s · done 6:49 PM\nYou've hit your session limit · resets 10:50pm",
+			wantToken: "10:50pm",
 		},
 	}
 
@@ -52,6 +62,10 @@ func TestDetectRateLimit_DoesNotMatchIncidentalMentions(t *testing.T) {
 		"Added a rate limit of 100 requests per minute",
 		"blocked: waiting for your permission to run this command",
 		"agent status: idle",
+		"session limit resets at 3pm",
+		"Approaching usage limit · resets at 10pm",
+		"You've used 90% of your session limit · resets 10:50pm",
+		"✻ Cogitated for 2m 42s · done 6:49 PM",
 	}
 
 	for _, text := range cases {
@@ -129,6 +143,36 @@ func TestSecondsUntilReset_ParsesClockTimeRollingToNextDayIfPassed(t *testing.T)
 		{"later today, with minutes", "10:10am", 70 * time.Minute},
 		{"already passed today, rolls to tomorrow", "3am", 18 * time.Hour},
 		{"exactly now rolls to tomorrow", "9am", 24 * time.Hour},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := secondsUntilReset(tc.token, now)
+			if !ok {
+				t.Fatalf("secondsUntilReset(%q) ok = false, want true", tc.token)
+			}
+			if got != tc.want {
+				t.Errorf("secondsUntilReset(%q) = %v, want %v", tc.token, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSecondsUntilReset_HonorsZoneSuffixElseNowsZone(t *testing.T) {
+	t.Parallel()
+	idt := time.FixedZone("IDT", 3*60*60)
+	now := time.Date(2026, 10, 6, 18, 49, 0, 0, idt) // 15:49 UTC
+
+	cases := []struct {
+		name  string
+		token string
+		want  time.Duration
+	}{
+		{"bare time is in now's zone", "10:50pm", 4*time.Hour + time.Minute},
+		{"UTC suffix", "6pm (UTC)", 2*time.Hour + 11*time.Minute},
+		{"IANA zone suffix", "11pm (Asia/Jerusalem)", 4*time.Hour + 11*time.Minute},
+		{"unknown zone falls back to now's zone", "10:50pm (Mars/Base)", 4*time.Hour + time.Minute},
 	}
 
 	for _, tc := range cases {
