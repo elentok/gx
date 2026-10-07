@@ -1647,16 +1647,44 @@ func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
 	}
 }
 
-// TestQueueTabLabelPlainWhenUnattached covers ticket 07: the Queue tab's
-// label only carries "(attached)" when this process holds the attach lock
-// (ticketsui.SelfAttached, exercised directly against true/false in the
-// tickets package) — absent that, tabSpecs must render the plain label even
-// though a Queue tab exists and is reachable.
-func TestQueueTabLabelPlainWhenUnattached(t *testing.T) {
+// TestServerIndicator is seam D: each connection state renders its indicator
+// on the tab bar (shown on every tab), in-process mode renders none, and the
+// queue tab label never carries "(attached)".
+func TestServerIndicator(t *testing.T) {
 	t.Parallel()
-	if ticketsui.SelfAttached() {
-		t.Fatal("SelfAttached() = true at test start, want false (no lock acquired)")
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
 	}
+	base := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: repoDir},
+		ActiveWorktreePath: repoDir,
+	})
+	cases := []struct {
+		conn ServerConn
+		want string
+	}{
+		{ServerConn{State: ServerUp, PID: 4242}, "server ● pid 4242"},
+		{ServerConn{State: ServerDown}, "server ○ down"},
+		{ServerConn{State: ServerReadOnly}, "server ◐ read-only — restart"},
+		{ServerConn{State: ServerHerdrUnavailable}, "server ⚠ herdr unavailable"},
+	}
+	for _, tc := range cases {
+		if got := ansi.Strip(base.WithServerConn(tc.conn).tabsView()); !strings.Contains(got, tc.want) {
+			t.Errorf("tabs = %q, want it to contain %q", got, tc.want)
+		}
+	}
+	if got := ansi.Strip(base.tabsView()); strings.Contains(got, "server") {
+		t.Errorf("in-process tabs = %q, want no server indicator", got)
+	}
+	if got := ansi.Strip(base.tabsView()); strings.Contains(got, "attached") {
+		t.Errorf("tabs = %q, want no \"(attached)\"", got)
+	}
+}
+
+func TestQueueTabLabelPlain(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

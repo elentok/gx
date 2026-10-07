@@ -61,6 +61,7 @@ type Model struct {
 	quitConfirm   confirm.Model
 
 	queueStore *ticketsui.QueueStore
+	serverConn ServerConn
 }
 
 var loadQueueStore = ticketsui.LoadQueueStore

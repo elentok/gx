@@ -192,31 +192,6 @@ func TestTryStartFailsAndLeavesRegistryUntouchedWhenForeignAttached(t *testing.T
 	}
 }
 
-func TestSelfAttachedReflectsThisProcessOnly(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry/processStartTime singletons
-	dir := t.TempDir()
-	withFakeProcessStartTime(t, map[int]string{os.Getpid(): "self-start-1"})
-
-	r := newLoopRegistry(2)
-	previous := ralphLoopRegistry
-	ralphLoopRegistry = r
-	t.Cleanup(func() { ralphLoopRegistry = previous })
-
-	if SelfAttached() {
-		t.Fatal("SelfAttached() = true before tryStart, want false")
-	}
-	if _, ok := r.tryStart("epic-a", 0, 1, dir); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	if !SelfAttached() {
-		t.Fatal("SelfAttached() = false while this process holds the lock, want true")
-	}
-	r.finish("epic-a", nil)
-	if SelfAttached() {
-		t.Fatal("SelfAttached() = true after finish released the lock, want false")
-	}
-}
-
 func TestForeignAttachPIDReportsLiveForeignHolderOnly(t *testing.T) {
 	// not parallel-safe: reassigns the package-level ralphLoopRegistry/processStartTime singletons
 	dir := t.TempDir()

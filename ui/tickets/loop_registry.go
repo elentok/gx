@@ -843,19 +843,11 @@ func (r *loopRegistry) isHardLimitPaused() bool {
 }
 
 // holdsAttach reports whether this process currently holds the per-repo
-// attach lock (ticket 05), for SelfAttached's tab-label signal.
+// attach lock (ticket 05).
 func (r *loopRegistry) holdsAttach() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.attachCount > 0
-}
-
-// SelfAttached reports whether this process holds the per-repo attach lock —
-// the Queue tab label's "(attached)" suffix (ticket 07) is self-only and
-// never reflects a foreign process's attachment (surfaced separately via
-// ForeignAttachPID and ticket 05's hard-block error).
-func SelfAttached() bool {
-	return ralphLoopRegistry.holdsAttach()
 }
 
 // ForeignAttachPID reports the pid of a live foreign process currently
