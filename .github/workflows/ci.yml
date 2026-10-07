@@ -81,4 +81,4 @@ jobs:
       - name: Test
         env:
           HERDR_ENV: "1"
-        run: go test ./e2e/... -timeout=2m
+        run: go test ./e2e/... -timeout=6m

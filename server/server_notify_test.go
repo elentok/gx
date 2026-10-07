@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -29,6 +30,13 @@ func chatServer(t *testing.T, soft, hard float64) (*Server, func(n int) []string
 		mu.Unlock()
 	}))
 	t.Cleanup(hook.Close)
+	// New probes herdr; answer it so a runner without herdr doesn't leak a
+	// "herdr unavailable" notice into the recorded sends.
+	fake := herdrfake.NewState(t)
+	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
+	})
+	herdrfake.StartState(t, fake)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
