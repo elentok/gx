@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -126,6 +127,12 @@ type QueueModel struct {
 	// handleQueueKey and handleQueuePreviewKey in queue_preview.go),
 	// mirroring the Tickets tab's own focus-toggle.
 	previewFocus
+
+	// serverAPI/serverStart/serverDown back the server-down banner (see
+	// queue_server_down.go); serverAPI is nil outside server mode.
+	serverAPI   ServerAPI
+	serverStart func(context.Context) error
+	serverDown  bool
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, extraKeys keys.Manager, orders ...map[string]uint64) QueueModel {
@@ -216,6 +223,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.checkOrder = snapshot.Order
 		m.queueStatus = snapshot.Status
 	}
+	if next, cmd, ok := m.updateServerDown(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -225,6 +235,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		return m, nil
 	case queueEpicsLoadedMsg:
+		if m.serverDown {
+			return m, nil
+		}
 		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
@@ -733,6 +746,7 @@ const (
 	bindingQueueClearDoneChecked keys.BindingID = "clear-done-checked"
 	bindingQueueDelete           keys.BindingID = "delete"
 	bindingQueueSuggestedActions keys.BindingID = "suggested-actions"
+	bindingQueueStartServer      keys.BindingID = "start-server"
 )
 
 func newQueueKeysManager() keys.Manager {
@@ -757,6 +771,7 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueClearDoneChecked, Seq: []string{"c"}, Categories: []string{"Other"}, Title: "clear completed checked"},
 		{ID: bindingQueueDelete, Seq: []string{"x"}, Categories: []string{"Other"}, Title: "delete"},
 		{ID: bindingQueueSuggestedActions, Seq: []string{"m"}, Categories: []string{"Other"}, Title: "suggested actions"},
+		{ID: bindingQueueStartServer, Seq: []string{"s"}, Categories: []string{"Other"}, Title: "start server (when down)"},
 	})
 }
 
@@ -840,6 +855,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleQueueDeleteKey()
 		case bindingQueueSuggestedActions:
 			return m.handleQueueSuggestedActionsKey()
+		case bindingQueueStartServer:
+			return m.openServerStartConfirm(), nil
 		}
 		return m, nil
 	}
