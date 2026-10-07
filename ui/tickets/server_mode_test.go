@@ -141,6 +141,32 @@ func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {
 	}
 }
 
+var scopeSnap = server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
+	{Address: "gx:alpha/01", Status: "open"},
+	{Address: "other:beta/01", Status: "open"},
+}}
+
+func TestServerMode_ScopesToCwdProjectAndToggles(t *testing.T) {
+	m, _, _ := newServerModel(t).WithCwdProject("gx").updateServer(serverSnapshotMsg{snap: scopeSnap})
+	if len(m.epics) != 1 || m.epics[0].Name != "gx:alpha" {
+		t.Fatalf("scoped epics = %+v", m.epics)
+	}
+	next, _ := m.toggleProjectScope()
+	if got := len(next.(Model).epics); got != 2 {
+		t.Fatalf("all-projects epics = %d, want 2", got)
+	}
+}
+
+func TestServerMode_OutsideProjectShowsAllWithHint(t *testing.T) {
+	m, cmd, _ := newServerModel(t).WithCwdProject("").updateServer(serverSnapshotMsg{snap: scopeSnap})
+	if len(m.epics) != 2 {
+		t.Fatalf("epics = %d, want all", len(m.epics))
+	}
+	if got := toastsOf(cmd); len(got) != 1 || !strings.Contains(got[0].Message, "gx project add .") {
+		t.Fatalf("hint toasts = %+v", got)
+	}
+}
+
 func TestServerMode_GapAndReconnectResnapshot(t *testing.T) {
 	m := newServerModel(t)
 	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Seq: 4}})

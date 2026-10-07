@@ -6,6 +6,7 @@ package viewmodel
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/elentok/gx/server"
 )
@@ -50,6 +51,38 @@ type State struct {
 	// Pending is each queue entry's explain verdict, as the last snapshot
 	// delivered it.
 	Pending []server.PendingRow
+	// CwdProject is the registered project the TUI started in; "" when the cwd
+	// is not in one. It survives snapshots.
+	CwdProject string
+	// AllProjects shows every project instead of just CwdProject.
+	AllProjects bool
+}
+
+// ScopedTickets is Tickets narrowed to the cwd project, unless the toggle says
+// all or the cwd is not a registered project.
+func (s State) ScopedTickets() []server.TicketInfo {
+	if s.CwdProject == "" || s.AllProjects {
+		return s.Tickets
+	}
+	prefix := s.CwdProject + ":"
+	return slices.DeleteFunc(slices.Clone(s.Tickets), func(t server.TicketInfo) bool {
+		return !strings.HasPrefix(t.Address, prefix)
+	})
+}
+
+// ToggleAllProjects flips between the cwd project and all projects.
+func (s State) ToggleAllProjects() State {
+	s.AllProjects = !s.AllProjects
+	return s
+}
+
+// UnregisteredHint is the hint shown when the cwd is not a registered project
+// (so the tab shows all); "" when it is.
+func (s State) UnregisteredHint() string {
+	if s.CwdProject != "" {
+		return ""
+	}
+	return "not in a registered project, showing all; run `gx project add .`"
 }
 
 // PendingRowFor is the pending row for a ticket address, if it is queued.
@@ -83,6 +116,8 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Tickets:          slices.Clone(snap.Tickets),
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
+		CwdProject:       s.CwdProject,
+		AllProjects:      s.AllProjects,
 	}
 	for _, t := range next.Tickets {
 		if it, ok := s.Iterations[t.Address]; ok && t.Status == statusClaimed {

@@ -10,27 +10,28 @@ import (
 )
 
 const (
-	bindingTicketsHelp             keys.BindingID = "help"
-	bindingTicketsBack             keys.BindingID = "back"
-	bindingTicketsResume           keys.BindingID = "resume"
-	bindingTicketsRefresh          keys.BindingID = "refresh"
-	bindingTicketsEditInPlace      keys.BindingID = "edit"
-	bindingTicketsEditHSplit       keys.BindingID = "edit-hsplit"
-	bindingTicketsEditVSplit       keys.BindingID = "edit-vsplit"
-	bindingTicketsEditTab          keys.BindingID = "edit-tab"
-	bindingTicketsCancelChord      keys.BindingID = "cancel-chord"
-	bindingTicketsReplaceQueue     keys.BindingID = "replace-queue"
-	bindingTicketsAddToQueue       keys.BindingID = "add-to-queue"
-	bindingTicketsDrainReplace     keys.BindingID = "drain-replace-queue"
-	bindingTicketsToggleCheck      keys.BindingID = "toggle-check"
-	bindingTicketsToggleHideDone   keys.BindingID = "toggle-hide-done"
-	bindingTicketsSelectFirst      keys.BindingID = "select-first"
-	bindingTicketsSelectLast       keys.BindingID = "select-last"
-	bindingTicketsPreviewBottom    keys.BindingID = "preview-bottom"
-	bindingTicketsChangeStatus     keys.BindingID = "change-status"
-	bindingTicketsSuggestedActions keys.BindingID = "suggested-actions"
-	bindingTicketsYankSummary      keys.BindingID = "yank-summary"
-	bindingTicketsYankFilePath     keys.BindingID = "yank-file-path"
+	bindingTicketsHelp               keys.BindingID = "help"
+	bindingTicketsBack               keys.BindingID = "back"
+	bindingTicketsResume             keys.BindingID = "resume"
+	bindingTicketsRefresh            keys.BindingID = "refresh"
+	bindingTicketsEditInPlace        keys.BindingID = "edit"
+	bindingTicketsEditHSplit         keys.BindingID = "edit-hsplit"
+	bindingTicketsEditVSplit         keys.BindingID = "edit-vsplit"
+	bindingTicketsEditTab            keys.BindingID = "edit-tab"
+	bindingTicketsCancelChord        keys.BindingID = "cancel-chord"
+	bindingTicketsReplaceQueue       keys.BindingID = "replace-queue"
+	bindingTicketsAddToQueue         keys.BindingID = "add-to-queue"
+	bindingTicketsDrainReplace       keys.BindingID = "drain-replace-queue"
+	bindingTicketsToggleCheck        keys.BindingID = "toggle-check"
+	bindingTicketsToggleHideDone     keys.BindingID = "toggle-hide-done"
+	bindingTicketsToggleProjectScope keys.BindingID = "toggle-project-scope"
+	bindingTicketsSelectFirst        keys.BindingID = "select-first"
+	bindingTicketsSelectLast         keys.BindingID = "select-last"
+	bindingTicketsPreviewBottom      keys.BindingID = "preview-bottom"
+	bindingTicketsChangeStatus       keys.BindingID = "change-status"
+	bindingTicketsSuggestedActions   keys.BindingID = "suggested-actions"
+	bindingTicketsYankSummary        keys.BindingID = "yank-summary"
+	bindingTicketsYankFilePath       keys.BindingID = "yank-file-path"
 )
 
 // archivedBlockedBindings lists every mutating binding archivedReadOnlyGuard
@@ -65,6 +66,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsDrainReplace, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "drain epic"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
+		{ID: bindingTicketsToggleProjectScope, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "cwd project / all projects"},
 		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
 		{ID: bindingTicketsSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
 		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
@@ -148,6 +150,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:
 			m.toggleHideDone()
+		case bindingTicketsToggleProjectScope:
+			if !m.serverMode() {
+				return m, nil
+			}
+			return m.toggleProjectScope()
 		case bindingTicketsSelectFirst:
 			m.selectFirstRow()
 		case bindingTicketsSelectLast:

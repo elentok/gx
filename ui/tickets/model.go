@@ -84,6 +84,9 @@ type Model struct {
 	// instance — every epicsLoadedMsg, including ones the loop itself
 	// produces, would otherwise spawn another parallel chain.
 	autoRefreshStarted bool
+	// scopeKnown: WithCwdProject ran, so an empty CwdProject means "not in a
+	// registered project" rather than "never told".
+	scopeKnown bool
 
 	// sidebarTree owns the sidebar's selection/scroll/collapse state (ticket
 	// 02e1): a tree.Model[sidebarNode] built from buildSidebarEntries,

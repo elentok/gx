@@ -193,6 +193,27 @@ func (m Model) WithServer(api ServerAPI) Model {
 	return m
 }
 
+// WithCwdProject scopes the tab to the registered project the TUI started in;
+// "" means the cwd is not a registered project, so the tab shows all.
+func (m Model) WithCwdProject(name string) Model {
+	m.vm.CwdProject = name
+	m.scopeKnown = true
+	return m
+}
+
+// toggleProjectScope is "tp": flip between the cwd project and all projects.
+func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
+	if m.vm.CwdProject == "" {
+		return m, notify.Info(m.vm.UnregisteredHint())
+	}
+	m.vm = m.vm.ToggleAllProjects()
+	label := "project: " + m.vm.CwdProject
+	if m.vm.AllProjects {
+		label = "all projects"
+	}
+	return m.applyServerRows(), notify.Info(label)
+}
+
 func (m Model) serverMode() bool { return m.serverAPI != nil }
 
 func (m Model) cmdServerSnapshot() tea.Cmd {
@@ -251,9 +272,14 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.err != nil {
 			return m, tea.Batch(notify.Error("server snapshot: "+msg.err.Error()), m.cmdServerResnapshotLater()), true
 		}
+		firstLoad := !m.loaded
 		m.vm = m.vm.ApplySnapshot(msg.snap)
 		m.loaded = true
-		return m.applyServerRows(), tea.Batch(m.cmdServerSubscribe(msg.snap.Seq), m.cmdServerQueue()), true
+		cmds := []tea.Cmd{m.cmdServerSubscribe(msg.snap.Seq), m.cmdServerQueue()}
+		if hint := m.vm.UnregisteredHint(); hint != "" && firstLoad && m.scopeKnown {
+			cmds = append(cmds, notify.Info(hint))
+		}
+		return m.applyServerRows(), tea.Batch(cmds...), true
 
 	case serverSubscribedMsg:
 		if msg.err != nil {
@@ -353,7 +379,7 @@ func (m Model) applyServerRows() Model {
 func epicsFromViewModel(vm viewmodel.State) []gxtickets.Epic {
 	var epics []gxtickets.Epic
 	byName := map[string]int{}
-	for _, info := range vm.Tickets {
+	for _, info := range vm.ScopedTickets() {
 		epic, id, ok := gxtickets.SplitTrailerValue(info.Address)
 		if !ok {
 			continue

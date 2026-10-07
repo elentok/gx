@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
+	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/confirm"
@@ -107,9 +108,19 @@ func (m Model) Init() tea.Cmd {
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
 	tm := ticketsui.NewModelWithStore(root, s, keys.New(Bindings()), m.queueStore).WithServerLink(m.serverConn.link())
 	if m.serverMode() {
-		tm = tm.WithServer(m.settings.Server.Client)
+		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(root))
 	}
 	return tm
+}
+
+// cwdProjectName is the registered project's address name for root's repo, or
+// "" when root is not in a registered project.
+func cwdProjectName(root string) string {
+	dir, err := gxtickets.RootFor(root)
+	if err != nil {
+		return ""
+	}
+	return gxtickets.ProjectName(dir)
 }
 
 func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
