@@ -1,7 +1,8 @@
 # gx local ticket tracker
 
-The issue tracker for this repo is local markdown files under `.scratch/`, read and written through
-`gx`'s own `tickets` package — not a hosted issue tracker, and not any personal skill-setup or
+The issue tracker for this repo is local markdown files in gx's ticket store (a git-backed directory,
+`<store>/<project>/`; a repo not yet moved by `gx tickets migrate` still uses `.scratch/`), read and
+written through `gx`'s own `tickets` package — not a hosted issue tracker, and not any personal skill-setup or
 triage-label mapping. This document is the complete contract: layout, statuses, blocking, frontier,
 claiming, and resolution. Every gx skill that reads or writes tickets treats this document as
 authoritative.
@@ -9,12 +10,11 @@ authoritative.
 ## Layout
 
 - **Always resolve the root with `gx tickets root` before locating any ticket, epic, or spec file —
-  never assume `.scratch/` at cwd or repo root, even when you're already inside a worktree or a
-  subdirectory.** In a bare-repo checkout with linked worktrees, the canonical root lives at the bare
-  repo's own path, not any worktree's, and cwd may be several directories below it. `gx tickets root`
-  prints the canonical `.scratch` path with no decoration, so `root=$(gx tickets root)` is safe to run
-  from anywhere inside the repo. Every `<root>` below refers to this resolved path, not a literal
-  `.scratch/`.
+  never assume a ticket directory at cwd or repo root, even when you're already inside a worktree or
+  a subdirectory.** The root is the project's directory in the ticket store (or the canonical
+  `.scratch` for an unmigrated repo), never any worktree's own path. `gx tickets root` prints it with
+  no decoration, so `root=$(gx tickets root)` is safe to run from anywhere inside the repo. Every
+  `<root>` below refers to this resolved path.
 - One feature/epic per directory: `<root>/<epic-slug>/`
 - **List the epics with `gx tickets epics`** — prints one bare epic slug per line, alphabetically,
   with `.archive` and other dot-prefixed directories already excluded, so it never needs filtering.
@@ -30,6 +30,9 @@ authoritative.
 - A ticket **identifier** is the filename's numeric prefix, optionally followed by one lowercase
   letter: `04`, `04a`, `04b`. The letter marks a ticket created by a mid-flight fork (see below); a
   bare number is an originally-authored ticket.
+- A ticket's canonical **address** is `project:epic/NN` (e.g. `gx:orchestrator-daemon/06`); `epic/NN`
+  and `NN` are accepted as input when the project or epic is implied. Verbs take addresses, not file
+  paths.
 
 ## Frontmatter
 
@@ -50,11 +53,15 @@ Fields:
 - **`id`** (string, required) — the ticket identifier, matching the filename prefix, e.g. `"04"` or
   `"04b"`. Fixed at creation.
 - **`status`** (enum, required) — exactly one of `draft`, `open`, `claimed`, `needs-answer`,
-  `needs-repair`, `done`. There is no default: a ticket with no `status:` is rejected by the
-  loader rather than read as `open`, so a half-written file can never be handed to an agent. Only
+  `needs-repair`, `done`, `cancelled`. There is no default: a ticket with no `status:` is rejected by
+  the loader rather than read as `open`, so a half-written file can never be handed to an agent. Only
   `open` is schedulable — `draft` is work its author parked deliberately, neither offered to an agent
-  nor counted as finished. The UI also shows `blocked` and `waiting-for-children`, but those are
-  derived from the graph on every render and are never written to a file.
+  nor counted as finished. `cancelled` is terminal like `done` but means the ticket was withdrawn,
+  not performed; it stops counting as outstanding. **Only `draft` and `open` can be written with
+  `gx tickets set --status`.** Every other status is an orchestration status, written by the gx
+  server alone (see "Who writes which status"). The UI also shows `blocked` and
+  `waiting-for-children`, but those are derived from the graph on every render and are never
+  written to a file.
 - **`blocked_by`** (list of ticket IDs) — tickets that must be finished before this one can start;
   omit or `[]` when there are none. Each token names exactly one ticket in the epic: a bare number
   (`"04"`) names the ticket whose identifier has no letter suffix, a lettered token (`"04a"`) names
@@ -76,11 +83,21 @@ Fields:
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
   occupy.
 - **`commitless`** (bool) — set `true` when a ticket intentionally finishes an iteration with no
-  commit (e.g. it turned out to need only a fork, or the behavior already existed). Pair it with a
-  terminal status (`done`, or an unclaimed status) — otherwise the ticket still reads
-  as claimed-but-stalled.
-- **`actual_context_window`**, **`elapsed_time`** — read-only, gx-managed. Stamped automatically at
-  landing time; never set these by hand.
+  commit (e.g. it turned out to need only a fork, or the behavior already existed). Pass it in the
+  same `set` call as `--iteration-status finished` — otherwise the ticket still reads as
+  claimed-but-stalled.
+- **`base`** (string) — optional override of the branch this ticket's work starts from: a branch
+  name or a ticket reference. Normally omit it: gx derives the base at claim time (a commitful ticket
+  blocked by one unlanded commitful ticket bases on that blocker's branch; otherwise leaf → parent's
+  branch, root → trunk). With two or more unlanded commitful blockers and no `base`, gx parks the
+  ticket `needs-answer` naming them. Not allowed on a `commitless` ticket (`validate` rejects it).
+  The target is always derived, never stored.
+- **`park_kind`** (enum) — why the ticket is parked (e.g. `blocked-pane`, `self-reported`,
+  `zero-commit`). Machine-written alongside a park, cleared on resume; never set it by hand. The full
+  closed kind enum is printed by `gx server events kinds`.
+- **`actual_context_window`**, **`elapsed_time`**, **`resolved_base`**, **`mutes`** — read-only,
+  gx-managed. The first two are stamped at landing time, `resolved_base` (ref + SHA) at every claim,
+  `mutes` when a notification throttle trips; never set these by hand.
 
 ### The `code-review` type
 
@@ -132,44 +149,65 @@ The **frontier** is the ticket to work next: the lowest-numbered ticket, across 
 `issues/*.md` files, whose status is `open` and every one of whose `blocked_by` tokens has resolved
 (see the field reference above — a token resolves only once the ticket it names *and* that ticket's
 whole fork subtree are done). `open` is the only schedulable status: `draft`, `claimed`,
-`needs-answer`, `needs-repair`, and `done` are all skipped. Scan in filename numeric order; the
+`needs-answer`, `needs-repair`, `done`, and `cancelled` are all skipped. Scan in filename numeric order; the
 first match wins.
 
 A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes eligible once every
 *other* ticket in the epic is `done`, regardless of its own (empty) `blocked_by` list.
 
+## Who writes which status
+
+The gx server is the only scheduler. Orchestration statuses are written by it alone, and
+`gx tickets set --status` refuses them (`claimed`, `done`, `needs-answer`, `needs-repair`,
+`cancelled`):
+
+| Status | Written by |
+| --- | --- |
+| `draft`, `open` | authors and agents, via `gx tickets set --status` |
+| `claimed` | the server, at claim time, before the agent's prompt is sent |
+| `done` | the server, after its own commit count and cherry-pick check |
+| `needs-answer` | the server, when an agent reports `--iteration-status needs-answer` |
+| `needs-repair` | the server, when it hits a fault it can't resolve |
+| `cancelled` | the server, via `gx server tickets cancel` (also cancels non-terminal descendants) |
+
+Orchestration changes a person may need go through server verbs, each with a `--json` result or a
+`{"refused":true,"reason":…}` refusal: `gx server tickets park | cancel | relaunch`,
+`gx server queue add | remove | replace | move`, and read verbs such as
+`gx server tickets explain <addr>` ("why isn't this running") and `history <addr>`. The repair verbs
+`gx tickets land | reset | unpark | verify` still work but are hidden, deprecated aliases. If the
+server is down, only the four repair verbs run directly; every other server verb refuses
+`server-not-running`.
+
 ## Claiming
 
-Before starting work on a frontier ticket, claim it: `gx tickets set <addr> --status claimed`. This
-must happen before any implementation work, not after — an unattended run that crashes mid-ticket
-should leave the ticket visibly claimed, not silently open, so a restart doesn't double-pick it.
-
-Under ralph-loop, gx itself writes `status: claimed` at claim time (`ralphloop.Claim`), before the
-agent's prompt is even sent — an iteration agent never calls `--status claimed` itself, and the CLI
-refuses the attempt from a `ralph-loop/*` branch. This section describes the mechanic for a
-hand-driven epic, where a person or script claims a ticket directly.
+An agent never claims a ticket. gx writes `status: claimed` before the agent's prompt is sent, so a
+crashed iteration leaves the ticket visibly claimed rather than silently open, and a restart doesn't
+double-pick it. gx re-reads the ticket file at claim time and refuses if it changed since the
+scheduler decided. If a launch fails, gx retries, then parks the ticket `needs-repair` with the
+launch error.
 
 ## Resolution
 
-When a ticket's work lands, set a terminal status: `gx tickets set <addr> --status done`. A ticket
-closed by a mid-flight fork rather than by landing its own work (see below) is also `done`, with
-`commitless: true` since it never had commits of its own.
+An iteration agent never writes a terminal status. When the work is finished it reports
+`gx tickets set <addr> --iteration-status finished [--commitless true]`, and gx adopts that into
+`status: done` only after checking its own commit count and cherry-pick outcome; the report can start
+a landing, never conclude one. The CLI refuses `--status done` from a `ralph-loop/*` branch outright,
+even paired with `--iteration-status finished`.
 
-Under ralph-loop, landing `status: done` is gx's alone to write — an iteration agent reports
-`gx tickets set <addr> --iteration-status finished [--commitless true]` instead, and gx adopts that
-report into `status: done` only after checking its own commit count and cherry-pick outcome; the
-report can start a landing, never conclude one. The CLI refuses `--status done` from a
-`ralph-loop/*` branch outright, even paired with `--iteration-status finished`. As with claiming,
-this section's plain `--status done` describes a hand-driven epic.
+A ticket closed by a mid-flight fork rather than by landing its own work (see below) is reported
+the same way: `--iteration-status finished --commitless true`.
 
-Other terminal outcomes:
+Other outcomes gx writes:
 
-- **`needs-answer`** — work is stalled on information only a human can supply. Leave a note in the
-  ticket body explaining what's missing.
-- **`needs-repair`** — something needs human judgment before work can continue (e.g. a design
-  question, a conflict with another ticket).
+- **`needs-answer`** — work is stalled on information only a human can supply. The agent reports
+  `--iteration-status needs-answer` after writing the sections described under Announce-and-stop.
+  gx also parks `needs-answer` itself in a few cases (`blocked-pane`, `zero-commit`, two or more
+  unlanded blockers with no `base`), recording `park_kind`.
+- **`needs-repair`** — something needs human judgment before work can continue (e.g. a crashed
+  iteration, a handle mismatch, repeated launch failures `retry-exhausted`, a park/re-claim loop
+  `spinning`, lost commits).
 
-A ticket finished with zero commits must also set `commitless: true` in the same `set` call, or it
+A ticket finished with zero commits must also pass `--commitless true` in the same `set` call, or it
 reads as a stalled agent rather than an intentional no-op finish.
 
 `status: done` means only "this ticket's own work is finished" — it says nothing about the tickets it
@@ -245,7 +283,8 @@ to mix a plumbing/infra concern with a feature-on-top concern. `parent` is the w
 2. Fill in the new ticket's body, moving any not-yet-finished acceptance criteria off the original
    onto it — don't leave a criterion sitting on a ticket that's about to close. Then promote it with
    `gx tickets set <addr> --status open`.
-3. The original is closed as `done`, with `commitless: true` if it lands zero commits of its own.
+3. The original is finished by reporting `--iteration-status finished`, with `--commitless true` if
+   it lands zero commits of its own. gx then writes it `done`.
 
 Nothing else is written. In particular a fork child gets **no** `blocked_by` naming the original, and
 the original records nothing about what it forked. `parent` on the child is the only structural edge

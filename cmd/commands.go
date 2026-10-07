@@ -284,7 +284,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	cmd.AddCommand(migrateCmd)
 	cmd.AddCommand(&cobra.Command{
 		Use:   "root",
-		Short: "print the canonical .scratch root for the current repo",
+		Short: "print the ticket root (in the ticket store, or .scratch before migrate) for the current repo",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			cwd, err := d.getwd()
@@ -297,7 +297,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	var mapsOnly bool
 	epicsCmd := &cobra.Command{
 		Use:   "epics",
-		Short: "print bare epic slugs under the current repo's .scratch root",
+		Short: "print bare epic slugs under the current repo's ticket root",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			cwd, err := d.getwd()
