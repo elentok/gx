@@ -6,30 +6,45 @@ package server_test
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-// Unlike ralphloop, which leaves the ticket needs-repair, the server gives a
-// failed launch's claim back: the ticket is open again and the failure streams.
-func TestLaunchPort_FailureAfterClaimGivesTheClaimBack(t *testing.T) {
+// A failed launch parks the ticket needs-repair with one chat message, and the
+// next ticks do not claim it again.
+func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
+	var mu sync.Mutex
+	var bodies []string
+	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+	}))
+	defer chat.Close()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Orchestrator = config.OrchestratorServer
-		c.PollInterval = time.Hour // one launch attempt, no retry inside the test
+		c.PollInterval = 50 * time.Millisecond // several ticks pass while the test waits
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}
 	})
 	var prompts atomic.Int32
 	h.RegisterLaunch(func(servertest.Prompt) { prompts.Add(1) })
@@ -53,7 +68,22 @@ func TestLaunchPort_FailureAfterClaimGivesTheClaimBack(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventIterationLaunchFailed, "proj:epic-a/01")
+	// The chat batches its sends; wait for the one message, then for any retry's extras.
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		mu.Lock()
+		got := len(bodies)
+		mu.Unlock()
+		if got > 0 {
+			break
+		}
+	}
+	time.Sleep(time.Second)
 
+	mu.Lock()
+	if len(bodies) != 1 || !strings.Contains(bodies[0], "Herdr rejected Codex integration") {
+		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", bodies)
+	}
+	mu.Unlock()
 	if got := starts.Load(); got != 1 {
 		t.Errorf("agent start calls = %d, want exactly 1", got)
 	}
@@ -65,10 +95,10 @@ func TestLaunchPort_FailureAfterClaimGivesTheClaimBack(t *testing.T) {
 		t.Fatalf("ticket files = %v", matches)
 	}
 	body := readFile(t, matches[0])
-	if !strings.Contains(body, "status: open") {
-		t.Errorf("ticket after launch failure:\n%s\nwant status: open", body)
+	if !strings.Contains(body, "status: needs-repair") {
+		t.Errorf("ticket after launch failure:\n%s\nwant status: needs-repair", body)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-answer", "status: claimed"} {
+	for _, unwanted := range []string{"status: done", "status: needs-answer", "status: claimed", "status: open"} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("ticket after launch failure must not contain %q:\n%s", unwanted, body)
 		}

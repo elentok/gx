@@ -244,8 +244,8 @@ func (s *Server) projectOf(project string) (dir, repo string, err error) {
 }
 
 // claimAndLaunch writes the claim to the ticket file first, so markdown stays
-// the truth and nothing streams before it is on disk. A failed launch gives
-// the ticket back rather than leaving a claim with no agent behind it.
+// the truth and nothing streams before it is on disk. A failed launch parks the
+// ticket needs-repair rather than leaving a claim with no agent behind it.
 func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind) error {
 	ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
 	rootBase, resolvedBase, leafBase, err := s.resolveBase(addr, t, repo)
@@ -272,8 +272,11 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	deps := ralphloop.DefaultDeps()
 	run, wt, err := s.prepareAndLaunch(deps, &one, addr, ticketAddr)
 	if err != nil {
-		if rerr := ralphloop.SetStatus(t.Path, "open"); rerr != nil {
-			err = errors.Join(err, fmt.Errorf("release claim: %w", rerr))
+		// Handing the claim back would make the next tick retry the same failure
+		// forever, so a person is told instead.
+		ticket := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
+		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.IterationError, "launch failed: "+err.Error()); perr != nil {
+			err = errors.Join(err, fmt.Errorf("park: %w", perr))
 		}
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
 		return fmt.Errorf("launch %s: %w", ticketAddr, err)
