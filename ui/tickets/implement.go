@@ -114,6 +114,9 @@ func (m Model) handleReplaceQueueConfirmed(msg replaceQueueConfirmedMsg) (tea.Mo
 // becomes claimable on the run's next iteration. Unlike "r", "a" always
 // confirms first, naming the count about to be added.
 func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
+	if m.serverMode() {
+		return m.handleServerEnqueueKey()
+	}
 	r, ok := m.selectedRow()
 	if !ok {
 		return m, nil

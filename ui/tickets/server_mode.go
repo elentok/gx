@@ -2,6 +2,8 @@ package tickets
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -10,8 +12,10 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
@@ -26,6 +30,65 @@ type ServerAPI interface {
 	Snapshot(ctx context.Context) (server.Snapshot, error)
 	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
 	QueueItems(ctx context.Context) ([]server.QueueItem, error)
+	QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error)
+}
+
+// serverEnqueueDefaultAgent is preselected in the "a" confirm; it matches the
+// server's own default for an empty agent.
+const serverEnqueueDefaultAgent = ralphloop.AgentClaude
+
+// serverEnqueuedMsg reports a finished "a" enqueue: how many addresses the
+// server accepted and the first failure or refusal, if any.
+type serverEnqueuedMsg struct {
+	added   int
+	problem string
+}
+
+// handleServerEnqueueKey is "a" in server mode: enqueue every checked,
+// not-yet-terminal ticket, live run or not, with the agent picked in the
+// confirm.
+func (m Model) handleServerEnqueueKey() (tea.Model, tea.Cmd) {
+	var addrs []string
+	for _, epic := range m.epics {
+		for _, t := range epic.Tickets {
+			if m.checked[t.Path] && !epic.RenderedStatus(t).Terminal() {
+				addrs = append(addrs, t.Path)
+			}
+		}
+	}
+	if len(addrs) == 0 {
+		return m, notify.Info("check at least one ticket to enqueue")
+	}
+	agents := []string{string(ralphloop.AgentClaude), string(ralphloop.AgentCodex)}
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt:     fmt.Sprintf("Enqueue %d ticket(s)?", len(addrs)),
+		Choices:    agents,
+		Choice:     slices.Index(agents, string(serverEnqueueDefaultAgent)),
+		ChoiceName: "Agent",
+		AcceptWith: func(agent string) tea.Cmd { return m.cmdServerEnqueue(addrs, agent) },
+	})
+	return m, nil
+}
+
+func (m Model) cmdServerEnqueue(addrs []string, agent string) tea.Cmd {
+	api := m.serverAPI
+	return func() tea.Msg {
+		out := serverEnqueuedMsg{}
+		for _, addr := range addrs {
+			res, err := api.QueueAdd(context.Background(), addr, agent)
+			switch {
+			case err != nil:
+				out.problem = addr + ": " + err.Error()
+			case res.Refused:
+				out.problem = addr + ": " + res.Message
+			default:
+				out.added++
+				continue
+			}
+			break
+		}
+		return out
+	}
 }
 
 type serverSnapshotMsg struct {
@@ -147,6 +210,13 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 
 	case serverStreamEndedMsg:
 		return m, m.cmdServerSnapshot(), true
+
+	case serverEnqueuedMsg:
+		note := notify.Success(fmt.Sprintf("enqueued %d ticket(s)", msg.added))
+		if msg.problem != "" {
+			note = notify.Error(fmt.Sprintf("enqueued %d, stopped at %s", msg.added, msg.problem))
+		}
+		return m, tea.Batch(note, m.cmdServerQueue()), true
 
 	case serverQueueMsg:
 		if msg.err == nil {

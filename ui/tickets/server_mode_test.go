@@ -3,6 +3,7 @@ package tickets
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -15,7 +16,16 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-type fakeServerAPI struct{}
+type fakeServerAPI struct {
+	adds *[]server.QueueItem
+}
+
+func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (server.QueueResult, error) {
+	if f.adds != nil {
+		*f.adds = append(*f.adds, server.QueueItem{Address: address, Agent: agent})
+	}
+	return server.QueueResult{}, nil
+}
 
 func (fakeServerAPI) Snapshot(context.Context) (server.Snapshot, error) {
 	return server.Snapshot{}, nil
@@ -150,6 +160,44 @@ func TestServerMode_StartImplementSendsNoChat(t *testing.T) {
 	// The server sends chat once; the TUI path must not wire a sink.
 	if got := m.notificationsForRun(); got.Telegram.BotToken != "" {
 		t.Fatalf("server mode kept chat sink: %+v", got)
+	}
+}
+
+// Seam D: the "a" confirm renders the agent picker and the client call carries
+// the chosen agent.
+func TestServerMode_EnqueueKeyPicksAgent(t *testing.T) {
+	var adds []server.QueueItem
+	m := newServerModel(t).WithServer(fakeServerAPI{adds: &adds})
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:alpha/02", Title: "Second", Status: "done"},
+	}}})
+	m.checked = map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}
+
+	next, _ := m.handleAddToQueueKey()
+	m = next.(Model)
+	if !m.confirm.IsOpen {
+		t.Fatal("confirm not open")
+	}
+	if view := m.confirm.View(80); !strings.Contains(view, "Agent: claude") || !strings.Contains(view, "Enqueue 1 ticket") {
+		t.Fatalf("confirm view = %q", view)
+	}
+
+	m.confirm, _, _ = m.confirm.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	if got := m.confirm.Choice(); got != "codex" {
+		t.Fatalf("choice after tab = %q", got)
+	}
+	var cmd tea.Cmd
+	m.confirm, cmd, _ = m.confirm.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if cmd == nil {
+		t.Fatal("accept produced no command")
+	}
+	if _, ok := cmd().(serverEnqueuedMsg); !ok {
+		t.Fatal("accept did not enqueue")
+	}
+	want := []server.QueueItem{{Address: "gx:alpha/01", Agent: "codex"}}
+	if !slices.Equal(adds, want) {
+		t.Fatalf("adds = %+v, want %+v", adds, want)
 	}
 }
 

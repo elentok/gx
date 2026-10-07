@@ -20,6 +20,13 @@ type Options struct {
 	SpinnerLabel string   // returned in Result so the parent can start its own spinner
 	CancelMsg    string   // emitted as notify.Info when the user cancels
 	DefaultYes   bool     // initial cursor position; false = No
+
+	// Choices adds a picker (cycled with tab) shown under the prompt; the
+	// accepted choice is fed to AcceptWith, which replaces AcceptCmd.
+	Choices    []string
+	Choice     int // index into Choices selected on open
+	ChoiceName string
+	AcceptWith func(choice string) tea.Cmd
 }
 
 // Result is returned by Update when the user has made a decision.
@@ -35,14 +42,26 @@ type storedOpts struct {
 	acceptCmd    tea.Cmd
 	spinnerLabel string
 	cancelMsg    string
+	choices      []string
+	choiceName   string
+	acceptWith   func(choice string) tea.Cmd
 }
 
 // Model is an embeddable confirm modal sub-model.
 type Model struct {
 	IsOpen bool
 
-	opts storedOpts
-	yes  bool
+	opts   storedOpts
+	yes    bool
+	choice int
+}
+
+// Choice returns the currently selected picker value ("" without a picker).
+func (m Model) Choice() string {
+	if len(m.opts.choices) == 0 {
+		return ""
+	}
+	return m.opts.choices[m.choice]
 }
 
 // New returns a zero-value Model.
@@ -60,6 +79,13 @@ func (m Model) Open(opts Options) Model {
 		acceptCmd:    opts.AcceptCmd,
 		spinnerLabel: opts.SpinnerLabel,
 		cancelMsg:    opts.CancelMsg,
+		choices:      opts.Choices,
+		choiceName:   opts.ChoiceName,
+		acceptWith:   opts.AcceptWith,
+	}
+	m.choice = 0
+	if opts.Choice >= 0 && opts.Choice < len(opts.Choices) {
+		m.choice = opts.Choice
 	}
 	return m
 }
@@ -74,6 +100,10 @@ func (m Model) Open(opts Options) Model {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		if msg.String() == "tab" && len(m.opts.choices) > 1 {
+			m.choice = (m.choice + 1) % len(m.opts.choices)
+			return m, nil, Result{}
+		}
 		nextYes, decided, accepted, handled := components.UpdateConfirm(msg, m.yes)
 		if !handled {
 			return m, nil, Result{}
@@ -146,7 +176,11 @@ func findButtonColumn(plain, label string) (col, width int, ok bool) {
 func (m Model) decide(accepted bool) (Model, tea.Cmd, Result) {
 	m.IsOpen = false
 	if accepted {
-		return m, m.opts.acceptCmd, Result{
+		cmd := m.opts.acceptCmd
+		if m.opts.acceptWith != nil {
+			cmd = m.opts.acceptWith(m.Choice())
+		}
+		return m, cmd, Result{
 			Done:         true,
 			Accepted:     true,
 			SpinnerLabel: m.opts.spinnerLabel,
@@ -162,8 +196,15 @@ func (m Model) decide(accepted bool) (Model, tea.Cmd, Result) {
 
 // View renders the confirm modal.
 func (m Model) View(width int) string {
+	prompt := m.opts.prompt
+	if len(m.opts.choices) > 0 {
+		prompt += "\n" + m.opts.choiceName + ": " + m.Choice()
+		if len(m.opts.choices) > 1 {
+			prompt += " (tab to change)"
+		}
+	}
 	return components.RenderConfirmModal(
-		m.opts.prompt,
+		prompt,
 		m.yes,
 		ui.ColorBorder,
 		ui.ColorGreen,
