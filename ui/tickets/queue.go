@@ -226,6 +226,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, cmd, ok := m.updateServerDown(msg); ok {
 		return next, cmd
 	}
+	if next, cmd, ok := m.updateServerKeys(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -814,6 +817,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueReload:
 			return m, m.cmdLoadQueue()
 		case bindingQueuePauseResume:
+			if m.serverAPI != nil {
+				return m.handleServerPauseKey()
+			}
 			hardBudgetPaused := ralphLoopRegistry.isHardLimitPaused()
 			softBudgetPaused := ralphLoopRegistry.isSoftLimitPaused()
 			var prompt string
@@ -839,6 +845,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case bindingQueueClearChecked:
 			if paths := m.checkedPaths(); len(paths) > 0 {
+				if m.serverAPI != nil {
+					return m.handleServerClearKey(fmt.Sprintf("Dequeue all %d ticket(s)?", len(paths)), paths)
+				}
 				m.confirm = m.confirm.Open(confirm.Options{
 					Prompt:    fmt.Sprintf("Clear all %d queued ticket(s)?", len(paths)),
 					AcceptCmd: cmdConfirmQueueClear(paths),
@@ -846,12 +855,18 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		case bindingQueueClearDoneChecked:
 			if paths := m.doneCheckedPaths(); len(paths) > 0 {
+				if m.serverAPI != nil {
+					return m.handleServerClearKey(fmt.Sprintf("Dequeue %d completed ticket(s)?", len(paths)), paths)
+				}
 				m.confirm = m.confirm.Open(confirm.Options{
 					Prompt:    fmt.Sprintf("Clear %d completed ticket(s) from the queue?", len(paths)),
 					AcceptCmd: cmdConfirmQueueClear(paths),
 				})
 			}
 		case bindingQueueDelete:
+			if m.serverAPI != nil {
+				return m.handleServerDeleteKey()
+			}
 			return m.handleQueueDeleteKey()
 		case bindingQueueSuggestedActions:
 			return m.handleQueueSuggestedActionsKey()

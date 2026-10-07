@@ -21,6 +21,45 @@ type fakeServerAPI struct {
 	// replaced records the QueueReplace items; replaceRes is what it returns.
 	replaced   *[]server.QueueItem
 	replaceRes server.QueueResult
+	calls      *[]string
+	removeRes  server.QueueResult
+	budget     server.BudgetStatus
+}
+
+// verb records the maintenance verbs ("drain", "pause", "resume", "override",
+// "remove <addr>") so a test can assert which one a key reached; removeRes and
+// budget are what QueueRemove and Budget return.
+func (f fakeServerAPI) verb(v string) {
+	if f.calls != nil {
+		*f.calls = append(*f.calls, v)
+	}
+}
+
+func (f fakeServerAPI) QueueRemove(_ context.Context, a string) (server.QueueResult, error) {
+	f.verb("remove " + a)
+	return f.removeRes, nil
+}
+
+func (f fakeServerAPI) QueuePause(context.Context) (server.QueueResult, error) {
+	f.verb("pause")
+	return server.QueueResult{Mode: "paused"}, nil
+}
+
+func (f fakeServerAPI) QueueResume(context.Context) (server.QueueResult, error) {
+	f.verb("resume")
+	return server.QueueResult{Mode: "running"}, nil
+}
+
+func (f fakeServerAPI) QueueDrain(context.Context) (server.QueueResult, error) {
+	f.verb("drain")
+	return server.QueueResult{Mode: "draining"}, nil
+}
+
+func (f fakeServerAPI) Budget(context.Context) (server.BudgetStatus, error) { return f.budget, nil }
+
+func (f fakeServerAPI) BudgetOverride(context.Context) (server.BudgetResult, error) {
+	f.verb("override")
+	return server.BudgetResult{}, nil
 }
 
 func (f fakeServerAPI) QueueReplace(_ context.Context, _ string, items []server.QueueItem) (server.QueueResult, error) {

@@ -32,6 +32,12 @@ type ServerAPI interface {
 	QueueItems(ctx context.Context) ([]server.QueueItem, error)
 	QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error)
 	QueueReplace(ctx context.Context, project string, items []server.QueueItem) (server.QueueResult, error)
+	QueueRemove(ctx context.Context, address string) (server.QueueResult, error)
+	QueuePause(ctx context.Context) (server.QueueResult, error)
+	QueueResume(ctx context.Context) (server.QueueResult, error)
+	QueueDrain(ctx context.Context) (server.QueueResult, error)
+	Budget(ctx context.Context) (server.BudgetStatus, error)
+	BudgetOverride(ctx context.Context) (server.BudgetResult, error)
 }
 
 // serverEnqueueDefaultAgent is preselected in the "a" confirm; it matches the
@@ -278,6 +284,12 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 			return m, notify.Error("replace refused: " + msg.problem), true
 		}
 		return m, tea.Batch(notify.Success(fmt.Sprintf("queue replaced with %d ticket(s)", msg.count)), m.cmdServerQueue()), true
+
+	case serverDoneMsg:
+		if msg.problem != "" {
+			return m, notify.Error("refused: " + msg.problem), true
+		}
+		return m, tea.Batch(notify.Success(msg.ok), m.cmdServerQueue()), true
 
 	case serverQueueMsg:
 		if msg.err == nil {

@@ -27,6 +27,9 @@ const (
 // reachable from here and the menu's header explains what draining does
 // before either is chosen.
 func (m Model) handleDrainReplaceKey() (tea.Model, tea.Cmd) {
+	if m.serverMode() {
+		return m.handleServerDrainKey()
+	}
 	r, ok := m.selectedRow()
 	if !ok {
 		return m, nil
