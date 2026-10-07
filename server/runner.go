@@ -39,6 +39,8 @@ const (
 	EventIterationFailed = "iteration-failed"
 	// EventRootCompleted streams once every ticket of a queued root is done.
 	EventRootCompleted = "root-completed"
+	// EventRootParked streams when a finished root cannot fast-forward onto its target.
+	EventRootParked = "root-parked"
 
 	implementSkill = "gx-implement"
 )
@@ -302,12 +304,9 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	ref, err = tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t)
+	ref, err = rootRef(addr.Project, epics, addr.Epic, t, repo)
 	if err != nil {
 		return "", "", "", err
-	}
-	if ref == "" {
-		ref = git.RemoteDefaultBranch(repo)
 	}
 	sha, err := git.RevParse(repo, ref)
 	if err != nil {
@@ -324,6 +323,18 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 		return "", "", "", fmt.Errorf("resolve %s: %w", addr.Epic, err)
 	}
 	return ref, ref + "@" + sha, leaf, nil
+}
+
+// rootRef is the branch a root's feature branch starts from and lands back onto.
+func rootRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
+	ref, err := tickets.DeriveRootBase(project, epics, epic, t)
+	if err != nil {
+		return "", err
+	}
+	if ref == "" {
+		ref = git.RemoteDefaultBranch(repo)
+	}
+	return ref, nil
 }
 
 // prepareAndLaunch gives the ticket its own worktree, then launches the agent
@@ -394,10 +405,12 @@ func (s *Server) notifyPark(one ralphloop.OneIteration, ticketAddr, status strin
 	s.chat.Park(addr.Project, addr.Epic, one.Ticket.Path, addr.ID, status, "iteration ended without landing the ticket")
 }
 
-// completeRootIfDone dequeues the root once every ticket in its epic is done.
+// completeRootIfDone lands the root's feature branch once every ticket in its
+// epic is done, then dequeues it. A branch that needs a rebase parks the root
+// instead: a person runs gx-merge.
 func (s *Server) completeRootIfDone(root string, one ralphloop.OneIteration) {
 	project, _, _ := strings.Cut(root, ":")
-	dir, _, err := s.projectOf(project)
+	dir, repo, err := s.projectOf(project)
 	if err != nil {
 		s.log.Warn("complete root", "root", root, "err", err)
 		return
@@ -411,6 +424,18 @@ func (s *Server) completeRootIfDone(root string, one ralphloop.OneIteration) {
 		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
 			continue
 		}
+		if reason, err := s.landRoot(project, epics, one, repo); err != nil {
+			s.log.Warn("land root", "root", root, "err", err)
+			s.events.publish(EventIterationFailed, root)
+			return
+		} else if reason != "" {
+			s.events.publish(EventRootParked, root)
+			s.log.Warn("root parked", "root", root, "reason", reason)
+			if s.chat != nil {
+				s.chat.Park(project, one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason)
+			}
+			return
+		}
 		for _, item := range s.queued.list() {
 			if a, err := tickets.ParseAddress(item.Address, tickets.AddressContext{}); err == nil && a.Project+":"+a.Epic == root {
 				_, _ = s.queueRemove(QueueRequest{Address: item.Address})
@@ -418,6 +443,31 @@ func (s *Server) completeRootIfDone(root string, one ralphloop.OneIteration) {
 		}
 		s.events.publish(EventRootCompleted, root)
 	}
+}
+
+// landRoot fast-forwards the root's target to its feature branch through the
+// merge core. A non-empty reason means the root must park, not land.
+func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, err error) {
+	target, err := rootRef(project, epics, one.Epic, one.Ticket, repoDir)
+	if err != nil {
+		return "", err
+	}
+	info, err := git.IdentifyDir(repoDir)
+	if err != nil {
+		return "", err
+	}
+	worktrees, err := git.ListWorktrees(info.Repo)
+	if err != nil {
+		return "", err
+	}
+	out, err := git.MergeBranchInto(info.Repo, worktrees, one.Epic, target)
+	if err != nil {
+		return "", err
+	}
+	if out.Merged {
+		return "", nil
+	}
+	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), nil
 }
 
 func (s *Server) launch(addr tickets.Address, ticketAddr, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {

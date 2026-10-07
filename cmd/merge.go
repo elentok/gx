@@ -36,20 +36,18 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 
 	branch := resolveMergeBranch(branchArg, worktrees)
 
-	ok, err := git.MergeFastForward(mainWorktreeDir(repo, worktrees), branch)
+	outcome, err := git.MergeBranchInto(repo, worktrees, branch, repo.MainBranch)
 	if err != nil {
 		return err
 	}
 
-	var result MergeResult
-	if ok {
-		result = MergeResult{Status: "merged"}
-	} else {
+	result := MergeResult{Status: "merged"}
+	if !outcome.Merged {
 		result = MergeResult{
 			Status:       "needs_rebase",
-			Branch:       branch,
-			Target:       repo.MainBranch,
-			WorktreePath: worktreePathForBranch(branch, worktrees),
+			Branch:       outcome.Branch,
+			Target:       outcome.Target,
+			WorktreePath: outcome.WorktreePath,
 		}
 	}
 
@@ -71,28 +69,6 @@ func resolveMergeBranch(arg string, worktrees []git.Worktree) string {
 		}
 	}
 	return arg
-}
-
-// mainWorktreeDir returns the directory to run the merge in: the linked
-// worktree checked out to repo.MainBranch, if one exists. Without one (main
-// was never checked out as its own worktree) it falls back to repo.Root; for
-// a non-bare repo that's the only working tree there is, and for a bare repo
-// it has no working tree at all, so the merge below fails with git's own
-// "must be run in a work tree" error rather than silently doing nothing.
-func mainWorktreeDir(repo git.Repo, worktrees []git.Worktree) string {
-	if path := worktreePathForBranch(repo.MainBranch, worktrees); path != "" {
-		return path
-	}
-	return repo.Root
-}
-
-func worktreePathForBranch(branch string, worktrees []git.Worktree) string {
-	for _, wt := range worktrees {
-		if wt.Branch == branch {
-			return wt.Path
-		}
-	}
-	return ""
 }
 
 func printMergeJSON(w io.Writer, result MergeResult) error {

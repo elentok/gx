@@ -246,7 +246,8 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	})
 	_, _, cwd := registerLaunch(h)
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
-		testutil.WriteFile(t, *cwd, "agent.txt", "work")
+		// Root A lands on main first, so root B needs work of its own to commit.
+		testutil.WriteFile(t, *cwd, filepath.Base(*cwd)+".txt", "work")
 		testutil.CommitAll(t, *cwd, "agent work")
 		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
 	})
