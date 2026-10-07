@@ -142,6 +142,8 @@ type QueueModel struct {
 	serverAPI   ServerAPI
 	serverStart func(context.Context) error
 	serverDown  bool
+	// projectFilter narrows the server-mode rows to one project; "" shows all.
+	projectFilter string
 }
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, extraKeys keys.Manager, orders ...map[string]uint64) QueueModel {
@@ -782,6 +784,9 @@ func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
 // (ticket 16).
 const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
 
+// bindingQueueCycleProject is "tp": all projects, then each project in turn.
+const bindingQueueCycleProject keys.BindingID = "cycle-project"
+
 // bindingQueueSelectFirst is the "gg" chord (ticket 11), dispatched through
 // keys.Manager since it's a two-key sequence like bindingQueueToggleHideDone
 // above.
@@ -824,6 +829,7 @@ func newQueueKeysManager() keys.Manager {
 	return keys.New([]keys.Binding{
 		{ID: bindingQueueHelp, Seq: []string{"?"}, Categories: []string{"Other"}, Title: "help"},
 		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
+		{ID: bindingQueueCycleProject, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "filter by project"},
 		{ID: bindingQueueEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
 		{ID: bindingQueueEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
 		{ID: bindingQueueEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
@@ -862,6 +868,17 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueToggleHideDone:
 			m.hideComplete = !m.hideComplete
 			m.clampSelected()
+		case bindingQueueCycleProject:
+			if m.serverAPI == nil {
+				return m, nil
+			}
+			m.projectFilter = nextProject(m.epics, m.projectFilter)
+			m.clampSelected()
+			label := "all projects"
+			if m.projectFilter != "" {
+				label = "project: " + m.projectFilter
+			}
+			return m, notify.Info(label)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 		case bindingQueueEditHSplit:

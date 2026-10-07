@@ -286,6 +286,9 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	}
 
 	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	if m.serverAPI != nil {
+		title = projectOf(t.Path) + ": " + title
+	}
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}

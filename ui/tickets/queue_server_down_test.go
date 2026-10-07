@@ -116,3 +116,32 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 		t.Error("server-mode load rewrote the local queue store")
 	}
 }
+
+// Seam D: a snapshot with two projects renders project-prefixed rows, and "tp"
+// filters them by project.
+func TestQueueServerMode_PrefixesRowsAndFiltersByProject(t *testing.T) {
+	api := fakeServerAPI{snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "blog:beta/01", Title: "Second", Status: "open"},
+	}}, queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}}}
+	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))).WithServerLink(api, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	next, _ = next.(QueueModel).Update(next.(QueueModel).cmdLoadQueue()())
+	m = next.(QueueModel)
+
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"gx: 01 First", "blog: 01 Second"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view missing %q:\n%s", want, view)
+		}
+	}
+
+	m.projectFilter = nextProject(m.epics, "")
+	view = ansi.Strip(m.View().Content)
+	if !strings.Contains(view, "blog: 01 Second") || strings.Contains(view, "gx: 01 First") {
+		t.Errorf("filter %q should show only blog:\n%s", m.projectFilter, view)
+	}
+	if got := nextProject(m.epics, "gx"); got != "" {
+		t.Errorf("after the last project the filter should return to all, got %q", got)
+	}
+}

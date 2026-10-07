@@ -3,6 +3,7 @@ package tickets
 import (
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -68,8 +69,9 @@ type queueEntriesCache struct {
 	epics        []tickets.Epic
 	checked      map[string]bool
 	hideComplete bool
+	project      string
 	collapsed    map[string]bool
-	entries      []tree.Entry[queueNode]
+	entries     []tree.Entry[queueNode]
 }
 
 // buildQueueEntriesCached returns buildQueueEntries' result, reusing the
@@ -87,6 +89,7 @@ func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 	c := m.entriesCache
 	if c.entries != nil &&
 		c.hideComplete == m.hideComplete &&
+		c.project == m.projectFilter &&
 		reflect.DeepEqual(c.epics, m.epics) &&
 		reflect.DeepEqual(c.checked, m.checked) &&
 		reflect.DeepEqual(c.collapsed, collapsed) {
@@ -96,6 +99,7 @@ func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 	c.epics = m.epics
 	c.checked = m.checked
 	c.hideComplete = m.hideComplete
+	c.project = m.projectFilter
 	c.collapsed = collapsed
 	c.entries = entries
 	return entries
@@ -124,6 +128,9 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 	childrenOf := map[string][]queueNode{}
 
 	for _, epic := range m.epics {
+		if m.projectFilter != "" && projectOf(epic.Name) != m.projectFilter {
+			continue
+		}
 		waves, planErr := epicWaves(epic, candidates, m.settings.MaxConcurrentTicketsPerEpic())
 		ordered := epicRowOrder(epic, waves, candidates)
 		if m.hideComplete {
@@ -217,6 +224,33 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		}
 	}
 	return entries
+}
+
+// projectOf is the project part of a "project:epic" or "project:epic/id" name.
+func projectOf(name string) string {
+	project, _, _ := strings.Cut(name, ":")
+	return project
+}
+
+// nextProject steps the filter through "" (all) and each project in epics, in
+// name order.
+func nextProject(epics []tickets.Epic, current string) string {
+	var projects []string
+	for _, e := range epics {
+		projects = append(projects, projectOf(e.Name))
+	}
+	slices.Sort(projects)
+	projects = slices.Compact(projects)
+	if current == "" {
+		if len(projects) == 0 {
+			return ""
+		}
+		return projects[0]
+	}
+	if i := slices.Index(projects, current); i >= 0 && i+1 < len(projects) {
+		return projects[i+1]
+	}
+	return ""
 }
 
 // filterDoneTickets drops a done ticket from ordered before nesting
