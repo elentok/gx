@@ -27,6 +27,8 @@ import (
 type Settings struct {
 	InitialRoute       nav.ViewState
 	ActiveWorktreePath string
+	// Server is set in server mode (config orchestrator = "server"); nil is in-process.
+	Server *ServerDeps
 	ui.Settings
 }
 
@@ -96,7 +98,26 @@ func New(repo git.Repo, settings Settings) Model {
 }
 
 func (m Model) Init() tea.Cmd {
+	if m.serverMode() {
+		return tea.Batch(m.activePage().model.Init(), m.cmdServerProbe())
+	}
 	return m.activePage().model.Init()
+}
+
+func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
+	tm := ticketsui.NewModelWithStore(root, s, keys.New(Bindings()), m.queueStore).WithServerLink(m.serverConn.link())
+	if m.serverMode() {
+		tm = tm.WithServer(m.settings.Server.Client)
+	}
+	return tm
+}
+
+func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
+	qm := ticketsui.NewQueueModelWithStore(root, s, keys.New(Bindings()), m.queueStore)
+	if m.serverMode() {
+		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
+	}
+	return qm
 }
 
 func (m Model) View() tea.View {
@@ -223,12 +244,12 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabTickets:
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewModelWithStore(viewState.WorktreeRoot, s, keys.New(Bindings()), m.queueStore).WithServerLink(m.serverConn.link()),
+			model:     m.newTicketsModel(viewState.WorktreeRoot, s),
 		}
 	case nav.TabQueue:
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewQueueModelWithStore(viewState.WorktreeRoot, s, keys.New(Bindings()), m.queueStore),
+			model:     m.newQueueModel(viewState.WorktreeRoot, s),
 		}
 	case nav.TabWorktrees:
 		fallthrough

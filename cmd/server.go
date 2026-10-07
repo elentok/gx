@@ -325,11 +325,26 @@ func runServerStartCmd(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	spawn := spawnDetached(stateDir)
+	return runServerStart(ctx, c, w, serverSpawn(stateDir))
+}
+
+// serverSpawn is the installed service when there is one, else a detached child.
+func serverSpawn(stateDir string) spawnFunc {
 	if svc := installedService(stateDir); svc != nil {
-		spawn = svc.Start
+		return svc.Start
 	}
-	return runServerStart(ctx, c, w, spawn)
+	return spawnDetached(stateDir)
+}
+
+// serverStarter is runServerStart without output, for the TUI.
+func serverStarter(c *apiclient.Client) func(context.Context) error {
+	return func(ctx context.Context) error {
+		stateDir, err := config.StateDir()
+		if err != nil {
+			return err
+		}
+		return runServerStart(ctx, c, io.Discard, serverSpawn(stateDir))
+	}
 }
 
 func runServerRestart(ctx context.Context, w io.Writer) error {

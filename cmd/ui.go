@@ -57,6 +57,7 @@ func runWorktrees(_ string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
@@ -101,6 +102,7 @@ func runStatus(target string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
@@ -138,6 +140,7 @@ func runLog(opts LogOptions) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: opts.Ref, FilterPath: opts.File},
 		ActiveWorktreePath: root,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
@@ -175,6 +178,7 @@ func runShow(ref string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
@@ -212,6 +216,7 @@ func runStash() error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabStash, WorktreeRoot: root},
 		ActiveWorktreePath: root,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
@@ -249,6 +254,7 @@ func runPRs(allRepos bool) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: root, AllRepos: allRepos},
 		ActiveWorktreePath: root,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
@@ -286,11 +292,25 @@ func runTickets() error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: root},
 		ActiveWorktreePath: root,
+		Server:             serverDeps(cfg),
 		Settings:           settingsFromConfig(cfg),
 	})
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err
+}
+
+// serverDeps is nil in in-process mode; in server mode it carries the API
+// client and the "start the server" action the TUI offers when it is down.
+func serverDeps(cfg config.Config) *app.ServerDeps {
+	if cfg.Orchestrator != config.OrchestratorServer {
+		return nil
+	}
+	c, err := serverClient()
+	if err != nil {
+		return nil
+	}
+	return &app.ServerDeps{Client: c, Build: getVersion(), Start: serverStarter(c)}
 }
 
 func settingsFromConfig(cfg config.Config) ui.Settings {
