@@ -176,14 +176,15 @@ func (s *Server) concurrencyLimit() int {
 	return config.DefaultExecutionQueueConfig().MaxConcurrentEpics
 }
 
-// claimRoot reports whether it launched an iteration for item's root.
+// claimRoot reports whether it launched an iteration for item's root. A claim
+// that parked instead (ambiguous base) launched nothing, so it used no slot.
 func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
 	if err != nil {
 		return false, err
 	}
-	root := addr.Project + ":" + addr.Epic
-	if s.registry.has(root) {
+	root := rootOf(addr)
+	if s.registry.has(root.String()) {
 		return false, nil
 	}
 	projectDir, repo, err := s.projectOf(addr.Project)
@@ -215,7 +216,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.refused.set(ticketAddr, false)
-		return true, s.claimAndLaunch(root, addr, t, repo, ralphloop.AgentKind(item.Agent))
+		return s.claimAndLaunch(root, addr, t, repo, ralphloop.AgentKind(item.Agent), loaded)
 	}
 	return false, nil
 }
@@ -246,23 +247,25 @@ func (s *Server) projectOf(project string) (dir, repo string, err error) {
 // claimAndLaunch writes the claim to the ticket file first, so markdown stays
 // the truth and nothing streams before it is on disk. A failed launch parks the
 // ticket needs-repair rather than leaving a claim with no agent behind it.
-func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind) error {
+// launched is false when the ticket parked on an ambiguous base: no agent runs.
+// epics is the project's loaded epics, for the base derivation.
+func (s *Server) claimAndLaunch(root rootRef, addr tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
 	ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
-	rootBase, resolvedBase, leafBase, err := s.resolveBase(addr, t, repo)
+	rootBase, resolvedBase, leafBase, err := s.resolveBase(addr, t, repo, epics)
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
 		ticket := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
 		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.AmbiguousBase, reason); perr != nil {
-			return fmt.Errorf("park %s: %w", ticketAddr, perr)
+			return false, fmt.Errorf("park %s: %w", ticketAddr, perr)
 		}
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return fmt.Errorf("base for %s: %w", ticketAddr, err)
+		return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 	}
 	if err := ralphloop.ClaimWithBase(t.Path, resolvedBase); err != nil {
-		return fmt.Errorf("claim %s: %w", ticketAddr, err)
+		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
@@ -279,36 +282,28 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 			err = errors.Join(err, fmt.Errorf("park: %w", perr))
 		}
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
-		return fmt.Errorf("launch %s: %w", ticketAddr, err)
+		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
 	s.registry.put(trackedRun{
-		Run: run, Root: root, Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path,
+		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path,
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
 	go s.finishRun(deps, root, one, wt, run, ticketAddr)
-	return nil
+	return true, nil
 }
 
 // resolveBase derives where t starts from. ref is the branch the root epic's
 // feature branch is created from, with its "ref@sha" claim stamp; leaf is the
 // unlanded sibling whose branch t starts from instead of the feature tip. A
 // commitless ticket reads at the feature tip, so everything comes back empty.
-func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string) (ref, stamp, leaf string, err error) {
+func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (ref, stamp, leaf string, err error) {
 	if t.Commitless {
 		return "", "", "", nil
-	}
-	dir, _, err := s.projectOf(addr.Project)
-	if err != nil {
-		return "", "", "", err
-	}
-	epics, err := tickets.Load(dir)
-	if err != nil {
-		return "", "", "", err
 	}
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	ref, err = rootRef(addr.Project, epics, addr.Epic, t, repo)
+	ref, err = rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -329,8 +324,8 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	return ref, ref + "@" + sha, leaf, nil
 }
 
-// rootRef is the branch a root's feature branch starts from and lands back onto.
-func rootRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
+// rootBaseRef is the branch a root's feature branch starts from and lands back onto.
+func rootBaseRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
 	ref, err := tickets.DeriveRootBase(project, epics, epic, t)
 	if err != nil {
 		return "", err
@@ -365,9 +360,9 @@ func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIterati
 
 // finishRun waits for the agent to settle, then lands (or parks) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
-func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
+func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
 	defer s.kickRunner()
-	defer s.registry.delete(root)
+	defer s.registry.delete(root.String())
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
 	var out ralphloop.FinishOutcome
@@ -400,8 +395,8 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 // completeRootIfDone lands the root's feature branch once every ticket in its
 // epic is done, then dequeues it. A branch that needs a rebase parks the root
 // instead: a person runs gx-merge.
-func (s *Server) completeRootIfDone(root string, one ralphloop.OneIteration) {
-	project, _, _ := strings.Cut(root, ":")
+func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
+	project := root.Project
 	dir, repo, err := s.projectOf(project)
 	if err != nil {
 		s.log.Warn("complete root", "root", root, "err", err)
@@ -418,29 +413,29 @@ func (s *Server) completeRootIfDone(root string, one ralphloop.OneIteration) {
 		}
 		if reason, err := s.landRoot(project, epics, one, repo); err != nil {
 			s.log.Warn("land root", "root", root, "err", err)
-			s.events.publish(EventIterationFailed, root)
+			s.events.publish(EventIterationFailed, root.String())
 			return
 		} else if reason != "" {
-			s.events.publish(EventRootParked, root)
+			s.events.publish(EventRootParked, root.String())
 			s.log.Warn("root parked", "root", root, "reason", reason)
 			if s.chat != nil {
 				s.chat.Park(project, one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason)
 			}
 			return
 		}
-		for _, item := range s.queued.list() {
-			if a, err := tickets.ParseAddress(item.Address, tickets.AddressContext{}); err == nil && a.Project+":"+a.Epic == root {
-				_, _ = s.queueRemove(QueueRequest{Address: item.Address})
-			}
+		if removed, err := s.queued.removeRoot(root); err != nil {
+			s.log.Warn("dequeue completed root", "root", root, "err", err)
+		} else if removed {
+			s.events.publish(EventQueueChanged, root.String())
 		}
-		s.events.publish(EventRootCompleted, root)
+		s.events.publish(EventRootCompleted, root.String())
 	}
 }
 
 // landRoot fast-forwards the root's target to its feature branch through the
 // merge core. A non-empty reason means the root must park, not land.
 func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, err error) {
-	target, err := rootRef(project, epics, one.Epic, one.Ticket, repoDir)
+	target, err := rootBaseRef(project, epics, one.Epic, one.Ticket, repoDir)
 	if err != nil {
 		return "", err
 	}

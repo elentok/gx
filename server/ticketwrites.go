@@ -30,7 +30,7 @@ type ticketRef struct {
 	epic       tickets.Epic
 }
 
-func (r ticketRef) root() string { return r.addr.Project + ":" + r.addr.Epic }
+func (r ticketRef) root() rootRef { return rootOf(r.addr) }
 
 // findTicket resolves a canonical address to its ticket, or reports it unknown.
 func (s *Server) findTicket(address string) (ticketRef, bool, error) {
@@ -63,8 +63,8 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 // ticket write shares, before do runs.
 func (s *Server) ticketWrite(req QueueRequest, do func(ticketRef) (QueueResult, error)) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
-		if s.registry.has(ref.root()) {
-			return refusal(ReasonIterationRunning, "an iteration is running in "+ref.root()), nil
+		if s.registry.has(ref.root().String()) {
+			return refusal(ReasonIterationRunning, "an iteration is running in "+ref.root().String()), nil
 		}
 		return do(ref)
 	})
@@ -124,7 +124,11 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 				agent = ralphloop.AgentKind(it.Agent)
 			}
 		}
-		if err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, agent); err != nil {
+		epics, err := tickets.Load(ref.projectDir)
+		if err != nil {
+			return QueueResult{}, err
+		}
+		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, agent, epics); err != nil {
 			return QueueResult{}, err
 		}
 		return QueueResult{}, nil

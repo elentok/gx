@@ -278,6 +278,35 @@ func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *tes
 	}
 }
 
+// A claim that parks on an ambiguous base launches nothing, so claimNext must
+// not count it against the concurrency limit. The frontier never offers such a
+// ticket (it shares the blocking rule with base derivation), so the claim is
+// driven directly.
+func TestRunner_AmbiguousBaseParksWithoutLaunching(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	registerLaunch(h)
+
+	launched, err := h.Server.ClaimTicket("proj:epic-a/03", "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if launched {
+		t.Error("claim reported launched, want parked with no slot used")
+	}
+	if runs := h.Server.Runs(); len(runs) != 0 {
+		t.Errorf("runs = %+v, want none", runs)
+	}
+	body, err := os.ReadFile(filepath.Join(store, "proj", "epic-a", "issues", "03-third.md"))
+	if err != nil || !strings.Contains(string(body), "status: needs-answer") {
+		t.Errorf("ticket 03 (%v):\n%s\nwant status: needs-answer", err, body)
+	}
+}
+
 func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

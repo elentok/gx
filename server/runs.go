@@ -197,10 +197,14 @@ func (s *Server) reclaim(t trackedRun) error {
 	if err != nil {
 		return err
 	}
+	root, err := parseRootRef(t.Root)
+	if err != nil {
+		return err
+	}
 	t.Pane, t.Tab = agent.PaneID, agent.TabID
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
-	go s.finishRun(ralphloop.DefaultDeps(), t.Root, one, wt, t.Run, t.Address)
+	go s.finishRun(ralphloop.DefaultDeps(), root, one, wt, t.Run, t.Address)
 	return nil
 }
 
