@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -26,6 +27,7 @@ type fakeServerAPI struct {
 	replaceRes server.QueueResult
 	removeRes  server.QueueResult
 	budget     server.BudgetStatus
+	iterations []server.IterationInfo
 }
 
 // verb records the maintenance verbs ("drain", "pause", "resume", "override",
@@ -360,5 +362,88 @@ func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
 	cmd()
 	if want := []string{"park gx:alpha/01", "unpark gx:alpha/02"}; !slices.Equal(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
+	}
+}
+
+func (f fakeServerAPI) Iterations(context.Context) ([]server.IterationInfo, error) {
+	return f.iterations, nil
+}
+
+func (f fakeServerAPI) TicketChanged(_ context.Context, address string) error {
+	f.record("changed " + address)
+	return nil
+}
+
+func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
+	t.Helper()
+	m := newServerModel(t).WithServer(api)
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
+	}}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = selectTicketRow(t, updated.(Model))
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	return updated.(Model)
+}
+
+// Seam D: Answer in pane targets the tab from the iterations read, and Resume
+// issues unpark.
+func TestServerMode_AnswerInPaneAndResume(t *testing.T) {
+	var focused []string
+	defer func(prev func(string) error) { focusIterationTab = prev }(focusIterationTab)
+	focusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
+
+	var calls []string
+	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
+	m := openAnswerMenu(t, api)
+	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswerInPane, actionResumeAnswered, actionInvestigate}; !slices.Equal(got, want) {
+		t.Fatalf("menu = %v, want %v", got, want)
+	}
+
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	cmd()
+	if !slices.Equal(focused, []string{"t1"}) {
+		t.Fatalf("focused = %v", focused)
+	}
+
+	m = updated.(Model)
+	m, _ = func() (Model, tea.Cmd) { u, c := m.handleSuggestedActionsKey(); return u.(Model), c }()
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	updated, cmd = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if msg, ok := cmd().(serverWriteMsg); !ok || msg.verb != serverVerbUnpark {
+		t.Fatalf("resume result = %+v", msg)
+	}
+	if !slices.Equal(calls, []string{"unpark gx:alpha/01"}) {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+// Seam D: with no live pane the menu offers Answer…, which writes the ticket
+// file directly; its resume pings the server and then unparks.
+func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
+	var calls []string
+	m := openAnswerMenu(t, fakeServerAPI{calls: &calls})
+	if got := menuValues(m.actionsMenu.state)[0]; got != actionAnswer {
+		t.Fatalf("first item = %q", got)
+	}
+	store := t.TempDir()
+	dir := filepath.Join(store, "gx", "alpha", "issues")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, "01-first.md")
+	if err := os.WriteFile(want, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := ticketFile(store, "gx:alpha/01"); err != nil || got != want {
+		t.Fatalf("ticketFile = %q, %v", got, err)
+	}
+
+	m = m.WithTicketStore(store)
+	if msg, ok := m.cmdServerResumeAnswered("gx:alpha/01")().(serverWriteMsg); !ok || msg.problem != "" {
+		t.Fatalf("resume result = %+v", msg)
+	}
+	if !slices.Equal(calls, []string{"changed gx:alpha/01", "unpark gx:alpha/01"}) {
+		t.Fatalf("calls = %v", calls)
 	}
 }

@@ -43,11 +43,18 @@ type answerEditorFinishedMsg struct {
 	before       string
 	worktreeRoot string
 	settings     ui.Settings
+	// resume replaces the file-write resume once the editor is done; server
+	// mode sets it to ping and unpark through the server.
+	resume tea.Cmd
 }
 
 // cmdAnswer opens $EDITOR at ticket path's "## Needs Answer" heading,
 // snapshotting that section first for the in-place comparison.
 func cmdAnswer(worktreeRoot string, settings ui.Settings, path string) tea.Cmd {
+	return cmdAnswerThen(worktreeRoot, settings, path, nil)
+}
+
+func cmdAnswerThen(worktreeRoot string, settings ui.Settings, path string, resume tea.Cmd) tea.Cmd {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return notify.Error("answer: " + err.Error())
@@ -62,7 +69,7 @@ func cmdAnswer(worktreeRoot string, settings ui.Settings, path string) tea.Cmd {
 	return terminalrun.Command(worktreeRoot, settings.Terminal, editor[0], args, func(err error, splitApp string) tea.Msg {
 		return answerEditorFinishedMsg{
 			err: err, splitApp: splitApp, path: path, before: before,
-			worktreeRoot: worktreeRoot, settings: settings,
+			worktreeRoot: worktreeRoot, settings: settings, resume: resume,
 		}
 	})
 }
@@ -82,16 +89,20 @@ func handleAnswerEditorFinished(c confirm.Model, msg answerEditorFinishedMsg, on
 		return c, notify.Error("answer: " + err.Error())
 	}
 	if needsAnswerSection(string(raw)) != msg.before {
+		resume := msg.resume
+		if resume == nil {
+			resume = cmdApplySuggestedAction(msg.path, actionResumeAnswered, onApplied)
+		}
 		return c.Open(confirm.Options{
 			Prompt:     "Resume the ticket?",
 			DefaultYes: true,
-			AcceptCmd:  cmdApplySuggestedAction(msg.path, actionResumeAnswered, onApplied),
+			AcceptCmd:  resume,
 		}), nil
 	}
 	return c.Open(confirm.Options{
 		Prompt:     "No answer found… Keep editing?",
 		DefaultYes: true,
-		AcceptCmd:  cmdAnswer(msg.worktreeRoot, msg.settings, msg.path),
+		AcceptCmd:  cmdAnswerThen(msg.worktreeRoot, msg.settings, msg.path, msg.resume),
 	}), nil
 }
 
