@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/events"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -172,7 +173,7 @@ func (s *Server) parkMismatch(t trackedRun, cause error) {
 	if err == nil {
 		var dir string
 		if dir, _, err = s.projectOf(addr.Project); err == nil {
-			err = ralphloop.ParkHandleMismatch(dir, addr.Epic, addr.ID, t.TicketPath, "cannot reclaim iteration after restart: "+cause.Error())
+			err = ralphloop.Park(dir, addr.Epic, addr.ID, t.TicketPath, events.HandleMismatch, "cannot reclaim iteration after restart: "+cause.Error())
 		}
 	}
 	if err != nil {

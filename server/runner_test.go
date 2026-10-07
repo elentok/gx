@@ -235,6 +235,49 @@ func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 	}
 }
 
+func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	_, _, cwd := registerLaunch(h)
+	// The agent's turn wrecks its own worktree, so the finish cannot read it.
+	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
+		if err := os.RemoveAll(*cwd); err != nil {
+			t.Error(err)
+		}
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	for ev := range evs {
+		if ev.Type == server.EventIterationFailed {
+			break
+		}
+	}
+	tk, err := schema.ParseTicket(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKind(events.IterationError) {
+		t.Errorf("ticket = (%q, %q), want needs-repair/iteration-error", tk.Status, tk.ParkKind)
+	}
+	if runs := h.Server.Runs(); len(runs) != 0 {
+		t.Errorf("runs = %+v, want the root freed", runs)
+	}
+}
+
 func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

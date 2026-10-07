@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/elentok/gx/events"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -329,7 +330,7 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 		return err
 	}
 	closeErr := herdr.TabClose(t.Tab)
-	parkErr := ralphloop.ParkBudgetKilled(dir, addr.Epic, addr.ID, t.TicketPath, "daily budget hard limit reached")
+	parkErr := ralphloop.Park(dir, addr.Epic, addr.ID, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
 	if parkErr == nil {
 		s.events.publish(EventTicketParked, t.Address)
 	}

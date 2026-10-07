@@ -47,53 +47,13 @@ func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone boo
 	return err
 }
 
-// ParkNeedsRepair parks the ticket needs-repair with a person's reason through
-// the park path: one status write (with the "## Needs Repair" section) and one
-// event. A blank reason is refused before anything is written.
-func ParkNeedsRepair(scratchDir, epicName, ticket, path, reason string) error {
+// Park parks the ticket through the park path: one status write, one event and
+// no live notification. The event type and the reason stub come from the kind.
+// A blank reason is refused before anything is written.
+func Park(scratchDir, epicName, ticket, path string, kind events.Kind, reason string) error {
 	_, err := park(noopEventSink{}, parkRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: events.NeedsRepair, Kind: events.ManualPark, Reason: reason,
-	})
-	return err
-}
-
-// ParkAmbiguousBase parks a ticket needs-answer at claim, its "## Needs Answer"
-// section naming the blockers to choose between.
-func ParkAmbiguousBase(scratchDir, epicName, ticket, path, reason string) error {
-	_, err := park(noopEventSink{}, parkRequest{
-		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: events.NeedsAnswer, Kind: events.AmbiguousBase, Reason: reason,
-	})
-	return err
-}
-
-// ParkBudgetKilled parks the ticket of an iteration the budget's hard limit
-// stopped, through the park path.
-func ParkBudgetKilled(scratchDir, epicName, ticket, path, reason string) error {
-	_, err := park(noopEventSink{}, parkRequest{
-		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: events.NeedsRepair, Kind: events.BudgetKilled, Reason: reason,
-	})
-	return err
-}
-
-// ParkHandleMismatch parks the ticket of a persisted iteration handle that a
-// restarted server cannot reclaim, through the park path.
-func ParkHandleMismatch(scratchDir, epicName, ticket, path, reason string) error {
-	_, err := park(noopEventSink{}, parkRequest{
-		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: events.NeedsRepair, Kind: events.HandleMismatch, Reason: reason,
-	})
-	return err
-}
-
-// ParkAmbiguousLand parks the ticket of a land a crash interrupted when verify
-// cannot say whether its commits landed, through the park path.
-func ParkAmbiguousLand(scratchDir, epicName, ticket, path, reason string) error {
-	_, err := park(noopEventSink{}, parkRequest{
-		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: events.NeedsRepair, Kind: events.AmbiguousLand, Reason: reason,
+		Type: kind.ParkType(), Kind: kind, Reason: reason,
 	})
 	return err
 }
@@ -114,7 +74,7 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	case events.NeedsAnswer:
 		// A blocked pane's question lives only in the pane, so its ticket gets a
 		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
-		if req.Kind == events.BlockedPane || req.Kind == events.AmbiguousBase {
+		if req.Kind.NeedsReasonStub() {
 			writeErr = markNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind))
 		} else {
 			writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))

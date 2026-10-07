@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/events"
 	"path/filepath"
 	"strings"
 
@@ -99,7 +100,7 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
-		if err := ralphloop.ParkNeedsRepair(ref.projectDir, ref.addr.Epic, ref.addr.ID, ref.ticket.Path, reason); err != nil {
+		if err := ralphloop.Park(ref.projectDir, ref.addr.Epic, ref.addr.ID, ref.ticket.Path, events.ManualPark, reason); err != nil {
 			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
 		}
 		s.events.publish(EventTicketParked, ref.addr.String())

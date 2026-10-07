@@ -6,8 +6,20 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
+
+// FinishOutcome is how a finished iteration ended without an error: the ticket
+// landed, or it parked with a status and kind. A failed finish is the error
+// return of FinishIteration, never an outcome.
+type FinishOutcome struct {
+	Landed bool
+	Status schema.Status // the park status; empty when Landed
+	Kind   events.Kind
+}
+
 
 // OneIteration is the fixed input of a single-ticket iteration driven from
 // outside Run (the server's runner). Label, branch and worktree names come out
@@ -100,8 +112,8 @@ func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
 // FinishIteration runs a finished agent through the shared finish path: park
 // on a needs-answer or zero-commit finish, otherwise land the commits onto the
 // feature branch, mark the ticket done and clean up. A deferred land (lock
-// held) is retried by the caller on its next pass.
-func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab string) error {
+// held) is an error, like any failed finish; the caller parks it.
+func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab string) (FinishOutcome, error) {
 	p := iterationParams{
 		WorkspaceID:     o.WorkspaceID,
 		RepoDir:         o.RepoDir,
@@ -119,9 +131,26 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab stri
 	}
 	err := finishIteration(d, p, w.Path, pane, tab, w.base, w.Branch, "")
 	var built *builtAwaitingLandError
-	if !errors.As(err, &built) {
-		return err
+	if err != nil && !errors.As(err, &built) {
+		return FinishOutcome{}, err
 	}
+	if built != nil {
+		if err := landBuilt(d, p, built); err != nil {
+			return FinishOutcome{}, err
+		}
+	}
+	t, err := schema.ParseTicket(o.Ticket.Path)
+	if err != nil {
+		return FinishOutcome{}, fmt.Errorf("reading finished ticket: %w", err)
+	}
+	if t.Status == schema.StatusDone {
+		return FinishOutcome{Landed: true}, nil
+	}
+	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
+}
+
+// landBuilt lands a built iteration that was waiting on the land queue.
+func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 	lp := landQueueParams{
 		WorkspaceID: p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
 		FeatureWorktree: p.FeatureWorktree, FeatureBranch: p.FeatureBranch, Agent: p.Agent,

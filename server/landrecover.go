@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/elentok/gx/events"
 	"path/filepath"
 
 	"github.com/elentok/gx/ralphloop"
@@ -90,7 +91,7 @@ func (s *Server) recoverEpicLand(projectDir, epicPath string) error {
 		s.events.publish(EventLandRolledBack, addr)
 	default:
 		reason := fmt.Sprintf("land interrupted by a crash (lock owner %s) and verify cannot tell whether it landed: %s", owner.Describe(), v.Landing)
-		if err := ralphloop.ParkAmbiguousLand(projectDir, epic, t.Identifier, t.Path, reason); err != nil {
+		if err := ralphloop.Park(projectDir, epic, t.Identifier, t.Path, events.AmbiguousLand, reason); err != nil {
 			return fmt.Errorf("parking %s: %w", addr, err)
 		}
 		s.events.publish(EventTicketParked, addr)

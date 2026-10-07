@@ -130,6 +130,29 @@ func Kinds() []Kind {
 // Valid reports whether k is in the closed enum.
 func (k Kind) Valid() bool { return kinds[k] }
 
+// kindNeedsAnswer lists the kinds that park a ticket as a question for a
+// person; every other kind parks needs-repair.
+var kindNeedsAnswer = map[Kind]bool{
+	ZeroCommit: true, BlockedPane: true, SelfReported: true, AmbiguousBase: true,
+}
+
+// kindNeedsStub lists the kinds whose question lives nowhere in the ticket, so
+// the park writes a "## Needs Answer" stub carrying the reason. Ticket-answered
+// kinds (zero-commit, self-reported) stay bare.
+var kindNeedsStub = map[Kind]bool{BlockedPane: true, AmbiguousBase: true}
+
+// ParkType is the event type a park of this kind writes.
+func (k Kind) ParkType() Type {
+	if kindNeedsAnswer[k] {
+		return NeedsAnswer
+	}
+	return NeedsRepair
+}
+
+// NeedsReasonStub reports whether a park of this kind writes its reason into a
+// stub section on the ticket.
+func (k Kind) NeedsReasonStub() bool { return kindNeedsStub[k] }
+
 // CauseHerdr reports whether a herdr outage can cause this kind.
 func (k Kind) CauseHerdr() bool { return kindCauseHerdr[k] }
 

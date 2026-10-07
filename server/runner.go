@@ -252,7 +252,7 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := ralphloop.ParkAmbiguousBase(s.cfg.TicketStore, addr.Epic, t.Identifier, t.Path, reason); perr != nil {
+		if perr := ralphloop.Park(s.cfg.TicketStore, addr.Epic, t.Identifier, t.Path, events.AmbiguousBase, reason); perr != nil {
 			return fmt.Errorf("park %s: %w", ticketAddr, perr)
 		}
 		return nil
@@ -365,23 +365,27 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 	defer s.kickRunner()
 	defer s.registry.delete(root)
 	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
+	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next server.
 		if !s.lands.begin() {
 			return
 		}
 		defer s.lands.end()
-		err = ralphloop.FinishIteration(deps, one, wt, run.Pane, run.Tab)
+		out, err = ralphloop.FinishIteration(deps, one, wt, run.Pane, run.Tab)
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
+		// Park it: a claimed ticket nobody is working on is stuck, not failed.
+		if perr := ralphloop.Park(s.cfg.TicketStore, one.Epic, one.Ticket.Identifier, one.Ticket.Path, events.IterationError, err.Error()); perr != nil {
+			s.log.Warn("park failed finish", "ticket", ticketAddr, "err", perr)
+		}
 		s.events.publish(EventIterationFailed, ticketAddr)
 		return
 	}
-	t, err := schema.ParseTicket(one.Ticket.Path)
-	if err != nil || t.Status != "done" {
+	if !out.Landed {
 		s.events.publish(EventIterationParked, ticketAddr)
-		s.notifyPark(one, ticketAddr, string(t.Status), events.Kind(t.ParkKind))
+		s.notifyPark(one, ticketAddr, string(out.Status), out.Kind)
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)

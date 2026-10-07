@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -145,5 +146,50 @@ func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
 	evs, _, _ := ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "budget-killed" {
 		t.Errorf("events = %+v, want the park event kept", evs)
+	}
+}
+
+// Seam: Park derives the event type from the kind, and writes the reason stub
+// only for kinds whose question lives nowhere else.
+func TestPark_DerivesTypeAndStubFromKind(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		kind   events.Kind
+		status schema.Status
+		event  string
+		stub   bool
+	}{
+		{events.ManualPark, schema.StatusNeedsRepair, "needs-repair", false},
+		{events.AmbiguousBase, schema.StatusNeedsAnswer, "needs-answer", true},
+		{events.BudgetKilled, schema.StatusNeedsRepair, "needs-repair", false},
+		{events.HandleMismatch, schema.StatusNeedsRepair, "needs-repair", false},
+		{events.AmbiguousLand, schema.StatusNeedsRepair, "needs-repair", false},
+		{events.IterationError, schema.StatusNeedsRepair, "needs-repair", false},
+	}
+	for _, c := range cases {
+		t.Run(string(c.kind), func(t *testing.T) {
+			t.Parallel()
+			scratchDir := writeEpic(t, "my-epic", map[string]string{
+				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
+			})
+			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			if err := Park(scratchDir, "my-epic", "01", path, c.kind, "the-reason"); err != nil {
+				t.Fatal(err)
+			}
+			got := mustParse(t, path)
+			if got.Status != c.status || got.ParkKind != schema.ParkKind(c.kind) {
+				t.Errorf("ticket = (%q, %q), want %s/%s", got.Status, got.ParkKind, c.status, c.kind)
+			}
+			if c.kind.NeedsReasonStub() != c.stub {
+				t.Errorf("NeedsReasonStub = %v, want %v", !c.stub, c.stub)
+			}
+			if data, _ := os.ReadFile(path); c.status == schema.StatusNeedsAnswer && !strings.Contains(string(data), "the-reason") {
+				t.Errorf("needs-answer stub lacks the reason:\n%s", data)
+			}
+			evs, _, _ := ReadEvents(scratchDir, "my-epic")
+			if len(evs) != 1 || evs[0].Type != c.event || evs[0].Kind != string(c.kind) {
+				t.Errorf("events = %+v, want one %s event kind %s", evs, c.event, c.kind)
+			}
+		})
 	}
 }
