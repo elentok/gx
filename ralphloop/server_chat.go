@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/elentok/gx/chatmarkup"
 )
@@ -21,30 +22,77 @@ type ServerChatConfig struct {
 }
 
 // ServerChat is the chat sink a server owns: one batcher and one gate per
-// destination, shared by every project, so a notification goes out once no
-// matter how many clients are connected.
+// destination (transport + target), shared by every project, so a notification
+// goes out once no matter how many clients are connected and two projects with
+// the same target share one batch.
 type ServerChat struct {
-	sinks []*chatEventSink
+	base ServerChatConfig // carries the test seams a project destination reuses
+
+	mu     sync.Mutex
+	dests  map[string]*chatEventSink // destination key -> its sink
+	global []*chatEventSink
+	closed bool
 }
 
-// NewServerChat starts a sink for each configured destination. It returns nil
-// when none is configured; a nil *ServerChat is safe to use.
+// NewServerChat starts a sink for each configured global destination. It
+// returns nil when none is configured; a nil *ServerChat is safe to use.
 func NewServerChat(cfg ServerChatConfig) *ServerChat {
-	c := &ServerChat{}
-	if cfg.TelegramBotToken != "" {
-		base := cfg.TelegramBaseURL
-		if base == "" {
-			base = telegramAPIBaseURL
-		}
-		c.sinks = append(c.sinks, newServerChatSink(telegramStyle, newTelegramTransport(cfg.TelegramBotToken, cfg.TelegramChatID, base), cfg.GateStatePath))
-	}
-	if cfg.SlackWebhookURL != "" {
-		c.sinks = append(c.sinks, newServerChatSink(slackStyle, newSlackTransport(cfg.SlackWebhookURL), cfg.GateStatePath))
-	}
-	if len(c.sinks) == 0 {
+	c := &ServerChat{base: cfg, dests: map[string]*chatEventSink{}}
+	c.global = c.sinksFor(cfg)
+	if len(c.global) == 0 {
 		return nil
 	}
 	return c
+}
+
+// sinksFor returns the sink of each destination cfg names, starting any that
+// does not exist yet. Destinations are keyed by transport and target, so equal
+// targets resolve to the same sink.
+func (c *ServerChat) sinksFor(cfg ServerChatConfig) []*chatEventSink {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []*chatEventSink
+	add := func(key string, start func() *chatEventSink) {
+		s, ok := c.dests[key]
+		if !ok {
+			if c.closed {
+				return
+			}
+			s = start()
+			c.dests[key] = s
+		}
+		out = append(out, s)
+	}
+	if cfg.TelegramBotToken != "" {
+		add("telegram\x00"+cfg.TelegramBotToken+"\x00"+cfg.TelegramChatID, func() *chatEventSink {
+			base := firstNonEmptyStr(cfg.TelegramBaseURL, c.base.TelegramBaseURL, telegramAPIBaseURL)
+			return newServerChatSink(telegramStyle, newTelegramTransport(cfg.TelegramBotToken, cfg.TelegramChatID, base), c.base.GateStatePath)
+		})
+	}
+	if cfg.SlackWebhookURL != "" {
+		add("slack\x00"+cfg.SlackWebhookURL, func() *chatEventSink {
+			return newServerChatSink(slackStyle, newSlackTransport(cfg.SlackWebhookURL), c.base.GateStatePath)
+		})
+	}
+	return out
+}
+
+func firstNonEmptyStr(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// projectSinks picks where a project's notifications go: its override block
+// replaces the global one whole (no per-transport merge), nil uses global.
+func (c *ServerChat) projectSinks(override *ServerChatConfig) []*chatEventSink {
+	if override == nil {
+		return c.global
+	}
+	return c.sinksFor(*override)
 }
 
 func newServerChatSink(style mrkdwnStyle, transport chatTransport, gateStatePath string) *chatEventSink {
@@ -58,11 +106,12 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, gateStatePath
 
 // Park notifies that a person must look at a ticket the server could not land.
 // Every message starts with the project name: one server notifies for many.
-func (c *ServerChat) Park(project, epic, ticketPath, identifier, status, reason string) {
+// override is the project's own notification block, nil to use the global one.
+func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, ticketPath, identifier, status, reason string) {
 	if c == nil {
 		return
 	}
-	for _, s := range c.sinks {
+	for _, s := range c.projectSinks(override) {
 		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, reason, EpicCounts{})
 		prefix := s.style.chatStyle.Escape(fmt.Sprintf("[%s] ", project))
 		s.send(chatmarkup.Join(chatmarkup.Text{}, []chatmarkup.Text{prefix, body}), notifyKindTicketNeedsHuman, ticketPath, identifier)
@@ -76,7 +125,7 @@ func (c *ServerChat) ParkDigest(lines []string) {
 		return
 	}
 	title := fmt.Sprintf("%d parked while herdr was down", len(lines))
-	for _, s := range c.sinks {
+	for _, s := range c.global {
 		s.send(s.style.chatStyle.Message("🅿️", title, "", strings.Join(lines, "\n"), s.style.identityLine("server", "")), notifyKindTicketNeedsHuman, serverSource, "")
 	}
 }
@@ -99,7 +148,7 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	if c == nil {
 		return
 	}
-	for _, s := range c.sinks {
+	for _, s := range c.global {
 		s.send(s.style.chatStyle.Message(n.Emoji, n.Title, "", n.Detail, s.style.identityLine("server", "")), n.Kind, serverSource, "")
 	}
 }
@@ -109,7 +158,14 @@ func (c *ServerChat) Close() {
 	if c == nil {
 		return
 	}
-	for _, s := range c.sinks {
+	c.mu.Lock()
+	c.closed = true
+	sinks := make([]*chatEventSink, 0, len(c.dests))
+	for _, s := range c.dests {
+		sinks = append(sinks, s)
+	}
+	c.mu.Unlock()
+	for _, s := range sinks {
 		s.Close()
 	}
 }

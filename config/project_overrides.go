@@ -76,9 +76,9 @@ func (c Config) WithProject(pf ProjectFile) Config {
 		}
 	}
 	if n := pf.Notifications; n != nil {
-		c.Notifications.Telegram.BotToken = firstNonEmpty(n.Telegram.BotToken, c.Notifications.Telegram.BotToken)
-		c.Notifications.Telegram.ChatID = firstNonEmpty(n.Telegram.ChatID, c.Notifications.Telegram.ChatID)
-		c.Notifications.Slack.WebhookURL = firstNonEmpty(n.Slack.WebhookURL, c.Notifications.Slack.WebhookURL)
+		// Replaces the whole block: a destination is transport + target, so
+		// merging per transport would mix one project's token with another's chat.
+		c.Notifications = *n
 	}
 	return c
 }

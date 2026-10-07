@@ -32,5 +32,5 @@ func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events
 		s.holdPark(addr, status, kind, reason)
 		return
 	}
-	s.chat.Park(addr.Project, addr.Epic, ticketPath, addr.ID, status, fmt.Sprintf("%s: %s", kind, reason))
+	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, fmt.Sprintf("%s: %s", kind, reason))
 }

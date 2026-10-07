@@ -242,6 +242,25 @@ func (s *Server) projectOf(project string) (dir, repo string, err error) {
 	return d, *pf.Repo, nil
 }
 
+// chatOverride is the project's own notification block from project.json, nil
+// when it has none (or is unreadable) so its notifications use the global one.
+func (s *Server) chatOverride(project string) *ralphloop.ServerChatConfig {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return nil
+	}
+	pf, err := config.ReadProjectFile(dir)
+	if err != nil || pf.Notifications == nil {
+		return nil
+	}
+	n := pf.Notifications
+	return &ralphloop.ServerChatConfig{
+		TelegramBotToken: n.Telegram.BotToken,
+		TelegramChatID:   n.Telegram.ChatID,
+		SlackWebhookURL:  n.Slack.WebhookURL,
+	}
+}
+
 // projectDir finds the project's directory in the store.
 func (s *Server) projectDir(project string) (string, error) {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
@@ -431,7 +450,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			s.events.publish(EventRootParked, root.String())
 			s.log.Warn("root parked", "root", root, "reason", reason)
 			if s.chat != nil {
-				s.chat.Park(project, one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason)
+				s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason)
 			}
 			return
 		}

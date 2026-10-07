@@ -47,6 +47,21 @@ func TestReadProjectFile_AcceptsWhitelist(t *testing.T) {
 	}
 }
 
+func TestWithProject_NotificationsReplaceTheGlobalBlock(t *testing.T) {
+	global := Config{Notifications: NotificationsConfig{
+		Telegram: TelegramConfig{BotToken: "t", ChatID: "c"},
+		Slack:    SlackConfig{WebhookURL: "g"},
+	}}
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{"notifications": {"slack": {"webhook-url": "u"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := global.WithProject(pf).Notifications
+	if got.Slack.WebhookURL != "u" || got.Telegram.BotToken != "" {
+		t.Errorf("notifications = %+v, want only the project's slack", got)
+	}
+}
+
 func TestWithProject_OverridesOnlyThatCopy(t *testing.T) {
 	global := Config{
 		ExecutionQueue: DefaultExecutionQueueConfig(),
