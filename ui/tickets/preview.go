@@ -1,7 +1,9 @@
 package tickets
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 )
 
@@ -102,13 +105,14 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")
-	if t.ReadErr != "" {
-		b.WriteString(statusErrorStyle.Render("  error reading ticket file: " + t.ReadErr))
+	text, err := ticketBody(t)
+	if err != nil {
+		b.WriteString(statusErrorStyle.Render("  error reading ticket file: " + err.Error()))
 		return b.String(), 0, false
 	}
 
 	prefixLines := strings.Count(b.String(), "\n")
-	body, target, ok := highlightParkSection(renderTicketMarkdown(t.Body, width), status)
+	body, target, ok := highlightParkSection(renderTicketMarkdown(text, width), status)
 	b.WriteString(body)
 	if ok {
 		target += prefixLines
@@ -198,4 +202,20 @@ func previewEpicHeaderLine(epic tickets.Epic) string {
 	}
 	line += " " + ui.StyleMuted.Render(fmt.Sprintf("(%d done / %d)", epic.DoneCount(), epic.TotalCount()))
 	return line
+}
+
+// ticketBody is t's markdown body. A server-mode ticket comes from the
+// snapshot, which carries no body, only the file: the body is read from there.
+func ticketBody(t tickets.Ticket) (string, error) {
+	if t.ReadErr != "" {
+		return "", errors.New(t.ReadErr)
+	}
+	if t.Body != "" || t.File == "" {
+		return t.Body, nil
+	}
+	raw, err := os.ReadFile(t.File)
+	if err != nil {
+		return "", err
+	}
+	return schema.ParseBody(string(raw)), nil
 }

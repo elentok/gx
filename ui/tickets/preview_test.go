@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -384,5 +385,21 @@ func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
 	}
 	if !strings.Contains(content, ui.StyleActiveSearchResult.Render("prose")) {
 		t.Fatalf("expected 'prose' wrapped in the active search-highlight style, got:\n%s", content)
+	}
+}
+
+// A server-mode ticket carries no body, only its file: the preview reads the
+// body from there.
+func TestRenderTicketPreview_ReadsBodyFromFileWhenMissing(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "20-a.md")
+	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nThe body text.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ticket := tickets.Ticket{Identifier: "20", Title: "A", Path: "gx:alpha/20", File: file, Status: "draft"}
+
+	content, _, _ := renderTicketPreview(tickets.Epic{Tickets: []tickets.Ticket{ticket}}, ticket, 80)
+
+	if !strings.Contains(ansi.Strip(content), "The body text.") {
+		t.Errorf("preview has no body:\n%s", ansi.Strip(content))
 	}
 }
