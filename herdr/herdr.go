@@ -7,7 +7,9 @@ package herdr
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -15,7 +17,32 @@ import (
 // runCommand is a seam so tests can fake `herdr` invocations without
 // spawning the real executable.
 var runCommand = func(args ...string) ([]byte, error) {
-	return exec.Command("herdr", args...).CombinedOutput()
+	return exec.Command(binary(), args...).CombinedOutput()
+}
+
+// fallbackDirs are where herdr is installed when the process's PATH lacks it,
+// as under launchd (PATH=/usr/bin:/bin:/usr/sbin:/sbin).
+var fallbackDirs = []string{"/opt/homebrew/bin", "/usr/local/bin"}
+
+// binary resolves the herdr executable: PATH first, then HERDR_BIN_PATH (set
+// inside a herdr pane), then the usual install dirs. It returns "herdr" when
+// nothing is found, so exec reports the usual not-found error.
+func binary() string {
+	if p, err := exec.LookPath("herdr"); err == nil {
+		return p
+	}
+	if p := os.Getenv("HERDR_BIN_PATH"); p != "" {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	for _, dir := range fallbackDirs {
+		p := filepath.Join(dir, "herdr")
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "herdr"
 }
 
 // AgentNameTakenError is herdr's agent_name_taken failure: the requested

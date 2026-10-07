@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -106,5 +107,29 @@ func TestLaunchdStartStop_RouteThroughLaunchctl(t *testing.T) {
 	}
 	if !reflect.DeepEqual(*calls, want) {
 		t.Errorf("launchctl calls = %v, want %v", *calls, want)
+	}
+}
+
+// bootout stops the old server asynchronously, so the bootstrap right after it
+// can fail with "Input/output error" until the teardown finishes.
+func TestLaunchdInstall_RetriesBootstrapWhileBootoutFinishes(t *testing.T) {
+	a, _ := newTestAgent(t)
+	oldAttempts, oldDelay := bootstrapAttempts, bootstrapRetryDelay
+	bootstrapAttempts, bootstrapRetryDelay = 5, 0
+	t.Cleanup(func() { bootstrapAttempts, bootstrapRetryDelay = oldAttempts, oldDelay })
+	failures := 2
+	a.run = func(args ...string) error {
+		if args[0] == "bootstrap" && failures > 0 {
+			failures--
+			return errors.New("Bootstrap failed: 5: Input/output error")
+		}
+		return nil
+	}
+
+	if err := a.Install(); err != nil {
+		t.Fatalf("Install = %v, want success after the bootstrap retries", err)
+	}
+	if failures != 0 {
+		t.Errorf("bootstrap was not retried: %d failures left", failures)
 	}
 }

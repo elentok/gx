@@ -152,6 +152,9 @@ type queueStrandedPendingMsg struct {
 // this process's lifetime reflects the user's own checking, not a restart, so
 // re-running the scan on every tab activation would nag mid-selection.
 func (m QueueModel) cmdCheckStrandedPending() tea.Cmd {
+	if m.serverAPI != nil {
+		return nil // the server owns the queue; nothing strands across a TUI restart
+	}
 	epics, checked, pendingEpics, runningEpics := m.epics, m.checked, m.pendingEpics, m.runningEpics
 	return func() tea.Msg {
 		names := requeueMaybeStrandedEpics(epics, checked, pendingEpics, runningEpics, byNameSnapshot())

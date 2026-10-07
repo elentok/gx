@@ -2,6 +2,8 @@ package herdr
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -226,5 +228,36 @@ func TestAppendFlag(t *testing.T) {
 	want := []string{"a", "--flag", "v"}
 	if len(got) != len(want) || got[1] != want[1] || got[2] != want[2] {
 		t.Fatalf("appendFlag = %v, want %v", got, want)
+	}
+}
+
+func TestBinary_FallsBackToHerdrBinPath(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "herdr")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir()) // no herdr here, as under launchd
+	t.Setenv("HERDR_BIN_PATH", bin)
+
+	if got := binary(); got != bin {
+		t.Errorf("binary() = %q, want %q", got, bin)
+	}
+}
+
+func TestBinary_FallsBackToInstallDirs(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "herdr")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("HERDR_BIN_PATH", "")
+	old := fallbackDirs
+	fallbackDirs = []string{dir}
+	t.Cleanup(func() { fallbackDirs = old })
+
+	if got := binary(); got != bin {
+		t.Errorf("binary() = %q, want %q", got, bin)
 	}
 }

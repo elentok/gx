@@ -374,6 +374,12 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 // when there's a checked plan to run, or a pointer back to the Tickets tab
 // when nothing is checked at all.
 func (m QueueModel) queueIdleBodyLine() string {
+	if m.serverAPI != nil {
+		if len(m.checked) == 0 {
+			return epicStatusParkedAnswerStyle.Render("Queue is empty — enqueue tickets from the Tickets tab")
+		}
+		return epicStatusParkedAnswerStyle.Render("Waiting for the server to claim queued tickets")
+	}
 	if len(m.checkedEpicPlans()) == 0 {
 		return epicStatusParkedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
 	}

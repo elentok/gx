@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 )
 
 const launchdLabel = "com.elentok.gx.server"
@@ -173,7 +174,26 @@ func (a *launchdAgent) Install() error {
 		return err
 	}
 	_ = a.run("bootout", a.target()) // not loaded yet is fine
-	return a.run("bootstrap", a.domain(), a.plistPath())
+	return a.bootstrap()
+}
+
+// bootstrapAttempts and bootstrapRetryDelay bound how long Install waits for a
+// bootout to finish: it stops the old server asynchronously, and a bootstrap
+// racing it fails with "Input/output error".
+var (
+	bootstrapAttempts   = 20
+	bootstrapRetryDelay = 250 * time.Millisecond
+)
+
+func (a *launchdAgent) bootstrap() error {
+	var err error
+	for i := 0; i < bootstrapAttempts; i++ {
+		if err = a.run("bootstrap", a.domain(), a.plistPath()); err == nil {
+			return nil
+		}
+		time.Sleep(bootstrapRetryDelay)
+	}
+	return err
 }
 
 func (a *launchdAgent) Start() error { return a.run("kickstart", a.target()) }

@@ -52,7 +52,10 @@ type QueueModel struct {
 	// -> in-memory orchestrator state, synced from the registry alongside
 	// queueStatus so the Queue tab's rows can render the same running/paused
 	// spinner+phase presentation as the Tickets tab (renderLiveTicketRow).
-	live             map[string]map[string]liveTicketState
+	live map[string]map[string]liveTicketState
+	// serverClaimSeen is when this tab first saw each ticket claimed (keyed by
+	// address), server mode only; see syncServerRunState.
+	serverClaimSeen  map[string]time.Time
 	implementSpinner spinner.Model
 
 	width, height int
@@ -323,6 +326,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// nagging mid-selection.
 		if firstLoad {
 			cmds = append(cmds, m.cmdCheckStrandedPending())
+		}
+		if m.serverAPI != nil {
+			cmds = append(cmds, m.syncServerRunState())
 		}
 		return m, tea.Batch(cmds...)
 
@@ -602,7 +608,9 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		m.executionCompletedAt = m.now()
 		cmds = append(cmds, m.cmdLoadQueue())
 	}
-	cmds = append(cmds, cmdCheckDetachedLive(m.worktreeRoot))
+	if m.serverAPI == nil {
+		cmds = append(cmds, cmdCheckDetachedLive(m.worktreeRoot))
+	}
 	return m, tea.Batch(cmds...)
 }
 
@@ -935,7 +943,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// nothing checked, or a run's already in flight — does it fall back to
 		// the row focus-toggle "l"/"right" also drive (ticket 12), so the two
 		// meanings of "enter" never fight over the same press.
-		if len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.checkedEpicPlans()) > 0 {
+		// In server mode the server claims queued tickets itself: there is
+		// nothing for "enter" to start here.
+		if m.serverAPI == nil && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.checkedEpicPlans()) > 0 {
 			return m.openRunStartModal()
 		}
 	}
@@ -1087,6 +1097,9 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 }
 
 func (m *QueueModel) startAvailableEpics() tea.Cmd {
+	if m.serverAPI != nil {
+		return nil // the server claims queued tickets; the in-process loop must not
+	}
 	count := min(ralphLoopRegistry.availableSlots(), len(m.pendingEpics))
 	cmds := make([]tea.Cmd, 0, count)
 	for _, plan := range m.pendingEpics[:count] {
