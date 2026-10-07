@@ -252,7 +252,8 @@ func (s *Server) claimAndLaunch(root string, addr tickets.Address, t tickets.Tic
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := ralphloop.Park(s.cfg.TicketStore, addr.Epic, t.Identifier, t.Path, events.AmbiguousBase, reason); perr != nil {
+		ticket := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
+		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.AmbiguousBase, reason); perr != nil {
 			return fmt.Errorf("park %s: %w", ticketAddr, perr)
 		}
 		return nil
@@ -364,6 +365,7 @@ func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIterati
 func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
 	defer s.kickRunner()
 	defer s.registry.delete(root)
+	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
 	var out ralphloop.FinishOutcome
 	if err == nil {
@@ -377,7 +379,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Park it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := ralphloop.Park(s.cfg.TicketStore, one.Epic, one.Ticket.Identifier, one.Ticket.Path, events.IterationError, err.Error()); perr != nil {
+		if perr := s.parkTicket(s.cfg.TicketStore, addr, one.Ticket.Path, events.IterationError, err.Error()); perr != nil {
 			s.log.Warn("park failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		s.events.publish(EventIterationFailed, ticketAddr)
@@ -385,28 +387,11 @@ func (s *Server) finishRun(deps ralphloop.Deps, root string, one ralphloop.OneIt
 	}
 	if !out.Landed {
 		s.events.publish(EventIterationParked, ticketAddr)
-		s.notifyPark(one, ticketAddr, string(out.Status), out.Kind)
+		s.notifyPark(addr, one.Ticket.Path, out.Kind, "iteration ended without landing the ticket")
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
 	s.completeRootIfDone(root, one)
-}
-
-// notifyPark sends the one chat message for a park. Anything that is not an
-// explicit needs-repair reads as a question for a person.
-func (s *Server) notifyPark(one ralphloop.OneIteration, ticketAddr, status string, kind events.Kind) {
-	addr, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{})
-	if err != nil {
-		return
-	}
-	if status != string(schema.StatusNeedsRepair) {
-		status = string(schema.StatusNeedsAnswer)
-	}
-	if kind.CauseHerdr() && s.herdr.isUnavailable() {
-		s.holdPark(addr.Project, addr.Epic, addr.ID, status)
-		return
-	}
-	s.chat.Park(addr.Project, addr.Epic, one.Ticket.Path, addr.ID, status, "iteration ended without landing the ticket")
 }
 
 // completeRootIfDone lands the root's feature branch once every ticket in its

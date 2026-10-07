@@ -173,14 +173,12 @@ func (s *Server) parkMismatch(t trackedRun, cause error) {
 	if err == nil {
 		var dir string
 		if dir, _, err = s.projectOf(addr.Project); err == nil {
-			err = ralphloop.Park(dir, addr.Epic, addr.ID, t.TicketPath, events.HandleMismatch, "cannot reclaim iteration after restart: "+cause.Error())
+			err = s.parkTicket(dir, addr, t.TicketPath, events.HandleMismatch, "cannot reclaim iteration after restart: "+cause.Error())
 		}
 	}
 	if err != nil {
 		s.log.Warn("park handle mismatch", "ticket", t.Address, "err", err)
-		return
 	}
-	s.events.publish(EventTicketParked, t.Address)
 }
 
 func (s *Server) reclaim(t trackedRun) error {

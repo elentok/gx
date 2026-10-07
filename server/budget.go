@@ -330,10 +330,7 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 		return err
 	}
 	closeErr := herdr.TabClose(t.Tab)
-	parkErr := ralphloop.Park(dir, addr.Epic, addr.ID, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
-	if parkErr == nil {
-		s.events.publish(EventTicketParked, t.Address)
-	}
+	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
 	return errors.Join(closeErr, parkErr)
 }
 

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets"
 )
 
 // parkFoldCap bounds how long a herdr-caused park waits for herdr to return.
@@ -46,6 +49,6 @@ func (s *Server) flushParkFold() {
 }
 
 // holdPark queues the park line for the digest.
-func (s *Server) holdPark(project, epic, id, status string) {
-	s.parkFold.hold(fmt.Sprintf("[%s] %s/%s — %s", project, epic, id, status), s.flushParkFold)
+func (s *Server) holdPark(addr tickets.Address, status string, kind events.Kind, reason string) {
+	s.parkFold.hold(fmt.Sprintf("[%s] %s/%s — %s (%s): %s", addr.Project, addr.Epic, addr.ID, status, kind, reason), s.flushParkFold)
 }

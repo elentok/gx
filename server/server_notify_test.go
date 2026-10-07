@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 )
 
 // chatServer is a server wired to a fake Slack webhook that records each body.
@@ -126,15 +127,36 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	}
 }
 
+func TestNotifyPark_ShowsRealStatusKindAndReason(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	addr := tickets.Address{Project: "p", Epic: "epic", ID: "01"}
+
+	s.notifyPark(addr, "", events.BudgetKilled, "daily budget hard limit reached")
+	s.notifyPark(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "", events.AmbiguousBase, "choose a base")
+
+	s.chat.Close()
+	all := strings.Join(wait(-1), "\n")
+	for _, want := range []string{"needs repair", string(events.BudgetKilled), "daily budget hard limit reached", "needs answer", string(events.AmbiguousBase), "choose a base"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("chat lacks %q: %s", want, all)
+		}
+	}
+	if strings.Contains(all, "iteration ended without landing") {
+		t.Errorf("hardcoded reason leaked: %s", all)
+	}
+}
+
 func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	s.herdr.unavailable = true
-	one := ralphloop.OneIteration{}
+	park := func(project, id string, kind events.Kind) {
+		s.notifyPark(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
+	}
 
-	s.notifyPark(one, "p1:epic/01", "needs-repair", events.AgentNameTaken)
-	s.notifyPark(one, "p2:epic/02", "needs-repair", events.HandleMismatch)
-	s.notifyPark(one, "p3:epic/03", "needs-repair", events.AgentPaneBusy)
-	s.notifyPark(one, "p4:epic/04", "needs-repair", events.ZeroCommit) // not herdr-caused: at once
+	park("p1", "01", events.AgentNameTaken)
+	park("p2", "02", events.HandleMismatch)
+	park("p3", "03", events.AgentPaneBusy)
+	park("p4", "04", events.ZeroCommit) // not herdr-caused: at once
 	s.herdr.unavailable = false
 	s.flushParkFold()
 
