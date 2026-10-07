@@ -133,6 +133,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
 	for {
+		s.checkProjects()
 		s.claimNext()
 		s.publishVerdictChanges()
 		select {
@@ -185,6 +186,9 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	}
 	root := rootOf(addr)
 	if s.registry.has(root.String()) {
+		return false, nil
+	}
+	if _, missing := s.unavailablePath(addr.Project); missing {
 		return false, nil
 	}
 	projectDir, repo, err := s.projectOf(addr.Project)

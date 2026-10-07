@@ -118,13 +118,14 @@ type Server struct {
 	parkFold    parkFold
 	rewatch     func() // set by keepFresh when the watch is active
 
-	chat      *ralphloop.ServerChat // nil when no chat destination is configured
-	registry  *runRegistry
-	savedRuns []trackedRun // handles the previous server left; consumed by reclaimRuns
-	refused   refusals
-	lands     landGuard
-	verdicts  verdictLog
-	kick      chan struct{} // wakes keepClaiming
+	chat        *ralphloop.ServerChat // nil when no chat destination is configured
+	registry    *runRegistry
+	savedRuns   []trackedRun // handles the previous server left; consumed by reclaimRuns
+	refused     refusals
+	lands       landGuard
+	verdicts    verdictLog
+	unavailable unavailableNotes
+	kick        chan struct{} // wakes keepClaiming
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.

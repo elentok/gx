@@ -43,6 +43,9 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 	case "stalled":
 		return Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Status} // needs-answer, needs-repair or draft
 	case "unclaimed":
+		if path, missing := s.unavailablePath(addr.Project); missing {
+			return Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}
+		}
 		return s.scheduleVerdict(e, t, addr)
 	}
 	return Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Reason}
