@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	"github.com/elentok/gx/events"
@@ -19,7 +20,6 @@ type FinishOutcome struct {
 	Status schema.Status // the park status; empty when Landed
 	Kind   events.Kind
 }
-
 
 // OneIteration is the fixed input of a single-ticket iteration driven from
 // outside Run (the server's runner). Label, branch and worktree names come out
@@ -129,7 +129,8 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab stri
 		Gate:            NewGate(),
 		Sink:            noopEventSink{},
 	}
-	err := finishIteration(d, p, w.Path, pane, tab, w.base, w.Branch, "")
+	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
+	err := finishIteration(d, p, w.Path, pane, tab, w.base, w.Branch, sessionID)
 	var built *builtAwaitingLandError
 	if err != nil && !errors.As(err, &built) {
 		return FinishOutcome{}, err
@@ -147,6 +148,23 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab stri
 		return FinishOutcome{Landed: true}, nil
 	}
 	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
+}
+
+// recordLiveSession reads the native session of the agent still running under
+// label and appends it to the ticket's session_ids once, as the in-process
+// loop does when it launches or reattaches an iteration. The server launches
+// without that step, so without this the finish path has no session to read
+// the closing occupancy, elapsed time and cost from and writes none of them.
+// Best-effort: "" (no live agent, no session yet) leaves the ticket as it was.
+func recordLiveSession(d Deps, label, ticketPath string) string {
+	agent, err := d.AgentGet(label)
+	if err != nil || agent.AgentSession == "" {
+		return ""
+	}
+	if t, err := schema.ParseTicket(ticketPath); err == nil && !slices.Contains(t.SessionIDs, agent.AgentSession) {
+		_ = AppendSessionID(ticketPath, agent.AgentSession)
+	}
+	return agent.AgentSession
 }
 
 // landBuilt lands a built iteration that was waiting on the land queue.
