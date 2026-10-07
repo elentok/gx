@@ -213,6 +213,22 @@ Repair` heading, with markdown markers stripped and ellipsised for display. What
 shows as subtext for a parked ticket, read fresh from disk on every render rather than cached, so
 the row can't go stale between a park and a restart.
 
+## Agent Runners
+
+**Agent runner** — the thing that hosts one agent session for an iteration: it starts the agent,
+takes its prompts, and reports whether it is working, idle or blocked. herdr is one agent runner.
+_Avoid_: "runner" alone, "backend"; never "run", which is an epic run.
+
+**Native agent runner** — any agent runner that `gx server` hosts itself, with no external
+multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
+agent but never take it over. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
+
+**Headless runner** — the native agent runner that drives claude through its non-interactive,
+structured-event mode. The default native choice.
+
+**PTY runner** — the native agent runner that drives interactive claude on a terminal gx owns. The
+backup for when the headless runner is unavailable; never picked automatically.
+
 ## Tickets, the Store, and Addresses
 
 **Ticket** — the one unit of scheduled work. An epic, a fork child and an investigate ticket are all
