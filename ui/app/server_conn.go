@@ -107,10 +107,14 @@ func (m Model) markTicketsReadOnly() {
 }
 
 // broadcastToLivePages delivers msg to every live tab, not just the active
-// one: the Tickets and Queue tabs both track the connection.
+// one: the Tickets and Queue tabs both track the connection. Tabs never opened
+// are empty placeholders (see ensureLivePages) and have no model to deliver to.
 func (m Model) broadcastToLivePages(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	for tab, p := range m.livePageByTab {
+		if p.model == nil {
+			continue
+		}
 		next, cmd := p.model.Update(msg)
 		p.model = next
 		m.livePageByTab[tab] = p

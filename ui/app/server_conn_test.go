@@ -118,3 +118,20 @@ func TestServerMode_HerdrUnavailableShowsInIndicator(t *testing.T) {
 		t.Errorf("tabs = %q, want the herdr indicator", got)
 	}
 }
+
+// Switching tabs seeds an empty placeholder for every tab (ensureLivePages);
+// the connection broadcast must skip those instead of calling Update on nil.
+func TestServerMode_ConnectionDropAfterTabSwitchDoesNotPanic(t *testing.T) {
+	client := &fakeServerClient{}
+	m := newServerShell(t, client)
+	m.ensureLivePages()
+
+	client.down = true
+	m = probe(t, m)
+	client.down = false
+	m = probe(t, m)
+
+	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ● pid 4242") {
+		t.Errorf("tabs = %q, want the server back up", got)
+	}
+}
