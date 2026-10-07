@@ -25,6 +25,9 @@ func writeDeadLandLock(t *testing.T, dir string, owner LandLockOwner) {
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, landLockFile), b, 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}

@@ -25,7 +25,13 @@ import (
 // "NN-slug.md" -> content pair), and returns the scratch dir.
 func writeEpic(t *testing.T, epicName string, tickets map[string]string) string {
 	t.Helper()
-	scratchDir := t.TempDir()
+	// t.TempDir() always ends in "001", and the land lock dir is keyed by that
+	// basename, so parallel tests would share one lock. Use a unique name.
+	scratchDir, err := os.MkdirTemp("", "gx-epic-")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(scratchDir) })
 	issuesDir := filepath.Join(scratchDir, epicName, "issues")
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
