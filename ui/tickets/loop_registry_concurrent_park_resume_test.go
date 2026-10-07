@@ -203,11 +203,9 @@ func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
 	var sharedHeld, sharedMaxHeld int32
 	permit1 := &permitProbe{real: registry, held: &sharedHeld, maxHeld: &sharedMaxHeld}
 
-	// epic2AcquireStarted/-Done track only epic two's *second* Acquire call —
-	// the one guarding its real claimed-ticket work — via acquireCount; its
-	// first Acquire (the nothing-claimable pass while its ticket is still
-	// needs-answer) is uninteresting and may complete at any time.
-	var epic2AcquireCount atomic.Int32
+	// epic2SecondAcquireStarted/-Done track epic two's first Acquire (see
+	// epic2Guarded), which begins while epic one holds the sole permit.
+	var epic2Guarded atomic.Bool
 	epic2SecondAcquireStarted := make(chan struct{})
 	epic2SecondAcquireDone := make(chan struct{})
 
@@ -230,13 +228,21 @@ func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
 	}
 	permit2 := &permitProbe{
 		real: registry, held: &sharedHeld, maxHeld: &sharedMaxHeld,
+		// The guarded Acquire is epic two's first: epic two only starts once
+		// epic one holds the permit, so that Acquire must block until epic one
+		// releases. Epic two's Acquire calls are serial, so once guarded is set
+		// the next Done is its Done.
 		onAcquireStart: func() {
-			if epic2AcquireCount.Add(1) == 2 {
-				close(epic2SecondAcquireStarted)
+			select {
+			case <-epic1Running:
+				if epic2Guarded.CompareAndSwap(false, true) {
+					close(epic2SecondAcquireStarted)
+				}
+			default:
 			}
 		},
 		onAcquireDone: func() {
-			if epic2AcquireCount.Load() == 2 {
+			if epic2Guarded.Load() {
 				select {
 				case <-epic2SecondAcquireDone:
 				default:
@@ -259,18 +265,23 @@ func TestConcurrentParkResume_TwoEpicsAgainstCapOfOne(t *testing.T) {
 
 	sink2 := ralphloop.NewChannelEventSink()
 	drainChannelEventSink(sink2)
-	wg.Go(func() {
-		err2 = ralphloop.Run(ralphloop.RunOptions{
-			EpicName: "epic-two", Skill: "implement", ScratchDir: scratch2, RepoDir: "/fake/repo-two", Permit: permit2,
-		}, deps2, sink2)
-	})
 
 	// Wait for epic one to actually be running its claimed ticket — it now
 	// holds the registry's sole permit, and will keep holding it until the
 	// test closes epic1Proceed below.
 	<-epic1Running
 
-	// Wait for epic two's real (second) Acquire call to have started.
+	// Only now start epic two, so its very first Acquire is guaranteed to
+	// begin while epic one holds the permit. Starting it earlier let that
+	// first Acquire already be in flight (blocked) when epic one reached
+	// AgentWait, so no later Acquire ever started and the test hung.
+	wg.Go(func() {
+		err2 = ralphloop.Run(ralphloop.RunOptions{
+			EpicName: "epic-two", Skill: "implement", ScratchDir: scratch2, RepoDir: "/fake/repo-two", Permit: permit2,
+		}, deps2, sink2)
+	})
+
+	// Wait for epic two's guarded Acquire call to have started.
 	<-epic2SecondAcquireStarted
 
 	// The synchronization point the ticket asks for: prove the block is
