@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
@@ -107,5 +108,24 @@ func TestStatusWarnings_OrchestratorMismatch(t *testing.T) {
 	n.Orchestrator = "server"
 	if got := statusWarnings(n, remote, "server"); len(got) != 0 {
 		t.Errorf("matching orchestrator warnings = %q, want none", got)
+	}
+}
+
+func TestWaitForExit_WaitsUntilPidIsGone(t *testing.T) {
+	checks := 0
+	alive := func(int) bool { checks++; return checks < 3 }
+	if err := waitForExit(42, time.Now().Add(time.Second), alive); err != nil {
+		t.Fatal(err)
+	}
+	if checks != 3 {
+		t.Fatalf("got %d alive checks, want 3", checks)
+	}
+}
+
+func TestWaitForExit_PidOutlivesDeadline(t *testing.T) {
+	alive := func(int) bool { return true }
+	err := waitForExit(42, time.Now().Add(100*time.Millisecond), alive)
+	if err == nil || !strings.Contains(err.Error(), "pid 42") {
+		t.Fatalf("got %v, want a still-running error", err)
 	}
 }

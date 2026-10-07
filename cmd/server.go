@@ -399,12 +399,36 @@ func stopServer(ctx context.Context, c *apiclient.Client, w io.Writer, signal fu
 	deadline := time.Now().Add(stopTimeout)
 	for time.Now().Before(deadline) {
 		if _, err := c.Handshake(ctx); err != nil {
+			// The socket closes before the process exits. A launchd kickstart
+			// in that gap sees the job still running and does nothing, so
+			// restart would leave the server stopped.
+			if err := waitForExit(h.Pid, deadline, processAlive); err != nil {
+				return err
+			}
 			_, werr := fmt.Fprintf(w, "stopped (pid %d)\n", h.Pid)
 			return werr
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 	return fmt.Errorf("server (pid %d) still running after %s", h.Pid, stopTimeout)
+}
+
+// waitForExit polls until pid is gone or deadline passes.
+func waitForExit(pid int, deadline time.Time, alive func(pid int) bool) error {
+	for alive(pid) {
+		if !time.Now().Before(deadline) {
+			return fmt.Errorf("server (pid %d) still running after %s", pid, stopTimeout)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return nil
+}
+
+// processAlive reports whether pid still exists (signal 0 checks without
+// sending anything).
+func processAlive(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
 // stopTimeout outlasts server.DefaultLandStopTimeout so a stop that waits for a
