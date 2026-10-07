@@ -96,7 +96,11 @@ func runServerRepair(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		stamped, err := stampProvenance(res, viaServer, actorRecovery)
+		via := viaServer
+		if res.Via == server.ViaDirect {
+			via = server.ViaDirect
+		}
+		stamped, err := stampProvenance(res, via, actorRecovery)
 		if err != nil {
 			return err
 		}
