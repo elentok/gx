@@ -18,6 +18,10 @@ server. A caller can tell from the command which path a write takes.
 **Repair verbs are the exception.** `gx tickets verify|land|reset|unpark` share one package and run
 direct under the land lock when the server is down, so recovery works when it is needed most.
 
+**Map epics are the other exception.** A `kind: map` epic is never scheduled, so the server is not
+its writer: `gx tickets set --status claimed|done` writes direct there, letting a person claim and
+close wayfinder decision tickets. One writer per epic still holds.
+
 ## Why
 
 - **Content must not depend on a process.** Agents edit tickets mid-iteration; a down server must

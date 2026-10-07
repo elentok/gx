@@ -183,8 +183,8 @@ Do NOT close or modify any parent/source ticket this epic was generated from.
 
 An epic is either hand-driven or loop-driven, never both. When the source you're breaking up is a
 wayfinder map, publish the implementation tickets into a **new** epic directory — never into the map
-epic's own `issues/`. A map's tickets are decisions its author resolves by hand, through
-`gx tickets set`; implementation tickets are claimed and closed by ralph-loop, which takes ownership
+epic's own `issues/` (a `kind: map` epic, which the server never schedules). A map's tickets are
+decisions its author resolves by hand, through `gx tickets set`; implementation tickets are claimed and closed by ralph-loop, which takes ownership
 of `status` for the whole epic it runs. Putting both kinds in one directory puts two writers on the
 same status field.
 
@@ -203,13 +203,16 @@ running it only if the user has explicitly asked for a second code-review ticket
 
 <ticket-template>
 
+```markdown
 ---
-
-id: "&lt;NN&gt;" status: open blocked_by: [] type: implement
+id: "<NN>"
+status: open
+blocked_by: []
+type: implement
 expected_context_window: 20000
 ---
 
-# &lt;NN&gt; — &lt;Ticket title&gt;
+# <NN> — <Ticket title>
 
 ## What to build
 
@@ -227,6 +230,7 @@ implementation list.
 
 - [ ] Acceptance criterion 1
 - [ ] Acceptance criterion 2
+```
 
 </ticket-template>
 

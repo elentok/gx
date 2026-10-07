@@ -350,6 +350,24 @@ func TestLoad_TicketMDFrontmatterSuppliesEpicFields(t *testing.T) {
 	}
 }
 
+func TestLoad_TicketMDKindMapMakesAMapEpic(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "map-epic", "ticket.md"),
+		"---\nkind: map\nstatus: open\n---\n# Map\n\n## Destination\n")
+	writeFile(t, filepath.Join(dir, "plain-epic", "ticket.md"), "---\nstatus: open\n---\nPlan link.\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 2 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	if m := epics[0]; !m.IsMap || m.MapBody != "# Map\n\n## Destination\n" {
+		t.Errorf("kind: map epic: IsMap=%v MapBody=%q", m.IsMap, m.MapBody)
+	}
+	if epics[1].IsMap {
+		t.Error("ticket.md without kind: map should not be IsMap")
+	}
+}
+
 func TestLoad_OldShapeEpicYAMLStillLoads(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "old-epic", "epic.yaml"), "started_at: 2026-01-02T03:04:05Z\n")

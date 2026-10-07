@@ -14,8 +14,12 @@ import (
 // number first. It's a thin wrapper over Epic.RenderedStatus: a ticket only
 // renders as StatusOpen once its own Status: is unclaimed/missing and every
 // Blocked by: number is done, so filtering on that single state gives the
-// frontier for free.
+// frontier for free. A map epic has no frontier: its tickets are decisions a
+// person resolves by hand, so no scheduler ever claims one.
 func Frontier(e tickets.Epic) []tickets.Ticket {
+	if e.IsMap {
+		return nil
+	}
 	var frontier []tickets.Ticket
 	for _, t := range e.Tickets {
 		if e.RenderedStatus(t) == tickets.StatusOpen {

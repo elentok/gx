@@ -224,24 +224,32 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 // projectOf finds the project's directory in the store and the repo its
 // agents run in.
 func (s *Server) projectOf(project string) (dir, repo string, err error) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	d, err := s.projectDir(project)
 	if err != nil {
 		return "", "", err
 	}
-	for _, d := range dirs {
-		if tickets.ProjectName(d) != project {
-			continue
-		}
-		pf, err := config.ReadProjectFile(d)
-		if err != nil {
-			return "", "", err
-		}
-		if pf.Repo == nil {
-			return "", "", fmt.Errorf("project %s has no repo", project)
-		}
-		return d, *pf.Repo, nil
+	pf, err := config.ReadProjectFile(d)
+	if err != nil {
+		return "", "", err
 	}
-	return "", "", fmt.Errorf("no project %s in the ticket store", project)
+	if pf.Repo == nil {
+		return "", "", fmt.Errorf("project %s has no repo", project)
+	}
+	return d, *pf.Repo, nil
+}
+
+// projectDir finds the project's directory in the store.
+func (s *Server) projectDir(project string) (string, error) {
+	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	if err != nil {
+		return "", err
+	}
+	for _, d := range dirs {
+		if tickets.ProjectName(d) == project {
+			return d, nil
+		}
+	}
+	return "", fmt.Errorf("no project %s in the ticket store", project)
 }
 
 // claimAndLaunch writes the claim to the ticket file first, so markdown stays

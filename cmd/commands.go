@@ -339,7 +339,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsAddBody(epicPath, parent, addSlug, body, addJSON, out)
+			return runTicketsAddBody(epicPath, parent, addSlug, body, addJSON, out, d.stderr)
 		})
 	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
 	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; stub lands at <id>-<slug>.md)")

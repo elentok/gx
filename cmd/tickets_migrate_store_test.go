@@ -149,8 +149,12 @@ func TestExecute_TicketsMigrateToStore_ConvertsEpicShapeAndTypes(t *testing.T) {
 		}
 	}
 	mapped := read("mapped/ticket.md")
-	if !strings.Contains(mapped, "status: open") || !strings.HasSuffix(mapped, "# The map\n\nPlans.\n") {
+	if !strings.Contains(mapped, "kind: map\n") || !strings.Contains(mapped, "status: open") ||
+		!strings.HasSuffix(mapped, "# The map\n\nPlans.\n") {
 		t.Errorf("mapped ticket.md = %q", mapped)
+	}
+	if strings.Contains(sidecar, "kind:") {
+		t.Errorf("sidecar-only epic marked with a kind:\n%s", sidecar)
 	}
 	if got := read("already/ticket.md"); got != files["already/ticket.md"] {
 		t.Errorf("existing ticket.md rewritten: %q", got)

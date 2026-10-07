@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,7 +28,7 @@ func TestRunTicketsAddBody_CreatesOpenTicketUnderParent(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "12", "child", "## What to build\n\nDo it.\n", false, &stdout); err != nil {
+	if err := runTicketsAddBody(epicPath, "12", "child", "## What to build\n\nDo it.\n", false, &stdout, io.Discard); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -51,12 +52,67 @@ func TestRunTicketsAddBody_CreatesOpenTicketUnderParent(t *testing.T) {
 	}
 }
 
+// The gx-to-tickets template opens with its own frontmatter: add merges it
+// into the one block it writes instead of stacking a second one.
+func TestRunTicketsAddBody_MergesBodyFrontmatter(t *testing.T) {
+	t.Parallel()
+	epicPath, issuesDir := newAddEpic(t)
+	writeTicket(t, filepath.Join(issuesDir, "01-first.md"), "01", "open", "implement")
+	body := "---\nid: \"07\"\nstatus: open\nblocked_by: [\"01\"]\ntype: grilling\nexpected_context_window: 60000\n---\n\n# Decide it\n\n## Question\n\nWhich?\n"
+
+	var stdout, stderr bytes.Buffer
+	if err := runTicketsAddBody(epicPath, "", "decide", body, false, &stdout, &stderr); err != nil {
+		t.Fatalf("runTicketsAddBody: %v", err)
+	}
+
+	path := filepath.Join(issuesDir, "02-decide.md")
+	ticket, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ticket failed validation: %v", err)
+	}
+	if ticket.Type != "grilling" || len(ticket.BlockedBy) != 1 || ticket.BlockedBy[0] != "01" || ticket.ExpectedContextWindow != 60000 {
+		t.Errorf("frontmatter not merged: %+v", ticket)
+	}
+	raw, _ := os.ReadFile(path)
+	if n := strings.Count(string(raw), "---\n"); n != 2 {
+		t.Errorf("want one frontmatter block, got %d delimiters:\n%s", n, raw)
+	}
+	if !strings.Contains(string(raw), "## Question") {
+		t.Errorf("body missing:\n%s", raw)
+	}
+	if !strings.Contains(stderr.String(), "allocated id wins") {
+		t.Errorf("stderr = %q, want an id-mismatch warning", stderr.String())
+	}
+}
+
+func TestRunTicketsAddBody_BadBodyFrontmatterRefusesWithoutWriting(t *testing.T) {
+	t.Parallel()
+	for name, fm := range map[string]string{
+		"unknown field": "owner: me\n",
+		"done status":   "status: done\n",
+		"read-only":     "actual_context_window: 5\n",
+		"bad type":      "type: chore\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			epicPath, issuesDir := newAddEpic(t)
+			body := "---\n" + fm + "---\n\n# T\n\nBody.\n"
+			if err := runTicketsAddBody(epicPath, "", "bad", body, false, io.Discard, io.Discard); err == nil {
+				t.Fatal("want a refusal")
+			}
+			if entries, _ := os.ReadDir(issuesDir); len(entries) != 0 {
+				t.Errorf("files written despite refusal: %v", entries)
+			}
+		})
+	}
+}
+
 func TestRunTicketsAddBody_EmptyBodyFailsWithoutWriting(t *testing.T) {
 	t.Parallel()
 	epicPath, issuesDir := newAddEpic(t)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "empty", "  \n", false, &stdout); err == nil {
+	if err := runTicketsAddBody(epicPath, "", "empty", "  \n", false, &stdout, io.Discard); err == nil {
 		t.Fatal("want error for empty body, got nil")
 	}
 	entries, _ := os.ReadDir(issuesDir)
@@ -70,7 +126,7 @@ func TestRunTicketsAddBody_JSON(t *testing.T) {
 	epicPath, _ := newAddEpic(t)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "thing", "body\n", true, &stdout); err != nil {
+	if err := runTicketsAddBody(epicPath, "", "thing", "body\n", true, &stdout, io.Discard); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 	var got struct{ Address, Path string }

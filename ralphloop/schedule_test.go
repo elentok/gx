@@ -23,6 +23,12 @@ func TestFrontier_MixedStatuses(t *testing.T) {
 	assertNumbers(t, got, want)
 }
 
+func TestFrontier_MapEpicHasNone(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{IsMap: true, Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}}
+	assertNumbers(t, Frontier(epic), nil)
+}
+
 func TestFrontier_PartiallyBlockedIsExcluded(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{

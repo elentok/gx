@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -83,6 +85,10 @@ func TestQueue_Refusals(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	servertest.WriteTicket(t, store, "proj", "map-epic", "01", "decide", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
 	ctx := context.Background()
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil {
@@ -100,6 +106,7 @@ func TestQueue_Refusals(t *testing.T) {
 		{"bad agent", func() (server.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:epic-a/02", "gpt") }, server.ReasonInvalidAgent},
 		{"remove unqueued", func() (server.QueueResult, error) { return h.Client.QueueRemove(ctx, "proj:epic-a/02") }, server.ReasonNotQueued},
 		{"move unqueued", func() (server.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/02", 1) }, server.ReasonNotQueued},
+		{"map epic", func() (server.QueueResult, error) { return h.Client.QueueAdd(ctx, "proj:map-epic/01", "") }, server.ReasonMapEpic},
 		{"move out of range", func() (server.QueueResult, error) { return h.Client.QueueMove(ctx, "proj:epic-a/01", 2) }, server.ReasonBadPosition},
 	}
 	for _, c := range cases {

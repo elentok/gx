@@ -32,6 +32,7 @@ const (
 	ReasonNotQueued        = "not-queued"
 	ReasonBadPosition      = "bad-position"
 	ReasonTicketLive       = "ticket-live"
+	ReasonMapEpic          = "map-epic"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.
@@ -145,6 +146,29 @@ func (s *Server) writeQueue(address string, mutate func(items []QueueItem) ([]Qu
 	return QueueResult{Queue: append([]QueueItem{}, next...)}, nil
 }
 
+// mapEpicRefusal refuses to queue a ticket of a map epic: a map's tickets are
+// decisions a person resolves by hand, never scheduled work.
+func (s *Server) mapEpicRefusal(address string) *QueueResult {
+	if !s.inMapEpic(address) {
+		return nil
+	}
+	r := refusal(ReasonMapEpic, address+" is in a map epic; its tickets are resolved by hand, not scheduled")
+	return &r
+}
+
+// inMapEpic reports whether address names a ticket (or root) of a map epic.
+func (s *Server) inMapEpic(address string) bool {
+	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return false
+	}
+	dir, err := s.projectDir(a.Project)
+	if err != nil {
+		return false
+	}
+	return tickets.IsMapEpic(filepath.Join(dir, a.Epic))
+}
+
 func (s *Server) hasTicket(address string) bool {
 	for _, t := range s.idx.snapshot().Tickets {
 		if t.Address == address {
@@ -180,6 +204,9 @@ func (s *Server) queueAdd(req QueueRequest) (QueueResult, error) {
 		if !s.hasTicket(addr) {
 			r := refusal(ReasonUnknownTicket, "no ticket "+addr)
 			return nil, &r
+		}
+		if r := s.mapEpicRefusal(addr); r != nil {
+			return nil, r
 		}
 		for _, it := range items {
 			if it.Address == addr {
@@ -241,6 +268,9 @@ func (s *Server) queueReplace(req QueueRequest) (QueueResult, error) {
 			if !s.hasTicket(it.Address) {
 				r := refusal(ReasonUnknownTicket, "no ticket "+it.Address)
 				return nil, &r
+			}
+			if r := s.mapEpicRefusal(it.Address); r != nil {
+				return nil, r
 			}
 		}
 		next := make([]QueueItem, 0, len(cur)+len(items))

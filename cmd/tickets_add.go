@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"gopkg.in/yaml.v3"
 )
 
 // runTicketsAdd atomically allocates the next ticket ID for epicPath (a
@@ -25,7 +26,7 @@ import (
 // with a real name instead of a placeholder the caller has to remember to
 // rename.
 func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
-	path, err := createTicket(epicPath, parent, slug, nil)
+	path, err := createTicket(epicPath, parent, slug, nil, addFrontmatter{})
 	if err != nil {
 		return err
 	}
@@ -38,11 +39,33 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 // runTicketsAddBody is runTicketsAdd for agents: the ticket arrives with its
 // body and is written open in that one write (no draft stub to promote), and
 // the output names it by address — an agent never needs the file path.
-func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w io.Writer) error {
-	if strings.TrimSpace(body) == "" {
+//
+// The body may open with its own frontmatter block (the ticket template does):
+// its settable fields are merged in rather than written as a second block. See
+// bodyFrontmatter.
+func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w, stderr io.Writer) error {
+	fm, text, err := bodyFrontmatter(body)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(text) == "" {
 		return errors.New("empty body; refusing to create an open ticket with no content")
 	}
-	path, err := createTicket(epicPath, parent, slug, &body)
+	if fm.Parent != "" {
+		if parent != "" && parent != fm.Parent {
+			return fmt.Errorf("--parent %s conflicts with the body's parent: %s", parent, fm.Parent)
+		}
+		parent = fm.Parent
+	}
+	path, err := createTicket(epicPath, parent, slug, &text, fm)
+	if err != nil {
+		return err
+	}
+	if fm.ID != "" && stderr != nil {
+		if got := ticketLabel(path); !strings.HasSuffix(got, "/"+fm.ID) {
+			fmt.Fprintf(stderr, "warning: body says id %q; the allocated id wins: %s\n", fm.ID, got)
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -50,10 +73,50 @@ func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w io.W
 	return printTicketRef(path, jsonOut, w)
 }
 
+// addFrontmatter is what `add --body` takes from a frontmatter block at the
+// top of the body: the settable fields, plus id and status, which are checked
+// rather than written. Any other field refuses the add.
+type addFrontmatter struct {
+	ID                    string   `yaml:"id"`
+	Status                string   `yaml:"status"`
+	BlockedBy             []string `yaml:"blocked_by"`
+	Type                  string   `yaml:"type"`
+	ExpectedContextWindow int      `yaml:"expected_context_window"`
+	Commitless            bool     `yaml:"commitless"`
+	Parent                string   `yaml:"parent"`
+}
+
+// bodyFrontmatter splits a leading frontmatter block off body and validates
+// it. A body with no block returns a zero addFrontmatter and body unchanged.
+func bodyFrontmatter(body string) (addFrontmatter, string, error) {
+	var fm addFrontmatter
+	yamlPart, text, ok := schema.SplitFrontmatter(strings.TrimLeft(body, "\n"))
+	if !ok {
+		return fm, body, nil
+	}
+	dec := yaml.NewDecoder(strings.NewReader(yamlPart))
+	dec.KnownFields(true)
+	if err := dec.Decode(&fm); err != nil && !errors.Is(err, io.EOF) {
+		return fm, "", fmt.Errorf("body frontmatter: %w (settable: blocked_by, type, expected_context_window, commitless, parent)", err)
+	}
+	switch schema.Status(fm.Status) {
+	case "", schema.StatusOpen, schema.StatusDraft:
+	default:
+		return fm, "", fmt.Errorf("body frontmatter: status %q; a new ticket is open or draft", fm.Status)
+	}
+	if fm.Type != "" && !schema.TicketType(fm.Type).Valid() {
+		return fm, "", fmt.Errorf("body frontmatter: unknown type %q", fm.Type)
+	}
+	if fm.ExpectedContextWindow < 0 {
+		return fm, "", errors.New("body frontmatter: expected_context_window must not be negative")
+	}
+	return fm, text, nil
+}
+
 // createTicket allocates the next id under the epic lock and writes the new
 // ticket file, returning its path. A nil body writes the empty draft stub; a
-// non-nil body writes an open ticket carrying it.
-func createTicket(epicPath, parent, slug string, body *string) (string, error) {
+// non-nil body writes an open ticket carrying it, with fm's fields applied.
+func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter) (string, error) {
 	if slug == "" {
 		return "", errors.New("slug is required")
 	}
@@ -89,6 +152,15 @@ func createTicket(epicPath, parent, slug string, body *string) (string, error) {
 	if body != nil {
 		t.Status = schema.StatusOpen
 		text = "\n" + strings.Trim(*body, "\n") + "\n"
+		if fm.Status != "" {
+			t.Status = schema.Status(fm.Status)
+		}
+		if fm.Type != "" {
+			t.Type = schema.TicketType(fm.Type)
+		}
+		t.BlockedBy = parseCSVIDs(strings.Join(fm.BlockedBy, ","))
+		t.ExpectedContextWindow = fm.ExpectedContextWindow
+		t.Commitless = fm.Commitless
 	}
 
 	out, err := schema.MarshalTicket(t, text)

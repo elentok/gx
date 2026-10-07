@@ -239,6 +239,11 @@ flat file in its `issues/`, linked by `parent`. _Avoid_: node (Go identifiers on
 `ticket.md` carries `status`, `blocked_by`, `base:` and timing in frontmatter; the body is optional
 (a plan, or a link to a spec). A forked ticket that has children is still just a ticket.
 
+**Map epic** — an epic whose body is a wayfinder map and whose tickets are decisions a person
+resolves by hand. Nothing schedules it; the person driving it claims and closes its tickets. Its
+implementation work goes into a separate epic. _Avoid_: "map" alone for the epic (the map is its
+body).
+
 **Ticket type** (`type` frontmatter) — what kind of work a ticket is. `implement` is the default
 code-writing type. _Avoid_: `task` (retired name; the loader accepts it as an alias until cutover,
 `gx tickets migrate` rewrites it).

@@ -23,7 +23,8 @@ const ticketsSchemaText = `Ticket frontmatter fields:
 Settable fields:
   status (enum, --status): draft, open. Orchestration statuses (claimed, done,
     needs-answer, needs-repair, cancelled) are the server's alone and refused here — gx
-    claims, parks and lands a ticket itself.
+    claims, parks and lands a ticket itself. Exception: in a map epic (ticket.md
+    kind: map), claimed and done are settable, since nothing schedules a map.
     Required on every ticket. draft is parked work: it never enters an epic's
     frontier, so no agent is ever handed it.
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03. A bare ID names a ticket in
@@ -55,6 +56,9 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
     machine-written only
 
 Epic frontmatter fields:
+
+An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
+never scheduled by the server.
 
 An epic's optional ` + "`.scratch/<epic>/epic.yaml`" + ` sidecar file holds epic-level timing,
 distinct from any ticket's own frontmatter. Both fields are gx-managed, not settable via
@@ -162,14 +166,29 @@ var orchestrationStatuses = map[schema.Status]bool{
 	schema.StatusCancelled:   true,
 }
 
+// mapEpicStatuses are the orchestration statuses `set` does write for a ticket
+// in a map epic: nothing schedules a map, so a person claims and closes its
+// decision tickets by hand.
+var mapEpicStatuses = map[schema.Status]bool{
+	schema.StatusClaimed: true,
+	schema.StatusDone:    true,
+}
+
+// inMapEpic reports whether path is a ticket under <epic>/issues/ of a map epic.
+func inMapEpic(path string) bool {
+	issuesDir := filepath.Dir(path)
+	return filepath.Base(issuesDir) == "issues" && tickets.IsMapEpic(filepath.Dir(issuesDir))
+}
+
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
 func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error)) error {
 	if c.Flags().Changed("status") {
 		status, _ := c.Flags().GetString("status")
-		if orchestrationStatuses[schema.Status(status)] {
-			return fmt.Errorf("%s: --status %s is an orchestration status; the server owns it, `tickets set` only moves a ticket between draft and open", path, status)
+		s := schema.Status(status)
+		if orchestrationStatuses[s] && !(mapEpicStatuses[s] && inMapEpic(path)) {
+			return fmt.Errorf("%s: --status %s is an orchestration status; the server owns it, `tickets set` only moves a ticket between draft and open (or, in a kind: map epic, claims and closes it)", path, status)
 		}
 		if err := checkAgentStatusGuard(path, schema.Status(status), getwd); err != nil {
 			return err

@@ -163,8 +163,9 @@ func convertTicketFile(path string, raw []byte) []byte {
 }
 
 // convertEpics builds a ticket.md for every epic that still has an epic.yaml
-// or map.md and no ticket.md yet. The map's text becomes the body; the
-// sidecar's timestamps carry over, and a completed epic is marked done.
+// or map.md and no ticket.md yet. The map's text becomes the body and the epic
+// is marked kind: map; the sidecar's timestamps carry over, and a completed
+// epic is marked done.
 func convertEpics(oldRoot string) ([]storeFile, error) {
 	entries, err := os.ReadDir(oldRoot)
 	if err != nil {
@@ -199,12 +200,16 @@ func epicTicketMD(sidecar, body []byte) ([]byte, error) {
 		return nil, err
 	}
 	fm := struct {
+		Kind        string     `yaml:"kind,omitempty"`
 		Status      string     `yaml:"status"`
 		StartedAt   *time.Time `yaml:"started_at,omitempty"`
 		CompletedAt *time.Time `yaml:"completed_at,omitempty"`
 	}{Status: string(schema.StatusOpen), StartedAt: wire.StartedAt, CompletedAt: wire.CompletedAt}
 	if wire.CompletedAt != nil {
 		fm.Status = string(schema.StatusDone)
+	}
+	if body != nil {
+		fm.Kind = KindMap
 	}
 	head, err := yaml.Marshal(fm)
 	if err != nil {

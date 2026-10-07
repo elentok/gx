@@ -1,6 +1,27 @@
 package tickets
 
-import "time"
+import (
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// KindMap is the ticket.md `kind:` of a wayfinder map epic. A map epic is
+// hand-driven: its tickets are decisions a person resolves, so the scheduler
+// never runs it and `tickets set` may claim and close its tickets directly.
+const KindMap = "map"
+
+// IsMapEpic reports whether the epic at epicPath is a wayfinder map, without
+// loading its tickets. Same rule as Epic.IsMap.
+func IsMapEpic(epicPath string) bool {
+	epic := Epic{Path: epicPath}
+	loadEpicTicketMD(&epic)
+	if epic.IsMap {
+		return true
+	}
+	_, err := os.Stat(filepath.Join(epicPath, "map.md"))
+	return err == nil
+}
 
 // Epic is one immediate subdirectory of `.scratch/`. Discovery is dumb: an
 // epic is counted regardless of which files exist inside it (spec.md,
@@ -8,8 +29,8 @@ import "time"
 type Epic struct {
 	Name    string
 	Path    string
-	IsMap   bool   // has a map.md (wayfinder map)
-	MapBody string // map.md's raw content, only set when IsMap
+	IsMap   bool   // a wayfinder map: ticket.md says kind: map, or an old-shape map.md exists
+	MapBody string // the map's text (ticket.md body or map.md), only set when IsMap
 	Tickets []Ticket
 
 	// HasTicketMD is true when the epic uses the store shape: a ticket.md

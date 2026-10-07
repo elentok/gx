@@ -21,10 +21,14 @@ authoritative.
   Use it instead of listing `<root>` yourself. The slugs compose with the resolved root:
   `<root>/$(gx tickets epics | head -1)/issues/`.
 - A spec or plan, if one exists, is `docs/specs/<epic-slug>.md` at the repo root — not under
-  `<root>`, so it can be committed alongside the code it describes. A `wayfinder` map's body (the
-  Destination/Notes/Decisions-so-far/Not-yet-specified/Out-of-scope doc — see the `wayfinder` skill)
-  is `<root>/<epic-slug>/map.md` instead — still under `<root>`, distinct location and filename so a
-  map is never mistaken for an ordinary spec.
+  `<root>`, so it can be committed alongside the code it describes.
+- A `wayfinder` map lives in its epic's entry file, `<root>/<epic-slug>/ticket.md`: the frontmatter
+  says `kind: map` and the body is the map (Destination/Notes/Decisions-so-far/Not-yet-specified/
+  Out-of-scope — see the `wayfinder` skill). `kind: map` makes it a **map epic**: hand-driven, never
+  scheduled by the server, and its decision tickets are claimed and closed by hand (see "Map epics"
+  below). An epic is a map epic or a loop epic, never both. List map epics with
+  `gx tickets epics --maps`. An unmigrated `.scratch` tree still uses `<root>/<epic-slug>/map.md`;
+  `gx tickets migrate --to-store` folds it into `ticket.md` with `kind: map`.
 - Tickets are one file per ticket at `<root>/<epic-slug>/issues/<NN>-<slug>.md`, numbered from
   `01` — never a single combined tickets file
 - A ticket **identifier** is the filename's numeric prefix, optionally followed by one lowercase
@@ -58,8 +62,8 @@ Fields:
   `open` is schedulable — `draft` is work its author parked deliberately, neither offered to an agent
   nor counted as finished. `cancelled` is terminal like `done` but means the ticket was withdrawn,
   not performed; it stops counting as outstanding. **Only `draft` and `open` can be written with
-  `gx tickets set --status`.** Every other status is an orchestration status, written by the gx
-  server alone (see "Who writes which status"). The UI also shows `blocked` and
+  `gx tickets set --status`** (plus `claimed` and `done` in a map epic). Every other status is an
+  orchestration status, written by the gx server alone (see "Who writes which status"). The UI also shows `blocked` and
   `waiting-for-children`, but those are derived from the graph on every render and are never
   written to a file.
 - **`blocked_by`** (list of ticket IDs) — tickets that must be finished before this one can start;
@@ -122,8 +126,11 @@ conversation history.
   validated write. Only the flags passed are changed; every other field is left exactly as it was.
   Never hand-edit frontmatter YAML directly when a `set` flag exists for the field.
 - **Create a ticket**: `gx tickets add <epic> --slug <slug> --body -` (body on stdin) writes the
-  ticket `open` and prints its address. Follow the frontmatter shape above and the per-ticket
-  template your skill defines, then validate it.
+  ticket `open` and prints its address. The body may open with a frontmatter block (the per-ticket
+  template your skill defines): `add` merges its `blocked_by`, `type`, `expected_context_window`,
+  `commitless` and `parent` into the one block it writes. `id` is ignored (the allocated id wins,
+  with a warning), `status` may only be `open` or `draft`, and any other field refuses the add with
+  nothing written. Then validate it.
 - **Address a ticket**: agents name a ticket by its address, `project:epic/NN` (`epic/NN` or `NN`
   work as input when the epic is implied). Read it with `gx tickets show <addr>`, change a body
   section with `gx tickets section <addr> <heading> <content|->`, change fields with `gx tickets
@@ -170,6 +177,9 @@ The gx server is the only scheduler. Orchestration statuses are written by it al
 | `needs-repair` | the server, when it hits a fault it can't resolve |
 | `cancelled` | the server, via `gx server tickets cancel` (also cancels non-terminal descendants) |
 
+Exception: in a **map epic** the server schedules nothing, so `claimed` and `done` are written by
+hand there — see "Map epics".
+
 Orchestration changes a person may need go through server verbs, each with a `--json` result or a
 `{"refused":true,"reason":…}` refusal: `gx server tickets park | cancel | relaunch`,
 `gx server queue add | remove | replace | move`, and read verbs such as
@@ -177,6 +187,19 @@ Orchestration changes a person may need go through server verbs, each with a `--
 `gx tickets land | reset | unpark | verify` still work but are hidden, deprecated aliases. If the
 server is down, only the four repair verbs run directly; every other server verb refuses
 `server-not-running`.
+
+## Map epics
+
+A map epic (`kind: map` in its `ticket.md`) holds wayfinder decision tickets, which a person resolves
+in a live session rather than an agent iteration. The server never schedules one: its frontier is
+always empty, and `gx server queue add` refuses its tickets with `map-epic`. So the person driving it
+writes the statuses directly:
+
+- **Claim** before any work: `gx tickets set <addr> --status claimed`.
+- **Close** once resolved: write the answer with `gx tickets section <addr> Resolution -`, then
+  `gx tickets set <addr> --status done --commitless true` (a decision lands no commits).
+
+`needs-answer`, `needs-repair` and `cancelled` stay server-only, even here.
 
 ## Claiming
 

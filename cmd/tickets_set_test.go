@@ -248,6 +248,38 @@ func TestExecute_TicketsSet_OrchestrationStatusesRefused(t *testing.T) {
 	}
 }
 
+// A map epic's decision tickets are hand-driven: set claims and closes them.
+// Statuses outside claimed/done stay refused even there.
+func TestExecute_TicketsSet_MapEpicClaimsAndCloses(t *testing.T) {
+	t.Parallel()
+	epic := filepath.Join(t.TempDir(), "map-epic")
+	if err := os.MkdirAll(epic, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeTicketFile(t, filepath.Join(epic, "ticket.md"), "---\nkind: map\nstatus: open\n---\n# Map\n")
+	if err := os.MkdirAll(filepath.Join(epic, "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(epic, "issues", "04-pick.md")
+	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: open\ntype: grilling\n---\nBody.\n")
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+
+	for _, args := range [][]string{{"--status=claimed"}, {"--status=done", "--commitless=true"}} {
+		if err := execute(append([]string{"tickets", "set", path}, args...), d); err != nil {
+			t.Fatalf("set %v: %v", args, err)
+		}
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), "status: done") || !strings.Contains(string(raw), "commitless: true") {
+		t.Errorf("ticket = %q, want done + commitless", raw)
+	}
+
+	err := execute([]string{"tickets", "set", path, "--status=needs-repair"}, d)
+	if err == nil || !strings.Contains(err.Error(), "orchestration status") {
+		t.Errorf("needs-repair in a map epic: error = %v, want refusal", err)
+	}
+}
+
 func TestExecute_TicketsSet_StatusOpenRefusedWithEmptyBody(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
