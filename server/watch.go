@@ -34,7 +34,13 @@ func (s *Server) keepFresh(ctx context.Context) {
 		if err != nil {
 			s.log.Warn("store watch unavailable, polling only", "err", err)
 		} else {
-			defer w.Close()
+			// kqueue's Close leaves the per-file fds open; Remove closes them.
+			defer func() {
+				for _, p := range w.WatchList() {
+					_ = w.Remove(p)
+				}
+				w.Close()
+			}()
 			WatchTree(w, s.cfg.TicketStore)
 			events = w.Events
 			go func() {

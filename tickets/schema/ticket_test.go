@@ -52,6 +52,7 @@ func TestIsCommitless(t *testing.T) {
 		{"prototype, flagged", Ticket{Type: TypePrototype, Commitless: true}, true},
 		{"research, no flag", Ticket{Type: TypeResearch}, true},
 		{"code-review, no flag", Ticket{Type: TypeCodeReview}, true},
+		{"prompt, no flag", Ticket{Type: TypePrompt}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

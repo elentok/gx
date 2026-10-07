@@ -53,7 +53,7 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(projects) != 1 || projects[0].Name != "proj" || projects[0].Tickets["open"] != 2 {
+	if len(projects) != 2 || projects[0].Name != "proj" || projects[0].Tickets["open"] != 2 || projects[1].Name != "scratch" {
 		t.Errorf("projects = %+v", projects)
 	}
 }

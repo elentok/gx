@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 	}
 
 	list, err := h.Client.Projects(ctx)
-	if err != nil || len(list) != 1 || list[0].Name != name {
+	if err != nil || len(list) != 2 || !slices.ContainsFunc(list, func(p server.ProjectInfo) bool { return p.Name == name }) {
 		t.Fatalf("list = %+v, %v", list, err)
 	}
 

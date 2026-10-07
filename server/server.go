@@ -143,6 +143,12 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cfg.TicketStore != "" {
+		if err := ensureScratchProject(cfg.TicketStore); err != nil {
+			lock.release()
+			return nil, fmt.Errorf("create scratch project: %w", err)
+		}
+	}
 	events := newBroker(cfg.SubscriberBuffer)
 	idx, err := buildIndex(cfg.TicketStore, events)
 	if err != nil {

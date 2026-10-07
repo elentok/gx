@@ -100,6 +100,8 @@ const (
 	// person, and never allocated via a plain `gx tickets add` without
 	// `--parent`.
 	TypeConflictResolution TicketType = "conflict-resolution"
+	// TypePrompt is a one-off prompt run; it never lands a commit.
+	TypePrompt TicketType = "prompt"
 )
 
 var validTypes = map[TicketType]bool{
@@ -110,6 +112,7 @@ var validTypes = map[TicketType]bool{
 	TypeTask:               true,
 	TypeCodeReview:         true,
 	TypeConflictResolution: true,
+	TypePrompt:             true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -249,7 +252,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeTask unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
