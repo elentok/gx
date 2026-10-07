@@ -49,6 +49,17 @@ func workerBinary(t *testing.T) string {
 	return workerBinDir
 }
 
+// herdrSocketEnv pins the real herdr's socket for a child whose HOME is
+// overridden. Inside herdr the var is inherited; on a bare runner herdr's
+// default socket lives under the real HOME, which the child would not find.
+func herdrSocketEnv() string {
+	if p := os.Getenv("HERDR_SOCKET_PATH"); p != "" {
+		return "HERDR_SOCKET_PATH=" + p
+	}
+	home, _ := os.UserHomeDir()
+	return "HERDR_SOCKET_PATH=" + filepath.Join(home, ".config", "herdr", "herdr.sock")
+}
+
 // lifecycleEnv is the real gx binary's isolated world: its own state dir,
 // ticket store and config, so the e2e never touches the user's server.
 type lifecycleEnv struct {
@@ -123,6 +134,7 @@ func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 		"XDG_DATA_HOME=" + filepath.Join(root, "data"),
 		"XDG_STATE_HOME=" + filepath.Join(root, "state"),
 		"HOME=" + filepath.Join(root, "home"), // gx reads config from ~/.config, ignoring XDG_CONFIG_HOME
+		herdrSocketEnv(),
 	}}
 	home := filepath.Join(root, "home")
 	configDir := filepath.Join(home, ".config", "gx")

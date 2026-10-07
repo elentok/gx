@@ -28,6 +28,7 @@ func TestServerTUI_ShowsServerModeAndDropsOnStop(t *testing.T) {
 		"XDG_DATA_HOME=" + filepath.Join(root, "data"),
 		"XDG_STATE_HOME=" + filepath.Join(root, "state"),
 		"HOME=" + home,
+		herdrSocketEnv(),
 	}}
 	configDir := filepath.Join(home, ".config", "gx")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
