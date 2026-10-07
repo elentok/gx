@@ -31,6 +31,7 @@ type ServerAPI interface {
 	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
 	QueueItems(ctx context.Context) ([]server.QueueItem, error)
 	QueueAdd(ctx context.Context, address, agent string) (server.QueueResult, error)
+	QueueReplace(ctx context.Context, project string, items []server.QueueItem) (server.QueueResult, error)
 }
 
 // serverEnqueueDefaultAgent is preselected in the "a" confirm; it matches the
@@ -48,6 +49,17 @@ type serverEnqueuedMsg struct {
 // not-yet-terminal ticket, live run or not, with the agent picked in the
 // confirm.
 func (m Model) handleServerEnqueueKey() (tea.Model, tea.Cmd) {
+	addrs := m.checkedPendingAddresses()
+	if len(addrs) == 0 {
+		return m, notify.Info("check at least one ticket to enqueue")
+	}
+	m.confirm = m.openAgentConfirm(fmt.Sprintf("Enqueue %d ticket(s)?", len(addrs)),
+		func(agent string) tea.Cmd { return m.cmdServerEnqueue(addrs, agent) })
+	return m, nil
+}
+
+// checkedPendingAddresses is every checked, not-yet-terminal ticket.
+func (m Model) checkedPendingAddresses() []string {
 	var addrs []string
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
@@ -56,18 +68,61 @@ func (m Model) handleServerEnqueueKey() (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	if len(addrs) == 0 {
-		return m, notify.Info("check at least one ticket to enqueue")
-	}
+	return addrs
+}
+
+func (m Model) openAgentConfirm(prompt string, accept func(agent string) tea.Cmd) confirm.Model {
 	agents := []string{string(ralphloop.AgentClaude), string(ralphloop.AgentCodex)}
-	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:     fmt.Sprintf("Enqueue %d ticket(s)?", len(addrs)),
+	return m.confirm.Open(confirm.Options{
+		Prompt:     prompt,
 		Choices:    agents,
 		Choice:     slices.Index(agents, string(serverEnqueueDefaultAgent)),
 		ChoiceName: "Agent",
-		AcceptWith: func(agent string) tea.Cmd { return m.cmdServerEnqueue(addrs, agent) },
+		AcceptWith: accept,
 	})
+}
+
+// serverReplacedMsg reports a finished "r": the server's refusal or error, if any.
+type serverReplacedMsg struct {
+	count   int
+	problem string
+}
+
+// handleServerReplaceKey is "r" in server mode: replace one project's pending
+// entries with the checked tickets, using the agent picked in the confirm. The
+// server owns the live-run guard and refuses with ticket-live.
+func (m Model) handleServerReplaceKey() (tea.Model, tea.Cmd) {
+	addrs := m.checkedPendingAddresses()
+	if len(addrs) == 0 {
+		return m, notify.Info("check at least one ticket to replace the queue")
+	}
+	project, _, _ := strings.Cut(addrs[0], ":")
+	for _, a := range addrs {
+		if p, _, _ := strings.Cut(a, ":"); p != project {
+			return m, notify.Info("replace works on one project; checked tickets span several")
+		}
+	}
+	m.confirm = m.openAgentConfirm(fmt.Sprintf("Replace %s's queue with %d ticket(s)?", project, len(addrs)),
+		func(agent string) tea.Cmd { return m.cmdServerReplace(project, addrs, agent) })
 	return m, nil
+}
+
+func (m Model) cmdServerReplace(project string, addrs []string, agent string) tea.Cmd {
+	api := m.serverAPI
+	items := make([]server.QueueItem, len(addrs))
+	for i, a := range addrs {
+		items[i] = server.QueueItem{Address: a, Agent: agent}
+	}
+	return func() tea.Msg {
+		res, err := api.QueueReplace(context.Background(), project, items)
+		switch {
+		case err != nil:
+			return serverReplacedMsg{problem: err.Error()}
+		case res.Refused:
+			return serverReplacedMsg{problem: res.Message}
+		}
+		return serverReplacedMsg{count: len(items)}
+	}
 }
 
 func (m Model) cmdServerEnqueue(addrs []string, agent string) tea.Cmd {
@@ -217,6 +272,12 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 			note = notify.Error(fmt.Sprintf("enqueued %d, stopped at %s", msg.added, msg.problem))
 		}
 		return m, tea.Batch(note, m.cmdServerQueue()), true
+
+	case serverReplacedMsg:
+		if msg.problem != "" {
+			return m, notify.Error("replace refused: " + msg.problem), true
+		}
+		return m, tea.Batch(notify.Success(fmt.Sprintf("queue replaced with %d ticket(s)", msg.count)), m.cmdServerQueue()), true
 
 	case serverQueueMsg:
 		if msg.err == nil {

@@ -66,6 +66,9 @@ type implementFailedMsg struct {
 // runs replaceQueuedSelection via handleReplaceQueueConfirmed and switches to
 // the Queue tab.
 func (m Model) handleReplaceQueueKey() (tea.Model, tea.Cmd) {
+	if m.serverMode() {
+		return m.handleServerReplaceKey()
+	}
 	if r, ok := m.selectedRow(); ok {
 		epic := m.epicAt(r)
 		if ralphLoopRegistry.isRunningEpic(epic.Name) {

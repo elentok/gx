@@ -18,6 +18,16 @@ import (
 
 type fakeServerAPI struct {
 	adds *[]server.QueueItem
+	// replaced records the QueueReplace items; replaceRes is what it returns.
+	replaced   *[]server.QueueItem
+	replaceRes server.QueueResult
+}
+
+func (f fakeServerAPI) QueueReplace(_ context.Context, _ string, items []server.QueueItem) (server.QueueResult, error) {
+	if f.replaced != nil {
+		*f.replaced = append(*f.replaced, items...)
+	}
+	return f.replaceRes, nil
 }
 
 func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (server.QueueResult, error) {
@@ -198,6 +208,42 @@ func TestServerMode_EnqueueKeyPicksAgent(t *testing.T) {
 	want := []server.QueueItem{{Address: "gx:alpha/01", Agent: "codex"}}
 	if !slices.Equal(adds, want) {
 		t.Fatalf("adds = %+v, want %+v", adds, want)
+	}
+}
+
+// Seam D: "r" replaces with the chosen agent; a ticket-live refusal becomes an
+// error toast.
+func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
+	var replaced []server.QueueItem
+	api := fakeServerAPI{replaced: &replaced}
+	m := newServerModel(t).WithServer(api)
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	}}})
+	m.checked = map[string]bool{"gx:alpha/01": true}
+
+	next, _ := m.handleReplaceQueueKey()
+	m = next.(Model)
+	if !m.confirm.IsOpen {
+		t.Fatal("confirm not open")
+	}
+	m.confirm, _, _ = m.confirm.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	_, cmd, _ := m.confirm.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if cmd == nil {
+		t.Fatal("accept produced no command")
+	}
+	if _, ok := cmd().(serverReplacedMsg); !ok {
+		t.Fatal("accept did not replace")
+	}
+	want := []server.QueueItem{{Address: "gx:alpha/01", Agent: "codex"}}
+	if !slices.Equal(replaced, want) {
+		t.Fatalf("replaced = %+v, want %+v", replaced, want)
+	}
+
+	api.replaceRes = server.QueueResult{Refused: true, Reason: server.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}
+	msg := m.WithServer(api).cmdServerReplace("gx", []string{"gx:alpha/01"}, "claude")()
+	if got := msg.(serverReplacedMsg).problem; !strings.Contains(got, "live iteration") {
+		t.Fatalf("problem = %q", got)
 	}
 }
 
