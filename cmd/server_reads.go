@@ -81,7 +81,72 @@ func newProjectCmd(_ deps) *cobra.Command {
 	add.Flags().StringVar(&vcs, "vcs", "", `"none" registers a directory that is not a git repo`)
 	add.Flags().BoolVar(&addJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(add)
+
+	var rmJSON bool
+	remove := &cobra.Command{
+		Use:   "remove <name>",
+		Short: "unregister a project (its tickets stay in the store; refused while any are queued or running)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runProjectEdit(c.Context(), c.OutOrStdout(), rmJSON, "removed", cl.RemoveProject,
+				server.ProjectRequest{Name: args[0]})
+		},
+	}
+	remove.Flags().BoolVar(&rmJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(remove)
+
+	var setJSON bool
+	setPath := &cobra.Command{
+		Use:   "set-path <name> [path]",
+		Short: "point a project at another repo (path defaults to the current directory)",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE: func(c *cobra.Command, args []string) error {
+			path := "."
+			if len(args) == 2 {
+				path = args[1]
+			}
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runProjectEdit(c.Context(), c.OutOrStdout(), setJSON, "updated", cl.SetProjectPath,
+				server.ProjectRequest{Name: args[0], Path: abs})
+		},
+	}
+	setPath.Flags().BoolVar(&setJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(setPath)
 	return cmd
+}
+
+type projectEditCall func(context.Context, server.ProjectRequest) (server.ProjectResult, error)
+
+func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string, call projectEditCall, req server.ProjectRequest) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := call(ctx, req)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = server.ProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	_, err = fmt.Fprintf(w, "%s project %s\n", verb, res.Name)
+	return err
 }
 
 func runProjectAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.AddProjectRequest) error {

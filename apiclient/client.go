@@ -149,6 +149,21 @@ func (c *Client) AddProject(ctx context.Context, req server.AddProjectRequest) (
 	return res, err
 }
 
+// RemoveProject unregisters a project, keeping its tickets. A refusal is a
+// result (Refused set), not an error.
+func (c *Client) RemoveProject(ctx context.Context, req server.ProjectRequest) (server.ProjectResult, error) {
+	var res server.ProjectResult
+	err := c.post(ctx, "/v1/projects/remove", req, &res)
+	return res, err
+}
+
+// SetProjectPath points a project at another repo. A refusal is a result.
+func (c *Client) SetProjectPath(ctx context.Context, req server.ProjectRequest) (server.ProjectResult, error) {
+	var res server.ProjectResult
+	err := c.post(ctx, "/v1/projects/set-path", req, &res)
+	return res, err
+}
+
 // Locks returns every held lock with its owner.
 func (c *Client) Locks(ctx context.Context) ([]server.LockInfo, error) {
 	var l []server.LockInfo

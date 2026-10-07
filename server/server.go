@@ -245,6 +245,8 @@ var routeTable = []struct {
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},
 	{"POST /v1/projects/add", (*Server).projectAdd},
+	{"POST /v1/projects/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.removeProject)(w, r) }},
+	{"POST /v1/projects/set-path", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.setProjectPath)(w, r) }},
 	{"GET /v1/locks", (*Server).locks},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
