@@ -38,6 +38,10 @@ type ServerAPI interface {
 	QueueDrain(ctx context.Context) (server.QueueResult, error)
 	Budget(ctx context.Context) (server.BudgetStatus, error)
 	BudgetOverride(ctx context.Context) (server.BudgetResult, error)
+	TicketPark(ctx context.Context, address, reason string) (server.QueueResult, error)
+	TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error)
+	TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error)
+	Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error)
 }
 
 // serverEnqueueDefaultAgent is preselected in the "a" confirm; it matches the
@@ -290,6 +294,9 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 			return m, notify.Error("refused: " + msg.problem), true
 		}
 		return m, tea.Batch(notify.Success(msg.ok), m.cmdServerQueue()), true
+
+	case serverWriteMsg:
+		return m, msg.toast(), true
 
 	case serverQueueMsg:
 		if msg.err == nil {

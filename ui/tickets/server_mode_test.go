@@ -18,10 +18,12 @@ import (
 
 type fakeServerAPI struct {
 	adds *[]server.QueueItem
+	// calls records the ticket write verbs as "verb address" and the
+	// maintenance verbs by name.
+	calls *[]string
 	// replaced records the QueueReplace items; replaceRes is what it returns.
 	replaced   *[]server.QueueItem
 	replaceRes server.QueueResult
-	calls      *[]string
 	removeRes  server.QueueResult
 	budget     server.BudgetStatus
 }
@@ -74,6 +76,32 @@ func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (serve
 		*f.adds = append(*f.adds, server.QueueItem{Address: address, Agent: agent})
 	}
 	return server.QueueResult{}, nil
+}
+
+func (f fakeServerAPI) TicketPark(_ context.Context, address, _ string) (server.QueueResult, error) {
+	f.record("park " + address)
+	return server.QueueResult{}, nil
+}
+
+func (f fakeServerAPI) TicketCancel(_ context.Context, address string, _ bool) (server.QueueResult, error) {
+	f.record("cancel " + address)
+	return server.QueueResult{}, nil
+}
+
+func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string) (server.QueueResult, error) {
+	f.record("relaunch " + address)
+	return server.QueueResult{}, nil
+}
+
+func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
+	f.record(verb + " " + req.Address)
+	return server.RepairResult{}, nil
+}
+
+func (f fakeServerAPI) record(call string) {
+	if f.calls != nil {
+		*f.calls = append(*f.calls, call)
+	}
 }
 
 func (fakeServerAPI) Snapshot(context.Context) (server.Snapshot, error) {
@@ -289,5 +317,48 @@ func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
 func TestServerMode_QuitNotGuarded(t *testing.T) {
 	if !newServerModel(t).CanQuit() {
 		t.Fatal("server mode must not guard quit")
+	}
+}
+
+// Seam D: the "s" menu lists the server actions for a ticket's state and
+// issues the chosen one; "enter" on a parked row issues unpark.
+func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
+	var calls []string
+	api := fakeServerAPI{calls: &calls}
+	m := newServerModel(t).WithServer(api)
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:alpha/02", Title: "Second", Status: "needs-repair"},
+	}}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = selectTicketRow(t, updated.(Model))
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if got, want := menuValues(m.statusMenu), []string{"server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
+		t.Fatalf("open ticket menu = %v, want %v", got, want)
+	}
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if msg, ok := cmd().(serverWriteMsg); !ok || msg.problem != "" {
+		t.Fatalf("park result = %+v", msg)
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if got, want := menuValues(m.statusMenu), []string{"server:unpark", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
+		t.Fatalf("parked ticket menu = %v, want %v", got, want)
+	}
+	m.statusMenuOpen = false
+
+	_, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("enter on a parked row issued nothing")
+	}
+	cmd()
+	if want := []string{"park gx:alpha/01", "unpark gx:alpha/02"}; !slices.Equal(calls, want) {
+		t.Fatalf("calls = %v, want %v", calls, want)
 	}
 }

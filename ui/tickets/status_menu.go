@@ -79,7 +79,12 @@ func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
 	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
 	live := ralphLoopRegistry.isRunningEpic(epic.Name)
-	menu := newStatusMenu(ticket, live)
+	var menu components.MenuState
+	if m.serverMode() {
+		menu = newServerStatusMenu(ticket, epic.RenderedStatus(ticket))
+	} else {
+		menu = newStatusMenu(ticket, live)
+	}
 	if len(menu.Items) == 0 {
 		return m, notify.Info("no status changes available for this ticket right now")
 	}
@@ -107,8 +112,15 @@ func (m Model) handleStatusMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if !accepted {
 		return m, nil
 	}
-	status := schema.Status(m.statusMenu.Items[m.statusMenu.Cursor].Value)
-	return m.applyStatusChange(status)
+	value := m.statusMenu.Items[m.statusMenu.Cursor].Value
+	if verb, isServer := strings.CutPrefix(value, serverMenuValuePrefix); isServer {
+		r, ok := m.selectedRow()
+		if !ok || r.isEpic() {
+			return m, nil
+		}
+		return m, m.cmdServerWrite(verb, m.epicAt(r).Tickets[r.ticketIdx].Path)
+	}
+	return m.applyStatusChange(schema.Status(value))
 }
 
 // applyStatusChange writes status to the selected row's ticket through

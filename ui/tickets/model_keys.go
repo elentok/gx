@@ -177,6 +177,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// toggle binding directly against its own internal collapsed map (see
 	// ui/tree/ops.go) — the only way ui/tickets learns which single entry
 	// just changed, short of duplicating that binding logic here.
+	if msg.String() == "enter" {
+		if cmd, handled := m.handleServerUnparkEnter(); handled {
+			return m, cmd
+		}
+	}
 	selectedID := ""
 	if entries := m.sidebarTree.Entries(); len(entries) > 0 {
 		if idx := m.sidebarTree.SelectedIndex(); idx >= 0 && idx < len(entries) {
