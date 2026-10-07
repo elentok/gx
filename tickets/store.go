@@ -11,7 +11,7 @@ import (
 )
 
 // ErrNoProject means no project in the ticket store points at the repo.
-var ErrNoProject = errors.New("no ticket-store project for this repo; run `gx tickets migrate`")
+var ErrNoProject = errors.New("no ticket-store project for this repo; run `gx project add .` to register it")
 
 // ProjectDir finds the project directory in the ticket store whose
 // project.json names repoRoot as its repo.

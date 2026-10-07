@@ -87,7 +87,7 @@ func TestExecute_TicketsRoot_HonorsConfiguredStorePath(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsRoot_NoProjectRefusesWithMigrateHint(t *testing.T) {
+func TestExecute_TicketsRoot_NoProjectRefusesWithProjectAddHint(t *testing.T) {
 	store := isolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	addProject(t, store, "other", filepath.Join(t.TempDir(), "elsewhere"))
@@ -97,8 +97,8 @@ func TestExecute_TicketsRoot_NoProjectRefusesWithMigrateHint(t *testing.T) {
 		if err == nil {
 			t.Fatalf("%v: expected error, got nil", args)
 		}
-		if !strings.Contains(err.Error(), "gx tickets migrate") {
-			t.Errorf("%v: error = %q, want migrate hint", args, err.Error())
+		if !strings.Contains(err.Error(), "gx project add .") {
+			t.Errorf("%v: error = %q, want project add hint", args, err.Error())
 		}
 		if out != "" {
 			t.Errorf("%v: stdout = %q, want empty", args, out)
