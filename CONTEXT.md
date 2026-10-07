@@ -146,7 +146,7 @@ siblings tie-breaking on display number so an original sorts before its replacem
 reads as the epic's intended order of execution.
 
 **Parked** — a ticket's state (`needs-answer`, `needs-repair`, or `draft`; `isParked`) and, derived
-from it, a run-level state: an epic with no runnable work left but at least one parked ticket keeps
+from it, an **epic state**: an epic with no runnable work left but at least one parked ticket keeps
 scheduling everything else, then parks indefinitely and notifies, releasing its slot in the
 epic-level concurrency cap, rather than exiting. Per ADR 0020, **stall** names the opposite thing —
 the invisible failure this design exists to eliminate — and must not be used for the deliberate,
@@ -172,7 +172,7 @@ liveness-only rule for it, ignoring the field. Cleared on claim; the event keeps
 (retired informal names — collided with the already-established `Gate` type and its `.gates()`
 verb).
 
-**Deadlocked** — a run-level state: an epic with no runnable work and nothing parked either — a
+**Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either — a
 genuine dependency error, reported as a failure rather than parked on.
 
 **Reattach** — reconnecting a run to an iteration that is still live and owned. Run at startup for
@@ -258,6 +258,51 @@ means taking a new snapshot.
 
 **Explain** — the scheduler's own verdict on why a ticket is or isn't running
 (`gx server tickets explain`). _Avoid_: diagnose.
+
+**Server queue** — the one server-wide collection of queued top-level tickets, across every
+project, in FIFO order (`gx server queue`). Replaces the per-repo **Queue** and its Attach lock: a
+second gx process can no longer be "foreign" to it, because only the server schedules. Queue
+membership and order live in the server's state dir, not in the tickets.
+
+**Direct write** — a write the CLI makes straight to a ticket's markdown under the per-ticket lock,
+then pings the server. Used for content (`gx tickets show|add|section|set`). The JSON result
+carries `"via": "direct"`. Works with the server down.
+
+**Server write** — a write only the server performs, because it changes scheduling (enqueue,
+dequeue, pause, drain, unpark, override). The server writes the file first, so markdown stays the
+truth. The JSON result carries `"via": "server"` and an `actor` (who asked). Refused with
+`server-not-running` when the server is down (ADR 0030). _Avoid_: daemon write.
+
+**View model** — what the TUI keeps of server state: a snapshot plus the events applied on top.
+It holds no scheduler state of its own and never starts agents. _Avoid_: loop registry (the
+in-process ralph-loop it replaced).
+
+**Server indicator** — the Queue tab's label for the server's reachability (running, down,
+starting). Replaces the "(attached)" suffix. When down, the Queue tab is cleared and offers to
+start the server; the Tickets tab still reads markdown.
+
+**Launch** — the server starting an iteration: claim the ticket, create the worktree, open the
+herdr tab and start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
+
+**Reclaim** — the server, after a restart, taking back an iteration whose pane is still live and
+owned (found by its recorded handle). A handle that no longer matches parks the ticket
+`needs-repair`. Replaces **Reattach** and Re-adopt; there is no prompt. _Avoid_: reattach.
+
+**Base** / **Target** — a ticket's **base** is the branch its work starts from; its **target** is
+the branch it lands on. Only `base:` is declared (a branch or a ticket address); the target is
+derived (a child's is its parent's branch, a top-level ticket's is trunk) and is none for a
+commitless ticket. The resolved base is recorded at claim as read-only `resolved_base`. `gx merge`
+takes `target`, not `base`.
+
+**Fix ticket** — a ticket a code-review ticket opens to repair what the review found. Its `parent`
+is the code-review ticket, so it sits in that ticket's fork subtree.
+
+**Budget day** — one local calendar day, from midnight to midnight. The run budget is global to the
+server and resets at the start of each budget day.
+
+**Budget ledger** — the persisted per-day record of live cost deltas that the soft and hard budget
+limits are checked against. It replaces the Attach baselines. One-offs and investigate tickets
+count. A hard kill parks the ticket with kind `budget-killed`.
 
 ## Ticket Forking
 
