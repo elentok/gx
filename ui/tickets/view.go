@@ -186,7 +186,9 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	// up within that epic's own inner map keeps a concurrently-running
 	// epic's same-numbered ticket (e.g. two epics' own "02") from
 	// cross-rendering as running here.
-	if m.implementingEpics[epic.Name] {
+	// While the server is down the live state is stale, so it is blanked
+	// rather than shown.
+	if m.implementingEpics[epic.Name] && m.serverLink != ServerLinkDown {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, triangle+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0)

@@ -223,7 +223,7 @@ func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabTickets:
 		return historyEntry{
 			viewState: viewState,
-			model:     ticketsui.NewModelWithStore(viewState.WorktreeRoot, s, keys.New(Bindings()), m.queueStore),
+			model:     ticketsui.NewModelWithStore(viewState.WorktreeRoot, s, keys.New(Bindings()), m.queueStore).WithServerLink(m.serverConn.link()),
 		}
 	case nav.TabQueue:
 		return historyEntry{

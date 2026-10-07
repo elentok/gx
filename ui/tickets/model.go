@@ -182,6 +182,8 @@ type Model struct {
 	// serverAPI is non-nil in server mode (see server_mode.go): vm is then the
 	// only source of rows.
 	serverAPI ServerAPI
+	// serverLink is how the TUI currently reaches the server (server_link.go).
+	serverLink ServerLink
 	vm        viewmodel.State
 }
 

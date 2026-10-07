@@ -1,6 +1,10 @@
 package app
 
-import "fmt"
+import (
+	"fmt"
+
+	ticketsui "github.com/elentok/gx/ui/tickets"
+)
 
 // ServerState is how this TUI sees the orchestrator server.
 type ServerState int
@@ -34,6 +38,18 @@ func (c ServerConn) indicator() string {
 		return "server ⚠ herdr unavailable"
 	}
 	return ""
+}
+
+// link is the connection state as the Tickets tab gates its keys and live
+// columns on it.
+func (c ServerConn) link() ticketsui.ServerLink {
+	switch c.State {
+	case ServerDown:
+		return ticketsui.ServerLinkDown
+	case ServerReadOnly:
+		return ticketsui.ServerLinkReadOnly
+	}
+	return ticketsui.ServerLinkUp
 }
 
 // WithServerConn sets the connection state the server indicator renders.

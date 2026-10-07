@@ -114,6 +114,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if match == nil {
 			return m, nil // chord in progress
 		}
+		if cmd, blocked := m.serverKeyGuard(match.ID); blocked {
+			return m, cmd
+		}
 		if archivedBlockedBindings[match.ID] {
 			if cmd, blocked := m.archivedReadOnlyGuard(); blocked {
 				return m, cmd
