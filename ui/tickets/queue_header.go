@@ -347,6 +347,9 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 	if m.serverDown {
 		return []string{epicStatusParkedAnswerStyle.Render(queueServerDownBanner)}
 	}
+	if m.serverAPI != nil && m.herdrDown {
+		return []string{epicStatusProblemStyle.Render(queueHerdrDownBanner)}
+	}
 	switch m.queueRunState() {
 	case queueRunCompleted:
 		total, average, maximum := m.completedContextMetrics()
@@ -369,6 +372,10 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 		return []string{m.queueIdleBodyLine()}
 	}
 }
+
+// queueHerdrDownBanner is shown in server mode while the server cannot reach
+// herdr: queued tickets stay queued until it answers again.
+const queueHerdrDownBanner = "herdr unavailable — the server can't start agents until it answers"
 
 // queueIdleBodyLine picks the reserved slot's idle copy: a call to action
 // when there's a checked plan to run, or a pointer back to the Tickets tab

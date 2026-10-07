@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -25,6 +26,9 @@ type TicketInfo struct {
 	// File is the ticket's markdown path, for clients that edit content or
 	// set a plain status directly (those are direct writes, not server ones).
 	File string `json:"file,omitempty"`
+	// ClaimedAt is when the server launched the claimed ticket's iteration;
+	// filled in by the snapshot handler, zero while the ticket is not running.
+	ClaimedAt time.Time `json:"claimed_at,omitzero"`
 
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.

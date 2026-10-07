@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -37,6 +38,9 @@ type trackedRun struct {
 	Workspace  string `json:"workspace"`
 	Base       string `json:"base"`
 	TicketPath string `json:"ticket_path"`
+	// StartedAt is when the claim launched; it survives a restart with the
+	// registry file. Zero for a run an older server recorded.
+	StartedAt time.Time `json:"started_at,omitzero"`
 }
 
 // runRegistry is the server's own record of launched iterations, keyed by
@@ -102,6 +106,18 @@ func (r *runRegistry) runOf(address string) (Run, bool) {
 		}
 	}
 	return Run{}, false
+}
+
+// startedAtOf returns when the iteration of the ticket at address was launched.
+func (r *runRegistry) startedAtOf(address string) (time.Time, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.runs {
+		if t.Address == address && !t.StartedAt.IsZero() {
+			return t.StartedAt, true
+		}
+	}
+	return time.Time{}, false
 }
 
 func (r *runRegistry) list() []trackedRun {

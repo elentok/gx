@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -14,10 +15,15 @@ import (
 
 func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 	t.Helper()
+	return loadedServerQueueWith(t, status, time.Time{}, false)
+}
+
+func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, herdrDown bool) (QueueModel, tea.Cmd) {
+	t.Helper()
 	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	api := fakeServerAPI{
-		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
-			{Address: "gx:alpha/01", Title: "First", Status: status},
+		snap: server.Snapshot{Seq: 1, HerdrUnavailable: herdrDown, Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: status, ClaimedAt: claimedAt},
 			{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}},
@@ -79,5 +85,23 @@ func TestQueueServerMode_NoLocalReattachOrStrandedChecks(t *testing.T) {
 	}
 	if cmd := m.startAvailableEpics(); cmd != nil {
 		t.Error("startAvailableEpics launched an in-process run in server mode")
+	}
+}
+
+func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {
+	claimed := time.Now().Add(-10 * time.Minute)
+	m, _ := loadedServerQueueWith(t, "claimed", claimed, false)
+
+	if got := m.live["gx:alpha"]["01"].startedAt; !got.Equal(claimed) {
+		t.Errorf("startedAt = %v, want the server's claim time %v", got, claimed)
+	}
+}
+
+func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
+	m, _ := loadedServerQueueWith(t, "open", time.Time{}, true)
+
+	body := strings.Join(m.queueHeaderBodyLines(), "\n")
+	if !strings.Contains(body, "herdr unavailable") {
+		t.Errorf("header body %q does not say herdr is unavailable", body)
 	}
 }

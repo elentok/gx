@@ -43,6 +43,9 @@ type Handshake struct {
 	// Orchestrator is the `orchestrator` value the server read at start; it
 	// does not follow later config.json edits.
 	Orchestrator string `json:"orchestrator,omitempty"`
+	// HerdrUnavailable is set while herdr isn't answering, so a client can say
+	// why nothing starts.
+	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
 }
 
 type Config struct {
@@ -300,6 +303,11 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	snap := s.idx.snapshot()
 	snap.HerdrUnavailable = s.herdr.isUnavailable()
+	for i, t := range snap.Tickets {
+		if t.Status == "claimed" {
+			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)
+		}
+	}
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.Pending = s.pendingRows()
 	_ = json.NewEncoder(w).Encode(snap)
@@ -351,7 +359,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), Orchestrator: s.cfg.Orchestrator})
+	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), Orchestrator: s.cfg.Orchestrator, HerdrUnavailable: s.herdr.isUnavailable()})
 }
 
 // DefaultLandStopTimeout is how long a stop waits for a land in flight.

@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"github.com/elentok/gx/ralphloop"
 	"os"
 	"path/filepath"
 	"strings"
@@ -148,5 +149,36 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 		if data, _ := os.ReadFile(p); !strings.Contains(string(data), "status: "+want) {
 			t.Errorf("%s lacks status %s:\n%s", filepath.Base(p), want, data)
 		}
+	}
+}
+
+func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
+	h, path := startTicketWrites(t)
+	if err := ralphloop.Claim(path); err != nil {
+		t.Fatal(err)
+	}
+	launched := time.Now().Add(-90 * time.Second).Truncate(time.Second)
+	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Pane: "p1", Tab: "t1"}, launched)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		snap, err := h.Client.Snapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, tk := range snap.Tickets {
+			if tk.Address == "proj:epic-a/01" && tk.Status == "claimed" {
+				if !tk.ClaimedAt.Equal(launched) {
+					t.Fatalf("ClaimedAt = %v, want %v", tk.ClaimedAt, launched)
+				}
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("ticket never showed as claimed: %+v", snap.Tickets)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }

@@ -41,3 +41,8 @@ func (s *Server) BudgetStatusAt(now time.Time) BudgetStatus { return s.budgetSta
 
 // RecordSpend adds spend to today's ledger.
 func (s *Server) RecordSpend(key string, cost float64) { s.ledger.record(key, cost, time.Now()) }
+
+// PutRunAt is PutRun with the time the iteration was launched.
+func (s *Server) PutRunAt(root string, r Run, at time.Time) {
+	s.registry.put(trackedRun{Run: r, Root: root, StartedAt: at})
+}

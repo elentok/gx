@@ -293,7 +293,7 @@ func (s *Server) claimAndLaunch(root rootRef, addr tickets.Address, t tickets.Ti
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
 	s.registry.put(trackedRun{
-		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path,
+		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: time.Now(),
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
 	go s.finishRun(deps, root, one, wt, run, ticketAddr)

@@ -23,6 +23,7 @@ type fakeServerClient struct {
 	ticketsui.ServerAPI
 	down     bool
 	readOnly bool
+	herdr    bool
 }
 
 func (f *fakeServerClient) Snapshot(context.Context) (server.Snapshot, error) {
@@ -33,7 +34,7 @@ func (f *fakeServerClient) Negotiate(context.Context, string) (apiclient.Negotia
 	if f.down {
 		return apiclient.Negotiation{}, errors.New("connection refused")
 	}
-	return apiclient.Negotiation{Handshake: server.Handshake{Pid: 4242}, ReadOnly: f.readOnly}, nil
+	return apiclient.Negotiation{Handshake: server.Handshake{Pid: 4242, HerdrUnavailable: f.herdr}, ReadOnly: f.readOnly}, nil
 }
 
 func newServerShell(t *testing.T, client ServerClient) Model {
@@ -105,5 +106,15 @@ func TestInProcessMode_NoProbe(t *testing.T) {
 	}
 	if got := ansi.Strip(m.tabsView()); strings.Contains(got, "server") {
 		t.Fatalf("tabs = %q", got)
+	}
+}
+
+func TestServerMode_HerdrUnavailableShowsInIndicator(t *testing.T) {
+	m := newServerShell(t, &fakeServerClient{herdr: true})
+
+	m = probe(t, m)
+
+	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ⚠ herdr unavailable") {
+		t.Errorf("tabs = %q, want the herdr indicator", got)
 	}
 }

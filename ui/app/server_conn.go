@@ -50,6 +50,8 @@ func (m Model) cmdServerProbe() tea.Cmd {
 			return serverConnMsg{ServerConn{State: ServerDown}}
 		case n.ReadOnly:
 			return serverConnMsg{ServerConn{State: ServerReadOnly, PID: n.Pid}}
+		case n.HerdrUnavailable:
+			return serverConnMsg{ServerConn{State: ServerHerdrUnavailable, PID: n.Pid}}
 		}
 		return serverConnMsg{ServerConn{State: ServerUp, PID: n.Pid}}
 	}

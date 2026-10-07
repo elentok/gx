@@ -53,6 +53,10 @@ type QueueModel struct {
 	// queueStatus so the Queue tab's rows can render the same running/paused
 	// spinner+phase presentation as the Tickets tab (renderLiveTicketRow).
 	live map[string]map[string]liveTicketState
+	// serverClaimedAt and herdrDown come from the last server load: the claim
+	// time of each running ticket, and whether the server can launch agents.
+	serverClaimedAt map[string]time.Time
+	herdrDown       bool
 	// serverClaimSeen is when this tab first saw each ticket claimed (keyed by
 	// address), server mode only; see syncServerRunState.
 	serverClaimSeen  map[string]time.Time
@@ -207,7 +211,11 @@ type queueEpicsLoadedMsg struct {
 type queueServerLoadedMsg struct {
 	epics []tickets.Epic
 	items []server.QueueItem
-	err   error
+	// claimedAt is when the server launched each running ticket, by address.
+	claimedAt map[string]time.Time
+	// herdrDown is the server's own view: it cannot start agents.
+	herdrDown bool
+	err       error
 }
 
 // localStore is the queue store the tab reads and writes, nil in server mode:
@@ -227,7 +235,16 @@ func (m QueueModel) cmdLoadQueue() tea.Cmd {
 				return queueServerLoadedMsg{err: err}
 			}
 			items, err := api.QueueItems(context.Background())
-			return queueServerLoadedMsg{epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap)), items: items, err: err}
+			claimedAt := map[string]time.Time{}
+			for _, t := range snap.Tickets {
+				if !t.ClaimedAt.IsZero() {
+					claimedAt[t.Address] = t.ClaimedAt
+				}
+			}
+			return queueServerLoadedMsg{
+				epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap)), items: items,
+				claimedAt: claimedAt, herdrDown: snap.HerdrUnavailable, err: err,
+			}
 		}
 	}
 	scratchDir := scratchDirFor(m.worktreeRoot)
@@ -275,6 +292,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil || m.serverDown {
 			return m, nil
 		}
+		m.serverClaimedAt, m.herdrDown = msg.claimedAt, msg.herdrDown
 		m.checked = make(map[string]bool, len(msg.items))
 		m.checkOrder = make(map[string]uint64, len(msg.items))
 		for i, item := range msg.items {

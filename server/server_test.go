@@ -325,3 +325,11 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 		t.Errorf("after recovery: %+v", after)
 	}
 }
+
+func TestHandshake_ReportsHerdrUnavailable(t *testing.T) {
+	h := servertest.StartHerdrDown(t, func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	got, err := h.Client.Handshake(context.Background())
+	if err != nil || !got.HerdrUnavailable {
+		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable", got, err)
+	}
+}

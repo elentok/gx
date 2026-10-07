@@ -13,8 +13,9 @@ import (
 // ralphLoopRegistry, so a claimed ticket is the only sign that an epic runs.
 // It fills runningEpics and live so the header, row spinners and timers behave
 // as they do for an in-process run, and returns the spinner tick when the tab
-// goes from idle to running. A ticket's timer counts from the first load that
-// saw it claimed: the snapshot carries no claim time.
+// goes from idle to running. A ticket's timer counts from the server's claim
+// time; a server that sent none (an older build) falls back to the first load
+// that saw the ticket claimed.
 func (m *QueueModel) syncServerRunState() tea.Cmd {
 	wasRunning := len(m.runningEpics) > 0
 	if m.runningEpics == nil {
@@ -31,10 +32,12 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 				delete(m.serverClaimSeen, t.Path)
 				continue
 			}
-			seen, ok := m.serverClaimSeen[t.Path]
+			seen, ok := m.serverClaimedAt[t.Path]
 			if !ok {
-				seen = time.Now()
-				m.serverClaimSeen[t.Path] = seen
+				if seen, ok = m.serverClaimSeen[t.Path]; !ok {
+					seen = time.Now()
+					m.serverClaimSeen[t.Path] = seen
+				}
 			}
 			if live[epic.Name] == nil {
 				live[epic.Name] = map[string]liveTicketState{}
