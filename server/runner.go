@@ -171,10 +171,10 @@ func (s *Server) claimNext() {
 }
 
 func (s *Server) concurrencyLimit() int {
-	if s.cfg.MaxConcurrentRoots > 0 {
-		return s.cfg.MaxConcurrentRoots
+	if s.cfg.MaxAgents > 0 {
+		return s.cfg.MaxAgents
 	}
-	return config.DefaultExecutionQueueConfig().MaxConcurrentEpics
+	return config.DefaultExecutionQueueConfig().MaxAgents
 }
 
 // claimRoot reports whether it launched an iteration for item's root. A claim

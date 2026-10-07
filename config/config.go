@@ -136,6 +136,7 @@ func Load() (Config, error) {
 		ExecutionQueue        *struct {
 			MaxConcurrentTicketsPerEpic *int    `json:"max-concurrent-tickets-per-epic"`
 			MaxConcurrentEpics          *int    `json:"max-concurrent-epics"`
+			MaxAgents                   *int    `json:"max-agents"`
 			RetryStormLaunches          *int    `json:"retry-storm-launches"`
 			SpinCycles                  *int    `json:"spin-cycles"`
 			SpinWindow                  *string `json:"spin-window"`
@@ -217,6 +218,9 @@ func Load() (Config, error) {
 		}
 		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
 			cfg.ExecutionQueue.MaxConcurrentEpics = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentEpics)
+		}
+		if raw.ExecutionQueue.MaxAgents != nil {
+			cfg.ExecutionQueue.MaxAgents = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxAgents)
 		}
 		if raw.ExecutionQueue.RetryStormLaunches != nil {
 			cfg.ExecutionQueue.RetryStormLaunches = clampExecutionQueueLimit(*raw.ExecutionQueue.RetryStormLaunches)

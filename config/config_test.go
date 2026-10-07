@@ -44,6 +44,9 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 	if cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic != 2 || cfg.ExecutionQueue.MaxConcurrentEpics != 2 {
 		t.Fatalf("ExecutionQueue = %+v, want both limits to default to 2", cfg.ExecutionQueue)
 	}
+	if cfg.ExecutionQueue.MaxAgents != 4 {
+		t.Fatalf("MaxAgents = %d, want default 4", cfg.ExecutionQueue.MaxAgents)
+	}
 }
 
 func TestLoadExecutionQueueConfigPreservesUnspecifiedDefault(t *testing.T) {

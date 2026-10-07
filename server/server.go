@@ -82,9 +82,9 @@ type Config struct {
 	// means DefaultLandStopTimeout.
 	LandStopTimeout time.Duration
 
-	// MaxConcurrentRoots caps queued roots running at once (config
-	// max-concurrent-epics); zero means the config default.
-	MaxConcurrentRoots int
+	// MaxAgents caps live agents across all projects (config
+	// execution-queue.max-agents); zero means the config default.
+	MaxAgents int
 
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.

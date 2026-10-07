@@ -314,7 +314,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Orchestrator = config.OrchestratorServer
-		c.MaxConcurrentRoots = 1
+		c.MaxAgents = 1
 	})
 	_, _, cwd := registerLaunch(h)
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
@@ -368,7 +368,7 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Orchestrator = config.OrchestratorServer
-		c.MaxConcurrentRoots = 1
+		c.MaxAgents = 1
 	})
 	registerLaunch(h)
 	// The first wait is the launch's; the second is epic-a's iteration, held
@@ -430,6 +430,63 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 		return
 	}
 	t.Fatal("no verdict-change event for the second root")
+}
+
+// Seam A: the cap is global, so roots of different projects share it, and the
+// queue is plain FIFO across projects.
+func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj-a", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj-b", "epic-b", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj-a", "epic-c", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj-a", repo)
+	servertest.SetProjectRepo(t, store, "proj-b", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.MaxAgents = 2
+	})
+	registerLaunch(h)
+	// Every iteration wait blocks until released, so started agents keep their slot.
+	release := make(chan struct{})
+	var once sync.Once
+	free := func() { once.Do(func() { close(release) }) }
+	defer free()
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}
+	var waits atomic.Int32
+	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		if waits.Add(1) > 3 { // the three launches' waits come first
+			<-release
+		}
+		return idle, herdrfake.Identities{}, nil
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	order := []string{"proj-a:epic-a/01", "proj-b:epic-b/01", "proj-a:epic-c/01"}
+	for _, addr := range order {
+		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", addr, res, err)
+		}
+	}
+	for {
+		snap, err := h.Client.Snapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(snap.Pending) == 3 && snap.Pending[2].Verdict == server.VerdictConcurrencyCap {
+			if a, b := snap.Pending[0].Verdict, snap.Pending[1].Verdict; a != "claimed" || b != "claimed" {
+				t.Errorf("first two verdicts = %q, %q, want both claimed", a, b)
+			}
+			break
+		}
+		if ctx.Err() != nil {
+			t.Fatalf("pending = %+v, want the third root at the cap", snap.Pending)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if runs := h.Server.Runs(); len(runs) != 2 {
+		t.Errorf("runs = %+v, want 2 live agents", runs)
+	}
 }
 
 // leaveIteration stages what a server that died mid-iteration leaves behind: a
