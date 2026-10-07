@@ -60,6 +60,9 @@ func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	if got.Address != "mine:epic/06" || got.Status != "open" || got.Type != "implement" {
 		t.Errorf("json = %+v", got)
 	}
+	if m := decodeJSON(t, []byte(out)); m["via"] != "direct" || m["actor"] == nil {
+		t.Errorf("via/actor = %v/%v, want direct/<actor>", m["via"], m["actor"])
+	}
 }
 
 func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {

@@ -197,9 +197,11 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
 	}
 	if jsonOut {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(info)
+		via := viaDirect
+		if info.Running {
+			via = viaServer
+		}
+		return encodeProvenance(w, info, via, callerActor(os.Getwd))
 	}
 	if !info.Running {
 		_, werr := fmt.Fprintln(w, "not running")
@@ -422,9 +424,7 @@ func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
 		return fmt.Errorf("server not reachable (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(snap)
+		return encodeProvenance(w, snap, viaServer, callerActor(os.Getwd))
 	}
 	if _, err := fmt.Fprintf(w, "seq: %d\n", snap.Seq); err != nil {
 		return err

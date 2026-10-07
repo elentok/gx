@@ -92,3 +92,28 @@ func TestServerQueueWriteJSON_ReportsServerVia(t *testing.T) {
 		t.Errorf("via/actor = %v/%v; want server/<actor>", got["via"], got["actor"])
 	}
 }
+
+// Read results that are JSON objects carry via/actor like writes do; a JSON
+// array keeps its shape, since stamping it would mean wrapping it.
+func TestEncodeProvenance_StampsObjectsLeavesArrays(t *testing.T) {
+	t.Parallel()
+	var obj bytes.Buffer
+	if err := encodeProvenance(&obj, server.Explanation{}, viaServer, actorHuman); err != nil {
+		t.Fatal(err)
+	}
+	if got := decodeJSON(t, obj.Bytes()); got["via"] != "server" || got["actor"] != "human" {
+		t.Errorf("object via/actor = %v/%v; want server/human", got["via"], got["actor"])
+	}
+
+	var arr bytes.Buffer
+	if err := encodeProvenance(&arr, []server.LockInfo{{}}, viaServer, actorHuman); err != nil {
+		t.Fatal(err)
+	}
+	var list []map[string]any
+	if err := json.Unmarshal(arr.Bytes(), &list); err != nil || len(list) != 1 {
+		t.Fatalf("array output %q: %v", arr.Bytes(), err)
+	}
+	if _, stamped := list[0]["via"]; stamped {
+		t.Errorf("array element stamped: %v", list[0])
+	}
+}

@@ -32,9 +32,7 @@ func serverRead[T any](ctx context.Context, jsonOut bool, w io.Writer, fetch fun
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}
 	if jsonOut {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(v)
+		return encodeProvenance(w, v, viaServer, callerActor(os.Getwd))
 	}
 	return text(w, v)
 }
@@ -107,9 +105,7 @@ func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
 	}
 	w := c.OutOrStdout()
 	if jsonOut {
-		enc := json.NewEncoder(w)
-		enc.SetIndent("", "  ")
-		return enc.Encode(res)
+		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
