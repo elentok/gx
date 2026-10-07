@@ -475,8 +475,10 @@ func (s *Server) launch(addr tickets.Address, ticketAddr, ws, cwd string, agent 
 	if err != nil {
 		return Run{}, err
 	}
+	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
 	if _, err := herdr.AgentStart(herdr.AgentStartOptions{
-		Name:      ticketAddr,
+		Name:      label,
 		Kind:      string(agent),
 		Pane:      tab.RootPaneID,
 		AgentArgs: ralphloop.AgentArgs(agent, s.cfg.TicketStore, addr.Epic, "", ""),

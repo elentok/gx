@@ -183,7 +183,11 @@ func (s *Server) parkMismatch(t trackedRun, cause error) {
 }
 
 func (s *Server) reclaim(t trackedRun) error {
-	agent, err := herdr.AgentGet(t.Address)
+	label := t.Address
+	if addr, perr := tickets.ParseAddress(t.Address, tickets.AddressContext{}); perr == nil {
+		label, _, _ = ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	}
+	agent, err := herdr.AgentGet(label)
 	if err != nil {
 		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
 	}
