@@ -250,12 +250,7 @@ func (m Model) cmdLoad() tea.Cmd {
 	if m.serverMode() {
 		return m.cmdServerSnapshot()
 	}
-	scratchDir := m.scratchDir()
-	return func() tea.Msg {
-		epics, err := tickets.Load(scratchDir)
-		archivedEpicCount, _ := tickets.CountArchivedEpics(scratchDir)
-		return epicsLoadedMsg{epics: epics, err: err, archivedEpicCount: archivedEpicCount}
-	}
+	return m.cmdLoadDisk()
 }
 
 // cmdRefresh reloads .scratch/ from disk, matching every other tab's manual

@@ -35,14 +35,14 @@ func (s *Server) keepFresh(ctx context.Context) {
 			s.log.Warn("store watch unavailable, polling only", "err", err)
 		} else {
 			defer w.Close()
-			watchTree(w, s.cfg.TicketStore)
+			WatchTree(w, s.cfg.TicketStore)
 			events = w.Events
 			go func() {
 				// Drain errors so the watcher never blocks; the poll covers any loss.
 				for range w.Errors {
 				}
 			}()
-			s.rewatch = func() { watchTree(w, s.cfg.TicketStore) }
+			s.rewatch = func() { WatchTree(w, s.cfg.TicketStore) }
 		}
 	}
 
@@ -97,9 +97,9 @@ func (s *Server) rescan() {
 	}
 }
 
-// watchTree adds every directory under root. fsnotify is not recursive, and
+// WatchTree adds every directory under root. fsnotify is not recursive, and
 // re-adding a watched directory is a no-op.
-func watchTree(w *fsnotify.Watcher, root string) {
+func WatchTree(w *fsnotify.Watcher, root string) {
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && d.IsDir() {
 			_ = w.Add(path)

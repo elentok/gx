@@ -184,7 +184,13 @@ type Model struct {
 	serverAPI ServerAPI
 	// serverLink is how the TUI currently reaches the server (server_link.go).
 	serverLink ServerLink
-	vm        viewmodel.State
+	vm         viewmodel.State
+	// fallbackStop is non-nil while the server is down and the tab reads the
+	// store itself (server_refresh.go); fallbackGen orphans a finished
+	// fallback's in-flight ticks.
+	fallbackStop   func()
+	fallbackEvents <-chan struct{}
+	fallbackGen    int
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -268,6 +274,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, cmd, ok := m.updateServer(msg); ok {
 		return next, cmd
 	}
+	if next, cmd, ok := m.updateServerLink(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -278,6 +287,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
+		if m.refreshMode() == refreshStream {
+			// A disk read that outlived the fallback must not overwrite stream rows.
+			return m, nil
+		}
 		if err := autoCheckForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
