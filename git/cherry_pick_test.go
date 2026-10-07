@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -180,6 +181,60 @@ func TestCommitsAhead_CountsCommitsInRange(t *testing.T) {
 	}
 	if ahead != 2 {
 		t.Errorf("CommitsAhead() = %d, want 2", ahead)
+	}
+}
+
+func TestCommitSubjects_ListsRangeOldestFirst(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+	if subjects, err := git.CommitSubjects(dir, base, "HEAD"); err != nil || subjects != nil {
+		t.Fatalf("CommitSubjects(empty range) = %v, %v; want nil, nil", subjects, err)
+	}
+
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	testutil.WriteFile(t, dir, "b.txt", "b\n")
+	testutil.CommitAll(t, dir, "add b")
+
+	subjects, err := git.CommitSubjects(dir, base, "HEAD")
+	if err != nil {
+		t.Fatalf("CommitSubjects: %v", err)
+	}
+	if want := []string{"add a", "add b"}; !slices.Equal(subjects, want) {
+		t.Errorf("CommitSubjects() = %q, want %q", subjects, want)
+	}
+}
+
+func TestPatchesApplied_RangeAlreadyOnUpstream_IsApplied(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	base, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+	if applied, err := git.PatchesApplied(dir, "HEAD", base, base); err != nil || applied {
+		t.Fatalf("PatchesApplied(empty range) = %v, %v; want false, nil", applied, err)
+	}
+
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	tip, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse: %v", err)
+	}
+
+	applied, err := git.PatchesApplied(dir, "HEAD", base, tip)
+	if err != nil {
+		t.Fatalf("PatchesApplied: %v", err)
+	}
+	if !applied {
+		t.Error("PatchesApplied(a range upstream already reaches) = false, want true")
 	}
 }
 

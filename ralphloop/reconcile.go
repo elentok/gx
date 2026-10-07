@@ -86,6 +86,12 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		liveTabs[key] = tab
 	}
 
+	// First, so a landing it records is in the run log read below and in
+	// every ticket landing's own already-applied check.
+	if err := recoverInterruptedLanding(d, rp, epic); err != nil {
+		return nil, fmt.Errorf("recovering an interrupted landing: %w", err)
+	}
+
 	events, _, err := ReadEvents(paths.ScratchDir, epic.Name)
 	if err != nil {
 		return nil, fmt.Errorf("reading run log for done-ticket verification: %w", err)

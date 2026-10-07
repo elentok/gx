@@ -202,6 +202,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		CommitsAhead: func(dir, fromExclusive, toRef string) (int, error) {
 			return 1, nil
 		},
+		CommitSubjects: func(dir, fromExclusive, toRef string) ([]string, error) {
+			return nil, nil
+		},
 		CherryPickRange: func(dir, fromExclusive, toInclusive string) error {
 			return nil
 		},

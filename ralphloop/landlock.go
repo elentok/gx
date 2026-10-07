@@ -56,6 +56,10 @@ type LandLockOwner struct {
 	Time   time.Time `json:"time"`
 	Epic   string    `json:"epic,omitempty"`
 	Ticket string    `json:"ticket,omitempty"`
+	// PrePickHead is the feature branch's HEAD when the lock was taken. A
+	// dead owner's lock plus a branch that moved past it is how startup
+	// finds a landing git finished but gx never recorded.
+	PrePickHead string `json:"pre_pick_head,omitempty"`
 }
 
 // Alive reports whether the owning process still exists.
@@ -83,6 +87,12 @@ func (o LandLockOwner) Describe() string {
 
 // AcquireLandLockFor is AcquireLandLock recording epic/ticket as the owner.
 func AcquireLandLockFor(dir, epic, ticket string) error {
+	return AcquireLandLockAt(dir, epic, ticket, "")
+}
+
+// AcquireLandLockAt is AcquireLandLockFor also recording the feature
+// branch's pre-pick HEAD.
+func AcquireLandLockAt(dir, epic, ticket, prePickHead string) error {
 	f, err := os.OpenFile(filepath.Join(dir, landLockFile), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if errors.Is(err, os.ErrExist) {
 		return ErrLandLocked
@@ -90,7 +100,7 @@ func AcquireLandLockFor(dir, epic, ticket string) error {
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(LandLockOwner{PID: os.Getpid(), Time: time.Now().UTC(), Epic: epic, Ticket: ticket})
+	b, err := json.Marshal(LandLockOwner{PID: os.Getpid(), Time: time.Now().UTC(), Epic: epic, Ticket: ticket, PrePickHead: prePickHead})
 	if err == nil {
 		_, err = f.Write(b)
 	}

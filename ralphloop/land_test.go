@@ -130,6 +130,23 @@ func TestLandTicket_RecordedSHARung_DetectsAlreadyApplied(t *testing.T) {
 	}
 }
 
+// A range whose commits are already on the feature branch (e.g. `land --from
+// X^ --to X` for a landed X) has no git cherry output at all, which
+// PatchesApplied reads as "unverified"; re-picking it would conflict with
+// itself or come up empty.
+func TestLandTicket_RangeAlreadyOnFeatureBranch_IsAlreadyApplied(t *testing.T) {
+	dir, lp := landFixture(t, false)
+	testutil.MustGitExported(t, dir, "merge", "--ff-only", lp.SourceRange.Tip)
+
+	res, err := LandTicket(landDepsFor(testDeps()), lp)
+	if err != nil || res.Outcome != AlreadyApplied {
+		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+	}
+	if res.SHA != lp.SourceRange.Tip {
+		t.Errorf("SHA = %q, want the range's tip %q", res.SHA, lp.SourceRange.Tip)
+	}
+}
+
 func TestLandTicket_Conflict_IsAResultNotAnError(t *testing.T) {
 	dir, lp := landFixture(t, true)
 

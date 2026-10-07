@@ -56,8 +56,11 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 	// while this repair runs.
 	rp.Sink.TicketRecovering(t.Identifier)
 
-	landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
-	if err != nil {
+	var landedSHA string
+	if err := withLandLock(d, p, func() (err error) {
+		landedSHA, err = landCherryPick(d, p, base, branch, "", "", "")
+		return err
+	}); err != nil {
 		return fmt.Errorf("re-cherry-picking ticket %s during startup repair: %w", t.Identifier, err)
 	}
 

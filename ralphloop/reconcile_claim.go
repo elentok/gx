@@ -37,23 +37,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 			return fmt.Errorf("counting %s's commits ahead of %s: %w", branch, base, err)
 		}
 		if ahead > 0 {
-			p := iterationParams{
-				WorkspaceID:     rp.WorkspaceID,
-				RepoDir:         paths.RepoDir,
-				WorktreeDir:     paths.WorktreeDir,
-				FeatureWorktree: paths.FeatureWorktree,
-				FeatureBranch:   featureBranch,
-				Agent:           rp.Agent,
-				Model:           rp.Model,
-				Effort:          rp.Effort,
-				Skill:           rp.Skill,
-				Ticket:          t,
-				ScratchDir:      paths.ScratchDir,
-				WorktreeLock:    rp.WorktreeLock,
-				SmartZone:       rp.SmartZone,
-				Gate:            rp.Gate,
-				Sink:            rp.Sink,
-			}
+			p := rp.iterationParamsFor(featureBranch, t)
 
 			// Seed a live row so landCherryPick's CherryPickStarted/
 			// ConflictResolutionStarted events below have a live entry to
@@ -61,8 +45,11 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 			// this recovery cherry-pick runs.
 			rp.Sink.TicketRecovering(t.Identifier)
 
-			landedSHA, err := landCherryPick(d, p, base, branch, "", "", "")
-			if err != nil {
+			var landedSHA string
+			if err := withLandLock(d, p, func() (err error) {
+				landedSHA, err = landCherryPick(d, p, base, branch, "", "", "")
+				return err
+			}); err != nil {
 				return fmt.Errorf("re-cherry-picking orphaned claim %s: %w", t.Identifier, err)
 			}
 			p.logTicketEventSHA(string(events.CherryPicked), "", "", "", path, "", landedSHA)

@@ -229,7 +229,10 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 	// The lock is shared with the human land command, whose conflicted land
 	// exits still holding it. Never wait on it: park as deferred, retry next tick.
 	lockDir := landLockDir(p.ScratchDir, p.FeatureBranch)
-	if err := AcquireLandLockFor(lockDir, p.FeatureBranch, job.ticket.Identifier); err != nil {
+	// The pre-pick HEAD lets a restart finish this landing if gx stops
+	// after git does (see recoverInterruptedLanding).
+	head, _ := d.RevParse(p.FeatureWorktree, "HEAD")
+	if err := AcquireLandLockAt(lockDir, p.FeatureBranch, job.ticket.Identifier, head); err != nil {
 		if errors.Is(err, ErrLandLocked) {
 			return outcome{ticket: job.ticket, landDeferred: true}
 		}

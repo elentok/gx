@@ -74,10 +74,14 @@ type Deps struct {
 	// AgentRead reads pane's terminal output, used to confirm a submitted
 	// prompt has actually rendered rather than still sitting unsubmitted (see
 	// confirmCompactSubmitted).
-	AgentRead            func(target string, opts herdr.AgentReadOptions) (string, error)
-	RevParse             func(dir, ref string) (string, error)
-	MergeBase            func(dir, refA, refB string) (string, error)
-	CommitsAhead         func(dir, fromExclusive, toRef string) (int, error)
+	AgentRead    func(target string, opts herdr.AgentReadOptions) (string, error)
+	RevParse     func(dir, ref string) (string, error)
+	MergeBase    func(dir, refA, refB string) (string, error)
+	CommitsAhead func(dir, fromExclusive, toRef string) (int, error)
+	// CommitSubjects lists fromExclusive..toRef's subjects, oldest first, so
+	// startup reconciliation can tell an interrupted landing's commits from
+	// anything else that reached the feature branch.
+	CommitSubjects       func(dir, fromExclusive, toRef string) ([]string, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
 	// AbortCherryPick clears sequencer state in the shared feature worktree;
@@ -232,6 +236,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RevParse:              git.RevParse,
 		MergeBase:             git.MergeBase,
 		CommitsAhead:          git.CommitsAhead,
+		CommitSubjects:        git.CommitSubjects,
 		CherryPickRange:       git.CherryPickRange,
 		CherryPickInProgress:  git.CherryPickInProgress,
 		AbortCherryPick:       git.AbortCherryPick,

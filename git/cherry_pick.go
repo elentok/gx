@@ -35,6 +35,15 @@ func MergeBase(dir, refA, refB string) (string, error) {
 	return out, err
 }
 
+// CommitSubjects returns the subjects of fromExclusive..toRef, oldest first.
+func CommitSubjects(dir, fromExclusive, toRef string) ([]string, error) {
+	out, _, err := run(dir, []string{"log", "--reverse", "--format=%s", fromExclusive + ".." + toRef})
+	if err != nil || out == "" {
+		return nil, err
+	}
+	return strings.Split(out, "\n"), nil
+}
+
 // CommitsAhead returns how many commits toRef has that fromExclusive
 // doesn't (git rev-list --count fromExclusive..toRef) — zero means toRef has
 // landed nothing new since fromExclusive.
@@ -88,9 +97,11 @@ func AbortCherryPick(dir string) error {
 // compares patch-id rather than commit hash). Unlike IsAncestor, this stays
 // correct even after upstream was rebased/amended past the point where these
 // commits originally landed, since rebasing rewrites hashes but not patch
-// content. An empty range (branch has no commits ahead of base) reports
-// false — there's nothing to compare, so callers must treat that as
-// "unverified", not "confirmed landed".
+// content. git cherry omits commits upstream already reaches, so a range
+// that is itself on upstream (e.g. a landed commit's own X^..X) prints
+// nothing yet is applied: it reports true. An empty range (branch has no
+// commits ahead of base) reports false — there's nothing to compare, so
+// callers must treat that as "unverified", not "confirmed landed".
 func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 	out, _, err := run(dir, []string{"cherry", upstream, branch, base})
 	if err != nil {
@@ -107,7 +118,11 @@ func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
 			return false, nil
 		}
 	}
-	return found, nil
+	if found {
+		return true, nil
+	}
+	ahead, err := CommitsAhead(dir, base, branch)
+	return ahead > 0, err
 }
 
 // Trailer is one "key: value" commit-message trailer line, see
