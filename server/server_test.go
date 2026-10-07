@@ -54,6 +54,9 @@ func TestSnapshot_ListsStoreTicketsByAddressWithSequence(t *testing.T) {
 	if snap.Tickets[2].Status != "open" || len(snap.Tickets[2].BlockedBy) != 1 {
 		t.Errorf("ticket = %+v", snap.Tickets[2])
 	}
+	if f := snap.Tickets[2].File; !strings.HasSuffix(f, filepath.Join("proj", "epic-a", "issues", "02-second.md")) {
+		t.Errorf("file = %q, want the ticket's markdown path", f)
+	}
 	again, err := h.Client.Snapshot(context.Background())
 	if err != nil {
 		t.Fatal(err)

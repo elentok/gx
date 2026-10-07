@@ -378,6 +378,7 @@ func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
 		Identifier: id,
 		Title:      info.Title,
 		Path:       info.Address,
+		File:       info.File,
 		Type:       info.Type,
 		BlockedBy:  info.BlockedBy,
 		Status:     info.Status,

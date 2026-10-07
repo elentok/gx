@@ -40,12 +40,15 @@ type Handshake struct {
 	Pid        int    `json:"pid"`
 	// TCPAddr is the loopback address of the opt-in TCP listener; empty when off.
 	TCPAddr string `json:"tcp_addr,omitempty"`
+	// Orchestrator is the `orchestrator` value the server read at start; it
+	// does not follow later config.json edits.
+	Orchestrator string `json:"orchestrator,omitempty"`
 }
 
 type Config struct {
 	StateDir    string
 	Build       string
-	TicketStore string // ticket-store root; kept fresh by watch + poll
+	TicketStore string   // ticket-store root; kept fresh by watch + poll
 	TabEnv      []string // KEY=VALUE entries set on each iteration tab
 
 	PollInterval time.Duration // zero means the default
@@ -348,7 +351,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr()})
+	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), Orchestrator: s.cfg.Orchestrator})
 }
 
 // DefaultLandStopTimeout is how long a stop waits for a land in flight.

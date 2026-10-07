@@ -368,6 +368,55 @@ func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
 	}
 }
 
+// In server mode a row's Path is the ticket's address, so the "s" menu's
+// direct statuses and the edit chords must reach the ticket's file instead.
+func serverModelWithTicketFile(t *testing.T) (Model, string) {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "20-a.md")
+	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := newServerModel(t)
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file},
+	}}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	return selectTicketRow(t, updated.(Model)), file
+}
+
+func TestServerMode_StatusMenuOffersDirectStatusesAndWritesTheFile(t *testing.T) {
+	m, file := serverModelWithTicketFile(t)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	m = updated.(Model)
+	if got, want := menuValues(m.statusMenu), []string{"open", "done", "server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
+		t.Fatalf("draft ticket menu = %v, want %v", got, want)
+	}
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("choosing done issued nothing")
+	}
+	cmd()
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket file = %s, want status: done", raw)
+	}
+}
+
+func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
+	m, file := serverModelWithTicketFile(t)
+
+	target, ok, warning := m.selectedEditTarget()
+	if !ok || target != file {
+		t.Errorf("edit target = %q, %v (%s), want the ticket file %q", target, ok, warning, file)
+	}
+}
+
 func (f fakeServerAPI) Iterations(context.Context) ([]server.IterationInfo, error) {
 	return f.iterations, nil
 }

@@ -140,7 +140,7 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 	ticket := epic.Tickets[r.ticketIdx]
 
 	if status == schema.StatusOpen {
-		if err := checkTicketBodyBeforeOpen(ticket.Path); err != nil {
+		if err := checkTicketBodyBeforeOpen(ticket.FilePath()); err != nil {
 			return m, notify.Error(err.Error())
 		}
 	}
@@ -152,7 +152,7 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 			))
 		}
 	}
-	return m, cmdApplyTicketStatus(ticket.Path, status)
+	return m, cmdApplyTicketStatus(ticket.FilePath(), status)
 }
 
 // checkTicketBodyBeforeOpen mirrors cmd/tickets_set.go's checkBodyBeforeOpen:

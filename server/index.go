@@ -22,6 +22,9 @@ type TicketInfo struct {
 	BlockedBy []string `json:"blocked_by,omitempty"`
 	// Parent is the address of the ticket this one was forked from.
 	Parent string `json:"parent,omitempty"`
+	// File is the ticket's markdown path, for clients that edit content or
+	// set a plain status directly (those are direct writes, not server ones).
+	File string `json:"file,omitempty"`
 
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.
@@ -134,6 +137,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		Status:    t.Status,
 		Type:      t.Type,
 		BlockedBy: t.BlockedBy,
+		File:      t.Path,
 	}
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)

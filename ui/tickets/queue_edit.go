@@ -27,7 +27,7 @@ func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd
 	if !ok {
 		return notify.Warning("nothing selected")
 	}
-	return editTicketFile(m.worktreeRoot, m.settings, row.ticket.Path, splitType)
+	return editTicketFile(m.worktreeRoot, m.settings, row.ticket.FilePath(), splitType)
 }
 
 func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {

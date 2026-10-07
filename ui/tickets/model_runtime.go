@@ -65,7 +65,7 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 		}
 		return filepath.Join(epic.Path, "map.md"), true, ""
 	}
-	return epic.Tickets[r.ticketIdx].Path, true, ""
+	return epic.Tickets[r.ticketIdx].FilePath(), true, ""
 }
 
 func (m Model) handleEditFileFinished(msg editFileFinishedMsg) (Model, tea.Cmd) {

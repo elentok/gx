@@ -21,6 +21,10 @@ type Ticket struct {
 	Identifier string
 	Title      string
 	Path       string
+	// File is the ticket's markdown file when Path holds something else: in
+	// the TUI's server mode Path is the ticket's address (what every server
+	// verb takes). Empty means Path is the file; see FilePath.
+	File string
 
 	Type string
 	// BlockedBy holds each "Blocked by:" token as written, e.g. "02" or
@@ -135,4 +139,12 @@ func (t Ticket) IsTerminal() bool {
 // still renders as StatusWaitingForChildren (see Epic.RenderedStatus).
 func (t Ticket) IsDone() bool {
 	return doneStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
+}
+
+// FilePath is the ticket's markdown file: File when set, else Path.
+func (t Ticket) FilePath() string {
+	if t.File != "" {
+		return t.File
+	}
+	return t.Path
 }

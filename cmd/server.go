@@ -172,10 +172,11 @@ func serverClient() (*apiclient.Client, error) {
 
 // StatusInfo is the `gx server status --json` payload.
 type StatusInfo struct {
-	Running  bool     `json:"running"`
-	Pid      int      `json:"pid,omitempty"`
-	Build    string   `json:"build,omitempty"`
-	Warnings []string `json:"warnings,omitempty"`
+	Running      bool     `json:"running"`
+	Pid          int      `json:"pid,omitempty"`
+	Build        string   `json:"build,omitempty"`
+	Orchestrator string   `json:"orchestrator,omitempty"`
+	Warnings     []string `json:"warnings,omitempty"`
 }
 
 func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
@@ -193,7 +194,7 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 		if cerr != nil {
 			return cerr
 		}
-		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
+		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
 	}
 	if jsonOut {
 		enc := json.NewEncoder(w)
@@ -207,6 +208,11 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", info.Pid, info.Build); err != nil {
 		return err
 	}
+	if info.Orchestrator != "" {
+		if _, err = fmt.Fprintf(w, "orchestrator: %s\n", info.Orchestrator); err != nil {
+			return err
+		}
+	}
 	for _, warning := range info.Warnings {
 		if _, err = fmt.Fprintln(w, "warning: "+warning); err != nil {
 			return err
@@ -216,9 +222,13 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 }
 
 // statusWarnings lists what `gx server status` flags. n.Hint covers the
-// binary-on-disk-vs-running-build mismatch (and API mismatch).
-func statusWarnings(n apiclient.Negotiation, storePath string) []string {
+// binary-on-disk-vs-running-build mismatch (and API mismatch); configured is
+// config.json's orchestrator, which the server read only when it started.
+func statusWarnings(n apiclient.Negotiation, storePath, configured string) []string {
 	var out []string
+	if n.Orchestrator != "" && configured != "" && n.Orchestrator != configured {
+		out = append(out, fmt.Sprintf("server runs with orchestrator %q but config.json says %q; run gx server restart", n.Orchestrator, configured))
+	}
 	if n.TCPAddr != "" {
 		out = append(out, fmt.Sprintf("TCP listener is on (%s): any local process can use the API, no auth", n.TCPAddr))
 	}

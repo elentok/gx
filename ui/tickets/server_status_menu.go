@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"context"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -12,10 +13,8 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// Server-write verbs offered by the "s" menu. In server mode a ticket row only
-// carries its address (no file path), so the orchestration writes — the ones
-// the server owns — are the whole menu; the direct file writes (open/draft)
-// stay on the disk-backed menu.
+// Server-write verbs offered by the "s" menu. In server mode the menu also
+// offers serverDirectStatuses, written straight to the ticket's file.
 const (
 	serverVerbPark     = "park"
 	serverVerbUnpark   = "unpark"
@@ -27,6 +26,11 @@ const (
 	serverParkReason = "parked from the TUI"
 )
 
+// serverDirectStatuses are the statuses a person sets directly in server
+// mode: the rest (claimed, needs-answer, needs-repair) are orchestration
+// statuses only the server's verbs change.
+var serverDirectStatuses = []schema.Status{schema.StatusOpen, schema.StatusDraft, schema.StatusDone}
+
 // serverMenuValuePrefix tells handleStatusMenuKey a menu value is a server verb
 // rather than a schema.Status.
 const serverMenuValuePrefix = "server:"
@@ -35,21 +39,30 @@ func isParkedStatus(status string) bool {
 	return schema.Status(status) == schema.StatusNeedsRepair
 }
 
-// newServerStatusMenu lists the server actions that apply to ticket's state:
-// a parked ticket unparks, any other unfinished one parks; both can be
-// cancelled or relaunched. A finished ticket has none.
+// newServerStatusMenu lists, first, the direct statuses other than ticket's
+// own (only when its file is known), then the server actions that apply to
+// its state: a parked ticket unparks, any other unfinished one parks; both
+// can be cancelled or relaunched. A finished ticket has no server actions.
 func newServerStatusMenu(ticket tickets.Ticket, rendered tickets.RenderedStatus) components.MenuState {
+	var items []components.MenuItem
+	if ticket.File != "" {
+		current := schema.Status(strings.ToLower(strings.TrimSpace(ticket.Status)))
+		for _, status := range serverDirectStatuses {
+			if status != current {
+				items = append(items, components.MenuItem{Label: statusMenuLabels[status], Value: string(status)})
+			}
+		}
+	}
 	if rendered.Terminal() {
-		return components.MenuState{}
+		return components.MenuState{Items: items}
 	}
 	verbs := []string{serverVerbPark}
 	if isParkedStatus(ticket.Status) {
 		verbs = []string{serverVerbUnpark}
 	}
 	verbs = append(verbs, serverVerbCancel, serverVerbRelaunch)
-	items := make([]components.MenuItem, len(verbs))
-	for i, v := range verbs {
-		items[i] = components.MenuItem{Label: v, Value: serverMenuValuePrefix + v}
+	for _, v := range verbs {
+		items = append(items, components.MenuItem{Label: v, Value: serverMenuValuePrefix + v})
 	}
 	return components.MenuState{Items: items}
 }
