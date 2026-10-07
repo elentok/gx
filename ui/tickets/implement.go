@@ -348,7 +348,7 @@ func (m Model) OnPageActivated() tea.Cmd {
 func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
 	return cmdStartImplement(
 		m.worktreeRoot, epicName, agent, done, total,
-		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.settings.Notifications, m.settings.ImplementSkill(),
+		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.notificationsForRun(), m.settings.ImplementSkill(),
 		m.settings.ResolvedAgents(), m.settings.ExecutionQueue,
 	)
 }

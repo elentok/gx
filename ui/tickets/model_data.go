@@ -196,7 +196,15 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 		}
 	}
 
-	return tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.sidebarTree.CollapsedIDs())
+	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.sidebarTree.CollapsedIDs())
+	if m.serverMode() {
+		for i := range entries {
+			if line, ok := m.pendingSubtext(entries[i]); ok {
+				entries[i].Body = []string{line}
+			}
+		}
+	}
+	return entries
 }
 
 // archivedSectionChildren computes the Archived section header's synthetic

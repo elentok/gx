@@ -7,10 +7,13 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -130,8 +133,14 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 
 	case serverEventMsg:
 		var effect viewmodel.Effect
+		seqBefore := m.vm.Seq
 		m.vm, effect = m.vm.Reduce(msg.ev)
-		return m.applyServerRows(), tea.Batch(cmdServerNextEvent(msg.events), m.cmdServerEffects(effect)), true
+		cmds := []tea.Cmd{cmdServerNextEvent(msg.events), m.cmdServerEffects(effect)}
+		// Only an applied event toasts: a replayed duplicate or a gap is not news.
+		if text, ok := viewmodel.ToastFor(msg.ev); ok && m.vm.Seq > seqBefore {
+			cmds = append(cmds, notify.Warning(text))
+		}
+		return m.applyServerRows(), tea.Batch(cmds...), true
 
 	case serverRetryMsg:
 		return m, m.cmdServerSnapshot(), true
@@ -146,6 +155,38 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	return m, nil, false
+}
+
+// notificationsForRun is the chat config a TUI-started run wires sinks from.
+// In server mode it is empty: the server sends chat once, and a TUI sink
+// would duplicate it.
+func (m Model) notificationsForRun() config.NotificationsConfig {
+	if m.serverMode() {
+		return config.NotificationsConfig{}
+	}
+	return m.settings.Notifications
+}
+
+// pendingSubtext is a queued ticket row's explain verdict, indented under the
+// row's title. ok is false for any entry that isn't a queued ticket.
+func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
+	if entry.Value.kind != nodeTicket {
+		return "", false
+	}
+	r, _ := rowFromEntry(entry)
+	t := m.epicAt(r).Tickets[r.ticketIdx]
+	p, ok := m.vm.PendingRowFor(t.Path)
+	if !ok {
+		return "", false
+	}
+	text := p.Verdict
+	if p.Reason != "" {
+		text += ": " + p.Reason
+	}
+	icons := m.icons()
+	icon, _ := statusIconAndStyle(icons, m.epicAt(r).RenderedStatus(t))
+	width := triangleColumnWidth(icons) + 1 + lipgloss.Width(icons.CheckboxUnchecked) + 1 + lipgloss.Width(icon) + 1
+	return strings.Repeat(" ", width) + blockedBySuffixStyle.Render(ellipsize(text, parkReasonMaxRunes, icons.Ellipsis)), true
 }
 
 func (m Model) applyServerRows() Model {

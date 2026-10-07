@@ -47,6 +47,29 @@ type State struct {
 	// Iterations holds live state by ticket address; absent means no live
 	// iteration, so the row falls back to its on-disk status.
 	Iterations map[string]IterationState
+	// Pending is each queue entry's explain verdict, as the last snapshot
+	// delivered it.
+	Pending []server.PendingRow
+}
+
+// PendingRowFor is the pending row for a ticket address, if it is queued.
+func (s State) PendingRowFor(address string) (server.PendingRow, bool) {
+	i := slices.IndexFunc(s.Pending, func(p server.PendingRow) bool { return p.Address == address })
+	if i < 0 {
+		return server.PendingRow{}, false
+	}
+	return s.Pending[i], true
+}
+
+// ToastFor is the toast a live event warrants. Only the caller's event path
+// may use it: a snapshot or a reconnect re-snapshot describes state, not
+// something that just happened, so it must never produce a toast.
+func ToastFor(ev server.Event) (string, bool) {
+	switch ev.Type {
+	case server.EventIterationParked, server.EventTicketParked:
+		return ev.Address + " parked", true
+	}
+	return "", false
 }
 
 // ApplySnapshot replaces the ticket rows and resets Seq. Live iteration state
@@ -59,6 +82,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Budget:           snap.Budget,
 		Tickets:          slices.Clone(snap.Tickets),
 		Queue:            s.Queue,
+		Pending:          slices.Clone(snap.Pending),
 	}
 	for _, t := range next.Tickets {
 		if it, ok := s.Iterations[t.Address]; ok && t.Status == statusClaimed {

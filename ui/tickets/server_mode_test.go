@@ -3,11 +3,16 @@ package tickets
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/notify"
 )
 
 type fakeServerAPI struct{}
@@ -61,6 +66,90 @@ func TestServerMode_GapAndReconnectResnapshot(t *testing.T) {
 	}
 	if _, isSnap := cmd().(serverSnapshotMsg); !isSnap {
 		t.Fatalf("stream end cmd did not fetch a snapshot")
+	}
+}
+
+// toastsOf runs cmd (flattening batches) and returns the toasts it emits.
+func toastsOf(cmd tea.Cmd) []notify.NotifyMsg {
+	if cmd == nil {
+		return nil
+	}
+	switch msg := cmd().(type) {
+	case notify.NotifyMsg:
+		return []notify.NotifyMsg{msg}
+	case tea.BatchMsg:
+		var out []notify.NotifyMsg
+		for _, c := range msg {
+			out = append(out, toastsOf(c)...)
+		}
+		return out
+	}
+	return nil
+}
+
+func closedEvents() <-chan server.Event {
+	ch := make(chan server.Event)
+	close(ch)
+	return ch
+}
+
+func TestServerMode_ToastsFromLiveEventsOnly(t *testing.T) {
+	m := newServerModel(t)
+	snap := server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"},
+	}}
+
+	// A snapshot holding a parked ticket is state, not news.
+	m, cmd, _ := m.updateServer(serverSnapshotMsg{snap: snap})
+	if got := toastsOf(cmd); len(got) != 0 {
+		t.Fatalf("snapshot toasted: %+v", got)
+	}
+
+	// A live park event toasts once.
+	park := server.Event{Seq: 5, Type: server.EventIterationParked, Address: "gx:alpha/01"}
+	m, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: closedEvents()})
+	if got := toastsOf(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {
+		t.Fatalf("live park toasts = %+v", got)
+	}
+
+	// The same event replayed after a reconnect is a duplicate: no toast.
+	_, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: closedEvents()})
+	if got := toastsOf(cmd); len(got) != 0 {
+		t.Fatalf("replayed event toasted: %+v", got)
+	}
+
+	// A reconnect re-snapshot toasts nothing either.
+	_, cmd, _ = m.updateServer(serverSnapshotMsg{snap: snap})
+	if got := toastsOf(cmd); len(got) != 0 {
+		t.Fatalf("re-snapshot toasted: %+v", got)
+	}
+}
+
+func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
+	m := newServerModel(t)
+	snap := server.Snapshot{Seq: 1,
+		Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "open"}},
+		Pending: []server.PendingRow{{Address: "gx:alpha/01", Verdict: "blocked", Reason: "waiting on 00"}},
+	}
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: snap})
+
+	var body []string
+	for _, e := range m.buildSidebarEntries() {
+		if e.Value.kind == nodeTicket {
+			body = e.Body
+		}
+	}
+	if len(body) != 1 || !strings.Contains(body[0], "blocked: waiting on 00") {
+		t.Fatalf("subtext = %q", body)
+	}
+}
+
+func TestServerMode_StartImplementSendsNoChat(t *testing.T) {
+	m := newServerModel(t)
+	m.settings.Notifications.Telegram = config.TelegramConfig{BotToken: "tok", ChatID: "42"}
+	// The server sends chat once; the TUI path must not wire a sink.
+	if got := m.notificationsForRun(); got.Telegram.BotToken != "" {
+		t.Fatalf("server mode kept chat sink: %+v", got)
 	}
 }
 
