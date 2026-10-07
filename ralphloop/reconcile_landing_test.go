@@ -71,7 +71,10 @@ func TestReconcile_InterruptedLanding_RecordsItInsteadOfRepicking(t *testing.T) 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	lockDir := landLockDir(scratchDir, "epic")
+	lockDir, err := landLockDir(scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeDeadLandLock(t, lockDir, LandLockOwner{Time: time.Now().UTC(), Epic: "epic", Ticket: "01", PrePickHead: "pre"})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -117,7 +120,10 @@ func TestReconcile_DeadLandLockWithUnrelatedCommits_ReleasedAndRepicked(t *testi
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	lockDir := landLockDir(scratchDir, "epic")
+	lockDir, err := landLockDir(scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
 	writeDeadLandLock(t, lockDir, LandLockOwner{Time: time.Now().UTC(), Epic: "epic", Ticket: "01", PrePickHead: "pre"})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -151,7 +157,10 @@ func TestReconcile_OrphanedClaimLandingHoldsLandLock(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	lockDir := landLockDir(scratchDir, "epic")
+	lockDir, err := landLockDir(scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
 		t.Fatalf("tickets.Load: %v", err)
