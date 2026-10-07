@@ -17,6 +17,7 @@ type TabCreateOptions struct {
 	Cwd         string
 	Label       string
 	Focus       bool
+	Env         []string // KEY=VALUE entries
 }
 
 // CreatedTab is the result of TabCreate: the new tab plus its root pane id,
@@ -32,6 +33,9 @@ func TabCreate(opts TabCreateOptions) (CreatedTab, error) {
 	args = appendFlag(args, "--workspace", opts.WorkspaceID)
 	args = appendFlag(args, "--cwd", opts.Cwd)
 	args = appendFlag(args, "--label", opts.Label)
+	for _, kv := range opts.Env {
+		args = append(args, "--env", kv)
+	}
 	if opts.Focus {
 		args = append(args, "--focus")
 	}

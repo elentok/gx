@@ -471,7 +471,7 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 }
 
 func (s *Server) launch(addr tickets.Address, ticketAddr, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
-	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticketAddr})
+	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticketAddr, Env: s.cfg.TabEnv})
 	if err != nil {
 		return Run{}, err
 	}

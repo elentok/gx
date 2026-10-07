@@ -113,7 +113,6 @@ func (e *lifecycleEnv) waitStatus(address, want string, timeout time.Duration) {
 // and lands the ticket.
 func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 	herdrctl.RequireHerdr(t)
-	t.Skip("herdr reports agent_not_ready for the fake claude the server launches; tracked in orchestrator-daemon-2-server follow-up ticket")
 
 	root, err := os.MkdirTemp("", "gxl")
 	if err != nil {
@@ -130,7 +129,17 @@ func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"orchestrator":"server"}`), 0o644); err != nil {
+	// tab-env: HOME is the empty test home so the user's shell rc can't reorder
+	// PATH behind the real `claude`, which would block on its startup prompts.
+	tabEnv, err := json.Marshal([]string{
+		"HOME=" + home,
+		"PATH=" + workerBinary(t) + string(os.PathListSeparator) + os.Getenv("PATH"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfgJSON := fmt.Sprintf(`{"orchestrator":"server","server":{"tab-env":%s}}`, tabEnv)
+	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(cfgJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	store := filepath.Join(root, "data", "gx", "tickets")
@@ -169,10 +178,9 @@ func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 	ws := herdrctl.NewWorkspace(t, repo)
 	ws.PrependPath(workerBinary(t))
 
-	// The server reuses a workspace labeled after the epic. Pre-creating it is
-	// the only way to put the fake `claude` on PATH in the tabs the server opens.
-	out, err := exec.Command("herdr", "workspace", "create", "--cwd", repo, "--label", epic, "--no-focus",
-		"--env", "PATH="+workerBinary(t)+string(os.PathListSeparator)+os.Getenv("PATH")).Output()
+	// The server reuses a workspace labeled after the epic; its tabs get the
+	// fake `claude` on PATH through the config's tab-env (see the config above).
+	out, err := exec.Command("herdr", "workspace", "create", "--cwd", repo, "--label", epic, "--no-focus").Output()
 	if err != nil {
 		t.Fatalf("create epic workspace: %v\n%s", err, out)
 	}

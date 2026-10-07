@@ -46,6 +46,7 @@ type Config struct {
 	StateDir    string
 	Build       string
 	TicketStore string // ticket-store root; kept fresh by watch + poll
+	TabEnv      []string // KEY=VALUE entries set on each iteration tab
 
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only

@@ -72,6 +72,9 @@ type Config struct {
 type ServerConfig struct {
 	// TCPListen adds a loopback-only, unauthenticated TCP listener.
 	TCPListen bool `json:"tcp-listen"`
+	// TabEnv is KEY=VALUE entries set on every iteration tab's shell, for
+	// overriding what the user's shell rc would otherwise decide (e.g. PATH).
+	TabEnv []string `json:"tab-env"`
 }
 
 const (
@@ -175,7 +178,8 @@ func Load() (Config, error) {
 		} `json:"ticket-store"`
 		Orchestrator *string `json:"orchestrator"`
 		Server       *struct {
-			TCPListen *bool `json:"tcp-listen"`
+			TCPListen *bool    `json:"tcp-listen"`
+			TabEnv    []string `json:"tab-env"`
 		} `json:"server"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -281,6 +285,9 @@ func Load() (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.TCPListen != nil {
 		cfg.Server.TCPListen = *raw.Server.TCPListen
+	}
+	if raw.Server != nil && raw.Server.TabEnv != nil {
+		cfg.Server.TabEnv = raw.Server.TabEnv
 	}
 	if raw.Orchestrator != nil {
 		switch *raw.Orchestrator {
