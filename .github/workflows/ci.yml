@@ -88,5 +88,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: herdr-server-log
-          path: herdr-server.log
+          path: |
+            herdr-server.log
+            ~/.config/herdr/*.log
+          include-hidden-files: true
           if-no-files-found: warn

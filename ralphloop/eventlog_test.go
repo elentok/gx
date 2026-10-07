@@ -353,7 +353,8 @@ func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *tes
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
 		events, _, _ = ReadEvents(dir, "epic")
-		if len(events) > 0 {
+		// onFailed runs after the event is logged; wait for both.
+		if len(events) > 0 && onFailedCalls.Load() > 0 {
 			break
 		}
 		time.Sleep(5 * time.Millisecond)
