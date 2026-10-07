@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 )
 
@@ -29,7 +31,26 @@ type launchdAgent struct {
 	stateDir  string
 	exe       string
 	uid       int
-	run       func(args ...string) error
+	// environ is written into the plist: launchd's own PATH is
+	// /usr/bin:/bin:/usr/sbin:/sbin, which has neither herdr nor the agents.
+	environ map[string]string
+	run     func(args ...string) error
+}
+
+// launchdEnvKeys are the installing shell's variables the server needs: PATH
+// to find herdr, git and the agent CLIs, and herdr's socket. Pane- and
+// tab-scoped HERDR_* variables are left out on purpose.
+var launchdEnvKeys = []string{"PATH", "HERDR_SOCKET_PATH"}
+
+// launchdEnviron picks launchdEnvKeys' non-empty values via getenv.
+func launchdEnviron(getenv func(string) string) map[string]string {
+	environ := map[string]string{}
+	for _, key := range launchdEnvKeys {
+		if v := getenv(key); v != "" {
+			environ[key] = v
+		}
+	}
+	return environ
 }
 
 func newLaunchdAgent(stateDir string) (*launchdAgent, error) {
@@ -49,6 +70,7 @@ func newLaunchdAgent(stateDir string) (*launchdAgent, error) {
 		stateDir:  stateDir,
 		exe:       exe,
 		uid:       os.Getuid(),
+		environ:   launchdEnviron(os.Getenv),
 		run:       runLaunchctl,
 	}, nil
 }
@@ -92,6 +114,22 @@ func (a *launchdAgent) plist() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	var environ strings.Builder
+	if len(a.environ) > 0 {
+		environ.WriteString("\t<key>EnvironmentVariables</key>\n\t<dict>\n")
+		for _, key := range slices.Sorted(maps.Keys(a.environ)) {
+			k, err := esc(key)
+			if err != nil {
+				return "", err
+			}
+			v, err := esc(a.environ[key])
+			if err != nil {
+				return "", err
+			}
+			fmt.Fprintf(&environ, "\t\t<key>%s</key>\n\t\t<string>%s</string>\n", k, v)
+		}
+		environ.WriteString("\t</dict>\n")
+	}
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -114,9 +152,9 @@ func (a *launchdAgent) plist() (string, error) {
 	<string>%s</string>
 	<key>StandardErrorPath</key>
 	<string>%s</string>
-</dict>
+%s</dict>
 </plist>
-`, launchdLabel, exe, stderr, stderr), nil
+`, launchdLabel, exe, stderr, stderr, environ.String()), nil
 }
 
 // Install writes the definition and (re)loads it; RunAtLoad starts the server.

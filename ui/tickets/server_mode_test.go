@@ -28,6 +28,9 @@ type fakeServerAPI struct {
 	removeRes  server.QueueResult
 	budget     server.BudgetStatus
 	iterations []server.IterationInfo
+	// snap and queue are what Snapshot and QueueItems return.
+	snap  server.Snapshot
+	queue []server.QueueItem
 }
 
 // verb records the maintenance verbs ("drain", "pause", "resume", "override",
@@ -106,11 +109,11 @@ func (f fakeServerAPI) record(call string) {
 	}
 }
 
-func (fakeServerAPI) Snapshot(context.Context) (server.Snapshot, error) {
-	return server.Snapshot{}, nil
+func (f fakeServerAPI) Snapshot(context.Context) (server.Snapshot, error) {
+	return f.snap, nil
 }
 func (fakeServerAPI) Events(context.Context, uint64) (<-chan server.Event, error) { return nil, nil }
-func (fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)      { return nil, nil }
+func (f fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)    { return f.queue, nil }
 
 func newServerModel(t *testing.T) Model {
 	t.Helper()

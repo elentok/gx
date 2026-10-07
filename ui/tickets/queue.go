@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -21,6 +22,7 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tree"
+	"github.com/elentok/gx/viewmodel"
 )
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
@@ -197,7 +199,34 @@ type queueEpicsLoadedMsg struct {
 	foreignAttachPID int
 }
 
+// queueServerLoadedMsg is a server-mode load: the server's tickets and its
+// queue, in order.
+type queueServerLoadedMsg struct {
+	epics []tickets.Epic
+	items []server.QueueItem
+	err   error
+}
+
+// localStore is the queue store the tab reads and writes, nil in server mode:
+// there the server's queue is the only queue.
+func (m QueueModel) localStore() *QueueStore {
+	if m.serverAPI != nil {
+		return nil
+	}
+	return m.queueStore
+}
+
 func (m QueueModel) cmdLoadQueue() tea.Cmd {
+	if api := m.serverAPI; api != nil {
+		return func() tea.Msg {
+			snap, err := api.Snapshot(context.Background())
+			if err != nil {
+				return queueServerLoadedMsg{err: err}
+			}
+			items, err := api.QueueItems(context.Background())
+			return queueServerLoadedMsg{epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap)), items: items, err: err}
+		}
+	}
 	scratchDir := scratchDirFor(m.worktreeRoot)
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)
@@ -217,8 +246,8 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.queueStore != nil {
-		snapshot := m.queueStore.Snapshot()
+	if store := m.localStore(); store != nil {
+		snapshot := store.Snapshot()
 		m.checked = snapshot.Checked
 		m.checkOrder = snapshot.Order
 		m.queueStatus = snapshot.Status
@@ -237,18 +266,31 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help, _ = m.help.Update(msg)
 		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		return m, nil
+	case queueServerLoadedMsg:
+		// A failed load leaves the rows as they are: the server-down probe
+		// owns clearing them and showing the banner.
+		if msg.err != nil || m.serverDown {
+			return m, nil
+		}
+		m.checked = make(map[string]bool, len(msg.items))
+		m.checkOrder = make(map[string]uint64, len(msg.items))
+		for i, item := range msg.items {
+			m.checked[item.Address] = true
+			m.checkOrder[item.Address] = uint64(i + 1)
+		}
+		return m.updateInner(queueEpicsLoadedMsg{epics: msg.epics})
 	case queueEpicsLoadedMsg:
 		if m.serverDown {
 			return m, nil
 		}
-		if err := autoQueueForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
+		if err := autoQueueForkedChildren(m.epics, msg.epics, m.localStore()); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
-		if err := autoQueueNewEpicSiblings(m.epics, msg.epics, m.queueStore); err != nil {
+		if err := autoQueueNewEpicSiblings(m.epics, msg.epics, m.localStore()); err != nil {
 			return m, notify.Error("save queue: " + err.Error())
 		}
-		if m.queueStore != nil {
-			snapshot := m.queueStore.Snapshot()
+		if store := m.localStore(); store != nil {
+			snapshot := store.Snapshot()
 			m.checked = snapshot.Checked
 			m.checkOrder = snapshot.Order
 			m.queueStatus = snapshot.Status

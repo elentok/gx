@@ -15,8 +15,8 @@ import (
 )
 
 func (m QueueModel) View() tea.View {
-	if m.queueStore != nil {
-		snapshot := m.queueStore.Snapshot()
+	if store := m.localStore(); store != nil {
+		snapshot := store.Snapshot()
 		m.checked = snapshot.Checked
 		m.checkOrder = snapshot.Order
 		m.queueStatus = snapshot.Status
@@ -129,7 +129,9 @@ func (m QueueModel) checkedProgress() (int, int) {
 // sidebarBody split between its own pre-load short-circuit and
 // sidebarTree.RenderLines.
 func (m QueueModel) queueBody(width int) []string {
-	if !m.loaded {
+	// A server down before the first load never loads, so its banner must
+	// not wait behind "loading…".
+	if !m.loaded && !m.serverDown {
 		return []string{ui.StyleDim.Render("  loading…")}
 	}
 

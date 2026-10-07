@@ -3,12 +3,14 @@ package tickets
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -77,5 +79,40 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 	}
 	if _, ok := cmd().(queueServerStartedMsg); !ok || !started {
 		t.Fatalf("started = %v", started)
+	}
+}
+
+// In server mode the Queue tab shows the server's queue, never the local
+// queue store a pre-server run left behind.
+func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	if err := store.SetChecked([]string{"/old/epic/issues/01-stale.md"}, true); err != nil {
+		t.Fatal(err)
+	}
+	api := fakeServerAPI{
+		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: "open"},
+			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+		}},
+		queue: []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}},
+	}
+	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), store).WithServerLink(api, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m = next.(QueueModel)
+
+	next, _ = m.Update(m.cmdLoadQueue()())
+	m = next.(QueueModel)
+
+	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.checked, want) {
+		t.Errorf("checked = %v, want the server queue %v", m.checked, want)
+	}
+	if m.checkOrder["gx:alpha/02"] >= m.checkOrder["gx:alpha/01"] {
+		t.Errorf("checkOrder = %v, want the server's order (02 before 01)", m.checkOrder)
+	}
+	if len(m.epics) != 1 || m.epics[0].Name != "gx:alpha" || len(m.epics[0].Tickets) != 2 {
+		t.Errorf("epics = %+v, want gx:alpha with both server tickets", m.epics)
+	}
+	if !store.IsChecked("/old/epic/issues/01-stale.md") {
+		t.Error("server-mode load rewrote the local queue store")
 	}
 }
