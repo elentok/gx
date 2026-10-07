@@ -201,6 +201,23 @@ writes the statuses directly:
 
 `needs-answer`, `needs-repair` and `cancelled` stay server-only, even here.
 
+### Wayfinding operations
+
+How the `wayfinder` skill's map and tickets map onto this tracker:
+
+- **Map**: the epic's `<root>/<epic>/ticket.md`. Chart it by creating the directory and writing
+  that file by hand (no verb creates an epic): frontmatter `kind: map` and `status: open`, body =
+  the map. Later edits to the map body (Decisions so far, Not yet specified, Out of scope) are also
+  hand edits of `ticket.md`. Then run `gx tickets validate` on any ticket of the epic.
+- **Child ticket**: `gx tickets add <epic> --slug <slug> --body -`, with the ticket's `type` and
+  `blocked_by` in a frontmatter block at the top of the body and the question under `## Question`.
+- **Blocking**: `blocked_by`, as for any ticket. The **frontier** is the rule under "Frontier"
+  above, applied by hand: the server never computes one for a map epic.
+- **Claim**: `gx tickets set <addr> --status claimed`.
+- **Resolve**: `gx tickets section <addr> Resolution -`, then
+  `gx tickets set <addr> --status done --commitless true`, then append a gist + link to the map's
+  Decisions so far.
+
 ## Claiming
 
 An agent never claims a ticket. gx writes `status: claimed` before the agent's prompt is sent, so a

@@ -34,7 +34,7 @@ Two bugs found while resolving agent-runner ticket 04 by hand.
       `validate` know it
 - [x] `IsMap` = `kind: map` in `ticket.md`, else `map.md` exists (`tickets/loader.go:45`); test both
 - [x] `migrate --to-store` writes `kind: map` when it folds a `map.md` in (`epicTicketMD`); test
-- [ ] One-time backfill: add `kind: map` to `agent-runner`, `orchestrator-daemon`,
+- [x] One-time backfill: add `kind: map` to `agent-runner`, `orchestrator-daemon`,
       `run-budget-limits`, `ticket-land-recovery` (hand edit + `validate`, no new command)
 - [x] Server never schedules a map epic: `ralphloop.Frontier` is empty for it (covers the server and
       the old TUI loop), and `gx server queue add|replace` refuses its tickets with `map-epic`; tests
@@ -55,8 +55,9 @@ Two bugs found while resolving agent-runner ticket 04 by hand.
 - [x] `gx-local-tracker.md`: a map's body is the epic's `ticket.md` with `kind: map` (not
       `map.md`); hand-driven claim/close via `tickets set` on map epics; `add --body` may carry
       frontmatter
-- [ ] `myway/SKILL.md`: step 1 checks for a `kind: map` epic, not `map.md`; map edits go to
+- [x] `myway/SKILL.md`: step 1 checks for a `kind: map` epic, not `map.md`; map edits go to
       `ticket.md`
-- [ ] `wayfinder/SKILL.md` "Chart the map": create the epic `ticket.md` with `kind: map`
+- [x] `wayfinder/SKILL.md` "Chart the map": no change needed; it defers to the tracker doc's
+      "Wayfinding operations", now added to `gx-local-tracker.md`
 - [x] `gx-to-tickets/SKILL.md`: fix the template's mangled frontmatter (one field per line)
 - [x] `CONTEXT.md`: define **Map epic** (hand-driven, never scheduled)
