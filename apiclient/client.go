@@ -141,6 +141,14 @@ func (c *Client) Projects(ctx context.Context) ([]server.ProjectInfo, error) {
 	return p, err
 }
 
+// AddProject registers a project. A refusal is a result (Refused set), not an
+// error.
+func (c *Client) AddProject(ctx context.Context, req server.AddProjectRequest) (server.AddProjectResult, error) {
+	var res server.AddProjectResult
+	err := c.post(ctx, "/v1/projects/add", req, &res)
+	return res, err
+}
+
 // Locks returns every held lock with its owner.
 func (c *Client) Locks(ctx context.Context) ([]server.LockInfo, error) {
 	var l []server.LockInfo

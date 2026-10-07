@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -52,7 +53,60 @@ func newProjectCmd(_ deps) *cobra.Command {
 	}
 	list.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(list)
+
+	var addJSON bool
+	var name, vcs string
+	add := &cobra.Command{
+		Use:   "add [path]",
+		Short: "register a project (path defaults to the current directory; asks the server)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			path := "."
+			if len(args) == 1 {
+				path = args[0]
+			}
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runProjectAdd(c.Context(), cl, c.OutOrStdout(), addJSON,
+				server.AddProjectRequest{Path: abs, Name: name, VCS: vcs})
+		},
+	}
+	add.Flags().StringVar(&name, "name", "", "project name (default: the repo directory's name)")
+	add.Flags().StringVar(&vcs, "vcs", "", `"none" registers a directory that is not a git repo`)
+	add.Flags().BoolVar(&addJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(add)
 	return cmd
+}
+
+func runProjectAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.AddProjectRequest) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := cl.AddProject(ctx, req)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = server.AddProjectResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	verb := "added"
+	if res.Existing {
+		verb = "already registered as"
+	}
+	_, err = fmt.Fprintf(w, "%s project %s\n", verb, res.Name)
+	return err
 }
 
 func newBudgetCmd(_ deps) *cobra.Command {

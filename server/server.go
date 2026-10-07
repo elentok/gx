@@ -244,6 +244,7 @@ var routeTable = []struct {
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},
+	{"POST /v1/projects/add", (*Server).projectAdd},
 	{"GET /v1/locks", (*Server).locks},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},

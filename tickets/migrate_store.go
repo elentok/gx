@@ -249,7 +249,12 @@ func ensureProjectFile(projectDir, name, repo string) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	data, err := json.MarshalIndent(config.ProjectFile{Name: &name, Repo: &repo}, "", "  ")
+	return WriteProjectFile(projectDir, config.ProjectFile{Name: &name, Repo: &repo})
+}
+
+// WriteProjectFile writes <projectDir>/project.json, creating the directory.
+func WriteProjectFile(projectDir string, pf config.ProjectFile) error {
+	data, err := json.MarshalIndent(pf, "", "  ")
 	if err != nil {
 		return err
 	}
