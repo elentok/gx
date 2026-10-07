@@ -361,6 +361,48 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	}
 }
 
+func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
+	for _, tc := range []struct {
+		perRoot int
+		starts  bool
+	}{{1, false}, {2, true}} {
+		store, repo := t.TempDir(), testutil.TempRepo(t)
+		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+		servertest.SetProjectRepo(t, store, "proj", repo)
+		h := servertest.StartWithStore(t, store, func(c *server.Config) {
+			c.Orchestrator = config.OrchestratorServer
+			c.MaxAgentsPerRoot = tc.perRoot
+			c.PollInterval = 50 * time.Millisecond
+		})
+		registerLaunch(h)
+		// One agent of the root is already running.
+		h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		snap, err := h.Client.Snapshot(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evs, err := h.Client.Events(ctx, snap.Seq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			t.Fatalf("add: %+v, %v", res, err)
+		}
+		started := false
+		for ev := range evs {
+			if ev.Type == server.EventIterationStarted {
+				started = true
+				break
+			}
+		}
+		if started != tc.starts {
+			t.Errorf("per-root cap %d: ticket 01 started = %v, want %v", tc.perRoot, started, tc.starts)
+		}
+		cancel()
+	}
+}
+
 func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsWhenTheSlotFrees(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

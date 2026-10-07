@@ -44,7 +44,7 @@ type trackedRun struct {
 }
 
 // runRegistry is the server's own record of launched iterations, keyed by
-// project:epic (one running iteration per root). Independent of the TUI's.
+// ticket address (a root may hold several). Independent of the TUI's.
 // It lives in a state-dir file too, so a restart can reclaim what is running.
 type runRegistry struct {
 	mu   sync.Mutex
@@ -89,11 +89,24 @@ func (r *runRegistry) save() {
 	}
 }
 
-func (r *runRegistry) has(root string) bool {
+func (r *runRegistry) has(address string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	_, ok := r.runs[root]
+	_, ok := r.runs[address]
 	return ok
+}
+
+// countRoot is how many iterations of root's tickets are running.
+func (r *runRegistry) countRoot(root string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, t := range r.runs {
+		if t.Root == root {
+			n++
+		}
+	}
+	return n
 }
 
 // runOf returns the run whose iteration is of the ticket at address.
@@ -136,17 +149,17 @@ func (r *runRegistry) count() int {
 	return len(r.runs)
 }
 
-func (r *runRegistry) delete(root string) {
+func (r *runRegistry) delete(address string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.runs, root)
+	delete(r.runs, address)
 	r.save()
 }
 
 func (r *runRegistry) put(t trackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.runs[t.Root] = t
+	r.runs[t.Address] = t
 	r.save()
 }
 

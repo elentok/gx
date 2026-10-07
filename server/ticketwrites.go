@@ -63,8 +63,8 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 // ticket write shares, before do runs.
 func (s *Server) ticketWrite(req QueueRequest, do func(ticketRef) (QueueResult, error)) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
-		if s.registry.has(ref.root().String()) {
-			return refusal(ReasonIterationRunning, "an iteration is running in "+ref.root().String()), nil
+		if s.registry.has(ref.addr.String()) {
+			return refusal(ReasonIterationRunning, "an iteration is running in "+ref.addr.String()), nil
 		}
 		return do(ref)
 	})

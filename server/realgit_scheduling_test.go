@@ -45,6 +45,7 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 	f.h = servertest.StartWithStore(t, f.store, func(c *server.Config) {
 		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
+		c.MaxAgentsPerRoot = 1 // these scenarios pin the sequential order
 	})
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -180,8 +181,7 @@ func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	f.assertLanded(t, "01", "02", "02a", "02b")
 }
 
-// The diamond's concurrent legs have no server equivalent (one iteration per
-// root), so this pins the sequential order and the single landing per ticket.
+// The per-root cap is pinned to 1 here, so this pins the sequential order and the single landing per ticket.
 func TestSchedulingPort_ABlocksBAndCAndTheyLandInOrder(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},

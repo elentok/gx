@@ -64,10 +64,10 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	switch {
 	case !queued:
 		ex.Verdict = VerdictNotQueued
-	case s.registry.has(root):
-		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "an iteration of this epic is running"
-	case !isFrontierHead(e, t):
-		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "an earlier ticket of the epic goes first"
+	case s.registry.countRoot(root) >= s.perRootLimit():
+		ex.Verdict, ex.Reason = VerdictConcurrencyCap, fmt.Sprintf("%d of %d agents in use for this epic", s.registry.countRoot(root), s.perRootLimit())
+	case frontierIndex(e, t) >= s.perRootLimit()-s.registry.countRoot(root):
+		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "earlier tickets of the epic go first"
 	default:
 		limit, running := s.concurrencyLimit(), s.registry.count()
 		free := limit - running
@@ -83,9 +83,14 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	return ex
 }
 
-func isFrontierHead(e tickets.Epic, t tickets.Ticket) bool {
-	f := ralphloop.Frontier(e)
-	return len(f) > 0 && f[0].Identifier == t.Identifier
+// frontierIndex is t's place among the epic's claimable tickets, or -1.
+func frontierIndex(e tickets.Epic, t tickets.Ticket) int {
+	for i, f := range ralphloop.Frontier(e) {
+		if f.Identifier == t.Identifier {
+			return i
+		}
+	}
+	return -1
 }
 
 // rootsAhead counts the distinct idle roots queued before root, and whether
@@ -101,7 +106,7 @@ func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 		if r == root {
 			return ahead, true
 		}
-		if !seen[r] && !s.registry.has(r) {
+		if !seen[r] && s.registry.countRoot(r) == 0 {
 			seen[r] = true
 			ahead++
 		}

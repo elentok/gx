@@ -85,6 +85,9 @@ type Config struct {
 	// MaxAgents caps live agents across all projects (config
 	// execution-queue.max-agents); zero means the config default.
 	MaxAgents int
+	// MaxAgentsPerRoot caps live agents of one root (config
+	// execution-queue.max-agents-per-epic). Zero means the default.
+	MaxAgentsPerRoot int
 
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.

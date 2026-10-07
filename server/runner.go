@@ -146,8 +146,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 }
 
 // claimNext backfills free slots in queue order: it claims and launches the
-// frontier ticket of each queued root that has one and no iteration running,
-// until the concurrency limit is reached. It does nothing while herdr is down:
+// frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached. It does nothing while herdr is down:
 // a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
 	if s.herdr.isUnavailable() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
@@ -155,19 +154,34 @@ func (s *Server) claimNext() {
 	}
 	limit := s.concurrencyLimit()
 	running := s.registry.count()
+	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
-		if running >= limit {
-			return
-		}
-		launched, err := s.claimRoot(item)
-		if err != nil {
-			s.log.Warn("claim queued root", "root", item.Address, "err", err)
+		addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
+		if err != nil || seen[rootOf(addr).String()] {
 			continue
 		}
-		if launched {
+		seen[rootOf(addr).String()] = true
+		// One root fills its own slots before the next root in the queue gets a turn.
+		for running < limit {
+			launched, err := s.claimRoot(item)
+			if err != nil {
+				s.log.Warn("claim queued root", "root", item.Address, "err", err)
+				break
+			}
+			if !launched {
+				break
+			}
 			running++
 		}
 	}
+}
+
+// perRootLimit is how many agents one root may run at once.
+func (s *Server) perRootLimit() int {
+	if s.cfg.MaxAgentsPerRoot > 0 {
+		return s.cfg.MaxAgentsPerRoot
+	}
+	return config.DefaultExecutionQueueConfig().MaxConcurrentTicketsPerEpic
 }
 
 func (s *Server) concurrencyLimit() int {
@@ -185,7 +199,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		return false, err
 	}
 	root := rootOf(addr)
-	if s.registry.has(root.String()) {
+	if s.registry.countRoot(root.String()) >= s.perRootLimit() {
 		return false, nil
 	}
 	if _, missing := s.unavailablePath(addr.Project); missing {
@@ -393,7 +407,7 @@ func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIterati
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
 	defer s.kickRunner()
-	defer s.registry.delete(root.String())
+	defer s.registry.delete(ticketAddr)
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
 	var out ralphloop.FinishOutcome
