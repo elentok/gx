@@ -41,6 +41,19 @@ type ProjectFile struct {
 	Repo *string `json:"repo"`
 	// VCS is "none" for a repo-less project (the built-in scratch project).
 	VCS *string `json:"vcs"`
+
+	// The rest are the whitelisted overrides layered over config.json; see
+	// project_overrides.go.
+	Trunk          *string              `json:"trunk"`
+	Landing        *string              `json:"landing"`
+	AutoFFMerge    *bool                `json:"auto-ff-merge"`
+	MaxAgents      *int                 `json:"max-agents"`
+	Agents         *AgentsConfig        `json:"agents"`
+	Skills         *SkillsConfig        `json:"skills"`
+	Notifications  *NotificationsConfig `json:"notifications"`
+	ExecutionQueue *struct {
+		MaxAgentsPerEpic *int `json:"max-agents-per-epic"`
+	} `json:"execution-queue"`
 }
 
 // VCSNone is the project.json vcs value for a project with no repository.
@@ -53,6 +66,9 @@ func ReadProjectFile(projectDir string) (ProjectFile, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return pf, err
+	}
+	if err := checkProjectKeys(data); err != nil {
+		return pf, fmt.Errorf("%s: %w", path, err)
 	}
 	if err := json.Unmarshal(data, &pf); err != nil {
 		return pf, fmt.Errorf("parse %s: %w", path, err)
