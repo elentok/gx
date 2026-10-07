@@ -82,3 +82,11 @@ jobs:
         env:
           HERDR_ENV: "1"
         run: go test ./e2e/... -timeout=6m
+
+      - name: Upload herdr server log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: herdr-server-log
+          path: herdr-server.log
+          if-no-files-found: warn
