@@ -313,6 +313,16 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if err != nil {
 		return "", "", "", fmt.Errorf("resolve %s: %w", ref, err)
 	}
+	// A feature branch that already exists is adopted, not recreated; its
+	// merge-base stays the branch's true start even after ref moves on.
+	switch _, err := git.RevParse(repo, "refs/heads/"+addr.Epic); {
+	case err == nil:
+		if sha, err = git.MergeBase(repo, "refs/heads/"+addr.Epic, ref); err != nil {
+			return "", "", "", fmt.Errorf("merge-base of %s and %s: %w", addr.Epic, ref, err)
+		}
+	case !errors.Is(err, git.ErrRefNotFound):
+		return "", "", "", fmt.Errorf("resolve %s: %w", addr.Epic, err)
+	}
 	return ref, ref + "@" + sha, leaf, nil
 }
 
