@@ -521,3 +521,21 @@ func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 		t.Error("R13 not recorded")
 	}
 }
+
+func TestR9IsRecordedNotCatalogued(t *testing.T) {
+	if _, ok := NotCatalogued["R9"]; !ok {
+		t.Error("R9 not recorded")
+	}
+	c := Default()
+	for i := range c.Entries {
+		if c.Entries[i].ID == "R9" {
+			t.Errorf("R9 entry %+v, want none", c.Entries[i])
+		}
+		c.Entries[i].Enabled = true
+	}
+	for _, reason := range []string{"context deadline exceeded", "dial tcp: lookup api.telegram.org: no such host", "send failed with status 400"} {
+		if e, ok := c.Match([]Event{{Type: events.NotificationFailed, Reason: reason}}); ok {
+			t.Errorf("notification-failed %q matched %s", reason, e.ID)
+		}
+	}
+}

@@ -66,6 +66,9 @@ type Catalog struct {
 // NotCatalogued records failures deliberately without an entry.
 var NotCatalogued = map[string]string{
 	"R13": "vanishes under the server's durable queue",
+	// A catalog entry would re-send on top of the chat sink's own resend and
+	// amplify R1's notification storm.
+	"R9": "the chat sink already re-sends a transient failure: one backed-off retry, then a requeue to the next flush; a 4xx is never retried",
 }
 
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
