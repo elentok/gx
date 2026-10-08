@@ -205,11 +205,13 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	if _, missing := s.unavailablePath(addr.Project); missing {
 		return false, nil
 	}
-	projectDir, repo, err := s.projectOf(addr.Project)
+	_, repo, err := s.projectOf(addr.Project)
 	if err != nil {
 		return false, err
 	}
-	loaded, err := tickets.Load(projectDir)
+	// The epics of the last scan, not a fresh load: this runs every poll tick for
+	// every queued root. The sum check below catches a file the scan has not seen.
+	loaded, err := s.projectEpics(addr.Project)
 	if err != nil {
 		return false, err
 	}
