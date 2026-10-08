@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/subscription"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
@@ -85,6 +86,10 @@ func (m Model) checkedPendingAddresses() []string {
 
 func (m Model) openAgentConfirm(prompt string, accept func(agent string) tea.Cmd) confirm.Model {
 	agents := []string{string(ralphloop.AgentClaude), string(ralphloop.AgentCodex)}
+	if m.vm.ExtraUsage {
+		banner := styleSubscriptionLine(subscription.BuildLine(subscription.StateEnabled, false))
+		prompt = banner + "\n\n" + prompt
+	}
 	return m.confirm.Open(confirm.Options{
 		Prompt:     prompt,
 		Choices:    agents,

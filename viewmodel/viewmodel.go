@@ -41,6 +41,8 @@ type State struct {
 	Seq              uint64
 	HerdrUnavailable bool
 	Budget           server.BudgetStatus
+	// ExtraUsage is the snapshot's extra-usage warning flag.
+	ExtraUsage bool
 	// Tickets is in snapshot order (by address, forks under their parent).
 	Tickets []server.TicketInfo
 	// Queue is the queued ticket addresses in launch order.
@@ -113,7 +115,8 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Seq:              snap.Seq,
 		HerdrUnavailable: snap.HerdrUnavailable,
 		Budget:           snap.Budget,
-		Tickets:          slices.Clone(snap.Tickets),
+		ExtraUsage:       snap.ExtraUsage,
+		Tickets:         slices.Clone(snap.Tickets),
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		CwdProject:       s.CwdProject,

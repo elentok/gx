@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/storecommit"
+	"github.com/elentok/gx/subscription"
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
@@ -98,6 +99,11 @@ type Config struct {
 
 	// Chat names the chat destinations the server notifies; empty means none.
 	Chat ralphloop.ServerChatConfig
+
+	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
+	SuppressExtraUsageWarning bool
+	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
+	ExtraUsageCheck func() subscription.State
 }
 
 // DefaultTCPAddr is where the opt-in TCP listener binds.
@@ -118,7 +124,8 @@ type Server struct {
 	pause       *pauseState
 	ledger      *budgetLedger
 	budgetNotes budgetNotes
-	costOf      func(IterationInfo) (float64, bool) // swapped in tests
+	extraUsage  extraUsageNotes
+	costOf     func(IterationInfo) (float64, bool) // swapped in tests
 	events      *broker
 	herdr       herdrWatch
 	parkFold    parkFold
@@ -325,6 +332,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	snap.Budget = s.budgetStatus(time.Now())
+	snap.ExtraUsage = s.extraUsageOn()
 	snap.Pending = s.pendingRows()
 	_ = json.NewEncoder(w).Encode(snap)
 }
@@ -386,6 +394,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	s.seedBudgetNotes(time.Now())
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
+	s.checkExtraUsage(time.Now())
 	errc := make(chan error, 2)
 	lns := []net.Listener{s.ln}
 	if s.tcp != nil {

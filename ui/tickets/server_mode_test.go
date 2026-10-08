@@ -540,3 +540,18 @@ func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
 		t.Errorf("ticket = %+v, want the landing metrics so the summary can add them up", got)
 	}
 }
+
+func TestServerMode_EnqueueConfirmShowsExtraUsageBanner(t *testing.T) {
+	m := newServerModel(t)
+	open := func(extra bool) string {
+		m.vm.ExtraUsage = extra
+		m.confirm = m.openAgentConfirm("Enqueue 1 ticket(s)?", func(string) tea.Cmd { return nil })
+		return m.confirm.View(200)
+	}
+	if got := open(true); !strings.Contains(got, "auto-purchase extra usage") {
+		t.Fatalf("confirm lacks the banner:\n%s", got)
+	}
+	if got := open(false); strings.Contains(got, "extra usage") {
+		t.Fatalf("confirm shows the banner while extra usage is off:\n%s", got)
+	}
+}

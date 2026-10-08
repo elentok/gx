@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
@@ -46,8 +47,11 @@ type QueueItem struct {
 type QueueResult struct {
 	Queue []QueueItem `json:"queue,omitempty"`
 	// Mode is set by pause, resume and drain: running, paused or draining.
-	Mode    string `json:"mode,omitempty"`
-	Refused bool   `json:"refused,omitempty"`
+	Mode string `json:"mode,omitempty"`
+	// ExtraUsage is the warning an enqueue carries while the account
+	// auto-purchases extra usage.
+	ExtraUsage bool   `json:"extra_usage,omitempty"`
+	Refused    bool   `json:"refused,omitempty"`
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
@@ -188,7 +192,20 @@ func canonical(raw string) (string, *QueueResult) {
 	return a.String(), nil
 }
 
+// withExtraUsage runs the extra-usage check for an enqueue and puts the warning
+// on an accepted result.
+func (s *Server) withExtraUsage(res QueueResult, err error) (QueueResult, error) {
+	if err == nil && !res.Refused {
+		res.ExtraUsage = s.checkExtraUsage(time.Now())
+	}
+	return res, err
+}
+
 func (s *Server) queueAdd(req QueueRequest) (QueueResult, error) {
+	return s.withExtraUsage(s.queueAddItem(req))
+}
+
+func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 	addr, bad := canonical(req.Address)
 	if bad != nil {
 		return *bad, nil
@@ -240,6 +257,10 @@ func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {
 // queueReplace swaps one project's pending entries for req.Items, leaving the
 // other projects' entries where they are. The new entries go at the end.
 func (s *Server) queueReplace(req QueueRequest) (QueueResult, error) {
+	return s.withExtraUsage(s.queueReplaceItems(req))
+}
+
+func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 	items := make([]QueueItem, 0, len(req.Items))
 	seen := map[string]bool{}
 	for _, it := range req.Items {

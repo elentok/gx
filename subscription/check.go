@@ -68,6 +68,12 @@ func Check() State {
 	return checkState
 }
 
+// CheckFresh re-reads the account state file on every call. A long-lived
+// server uses it instead of Check, whose per-process cache would go stale.
+func CheckFresh() State {
+	return detectFromDefaultPath()
+}
+
 func detectFromDefaultPath() State {
 	home, err := os.UserHomeDir()
 	if err != nil {

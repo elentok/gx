@@ -51,8 +51,11 @@ type Snapshot struct {
 	// view, filled in by the handler rather than the index.
 	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
 	// Budget is today's spend, filled in by the handler like HerdrUnavailable.
-	Budget  BudgetStatus `json:"budget"`
-	Tickets []TicketInfo `json:"tickets"`
+	Budget BudgetStatus `json:"budget"`
+	// ExtraUsage is set while the account auto-purchases extra usage, so the
+	// enqueue confirm can warn; filled in by the handler.
+	ExtraUsage bool         `json:"extra_usage,omitempty"`
+	Tickets    []TicketInfo `json:"tickets"`
 	// Pending is every queue entry with its explain verdict, so a client never
 	// asks per row. Filled in by the handler, like HerdrUnavailable.
 	Pending []PendingRow `json:"pending"`
