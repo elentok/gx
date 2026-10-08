@@ -20,7 +20,7 @@ type iterationMode struct {
 }
 
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
-	m := iterationMode{commitless: addr.Project == ScratchProject || schema.TicketType(t.Type) == schema.TypePrompt}
+	m := iterationMode{commitless: addr.Project == ScratchProject || schema.TicketType(t.Type) == schema.TypePrompt || schema.TicketType(t.Type) == schema.TypeInvestigate}
 	if m.commitless && addr.Project == ScratchProject {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}

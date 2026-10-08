@@ -102,6 +102,9 @@ const (
 	TypeConflictResolution TicketType = "conflict-resolution"
 	// TypePrompt is a one-off prompt run; it never lands a commit.
 	TypePrompt TicketType = "prompt"
+	// TypeInvestigate is system-generated only: recovery forks one as a commitless
+	// child of a parked ticket when a failure needs judgment.
+	TypeInvestigate TicketType = "investigate"
 )
 
 var validTypes = map[TicketType]bool{
@@ -113,6 +116,7 @@ var validTypes = map[TicketType]bool{
 	TypeCodeReview:         true,
 	TypeConflictResolution: true,
 	TypePrompt:             true,
+	TypeInvestigate:        true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -261,7 +265,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeTask unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a

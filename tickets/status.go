@@ -94,6 +94,7 @@ var commitlessByDesignTypes = map[string]bool{
 	string(schema.TypeCodeReview):         true,
 	string(schema.TypeConflictResolution): true,
 	string(schema.TypePrompt):             true,
+	string(schema.TypeInvestigate):        true,
 }
 
 // ShowsCommitlessSuffix reports whether t's UI row should append
@@ -140,7 +141,7 @@ func (t Ticket) baseStatus() RenderedStatus {
 // but is otherwise resolved the same way as every other ticket's.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	base := t.baseStatus()
-	if base == StatusDone && e.Blocking(t) {
+	if base == StatusDone && e.Blocking(t) || e.parkedOnInvestigation(t, base) {
 		return StatusWaitingForChildren
 	}
 	if base != StatusOpen && base != StatusClaimed {
@@ -150,6 +151,22 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 		return StatusBlocked
 	}
 	return base
+}
+
+// parkedOnInvestigation reports whether t is parked while an investigate child
+// of it is still unfinished: it renders as waiting for that child. An
+// investigate ticket is the one fork child that works on a parked parent, so
+// parentDone never holds it back.
+func (e Epic) parkedOnInvestigation(t Ticket, base RenderedStatus) bool {
+	if base != StatusNeedsRepair && base != StatusNeedsAnswer {
+		return false
+	}
+	for _, child := range e.forkChildren()[ticketKey(t)] {
+		if child.Type == string(schema.TypeInvestigate) && !child.IsTerminal() {
+			return true
+		}
+	}
+	return false
 }
 
 // parentDone reports whether t's Parent ticket (see Ticket.Parent) has
@@ -163,7 +180,7 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // any non-done status, holds the child; a commitless-done parent still has
 // Status: done (see ticket 08), so it releases the child same as any other.
 func (e Epic) parentDone(t Ticket) bool {
-	if t.Parent == nil {
+	if t.Parent == nil || t.Type == string(schema.TypeInvestigate) {
 		return true
 	}
 	num, letters := splitBlockedByToken(*t.Parent)

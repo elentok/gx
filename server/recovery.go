@@ -26,16 +26,23 @@ func (s *Server) recoverAsync(f recovery.Failure) {
 // logged, never fatal: recovery is best effort on top of a park that stands.
 func (s *Server) recoverFrom(f recovery.Failure) {
 	ref, ok, err := s.findTicket(f.Address)
-	if err != nil || !ok || ref.ticket.NoRecover {
+	// An investigate ticket's own failure is a person's to handle, never another
+	// investigation: recovery must not recurse.
+	if err != nil || !ok || ref.ticket.NoRecover || ref.ticket.Type == string(schema.TypeInvestigate) {
 		return
 	}
 	log := s.ticketEvents(ref, f)
-	entry, ok := s.cfg.Recovery.Match(failureSequence(log, f))
-	if !ok || !(entry.Runnable(f) || entry.Proposable(f)) {
+	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
+	needsJudgment := !matched || entry.Executor == recovery.ExecutorAgent
+	if f.DiagnosisOnly() || (!needsJudgment && !(entry.Runnable(f) || entry.Proposable(f))) {
 		return
 	}
 	if why := guardRailStop(log, f); why != "" {
 		s.recordRecovery(ref, events.RecoveryEscalated, f, why, "")
+		return
+	}
+	if needsJudgment {
+		s.recoverByInvestigating(ref, f)
 		return
 	}
 	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
@@ -144,6 +151,17 @@ func (s *Server) ticketApprove(req QueueRequest) (QueueResult, error) {
 		}
 		return QueueResult{}, nil
 	})
+}
+
+// recoverByInvestigating is recovery for a failure that needs judgment. It
+// counts as an applied recovery, so the caps and the failed-recovery check see it.
+func (s *Server) recoverByInvestigating(ref ticketRef, f recovery.Failure) {
+	outcome, err := s.investigate(ref, f)
+	if err != nil {
+		s.log.Warn("recovery cannot create an investigate ticket", "ticket", f.Address, "err", err)
+		outcome = err.Error()
+	}
+	s.recordRecovery(ref, events.RecoveryApplied, f, investigateEntry, outcome)
 }
 
 // Guard-rail caps on automatic recovery, counted from the run log so a resume

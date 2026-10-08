@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // startRecovery starts a server whose catalog has one test-only low-authority
@@ -272,4 +273,80 @@ func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
 	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Reason != server.ReasonProposalStale {
 		t.Errorf("approve = %+v, %v, want proposal-stale", res, err)
 	}
+}
+
+// startUnmatched starts a server whose catalog matches nothing, so every park
+// needs judgment, and queues ticket 02 behind the one that will be parked.
+func startUnmatched(t *testing.T) *servertest.Harness {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	return servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Catalog{Enabled: true}
+	})
+}
+
+func epicTickets(t *testing.T, h *servertest.Harness) tickets.Epic {
+	t.Helper()
+	epics, err := tickets.Load(filepath.Join(h.TicketStore, "proj"))
+	if err != nil || len(epics) != 1 {
+		t.Fatalf("load = %v, %v", epics, err)
+	}
+	return epics[0]
+}
+
+func TestRecovery_UnmatchedParkForksAQueuedInvestigateChildAndNeverRecurses(t *testing.T) {
+	h := startUnmatched(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/02", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+		t.Fatalf("park = %+v, %v", res, err)
+	}
+	waitFor(t, func() bool { return len(queueAddresses(t, h)) > 0 && queueAddresses(t, h)[0] == "proj:epic-a/01a" })
+
+	epic := epicTickets(t, h)
+	var parent, child tickets.Ticket
+	for _, tk := range epic.Tickets {
+		switch tk.Identifier {
+		case "01":
+			parent = tk
+		case "01a":
+			child = tk
+		}
+	}
+	if child.Type != "investigate" || child.Parent == nil || *child.Parent != "01" {
+		t.Errorf("child = %+v, want an investigate fork of 01", child)
+	}
+	if got := epic.RenderedStatus(parent); got != tickets.StatusWaitingForChildren {
+		t.Errorf("parent renders %v, want waiting-for-children", got)
+	}
+
+	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01a", "stuck"); err != nil || res.Refused {
+		t.Fatalf("park child = %+v, %v", res, err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	for _, tk := range epicTickets(t, h).Tickets {
+		if tk.Identifier == "01b" || tk.Identifier == "01a1" {
+			t.Errorf("investigate ticket failure forked %s, want no recursion", tk.Identifier)
+		}
+	}
+}
+
+func waitFor(t *testing.T, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if ok() {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("condition never held")
 }
