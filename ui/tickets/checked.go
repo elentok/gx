@@ -45,10 +45,6 @@ func (m *Model) setPathsChecked(paths []string, checked bool) {
 	}
 }
 
-func (m *Model) refreshQueueSnapshot() {
-	m.queueStatus = m.queueStore.Snapshot().Status
-}
-
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
 	var next uint64 = 1
 	for _, ordinal := range checkOrder {
@@ -95,10 +91,7 @@ func eligibleEpicTickets(epic tickets.Epic) []tickets.Ticket {
 }
 
 // epicFullyMember reports whether every one of epic's eligible (non-done)
-// tickets is a member of the set isMember tests — the shared predicate
-// behind epicChecked (Tickets tab) and autoQueueNewEpicSiblings (Queue tab),
-// which each apply it to their own independent membership set. A
-// zero-eligible epic (no tickets, or all done) is never "fully member": it
+// tickets is a member of the set isMember tests. A zero-eligible epic (no tickets, or all done) is never "fully member": it
 // has nothing to be fully checked/queued about.
 func epicFullyMember(epic tickets.Epic, isMember func(string) bool) bool {
 	eligible := eligibleEpicTickets(epic)
@@ -207,17 +200,6 @@ func (m *Model) autoCheckForkedChildren(newEpics []tickets.Epic) {
 	})
 }
 
-// autoQueueForkedChildren mirrors autoCheckForkedChildren for the Queue
-// tab's own membership concept (Items) instead of the Tickets tab's
-// independent checked set: a fork of an already-queued ticket is queued
-// automatically.
-func autoQueueForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
-	if store == nil {
-		return nil
-	}
-	return applyForkedChildren(oldEpics, newEpics, store.IsChecked, store.SetChecked)
-}
-
 // epicNewTickets pairs a newly-loaded epic with the tickets in it that
 // didn't exist in the previous load, plus that epic's own pre-reload state
 // (oldEpic, oldEpicOK — false for a brand-new epic) for callers that need to
@@ -231,11 +213,7 @@ type epicNewTickets struct {
 
 // diffNewTickets compares oldEpics against newEpics and returns, for every
 // epic that gained at least one ticket since the last load, that epic paired
-// with its freshly-appeared tickets. Shared by applyForkedChildren (forks of
-// already-member tickets auto-join their membership set) and
-// autoQueueNewEpicSiblings (siblings of a fully-queued epic auto-join the
-// queue) so both skip re-deriving "which tickets are new" from oldEpics
-// themselves.
+// with its freshly-appeared tickets.
 func diffNewTickets(oldEpics, newEpics []tickets.Epic) []epicNewTickets {
 	oldByPath := make(map[string]tickets.Epic, len(oldEpics))
 	oldTicketPaths := make(map[string]bool)
@@ -263,10 +241,8 @@ func diffNewTickets(oldEpics, newEpics []tickets.Epic) []epicNewTickets {
 	return out
 }
 
-// applyForkedChildren is the shared traversal behind autoCheckForkedChildren
-// and autoQueueForkedChildren: isMember/setMember let each caller apply it
-// to its own independent membership set (see QueueStore's decoupled
-// checked/queued API).
+// applyForkedChildren is autoCheckForkedChildren's traversal over the
+// membership set isMember/setMember expose.
 //
 // The fork is detected from the new ticket's own `parent` rather than from
 // any list kept on the parent, so a fork still gets picked up when the tool
@@ -296,38 +272,6 @@ func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string
 		}
 	}
 	return setMember(childPaths, true)
-}
-
-// autoQueueNewEpicSiblings mirrors the scheduler's own dynamic-scope
-// behavior (ralphloop.RunScope.Frontier: an epic launched with every
-// eligible ticket checked keeps running any ticket added to it later, see
-// checkedEpicPlans) for the Queue tab's tree display. Without this, a ticket
-// added to an already-fully-checked epic starts running (the scheduler
-// doesn't consult per-ticket membership once an epic is dynamic) but never
-// appears in the tree, since buildQueueEntries only renders tickets present
-// in the checked/candidates set. A newly-appeared ticket joins the checked
-// set automatically when every one of its epic's other tickets — as they
-// existed before this reload — was already checked; an epic that was only
-// partially checked leaves new tickets out, matching toggleEpicChecked's
-// "select all" semantics for what counts as a fully-queued epic.
-func autoQueueNewEpicSiblings(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
-	if store == nil {
-		return nil
-	}
-
-	var newTicketPaths []string
-	for _, group := range diffNewTickets(oldEpics, newEpics) {
-		if !group.oldEpicOK || !epicFullyMember(group.oldEpic, store.IsChecked) {
-			continue
-		}
-		for _, t := range group.newTickets {
-			newTicketPaths = append(newTicketPaths, t.Path)
-		}
-	}
-	if len(newTicketPaths) == 0 {
-		return nil
-	}
-	return store.SetChecked(newTicketPaths, true)
 }
 
 // epicChecked reports whether every non-done ticket in epic is currently

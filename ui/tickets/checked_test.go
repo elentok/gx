@@ -531,34 +531,3 @@ func TestModel_CheckOrderFollowsCheckSequence(t *testing.T) {
 		t.Fatalf("unchecked b still tracked: checked=%v order=%v", m.checked, m.checkOrder)
 	}
 }
-
-// The checked set lives in the model alone: a checkbox toggle must leave the
-// queue store untouched, and a fresh model never inherits a selection from it.
-func TestModel_CheckedSetBypassesQueueStore(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	statePath := filepath.Join(t.TempDir(), "queue.json")
-	store := loadQueueStoreAt(statePath)
-
-	m := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	updated, _ = m.Update(spacePress())
-	m = updated.(Model)
-	ticket := m.epics[0].Tickets[0]
-	if !m.isChecked(ticket.Path) {
-		t.Fatal("expected ticket checked after space")
-	}
-
-	if _, err := os.Stat(statePath); !os.IsNotExist(err) {
-		t.Fatalf("checking a ticket wrote the queue store: stat err=%v", err)
-	}
-	restarted := deliverLoad(t, NewModelWithStore(root, ui.Settings{}, keys.New(nil), store))
-	if restarted.isChecked(ticket.Path) {
-		t.Fatal("a fresh model inherited the checked set")
-	}
-}

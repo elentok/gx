@@ -14,7 +14,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -682,75 +681,25 @@ func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 	}
 }
 
-// TestQueueModelClearAllRequiresConfirmation covers ticket 08's "C" keymap:
-// pressing it opens a confirmation, and only accepting it clears every
-// queued ticket.
-func TestQueueModelClearAllRequiresConfirmation(t *testing.T) {
+// Without a server there is no queue to clear: "c" and "C" do nothing.
+func TestQueueModelClearKeysWithoutServerDoNothing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
-	alpha := ticketPath(root, "alpha", "01-first.md")
-	beta := ticketPath(root, "beta", "01-first.md")
-	checked := map[string]bool{alpha: true, beta: true}
+	writeTicket(t, root, "alpha", "01-done.md", "Status: open\n\nBody.\n")
+	writeRawQueueTicket(t, root, "alpha", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
+	done := ticketPath(root, "alpha", "01-done.md")
+	checked := map[string]bool{done: true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'C', Text: "C"})
-	m = updated.(QueueModel)
-	if !m.confirm.IsOpen {
-		t.Fatal("expected \"C\" to open a confirmation before clearing")
-	}
-	if !checked[alpha] || !checked[beta] {
-		t.Fatal("expected nothing cleared before the confirmation is accepted")
-	}
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	m = updated.(QueueModel)
-	m = deliverQueueCommands(t, m, cmd)
-	if checked[alpha] || checked[beta] {
-		t.Fatal("expected accepting the confirmation to clear every queued ticket")
-	}
-}
-
-// TestQueueModelClearCompleteRequiresConfirmation covers ticket 08's "c"
-// keymap: only done tickets (and epics left with nothing visible) are
-// cleared, after confirmation.
-func TestQueueModelClearCompleteRequiresConfirmation(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-open.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-done.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-done.md", "Status: open\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "beta", "01-done.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n\nBody.\n")
-	open := ticketPath(root, "alpha", "01-open.md")
-	alphaDone := ticketPath(root, "alpha", "02-done.md")
-	betaDone := ticketPath(root, "beta", "01-done.md")
-	checked := map[string]bool{open: true, alphaDone: true, betaDone: true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
-	m = updated.(QueueModel)
-	if !m.confirm.IsOpen {
-		t.Fatal("expected \"c\" to open a confirmation before clearing")
-	}
-	if !checked[alphaDone] || !checked[betaDone] {
-		t.Fatal("expected nothing cleared before the confirmation is accepted")
-	}
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	m = updated.(QueueModel)
-	m = deliverQueueCommands(t, m, cmd)
-	if checked[alphaDone] || checked[betaDone] {
-		t.Fatal("expected accepting the confirmation to clear done tickets")
-	}
-	if !checked[open] {
-		t.Fatal("expected non-done tickets to remain checked")
-	}
-
-	content := m.View().Content
-	if strings.Contains(content, "beta") {
-		t.Fatalf("expected beta epic to disappear once its only ticket cleared:\n%s", content)
+	for _, key := range []rune{'c', 'C'} {
+		updated, _ := m.Update(tea.KeyPressMsg{Code: key, Text: string(key)})
+		m = updated.(QueueModel)
+		if m.confirm.IsOpen {
+			t.Fatalf("press %q: expected no confirmation without a server", key)
+		}
+		if !checked[done] {
+			t.Fatalf("press %q: expected nothing cleared without a server", key)
+		}
 	}
 }
 
@@ -806,9 +755,8 @@ func TestQueueModelHideCompleteToggleHidesDoneTicketsButKeepsPlanValidation(t *t
 }
 
 // TestQueueModelTChordDoesNotCollideWithClearKeymaps covers ticket 09: the
-// "t"-prefix chord swallows its second key without triggering "c"'s clear
-// behavior, and plain "c"/"C" (with no preceding "t") still open their clear
-// confirmations unaffected.
+// "t"-prefix chord swallows its second key, and plain "c" (with no preceding
+// "t") doesn't toggle hideComplete.
 func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -851,9 +799,6 @@ func TestQueueModelTChordDoesNotCollideWithClearKeymaps(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'c', Text: "c"})
 	m = updated.(QueueModel)
-	if !m.confirm.IsOpen {
-		t.Fatal("expected plain \"c\" (no preceding \"t\") to still open the clear-complete confirmation")
-	}
 	if m.hideComplete {
 		t.Fatal("expected plain \"c\" not to toggle hideComplete")
 	}
@@ -872,22 +817,6 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 	if content := m.View().Content; !strings.Contains(content, "Later") {
 		t.Fatalf("expected cached Queue model to include a later shared selection:\n%s", content)
 	}
-}
-
-func deliverQueueCommands(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
-	t.Helper()
-	if cmd == nil {
-		return m
-	}
-	msg := cmd()
-	if batch, ok := msg.(tea.BatchMsg); ok {
-		for _, nested := range batch {
-			m = deliverQueueCommands(t, m, nested)
-		}
-		return m
-	}
-	updated, _ := m.Update(msg)
-	return updated.(QueueModel)
 }
 
 func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
@@ -934,84 +863,6 @@ func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 	}
 	t.Fatalf("expected at least one ticket row, found none")
 	return m
-}
-
-// TestQueueModelRestoresAllStatusesAsInitialTab simulates a restart landing
-// directly on Queue (ticket 21): a QueueStore pre-populated with every status
-// (as a prior process session would have left it) must be fully reflected in
-// a freshly constructed QueueModel with no prior Tickets-tab visit.
-func TestQueueModelRestoresAllStatusesAsInitialTab(t *testing.T) {
-	root := testutil.TempRepo(t)
-	linkStoreProject(t, root)
-	writeTicket(t, root, "alpha", "01-pending.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-running.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "03-done.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "alpha", "04-errored.md", "Status: open\n\nBody.\n")
-	pending := ticketPath(root, "alpha", "01-pending.md")
-	running := ticketPath(root, "alpha", "02-running.md")
-	done := ticketPath(root, "alpha", "03-done.md")
-	errored := ticketPath(root, "alpha", "04-errored.md")
-
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	for path, status := range map[string]queueItemStatus{
-		pending: queueStatusPending,
-		running: queueStatusRunning,
-		done:    queueStatusDone,
-		errored: queueStatusErrored,
-	} {
-		if err := store.Check(path); err != nil {
-			t.Fatal(err)
-		}
-		if err := store.SetStatus(path, status); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	m := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.Manager{}, store))
-
-	for path, want := range map[string]queueItemStatus{
-		pending: queueStatusPending,
-		running: queueStatusRunning,
-		done:    queueStatusDone,
-		errored: queueStatusErrored,
-	} {
-		if !m.checked[path] {
-			t.Fatalf("expected %s checked after restart", path)
-		}
-		if got := m.queueStatus[path]; got != want {
-			t.Fatalf("status for %s = %v, want %v", path, got, want)
-		}
-	}
-}
-
-// TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder covers the
-// "identical state in either navigation order" acceptance criterion: both
-// tabs read the same QueueStore, so a Tickets-first-then-Queue construction
-// and a Queue-first-then-Tickets construction must agree.
-func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.T) {
-	root := testutil.TempRepo(t)
-	linkStoreProject(t, root)
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	queuedPath := ticketPath(root, "alpha", "01-first.md")
-
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	if err := store.Check(queuedPath); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SetStatus(queuedPath, queueStatusDone); err != nil {
-		t.Fatal(err)
-	}
-	queueFirst := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.New(nil), store))
-	ticketsModel := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
-	ticketsModel = deliverLoad(t, ticketsModel)
-
-	_, ticketsQueued := ticketsModel.queueStatus[queuedPath]
-	if queueFirst.checked[queuedPath] != ticketsQueued {
-		t.Fatalf("queued mismatch: queue=%v tickets=%v", queueFirst.checked[queuedPath], ticketsQueued)
-	}
-	if queueFirst.queueStatus[queuedPath] != ticketsModel.queueStatus[queuedPath] {
-		t.Fatalf("status mismatch: queue=%v tickets=%v", queueFirst.queueStatus[queuedPath], ticketsModel.queueStatus[queuedPath])
-	}
 }
 
 // TestQueueModelShowsSameStatusAsTicketsTab covers ticket 25's first
@@ -1740,17 +1591,6 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	}
 }
 
-// linkStoreProject registers repoRoot as a ticket-store project in a temp
-// store and symlinks repoRoot/.scratch to the project dir, so fixtures that
-// write under .scratch land in the store. Not parallel-safe (sets env).
-func linkStoreProject(t *testing.T, repoRoot string) {
-	t.Helper()
-	project := addStoreProject(t, repoRoot)
-	if err := os.Symlink(project, filepath.Join(repoRoot, ".scratch")); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // addStoreProject isolates HOME/XDG into temp dirs and registers repoRoot as a
 // project in the temp ticket store, returning the project dir.
 func addStoreProject(t *testing.T, repoRoot string) string {
@@ -1773,14 +1613,7 @@ func addStoreProject(t *testing.T, repoRoot string) string {
 }
 
 func ticketPath(root, epic, name string) string {
-	scratch := filepath.Join(root, ".scratch")
-	if info, err := os.Lstat(scratch); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		// linkStoreProject: the loader reports store paths, not the link's.
-		if target, err := os.Readlink(scratch); err == nil {
-			scratch = target
-		}
-	}
-	return filepath.Join(scratch, epic, "issues", name)
+	return filepath.Join(root, ".scratch", epic, "issues", name)
 }
 
 func writeRawQueueTicket(t *testing.T, root, epic, name, content string) {

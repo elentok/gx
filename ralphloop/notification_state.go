@@ -86,8 +86,7 @@ func emptyNotificationState() NotificationState {
 var notificationStateFilePathFn = notificationStateFilePath
 
 // notificationStateFilePath returns notifications-state.json's path, under
-// config.UserStateDir's ~/.local/state/gx/ layout (mirroring
-// queue-state.json's queueStateFilePath).
+// config.UserStateDir's ~/.local/state/gx/ layout.
 func notificationStateFilePath() (string, error) {
 	base, err := config.UserStateDir()
 	if err != nil {

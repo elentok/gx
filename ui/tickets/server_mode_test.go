@@ -123,7 +123,7 @@ func (f fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)  
 
 func newServerModel(t *testing.T) Model {
 	t.Helper()
-	return NewModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))).WithServer(fakeServerAPI{})
+	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{})
 }
 
 func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {

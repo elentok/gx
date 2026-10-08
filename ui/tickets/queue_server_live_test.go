@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +23,6 @@ func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 
 func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, herdrDown bool) (QueueModel, tea.Cmd) {
 	t.Helper()
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	api := fakeServerAPI{
 		snap: server.Snapshot{Seq: 1, HerdrUnavailable: herdrDown, Tickets: []server.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: status, ClaimedAt: claimedAt},
@@ -32,7 +30,7 @@ func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, her
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}},
 	}
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), store).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, cmd := next.(QueueModel).Update(m.cmdLoadQueue()())
 	return next.(QueueModel), cmd
@@ -102,7 +100,6 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 // A conflict-resolution child runs inside its parent's land, so the server has
 // no run for it: it still shows as resolving, and the parent as waiting on it.
 func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T) {
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	api := fakeServerAPI{
 		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
@@ -111,7 +108,7 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/01"}},
 	}
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), store).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
 	m = next.(QueueModel)

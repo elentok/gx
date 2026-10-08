@@ -15,19 +15,11 @@ import (
 )
 
 func (m QueueModel) View() tea.View {
-	if store := m.localStore(); store != nil {
-		snapshot := store.Snapshot()
-		m.checked = snapshot.Checked
-		m.checkOrder = snapshot.Order
-		m.queueStatus = snapshot.Status
-	}
 	if !m.ready {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	if m.loaded {
-		// m.checked is a map shared with the Tickets tab (and, with a
-		// queueStore, refreshed from its snapshot just above) — either can add
-		// a ticket to it between Update calls with no queueEpicsLoadedMsg/
+		// m.checked can change between Update calls with no queueEpicsLoadedMsg/
 		// clampSelected in between, so this must be re-evaluated on every
 		// render rather than only on the events clampSelected's own doc
 		// comment lists. buildQueueEntriesCached (queue_rows.go) reuses the
@@ -107,7 +99,7 @@ func (m QueueModel) checkedProgress() (int, int) {
 				continue
 			}
 			total++
-			if epic.RenderedStatus(ticket).Terminal() || m.queueStatus[ticket.Path] == queueStatusDone {
+			if epic.RenderedStatus(ticket).Terminal() {
 				done++
 			}
 		}

@@ -116,14 +116,6 @@ type Model struct {
 	checked map[string]bool
 	// checkOrder records when each path joined checked.
 	checkOrder map[string]uint64
-	// queueStatus is each queued ticket's queue-run status (ticket 11):
-	// pending as soon as it's queued, then running/done/errored as execution
-	// wiring (tickets 08/09/12) progresses it. Persisted to disk (see
-	// queue_state.go) so a restart restores both queue membership and its
-	// last-known progress instead of starting empty. Independent of checked
-	// since ticket 15 — a ticket can be queued without being checked.
-	queueStatus map[string]queueItemStatus
-	queueStore  *QueueStore
 
 	search search.Model
 
@@ -179,10 +171,6 @@ type Model struct {
 // `.scratch/`. extraKeys (the app-wide global bindings) feeds the "?" help
 // modal alongside the tab's own bindings, mirroring ui/prs's NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
-	return NewModelWithStore(worktreeRoot, settings, extraKeys, LoadQueueStore())
-}
-
-func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, store *QueueStore) Model {
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
 	km := newTicketsManager()
@@ -208,8 +196,6 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 		live:              map[string]map[string]liveTicketState{},
 		checked:           map[string]bool{},
 		checkOrder:        map[string]uint64{},
-		queueStatus:       store.Snapshot().Status,
-		queueStore:        store,
 		explicitCollapsed: map[string]bool{},
 		archivedLazy:      archivedLazy,
 	}
@@ -272,7 +258,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.autoCheckForkedChildren(msg.epics)
-		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics
 		m.archivedEpicCount = msg.archivedEpicCount
@@ -311,9 +296,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case checkAddConfirmedMsg:
 		return m.handleCheckAddConfirmed(msg)
-
-	case replaceQueueConfirmedMsg:
-		return m.handleReplaceQueueConfirmed(msg)
 
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {

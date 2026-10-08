@@ -57,7 +57,6 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 	ticket := m.epicAt(selectionBefore).Tickets[selectionBefore.ticketIdx]
 
 	checkedBefore := len(m.checked)
-	queueBefore := m.queueStore.Snapshot()
 
 	presses := []tea.KeyPressMsg{
 		{Code: 's', Text: "s"},
@@ -88,10 +87,6 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 	}
 	if m.isChecked(ticket.Path) {
 		t.Fatalf("expected archived ticket to remain unchecked after space")
-	}
-	afterQueue := m.queueStore.Snapshot()
-	if len(afterQueue.Status) != len(queueBefore.Status) {
-		t.Fatalf("expected queue store unaffected by mutating keys on archived row")
 	}
 }
 

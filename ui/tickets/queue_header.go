@@ -198,7 +198,7 @@ const (
 
 // queueRunState classifies the queue's current run state. Paused only wins
 // over idle once a run has actually captured a ticket scope
-// (m.checkedProgress total > 0) — m.paused alone can be set by the bare `p`
+// (m.completedExecutionProgress total > 0) — m.paused alone can be set by the bare `p`
 // key with no run-state guard, so a queue that was never started must still
 // classify as idle even while globally paused.
 func (m QueueModel) queueRunState() queueRunStateKind {
@@ -209,7 +209,7 @@ func (m QueueModel) queueRunState() queueRunStateKind {
 		}
 	}
 	if m.paused {
-		if _, total := m.checkedProgress(); total > 0 {
+		if _, total := m.completedExecutionProgress(); total > 0 {
 			return queueRunPaused
 		}
 	}
@@ -236,10 +236,10 @@ func (m QueueModel) queueRunStateTitle() string {
 		elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
 		return fmt.Sprintf("Queue · done, took %s", formatElapsed(elapsed))
 	case queueRunPaused:
-		done, total := m.checkedProgress()
+		done, total := m.completedExecutionProgress()
 		return fmt.Sprintf("Queue · paused (%d of %d done)", done, total)
 	case queueRunRunning:
-		done, total := m.checkedProgress()
+		done, total := m.completedExecutionProgress()
 		glyph := strings.TrimRight(m.implementSpinner.View(), " ")
 		return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
 	default:

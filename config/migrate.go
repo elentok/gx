@@ -44,7 +44,7 @@ func WarnOnMigrateFailure(w io.Writer) {
 // ~/.config/gx/ into ~/.local/state/gx/ (see UserStateDir) on first launch
 // after the split - config.json and other user-edited config stay under
 // UserConfigDir.
-var stateFileNames = []string{"queue-state.json", "notifications-state.json"}
+var stateFileNames = []string{"notifications-state.json"}
 
 // MigrateStateFiles moves each of stateFileNames from the old
 // ~/.config/gx/ location to the new ~/.local/state/gx/ one, individually

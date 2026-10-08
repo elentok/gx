@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,134 +8,29 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation covers
-// bugs-05/03 and its bugs-06/03 fix: "r" ("Replace queue") opens the same
-// confirmation "a" already goes through before touching anything; only once
-// that's accepted (handleReplaceQueueConfirmed) does it replace the queue's
-// not-yet-started (pending) and already-finished (done) entries with the
-// current checked selection — while running entries are left exactly as they
-// are, whether or not they're still part of the selection.
-func TestModel_ImplementKeyReplacesPendingSelectionAfterConfirmation(t *testing.T) {
+// Without a server there is no queue: "r" only tells the user to start one,
+// and leaves the checked selection alone.
+func TestModel_ReplaceQueueKeyWithoutServerNotifies(t *testing.T) {
 	t.Parallel()
-	worktreeRoot := t.TempDir()
-	scratch := func(name string) string {
-		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
-	}
-	running := scratch("01-running.md")
-	done := scratch("02-done.md")
-	stalePending := scratch("03-stale.md")
-	newSelection := scratch("04-new.md")
-
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	for _, p := range []string{running, done, stalePending} {
-		if err := store.Check(p); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := store.SetStatus(running, queueStatusRunning); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SetStatus(done, queueStatusDone); err != nil {
-		t.Fatal(err)
-	}
-
 	m := Model{
-		worktreeRoot: worktreeRoot,
-		queueStore:   store,
-		// The new checked selection: still includes the running ticket (it
-		// renders checked regardless of status), drops the stale pending one
-		// and the previously-done one from an earlier run, and adds a fresh
-		// pending one.
-		checked:    map[string]bool{running: true, newSelection: true},
-		checkOrder: map[string]uint64{running: 1, newSelection: 3},
+		checked:    map[string]bool{"/alpha/01.md": true},
+		checkOrder: map[string]uint64{"/alpha/01.md": 1},
 	}
 
 	updated, cmd := m.handleReplaceQueueKey()
 	m = updated.(Model)
-	if cmd != nil {
-		t.Fatal("expected no cmd until the confirmation is accepted")
-	}
-	if !m.confirm.IsOpen {
-		t.Fatal("expected the confirmation modal to open")
-	}
-
-	confirmedMsg := cmdConfirmReplaceQueue(m.worktreeRoot)()
-	updated, cmd = m.handleReplaceQueueConfirmed(confirmedMsg.(replaceQueueConfirmedMsg))
-	m = updated.(Model)
 	if cmd == nil {
-		t.Fatal("expected a tab-switch command, got nil")
+		t.Fatal("expected a notify command, got nil")
 	}
-
-	status := store.Snapshot().Status
-	if got := status[running]; got != queueStatusRunning {
-		t.Fatalf("running entry status = %v, want untouched running", got)
+	notifyMsg, ok := cmd().(notify.NotifyMsg)
+	if !ok || notifyMsg.Message != "start the server to queue tickets" {
+		t.Fatalf("expected the start-the-server info notification, got %#v", notifyMsg)
 	}
-	if got, ok := status[done]; ok {
-		t.Fatalf("done entry should have been cleared by Replace, still present as %v", got)
+	if m.confirm.IsOpen {
+		t.Fatal("expected no confirmation modal without a server")
 	}
-	if got, ok := status[stalePending]; ok {
-		t.Fatalf("stale pending entry should have been replaced, still present as %v", got)
-	}
-	if got := status[newSelection]; got != queueStatusPending {
-		t.Fatalf("new selection entry status = %v, want pending", got)
-	}
-
-	if len(m.checked) != 0 {
-		t.Fatalf("checked set = %v, want empty after queueing (ticket 15)", m.checked)
-	}
-	snapshot := store.Snapshot()
-	for _, p := range []string{running, newSelection} {
-		if _, ok := snapshot.Status[p]; !ok {
-			t.Fatalf("queue status missing %q after checked-set clear", p)
-		}
-	}
-}
-
-// TestModel_ImplementKeyExcludesAlreadyDoneTickets covers ticket 05(b): a
-// checked selection that includes a ticket whose Epic.RenderedStatus is
-// already tickets.StatusDone must not be enqueued — it has nothing left to
-// implement — while the rest of the checked selection still queues normally.
-func TestModel_ImplementKeyExcludesAlreadyDoneTickets(t *testing.T) {
-	t.Parallel()
-	worktreeRoot := t.TempDir()
-	scratch := func(name string) string {
-		return filepath.Join(worktreeRoot, ".scratch", "alpha", "issues", name)
-	}
-	donePath := scratch("01-done.md")
-	openPath := scratch("02-open.md")
-
-	epic := tickets.Epic{
-		Name: "alpha",
-		Tickets: []tickets.Ticket{
-			{Number: 1, Identifier: "01", Path: donePath, Status: "done"},
-			{Number: 2, Identifier: "02", Path: openPath, Status: "open"},
-		},
-	}
-
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	m := Model{
-		worktreeRoot: worktreeRoot,
-		queueStore:   store,
-		epics:        []tickets.Epic{epic},
-		checked:      map[string]bool{donePath: true, openPath: true},
-		checkOrder:   map[string]uint64{donePath: 1, openPath: 2},
-	}
-
-	updated, _ := m.handleReplaceQueueKey()
-	m = updated.(Model)
-	confirmedMsg := cmdConfirmReplaceQueue(m.worktreeRoot)()
-	updated, _ = m.handleReplaceQueueConfirmed(confirmedMsg.(replaceQueueConfirmedMsg))
-	m = updated.(Model)
-
-	status := store.Snapshot().Status
-	if _, ok := status[donePath]; ok {
-		t.Fatalf("done ticket should not have been enqueued, got status %v", status[donePath])
-	}
-	if got := status[openPath]; got != queueStatusPending {
-		t.Fatalf("open ticket status = %v, want pending", got)
-	}
-	if len(m.checked) != 0 {
-		t.Fatalf("checked set = %v, want empty after queueing", m.checked)
+	if !m.checked["/alpha/01.md"] {
+		t.Fatalf("checked set = %v, want it untouched", m.checked)
 	}
 }
 

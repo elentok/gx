@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"context"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ import (
 
 func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueModel {
 	t.Helper()
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))).
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).
 		WithServerLink(fakeServerAPI{}, start)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
@@ -82,13 +81,8 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 	}
 }
 
-// In server mode the Queue tab shows the server's queue, never the local
-// queue store a pre-server run left behind.
+// In server mode the Queue tab shows the server's queue.
 func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
-	if err := store.SetChecked([]string{"/old/epic/issues/01-stale.md"}, true); err != nil {
-		t.Fatal(err)
-	}
 	api := fakeServerAPI{
 		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "open"},
@@ -96,7 +90,7 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}},
 	}
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), store).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 
@@ -112,9 +106,6 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 	if len(m.epics) != 1 || m.epics[0].Name != "gx:alpha" || len(m.epics[0].Tickets) != 2 {
 		t.Errorf("epics = %+v, want gx:alpha with both server tickets", m.epics)
 	}
-	if !store.IsChecked("/old/epic/issues/01-stale.md") {
-		t.Error("server-mode load rewrote the local queue store")
-	}
 }
 
 // Seam D: a snapshot with two projects renders project-prefixed rows, and "tp"
@@ -124,7 +115,7 @@ func TestQueueServerMode_PrefixesRowsAndFiltersByProject(t *testing.T) {
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "blog:beta/01", Title: "Second", Status: "open"},
 	}}, queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}}}
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, _ = next.(QueueModel).Update(next.(QueueModel).cmdLoadQueue()())
 	m = next.(QueueModel)

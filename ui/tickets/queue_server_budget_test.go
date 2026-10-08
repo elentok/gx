@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,14 +13,13 @@ import (
 
 func loadedServerQueueWithBudget(t *testing.T, budget server.BudgetStatus) QueueModel {
 	t.Helper()
-	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
 	api := fakeServerAPI{
 		snap: server.Snapshot{Seq: 1, Budget: budget, Tickets: []server.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/01"}},
 	}
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), store).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
 	return next.(QueueModel)

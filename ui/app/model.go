@@ -61,11 +61,8 @@ type Model struct {
 	notifyHistory notifyhistory.Model
 	gate          *reloadgate.ReloadGate
 
-	queueStore *ticketsui.QueueStore
 	serverConn ServerConn
 }
-
-var loadQueueStore = ticketsui.LoadQueueStore
 
 func New(repo git.Repo, settings Settings) Model {
 	m := Model{
@@ -77,7 +74,6 @@ func New(repo git.Repo, settings Settings) Model {
 		notifyLog:     notifylog.New(),
 		notifyHistory: notifyhistory.New(),
 		gate:          reloadgate.New(),
-		queueStore:    loadQueueStore(),
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
@@ -100,7 +96,7 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
-	tm := ticketsui.NewModelWithStore(root, s, keys.New(Bindings()), m.queueStore).WithServerLink(m.serverConn.link())
+	tm := ticketsui.NewModel(root, s, keys.New(Bindings())).WithServerLink(m.serverConn.link())
 	if m.serverMode() {
 		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(root))
 	}
@@ -118,7 +114,7 @@ func cwdProjectName(root string) string {
 }
 
 func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
-	qm := ticketsui.NewQueueModelWithStore(root, s, keys.New(Bindings()), m.queueStore)
+	qm := ticketsui.NewQueueModel(root, s, nil, keys.New(Bindings()))
 	if m.serverMode() {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
 	}

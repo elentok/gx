@@ -34,8 +34,8 @@ func UserCacheDir() (string, error) {
 }
 
 // UserStateDir is the runtime-state base directory: ~/.local/state on every
-// platform, or XDG_STATE_HOME when set. Runtime state (queue-state.json,
-// notifications-state.json) lives here rather than under UserConfigDir,
+// platform, or XDG_STATE_HOME when set. Runtime state (notifications-state.json)
+// lives here rather than under UserConfigDir,
 // which is reserved for user-edited config (config.json).
 func UserStateDir() (string, error) {
 	return xdgBase("XDG_STATE_HOME", ".local", "state")

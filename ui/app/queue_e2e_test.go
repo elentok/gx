@@ -16,7 +16,8 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
+// Without a server, "r" on the Tickets tab only asks the user to start one.
+func TestTicketsReplaceQueueWithoutServerNotifies(t *testing.T) {
 	// not parallel-safe: points XDG_DATA_HOME at a temp ticket store
 	repoDir := testutil.TempRepo(t)
 	t.Setenv("HOME", t.TempDir())
@@ -54,13 +55,7 @@ func TestTicketsConfirmOpensQueueWithSharedSelection(t *testing.T) {
 	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
-	// bugs-05/03: "r" ("Replace queue") now opens the same confirmation "a"
-	// already goes through before touching the queue; accepting it applies
-	// the selection and switches to the Queue tab.
-	waitForAppText(t, tm, "Replace the queue")
-	tm.Send(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	waitForAppText(t, tm, "Queue")
-	waitForAppText(t, tm, "First")
+	waitForAppText(t, tm, "start the server to queue tickets")
 }
 
 func waitForAppText(t *testing.T, tm *teatest.TestModel, want string) {

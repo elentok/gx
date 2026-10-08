@@ -134,13 +134,10 @@ func TestMigrateStateFilesMovesEachFileWhenOldExistsAndNewDoesNot(t *testing.T) 
 	if err := os.MkdirAll(oldGx, 0755); err != nil {
 		t.Fatalf("mkdir old: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(oldGx, "queue-state.json"), []byte("queue"), 0644); err != nil {
-		t.Fatalf("write queue-state.json: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(oldGx, "notifications-state.json"), []byte("notif"), 0644); err != nil {
 		t.Fatalf("write notifications-state.json: %v", err)
 	}
-	// config.json must stay behind - only the two state files migrate.
+	// config.json must stay behind - only state files migrate.
 	if err := os.WriteFile(filepath.Join(oldGx, "config.json"), []byte("config"), 0644); err != nil {
 		t.Fatalf("write config.json: %v", err)
 	}
@@ -156,7 +153,7 @@ func TestMigrateStateFilesMovesEachFileWhenOldExistsAndNewDoesNot(t *testing.T) 
 		t.Fatalf("MigrateStateFiles: %v", err)
 	}
 
-	for _, name := range []string{"queue-state.json", "notifications-state.json"} {
+	for _, name := range stateFileNames {
 		if _, err := os.Stat(filepath.Join(oldGx, name)); !os.IsNotExist(err) {
 			t.Errorf("%s still exists in old dir: %v", name, err)
 		}
@@ -178,14 +175,14 @@ func TestMigrateStateFilesNoopWhenNewAlreadyExists(t *testing.T) {
 	if err := os.MkdirAll(oldGx, 0755); err != nil {
 		t.Fatalf("mkdir old: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(oldGx, "queue-state.json"), []byte("old"), 0644); err != nil {
-		t.Fatalf("write old queue-state.json: %v", err)
+	if err := os.WriteFile(filepath.Join(oldGx, "notifications-state.json"), []byte("old"), 0644); err != nil {
+		t.Fatalf("write old notifications-state.json: %v", err)
 	}
 	if err := os.MkdirAll(newGx, 0755); err != nil {
 		t.Fatalf("mkdir new: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(newGx, "queue-state.json"), []byte("new"), 0644); err != nil {
-		t.Fatalf("write new queue-state.json: %v", err)
+	if err := os.WriteFile(filepath.Join(newGx, "notifications-state.json"), []byte("new"), 0644); err != nil {
+		t.Fatalf("write new notifications-state.json: %v", err)
 	}
 
 	prevConfig := userConfigDirFn
@@ -199,7 +196,7 @@ func TestMigrateStateFilesNoopWhenNewAlreadyExists(t *testing.T) {
 		t.Fatalf("MigrateStateFiles: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(newGx, "queue-state.json"))
+	data, err := os.ReadFile(filepath.Join(newGx, "notifications-state.json"))
 	if err != nil {
 		t.Fatalf("read new file: %v", err)
 	}

@@ -41,14 +41,8 @@ type QueueModel struct {
 	settings     ui.Settings
 	checked      map[string]bool
 	checkOrder   map[string]uint64
-	// queueStatus mirrors m.checked's keys with each ticket's durable
-	// lifecycle status (queue_state.go), read from queueStore so rendering
-	// doesn't duplicate completion into its own bookkeeping (ticket 20).
-	queueStatus map[string]queueItemStatus
-	queueStore  *QueueStore
 	// live mirrors Model.live (model_live.go): epicName -> ticket identifier
-	// -> in-memory orchestrator state, synced from the registry alongside
-	// queueStatus so the Queue tab's rows can render the same running/paused
+	// -> in-memory orchestrator state, so the Queue tab's rows can render the same running/paused
 	// spinner+phase presentation as the Tickets tab (renderLiveTicketRow).
 	live map[string]map[string]liveTicketState
 	// serverClaimedAt and herdrDown come from the last server load: the claim
@@ -162,7 +156,6 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		settings:         settings,
 		checked:          checked,
 		checkOrder:       checkOrder,
-		queueStatus:      map[string]queueItemStatus{},
 		live:             map[string]map[string]liveTicketState{},
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},
@@ -174,14 +167,6 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		help:             help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys)),
 		previewFocus:     newPreviewFocus(),
 	}
-}
-
-func NewQueueModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, store *QueueStore) QueueModel {
-	snapshot := store.Snapshot()
-	m := NewQueueModel(worktreeRoot, settings, snapshot.Checked, extraKeys, snapshot.Order)
-	m.queueStore = store
-	m.queueStatus = snapshot.Status
-	return m
 }
 
 func (m QueueModel) Init() tea.Cmd {
@@ -204,15 +189,6 @@ type queueServerLoadedMsg struct {
 	herdrDown bool
 	budget    server.BudgetStatus
 	err       error
-}
-
-// localStore is the queue store the tab reads and writes, nil in server mode:
-// there the server's queue is the only queue.
-func (m QueueModel) localStore() *QueueStore {
-	if m.serverAPI != nil {
-		return nil
-	}
-	return m.queueStore
 }
 
 func (m QueueModel) cmdLoadQueue() tea.Cmd {
@@ -254,12 +230,6 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if store := m.localStore(); store != nil {
-		snapshot := store.Snapshot()
-		m.checked = snapshot.Checked
-		m.checkOrder = snapshot.Order
-		m.queueStatus = snapshot.Status
-	}
 	if next, cmd, ok := m.updateServerDown(msg); ok {
 		return next, cmd
 	}
@@ -292,18 +262,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.serverDown {
 			return m, nil
 		}
-		if err := autoQueueForkedChildren(m.epics, msg.epics, m.localStore()); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
-		if err := autoQueueNewEpicSiblings(m.epics, msg.epics, m.localStore()); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
-		if store := m.localStore(); store != nil {
-			snapshot := store.Snapshot()
-			m.checked = snapshot.Checked
-			m.checkOrder = snapshot.Order
-			m.queueStatus = snapshot.Status
-		}
 		m.loaded = true
 		m.epics = msg.epics
 		m.candidates = make(map[string]bool, len(m.checked))
@@ -334,8 +292,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m.handleQueueMouseWheel(msg)
-	case queueClearConfirmedMsg:
-		return m.handleQueueClearConfirmed(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case answerEditorFinishedMsg:
@@ -477,26 +433,6 @@ func (m QueueModel) ticketPathFor(epicName, identifier string) (string, bool) {
 	return "", false
 }
 
-// setItemStatus records path's durable lifecycle status, through queueStore
-// when one is wired (persisting it) or into m.queueStatus directly otherwise
-// (mirroring Model.setQueueItemStatus's store/local fallback).
-func (m *QueueModel) setItemStatus(path string, status queueItemStatus) {
-	if path == "" {
-		return
-	}
-	if m.queueStore != nil {
-		if err := m.queueStore.SetStatus(path, status); err != nil {
-			return
-		}
-		m.queueStatus = m.queueStore.Snapshot().Status
-		return
-	}
-	if m.queueStatus == nil {
-		m.queueStatus = map[string]queueItemStatus{}
-	}
-	m.queueStatus[path] = status
-}
-
 // bindingQueueToggleHideDone is the Queue tab's "tc" chord (ticket 09),
 // dispatched through keys.Manager so a key typed right after an unconsumed
 // "t" falls through to its own normal action instead of being swallowed
@@ -624,24 +560,12 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m.handleServerPauseKey()
 			}
 		case bindingQueueClearChecked:
-			if paths := m.checkedPaths(); len(paths) > 0 {
-				if m.serverAPI != nil {
-					return m.handleServerClearKey(fmt.Sprintf("Dequeue all %d ticket(s)?", len(paths)), paths)
-				}
-				m.confirm = m.confirm.Open(confirm.Options{
-					Prompt:    fmt.Sprintf("Clear all %d queued ticket(s)?", len(paths)),
-					AcceptCmd: cmdConfirmQueueClear(paths),
-				})
+			if paths := m.checkedPaths(); len(paths) > 0 && m.serverAPI != nil {
+				return m.handleServerClearKey(fmt.Sprintf("Dequeue all %d ticket(s)?", len(paths)), paths)
 			}
 		case bindingQueueClearDoneChecked:
-			if paths := m.doneCheckedPaths(); len(paths) > 0 {
-				if m.serverAPI != nil {
-					return m.handleServerClearKey(fmt.Sprintf("Dequeue %d completed ticket(s)?", len(paths)), paths)
-				}
-				m.confirm = m.confirm.Open(confirm.Options{
-					Prompt:    fmt.Sprintf("Clear %d completed ticket(s) from the queue?", len(paths)),
-					AcceptCmd: cmdConfirmQueueClear(paths),
-				})
+			if paths := m.doneCheckedPaths(); len(paths) > 0 && m.serverAPI != nil {
+				return m.handleServerClearKey(fmt.Sprintf("Dequeue %d completed ticket(s)?", len(paths)), paths)
 			}
 		case bindingQueueDelete:
 			if m.serverAPI != nil {

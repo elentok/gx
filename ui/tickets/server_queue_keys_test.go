@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -18,15 +17,12 @@ import (
 
 func newMaintenanceQueue(t *testing.T, api fakeServerAPI) QueueModel {
 	t.Helper()
-	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))).
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).
 		WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
 	m.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
-	if err := m.queueStore.SetChecked([]string{"gx:alpha/01"}, true); err != nil {
-		t.Fatal(err)
-	}
 	m.checked = map[string]bool{"gx:alpha/01": true}
 	m.clampSelected()
 	return m
