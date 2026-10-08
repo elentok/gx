@@ -562,6 +562,57 @@ func TestR10MatchesOnlyAGateStillHeld(t *testing.T) {
 	}
 }
 
+func TestDefaultR11LaunchesDisabledAsAMediumReclaimAgent(t *testing.T) {
+	c := Default()
+	i := slices.IndexFunc(c.Entries, func(e Entry) bool { return e.ID == "R11" })
+	if i < 0 {
+		t.Fatal("R11 not in the default catalog")
+	}
+	e := c.Entries[i]
+	if e.Enabled || e.Executor != ExecutorAgent || e.Authority != AuthorityMedium || e.Remedy != nil || !slices.Equal(e.Verbs, []string{"reclaim"}) {
+		t.Errorf("R11 = %+v, want disabled medium agent that reclaims", e)
+	}
+	seq := []Event{{Type: events.IterationStarted}, {Type: events.LaunchFailed, Kind: events.AgentNameTaken}, {Type: events.NeedsRepair, Kind: events.AgentNameTaken}}
+	if got, ok := c.Match(seq); ok && got.ID == "R11" {
+		t.Error("disabled R11 must not match")
+	}
+}
+
+func TestR11MatchesANameTakenRelaunchOfAStillLiveIteration(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	started := Event{Type: events.IterationStarted}
+	taken := Event{Type: events.LaunchFailed, Kind: events.AgentNameTaken}
+	park := Event{Type: events.NeedsRepair, Kind: events.AgentNameTaken}
+	tests := []struct {
+		name string
+		seq  []Event
+		want string
+	}{
+		{"live iteration, then a taken name", []Event{started, taken, park}, "R11"},
+		{"in-iteration retries", []Event{started, taken, taken, park}, "R11"},
+		{"rate-limit pause while live", []Event{started, {Type: events.PausedRateLimit}, taken, park}, "R11"},
+		{"no iteration ever started", []Event{taken, park}, "R6"},
+		{"start only after the failure", []Event{taken, started, park}, "R6"},
+		{"iteration finished first", []Event{started, {Type: events.IterationFinished}, taken, park}, "R6"},
+		{"iteration parked first", []Event{started, {Type: events.NeedsRepair, Kind: events.IterationError}, taken, park}, "R6"},
+		{"a person reset it", []Event{started, {Type: events.TicketReset}, taken, park}, "R6"},
+		{"landed first", []Event{started, {Type: events.CherryPicked}, taken, park}, "R6"},
+		{"busy pane, not a taken name", []Event{started, {Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, {Type: events.NeedsRepair, Kind: events.AgentPaneBusy}}, "R6"},
+		{"taken-name failure, other park", []Event{started, taken, {Type: events.NeedsRepair, Kind: events.RetryExhausted}}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if (tt.want == "") == ok || e.ID != tt.want {
+				t.Fatalf("got (%q, %v), want %q", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")

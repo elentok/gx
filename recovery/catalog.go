@@ -77,6 +77,8 @@ func Default() Catalog {
 	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered(), r7CompactionTimedOut()}
 	entries = append(entries, r3LandRecoverable()...)
 	entries = append(entries, r4BlockedPaneDialog())
+	// R11 is a narrower name-taken park than R6's, so it goes first.
+	entries = append(entries, r11ClaimClobbered())
 	entries = append(entries, r6LaunchCollision()...)
 	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause(), r10BackgroundGateHeld())}
 }
@@ -94,6 +96,42 @@ func r10BackgroundGateHeld() Entry {
 	return Entry{
 		ID: "R10", Type: events.BackgroundTaskGateHeld,
 		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"release-gate", "finish"},
+	}
+}
+
+// r11ClaimClobbered is a second launch of a ticket whose own iteration is still
+// live: an agent's full-file write reverted its claimed status to open, so the
+// scheduler launched it again and herdr refused the taken name. The run log
+// shows it as a name-taken park whose launch-failed follows an
+// iteration-started that nothing closed. The fix restores claimed with the live
+// iteration's session and keeps the duplicate from relaunching; the live tab is
+// never closed, it holds the real work. An agent acts because no server verb
+// restores a claim, and a false positive re-claims a ticket a person reset on
+// purpose. Launches disabled: the per-ticket lock and server-owned status
+// writes should make it unreachable, and there is no S0 event data behind it.
+func r11ClaimClobbered() Entry {
+	return Entry{
+		ID: "R11", Type: events.NeedsRepair, Kind: events.AgentNameTaken,
+		Predicate: func(seq []Event) bool {
+			failed := false
+			for _, e := range slices.Backward(seq[:len(seq)-1]) {
+				switch e.Type {
+				case events.LaunchFailed:
+					failed = failed || e.Kind == events.AgentNameTaken
+				case events.IterationStarted:
+					if failed {
+						return true
+					}
+				case events.IterationFinished, events.NeedsRepair, events.NeedsAnswer, events.Commitless,
+					events.CherryPicked, events.ManualLand, events.TicketReset:
+					if failed {
+						return false
+					}
+				}
+			}
+			return false
+		},
+		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"reclaim"},
 	}
 }
 
