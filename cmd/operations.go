@@ -371,20 +371,41 @@ func runConfigTestNotifications(d deps) error {
 	return nil
 }
 
-// notifyTransports is the ordered set of transport names --enable/--disable/
-// --status operate on, matching ralphloop.NotificationState's keys and
-// SendMessage's sent-to strings.
-var notifyTransports = []string{"telegram", "slack"}
-
 func isKnownNotifyTransport(name string) bool {
-	return slices.Contains(notifyTransports, name)
+	return slices.Contains(ralphloop.NotifyTransports, name)
+}
+
+// notifyDestinations lists every notification destination: the global one per
+// transport plus any a project's override adds.
+func notifyDestinations(d deps) ([]ralphloop.Destination, error) {
+	load := d.loadConfig
+	if load == nil {
+		load = config.Load
+	}
+	cfg, err := load()
+	if err != nil {
+		return nil, err
+	}
+	dirs, err := tickets.ProjectDirs(cfg.TicketStore.Path)
+	if err != nil {
+		return nil, err
+	}
+	overrides := map[string]*config.NotificationsConfig{}
+	for _, dir := range dirs {
+		var n *config.NotificationsConfig
+		if pf, err := config.ReadProjectFile(dir); err == nil {
+			n = pf.Notifications
+		}
+		overrides[tickets.ProjectName(dir)] = n
+	}
+	return ralphloop.NotificationDestinations(cfg.Notifications, overrides), nil
 }
 
 // runNotify dispatches `gx notify` to whichever of its mutually exclusive
 // modes was requested: send a message, flip a transport's manual mute, or
 // report status. Args holds at most one positional message (Args:
 // cobra.MaximumNArgs(1)).
-func runNotify(args []string, enable, disable string, status, testBatch bool, d deps) error {
+func runNotify(args []string, enable, disable, project string, status, testBatch bool, d deps) error {
 	hasMessage := len(args) == 1
 	controlFlags := 0
 	if enable != "" {
@@ -405,10 +426,12 @@ func runNotify(args []string, enable, disable string, status, testBatch bool, d 
 		return fmt.Errorf("a message and --enable/--disable/--status/--test-batch are mutually exclusive")
 	case controlFlags > 1:
 		return fmt.Errorf("--enable, --disable, --status, and --test-batch are mutually exclusive")
+	case project != "" && enable == "" && disable == "":
+		return fmt.Errorf("--project only narrows --enable/--disable")
 	case enable != "":
-		return runNotifySetMute(enable, false, d)
+		return runNotifySetMute(enable, project, false, d)
 	case disable != "":
-		return runNotifySetMute(disable, true, d)
+		return runNotifySetMute(disable, project, true, d)
 	case status:
 		return runNotifyStatus(d)
 	case testBatch:
@@ -462,52 +485,75 @@ func sendTestBatch(d deps) error {
 	return err
 }
 
-// runNotifySetMute flips transport's manual mute in the notification state
-// file (ticket 02's module) and reports the new state. This is the same
-// manual path a planned quiet period would use.
-func runNotifySetMute(transport string, muted bool, d deps) error {
+// runNotifySetMute flips the manual mute of every destination of transport
+// (only project's, when set) in the notification state file and reports the
+// new state. This is the same manual path a planned quiet period would use.
+func runNotifySetMute(transport, project string, muted bool, d deps) error {
 	if !isKnownNotifyTransport(transport) {
 		return fmt.Errorf("unknown transport %q (expected telegram or slack)", transport)
 	}
-
-	err := ralphloop.UpdateNotificationState(func(state *ralphloop.NotificationState) {
-		ts := state.Transports[transport]
-		ts.Muted = muted
-		if muted {
-			ts.Reason = "manual-disable"
-			ts.TrippedAt = time.Now()
-		} else {
-			ts.Reason = ""
-			ts.TrippedAt = time.Time{}
+	all, err := notifyDestinations(d)
+	if err != nil {
+		return err
+	}
+	var targets []ralphloop.Destination
+	for _, dest := range all {
+		if dest.Transport == transport && (project == "" || slices.Contains(dest.Projects, project)) {
+			targets = append(targets, dest)
 		}
-		state.Transports[transport] = ts
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("project %q has no %s destination", project, transport)
+	}
+
+	err = ralphloop.UpdateNotificationState(func(state *ralphloop.NotificationState) {
+		for _, dest := range targets {
+			ts := state.Transports[dest.Key]
+			ts.Muted = muted
+			if muted {
+				ts.Reason = "manual-disable"
+				ts.TrippedAt = time.Now()
+			} else {
+				ts.Reason = ""
+				ts.TrippedAt = time.Time{}
+			}
+			state.Transports[dest.Key] = ts
+		}
 	})
 	if err != nil {
 		return err
 	}
 
-	if muted {
-		fmt.Fprintf(d.stdout, "%s: muted\n", transport)
-	} else {
-		fmt.Fprintf(d.stdout, "%s: active\n", transport)
+	for _, dest := range targets {
+		if muted {
+			fmt.Fprintf(d.stdout, "%s: muted\n", dest.Key)
+		} else {
+			fmt.Fprintf(d.stdout, "%s: active\n", dest.Key)
+		}
 	}
 	return nil
 }
 
-// runNotifyStatus reports every transport's mute state plus every ticket
-// under the current repo's tracker root carrying a non-empty Mutes.
+// runNotifyStatus reports every destination's mute state and projects, plus
+// every ticket under the current repo's tracker root carrying a non-empty Mutes.
 func runNotifyStatus(d deps) error {
 	state, err := ralphloop.LoadNotificationState()
 	if err != nil {
 		return err
 	}
-	for _, transport := range notifyTransports {
-		ts := state.Transports[transport]
-		if ts.Muted {
-			fmt.Fprintf(d.stdout, "%s: muted (%s)\n", transport, ts.Reason)
-		} else {
-			fmt.Fprintf(d.stdout, "%s: active\n", transport)
+	dests, err := notifyDestinations(d)
+	if err != nil {
+		return err
+	}
+	for _, dest := range dests {
+		line := fmt.Sprintf("%s: active", dest.Key)
+		if ts := state.Transports[dest.Key]; ts.Muted {
+			line = fmt.Sprintf("%s: muted (%s)", dest.Key, ts.Reason)
 		}
+		if len(dest.Projects) > 0 {
+			line += " [projects: " + strings.Join(dest.Projects, ", ") + "]"
+		}
+		fmt.Fprintln(d.stdout, line)
 	}
 
 	cwd, err := d.getwd()

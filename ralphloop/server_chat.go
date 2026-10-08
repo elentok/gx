@@ -61,15 +61,19 @@ func (c *ServerChat) sinksFor(cfg ServerChatConfig) []*chatEventSink {
 		}
 		out = append(out, s)
 	}
-	if cfg.TelegramBotToken != "" {
-		add("telegram\x00"+cfg.TelegramBotToken+"\x00"+cfg.TelegramChatID, func() *chatEventSink {
+	if target := telegramTarget(cfg.TelegramBotToken, cfg.TelegramChatID); target != "" {
+		add("telegram\x00"+target, func() *chatEventSink {
 			base := firstNonEmptyStr(cfg.TelegramBaseURL, c.base.TelegramBaseURL, telegramAPIBaseURL)
-			return newServerChatSink(telegramStyle, newTelegramTransport(cfg.TelegramBotToken, cfg.TelegramChatID, base), c.base.GateStatePath)
+			s := newServerChatSink(telegramStyle, newTelegramTransport(cfg.TelegramBotToken, cfg.TelegramChatID, base), c.base.GateStatePath)
+			s.gateKey = destinationKey(transportTelegram, target, telegramTarget(c.base.TelegramBotToken, c.base.TelegramChatID))
+			return s
 		})
 	}
 	if cfg.SlackWebhookURL != "" {
 		add("slack\x00"+cfg.SlackWebhookURL, func() *chatEventSink {
-			return newServerChatSink(slackStyle, newSlackTransport(cfg.SlackWebhookURL), c.base.GateStatePath)
+			s := newServerChatSink(slackStyle, newSlackTransport(cfg.SlackWebhookURL), c.base.GateStatePath)
+			s.gateKey = destinationKey(transportSlack, cfg.SlackWebhookURL, slackTarget(c.base.SlackWebhookURL))
+			return s
 		})
 	}
 	return out

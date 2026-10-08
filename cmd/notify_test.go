@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -129,5 +131,58 @@ func writeMutedTicket(t *testing.T, projectDir, epic, filename, id, mutesYAML st
 	content := "---\nid: \"" + id + "\"\nstatus: open\ntype: implement\nmutes:" + mutesYAML + "\n---\nBody.\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestExecute_Notify_PerDestinationMutes(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	store := isolateTicketStore(t)
+	addProject(t, store, "plain", repo)
+	own := addProject(t, store, "own", repo)
+	if err := os.WriteFile(filepath.Join(own, "project.json"), []byte(
+		`{"name":"own","repo":"`+repo+`","notifications":{"telegram":{"bot-token":"tok","chat-id":"7"}}}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A state file from before destinations existed: transport-keyed.
+	if err := ralphloop.UpdateNotificationState(func(s *ralphloop.NotificationState) {
+		s.Transports["slack"] = ralphloop.TransportState{Muted: true, Reason: "manual-disable"}
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	run := func(args ...string) string {
+		t.Helper()
+		var out bytes.Buffer
+		d := deps{stdout: &out, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return repo, nil },
+			loadConfig: func() (config.Config, error) {
+				cfg := config.Default()
+				cfg.TicketStore.Path = store
+				cfg.Notifications.Telegram = config.TelegramConfig{BotToken: "global", ChatID: "1"}
+				return cfg, nil
+			}}
+		if err := execute(args, d); err != nil {
+			t.Fatalf("execute %v: %v", args, err)
+		}
+		return out.String()
+	}
+
+	if got := run("notify", "--status"); !strings.Contains(got, "slack: muted (manual-disable)") {
+		t.Fatalf("old slack mute should be the global destination's, got: %q", got)
+	}
+
+	if got := run("notify", "--disable", "telegram", "--project", "own"); strings.Contains(got, "telegram: muted") || !strings.Contains(got, "telegram:") {
+		t.Fatalf("expected only the project's destination muted, got: %q", got)
+	}
+	status := run("notify", "--status")
+	if !strings.Contains(status, "telegram: active [projects: plain]") {
+		t.Fatalf("global telegram should stay active with its projects, got: %q", status)
+	}
+	if !strings.Contains(status, "muted (manual-disable) [projects: own]") {
+		t.Fatalf("project destination should be muted and list its project, got: %q", status)
+	}
+
+	if got := run("notify", "--enable", "telegram"); strings.Count(got, "active") != 2 {
+		t.Fatalf("--enable without --project should clear every telegram destination, got: %q", got)
 	}
 }

@@ -513,7 +513,7 @@ func newDoctorCmd(d deps) *cobra.Command {
 }
 
 func newNotifyCmd(d deps) *cobra.Command {
-	var enable, disable string
+	var enable, disable, project string
 	var status, testBatch bool
 
 	cmd := &cobra.Command{
@@ -521,12 +521,13 @@ func newNotifyCmd(d deps) *cobra.Command {
 		Short: "send a message via configured Telegram/Slack notifications",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return runNotify(args, enable, disable, status, testBatch, d)
+			return runNotify(args, enable, disable, project, status, testBatch, d)
 		},
 	}
-	cmd.Flags().StringVar(&enable, "enable", "", "clear the manual mute for a transport (telegram/slack)")
-	cmd.Flags().StringVar(&disable, "disable", "", "trip the manual mute for a transport (telegram/slack)")
-	cmd.Flags().BoolVar(&status, "status", false, "report per-transport mute state and muted tickets")
+	cmd.Flags().StringVar(&enable, "enable", "", "clear the manual mute for every destination of a transport (telegram/slack)")
+	cmd.Flags().StringVar(&disable, "disable", "", "trip the manual mute for every destination of a transport (telegram/slack)")
+	cmd.Flags().StringVar(&project, "project", "", "with --enable/--disable: only that project's destination")
+	cmd.Flags().BoolVar(&status, "status", false, "report per-destination mute state, its projects and muted tickets")
 	cmd.Flags().BoolVar(&testBatch, "test-batch", false, "send a fixed 2-message batch through the same join a real flush uses, to reproduce/verify the batch-separator escaping bug live")
 	return cmd
 }

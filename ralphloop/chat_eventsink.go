@@ -98,6 +98,9 @@ type chatEventSink struct {
 	// Empty (the production default from newChatEventSink) means "use the
 	// real path".
 	gateStatePath string
+	// gateKey is the destination's key in the notification state; empty means
+	// the transport name, i.e. the global destination.
+	gateKey string
 
 	// flushMidpointHook, if non-nil, runs synchronously inside flush() right
 	// after drainQueue but before the gate/sendRaw call that hands the
@@ -534,10 +537,11 @@ func (s *chatEventSink) parkTicket(source, reason string) error {
 // (see flush/closeFlush), never at enqueue time (see send), so the global
 // budget tracks actual sends rather than raw event volume.
 func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateResult, error) {
+	key := firstNonEmptyStr(s.gateKey, s.transport.name())
 	if s.gateStatePath != "" {
-		return notificationGateAt(s.gateStatePath, s.transport.name(), eventType, source, time.Now(), recordSend, s.parkTicket)
+		return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.parkTicket)
 	}
-	return NotificationGate(s.transport.name(), eventType, source, time.Now(), recordSend, s.parkTicket)
+	return NotificationGate(key, eventType, source, time.Now(), recordSend, s.parkTicket)
 }
 
 func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
