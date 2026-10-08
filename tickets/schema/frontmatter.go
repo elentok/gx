@@ -28,7 +28,7 @@ type ticketYAML struct {
 	Notify                bool         `yaml:"notify,omitempty"`
 	Recover               *bool        `yaml:"recover,omitempty"`
 	Unique                string       `yaml:"unique,omitempty"`
-	SessionIDs           []string     `yaml:"session_ids,omitempty"`
+	SessionIDs            []string     `yaml:"session_ids,omitempty"`
 	IterationStatus       string       `yaml:"iteration_status,omitempty"`
 	ParkKind              string       `yaml:"park_kind,omitempty"`
 	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
