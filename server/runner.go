@@ -410,6 +410,17 @@ func (s *Server) landingOnLanded(project string) bool {
 	return pf.LandingPolicy() == config.LandingOnLanded
 }
 
+// autoFFMerge reports whether the project opted in to automatic ff-only merges,
+// read live. An unreadable project file means off: never merge on a guess.
+func (s *Server) autoFFMerge(project string) bool {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return false
+	}
+	pf, _ := config.ReadProjectFile(dir)
+	return pf.AutoFFMergeEnabled()
+}
+
 // rootBaseRef is the branch a root's feature branch starts from and lands back onto.
 func (s *Server) rootBaseRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
 	ref, err := tickets.DeriveRootBase(project, epics, epic, t, s.landingOnLanded(project))
@@ -528,6 +539,9 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 // landRoot fast-forwards the root's target to its feature branch through the
 // merge core. A non-empty reason means the root must park, not land.
 func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, err error) {
+	if !s.autoFFMerge(project) {
+		return fmt.Sprintf("auto-ff-merge is off for %s; run gx-merge %s", project, one.Epic), nil
+	}
 	target, err := s.rootBaseRef(project, epics, one.Epic, one.Ticket, repoDir)
 	if err != nil {
 		return "", err

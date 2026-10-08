@@ -28,6 +28,21 @@ func TestLandRoot_FastForwardLandsOntoTheTarget(t *testing.T) {
 	}
 }
 
+func TestLandRoot_AutoFFMergeOffParksTheRootUnmerged(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+		commitWork(t, p, id)
+	})
+	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo) // read live, so after Start is fine
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+
+	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
+		t.Errorf("main contains the feature branch: %q", out)
+	}
+}
+
 func TestLandRoot_NeedsRebaseParksTheRootWithoutRebasing(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)

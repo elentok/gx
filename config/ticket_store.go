@@ -68,6 +68,12 @@ func (pf ProjectFile) LandingPolicy() string {
 	return *pf.Landing
 }
 
+// AutoFFMergeEnabled reports whether the project opted in to the server
+// fast-forwarding a finished epic onto its target. Absent means off.
+func (pf ProjectFile) AutoFFMergeEnabled() bool {
+	return pf.AutoFFMerge != nil && *pf.AutoFFMerge
+}
+
 // VCSNone is the project.json vcs value for a project with no repository.
 const VCSNone = "none"
 

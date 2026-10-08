@@ -165,10 +165,22 @@ func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, ty
 }
 
 // SetProjectRepo points the project at the repo its agents run in. Call it
-// after WriteTicket, before Start.
+// after WriteTicket, before Start. It opts the project in to auto-ff-merge so a
+// finished epic lands; SetProjectRepoNoAutoMerge leaves the default (off).
 func SetProjectRepo(t *testing.T, store, project, repo string) {
 	t.Helper()
-	body := `{"name":"` + project + `","repo":"` + repo + `"}`
+	writeProjectRepo(t, store, project, repo, `,"auto-ff-merge":true`)
+}
+
+// SetProjectRepoNoAutoMerge is SetProjectRepo without the auto-ff-merge opt-in.
+func SetProjectRepoNoAutoMerge(t *testing.T, store, project, repo string) {
+	t.Helper()
+	writeProjectRepo(t, store, project, repo, "")
+}
+
+func writeProjectRepo(t *testing.T, store, project, repo, extra string) {
+	t.Helper()
+	body := `{"name":"` + project + `","repo":"` + repo + `"` + extra + `}`
 	if err := os.WriteFile(filepath.Join(store, project, "project.json"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
