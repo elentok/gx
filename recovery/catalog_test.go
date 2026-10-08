@@ -143,13 +143,19 @@ func TestDefaultR3LaunchesDisabledAsMediumAgentEntriesWithVerifyAndLand(t *testi
 		if e.ID != "R3" {
 			continue
 		}
+		if e.Enabled {
+			t.Errorf("R3 = %+v, want disabled", e)
+		}
+		if e.Executor != ExecutorAgent {
+			continue
+		}
 		n++
-		if e.Enabled || e.Executor != ExecutorAgent || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"verify", "land"}) {
-			t.Errorf("R3 = %+v, want disabled medium agent entry with verify and land", e)
+		if e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"verify", "land"}) {
+			t.Errorf("R3 = %+v, want medium agent entry with verify and land", e)
 		}
 	}
 	if n != 2 {
-		t.Fatalf("R3 entries = %d, want 2 (one per signature)", n)
+		t.Fatalf("R3 agent entries = %d, want 2 (one per signature)", n)
 	}
 	if _, ok := c.Match([]Event{{Type: events.NeedsRepair, Kind: events.AmbiguousLand}}); ok {
 		t.Error("disabled R3 must not match")
@@ -161,7 +167,9 @@ func TestR3MatchesAnUnrecoverableDoneTicketOrAZeroCommitClaimingPresence(t *test
 	for i := range c.Entries {
 		c.Entries[i].Enabled = true
 	}
-	zero := func(text string) []Event { return []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: text}} }
+	zero := func(text string) []Event {
+		return []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: text}}
+	}
 	tests := []struct {
 		name string
 		seq  []Event
@@ -184,6 +192,45 @@ func TestR3MatchesAnUnrecoverableDoneTicketOrAZeroCommitClaimingPresence(t *test
 				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
 			}
 		})
+	}
+}
+
+func enabledDefault() Catalog {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	return c
+}
+
+func TestR3ProposesCommitlessDoneWhenTheWorkLandedInAnotherTicket(t *testing.T) {
+	f := Failure{Address: "p:e/01", Type: events.NeedsAnswer, Kind: events.ZeroCommit}
+	e, ok := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Text: "Already implemented by the sibling ticket 04."}})
+	if !ok || e.ID != "R3" {
+		t.Fatalf("got (%q, %v), want R3", e.ID, ok)
+	}
+	if e.Runnable(f) || !e.Proposable(f) {
+		t.Fatalf("R3 commitless-done = %+v, want proposed only", e)
+	}
+	calls, err := e.Propose(f)
+	if err != nil || len(calls) != 1 || calls[0].String() != "commitless-done p:e/01" {
+		t.Fatalf("proposal = %v, %v, want one commitless-done call", calls, err)
+	}
+}
+
+func TestR3LostCommitsOnlyEscalate(t *testing.T) {
+	f := Failure{Type: events.NeedsRepair, Kind: events.AmbiguousLand}
+	for _, reason := range []string{
+		"done but commits missing from epic-a and iteration branch ralph-loop/epic-a-item-01 no longer exists to recover them",
+		"land interrupted by a crash (lock owner pid 1) and verify cannot tell whether it landed: unrecoverable",
+	} {
+		e, ok := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Reason: reason}})
+		if !ok || e.ID != "R3" || e.Executor != ExecutorPerson || e.Runnable(f) || e.Proposable(f) {
+			t.Errorf("reason %q matched (%+v, %v), want an escalate-only R3", reason, e, ok)
+		}
+	}
+	if e, _ := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Reason: "verify cannot tell whether it landed: unknown"}}); e.Executor != ExecutorAgent {
+		t.Errorf("an ambiguous land with its branch = %+v, want the agent entry", e)
 	}
 }
 

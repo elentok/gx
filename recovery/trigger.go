@@ -51,6 +51,7 @@ type Result struct {
 type Verbs interface {
 	Park(address, reason string) (Result, error)
 	Relaunch(address string) (Result, error)
+	CommitlessDone(address string) (Result, error)
 }
 
 // Remedy is a rule entry's fix, written in Go against the server's verbs.

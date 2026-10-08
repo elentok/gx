@@ -440,6 +440,85 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	})
 }
 
+// startR3 starts a server with the default catalog fully enabled. The server
+// does not read the transcript yet, so the commitless-done entry's claim
+// predicate is dropped to let a bare zero-commit park reach it.
+func startR3(t *testing.T) *servertest.Harness {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+		for i, e := range c.Recovery.Entries {
+			c.Recovery.Entries[i].Enabled = true
+			if e.Executor == recovery.ExecutorRule && e.Authority == recovery.AuthorityHigh {
+				c.Recovery.Entries[i].Predicate = nil
+			}
+		}
+	})
+	registerLaunch(h)
+	return h
+}
+
+func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
+	h := startR3(t)
+	if err := h.Server.ParkAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(h.TicketStore, "proj")
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryProposed && ev.Reason == "R3" && ev.Text == "commitless-done proj:epic-a/01" {
+				return true
+			}
+		}
+		return false
+	})
+	tk := epicTickets(t, h).Tickets[0]
+	if tk.IsDone() || tk.Commitless {
+		t.Fatalf("proposal acted: status %s, commitless %v", tk.Status, tk.Commitless)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+		t.Fatalf("approve = %+v, %v", res, err)
+	}
+	if tk := epicTickets(t, h).Tickets[0]; !tk.IsDone() || !tk.Commitless {
+		t.Errorf("approved ticket: status %s, commitless %v, want done and commitless", tk.Status, tk.Commitless)
+	}
+}
+
+func TestRecovery_R3LostCommitsEscalateWithoutAnInvestigation(t *testing.T) {
+	h := startR3(t)
+	reason := "done but commits missing from epic-a and iteration branch ralph-loop/epic-a-item-01 no longer exists to recover them"
+	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousLand, reason); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(h.TicketStore, "proj")
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryEscalated && strings.Contains(ev.Reason, "R3") {
+				return true
+			}
+		}
+		return false
+	})
+	log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+	for _, ev := range log {
+		if typ := events.Type(ev.Type); typ == events.RecoveryApplied || typ == events.RecoveryProposed {
+			t.Errorf("unexpected %s for lost commits", ev.Type)
+		}
+	}
+	if n := len(epicTickets(t, h).Tickets); n != 1 {
+		t.Errorf("tickets = %d, want no investigate fork", n)
+	}
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

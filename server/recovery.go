@@ -14,7 +14,7 @@ import (
 )
 
 // recoveryPlan is the recovery a failure gets: a catalog entry, an
-// investigation, or a proposal awaiting approval.
+// investigation, a proposal awaiting approval, or an escalation.
 type recoveryPlan struct {
 	ref     ticketRef
 	log     []ralphloop.Event
@@ -48,7 +48,8 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	log := s.ticketEvents(ref, f)
 	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
-	if f.DiagnosisOnly() || (!plan.needsJudgment() && !(entry.Runnable(f) || entry.Proposable(f))) {
+	acts := entry.Runnable(f) || entry.Proposable(f) || entry.Executor == recovery.ExecutorPerson
+	if f.DiagnosisOnly() || (!plan.needsJudgment() && !acts) {
 		return recoveryPlan{}, false
 	}
 	return plan, true
@@ -78,6 +79,10 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 		return
 	}
 	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
+	if entry.Executor == recovery.ExecutorPerson {
+		s.recordRecovery(ref, events.RecoveryEscalated, f, entry.ID+" is a person's to handle", "")
+		return
+	}
 	if entry.Proposable(f) {
 		s.propose(ref, entry, f)
 		return
@@ -299,10 +304,10 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
 	var seq []recovery.Event
 	for _, ev := range log {
-		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind)})
+		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason})
 	}
 	if len(seq) == 0 || seq[len(seq)-1].Type != f.Type {
-		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind})
+		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind, Reason: f.Reason})
 	}
 	return seq
 }
@@ -327,6 +332,27 @@ func (v recoveryVerbs) Park(address, reason string) (recovery.Result, error) {
 func (v recoveryVerbs) Relaunch(address string) (recovery.Result, error) {
 	res, err := v.s.ticketRelaunch(QueueRequest{Address: address, actor: recovery.ActorRecovery})
 	return recoveryResult(res), err
+}
+
+func (v recoveryVerbs) CommitlessDone(address string) (recovery.Result, error) {
+	res, err := v.s.ticketCommitlessDone(QueueRequest{Address: address, actor: recovery.ActorRecovery})
+	return recoveryResult(res), err
+}
+
+// ticketCommitlessDone marks a ticket done with no commits of its own, for work
+// that landed inside another ticket's commits. Commitless takes it out of
+// reconcile's hands for good, which is why only an approved proposal calls it.
+func (s *Server) ticketCommitlessDone(req QueueRequest) (QueueResult, error) {
+	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
+		err := schema.UpdateTicket(ref.ticket.Path, func(t *schema.Ticket) {
+			t.Status, t.IterationStatus, t.Commitless = schema.StatusDone, schema.IterationStatusFinished, true
+		})
+		if err != nil {
+			return QueueResult{}, fmt.Errorf("commitless-done %s: %w", ref.addr, err)
+		}
+		s.events.publish(EventTicketDone, ref.addr.String())
+		return QueueResult{}, nil
+	})
 }
 
 func recoveryResult(r QueueResult) recovery.Result {

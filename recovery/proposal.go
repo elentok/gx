@@ -51,6 +51,8 @@ func (c Call) Apply(v Verbs) (Result, error) {
 		return v.Park(c.Address, c.Reason)
 	case "relaunch":
 		return v.Relaunch(c.Address)
+	case "commitless-done":
+		return v.CommitlessDone(c.Address)
 	}
 	return Result{}, fmt.Errorf("unknown proposed verb %q", c.Verb)
 }
@@ -65,6 +67,11 @@ func (r *recorder) Park(address, reason string) (Result, error) {
 
 func (r *recorder) Relaunch(address string) (Result, error) {
 	r.calls = append(r.calls, Call{Verb: "relaunch", Address: address})
+	return Result{}, nil
+}
+
+func (r *recorder) CommitlessDone(address string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "commitless-done", Address: address})
 	return Result{}, nil
 }
 

@@ -16,6 +16,8 @@ type Executor string
 const (
 	ExecutorRule  Executor = "rule"
 	ExecutorAgent Executor = "agent"
+	// ExecutorPerson entries only escalate: neither a rule nor an agent may act.
+	ExecutorPerson Executor = "person"
 )
 
 type Authority string
@@ -33,6 +35,8 @@ type Event struct {
 	// Text is the iteration's last assistant text, set on the failure event
 	// only when the matcher's caller read the transcript.
 	Text string
+	// Reason is the event's reason as the run log recorded it.
+	Reason string
 }
 
 // Entry is one catalogued failure. It matches when the newest event in the
@@ -69,28 +73,57 @@ func Default() Catalog {
 	return Catalog{Enabled: true, Entries: append(entries, r3LandRecoverable()...)}
 }
 
-var claimsWorkPresentRE = regexp.MustCompile(`(?i)\balready (present|implemented|merged|landed|exists?|done|on the (feature )?branch)\b`)
+var (
+	claimsWorkPresentRE = regexp.MustCompile(`(?i)\balready (present|implemented|merged|landed|exists?|done|on the (feature )?branch)\b`)
+	landedElsewhereRE   = regexp.MustCompile(`(?i)\b(in|by|via|with|inside|as part of) (another|an? sibling|the sibling|sibling|an upstream|the upstream)\b`)
+	// lostCommitsRE is the reason of an ambiguous land whose iteration branch
+	// is gone, from reconcile and from the server's crashed-land verify.
+	lostCommitsRE = regexp.MustCompile(`no longer exists to recover them|cannot tell whether it landed: unrecoverable$`)
+)
 
 // r3LandRecoverable is work that is on the feature branch (or a recoverable
 // branch) but gx cannot attribute: a done ticket whose commits are missing, or
 // a zero-commit finish whose last turn claims the work is already present.
-// One catalogued failure with two signatures, so two entries sharing the ID
-// (a disable by ID covers both). An agent proves presence with verify and the
-// acceptance criteria before it lands a recoverable branch. Launches
-// disabled: there is no S0 event data showing it occurs yet.
+// One catalogued failure with several signatures, so entries sharing the ID
+// (a disable by ID covers all), most specific first. An agent proves presence
+// with verify and the acceptance criteria before it lands a recoverable
+// branch. Launches disabled: there is no S0 event data showing it occurs yet.
+//
+// Two branches never act unattended. Work that landed inside another ticket's
+// commits has no commit to attribute, so commitless-done is the only fix, and
+// a false one silently drops the ticket from the epic: high authority, so it
+// is proposed. Lost commits with no iteration branch only escalate: finding
+// their range is out of scope, and recovery must never invent one.
 func r3LandRecoverable() []Entry {
 	base := Entry{
 		ID: "R3", Executor: ExecutorAgent, Authority: AuthorityMedium,
 		Verbs: []string{"verify", "land"},
 	}
+	lost := Entry{
+		ID: "R3", Type: events.NeedsRepair, Kind: events.AmbiguousLand,
+		Predicate: func(seq []Event) bool { return lostCommitsRE.MatchString(seq[len(seq)-1].Reason) },
+		Executor:  ExecutorPerson, Authority: AuthorityHigh,
+	}
 	unrecoverable := base
 	unrecoverable.Type, unrecoverable.Kind = events.NeedsRepair, events.AmbiguousLand
+	elsewhere := Entry{
+		ID: "R3", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		Predicate: func(seq []Event) bool {
+			text := seq[len(seq)-1].Text
+			return claimsWorkPresentRE.MatchString(text) && landedElsewhereRE.MatchString(text)
+		},
+		Executor: ExecutorRule, Authority: AuthorityHigh, Verbs: []string{"commitless-done"},
+		Remedy: func(f Failure, v Verbs) error {
+			_, err := v.CommitlessDone(f.Address)
+			return err
+		},
+	}
 	claimed := base
 	claimed.Type, claimed.Kind = events.NeedsAnswer, events.ZeroCommit
 	claimed.Predicate = func(seq []Event) bool {
 		return claimsWorkPresentRE.MatchString(seq[len(seq)-1].Text)
 	}
-	return []Entry{unrecoverable, claimed}
+	return []Entry{lost, unrecoverable, elsewhere, claimed}
 }
 
 // r2UnexecutedToolCall is a zero-commit finish whose last assistant turn is only
