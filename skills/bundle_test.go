@@ -266,6 +266,16 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 	}
 }
 
+// TestInvestigateHasNoNudgeGrant pins that gx-investigate never nudges a pane
+// itself: the daemon's nudge verb owns that now, so a mention may only forbid it.
+func TestInvestigateHasNoNudgeGrant(t *testing.T) {
+	for line := range strings.SplitSeq(readFile(t, "gx-investigate/SKILL.md"), "\n") {
+		if strings.Contains(strings.ToLower(line), "nudge") && !strings.HasPrefix(line, "- never:") {
+			t.Errorf("gx-investigate/SKILL.md grants a nudge: %q", line)
+		}
+	}
+}
+
 // bundleMarkdownFiles is every markdown file in the bundle directory, not
 // just requiredFiles — a skill that isn't a required runtime file still
 // instructs an agent.

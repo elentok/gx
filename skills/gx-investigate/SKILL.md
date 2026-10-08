@@ -107,7 +107,7 @@ result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`
 (`land_locked`, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
 `commitless`, `land_conflict_pending`, …), never on `message`.
 
-**Go-ahead.** Every write (`land`, `reset`, `unpark`, `land --continue/--abort`, a nudge) needs the
+**Go-ahead.** Every write (`land`, `reset`, `unpark`, `land --continue/--abort`) needs the
 human's explicit go-ahead in this session. `verify` is read-only and always free. In attended mode
 this is the only rule; unattended mode is below.
 
@@ -164,19 +164,6 @@ explicit range; `land_conflict_pending` → resolve in the feature worktree, the
 **A live agent on the tab starts an investigation, not a stop.** `live_agent_on_tab` stands — don't
 use `--ignore-live-tab` to get past it. Read iteration status, the run log, the transcript and
 `gx tickets verify <epic> <id>` to answer _why it is not finishing_.
-
-**Interim pane nudge** (sunset: replaced by the auto-recovery effort's own remedy ticket; delete
-this rule then). gx stops nudging once the agent was seen "working", so an agent that wedges later
-gets nothing. You may send **one bare keypress** (never text — you must not answer for a human) only
-if all four hold:
-
-1. The human gave a go-ahead for the nudge.
-2. A live agent is on the tab and the ticket is not `needs-answer`.
-3. The pane shows no question or prompt that needs a human decision.
-4. Two pane reads, spaced apart, show identical output.
-
-Send it once, then re-observe. If still wedged, report; never repeat. A nudge writes no run-log
-event and no ticket note.
 
 **Report at the action, not in the write-up.** `land` and `reset` write their own run-log event
 (`manual-land`, `ticket-reset`). After a landing, add a `## Comments` note on the ticket: what you
