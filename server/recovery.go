@@ -42,7 +42,7 @@ func (s *Server) recoverFrom(f recovery.Failure) {
 		return
 	}
 	if needsJudgment {
-		s.recoverByInvestigating(ref, f)
+		s.recoverByInvestigating(ref, f, matchedEntryText(entry, matched))
 		return
 	}
 	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
@@ -155,8 +155,8 @@ func (s *Server) ticketApprove(req QueueRequest) (QueueResult, error) {
 
 // recoverByInvestigating is recovery for a failure that needs judgment. It
 // counts as an applied recovery, so the caps and the failed-recovery check see it.
-func (s *Server) recoverByInvestigating(ref ticketRef, f recovery.Failure) {
-	outcome, err := s.investigate(ref, f)
+func (s *Server) recoverByInvestigating(ref ticketRef, f recovery.Failure, entry string) {
+	outcome, err := s.investigate(ref, f, entry)
 	if err != nil {
 		s.log.Warn("recovery cannot create an investigate ticket", "ticket", f.Address, "err", err)
 		outcome = err.Error()

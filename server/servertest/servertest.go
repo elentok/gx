@@ -90,6 +90,7 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 type Prompt struct {
 	Address string // the ticket the skill prompt names
 	Cwd     string // the worktree the agent's tab was opened in
+	Text    string // the whole prompt, notes included
 }
 
 // RegisterLaunch answers the herdr commands a launch makes, giving each tab its
@@ -130,8 +131,9 @@ func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
 		mu.Lock()
 		cwd := cwds[pane]
 		mu.Unlock()
-		_, addr, _ := strings.Cut(text, " ")
-		agent(Prompt{Address: addr, Cwd: cwd})
+		_, rest, _ := strings.Cut(text, " ")
+		addr, _, _ := strings.Cut(rest, "\n")
+		agent(Prompt{Address: addr, Cwd: cwd, Text: text})
 		return reply(pane), herdrfake.Identities{}, nil
 	})
 }

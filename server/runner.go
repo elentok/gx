@@ -464,6 +464,9 @@ func retargetIfLanded(ref, def string, isAncestor func(ancestor, descendant stri
 // commitlessRef is the ref a commitless ticket's detached worktree starts at:
 // where its blockers resolve to.
 func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (string, error) {
+	if ref, ok := investigateRef(repo, addr, t, epics); ok && t.Type == string(schema.TypeInvestigate) {
+		return ref, nil
+	}
 	ref, err := s.rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
 	if err != nil {
 		return "", err
@@ -488,7 +491,7 @@ func (s *Server) prepareAndLaunch(
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	run, err := s.launch(ticket, launchSkill(one.Ticket), ws, wt.Path, one.Agent)
+	run, err := s.launch(ticket, launchSkill(one.Ticket), investigatePrompt(one.Ticket), ws, wt.Path, one.Agent)
 	if err != nil {
 		if derr := mode.discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
@@ -620,7 +623,11 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), nil
 }
 
-func (s *Server) launch(ticket tickets.Address, skill, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
+func (s *Server) launch(ticket tickets.Address, skill, note, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
+	prompt := ralphloop.SkillPrompt(agent, skill, ticket.String())
+	if note != "" {
+		prompt += "\n\n" + note
+	}
 	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticket.String(), Env: s.cfg.TabEnv})
 	if err != nil {
 		return Run{}, err
@@ -640,7 +647,7 @@ func (s *Server) launch(ticket tickets.Address, skill, ws, cwd string, agent ral
 	}
 	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{
 		Target: tab.RootPaneID,
-		Text:   ralphloop.SkillPrompt(agent, skill, ticket.String()),
+		Text:   prompt,
 		Wait:   true,
 		Until:  []string{"working"},
 	}); err != nil {

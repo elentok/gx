@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -21,10 +22,24 @@ type iterationMode struct {
 
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	m := iterationMode{commitless: addr.Project == ScratchProject || schema.TicketType(t.Type) == schema.TypePrompt || schema.TicketType(t.Type) == schema.TypeInvestigate}
-	if m.commitless && addr.Project == ScratchProject {
+	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}
 	return m
+}
+
+// investigatesWithoutVCS: an investigate ticket in a vcs: none project has no
+// repository to check out, so it runs in a scratch subdir.
+func (s *Server) investigatesWithoutVCS(addr tickets.Address, t tickets.Ticket) bool {
+	if t.Type != string(schema.TypeInvestigate) {
+		return false
+	}
+	dir, err := s.projectDir(addr.Project)
+	if err != nil {
+		return false
+	}
+	pf, _ := config.ReadProjectFile(dir)
+	return pf.VCS != nil && *pf.VCS == config.VCSNone
 }
 
 func (m iterationMode) prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
