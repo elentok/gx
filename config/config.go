@@ -78,7 +78,13 @@ type RecoveryConfig struct {
 	// FollowUps is the epic (project:epic) that receives the draft research
 	// tickets an investigate ticket's report files. Empty means the default.
 	FollowUps string `json:"follow-ups,omitempty"`
+	// NotifyHold is how long a park's chat message waits for recovery before
+	// it is sent anyway.
+	NotifyHold time.Duration `json:"-"`
 }
+
+// DefaultRecoveryNotifyHold is the NotifyHold when none is configured.
+const DefaultRecoveryNotifyHold = 10 * time.Minute
 
 // ServerConfig configures the orchestrator server.
 type ServerConfig struct {
@@ -113,7 +119,7 @@ func Default() Config {
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
 		Orchestrator:          OrchestratorInProcess,
-		Recovery:              RecoveryConfig{Enabled: true},
+		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 	}
 }
 
@@ -199,9 +205,10 @@ func Load() (Config, error) {
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
 		} `json:"server"`
 		Recovery *struct {
-			Enabled  *bool    `json:"enabled"`
-			Disabled  []string `json:"disabled"`
-			FollowUps *string  `json:"follow-ups"`
+			Enabled    *bool    `json:"enabled"`
+			Disabled   []string `json:"disabled"`
+			FollowUps  *string  `json:"follow-ups"`
+			NotifyHold *string  `json:"notify-hold"`
 		} `json:"recovery"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -323,6 +330,11 @@ func Load() (Config, error) {
 		}
 		if raw.Recovery.FollowUps != nil {
 			cfg.Recovery.FollowUps = *raw.Recovery.FollowUps
+		}
+		if raw.Recovery.NotifyHold != nil {
+			if d, err := time.ParseDuration(*raw.Recovery.NotifyHold); err == nil && d > 0 {
+				cfg.Recovery.NotifyHold = d
+			}
 		}
 	}
 	if raw.Orchestrator != nil {

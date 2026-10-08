@@ -149,6 +149,7 @@ func runServer(ctx context.Context) error {
 		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
 		Recovery:                  recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
 		FollowUps:                 cfg.Recovery.FollowUps,
+		RecoveryNotifyHold:        cfg.Recovery.NotifyHold,
 		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
 		StoreCommitDebounce:       time.Duration(cfg.TicketStore.CommitDebounce) * time.Second, StorePushRemote: cfg.TicketStore.PushRemote,
 		Chat: ralphloop.ServerChatConfig{

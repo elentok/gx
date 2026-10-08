@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"path/filepath"
 	"time"
 
 	"github.com/elentok/gx/events"
@@ -66,3 +67,14 @@ func (s *Server) RecordSpend(key string, cost float64) { s.ledger.record("", key
 func (s *Server) PutRunAt(root string, r Run, at time.Time) {
 	s.registry.put(trackedRun{Run: r, Root: root, StartedAt: at})
 }
+
+// ParkTicket parks a ticket the way a failed iteration does: the write, the
+// event, then the chat message (or its hold while recovery runs).
+func (s *Server) ParkTicket(project, epic, id string, kind events.Kind, reason string) error {
+	dir := filepath.Join(s.cfg.TicketStore, project)
+	path := filepath.Join(dir, epic, "issues", id+"-first.md")
+	return s.parkTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason)
+}
+
+// RecoveredCount is recoveredCount for tests.
+func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }

@@ -5,44 +5,76 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+// recoveryPlan is the recovery a failure gets: a catalog entry, an
+// investigation, or a proposal awaiting approval.
+type recoveryPlan struct {
+	ref     ticketRef
+	log     []ralphloop.Event
+	entry   recovery.Entry
+	matched bool
+}
+
+// needsJudgment reports whether the failure goes to an investigation rather
+// than a rule entry.
+func (p recoveryPlan) needsJudgment() bool {
+	return !p.matched || p.entry.Executor == recovery.ExecutorAgent
+}
+
+// runsRemedy reports whether a rule remedy will run unattended, so the park's
+// chat message can wait for its outcome.
+func (p recoveryPlan) runsRemedy(f recovery.Failure) bool {
+	return !p.needsJudgment() && p.entry.Runnable(f) && guardRailStop(p.log, f) == ""
+}
+
+// planRecovery reports the recovery a failure would get, if any.
+func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
+	if !s.cfg.Recovery.Enabled || !f.Triggers() {
+		return recoveryPlan{}, false
+	}
+	ref, ok, err := s.findTicket(f.Address)
+	// An investigate ticket's own failure is a person's to handle, never another
+	// investigation: recovery must not recurse.
+	if err != nil || !ok || ref.ticket.NoRecover || ref.ticket.Type == string(schema.TypeInvestigate) {
+		return recoveryPlan{}, false
+	}
+	log := s.ticketEvents(ref, f)
+	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
+	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
+	if f.DiagnosisOnly() || (!plan.needsJudgment() && !(entry.Runnable(f) || entry.Proposable(f))) {
+		return recoveryPlan{}, false
+	}
+	return plan, true
+}
 
 // recoverAsync starts recovery for a failure that is already written. It runs
 // off the caller's goroutine: a remedy calls the same verbs the caller may be
 // inside of (claim, land), which would otherwise wait on themselves.
 func (s *Server) recoverAsync(f recovery.Failure) {
-	if !s.cfg.Recovery.Enabled || !f.Triggers() {
-		return
+	if plan, ok := s.planRecovery(f); ok {
+		go s.recoverFrom(plan, f)
 	}
-	go s.recoverFrom(f)
 }
 
-// recoverFrom matches the failure against the catalog and, for a rule entry,
-// runs its remedy through the server's own verbs. Failures to record are
-// logged, never fatal: recovery is best effort on top of a park that stands.
-func (s *Server) recoverFrom(f recovery.Failure) {
-	ref, ok, err := s.findTicket(f.Address)
-	// An investigate ticket's own failure is a person's to handle, never another
-	// investigation: recovery must not recurse.
-	if err != nil || !ok || ref.ticket.NoRecover || ref.ticket.Type == string(schema.TypeInvestigate) {
-		return
-	}
-	log := s.ticketEvents(ref, f)
-	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
-	needsJudgment := !matched || entry.Executor == recovery.ExecutorAgent
-	if f.DiagnosisOnly() || (!needsJudgment && !(entry.Runnable(f) || entry.Proposable(f))) {
-		return
-	}
-	if why := guardRailStop(log, f); why != "" {
+// recoverFrom runs the planned recovery through the server's own verbs.
+// Failures to record are logged, never fatal: recovery is best effort on top
+// of a park that stands. A failed remedy releases the held park message
+// naming the entry; a successful one drops it.
+func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
+	ref, entry := plan.ref, plan.entry
+	if why := guardRailStop(plan.log, f); why != "" {
 		s.recordRecovery(ref, events.RecoveryEscalated, f, why, "")
 		return
 	}
-	if needsJudgment {
-		s.recoverByInvestigating(ref, f, matchedEntryText(entry, matched))
+	if plan.needsJudgment() {
+		s.recoverByInvestigating(ref, f, matchedEntryText(entry, plan.matched))
 		return
 	}
 	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
@@ -56,6 +88,43 @@ func (s *Server) recoverFrom(f recovery.Failure) {
 		outcome = err.Error()
 	}
 	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID, outcome)
+	if s.parkHold.take(f.Address) && outcome != "ok" {
+		s.notifyPark(ref.addr, ref.ticket.Path, f.Kind, fmt.Sprintf("%s (recovery %s failed: %s)", f.Reason, entry.ID, outcome))
+	}
+}
+
+// holdParkForRecovery starts whatever recovery the park gets and, when a rule
+// remedy will run unattended, keeps back the park's chat message for it. It
+// reports false when nothing is held: the caller then notifies at once.
+func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
+	f := recovery.Failure{Address: addr.String(), Type: kind.ParkType(), Kind: kind, Reason: reason}
+	plan, ok := s.planRecovery(f)
+	if !ok {
+		return false
+	}
+	if !plan.runsRemedy(f) {
+		go s.recoverFrom(plan, f)
+		return false
+	}
+	hold := s.cfg.RecoveryNotifyHold
+	if hold <= 0 {
+		hold = config.DefaultRecoveryNotifyHold
+	}
+	s.parkHold.hold(f.Address, hold, func() { s.notifyPark(addr, ticketPath, kind, reason) })
+	go s.recoverFrom(plan, f)
+	return true
+}
+
+// recoveredCount is how many remedies in the epic's run log ended ok.
+func recoveredCount(projectDir, epic string) int {
+	log, _, _ := ralphloop.ReadEvents(projectDir, epic)
+	n := 0
+	for _, ev := range log {
+		if events.Type(ev.Type) == events.RecoveryApplied && ev.Outcome == "ok" {
+			n++
+		}
+	}
+	return n
 }
 
 // Refusal reasons of approve.

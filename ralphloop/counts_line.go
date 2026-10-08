@@ -25,6 +25,9 @@ type EpicCounts struct {
 	Blocked           int
 	Ready             int
 	Total             int
+	// Recovered is how many parks recovery fixed without a person; only the
+	// server fills it, for the epic-complete summary.
+	Recovered int
 }
 
 // Counts tallies epic's tickets into EpicCounts, restricted to s's

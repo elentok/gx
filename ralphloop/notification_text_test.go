@@ -227,3 +227,12 @@ func TestTelegramStyle_OverflowParkedIdentifiersEscapesPlus(t *testing.T) {
 		}
 	})
 }
+
+func TestEpicCompleteText_CountsRecoveredParksOnlyWhenThereAre(t *testing.T) {
+	if got := slackStyle.epicCompleteText("e", EpicCounts{}, 1, 10, 0).String(); strings.Contains(got, "recovered") {
+		t.Errorf("no recoveries but text says so: %s", got)
+	}
+	if got := slackStyle.epicCompleteText("e", EpicCounts{Recovered: 2}, 1, 10, 0).String(); !strings.Contains(got, "2 recovered automatically") {
+		t.Errorf("text lacks the recovered count: %s", got)
+	}
+}

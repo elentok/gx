@@ -591,7 +591,9 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		s.events.publish(EventRootCompleted, root.String())
 		if s.chat != nil {
 			elapsed, cost := ralphloop.EpicTotals(e)
-			s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, ralphloop.CountsOf(e), elapsed, cost)
+			counts := ralphloop.CountsOf(e)
+			counts.Recovered = recoveredCount(dir, one.Epic)
+			s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, counts, elapsed, cost)
 		}
 	}
 }

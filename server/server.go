@@ -85,6 +85,9 @@ type Config struct {
 	// FollowUps is config recovery.follow-ups: the project:epic that receives
 	// an investigate report's draft follow-ups. Empty means DefaultFollowUps.
 	FollowUps string
+	// RecoveryNotifyHold is how long a park's chat message waits for recovery
+	// before it is sent anyway; zero means config.DefaultRecoveryNotifyHold.
+	RecoveryNotifyHold time.Duration
 
 	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
 	// which runs only when Orchestrator is "server". A zero debounce means 60s.
@@ -137,6 +140,7 @@ type Server struct {
 	events      *broker
 	herdr       herdrWatch
 	parkFold    parkFold
+	parkHold    recoveryHold
 	rewatch     func() // set by keepFresh when the watch is active
 
 	chat        *ralphloop.ServerChat // nil when no chat destination is configured
