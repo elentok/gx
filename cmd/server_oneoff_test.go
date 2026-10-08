@@ -60,6 +60,55 @@ func TestServerOneOff_DuplicateWithoutWaitStillExitsSeven(t *testing.T) {
 	}
 }
 
+func TestServerOneOff_JSONDuplicateWithoutWaitExitsSeven(t *testing.T) {
+	cl := dupServer(t, "claimed")
+	var out, errOut bytes.Buffer
+	err := runServerOneOff(context.Background(), cl, &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != exitDuplicateLive {
+		t.Fatalf("err = %v; want exit code 7", err)
+	}
+	if !json.Valid(out.Bytes()) {
+		t.Errorf("stdout = %q; want pure JSON", out.String())
+	}
+}
+
+func TestServerOneOff_JSONDuplicateWaitFollowsExistingTicket(t *testing.T) {
+	cl := dupServer(t, "needs-answer")
+	var out, errOut bytes.Buffer
+	err := runServerOneOff(context.Background(), cl, &out, &errOut, true, true, 0, server.OneOffRequest{Prompt: "x"})
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != 3 {
+		t.Fatalf("err = %v; want exit code 3 from the existing ticket", err)
+	}
+	if !json.Valid(out.Bytes()) {
+		t.Errorf("stdout = %q; want pure JSON", out.String())
+	}
+}
+
+func TestServerOneOff_JSONOtherRefusalFails(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(server.OneOffResult{Refused: true, Reason: "bad-agent", Message: "no such agent"})
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	var out, errOut bytes.Buffer
+	err = runServerOneOff(context.Background(), apiclient.New(sock), &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
+	if err == nil {
+		t.Fatal("err = nil; want a refusal failure")
+	}
+	if !json.Valid(out.Bytes()) {
+		t.Errorf("stdout = %q; want pure JSON", out.String())
+	}
+}
+
 func TestServerOneOff_ExitsEightWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out, errOut bytes.Buffer

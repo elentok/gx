@@ -86,44 +86,49 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 	case err != nil:
 		return fmt.Errorf("server write failed: %w", err)
 	}
-	down := res.Refused && res.Reason == server.ReasonServerNotRunning
-	dup := res.Refused && res.Reason == server.ReasonDuplicateLive
+	d := decideOneOff(res, wait)
+	if d.notice != "" {
+		fmt.Fprintln(errW, d.notice)
+	}
+	resultW := w
 	if jsonOut {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(res); err != nil {
 			return err
 		}
-		if down {
-			return &ExitError{Code: exitServerNotRunning}
-		}
-		if wait && (!res.Refused || dup) {
-			if dup {
-				fmt.Fprintf(errW, "duplicate: waiting on %s\n", res.Address)
-			}
-			// stdout stays pure JSON, so the Result is not printed.
-			return runOneOffWait(ctx, cl, io.Discard, errW, res.Address, timeout)
-		}
-		return nil
-	}
-	if down {
-		fmt.Fprintf(errW, "refused (%s): %s\n", res.Reason, res.Message)
-		return &ExitError{Code: exitServerNotRunning}
-	}
-	if dup {
+		// stdout stays pure JSON, so the waited Result is not printed.
+		resultW = io.Discard
+	} else if d.printAddress {
 		fmt.Fprintln(w, res.Address)
-		if wait {
-			fmt.Fprintf(errW, "duplicate: waiting on %s\n", res.Address)
-			return runOneOffWait(ctx, cl, w, errW, res.Address, timeout)
-		}
-		fmt.Fprintf(errW, "refused (%s): %s\n", res.Reason, res.Message)
-		return &ExitError{Code: exitDuplicateLive}
 	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	if d.err != nil || !d.follow {
+		return d.err
 	}
-	if _, err = fmt.Fprintln(w, res.Address); err != nil || !wait {
-		return err
+	return runOneOffWait(ctx, cl, resultW, errW, res.Address, timeout)
+}
+
+// oneOffDecision is what a submit result means for the process, independent of
+// how the result is rendered.
+type oneOffDecision struct {
+	err          error  // non-nil: the command fails with it, nothing is waited on
+	notice       string // stderr line, if any
+	follow       bool   // wait on res.Address
+	printAddress bool   // text mode prints the address on stdout
+}
+
+func decideOneOff(res server.OneOffResult, wait bool) oneOffDecision {
+	refusal := fmt.Sprintf("refused (%s): %s", res.Reason, res.Message)
+	switch {
+	case !res.Refused:
+		return oneOffDecision{follow: wait, printAddress: true}
+	case res.Reason == server.ReasonServerNotRunning:
+		return oneOffDecision{err: &ExitError{Code: exitServerNotRunning}, notice: refusal}
+	case res.Reason == server.ReasonDuplicateLive && wait:
+		return oneOffDecision{follow: true, printAddress: true, notice: "duplicate: waiting on " + res.Address}
+	case res.Reason == server.ReasonDuplicateLive:
+		return oneOffDecision{err: &ExitError{Code: exitDuplicateLive}, notice: refusal, printAddress: true}
+	default:
+		return oneOffDecision{err: errors.New(refusal)}
 	}
-	return runOneOffWait(ctx, cl, w, errW, res.Address, timeout)
 }
