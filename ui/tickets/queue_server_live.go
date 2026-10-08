@@ -14,30 +14,24 @@ import (
 // It fills runningEpics and live so the header, row spinners and timers behave
 // as they do for an in-process run, and returns the spinner tick when the tab
 // goes from idle to running. A ticket's timer counts from the server's claim
-// time; a server that sent none (an older build) falls back to the first load
-// that saw the ticket claimed.
+// time; a claimed ticket the server has no run for is not counted as running.
 func (m *QueueModel) syncServerRunState() tea.Cmd {
 	wasRunning := len(m.runningEpics) > 0
 	if m.runningEpics == nil {
 		m.runningEpics = map[string]bool{}
-	}
-	if m.serverClaimSeen == nil {
-		m.serverClaimSeen = map[string]time.Time{}
 	}
 	live := map[string]map[string]liveTicketState{}
 	running := map[string]bool{}
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
 			if epic.RenderedStatus(t) != gxtickets.StatusClaimed {
-				delete(m.serverClaimSeen, t.Path)
 				continue
 			}
+			// No claim time means the server holds no run for it: a person
+			// claimed it (a grilling session, say), so nothing is implementing.
 			seen, ok := m.serverClaimedAt[t.Path]
-			if !ok {
-				if seen, ok = m.serverClaimSeen[t.Path]; !ok {
-					seen = time.Now()
-					m.serverClaimSeen[t.Path] = seen
-				}
+			if !ok || seen.IsZero() {
+				continue
 			}
 			if live[epic.Name] == nil {
 				live[epic.Name] = map[string]liveTicketState{}

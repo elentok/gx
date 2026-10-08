@@ -55,11 +55,8 @@ type QueueModel struct {
 	live map[string]map[string]liveTicketState
 	// serverClaimedAt and herdrDown come from the last server load: the claim
 	// time of each running ticket, and whether the server can launch agents.
-	serverClaimedAt map[string]time.Time
-	herdrDown       bool
-	// serverClaimSeen is when this tab first saw each ticket claimed (keyed by
-	// address), server mode only; see syncServerRunState.
-	serverClaimSeen  map[string]time.Time
+	serverClaimedAt  map[string]time.Time
+	herdrDown        bool
 	implementSpinner spinner.Model
 
 	width, height int

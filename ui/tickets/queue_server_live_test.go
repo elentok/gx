@@ -15,7 +15,11 @@ import (
 
 func loadedServerQueue(t *testing.T, status string) (QueueModel, tea.Cmd) {
 	t.Helper()
-	return loadedServerQueueWith(t, status, time.Time{}, false)
+	claimedAt := time.Time{}
+	if status == "claimed" {
+		claimedAt = time.Now()
+	}
+	return loadedServerQueueWith(t, status, claimedAt, false)
 }
 
 func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, herdrDown bool) (QueueModel, tea.Cmd) {
@@ -103,5 +107,16 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 	body := strings.Join(m.queueHeaderBodyLines(), "\n")
 	if !strings.Contains(body, "herdr unavailable") {
 		t.Errorf("header body %q does not say herdr is unavailable", body)
+	}
+}
+
+func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) {
+	m, _ := loadedServerQueueWith(t, "claimed", time.Time{}, false)
+
+	if len(m.runningEpics) != 0 {
+		t.Errorf("runningEpics = %v, want none: the server has no run for the claimed ticket", m.runningEpics)
+	}
+	if got := m.queueRunState(); got != queueRunIdle {
+		t.Errorf("queueRunState = %v, want idle", got)
 	}
 }
