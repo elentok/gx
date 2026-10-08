@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/transcript"
 )
 
 type Executor string
@@ -28,6 +29,9 @@ const (
 type Event struct {
 	Type events.Type
 	Kind events.Kind
+	// Text is the iteration's last assistant text, set on the failure event
+	// only when the matcher's caller read the transcript.
+	Text string
 }
 
 // Entry is one catalogued failure. It matches when the newest event in the
@@ -60,7 +64,22 @@ var NotCatalogued = map[string]string{
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
 // they land.
 func Default() Catalog {
-	return Catalog{Enabled: true, Entries: []Entry{r1Spin()}}
+	return Catalog{Enabled: true, Entries: []Entry{r1Spin(), r2UnexecutedToolCall()}}
+}
+
+// r2UnexecutedToolCall is a zero-commit finish whose last assistant turn is only
+// a call literal. Telling that from a real answer needs the transcript, so an
+// agent investigates; the verbs are the whole grant (one corrective nudge, then
+// one finish-wait, both done by relaunching the iteration). Launches disabled:
+// there is no S0 event data showing it occurs yet.
+func r2UnexecutedToolCall() Entry {
+	return Entry{
+		ID: "R2", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		Predicate: func(seq []Event) bool {
+			return transcript.LooksLikeUnexecutedToolCall(seq[len(seq)-1].Text)
+		},
+		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"relaunch"},
+	}
 }
 
 // r1Spin records a park/re-claim spin. The S0 spinning park already carries

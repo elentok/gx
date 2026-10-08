@@ -153,5 +153,11 @@ func ReadUnexecutedToolCall(path string) (bool, error) {
 	if last.Type != "text" {
 		return false, nil
 	}
-	return unexecutedToolCallShapeRE.MatchString(strings.TrimSpace(last.Text)), nil
+	return LooksLikeUnexecutedToolCall(last.Text), nil
+}
+
+// LooksLikeUnexecutedToolCall reports whether assistant text reads like a bare
+// call literal rather than an answer.
+func LooksLikeUnexecutedToolCall(text string) bool {
+	return unexecutedToolCallShapeRE.MatchString(strings.TrimSpace(text))
 }

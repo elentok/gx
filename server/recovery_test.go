@@ -370,6 +370,37 @@ func TestRecovery_UnmatchedParkForksAQueuedInvestigateChildAndNeverRecurses(t *t
 	}
 }
 
+// R2 launches disabled, so a zero-commit park falls through to an investigate
+// fork with no R2 event: nothing is applied or proposed on R2's behalf.
+func TestRecovery_ZeroCommitParkWithR2DisabledInvestigatesWithoutR2Events(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+	})
+	registerLaunch(h)
+
+	if err := h.Server.ParkAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		for _, tk := range epicTickets(t, h).Tickets {
+			if tk.Identifier == "01a" && tk.Type == "investigate" {
+				return true
+			}
+		}
+		return false
+	})
+	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	for _, ev := range log {
+		if ev.Reason == "R2" {
+			t.Errorf("unexpected %s event for disabled R2", ev.Type)
+		}
+	}
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

@@ -88,6 +88,53 @@ func TestDefaultR1IsAnEnabledLowRuleThatNeverNudges(t *testing.T) {
 	}
 }
 
+func TestDefaultR2LaunchesDisabledAsAnAgentEntry(t *testing.T) {
+	c := Default()
+	for _, e := range c.Entries {
+		if e.ID != "R2" {
+			continue
+		}
+		if e.Enabled || e.Executor != ExecutorAgent || e.Authority != AuthorityMedium {
+			t.Errorf("R2 = %+v, want disabled medium agent entry", e)
+		}
+		if _, ok := c.Match([]Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Bash({"}}); ok {
+			t.Error("disabled R2 must not match")
+		}
+		return
+	}
+	t.Fatal("no R2 in the default catalog")
+}
+
+func TestR2MatchesOnlyAZeroCommitEndingInABareCallLiteral(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"bare call literal", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Bash({\n  command: \"ls\"\n})"}}, true},
+		{"surrounding whitespace", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "\n  Agent({ prompt: \"x\" })\n"}}, true},
+		{"fenced literal", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "```\nBash({})\n```"}}, false},
+		{"prose mentioning a call", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "I would run Bash({ command }) next."}}, false},
+		{"plain answer", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Done."}}, false},
+		{"no text", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit}}, false},
+		{"call literal on another kind", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane, Text: "Bash({})"}}, false},
+		{"call literal on another type", []Event{{Type: events.NeedsRepair, Kind: events.ZeroCommit, Text: "Bash({})"}}, false},
+		{"literal only on an earlier event", []Event{{Type: events.IterationStarted, Text: "Bash({})"}, {Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Done."}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R2") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")
