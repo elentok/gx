@@ -91,7 +91,8 @@ const (
 	TypeGrilling  TicketType = "grilling"
 	TypePrototype TicketType = "prototype"
 	TypeImplement TicketType = "implement"
-	// TypeTask is the legacy spelling of TypeImplement, accepted until cutover.
+	// TypeTask is the retired spelling of TypeImplement: Validate rejects it,
+	// and only `gx tickets migrate` still reads it, to rewrite it.
 	TypeTask       TicketType = "task"
 	TypeCodeReview TicketType = "code-review"
 	// TypeConflictResolution is system-generated only: gx forks one as a
@@ -112,7 +113,6 @@ var validTypes = map[TicketType]bool{
 	TypeGrilling:           true,
 	TypePrototype:          true,
 	TypeImplement:          true,
-	TypeTask:               true,
 	TypeCodeReview:         true,
 	TypeConflictResolution: true,
 	TypePrompt:             true,
@@ -263,7 +263,7 @@ type MuteRecord struct {
 // so the same landed-commit verification doesn't apply to it either.
 // TypePrototype is deliberately excluded: a prototype can legitimately land
 // a real spike/scaffold commit as its actual output, so it stays on the
-// crash-recovery path like TypeTask unless explicitly flagged.
+// crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
 	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate
 }
@@ -285,7 +285,9 @@ func Validate(t Ticket) error {
 			errs = append(errs, fmt.Errorf("status: invalid status %q", t.Status))
 		}
 	}
-	if !t.Type.Valid() {
+	if t.Type == TypeTask {
+		errs = append(errs, fmt.Errorf("type: %q was renamed to %q, run `gx tickets migrate`", t.Type, TypeImplement))
+	} else if !t.Type.Valid() {
 		errs = append(errs, fmt.Errorf("type: invalid type %q", t.Type))
 	}
 	if t.ExpectedContextWindow < 0 {

@@ -39,7 +39,7 @@ type CleanupScanResult struct {
 	Epics        []EpicScan       `json:"epics"`
 	Worktrees    []WorktreeScan   `json:"worktrees"`
 	Housekeeping HousekeepingScan `json:"housekeeping"`
-	// AtticRefs lists branches `gx tickets reset` set aside. Report-only: nothing
+	// AtticRefs lists branches `gx server tickets reset` set aside. Report-only: nothing
 	// in gx prunes them, and scan must never learn to.
 	AtticRefs []string `json:"attic_refs"`
 }

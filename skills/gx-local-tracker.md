@@ -184,8 +184,8 @@ Orchestration changes a person may need go through server verbs, each with a `--
 `{"refused":true,"reason":…}` refusal: `gx server tickets park | cancel | relaunch`,
 `gx server queue add | remove | replace | move`, and read verbs such as
 `gx server tickets explain <addr>` ("why isn't this running") and `history <addr>`. The repair verbs
-`gx tickets land | reset | unpark | verify` still work but are hidden, deprecated aliases. If the
-server is down, only the four repair verbs run directly; every other server verb refuses
+are `gx server tickets land | reset | unpark | verify`. If the server is down, only these four run
+directly; every other server verb refuses
 `server-not-running`.
 
 ## Map epics

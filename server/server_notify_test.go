@@ -241,8 +241,8 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 		}
 		return path
 	}
-	landed := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeTask})
-	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeTask})
+	landed := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement})
+	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeImplement})
 	oneOff := write("cron", oneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
 
 	s.notifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)

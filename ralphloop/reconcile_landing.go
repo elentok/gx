@@ -115,7 +115,7 @@ func recordInterruptedLanding(d Deps, rp reconcileParams, epic tickets.Epic, own
 }
 
 // withLandLock runs land holding the epic's land lock, the same lock the
-// land-queue worker and `gx tickets land` take, recording the pre-pick HEAD
+// land-queue worker and `gx server tickets land` take, recording the pre-pick HEAD
 // so a landing cut short can be finished on restart.
 func withLandLock(d Deps, p iterationParams, land func() error) error {
 	lockDir, err := landLockDir(p.ScratchDir, p.FeatureBranch)

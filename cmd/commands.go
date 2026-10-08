@@ -255,12 +255,6 @@ func newTicketsCmd(d deps) *cobra.Command {
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
 	cmd.AddCommand(showCmd)
 	cmd.AddCommand(newTicketsSetCmd(d))
-	cmd.AddCommand(
-		deprecatedRepairAlias(newTicketsUnparkCmd(d)),
-		deprecatedRepairAlias(newTicketsVerifyCmd(d)),
-		deprecatedRepairAlias(newTicketsLandCmd(d)),
-		deprecatedRepairAlias(newTicketsResetCmd(d)),
-	)
 	var migrateToStore, migrateDryRun bool
 	var migrateProject string
 	migrateCmd := &cobra.Command{

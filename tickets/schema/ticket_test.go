@@ -1,21 +1,26 @@
 package schema
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestStatus_DraftIsValid(t *testing.T) {
 	if !StatusDraft.Valid() {
 		t.Error("draft is not accepted as a status")
 	}
-	if err := Validate(Ticket{ID: "01", Status: StatusDraft, Type: TypeTask}); err != nil {
+	if err := Validate(Ticket{ID: "01", Status: StatusDraft, Type: TypeImplement}); err != nil {
 		t.Errorf("Validate() = %v, want nil for a draft ticket", err)
 	}
 }
 
-func TestType_ImplementAndTaskAliasAreValid(t *testing.T) {
-	for _, ty := range []TicketType{TypeImplement, TypeTask} {
-		if err := Validate(Ticket{ID: "01", Status: StatusDraft, Type: ty}); err != nil {
-			t.Errorf("Validate(type %q) = %v, want nil", ty, err)
-		}
+func TestType_LegacyTaskIsRejectedWithMigrateHint(t *testing.T) {
+	err := Validate(Ticket{ID: "01", Status: StatusDraft, Type: TypeTask})
+	if err == nil {
+		t.Fatal("Validate(type task) = nil, want an error")
+	}
+	if !strings.Contains(err.Error(), `"implement"`) || !strings.Contains(err.Error(), "gx tickets migrate") {
+		t.Errorf("Validate(type task) = %v, want a pointer to implement and migrate", err)
 	}
 }
 
@@ -24,7 +29,7 @@ func validTicket() Ticket {
 		ID:                    "04b",
 		Status:                StatusOpen,
 		BlockedBy:             []TicketID{"01", "03"},
-		Type:                  TypeTask,
+		Type:                  TypeImplement,
 		ExpectedContextWindow: 20000,
 		ActualContextWindow:   45230,
 		ElapsedTime:           3612,
@@ -45,8 +50,8 @@ func TestIsCommitless(t *testing.T) {
 		tk   Ticket
 		want bool
 	}{
-		{"task, no flag", Ticket{Type: TypeTask}, false},
-		{"task, flagged", Ticket{Type: TypeTask, Commitless: true}, true},
+		{"implement, no flag", Ticket{Type: TypeImplement}, false},
+		{"implement, flagged", Ticket{Type: TypeImplement, Commitless: true}, true},
 		{"grilling, no flag", Ticket{Type: TypeGrilling}, true},
 		{"prototype, no flag", Ticket{Type: TypePrototype}, false},
 		{"prototype, flagged", Ticket{Type: TypePrototype, Commitless: true}, true},

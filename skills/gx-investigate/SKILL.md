@@ -102,7 +102,7 @@ to gotchas.md yourself. Don't re-explain what the linked commit/ticket already d
 ## Recovering a stuck ticket
 
 Charter: **never edits _product_ code — may repair ralph-loop state.** The repair tools are
-`gx tickets land | verify | reset | unpark`. All four share one `--json` contract: exit 0 with the
+`gx server tickets land | verify | reset | unpark`. All four share one `--json` contract: exit 0 with the
 result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`. Branch on `reason`
 (`land_locked`, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
 `commitless`, `land_conflict_pending`, …), never on `message`.
@@ -148,11 +148,11 @@ exactly as before.
 
 - `needs-answer` → never land or reset. Route to answer-then-unpark: the human answers in
   `## Needs Answer` (`m` menu → "Answer…", or "Answer in pane" if the pane is live), then
-  `gx tickets unpark <epic> <id>` (or `m` → "Resume (I answered)").
+  `gx server tickets unpark <project:epic/NN>` (or `m` → "Resume (I answered)").
 - `claimed` / `needs-repair` (`land` also accepts `done`; `reset` needs `--force` for `done`):
-  - Complete → `gx tickets land <epic> <id> --json`. Commits already landed with a stale status is
-    the common case; `land` just writes `status: done`.
-  - Incomplete → `gx tickets reset <epic> <id> --reason "<why>" --json`. The branch is kept under
+  - Complete → `gx server tickets land <project:epic/NN> --json`. Commits already landed with a
+    stale status is the common case; `land` just writes `status: done`.
+  - Incomplete → `gx server tickets reset <project:epic/NN> --reason "<why>" --json`. The branch is kept under
     `ralph-loop/attic/`; the reason is written to Comments as unverified partial work.
 - `draft` / `open` → nothing ran; neither ending applies.
 
@@ -164,7 +164,7 @@ explicit range; `land_conflict_pending` → resolve in the feature worktree, the
 
 **A live agent on the tab starts an investigation, not a stop.** `live_agent_on_tab` stands — don't
 use `--ignore-live-tab` to get past it. Read iteration status, the run log, the transcript and
-`gx tickets verify <epic> <id>` to answer _why it is not finishing_.
+`gx server tickets verify <project:epic/NN>` to answer _why it is not finishing_.
 
 **Report at the action, not in the write-up.** `land` and `reset` write their own run-log event
 (`manual-land`, `ticket-reset`). After a landing, add a `## Comments` note on the ticket: what you

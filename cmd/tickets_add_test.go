@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -29,7 +30,7 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	}
 
 	wantPath := filepath.Join(issuesDir, "04-do-fourth-thing.md")
-	if got, want := strings.TrimSpace(stdout.String()), epicTicketLabel(epicPath, "04"); got != want {
+	if got, want := strings.TrimSpace(stdout.String()), repair.EpicTicketLabel(epicPath, "04"); got != want {
 		t.Fatalf("stdout = %q, want canonical address %q", got, want)
 	}
 	if got := addedPath(t, epicPath, stdout.String()); got != wantPath {

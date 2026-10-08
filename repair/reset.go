@@ -226,11 +226,3 @@ func resetNote(in ResetInput, a atticInfo) string {
 	}
 	return b.String()
 }
-
-// AtticLabel renders an attic ref for human output.
-func AtticLabel(ref *string) string {
-	if ref == nil {
-		return "none, no iteration branch"
-	}
-	return *ref
-}

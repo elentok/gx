@@ -2186,7 +2186,7 @@ func TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue(t *testing.T) {
 func TestQueueModelShowsPreviewPaneForSelectedTicket(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nType: task\n\nDistinctive queue-preview body.\n")
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\nType: implement\n\nDistinctive queue-preview body.\n")
 
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))

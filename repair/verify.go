@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// VerifyResult is the --json payload of `gx tickets verify`: always the full,
+// VerifyResult is the --json payload of `gx server tickets verify`: always the full,
 // unfiltered list, with a landing in flight reported beside it.
 type VerifyResult struct {
 	Tickets         []ralphloop.TicketVerification `json:"tickets"`

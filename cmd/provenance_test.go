@@ -52,18 +52,6 @@ func TestTicketsSetJSON_IterationStatusFromAgent(t *testing.T) {
 	}
 }
 
-func TestRecoveryJSON_DirectRecoveryOnSuccessAndRefusal(t *testing.T) {
-	t.Parallel()
-	for name, runErr := range map[string]error{"success": nil, "refusal": &RefusalError{Reason: ReasonNotParked, Message: "no"}} {
-		var out bytes.Buffer
-		_ = finishRecovery(&out, &bytes.Buffer{}, true, struct{}{}, "", runErr)
-		got := decodeJSON(t, out.Bytes())
-		if got["via"] != "direct" || got["actor"] != "recovery" {
-			t.Errorf("%s: via/actor = %v/%v; want direct/recovery", name, got["via"], got["actor"])
-		}
-	}
-}
-
 func TestServerRepairJSON_ReportsServerVia(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer

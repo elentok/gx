@@ -17,7 +17,7 @@ import (
 func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Type: task\nStatus: open\n\n## Heading\n\nSome distinctive body prose.\n")
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Type: implement\nStatus: open\n\n## Heading\n\nSome distinctive body prose.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -38,7 +38,7 @@ func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
 	if !strings.Contains(content, "Status: open") {
 		t.Fatalf("expected prettified 'Status:' frontmatter line in view, got:\n%s", content)
 	}
-	if !strings.Contains(content, "Type: task") {
+	if !strings.Contains(content, "Type: implement") {
 		t.Fatalf("expected prettified 'Type:' frontmatter line in view, got:\n%s", content)
 	}
 	if !strings.Contains(content, "Some distinctive body prose.") {

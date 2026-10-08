@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// LandResult is the --json success payload of `gx tickets land`.
+// LandResult is the --json success payload of `gx server tickets land`.
 type LandResult struct {
 	Outcome        string `json:"outcome"`
 	SHA            string `json:"sha"`
@@ -82,7 +82,7 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	}
 	if err := ralphloop.AcquireLandLockFor(lockDir, epic, in.ID); err != nil {
 		if errors.Is(err, ralphloop.ErrLandLocked) {
-			return LandResult{}, "", landLockedRefusal(lockDir, epic, in.ID)
+			return LandResult{}, "", landLockedRefusal(lockDir, in.EpicPath, in.ID)
 		}
 		return LandResult{}, "", err
 	}
@@ -131,11 +131,11 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 
 // landLockedRefusal names the lock's owner and, when no marker explains the
 // lock, how to clear it.
-func landLockedRefusal(lockDir, epic, id string) *RefusalError {
+func landLockedRefusal(lockDir, epicPath, id string) *RefusalError {
 	msg := "another land is in progress (land lock is held)"
 	owner, err := ralphloop.OrphanLandLock(lockDir)
 	if err == nil && owner != nil {
-		msg = fmt.Sprintf("land lock is held by %s with no conflict pending; if that land crashed, clear it with `gx tickets land %s %s --abort`", owner.Describe(), epic, id)
+		msg = fmt.Sprintf("land lock is held by %s with no conflict pending; if that land crashed, clear it with `gx server tickets land %s --abort`", owner.Describe(), EpicTicketLabel(epicPath, id))
 	}
 	return &RefusalError{Reason: ReasonLandLocked, Message: msg}
 }

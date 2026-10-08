@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -67,12 +66,6 @@ func resolveTicketRef(getwd func() (string, error), arg string) (string, error) 
 		return "", err
 	}
 	return t.Path, nil
-}
-
-// epicTicketLabel is the canonical address of ticket id in the epic at
-// epicPath, for commands that know the epic and id but not a ticket path.
-func epicTicketLabel(epicPath, id string) string {
-	return repair.EpicTicketLabel(epicPath, id)
 }
 
 // ticketLabel is how output names the ticket at path: its canonical address
