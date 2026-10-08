@@ -9,7 +9,6 @@ import (
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	commitui "github.com/elentok/gx/ui/commit"
-	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/keys"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
@@ -61,7 +60,6 @@ type Model struct {
 	notifyLog     *notifylog.Log
 	notifyHistory notifyhistory.Model
 	gate          *reloadgate.ReloadGate
-	quitConfirm   confirm.Model
 
 	queueStore *ticketsui.QueueStore
 	serverConn ServerConn
@@ -82,7 +80,6 @@ func New(repo git.Repo, settings Settings) Model {
 		notifyLog:     notifylog.New(),
 		notifyHistory: notifyhistory.New(),
 		gate:          reloadgate.New(),
-		quitConfirm:   confirm.New(),
 		queueStore:    loadQueueStore(),
 	}
 	if m.settings.InitialRoute.Tab == "" {
@@ -148,9 +145,6 @@ func (m Model) View() tea.View {
 		if len(hints) > 0 {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(m.keyPrefix, hints), m.width, m.height)
 		}
-	}
-	if m.quitConfirm.IsOpen {
-		content = ui.OverlayCenter(content, m.quitConfirm.View(m.width), m.width, m.height)
 	}
 	if m.notifyHistory.IsOpen {
 		content = m.notifyHistory.View(content, m.width, m.height)

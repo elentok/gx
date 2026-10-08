@@ -156,7 +156,7 @@ func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 func TestServerMode_DrainKeyReachesDrainVerb(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
-	next, _ := m.handleDrainReplaceKey()
+	next, _ := m.handleServerDrainKey()
 	m = next.(Model)
 	if !m.confirm.IsOpen {
 		t.Fatal("confirm not open")

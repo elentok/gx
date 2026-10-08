@@ -23,14 +23,7 @@ type epicRun struct {
 	// scope is written once, by RunOptions.OnScopeResolved shortly after the
 	// run starts (see cmdStartImplement) — until then it's the zero RunScope,
 	// on which Add is a documented no-op.
-	scope ralphloop.RunScope
-	// agent is written once, by setAgent right after tryStart succeeds in
-	// cmdStartImplement — it lets the drain-then-replace combo
-	// (handleDrainReplaceKey in drain_replace.go) capture which agent is
-	// driving a live run and reuse it for the replacement run, since agentFor
-	// stops returning ok=true the moment finish() deletes the epic from
-	// r.runs.
-	agent      ralphloop.AgentKind
+	scope      ralphloop.RunScope
 	state      RunState
 	finalError string
 	// failureNotifier is set once, by cmdStartImplement right after
@@ -661,44 +654,6 @@ func (r *loopRegistry) gateFor(epicName string) *ralphloop.Gate {
 	return nil
 }
 
-// drain stops epicName's live run from admitting new claims (via its Gate's
-// Drain, see ralphloop/pause.go) without interrupting any iteration already
-// in flight; ok reports whether a run was found to drain.
-func (r *loopRegistry) drain(epicName string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	run := r.runs[epicName]
-	if run == nil {
-		return false
-	}
-	run.gate.Drain()
-	return true
-}
-
-// setAgent records which agent is driving epicName's live run, called back
-// right after tryStart succeeds in cmdStartImplement — see epicRun.agent's
-// doc comment for why this is captured rather than re-derived later.
-func (r *loopRegistry) setAgent(epicName string, agent ralphloop.AgentKind) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if run := r.runs[epicName]; run != nil {
-		run.agent = agent
-	}
-}
-
-// agentFor returns the agent driving epicName's live run. ok is false once
-// the epic is no longer running (finish deletes it from r.runs) — capture the
-// value while the run is still confirmed live rather than re-fetching later.
-func (r *loopRegistry) agentFor(epicName string) (ralphloop.AgentKind, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	run := r.runs[epicName]
-	if run == nil {
-		return "", false
-	}
-	return run.agent, true
-}
-
 // setScope records epicName's resolved RunScope, called back from
 // RunOptions.OnScopeResolved once Run has loaded the epic and resolved it.
 func (r *loopRegistry) setScope(epicName string, scope ralphloop.RunScope) {
@@ -939,20 +894,6 @@ func (r *loopRegistry) takeAttachError() error {
 	err := r.attachErr
 	r.attachErr = nil
 	return err
-}
-
-// CanQuit implements the app shell's quit-guard duck type (see
-// ui/app/model_quit.go): it blocks quitting gx while this process has any
-// epic's ralph-loop in flight, since an interrupted loop can leave the
-// worktree mid-cherry-pick. This is warn-then-allow, not a hard block —
-// reconcile.go recovers an interrupted loop on the next run, so there's no
-// correctness reason to prevent quitting outright.
-func (m Model) CanQuit() bool {
-	// In server mode the loops live in the server, not this process.
-	if m.serverMode() {
-		return true
-	}
-	return !ralphLoopRegistry.isRunning()
 }
 
 // isRunning reports whether any epic currently has a run in flight.

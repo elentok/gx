@@ -74,9 +74,9 @@ func TestQueueServerMode_EnterNeverStartsInProcessRun(t *testing.T) {
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	nm := next.(QueueModel)
 
-	if len(nm.pendingEpics) != 0 || len(nm.runningEpics) != 0 || nm.confirm.IsOpen || nm.implementAgentMenuOpen {
-		t.Errorf("enter opened an in-process run: pending=%v running=%v confirm=%v menu=%v",
-			nm.pendingEpics, nm.runningEpics, nm.confirm.IsOpen, nm.implementAgentMenuOpen)
+	if len(nm.pendingEpics) != 0 || len(nm.runningEpics) != 0 || nm.confirm.IsOpen {
+		t.Errorf("enter opened an in-process run: pending=%v running=%v confirm=%v",
+			nm.pendingEpics, nm.runningEpics, nm.confirm.IsOpen)
 	}
 	_ = cmd
 }

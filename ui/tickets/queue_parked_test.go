@@ -112,46 +112,6 @@ func TestQueueModelEnterOnParkedRowResumesEvenWhenCheckedAndLaunchable(t *testin
 	case <-time.After(time.Second):
 		t.Fatal("expected enter on a parked row to call resumeParked/WakeParked")
 	}
-	if m.implementAgentMenuOpen {
-		t.Fatal("expected enter on a parked row not to open the implement-agent menu")
-	}
-}
-
-// TestQueueModelEnterOnNonParkedRowUnchanged is a regression guard for the
-// parked early-return in handleQueueKey's "enter" case: with one epic parked
-// and another selected and checked/launchable, enter must still open the
-// implement-agent menu for the selected (non-parked) row instead of the
-// parked check swallowing it.
-func TestQueueModelEnterOnNonParkedRowUnchanged(t *testing.T) {
-	// not parallel-safe: installParkedRegistry reassigns the package-level ralphLoopRegistry singleton
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"): true,
-		ticketPath(root, "beta", "01-first.md"):  true,
-	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	installParkedRegistry(t, map[string][]ralphloop.StalledTicket{"alpha": {{Identifier: "01"}}})
-
-	m.View() // populate m.queueTree.Entries() (queue_view.go's View())
-	betaIdx := -1
-	for i, e := range m.queueTree.Entries() {
-		if e.Value.kind == nodeQueueTicket && e.Value.ticket.epic.Name == "beta" {
-			betaIdx = i
-		}
-	}
-	if betaIdx == -1 {
-		t.Fatalf("expected a beta row among %+v", m.queueTree.Entries())
-	}
-	m.queueTree.SetSelectedIndex(betaIdx)
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = updated.(QueueModel)
-
-	if !m.implementAgentMenuOpen {
-		t.Fatal("expected enter on a non-parked row to still open the implement-agent menu")
-	}
 }
 
 // TestQueueModelParkedEpicResumesToRunningRendering covers the last "What to

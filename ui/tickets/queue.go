@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
@@ -89,8 +88,6 @@ type QueueModel struct {
 	// on disk changed.
 	entriesCache *queueEntriesCache
 
-	implementAgentMenuOpen bool
-	implementAgentMenu     components.MenuState
 	// actionsMenu backs the "m"-triggered suggested-actions menu (see
 	// queue_actions_menu.go), mirroring the Tickets tab's own
 	// Model.actionsMenu — a deliberate, narrow exception to this tab's
@@ -167,26 +164,25 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		}
 	})
 	return QueueModel{
-		executionTickets:   map[string]bool{},
-		runTicketIDs:       map[string][]string{},
-		now:                time.Now,
-		worktreeRoot:       worktreeRoot,
-		settings:           settings,
-		checked:            checked,
-		checkOrder:         checkOrder,
-		queueStatus:        map[string]queueItemStatus{},
-		live:               map[string]map[string]liveTicketState{},
-		implementSpinner:   sp,
-		implementAgentMenu: newRunStartAgentMenu(),
-		runningEpics:       map[string]bool{},
-		paused:             ralphLoopRegistry.isPaused(),
-		confirm:            confirm.New(),
-		search:             search.NewModel(),
-		keys:               km,
-		queueTree:          queueTree,
-		entriesCache:       &queueEntriesCache{},
-		help:               help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys)),
-		previewFocus:       newPreviewFocus(),
+		executionTickets: map[string]bool{},
+		runTicketIDs:     map[string][]string{},
+		now:              time.Now,
+		worktreeRoot:     worktreeRoot,
+		settings:         settings,
+		checked:          checked,
+		checkOrder:       checkOrder,
+		queueStatus:      map[string]queueItemStatus{},
+		live:             map[string]map[string]liveTicketState{},
+		implementSpinner: sp,
+		runningEpics:     map[string]bool{},
+		paused:           ralphLoopRegistry.isPaused(),
+		confirm:          confirm.New(),
+		search:           search.NewModel(),
+		keys:             km,
+		queueTree:        queueTree,
+		entriesCache:     &queueEntriesCache{},
+		help:             help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys)),
+		previewFocus:     newPreviewFocus(),
 	}
 }
 
@@ -407,8 +403,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueResumeConfirmed(msg)
 	case budgetOverrideConfirmedMsg:
 		return m.handleBudgetOverrideConfirmed(msg)
-	case runStartConfirmedMsg:
-		return m.handleRunStartConfirmed(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case answerEditorFinishedMsg:
@@ -856,9 +850,6 @@ func newQueueKeysManager() keys.Manager {
 }
 
 func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if m.implementAgentMenuOpen {
-		return m.handleQueueAgentMenuKey(msg)
-	}
 	match, consumed := m.keys.Process(msg)
 	if consumed {
 		if match == nil {
@@ -969,24 +960,13 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		return m, nav.Back()
 	case "enter":
-		// A parked row's "enter" wins over every other meaning below: it
-		// resumes that epic (cosmetic wake via Gate.WakeParked, not reattach)
-		// rather than launching the checked queue or toggling focus.
+		// A parked row's "enter" resumes that epic (cosmetic wake via
+		// Gate.WakeParked, not reattach) rather than toggling focus.
 		if row, ok := m.selectedQueueRow(); ok {
 			if _, parked := ralphLoopRegistry.parkedStalledFor(row.epic.Name); parked {
 				ralphLoopRegistry.resumeParked(row.epic.Name)
 				return m, nil
 			}
-		}
-		// "enter" launches the checked queue (existing behavior, unrelated to
-		// row selection) whenever that's actionable; only when it isn't —
-		// nothing checked, or a run's already in flight — does it fall back to
-		// the row focus-toggle "l"/"right" also drive (ticket 12), so the two
-		// meanings of "enter" never fight over the same press.
-		// In server mode the server claims queued tickets itself: there is
-		// nothing for "enter" to start here.
-		if m.serverAPI == nil && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(m.checkedEpicPlans()) > 0 {
-			return m.openRunStartModal()
 		}
 	}
 
@@ -1017,55 +997,6 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m QueueModel) handleQueueAgentMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "l":
-		return m.startCheckedEpic(ralphloop.AgentClaude)
-	case "o":
-		return m.startCheckedEpic(ralphloop.AgentCodex)
-	}
-
-	next, decided, accepted, handled := components.UpdateMenu(msg, m.implementAgentMenu)
-	if !handled {
-		return m, nil
-	}
-	m.implementAgentMenu = next
-	if !decided {
-		return m, nil
-	}
-	if !accepted {
-		m.implementAgentMenuOpen = false
-		return m, nil
-	}
-	value := m.implementAgentMenu.Items[m.implementAgentMenu.Cursor].Value
-	if value == "cancel" {
-		m.implementAgentMenuOpen = false
-		return m, nil
-	}
-	return m.startCheckedEpic(ralphloop.AgentKind(value))
-}
-
-func (m QueueModel) startCheckedEpic(agent ralphloop.AgentKind) (tea.Model, tea.Cmd) {
-	m.pendingEpics = m.checkedEpicPlans()
-	if len(m.pendingEpics) == 0 {
-		m.implementAgentMenuOpen = false
-		return m, nil
-	}
-	m.implementAgentMenuOpen = false
-	m.executionStartedAt = time.Time{}
-	m.executionCompletedAt = time.Time{}
-	m.executionTickets = map[string]bool{}
-	m.runTicketIDs = map[string][]string{}
-	for _, plan := range m.pendingEpics {
-		m.runTicketIDs[plan.epic.Name] = append([]string(nil), plan.ticketIDs...)
-		for _, ticketID := range plan.ticketIDs {
-			m.executionTickets[plan.epic.Name+"/"+ticketID] = true
-		}
-	}
-	m.runningAgent = agent
-	return m, m.startAvailableEpics()
-}
-
 type checkedEpicPlan struct {
 	epic tickets.Epic
 	// ticketIDs is the checked-set snapshot, always used for this Model's own
@@ -1089,10 +1020,6 @@ func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
 	return checkedEpicPlansFor(m.epics, m.checked, m.checkOrder)
 }
 
-// checkedEpicPlansFor is checkedEpicPlans' free-function body, shared with the
-// Tickets tab's drain-then-replace combo (handleDrainReplaceKey in
-// drain_replace.go) so both callers build the same launch plan from whichever
-// checked/checkOrder pair they hold.
 func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrder map[string]uint64) []checkedEpicPlan {
 	plans := make([]checkedEpicPlan, 0, len(epics))
 	for _, epic := range epics {

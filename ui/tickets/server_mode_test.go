@@ -397,12 +397,6 @@ func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
 	}
 }
 
-func TestServerMode_QuitNotGuarded(t *testing.T) {
-	if !newServerModel(t).CanQuit() {
-		t.Fatal("server mode must not guard quit")
-	}
-}
-
 // Seam D: the "s" menu lists the server actions for a ticket's state and
 // issues the chosen one; "enter" on a parked row issues unpark.
 func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {

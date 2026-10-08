@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -223,27 +222,6 @@ func cmdOpenQueueTab(worktreeRoot string) tea.Cmd {
 	return nav.Switch(nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: worktreeRoot})
 }
 
-func renderImplementAgentMenu(prompt string, menu components.MenuState) string {
-	return components.RenderMenuModal(
-		"Implement Epic",
-		prompt,
-		menu,
-		"",
-		ui.ColorBorder,
-		ui.ColorBlue,
-		ui.ColorSubtle,
-		ui.ColorText,
-		48,
-	)
-}
-
-func agentDisplayName(agent ralphloop.AgentKind) string {
-	if agent == ralphloop.AgentCodex {
-		return "Codex"
-	}
-	return "Claude"
-}
-
 func (m Model) handleConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd, _ := m.confirm.Update(msg)
 	m.confirm = next
@@ -390,7 +368,6 @@ func cmdStartImplement(
 			}
 			ralphLoopRegistry.setFailureNotifier(epicName, reporter)
 		}
-		ralphLoopRegistry.setAgent(epicName, agent)
 		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill, agents, queue)
 		if err != nil {
 			ralphLoopRegistry.finish(epicName, err)
@@ -476,7 +453,7 @@ func buildImplementRunOptionsForTickets(
 		Agent:               agent,
 		Agents:              agents,
 		Orchestrator:        cfg.Orchestrator,
-		SpinCycles:         queue.SpinCycles,
+		SpinCycles:          queue.SpinCycles,
 		SpinWindow:          queue.SpinWindow,
 		Skill:               skill,
 		RepoDir:             repo.Root,

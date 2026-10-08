@@ -145,7 +145,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsAddToQueue:
 			return m.handleAddToQueueKey()
 		case bindingTicketsDrainReplace:
-			return m.handleDrainReplaceKey()
+			if !m.serverMode() {
+				return m, nil
+			}
+			return m.handleServerDrainKey()
 		case bindingTicketsToggleCheck:
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:

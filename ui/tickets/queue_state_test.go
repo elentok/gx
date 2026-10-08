@@ -244,7 +244,6 @@ func TestMain(m *testing.M) {
 	}
 	defer os.RemoveAll(dir)
 	queueStateDirFn = func() (string, error) { return dir, nil }
-	codexOnPath = func() bool { return true }
 	os.Exit(m.Run())
 }
 

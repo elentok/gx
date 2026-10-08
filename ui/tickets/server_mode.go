@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/subscription"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tree"
@@ -98,6 +99,19 @@ func (m Model) openAgentConfirm(prompt string, accept func(agent string) tea.Cmd
 		ChoiceName: "Agent",
 		AcceptWith: accept,
 	})
+}
+
+// styleSubscriptionLine renders a subscription safety-check line per its
+// severity: SeverityWarning is unmissable (bold, warning color) since gx has
+// no control over the account setting itself; SeverityInfo is a quieter,
+// muted confirmation/remind-only line.
+func styleSubscriptionLine(line *subscription.Line) string {
+	switch line.Severity {
+	case subscription.SeverityWarning:
+		return ui.StyleWarning.Bold(true).Render(line.Text)
+	default:
+		return ui.StyleMuted.Render(line.Text)
+	}
 }
 
 // serverReplacedMsg reports a finished "r": the server's refusal or error, if any.

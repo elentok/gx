@@ -87,7 +87,7 @@ func startCostAggregator() {
 
 // stopCostAggregator stops costAgg's poller goroutine and blocks until it has
 // fully exited, called from finish at the attach one-to-zero transition so a
-// caller like CanQuit/tests can rely on it being gone once finish returns.
+// caller like a test can rely on it being gone once finish returns.
 func stopCostAggregator() {
 	costAgg.stop()
 }

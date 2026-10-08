@@ -382,9 +382,8 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 // herdr: queued tickets stay queued until it answers again.
 const queueHerdrDownBanner = "herdr unavailable — the server can't start agents until it answers"
 
-// queueIdleBodyLine picks the reserved slot's idle copy: a call to action
-// when there's a checked plan to run, or a pointer back to the Tickets tab
-// when nothing is checked at all.
+// queueIdleBodyLine picks the reserved slot's idle copy: a pointer back to
+// the Tickets tab when nothing is checked, otherwise where runs start from.
 func (m QueueModel) queueIdleBodyLine() string {
 	if m.serverAPI != nil {
 		if len(m.checked) == 0 {
@@ -395,7 +394,7 @@ func (m QueueModel) queueIdleBodyLine() string {
 	if len(m.checkedEpicPlans()) == 0 {
 		return epicStatusParkedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
 	}
-	return epicStatusParkedAnswerStyle.Render("Idle — press enter to start")
+	return epicStatusParkedAnswerStyle.Render("Idle — runs start from the server")
 }
 
 func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
