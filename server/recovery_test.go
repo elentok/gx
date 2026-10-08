@@ -304,7 +304,8 @@ func TestRecovery_SecondCompactionTimeoutLeavesTheParkToAPerson(t *testing.T) {
 }
 
 // parkAfterSeeding appends seed events to ticket 01's run log (as a previous
-// server run would have left them), parks it, and returns the escalation or nil.
+// server run would have left them), parks it, and returns the escalation, or
+// nil once the park's own recovery is applied instead.
 func parkAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, <-chan recovery.Result) {
 	t.Helper()
 	h, results := startRecovery(t, false)
@@ -322,8 +323,13 @@ func parkAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, 
 	for time.Now().Before(deadline) {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
 		for i, ev := range log {
-			if events.Type(ev.Type) == events.RecoveryEscalated {
+			switch events.Type(ev.Type) {
+			case events.RecoveryEscalated:
 				return &log[i], results
+			case events.RecoveryApplied:
+				if i >= len(seed) {
+					return nil, results
+				}
 			}
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -357,13 +363,45 @@ func TestRecovery_PerTicketCapEscalatesDifferentKinds(t *testing.T) {
 	}
 }
 
-func TestRecovery_ReFailRightAfterARecoveryNamesBothFailures(t *testing.T) {
-	esc, _ := parkAfterSeeding(t, applied(events.ZeroCommit))
+func TestRecovery_ReFailRightAfterARecoveryOfTheSameKindIsAFailedRecovery(t *testing.T) {
+	esc, _ := parkAfterSeeding(t, applied(events.IterationError))
 	if esc == nil {
 		t.Fatal("re-fail after a recovery was not escalated")
 	}
-	if !strings.Contains(esc.Reason, string(events.ZeroCommit)) || !strings.Contains(esc.Reason, string(events.IterationError)) {
-		t.Errorf("reason = %q, want both zero-commit and iteration-error", esc.Reason)
+	if !strings.Contains(esc.Reason, "TEST for "+string(events.IterationError)+" failed") {
+		t.Errorf("reason = %q, want a failed TEST recovery for iteration-error", esc.Reason)
+	}
+}
+
+// A recovery of another kind, an investigation fork or a parent backfill is
+// not a remedy for the park, so the park recovers as if it never happened.
+func TestRecovery_UnrelatedPriorRecoveryDoesNotTripTheGuardRail(t *testing.T) {
+	investigated := applied(events.IterationError)
+	investigated.Reason = "investigate"
+	backfilled := applied(events.ParentDefect)
+	backfilled.Reason = "R14"
+	for name, seed := range map[string]ralphloop.Event{
+		"other kind":  applied(events.ZeroCommit),
+		"set-parent":  backfilled,
+		"investigate": investigated,
+	} {
+		t.Run(name, func(t *testing.T) {
+			esc, results := parkAfterSeeding(t, seed)
+			if esc != nil && strings.Contains(esc.Reason, "failed") {
+				t.Fatalf("escalated as a failed recovery: %+v", esc)
+			}
+			if name == "investigate" {
+				return // the per-kind cap still counts the investigation
+			}
+			if esc != nil {
+				t.Fatalf("escalated: %+v", esc)
+			}
+			select {
+			case <-results:
+			case <-time.After(2 * time.Second):
+				t.Fatal("remedy did not run")
+			}
+		})
 	}
 }
 
@@ -1235,7 +1273,7 @@ func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
 
 // watchHeldGate seeds ticket 01's run log, puts its run in the registry with a
 // pane reporting status, and runs one watchdog pass an hour after the start.
-// It returns a counter of the recovery-applied events on 01 and a rerun.
+// It returns a counter of the gate's recovery-applied events on 01 and a rerun.
 func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applied func() int, pass func()) {
 	t.Helper()
 	store := t.TempDir()
@@ -1261,7 +1299,7 @@ func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applie
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
 		n := 0
 		for _, ev := range log {
-			if ev.Ticket == "01" && events.Type(ev.Type) == events.RecoveryApplied {
+			if ev.Ticket == "01" && events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.BackgroundTaskGate) {
 				n++
 			}
 		}

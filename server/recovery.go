@@ -285,9 +285,10 @@ func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Eve
 }
 
 // guardRailStop says why automatic recovery must not run for f, or "" when it
-// may. A failure after a recovery that no landing, reset or manual land has
-// since cleared is a failed recovery and names both failures; otherwise the
-// per-kind and per-ticket caps apply.
+// may. A failure after a remedy for the same kind that no landing, reset or
+// manual land has since cleared is a failed recovery; otherwise the per-kind
+// and per-ticket caps apply. An investigation or a parent backfill remedies
+// nothing the next park could be a re-failure of, so only the caps see them.
 func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 	var applied int
 	perKind := map[string]int{}
@@ -297,14 +298,16 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 		case events.RecoveryApplied:
 			applied++
 			perKind[ev.Kind]++
-			last = &log[i]
+			if ev.Kind == string(f.Kind) && ev.Reason != investigateEntry && ev.Kind != string(events.ParentDefect) {
+				last = &log[i]
+			}
 		case events.CherryPicked, events.TicketReset, events.ManualLand:
 			last = nil
 		}
 	}
 	switch {
 	case last != nil:
-		return fmt.Sprintf("recovery %s for %s failed: ticket failed again with %s", last.Reason, last.Kind, f.Kind)
+		return fmt.Sprintf("recovery %s for %s failed: ticket failed again", last.Reason, last.Kind)
 	case perKind[string(f.Kind)] >= maxRecoveriesPerKind:
 		return fmt.Sprintf("already recovered %s %d time(s)", f.Kind, perKind[string(f.Kind)])
 	case applied >= maxRecoveriesPerTicket:
