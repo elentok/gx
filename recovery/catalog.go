@@ -84,16 +84,29 @@ var NotCatalogued = map[string]string{
 }
 
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
-// they land.
+// they land. Match takes the first entry that fits, so a narrower signature
+// goes before a wider one of the same type and kind.
 func Default() Catalog {
-	// R12 is a narrower zero-commit park than R2's and R3's, so it goes first.
-	entries := []Entry{r12StalledReclaim(), r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered(), r7CompactionTimedOut()}
-	entries = append(entries, r3LandRecoverable()...)
-	entries = append(entries, r4BlockedPaneDialog())
-	// R11 is a narrower name-taken park than R6's, so it goes first.
-	entries = append(entries, r11ClaimClobbered())
-	entries = append(entries, r6LaunchCollision()...)
-	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause(), r10BackgroundGateHeld(), r14ParentDefect())}
+	return Catalog{Enabled: true, Entries: []Entry{
+		// R12 is a narrower zero-commit park than R2's and R3's.
+		r12StalledReclaim(),
+		r1Spin(),
+		r2UnexecutedToolCall(),
+		r5PromptNeverDelivered(),
+		r7CompactionTimedOut(),
+		r3LostCommits(),
+		r3Unrecoverable(),
+		r3LandedElsewhere(),
+		r3ClaimedPresent(),
+		r4BlockedPaneDialog(),
+		// R11 is a narrower name-taken park than R6's.
+		r11ClaimClobbered(),
+		r6PaneBusy(),
+		r6NameTaken(),
+		r8RateLimitPause(),
+		r10BackgroundGateHeld(),
+		r14ParentDefect(),
+	}}
 }
 
 // ParentDefect is R14's signature, checked per ticket file with no log: a
@@ -116,14 +129,10 @@ func ParentDefect(id string, parent *string) (want string, defect bool) {
 func r14ParentDefect() Entry {
 	return Entry{
 		ID: "R14", Type: events.TicketGraphDefect, Kind: events.ParentDefect,
-		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"set-parent"},
+		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{VerbSetParent},
 		Remedy: func(f Failure, v Verbs) error {
-			res, err := v.SetParent(f.Address, f.Reason)
-			if err == nil && res.Refused {
-				err = fmt.Errorf("refused: %s", res.Reason)
-			}
-			if err != nil {
-				return fmt.Errorf("backfilling parent %s: %w", f.Reason, err)
+			if err := Run(v, Call{Verb: VerbSetParent, Address: f.Address, Parent: f.Parent}); err != nil {
+				return fmt.Errorf("backfilling parent %s: %w", f.Parent, err)
 			}
 			return nil
 		},
@@ -141,15 +150,9 @@ func r14ParentDefect() Entry {
 func r10BackgroundGateHeld() Entry {
 	return Entry{
 		ID: "R10", Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate,
-		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"release-gate", "finish"},
+		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{VerbReleaseGate, VerbFinish},
 		Remedy: func(f Failure, v Verbs) error {
-			res, err := v.ReleaseGate(f.Address)
-			if err == nil && !res.Refused {
-				res, err = v.Finish(f.Address)
-			}
-			if err == nil && res.Refused {
-				err = fmt.Errorf("refused: %s", res.Reason)
-			}
+			err := Run(v, Call{Verb: VerbReleaseGate, Address: f.Address}, Call{Verb: VerbFinish, Address: f.Address})
 			if err != nil {
 				return fmt.Errorf("releasing the background-task gate: %w", err)
 			}
@@ -253,7 +256,7 @@ func r8RateLimitPause() Entry {
 	}
 }
 
-// r6LaunchCollision is a ticket parked because herdr refused its launch. A busy
+// r6PaneBusy and r6NameTaken are a ticket parked because herdr refused its launch. A busy
 // pane is transient, so a rule relaunches once. A taken name needs herdr's
 // candidate block read: a leaked pane in this ticket's own worktree is closed
 // and the ticket relaunched, while another ticket's live agent means this
@@ -262,22 +265,23 @@ func r8RateLimitPause() Entry {
 // propose it. Both require a launch-failed event of the same kind, so a park
 // that merely reuses the kind is not a collision. Launches disabled: there is
 // no S0 launch-failed event data behind it yet.
-func r6LaunchCollision() []Entry {
-	busy := Entry{
+func r6PaneBusy() Entry {
+	return Entry{
 		ID: "R6", Type: events.NeedsRepair, Kind: events.AgentPaneBusy,
 		Predicate: afterLaunchFailed(events.AgentPaneBusy),
-		Executor:  ExecutorRule, Authority: AuthorityLow, Verbs: []string{"relaunch"},
+		Executor:  ExecutorRule, Authority: AuthorityLow, Verbs: []string{VerbRelaunch},
 		Remedy: func(f Failure, v Verbs) error {
-			_, err := v.Relaunch(f.Address)
-			return err
+			return Run(v, Call{Verb: VerbRelaunch, Address: f.Address})
 		},
 	}
-	taken := Entry{
+}
+
+func r6NameTaken() Entry {
+	return Entry{
 		ID: "R6", Type: events.NeedsRepair, Kind: events.AgentNameTaken,
 		Predicate: afterLaunchFailed(events.AgentNameTaken),
-		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"close-pane", "relaunch"},
+		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{VerbClosePane, VerbRelaunch},
 	}
-	return []Entry{busy, taken}
 }
 
 func afterLaunchFailed(kind events.Kind) func(seq []Event) bool {
@@ -311,49 +315,54 @@ var (
 	lostCommitsRE = regexp.MustCompile(`no longer exists to recover them|cannot tell whether it landed: unrecoverable$`)
 )
 
-// r3LandRecoverable is work that is on the feature branch (or a recoverable
+// r3Unrecoverable and r3ClaimedPresent are work that is on the feature branch (or a recoverable
 // branch) but gx cannot attribute: a done ticket whose commits are missing, or
 // a zero-commit finish whose last turn claims the work is already present.
 // One catalogued failure with several signatures, so entries sharing the ID
 // (a disable by ID covers all), most specific first. An agent proves presence
 // with verify and the acceptance criteria before it lands a recoverable
 // branch. Launches disabled: there is no S0 event data showing it occurs yet.
-//
-// Two branches never act unattended. Work that landed inside another ticket's
-// commits has no commit to attribute, so commitless-done is the only fix, and
-// a false one silently drops the ticket from the epic: high authority, so it
-// is proposed. Lost commits with no iteration branch only escalate: finding
-// their range is out of scope, and recovery must never invent one.
-func r3LandRecoverable() []Entry {
-	base := Entry{
-		ID: "R3", Executor: ExecutorAgent, Authority: AuthorityMedium,
-		Verbs: []string{"verify", "land"},
+func r3Unrecoverable() Entry {
+	return Entry{
+		ID: "R3", Type: events.NeedsRepair, Kind: events.AmbiguousLand,
+		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "land"},
 	}
-	lost := Entry{
+}
+
+func r3ClaimedPresent() Entry {
+	return Entry{
+		ID: "R3", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		Predicate: func(seq []Event) bool { return claimsWorkPresentRE.MatchString(seq[len(seq)-1].Text) },
+		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "land"},
+	}
+}
+
+// r3LostCommits and r3LandedElsewhere are the two R3 branches that never act
+// unattended. Lost commits with no iteration branch only escalate: finding
+// their range is out of scope, and recovery must never invent one.
+func r3LostCommits() Entry {
+	return Entry{
 		ID: "R3", Type: events.NeedsRepair, Kind: events.AmbiguousLand,
 		Predicate: func(seq []Event) bool { return lostCommitsRE.MatchString(seq[len(seq)-1].Reason) },
 		Executor:  ExecutorPerson, Authority: AuthorityHigh,
 	}
-	unrecoverable := base
-	unrecoverable.Type, unrecoverable.Kind = events.NeedsRepair, events.AmbiguousLand
-	elsewhere := Entry{
+}
+
+// r3LandedElsewhere is work that landed inside another ticket's commits: it has
+// no commit to attribute, so commitless-done is the only fix, and a false one
+// silently drops the ticket from the epic: high authority, so it is proposed.
+func r3LandedElsewhere() Entry {
+	return Entry{
 		ID: "R3", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool {
 			text := seq[len(seq)-1].Text
 			return claimsWorkPresentRE.MatchString(text) && landedElsewhereRE.MatchString(text)
 		},
-		Executor: ExecutorRule, Authority: AuthorityHigh, Verbs: []string{"commitless-done"},
+		Executor: ExecutorRule, Authority: AuthorityHigh, Verbs: []string{VerbCommitlessDone},
 		Remedy: func(f Failure, v Verbs) error {
-			_, err := v.CommitlessDone(f.Address)
-			return err
+			return Run(v, Call{Verb: VerbCommitlessDone, Address: f.Address})
 		},
 	}
-	claimed := base
-	claimed.Type, claimed.Kind = events.NeedsAnswer, events.ZeroCommit
-	claimed.Predicate = func(seq []Event) bool {
-		return claimsWorkPresentRE.MatchString(seq[len(seq)-1].Text)
-	}
-	return []Entry{lost, unrecoverable, elsewhere, claimed}
 }
 
 // r2UnexecutedToolCall is a zero-commit finish whose last assistant turn is only
@@ -385,19 +394,15 @@ func r5PromptNeverDelivered() Entry {
 				return e.Type == events.LaunchFailed && e.Kind == events.AgentPromptStalled
 			})
 		},
-		Executor: ExecutorRule, Authority: AuthorityLow, Verbs: []string{"nudge", "close-pane"}, Enabled: true,
+		Executor: ExecutorRule, Authority: AuthorityLow, Verbs: []string{VerbNudge, VerbClosePane}, Enabled: true,
 		Remedy: func(f Failure, v Verbs) error {
 			prompt, err := v.LaunchPrompt(f.Address)
 			if err == nil {
-				var res Result
-				if res, err = v.Nudge(f.Address, prompt); err == nil && !res.Refused {
+				if err = Run(v, Call{Verb: VerbNudge, Address: f.Address, Text: prompt}); err == nil {
 					return nil
 				}
-				if err == nil {
-					err = fmt.Errorf("nudge refused: %s", res.Reason)
-				}
 			}
-			if _, cerr := v.ClosePane(f.Address); cerr != nil {
+			if cerr := Run(v, Call{Verb: VerbClosePane, Address: f.Address}); cerr != nil {
 				err = errors.Join(err, cerr)
 			}
 			return fmt.Errorf("retyping the prompt: %w", err)
@@ -437,15 +442,9 @@ func r7CompactionTimedOut() Entry {
 			}
 			return false
 		},
-		Executor: ExecutorRule, Authority: AuthorityLow, Verbs: []string{"wait", "nudge"}, Enabled: true,
+		Executor: ExecutorRule, Authority: AuthorityLow, Verbs: []string{VerbWait, VerbNudge}, Enabled: true,
 		Remedy: func(f Failure, v Verbs) error {
-			res, err := v.Wait(f.Address)
-			if err == nil && !res.Refused {
-				res, err = v.Nudge(f.Address, FinishUpPrompt)
-			}
-			if err == nil && res.Refused {
-				err = fmt.Errorf("refused: %s", res.Reason)
-			}
+			err := Run(v, Call{Verb: VerbWait, Address: f.Address}, Call{Verb: VerbNudge, Address: f.Address, Text: FinishUpPrompt})
 			if err != nil {
 				return fmt.Errorf("re-waiting for compaction: %w", err)
 			}

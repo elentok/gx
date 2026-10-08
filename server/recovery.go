@@ -124,7 +124,7 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 		return
 	}
 	outcome := "ok"
-	if err := entry.Remedy(f, recoveryVerbs{s}); err != nil {
+	if err := entry.Apply(f, recoveryVerbs{s}); err != nil {
 		s.log.Warn("recovery remedy failed", "entry", entry.ID, "ticket", f.Address, "err", err)
 		outcome = err.Error()
 	}
@@ -291,15 +291,8 @@ func (s *Server) ticketApprove(req QueueRequest) (QueueResult, error) {
 		}
 		f.Kind = events.Kind(proposal.Kind)
 		outcome := "ok"
-		for _, c := range calls {
-			res, err := c.Apply(recoveryVerbs{s})
-			if err == nil && res.Refused {
-				err = fmt.Errorf("%s refused: %s", c.Verb, res.Reason)
-			}
-			if err != nil {
-				outcome = err.Error()
-				break
-			}
+		if err := recovery.Run(recoveryVerbs{s}, calls...); err != nil {
+			outcome = err.Error()
 		}
 		s.recordRecovery(ref, events.RecoveryApplied, f, proposal.Reason, outcome)
 		if outcome != "ok" {
@@ -441,29 +434,42 @@ func (s *Server) appendRecoveryEvent(ref ticketRef, f recovery.Failure, ev ralph
 // events are identical; only the actor differs.
 type recoveryVerbs struct{ s *Server }
 
-func (v recoveryVerbs) Park(address, reason string) (recovery.Result, error) {
-	res, err := v.s.ticketPark(QueueRequest{Address: address, ParkReason: reason, actor: recovery.ActorRecovery})
+// recoveryVerbHandlers are the server's verbs by name; each takes the request
+// a call makes, already stamped actor recovery.
+var recoveryVerbHandlers = map[string]func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error){
+	recovery.VerbPark: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
+		req.ParkReason = c.Text
+		return s.ticketPark(req)
+	},
+	recovery.VerbRelaunch: func(s *Server, req QueueRequest, _ recovery.Call) (QueueResult, error) {
+		return s.ticketRelaunch(req)
+	},
+	recovery.VerbCommitlessDone: func(s *Server, req QueueRequest, _ recovery.Call) (QueueResult, error) {
+		return s.ticketCommitlessDone(req)
+	},
+	recovery.VerbNudge: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
+		req.Text = c.Text
+		return s.ticketNudge(req)
+	},
+	recovery.VerbClosePane:   (*Server).recoveryClosePane,
+	recovery.VerbWait:        (*Server).recoveryWait,
+	recovery.VerbReleaseGate: (*Server).recoveryReleaseGate,
+	recovery.VerbFinish:      (*Server).recoveryFinish,
+	recovery.VerbSetParent:   (*Server).recoverySetParent,
+}
+
+func (v recoveryVerbs) Do(c recovery.Call) (recovery.Result, error) {
+	h, ok := recoveryVerbHandlers[c.Verb]
+	if !ok {
+		return recovery.Result{}, fmt.Errorf("unknown recovery verb %q", c.Verb)
+	}
+	res, err := h(v.s, QueueRequest{Address: c.Address, actor: recovery.ActorRecovery}, c)
 	return recoveryResult(res), err
 }
 
-func (v recoveryVerbs) Relaunch(address string) (recovery.Result, error) {
-	res, err := v.s.ticketRelaunch(QueueRequest{Address: address, actor: recovery.ActorRecovery})
-	return recoveryResult(res), err
-}
-
-func (v recoveryVerbs) CommitlessDone(address string) (recovery.Result, error) {
-	res, err := v.s.ticketCommitlessDone(QueueRequest{Address: address, actor: recovery.ActorRecovery})
-	return recoveryResult(res), err
-}
-
-func (v recoveryVerbs) Nudge(address, text string) (recovery.Result, error) {
-	res, err := v.s.ticketNudge(QueueRequest{Address: address, Text: text, actor: recovery.ActorRecovery})
-	return recoveryResult(res), err
-}
-
-func (v recoveryVerbs) ClosePane(address string) (recovery.Result, error) {
-	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
-		it, live := v.s.liveIteration(ref.addr.String())
+func (s *Server) recoveryClosePane(req QueueRequest, _ recovery.Call) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+		it, live := s.liveIteration(ref.addr.String())
 		if !live {
 			return QueueResult{}, nil
 		}
@@ -472,16 +478,15 @@ func (v recoveryVerbs) ClosePane(address string) (recovery.Result, error) {
 		}
 		return QueueResult{}, nil
 	})
-	return recoveryResult(res), err
 }
 
 // compactRewaitTimeoutMs is R7's one extended wait, well past the loop's own
 // compaction wait so a slow compaction can still finish inside it.
 const compactRewaitTimeoutMs = 15 * 60 * 1000
 
-func (v recoveryVerbs) Wait(address string) (recovery.Result, error) {
-	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
-		if _, live := v.s.liveIteration(ref.addr.String()); !live {
+func (s *Server) recoveryWait(req QueueRequest, _ recovery.Call) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+		if _, live := s.liveIteration(ref.addr.String()); !live {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
 		label, _, _ := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, "")
@@ -490,7 +495,6 @@ func (v recoveryVerbs) Wait(address string) (recovery.Result, error) {
 		}
 		return QueueResult{}, nil
 	})
-	return recoveryResult(res), err
 }
 
 // Refusal reasons of release-gate and finish.
@@ -501,13 +505,13 @@ const (
 	ReasonFinishTimedOut = "finish-timed-out"
 )
 
-func (v recoveryVerbs) ReleaseGate(address string) (recovery.Result, error) {
-	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
-		run, ok := v.s.registry.tracked(ref.addr.String())
+func (s *Server) recoveryReleaseGate(req QueueRequest, _ recovery.Call) (QueueResult, error) {
+	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
+		run, ok := s.registry.tracked(ref.addr.String())
 		if !ok {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
-		label, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, v.s.worktreeDir(ref.addr.Project))
+		label, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.worktreeDir(ref.addr.Project))
 		agent, err := herdr.AgentGet(label)
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("read agent of %s: %w", ref.addr, err)
@@ -529,10 +533,9 @@ func (v recoveryVerbs) ReleaseGate(address string) (recovery.Result, error) {
 		if ahead < 1 {
 			return refusal(ReasonNoCommitsAhead, worktree+" has no commits ahead of its base"), nil
 		}
-		v.s.registry.releaseGate(ref.addr.String())
+		s.registry.releaseGate(ref.addr.String())
 		return QueueResult{}, nil
 	})
-	return recoveryResult(res), err
 }
 
 // finishWaitTimeout bounds Finish: a released gate's finish only re-checks
@@ -542,14 +545,15 @@ const finishWaitTimeout = 10 * time.Minute
 // finishPoll paces Finish's registry reads; a var so tests can shorten it.
 var finishPoll = time.Second
 
-// Finish holds no ticket lock while it waits: the land it waits for needs it.
-func (v recoveryVerbs) Finish(address string) (recovery.Result, error) {
-	for deadline := time.Now().Add(finishWaitTimeout); v.s.registry.has(address); time.Sleep(finishPoll) {
+// recoveryFinish holds no ticket lock while it waits: the land it waits for
+// needs it.
+func (s *Server) recoveryFinish(req QueueRequest, _ recovery.Call) (QueueResult, error) {
+	for deadline := time.Now().Add(finishWaitTimeout); s.registry.has(req.Address); time.Sleep(finishPoll) {
 		if time.Now().After(deadline) {
-			return recoveryResult(refusal(ReasonFinishTimedOut, address+" is still running after its gate was released")), nil
+			return refusal(ReasonFinishTimedOut, req.Address+" is still running after its gate was released"), nil
 		}
 	}
-	return recoveryResult(QueueResult{}), nil
+	return QueueResult{}, nil
 }
 
 // Refusal reasons of set-parent.
@@ -558,10 +562,12 @@ const (
 	ReasonInvalidParent = "invalid-parent"
 )
 
-// SetParent re-checks and writes under the epic lock `gx tickets set --parent`
-// takes, so a re-parent between the scan and the write is seen, not clobbered.
-func (v recoveryVerbs) SetParent(address, parent string) (recovery.Result, error) {
-	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
+// recoverySetParent re-checks and writes under the epic lock `gx tickets set
+// --parent` takes, so a re-parent between the scan and the write is seen, not
+// clobbered.
+func (s *Server) recoverySetParent(req QueueRequest, c recovery.Call) (QueueResult, error) {
+	address, parent := req.Address, c.Parent
+	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		epic, unlock, err := tickets.LoadLockedEpic(ref.epic.Path)
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("lock epic of %s: %w", ref.addr, err)
@@ -588,7 +594,6 @@ func (v recoveryVerbs) SetParent(address, parent string) (recovery.Result, error
 		}
 		return QueueResult{}, nil
 	})
-	return recoveryResult(res), err
 }
 
 func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {

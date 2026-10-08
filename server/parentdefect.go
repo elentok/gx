@@ -65,5 +65,5 @@ func (s *Server) raiseParentDefect(projectDir, epic, id, want string) {
 		return
 	}
 	addr := tickets.Address{Project: tickets.ProjectName(projectDir), Epic: epic, ID: id}
-	s.recoverAsync(recovery.Failure{Address: addr.String(), Type: events.TicketGraphDefect, Kind: events.ParentDefect, Reason: want})
+	s.recoverAsync(recovery.Failure{Address: addr.String(), Type: events.TicketGraphDefect, Kind: events.ParentDefect, Reason: want, Parent: want})
 }

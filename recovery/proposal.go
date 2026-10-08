@@ -10,12 +10,23 @@ import (
 type Call struct {
 	Verb    string
 	Address string
-	Reason  string
+	// Text is a park's reason or a nudge's text.
+	Text string
+	// Parent is set-parent's new parent.
+	Parent string
 }
 
-// String is the call as one line: "verb address [reason]".
+// arg is the call's one argument, whichever field the verb takes it in.
+func (c Call) arg() string {
+	if c.Verb == VerbSetParent {
+		return c.Parent
+	}
+	return c.Text
+}
+
+// String is the call as one line: "verb address [arg]".
 func (c Call) String() string {
-	return strings.TrimSpace(c.Verb + " " + c.Address + " " + c.Reason)
+	return strings.TrimSpace(c.Verb + " " + c.Address + " " + c.arg())
 }
 
 // ParseCalls reads the lines String wrote.
@@ -28,7 +39,11 @@ func ParseCalls(text string) ([]Call, error) {
 		}
 		c := Call{Verb: parts[0], Address: parts[1]}
 		if len(parts) == 3 {
-			c.Reason = parts[2]
+			if c.Verb == VerbSetParent {
+				c.Parent = parts[2]
+			} else {
+				c.Text = parts[2]
+			}
 		}
 		calls = append(calls, c)
 	}
@@ -44,76 +59,11 @@ func FormatCalls(calls []Call) string {
 	return strings.Join(lines, "\n")
 }
 
-// Apply makes the call through v.
-func (c Call) Apply(v Verbs) (Result, error) {
-	switch c.Verb {
-	case "park":
-		return v.Park(c.Address, c.Reason)
-	case "relaunch":
-		return v.Relaunch(c.Address)
-	case "commitless-done":
-		return v.CommitlessDone(c.Address)
-	case "nudge":
-		return v.Nudge(c.Address, c.Reason)
-	case "close-pane":
-		return v.ClosePane(c.Address)
-	case "wait":
-		return v.Wait(c.Address)
-	case "release-gate":
-		return v.ReleaseGate(c.Address)
-	case "finish":
-		return v.Finish(c.Address)
-	case "set-parent":
-		return v.SetParent(c.Address, c.Reason)
-	}
-	return Result{}, fmt.Errorf("unknown proposed verb %q", c.Verb)
-}
-
 // recorder is Verbs that only remember what was asked.
 type recorder struct{ calls []Call }
 
-func (r *recorder) Park(address, reason string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "park", Address: address, Reason: reason})
-	return Result{}, nil
-}
-
-func (r *recorder) Relaunch(address string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "relaunch", Address: address})
-	return Result{}, nil
-}
-
-func (r *recorder) CommitlessDone(address string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "commitless-done", Address: address})
-	return Result{}, nil
-}
-
-func (r *recorder) Nudge(address, text string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "nudge", Address: address, Reason: text})
-	return Result{}, nil
-}
-
-func (r *recorder) ClosePane(address string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "close-pane", Address: address})
-	return Result{}, nil
-}
-
-func (r *recorder) Wait(address string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "wait", Address: address})
-	return Result{}, nil
-}
-
-func (r *recorder) ReleaseGate(address string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "release-gate", Address: address})
-	return Result{}, nil
-}
-
-func (r *recorder) Finish(address string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "finish", Address: address})
-	return Result{}, nil
-}
-
-func (r *recorder) SetParent(address, parent string) (Result, error) {
-	r.calls = append(r.calls, Call{Verb: "set-parent", Address: address, Reason: parent})
+func (r *recorder) Do(c Call) (Result, error) {
+	r.calls = append(r.calls, c)
 	return Result{}, nil
 }
 
@@ -126,10 +76,10 @@ func (e Entry) Proposable(f Failure) bool {
 }
 
 // Propose runs the entry's remedy against a recorder and returns the verbs it
-// would have called.
+// would have called. A verb outside the entry's Verbs fails the proposal.
 func (e Entry) Propose(f Failure) ([]Call, error) {
 	var r recorder
-	if err := e.Remedy(f, &r); err != nil {
+	if err := e.Apply(f, &r); err != nil {
 		return nil, err
 	}
 	return r.calls, nil

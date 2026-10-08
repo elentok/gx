@@ -46,9 +46,9 @@ func startRecoveryWith(t *testing.T, optOut bool, authority recovery.Authority) 
 	results := make(chan recovery.Result, 4)
 	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{
 		ID: "TEST", Type: events.NeedsRepair, Kind: events.IterationError,
-		Executor: recovery.ExecutorRule, Authority: authority, Enabled: true,
+		Executor: recovery.ExecutorRule, Authority: authority, Enabled: true, Verbs: []string{recovery.VerbRelaunch},
 		Remedy: func(f recovery.Failure, v recovery.Verbs) error {
-			res, err := v.Relaunch(f.Address)
+			res, err := v.Do(recovery.Call{Verb: recovery.VerbRelaunch, Address: f.Address})
 			results <- res
 			return err
 		},
@@ -1224,18 +1224,14 @@ func TestRecovery_SetParentRefusesAParentChangedSinceTheScan(t *testing.T) {
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01a2-fork.md")
 	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{
 		ID: "R14", Type: events.TicketGraphDefect, Kind: events.ParentDefect,
-		Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true,
+		Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true, Verbs: []string{recovery.VerbSetParent},
 		Remedy: func(f recovery.Failure, v recovery.Verbs) error {
 			// A person re-parents onto another ancestor the ID allows first.
 			err := schema.UpdateTicket(path, func(t *schema.Ticket) { id := schema.TicketID("01a1"); t.Parent = &id })
 			if err != nil {
 				return err
 			}
-			res, err := v.SetParent(f.Address, f.Reason)
-			if err == nil && res.Refused {
-				err = errors.New("refused: " + res.Reason)
-			}
-			return err
+			return recovery.Run(v, recovery.Call{Verb: recovery.VerbSetParent, Address: f.Address, Parent: f.Parent})
 		},
 	}}}
 	h := startParentDefect(t, store, cat)

@@ -136,11 +136,11 @@ func TestDefaultR5IsAnEnabledLowRuleThatNudgesOrClosesThePane(t *testing.T) {
 	}
 
 	delivered := &stubVerbs{prompt: "/gx-implement p:e/01"}
-	if err := e.Remedy(f, delivered); err != nil || !slices.Equal(delivered.calls, []string{"nudge p:e/01 /gx-implement p:e/01"}) {
+	if err := e.Apply(f, delivered); err != nil || !slices.Equal(delivered.calls, []string{"nudge p:e/01 /gx-implement p:e/01"}) {
 		t.Errorf("delivered: err %v, calls %q; want one nudge with the full prompt", err, delivered.calls)
 	}
 	refused := &stubVerbs{prompt: "/gx-implement p:e/01", refuse: true}
-	if err := e.Remedy(f, refused); err == nil || !slices.Equal(refused.calls, []string{"nudge p:e/01 /gx-implement p:e/01", "close-pane p:e/01"}) {
+	if err := e.Apply(f, refused); err == nil || !slices.Equal(refused.calls, []string{"nudge p:e/01 /gx-implement p:e/01", "close-pane p:e/01"}) {
 		t.Errorf("refused: err %v, calls %q; want a failed nudge then close-pane", err, refused.calls)
 	}
 }
@@ -186,59 +186,92 @@ func TestDefaultR7IsAnEnabledLowRuleThatWaitsOnceThenFinishesUp(t *testing.T) {
 	}
 
 	settled := &stubVerbs{}
-	if err := e.Remedy(f, settled); err != nil || !slices.Equal(settled.calls, []string{"wait p:e/01", "nudge p:e/01 " + FinishUpPrompt}) {
+	if err := e.Apply(f, settled); err != nil || !slices.Equal(settled.calls, []string{"wait p:e/01", "nudge p:e/01 " + FinishUpPrompt}) {
 		t.Errorf("settled: err %v, calls %q; want one wait then the finish-up", err, settled.calls)
 	}
 	timedOut := &stubVerbs{waitErr: errors.New("timed out")}
-	if err := e.Remedy(f, timedOut); err == nil || !slices.Equal(timedOut.calls, []string{"wait p:e/01"}) {
+	if err := e.Apply(f, timedOut); err == nil || !slices.Equal(timedOut.calls, []string{"wait p:e/01"}) {
 		t.Errorf("timed out: err %v, calls %q; want a failed wait and nothing typed", err, timedOut.calls)
 	}
 	gone := &stubVerbs{refuse: true}
-	if err := e.Remedy(f, gone); err == nil || !slices.Equal(gone.calls, []string{"wait p:e/01"}) {
+	if err := e.Apply(f, gone); err == nil || !slices.Equal(gone.calls, []string{"wait p:e/01"}) {
 		t.Errorf("no pane: err %v, calls %q; want a refused wait and nothing typed", err, gone.calls)
 	}
 }
 
-// stubVerbs records calls and refuses every nudge and wait when refuse is set.
+// stubRefusals is the refusal each verb answers with when refuse is set; a
+// verb missing from it never refuses.
+var stubRefusals = map[string]string{
+	VerbWait: "iteration-not-live", VerbNudge: "iteration-not-live",
+	VerbReleaseGate: "agent-busy", VerbSetParent: "parent-changed",
+}
+
+// stubVerbs records calls and refuses the verbs in stubRefusals when refuse is set.
 type stubVerbs struct {
-	recorder
 	prompt  string
 	refuse  bool
 	waitErr error
 	calls   []string
 }
 
-func (s *stubVerbs) Wait(address string) (Result, error) {
-	s.calls = append(s.calls, "wait "+address)
-	return Result{Refused: s.refuse, Reason: "iteration-not-live"}, s.waitErr
-}
-
-func (s *stubVerbs) Nudge(address, text string) (Result, error) {
-	s.calls = append(s.calls, "nudge "+address+" "+text)
-	return Result{Refused: s.refuse, Reason: "iteration-not-live"}, nil
-}
-
-func (s *stubVerbs) ClosePane(address string) (Result, error) {
-	s.calls = append(s.calls, "close-pane "+address)
-	return Result{}, nil
-}
-
-func (s *stubVerbs) ReleaseGate(address string) (Result, error) {
-	s.calls = append(s.calls, "release-gate "+address)
-	return Result{Refused: s.refuse, Reason: "agent-busy"}, nil
-}
-
-func (s *stubVerbs) Finish(address string) (Result, error) {
-	s.calls = append(s.calls, "finish "+address)
-	return Result{}, nil
-}
-
-func (s *stubVerbs) SetParent(address, parent string) (Result, error) {
-	s.calls = append(s.calls, "set-parent "+address+" "+parent)
-	return Result{Refused: s.refuse, Reason: "parent-changed"}, nil
+func (s *stubVerbs) Do(c Call) (Result, error) {
+	s.calls = append(s.calls, c.String())
+	reason, refusable := stubRefusals[c.Verb]
+	var err error
+	if c.Verb == VerbWait {
+		err = s.waitErr
+	}
+	return Result{Refused: s.refuse && refusable, Reason: reason}, err
 }
 
 func (s *stubVerbs) LaunchPrompt(string) (string, error) { return s.prompt, nil }
+
+func TestApplyRefusesAVerbOutsideTheEntrysVerbs(t *testing.T) {
+	e := Entry{ID: "T1", Verbs: []string{VerbNudge}, Remedy: func(f Failure, v Verbs) error {
+		// A remedy that swallows the refusal still fails.
+		_, _ = v.Do(Call{Verb: VerbPark, Address: f.Address, Text: "stop"})
+		return Run(v, Call{Verb: VerbNudge, Address: f.Address, Text: "go"})
+	}}
+	v := &stubVerbs{}
+	err := e.Apply(Failure{Address: "p:e/01"}, v)
+	if err == nil || !strings.Contains(err.Error(), ReasonVerbNotGranted) {
+		t.Errorf("err = %v, want a %s refusal", err, ReasonVerbNotGranted)
+	}
+	if !slices.Equal(v.calls, []string{"nudge p:e/01 go"}) {
+		t.Errorf("calls = %q, want only the granted nudge to reach the verbs", v.calls)
+	}
+	if _, err := e.Propose(Failure{Address: "p:e/01"}); err == nil {
+		t.Error("a proposal with an ungranted verb was accepted")
+	}
+}
+
+func TestDefaultOrderIsFirstWins(t *testing.T) {
+	var got []string
+	for _, e := range Default().Entries {
+		got = append(got, e.ID+" "+string(e.Executor)+" "+string(e.Kind))
+	}
+	want := []string{
+		"R12 agent zero-commit",
+		"R1 recognize spinning",
+		"R2 agent zero-commit",
+		"R5 rule agent_prompt_stalled",
+		"R7 rule iteration-error",
+		"R3 person ambiguous-land",
+		"R3 agent ambiguous-land",
+		"R3 rule zero-commit",
+		"R3 agent zero-commit",
+		"R4 agent blocked-pane",
+		"R11 agent agent_name_taken",
+		"R6 rule agent_pane_busy",
+		"R6 agent agent_name_taken",
+		"R8 recognize ",
+		"R10 rule background-task-gate",
+		"R14 rule parent-defect",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("Default() order =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
 
 func TestDefaultR2LaunchesDisabledAsAnAgentEntry(t *testing.T) {
 	c := Default()
@@ -564,15 +597,12 @@ func TestR10RemedyReleasesThenFinishesAndNeverParks(t *testing.T) {
 	}
 	f := Failure{Address: "p:e/01", Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate}
 	ok := &stubVerbs{}
-	if err := e.Remedy(f, ok); err != nil || !slices.Equal(ok.calls, []string{"release-gate p:e/01", "finish p:e/01"}) {
+	if err := e.Apply(f, ok); err != nil || !slices.Equal(ok.calls, []string{"release-gate p:e/01", "finish p:e/01"}) {
 		t.Errorf("released: err %v, calls %q; want release-gate then finish", err, ok.calls)
 	}
 	refused := &stubVerbs{refuse: true}
-	if err := e.Remedy(f, refused); err == nil || !strings.Contains(err.Error(), "agent-busy") || !slices.Equal(refused.calls, []string{"release-gate p:e/01"}) {
+	if err := e.Apply(f, refused); err == nil || !strings.Contains(err.Error(), "agent-busy") || !slices.Equal(refused.calls, []string{"release-gate p:e/01"}) {
 		t.Errorf("refused: err %v, calls %q; want the refusal and no finish", err, refused.calls)
-	}
-	if len(refused.recorder.calls) != 0 {
-		t.Errorf("refused remedy called %v, want no park", refused.recorder.calls)
 	}
 }
 
@@ -749,13 +779,13 @@ func TestR14RemedySetsTheIDDerivedParentAndReturnsARefusal(t *testing.T) {
 			e = c
 		}
 	}
-	f := Failure{Address: "p:e/12a", Type: events.TicketGraphDefect, Kind: events.ParentDefect, Reason: "12"}
+	f := Failure{Address: "p:e/12a", Type: events.TicketGraphDefect, Kind: events.ParentDefect, Parent: "12"}
 	ok := &stubVerbs{}
-	if err := e.Remedy(f, ok); err != nil || !slices.Equal(ok.calls, []string{"set-parent p:e/12a 12"}) {
+	if err := e.Apply(f, ok); err != nil || !slices.Equal(ok.calls, []string{"set-parent p:e/12a 12"}) {
 		t.Errorf("set: err %v, calls %q; want one set-parent to 12", err, ok.calls)
 	}
 	refused := &stubVerbs{refuse: true}
-	if err := e.Remedy(f, refused); err == nil || !strings.Contains(err.Error(), "parent-changed") {
+	if err := e.Apply(f, refused); err == nil || !strings.Contains(err.Error(), "parent-changed") {
 		t.Errorf("refused: err %v, want the refusal", err)
 	}
 }
