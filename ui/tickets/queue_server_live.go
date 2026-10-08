@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // syncServerRunState derives the Queue tab's running state from the server's
@@ -39,6 +40,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 			live[epic.Name][t.Identifier] = liveTicketState{running: true, phase: livePhaseImplementing, startedAt: seen}
 			running[epic.Name] = true
 		}
+		markConflictResolution(epic, live[epic.Name])
 	}
 	m.live = live
 	m.runningEpics = running
@@ -52,4 +54,25 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// markConflictResolution shows a claimed conflict-resolution child as resolving
+// conflicts and its parent as waiting on it. The child runs inside the
+// parent's land, so the server holds no run (and no claim time) of its own for
+// it; its timer stays blank rather than borrowing the parent's. The child's raw
+// status is checked: its rendered one reads blocked while the parent is not done.
+func markConflictResolution(epic gxtickets.Epic, live map[string]liveTicketState) {
+	for _, t := range epic.Tickets {
+		if t.Type != string(schema.TypeConflictResolution) || t.Parent == nil ||
+			t.Status != string(schema.StatusClaimed) {
+			continue
+		}
+		parent, ok := live[*t.Parent]
+		if !ok {
+			continue
+		}
+		parent.phase, parent.waitingOn = livePhaseResolvingConflicts, t.DisplayNumber()
+		live[*t.Parent] = parent
+		live[t.Identifier] = liveTicketState{running: true, phase: livePhaseResolvingConflicts}
+	}
 }

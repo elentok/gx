@@ -110,6 +110,37 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 	}
 }
 
+// A conflict-resolution child runs inside its parent's land, so the server has
+// no run for it: it still shows as resolving, and the parent as waiting on it.
+func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T) {
+	store := loadQueueStoreAt(filepath.Join(t.TempDir(), "queue.json"))
+	api := fakeServerAPI{
+		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
+			{Address: "gx:alpha/01a", Title: "Conflict resolution for 01", Status: "claimed",
+				Type: "conflict-resolution", Parent: "gx:alpha/01"},
+		}},
+		queue: []server.QueueItem{{Address: "gx:alpha/01"}},
+	}
+	m := NewQueueModelWithStore(t.TempDir(), ui.Settings{}, keys.New(nil), store).WithServerLink(api, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
+	m = next.(QueueModel)
+
+	child := m.live["gx:alpha"]["01a"]
+	if !child.running || child.phase != livePhaseResolvingConflicts {
+		t.Errorf("live[01a] = %+v, want running and resolving conflicts", child)
+	}
+	parent := m.live["gx:alpha"]["01"]
+	if !parent.running || parent.waitingOn != "01a" {
+		t.Errorf("live[01] = %+v, want running and waiting on 01a", parent)
+	}
+	_, suffix, _ := renderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[0], parent, "")
+	if suffix != "(waiting on 01a...)" {
+		t.Errorf("parent suffix = %q, want %q", suffix, "(waiting on 01a...)")
+	}
+}
+
 func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) {
 	m, _ := loadedServerQueueWith(t, "claimed", time.Time{}, false)
 

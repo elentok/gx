@@ -27,6 +27,9 @@ type liveTicketState struct {
 	pauseKind ralphloop.PauseKind
 	reason    string
 	phase     livePhase
+	// waitingOn is the conflict-resolution child a landing ticket waits on;
+	// when set it replaces the phase text.
+	waitingOn string
 	// startedAt is this ticket's own start time (RunTicketSnapshot.StartedAt),
 	// stamped when its iteration begins, so elapsed time keeps climbing across
 	// a pause/resume instead of resetting, and doesn't conflate two tickets in
@@ -160,6 +163,9 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 		spinnerView := lipgloss.NewStyle().Foreground(live.phase.color()).Render(strings.TrimRight(sp.View(), " "))
 		base = prefix + spinnerView + " " + title
 		suffix = live.phase.suffix()
+		if live.waitingOn != "" {
+			suffix = fmt.Sprintf("(waiting on %s...)", live.waitingOn)
+		}
 		if live.label != "" {
 			suffix = live.label + " " + suffix
 		}
