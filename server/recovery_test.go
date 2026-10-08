@@ -401,6 +401,45 @@ func TestRecovery_ZeroCommitParkWithR2DisabledInvestigatesWithoutR2Events(t *tes
 	}
 }
 
+// R3 is an agent entry: an enabled match hands the failure to an investigate
+// fork named for R3 and records the recovery as applied. The agent, not the
+// server, then proves presence and lands the recoverable branch.
+func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+		for i := range c.Recovery.Entries {
+			c.Recovery.Entries[i].Enabled = true
+		}
+	})
+	registerLaunch(h)
+
+	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousLand, "done but commits missing from epic-a"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		for _, tk := range epicTickets(t, h).Tickets {
+			if tk.Identifier == "01a" && tk.Type == "investigate" {
+				body, _ := os.ReadFile(tk.Path)
+				return strings.Contains(string(body), "R3")
+			}
+		}
+		return false
+	})
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AmbiguousLand) && ev.Outcome == "proj:epic-a/01a" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

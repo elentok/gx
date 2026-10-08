@@ -1,6 +1,7 @@
 package recovery
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/events"
@@ -129,6 +130,57 @@ func TestR2MatchesOnlyAZeroCommitEndingInABareCallLiteral(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e, ok := c.Match(tt.seq)
 			if ok != tt.want || (ok && e.ID != "R2") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestDefaultR3LaunchesDisabledAsMediumAgentEntriesWithVerifyAndLand(t *testing.T) {
+	c := Default()
+	var n int
+	for _, e := range c.Entries {
+		if e.ID != "R3" {
+			continue
+		}
+		n++
+		if e.Enabled || e.Executor != ExecutorAgent || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"verify", "land"}) {
+			t.Errorf("R3 = %+v, want disabled medium agent entry with verify and land", e)
+		}
+	}
+	if n != 2 {
+		t.Fatalf("R3 entries = %d, want 2 (one per signature)", n)
+	}
+	if _, ok := c.Match([]Event{{Type: events.NeedsRepair, Kind: events.AmbiguousLand}}); ok {
+		t.Error("disabled R3 must not match")
+	}
+}
+
+func TestR3MatchesAnUnrecoverableDoneTicketOrAZeroCommitClaimingPresence(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	zero := func(text string) []Event { return []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: text}} }
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"done ticket with commits missing", []Event{{Type: events.NeedsRepair, Kind: events.AmbiguousLand}}, true},
+		{"zero-commit claiming the work is present", zero("The feature is already implemented on the branch."), true},
+		{"claim in mixed case", zero("Already merged via the sibling ticket."), true},
+		{"zero-commit with no claim", zero("Done."), false},
+		{"zero-commit with no text", zero(""), false},
+		{"claim on another kind", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane, Text: "already implemented"}}, false},
+		{"claim on another type", []Event{{Type: events.NeedsRepair, Kind: events.ZeroCommit, Text: "already implemented"}}, false},
+		{"unrelated needs-repair kind", []Event{{Type: events.NeedsRepair, Kind: events.BudgetKilled}}, false},
+		{"claim only on an earlier event", []Event{{Type: events.IterationFinished, Text: "already implemented"}, {Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Done."}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R3") {
 				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
 			}
 		})

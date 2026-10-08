@@ -4,6 +4,7 @@
 package recovery
 
 import (
+	"regexp"
 	"slices"
 
 	"github.com/elentok/gx/events"
@@ -64,7 +65,32 @@ var NotCatalogued = map[string]string{
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
 // they land.
 func Default() Catalog {
-	return Catalog{Enabled: true, Entries: []Entry{r1Spin(), r2UnexecutedToolCall()}}
+	entries := []Entry{r1Spin(), r2UnexecutedToolCall()}
+	return Catalog{Enabled: true, Entries: append(entries, r3LandRecoverable()...)}
+}
+
+var claimsWorkPresentRE = regexp.MustCompile(`(?i)\balready (present|implemented|merged|landed|exists?|done|on the (feature )?branch)\b`)
+
+// r3LandRecoverable is work that is on the feature branch (or a recoverable
+// branch) but gx cannot attribute: a done ticket whose commits are missing, or
+// a zero-commit finish whose last turn claims the work is already present.
+// One catalogued failure with two signatures, so two entries sharing the ID
+// (a disable by ID covers both). An agent proves presence with verify and the
+// acceptance criteria before it lands a recoverable branch. Launches
+// disabled: there is no S0 event data showing it occurs yet.
+func r3LandRecoverable() []Entry {
+	base := Entry{
+		ID: "R3", Executor: ExecutorAgent, Authority: AuthorityMedium,
+		Verbs: []string{"verify", "land"},
+	}
+	unrecoverable := base
+	unrecoverable.Type, unrecoverable.Kind = events.NeedsRepair, events.AmbiguousLand
+	claimed := base
+	claimed.Type, claimed.Kind = events.NeedsAnswer, events.ZeroCommit
+	claimed.Predicate = func(seq []Event) bool {
+		return claimsWorkPresentRE.MatchString(seq[len(seq)-1].Text)
+	}
+	return []Entry{unrecoverable, claimed}
 }
 
 // r2UnexecutedToolCall is a zero-commit finish whose last assistant turn is only
