@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/ralphloop"
@@ -61,27 +62,32 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	}
 	root := addr.Project + ":" + addr.Epic
 	ahead, queued := s.rootsAhead(root)
-	projectRunning, projectLimit, projectFull := s.projectAtCap(addr.Project)
-	switch {
-	case !queued:
+	if !queued {
 		ex.Verdict = VerdictNotQueued
-	case s.registry.countRoot(root) >= s.perRootLimit():
-		ex.Verdict, ex.Reason = VerdictConcurrencyCap, fmt.Sprintf("%d of %d agents in use for this epic", s.registry.countRoot(root), s.perRootLimit())
-	case projectFull:
-		ex.Verdict, ex.Reason = VerdictConcurrencyCap, fmt.Sprintf("%d of %d agents in use for this project", projectRunning, projectLimit)
+		return ex
+	}
+	// Every full cap is named, not just the first one hit.
+	var full []string
+	if n, limit := s.registry.countRoot(root), s.perRootLimit(); n >= limit {
+		full = append(full, fmt.Sprintf("epic cap %d/%d", n, limit))
+	}
+	if n, limit, atCap := s.projectAtCap(addr.Project); atCap {
+		full = append(full, fmt.Sprintf("project cap %d/%d", n, limit))
+	}
+	limit, running := s.concurrencyLimit(), s.registry.count()
+	free := limit - running
+	if free <= 0 {
+		full = append(full, fmt.Sprintf("global cap %d/%d", running, limit))
+	}
+	switch {
+	case len(full) > 0:
+		ex.Verdict, ex.Reason = VerdictConcurrencyCap, strings.Join(full, ", ")
 	case frontierIndex(e, t) >= s.perRootLimit()-s.registry.countRoot(root):
 		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "earlier tickets of the epic go first"
+	case ahead >= free:
+		ex.Verdict, ex.Reason = VerdictWaitingInQueue, fmt.Sprintf("%d queued root(s) ahead for %d free slot(s)", ahead, free)
 	default:
-		limit, running := s.concurrencyLimit(), s.registry.count()
-		free := limit - running
-		switch {
-		case free <= 0:
-			ex.Verdict, ex.Reason = VerdictConcurrencyCap, fmt.Sprintf("%d of %d slots in use", running, limit)
-		case ahead >= free:
-			ex.Verdict, ex.Reason = VerdictWaitingInQueue, fmt.Sprintf("%d queued root(s) ahead for %d free slot(s)", ahead, free)
-		default:
-			ex.Verdict = VerdictEligible
-		}
+		ex.Verdict = VerdictEligible
 	}
 	return ex
 }

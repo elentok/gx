@@ -568,6 +568,36 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 	t.Fatal("no verdict-change event for the second root")
 }
 
+// Seam A: a ticket waiting on two full caps explains both, with counts.
+func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
+	body := fmt.Sprintf(`{"name":"proj","repo":%q,"max-agents":1}`, repo)
+	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.PollInterval = 50 * time.Millisecond
+		c.MaxAgents = 1
+	})
+	registerLaunch(h)
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	ex, err := h.Client.Explain(ctx, "proj:epic-b/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "project cap 1/1, global cap 1/1"; ex.Verdict != server.VerdictConcurrencyCap || ex.Reason != want {
+		t.Errorf("explain = %+v, want %s: %s", ex, server.VerdictConcurrencyCap, want)
+	}
+}
+
 // Seam A: the cap is global, so roots of different projects share it, and the
 // queue is plain FIFO across projects.
 func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {

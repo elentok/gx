@@ -76,6 +76,46 @@ func TestLoadExecutionQueueConfigPreservesUnspecifiedDefault(t *testing.T) {
 	}
 }
 
+func TestLoadDeprecatedCapKeys(t *testing.T) {
+	cases := []struct {
+		name, json   string
+		wantPerEpic  int
+		wantWarnings int
+	}{
+		{"old per-epic key applies with a warning", `{"execution-queue":{"max-concurrent-tickets-per-epic":4}}`, 4, 1},
+		{"new key applies silently", `{"execution-queue":{"max-agents-per-epic":3}}`, 3, 0},
+		{"new key wins over the old one", `{"execution-queue":{"max-agents-per-epic":3,"max-concurrent-tickets-per-epic":4}}`, 3, 1},
+		{"max-concurrent-epics is ignored with a warning", `{"execution-queue":{"max-concurrent-epics":9}}`, 2, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			prev := userConfigDirFn
+			userConfigDirFn = func() (string, error) { return tmp, nil }
+			t.Cleanup(func() { userConfigDirFn = prev })
+			if err := os.MkdirAll(filepath.Join(tmp, "gx"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(tmp, "gx", "config.json"), []byte(tc.json), 0644); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic; got != tc.wantPerEpic {
+				t.Errorf("per-epic = %d, want %d", got, tc.wantPerEpic)
+			}
+			if got := cfg.ExecutionQueue.MaxConcurrentEpics; got != 2 {
+				t.Errorf("MaxConcurrentEpics = %d, want default 2", got)
+			}
+			if len(cfg.Warnings) != tc.wantWarnings {
+				t.Errorf("warnings = %q, want %d", cfg.Warnings, tc.wantWarnings)
+			}
+		})
+	}
+}
+
 func TestLoadSubscriptionConfigDefaultsToUnsuppressed(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn
@@ -126,7 +166,7 @@ func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	path := filepath.Join(dir, "config.json")
-	if err := os.WriteFile(path, []byte(`{"execution-queue":{"max-concurrent-tickets-per-epic":0,"max-concurrent-epics":-3}}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"execution-queue":{"max-agents-per-epic":0,"max-agents":-3}}`), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -134,7 +174,7 @@ func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic != 1 || cfg.ExecutionQueue.MaxConcurrentEpics != 1 {
+	if cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic != 1 || cfg.ExecutionQueue.MaxAgents != 1 {
 		t.Fatalf("ExecutionQueue = %+v, want both limits clamped to 1", cfg.ExecutionQueue)
 	}
 }

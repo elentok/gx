@@ -66,6 +66,8 @@ type Config struct {
 	// and the orchestrator server. Global only: never a per-project key.
 	Orchestrator string       `json:"orchestrator"`
 	Server       ServerConfig `json:"server"`
+	// Warnings are problems Load found but tolerated, such as deprecated keys.
+	Warnings []string `json:"-"`
 }
 
 // ServerConfig configures the orchestrator server.
@@ -137,8 +139,9 @@ func Load() (Config, error) {
 		NameAliases           map[string]string `json:"name-aliases"`
 		Log                   *LogConfig        `json:"log"`
 		ExecutionQueue        *struct {
-			MaxConcurrentTicketsPerEpic *int    `json:"max-concurrent-tickets-per-epic"`
-			MaxConcurrentEpics          *int    `json:"max-concurrent-epics"`
+			MaxAgentsPerEpic            *int    `json:"max-agents-per-epic"`
+			MaxConcurrentTicketsPerEpic *int    `json:"max-concurrent-tickets-per-epic"` // deprecated alias
+			MaxConcurrentEpics          *int    `json:"max-concurrent-epics"`            // deprecated, ignored
 			MaxAgents                   *int    `json:"max-agents"`
 			RetryStormLaunches          *int    `json:"retry-storm-launches"`
 			SpinCycles                  *int    `json:"spin-cycles"`
@@ -217,11 +220,15 @@ func Load() (Config, error) {
 		}
 	}
 	if raw.ExecutionQueue != nil {
-		if raw.ExecutionQueue.MaxConcurrentTicketsPerEpic != nil {
-			cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentTicketsPerEpic)
+		if old := raw.ExecutionQueue.MaxConcurrentTicketsPerEpic; old != nil {
+			cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*old)
+			cfg.Warnings = append(cfg.Warnings, "execution-queue.max-concurrent-tickets-per-epic is deprecated: use execution-queue.max-agents-per-epic")
+		}
+		if raw.ExecutionQueue.MaxAgentsPerEpic != nil { // wins over the alias
+			cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxAgentsPerEpic)
 		}
 		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
-			cfg.ExecutionQueue.MaxConcurrentEpics = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxConcurrentEpics)
+			cfg.Warnings = append(cfg.Warnings, "execution-queue.max-concurrent-epics is deprecated and ignored: use execution-queue.max-agents to cap running agents")
 		}
 		if raw.ExecutionQueue.MaxAgents != nil {
 			cfg.ExecutionQueue.MaxAgents = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxAgents)

@@ -254,8 +254,8 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `stage-diff-context-lines` | integer (0–20)                  | `1`       | Number of context lines shown around each diff hunk in the staging view.                                                                                                                     |
 | `input-modal-bottom`       | integer \| `"N%"` \| `"center"` | `"5%"`    | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
 | `name-aliases`             | object                          | `{}`      | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression.                                                                                     |
-| `execution-queue.max-concurrent-tickets-per-epic` | integer (≥1) | `2` | Maximum tickets that may run concurrently within one epic. |
-| `execution-queue.max-concurrent-epics` | integer (≥1) | `2` | Maximum epics that may run concurrently in this `gx` process. |
+| `execution-queue.max-agents-per-epic` | integer (≥1) | `2` | Maximum agents that may run concurrently within one epic. Replaces `max-concurrent-tickets-per-epic`, still read as an alias with a warning. |
+| `execution-queue.max-concurrent-epics` | integer (≥1) | `2` | Deprecated: ignored, with a warning. |
 | `execution-queue.retry-storm-launches` | integer (≥1) | `3` | Consecutive failed launches of one ticket before it is parked `needs-repair` as `retry-exhausted`. |
 | `execution-queue.spin-cycles` | integer (≥1) | `3` | Park/re-claim cycles of one ticket within `spin-window` before it is quarantined `needs-repair` as `spinning`. |
 | `execution-queue.spin-window` | duration string | `"5m"` | Window for counting `spin-cycles` (Go duration, e.g. `"90s"`). Unparsable or non-positive values keep the default. |
