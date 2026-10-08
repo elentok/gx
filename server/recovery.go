@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/transcript"
 )
 
 // recoveryPlan is the recovery a failure gets: a catalog entry, an
@@ -311,19 +312,37 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 
 // failureSequence is the ticket's events as the matcher sees them, ending in
 // the failure itself (already appended by the park). A logged failure with no
-// kind, like the loop's gate hold, takes the failure's.
+// kind, like the loop's gate hold, takes the failure's. A logged failure also
+// carries its session's last assistant text, which R2 and R3 read.
 func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
 	var seq []recovery.Event
 	for _, ev := range log {
 		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason, Time: ev.Time})
 	}
-	switch n := len(seq); {
-	case n == 0 || seq[n-1].Type != f.Type:
-		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind, Reason: f.Reason, Time: time.Now()})
-	case seq[n-1].Kind == "":
+	n := len(seq)
+	if n == 0 || seq[n-1].Type != f.Type {
+		return append(seq, recovery.Event{Type: f.Type, Kind: f.Kind, Reason: f.Reason, Time: time.Now()})
+	}
+	if seq[n-1].Kind == "" {
 		seq[n-1].Kind = f.Kind
 	}
+	seq[n-1].Text = lastAssistantText(log[n-1])
 	return seq
+}
+
+// lastAssistantText is the last assistant text of the session a logged event
+// names, or "" when it names none or the transcript cannot be read. Only
+// Claude transcripts are read.
+func lastAssistantText(ev ralphloop.Event) string {
+	if ev.AgentSession == "" || ev.Cwd == "" || (ev.Agent != "" && ev.Agent != ralphloop.AgentClaude) {
+		return ""
+	}
+	path, err := transcript.Path(ev.Cwd, ev.AgentSession)
+	if err != nil {
+		return ""
+	}
+	text, _, _ := transcript.LastAssistantText(path)
+	return text
 }
 
 func (s *Server) recordRecovery(ref ticketRef, typ events.Type, f recovery.Failure, entryID, outcome string) {

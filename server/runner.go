@@ -541,7 +541,9 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 			reason = "iteration ended without landing the ticket"
 		}
 		s.events.publish(EventIterationParked, ticketAddr)
-		s.notifyPark(addr, one.Ticket.Path, out.Kind, reason)
+		if !s.holdParkForRecovery(addr, one.Ticket.Path, out.Kind, reason) {
+			s.notifyPark(addr, one.Ticket.Path, out.Kind, reason)
+		}
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)

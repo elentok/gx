@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/transcript"
 )
 
 // startRecovery starts a server whose catalog has one test-only low-authority
@@ -589,9 +591,7 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	})
 }
 
-// startR3 starts a server with the default catalog fully enabled. The server
-// does not read the transcript yet, so the commitless-done entry's claim
-// predicate is dropped to let a bare zero-commit park reach it.
+// startR3 starts a server with the default catalog fully enabled.
 func startR3(t *testing.T) *servertest.Harness {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
@@ -600,22 +600,82 @@ func startR3(t *testing.T) *servertest.Harness {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
-		for i, e := range c.Recovery.Entries {
+		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
-			if e.Executor == recovery.ExecutorRule && e.Authority == recovery.AuthorityHigh {
-				c.Recovery.Entries[i].Predicate = nil
-			}
 		}
 	})
 	registerLaunch(h)
 	return h
 }
 
-func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
-	h := startR3(t)
-	if err := h.Server.ParkAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
+// runToZeroCommitPark queues 01 under an agent whose every turn ends with
+// last as its final assistant text and no commit, so the loop parks it
+// zero-commit the way a real iteration does.
+func runToZeroCommitPark(t *testing.T, h *servertest.Harness, last string) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	_, _, cwd := registerLaunch(h)
+	agent := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "agent_session": map[string]any{"value": "s1"}}}
+	turn := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"content": []map[string]any{{"type": "text", "text": last}}}})
+		path := transcript.PathIn(home, *cwd, "s1")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		return agent, herdrfake.Identities{}, os.WriteFile(path, append(line, '\n'), 0o644)
+	}
+	reply := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return agent, herdrfake.Identities{}, nil
+	}
+	h.Herdr.Register("agent", "start", reply)
+	h.Herdr.Register("agent", "get", reply)
+	h.Herdr.Register("agent", "wait", reply)
+	h.Herdr.Register("agent", "prompt", turn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	// The loop's own finish debounce outlasts waitFor.
+	servertest.WaitForEvent(ctx, t, evs, server.EventIterationParked, "proj:epic-a/01")
+}
+
+// R2 and R3 read the transcript the park's session left: the matcher sees the
+// agent's last words with no test injecting them.
+func TestRecovery_ZeroCommitParkMatchesOnItsTranscriptText(t *testing.T) {
+	for _, tc := range []struct{ name, last, entry string }{
+		{"R2", `Bash({"command": "go test ./..."})`, "R2"},
+		{"R3", "The feature is already implemented on the feature branch.", "R3"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := startR3(t)
+			runToZeroCommitPark(t, h, tc.last)
+			waitFor(t, func() bool {
+				for _, tk := range epicTickets(t, h).Tickets {
+					if tk.Identifier == "01a" && tk.Type == "investigate" {
+						body, _ := os.ReadFile(tk.Path)
+						return strings.Contains(string(body), tc.entry)
+					}
+				}
+				return false
+			})
+		})
+	}
+}
+
+func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
+	h := startR3(t)
+	runToZeroCommitPark(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
