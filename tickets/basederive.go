@@ -12,11 +12,12 @@ import (
 // An explicit base: wins (the ticket's, else the epic's): a node ref gives its
 // epic's feature branch while that node is unlanded and trunk once it lands,
 // and anything that is not a node ref is a raw branch. Otherwise the base is
-// the one unlanded commitful blocker's feature branch, or trunk when there is
-// none. Two or more unlanded blockers are ambiguous; see the leaf tickets for
-// parking that. Under the on-landed landing policy (onLanded) a blocker
-// releases its dependents only once it has landed, so a derived base is always
-// trunk; only an explicit base: can point elsewhere.
+// the one commitful blocker's feature branch, or trunk when there is none.
+// Two or more such blockers are ambiguous; see the leaf tickets for parking
+// that. Under the on-landed landing policy (onLanded) a blocker releases its
+// dependents only once it has landed, so a derived base is always trunk; only
+// an explicit base: can point elsewhere. Under on-done the blocker's branch is
+// the base even once the blocker is done.
 func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLanded bool) (string, error) {
 	g := newProjectGraph(project, epics)
 	var e Epic
@@ -38,10 +39,12 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLande
 	var branches []string
 	for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
 		key, err := g.resolve(epic, ref)
-		if err != nil || g.tickets[key].Commitless {
+		if err != nil || g.tickets[key].Commitless || g.tickets[key].IsCancelled() {
 			continue
 		}
-		if b := unlandedBranch(g, key); b != "" && !slices.Contains(branches, b) {
+		// on-done: a done blocker is released but its branch has not reached
+		// trunk, so the dependent still bases on that branch.
+		if b := key[:strings.Index(key, "/")]; !slices.Contains(branches, b) {
 			branches = append(branches, b)
 		}
 	}

@@ -64,8 +64,9 @@ func TestDeriveRootBase(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		"unlanded blocker gives its branch": {epics: baseEpics("open"), want: "a"},
-		"landed blocker gives trunk":        {epics: baseEpics("done"), want: ""},
+		"unlanded blocker gives its branch":   {epics: baseEpics("open"), want: "a"},
+		"done blocker still gives its branch": {epics: baseEpics("done"), want: "a"},
+		"cancelled blocker gives trunk":       {epics: baseEpics("cancelled"), want: ""},
 		"no blockers gives trunk": {epics: func() []Epic {
 			e := baseEpics("open")
 			e[1].BlockedBy = nil

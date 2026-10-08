@@ -60,6 +60,10 @@ type ProjectFile struct {
 // once it has landed on trunk. It is the default.
 const LandingOnLanded = "on-landed"
 
+// LandingOnDone is the landing policy where a blocker releases its dependents
+// once it is done, before it lands; they base on the blocker's branch.
+const LandingOnDone = "on-done"
+
 // LandingPolicy is the project's landing policy; absent or empty means the default.
 func (pf ProjectFile) LandingPolicy() string {
 	if pf.Landing == nil || *pf.Landing == "" {
