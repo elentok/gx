@@ -234,10 +234,10 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 			}
 		}
 		item := QueueItem{Address: addr, Agent: string(agent)}
-			if req.Front {
-				return append([]QueueItem{item}, items...), nil
-			}
-			return append(items, item), nil
+		if req.Front {
+			return append([]QueueItem{item}, items...), nil
+		}
+		return append(items, item), nil
 	})
 }
 
