@@ -254,7 +254,7 @@ code-writing type. _Avoid_: `task` (retired name; the loader accepts it as an al
 **Ticket store** — the one global git-backed directory holding every project's tickets and event
 logs, laid out as `<store>/<project>/<epic>/…`. Markdown is the truth and any server state is an
 index rebuilt from it (ADR 0026). Agents, the CLI and humans never run git in it. _Avoid_: bare
-"store" — it collides with `QueueStore` and the Go `*Store` types.
+"store" — it collides with the Go `*Store` types.
 
 **Address** — a ticket's canonical name, `project:epic/06` (ADR 0027). Short forms (`06`,
 `epic/06`) are input only and are resolved before anything is stored. _Avoid_: path (agents name
@@ -553,7 +553,8 @@ when it is deactivated.
 ## Queue and Attach Lifecycle (Queue Tab)
 
 **Queue** — the single, per-repo collection of checked/queued tickets across all epics
-(`QueueStore`, keyed off the repo's `.scratch` dir). One Queue per repo, not per epic.
+(held only by the orchestrator server; with no server the Queue tab is empty). One Queue per repo,
+not per epic.
 
 **Epic run** — the per-epic ralph-loop execution, owned by the orchestrator server. Several can run
 concurrently, up to the concurrency slot cap.

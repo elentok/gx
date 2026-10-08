@@ -251,7 +251,7 @@ kept as history of what the code did at the time, not as a description of today'
   `m.pendingEpics` is process-local, in-memory-only state, populated exclusively by
   `startCheckedEpic` (Enter key) or `handleDetachedLiveConfirmed`. If the `gx` TUI process
   restarts (crash, reattach) after an epic was checked/queued but before its turn came up, the
-  new process's `pendingEpics` starts empty — `queue-state.json`'s `items` still durably marks
+  new process's `pendingEpics` starts empty — the TUI's (since-deleted) queue state file still marked
   the epic's tickets `"pending"`, but nothing reconstructs `pendingEpics` from that on load.
   `cmdCheckDetachedLive` (`queue_reattach.go`) only covers the *other* stranded case (a ticket
   left `claimed`/`needs-repair` with a live herdr tab) — an epic that never got claimed at all

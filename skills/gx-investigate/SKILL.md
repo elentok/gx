@@ -51,9 +51,6 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
   `--event` repeatable) rather than hand-rolling a `python3`/`jq` filter. This is usually the
   fastest way to see *why* the scheduler picked or skipped a ticket, especially for "it's in the
   tree but never starts" reports.
-- **`~/.config/gx/queue-state.json`** — the Queue tab's own UI bookkeeping (which tickets are
-  checked, their display order). A cache that can drift from the tickets it describes — never the
-  source of truth for ticket status.
 - **`~/.config/gx/config.json`** — effective gx config (`gx config show` prints it resolved).
 - **Agent session transcript** — `~/.claude/projects/<slugified-cwd>/<session-id>.jsonl`, keyed by
   the `Cwd`/`AgentSession` recorded on that ticket's `iteration-started` event. Locate it with
@@ -78,15 +75,13 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
 3. Read the affected ticket with `gx tickets show <addr>` and check it against gx-local-tracker.md's
    field reference — most "queued but stuck" reports are a frontmatter field (`parent`,
    `blocked_by`, `status`) not doing what the UI implies, not a scheduler logic bug.
-4. If the discrepancy is between the Queue tab and the tickets themselves, check
-   `queue-state.json` for drift.
-5. If the symptom is inside one agent session (hung, wrong edit, crashed), pull that iteration's
+4. If the symptom is inside one agent session (hung, wrong edit, crashed), pull that iteration's
    transcript via `gx claude session-path <session-id>`, using the `Cwd`/`AgentSession` on its
    `iteration-started` event to get the session id.
-6. Before concluding a symptom is a live bug, rule out a notification mute: check
+5. Before concluding a symptom is a live bug, rule out a notification mute: check
    `~/.config/gx/notifications-state.json` and the affected ticket's own `Mutes` frontmatter field.
    A muted event can look identical to a stuck ticket or a scheduler that silently skipped it.
-7. Once you have a concrete hypothesis, verify it against the source it actually lives in
+6. Once you have a concrete hypothesis, verify it against the source it actually lives in
    (`ralphloop/loop.go`, `scope.go`, `schedule.go`, `tickets/status.go`) — this file is a map, not
    a substitute for reading the code the bug is in.
 

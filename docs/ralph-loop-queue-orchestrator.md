@@ -319,8 +319,8 @@ is deliberately ambiguous on disk.
 The Queue tab keeps a list of checked-but-not-yet-started epics (`pendingEpics`) **purely in
 memory**, waiting for a `MaxConcurrentEpics` slot to free. If the `gx` process restarts while an
 epic is sitting in that queue — before its turn ever comes — the epic silently vanishes: the
-durable "checked" selection survives in `queue-state.json`, but nothing re-derives `pendingEpics`
-from it on the next load.
+durable "checked" selection survived in the TUI's since-deleted state file, but nothing re-derived
+`pendingEpics` from it on the next load.
 
 The subtlety: **"checked, Enter never pressed" and "checked, was queued, restarted before its
 turn" look identical on disk.** A first fix attempt auto-requeued on the checked signal alone and

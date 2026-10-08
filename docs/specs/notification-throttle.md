@@ -164,7 +164,7 @@ existing `follow-ups` backlog epic instead of the epic under investigation.
   then suppress every further send attempt on that transport (both the gate's decision and,
   functionally, the batch queue's flush — see the suppressed-flush handling above) until re-enabled.
   Global mute state persists to `~/.config/gx/notifications-state.json` (matching the existing
-  `queue-state.json` convention under `config.UserConfigDir`, not a new state-directory
+  state-file convention under `config.UserConfigDir`, not a new state-directory
   convention), one entry per transport: `{muted: bool, tripped_at: timestamp, reason: "auto-trip" |
   "manual-disable"}` plus the trailing event/send series and trip history described below —
   deliberately survives process restart, so a crash-loop can't self-heal into repeating the storm.
