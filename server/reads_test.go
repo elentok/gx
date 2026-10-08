@@ -142,3 +142,26 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 		t.Errorf("queue = %+v", q)
 	}
 }
+
+func TestSnapshot_CarriesTheLandingMetrics(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	with := strings.Replace(string(raw), "status: open", "status: done\nactual_context_window: 66395\nelapsed_time: 316\ncompactions: 2", 1)
+	if err := os.WriteFile(path, []byte(with), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Tickets) != 1 || snap.Tickets[0].ActualContextWindow != 66395 || snap.Tickets[0].ElapsedTime != 316 || snap.Tickets[0].Compactions != 2 {
+		t.Errorf("tickets = %+v, want the landing metrics", snap.Tickets)
+	}
+}

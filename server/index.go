@@ -29,6 +29,13 @@ type TicketInfo struct {
 	// ClaimedAt is when the server launched the claimed ticket's iteration;
 	// filled in by the snapshot handler, zero while the ticket is not running.
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
+	// The landing-time metrics the Queue header and the preview sum up; zero
+	// until the ticket lands.
+	ActualContextWindow   int     `json:"actual_context_window,omitempty"`
+	ExpectedContextWindow int     `json:"expected_context_window,omitempty"`
+	ElapsedTime           int     `json:"elapsed_time,omitempty"`
+	ActualCost            float64 `json:"actual_cost,omitempty"`
+	Compactions           int     `json:"compactions,omitempty"`
 
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.
@@ -155,6 +162,12 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		Type:      t.Type,
 		BlockedBy: t.BlockedBy,
 		File:      t.Path,
+
+		ActualContextWindow:   t.ActualContextWindow,
+		ExpectedContextWindow: t.ExpectedContextWindow,
+		ElapsedTime:           t.ElapsedTime,
+		ActualCost:            t.ActualCost,
+		Compactions:           t.Compactions,
 	}
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)

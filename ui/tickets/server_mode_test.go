@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/viewmodel"
 )
 
 type fakeServerAPI struct {
@@ -523,5 +524,19 @@ func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
 	}
 	if !slices.Equal(calls, []string{"changed gx:alpha/01", "unpark gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
+	vm := viewmodel.State{}.ApplySnapshot(server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
+	}})
+	epics := epicsFromViewModel(vm)
+	if len(epics) != 1 || len(epics[0].Tickets) != 1 {
+		t.Fatalf("epics = %+v", epics)
+	}
+	got := epics[0].Tickets[0]
+	if got.ActualContextWindow != 66395 || got.ElapsedTime != 316 || got.Compactions != 2 {
+		t.Errorf("ticket = %+v, want the landing metrics so the summary can add them up", got)
 	}
 }
