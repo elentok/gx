@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -24,8 +26,13 @@ func (s *Server) recoverFrom(f recovery.Failure) {
 	if err != nil || !ok || ref.ticket.NoRecover {
 		return
 	}
-	entry, ok := s.cfg.Recovery.Match(s.failureSequence(ref, f))
+	log := s.ticketEvents(ref, f)
+	entry, ok := s.cfg.Recovery.Match(failureSequence(log, f))
 	if !ok || !entry.Runnable(f) {
+		return
+	}
+	if why := guardRailStop(log, f); why != "" {
+		s.recordRecovery(ref, events.RecoveryEscalated, f, why, "")
 		return
 	}
 	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
@@ -37,18 +44,63 @@ func (s *Server) recoverFrom(f recovery.Failure) {
 	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID, outcome)
 }
 
-// failureSequence is the ticket's run-log events, oldest first, ending in the
-// failure itself (already appended by the park).
-func (s *Server) failureSequence(ref ticketRef, f recovery.Failure) []recovery.Event {
+// Guard-rail caps on automatic recovery, counted from the run log so a resume
+// or a server restart cannot clear them.
+const (
+	maxRecoveriesPerKind   = 1
+	maxRecoveriesPerTicket = 3
+)
+
+// ticketEvents is the ticket's run-log events, oldest first.
+func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Event {
 	log, _, err := ralphloop.ReadEvents(ref.projectDir, ref.addr.Epic)
 	if err != nil {
 		s.log.Warn("recovery cannot read the run log", "ticket", f.Address, "err", err)
 	}
-	var seq []recovery.Event
+	var mine []ralphloop.Event
 	for _, ev := range log {
 		if ev.Ticket == ref.addr.ID {
-			seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind)})
+			mine = append(mine, ev)
 		}
+	}
+	return mine
+}
+
+// guardRailStop says why automatic recovery must not run for f, or "" when it
+// may. A failure after a recovery that no landing, reset or manual land has
+// since cleared is a failed recovery and names both failures; otherwise the
+// per-kind and per-ticket caps apply.
+func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
+	var applied int
+	perKind := map[string]int{}
+	var last *ralphloop.Event
+	for i, ev := range log {
+		switch events.Type(ev.Type) {
+		case events.RecoveryApplied:
+			applied++
+			perKind[ev.Kind]++
+			last = &log[i]
+		case events.CherryPicked, events.TicketReset, events.ManualLand:
+			last = nil
+		}
+	}
+	switch {
+	case last != nil:
+		return fmt.Sprintf("recovery %s for %s failed: ticket failed again with %s", last.Reason, last.Kind, f.Kind)
+	case perKind[string(f.Kind)] >= maxRecoveriesPerKind:
+		return fmt.Sprintf("already recovered %s %d time(s)", f.Kind, perKind[string(f.Kind)])
+	case applied >= maxRecoveriesPerTicket:
+		return fmt.Sprintf("already recovered this ticket %d times", applied)
+	}
+	return ""
+}
+
+// failureSequence is the ticket's events as the matcher sees them, ending in
+// the failure itself (already appended by the park).
+func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
+	var seq []recovery.Event
+	for _, ev := range log {
+		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind)})
 	}
 	if len(seq) == 0 || seq[len(seq)-1].Type != f.Type {
 		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind})
