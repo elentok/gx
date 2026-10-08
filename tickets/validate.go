@@ -27,6 +27,9 @@ func ValidateProject(projectDir string) error {
 	vcsNone := isVCSNone(projectDir)
 	var errs []error
 	for _, epic := range epics {
+		if !epic.HasTicketMD {
+			errs = append(errs, fmt.Errorf("%s: epic directory has no ticket.md (run `gx tickets migrate`)", epic.Path))
+		}
 		for _, t := range epic.Tickets {
 			if _, err := schema.ParseTicket(t.Path); err != nil {
 				errs = append(errs, err)

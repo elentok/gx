@@ -51,7 +51,7 @@ func formatElapsed(seconds int) string {
 	}
 }
 
-// formatDuration renders a wall-clock span (epic.yaml's started_at ->
+// formatDuration renders a wall-clock span (ticket.md's started_at ->
 // completed_at) as "Xh Ym"/"Xd Yh"/"Xm" — distinct from formatElapsed's
 // per-ticket "12m34s" seconds precision, since a duration spanning idle time
 // between ticket runs has no meaningful seconds component. Days roll over

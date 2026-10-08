@@ -33,17 +33,16 @@ type Epic struct {
 	MapBody string // the map's text (ticket.md body or map.md), only set when IsMap
 	Tickets []Ticket
 
-	// HasTicketMD is true when the epic uses the store shape: a ticket.md
-	// entry file whose frontmatter supplies Status, BlockedBy, Base and
-	// timing. Old-shape epics (epic.yaml sidecar) leave the first four zero.
+	// HasTicketMD is true when the epic has its ticket.md entry file, whose
+	// frontmatter supplies Status, BlockedBy, Base and timing. An epic
+	// without one fails ValidateProject.
 	HasTicketMD bool
 	Status      string
 	BlockedBy   []string
 	Base        string
 
-	// StartedAt and CompletedAt come from ticket.md's frontmatter, or the
-	// old-shape epic.yaml sidecar (see loadEpicTiming). Zero when neither
-	// sets the field.
+	// StartedAt and CompletedAt come from ticket.md's frontmatter; zero when
+	// it doesn't set the field.
 	StartedAt   time.Time
 	CompletedAt time.Time
 }
@@ -71,7 +70,7 @@ func (e Epic) DoneCount() int {
 	return e.TotalCount() - e.OpenCount()
 }
 
-// CompletionDuration returns the epic's wall-clock span from epic.yaml's
+// CompletionDuration returns the epic's wall-clock span from ticket.md's
 // started_at to completed_at, and whether both are set — an epic missing
 // either (not yet done, or predating this feature) reports ok=false.
 func (e Epic) CompletionDuration() (duration time.Duration, ok bool) {

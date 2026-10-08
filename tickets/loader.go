@@ -48,9 +48,7 @@ func loadEpic(scratchDir, name string) Epic {
 		epic.MapBody = string(raw)
 	}
 
-	if !loadEpicTicketMD(&epic) {
-		epic.StartedAt, epic.CompletedAt = loadEpicTiming(epicPath)
-	}
+	loadEpicTicketMD(&epic)
 
 	issuesDir := filepath.Join(epicPath, "issues")
 	issueEntries, err := os.ReadDir(issuesDir)
@@ -170,23 +168,22 @@ func WriteEpicTicketMD(epicPath string, status schema.Status) error {
 	return err
 }
 
-// loadEpicTicketMD fills epic from its ticket.md frontmatter and reports
-// whether the epic has one. An unparsable ticket.md still counts as the new
-// shape, so a broken file doesn't silently fall back to epic.yaml.
-func loadEpicTicketMD(epic *Epic) bool {
+// loadEpicTicketMD fills epic from its ticket.md frontmatter. A missing
+// ticket.md leaves HasTicketMD false, which ValidateProject reports.
+func loadEpicTicketMD(epic *Epic) {
 	raw, err := os.ReadFile(filepath.Join(epic.Path, "ticket.md"))
 	if err != nil {
-		return false
+		return
 	}
 	epic.HasTicketMD = true
 
 	fm, ok := schema.FrontmatterYAML(string(raw))
 	if !ok {
-		return true
+		return
 	}
 	var wire ticketMDYAML
 	if err := yaml.Unmarshal([]byte(fm), &wire); err != nil {
-		return true
+		return
 	}
 	if wire.Kind == KindMap {
 		epic.IsMap = true
@@ -201,49 +198,22 @@ func loadEpicTicketMD(epic *Epic) bool {
 	if wire.CompletedAt != nil {
 		epic.CompletedAt = *wire.CompletedAt
 	}
-	return true
 }
 
-// epicYAML is the on-disk shape of an epic's optional `epic.yaml` sidecar
-// file (see loadEpicTiming). Both fields are optional: an epic with no
-// epic.yaml, or one that omits a field, leaves the corresponding Epic
-// timestamp zero-valued rather than erroring.
-type epicYAML struct {
+// epicTiming is an epic's optional started_at/completed_at pair, as stored in
+// ticket.md's frontmatter (and in migrate's old-shape epic.yaml sidecar).
+type epicTiming struct {
 	StartedAt   *time.Time `yaml:"started_at,omitempty"`
 	CompletedAt *time.Time `yaml:"completed_at,omitempty"`
 }
 
-// loadEpicTiming reads epicPath's epic.yaml sidecar, if present, for the
-// epic's started_at/completed_at timestamps. A missing or unparsable file is
-// not an error here — it just leaves both timestamps zero, the same as an
-// epic with no timing data recorded yet.
-func loadEpicTiming(epicPath string) (startedAt, completedAt time.Time) {
-	raw, err := os.ReadFile(filepath.Join(epicPath, "epic.yaml"))
-	if err != nil {
-		return time.Time{}, time.Time{}
-	}
-
-	var wire epicYAML
-	if err := yaml.Unmarshal(raw, &wire); err != nil {
-		return time.Time{}, time.Time{}
-	}
-
-	if wire.StartedAt != nil {
-		startedAt = *wire.StartedAt
-	}
-	if wire.CompletedAt != nil {
-		completedAt = *wire.CompletedAt
-	}
-	return startedAt, completedAt
-}
-
-// StampEpicStarted writes started_at into scratchDir/epicName's epic.yaml
-// sidecar, creating both the directory and file if needed. It is idempotent:
+// StampEpicStarted writes started_at into scratchDir/epicName's ticket.md
+// frontmatter. It is idempotent:
 // if started_at is already set, it leaves the file untouched, so calling it
 // on every ticket claim — not just the epic's first — never overwrites an
 // already-recorded start time across a resumed or reattached run.
 func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
-	return stampEpicTiming(scratchDir, epicName, func(wire *epicYAML) bool {
+	return stampEpicTiming(scratchDir, epicName, func(wire *epicTiming) bool {
 		if wire.StartedAt != nil {
 			return false
 		}
@@ -253,11 +223,11 @@ func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
 }
 
 // StampEpicCompleted writes completed_at into scratchDir/epicName's
-// epic.yaml sidecar. It is idempotent the same way StampEpicStarted is: a
+// ticket.md frontmatter. It is idempotent the same way StampEpicStarted is: a
 // completed_at already on disk is left alone, so completion is only ever
 // recorded once, at genuine completion.
 func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
-	return stampEpicTiming(scratchDir, epicName, func(wire *epicYAML) bool {
+	return stampEpicTiming(scratchDir, epicName, func(wire *epicTiming) bool {
 		if wire.CompletedAt != nil {
 			return false
 		}
@@ -266,56 +236,33 @@ func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
 	})
 }
 
-// stampEpicTiming reads scratchDir/epicName's epic.yaml sidecar (if any),
-// hands it to mutate, and writes it back only when mutate reports a change —
-// the shared idempotency check both StampEpicStarted and StampEpicCompleted
-// rely on.
-func stampEpicTiming(scratchDir, epicName string, mutate func(*epicYAML) bool) error {
+// stampEpicTiming reads scratchDir/epicName's ticket.md timing, hands it to
+// mutate, and writes it back only when mutate reports a change — the shared
+// idempotency check both StampEpicStarted and StampEpicCompleted rely on.
+func stampEpicTiming(scratchDir, epicName string, mutate func(*epicTiming) bool) error {
 	epicPath := filepath.Join(scratchDir, epicName)
 	ticketPath := filepath.Join(epicPath, "ticket.md")
-	if _, err := os.Stat(ticketPath); err == nil {
-		// The lock spans the read inside stampTicketMDTiming too, or a
-		// concurrent `set`/`section` write between read and write is lost.
-		unlock, err := schema.LockTicket(ticketPath)
-		if err != nil {
-			return err
-		}
-		defer unlock()
-		raw, err := os.ReadFile(ticketPath)
-		if err != nil {
-			return err
-		}
-		return stampTicketMDTiming(ticketPath, string(raw), mutate)
+	if _, err := os.Stat(ticketPath); err != nil {
+		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
 	}
-	yamlPath := filepath.Join(epicPath, "epic.yaml")
-
-	var wire epicYAML
-	if raw, err := os.ReadFile(yamlPath); err == nil {
-		if err := yaml.Unmarshal(raw, &wire); err != nil {
-			return fmt.Errorf("parsing %s: %w", yamlPath, err)
-		}
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-
-	if !mutate(&wire) {
-		return nil
-	}
-
-	out, err := yaml.Marshal(wire)
+	// The lock spans the read inside stampTicketMDTiming too, or a
+	// concurrent `set`/`section` write between read and write is lost.
+	unlock, err := schema.LockTicket(ticketPath)
 	if err != nil {
-		return fmt.Errorf("marshaling %s: %w", yamlPath, err)
-	}
-	if err := os.MkdirAll(epicPath, 0755); err != nil {
 		return err
 	}
-	return writeFileAtomic(yamlPath, out)
+	defer unlock()
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		return err
+	}
+	return stampTicketMDTiming(ticketPath, string(raw), mutate)
 }
 
 // stampTicketMDTiming applies mutate to the timing fields of ticket.md's
 // frontmatter. It edits the YAML node tree rather than re-marshaling a struct,
 // so the epic's other frontmatter keys and its body survive untouched.
-func stampTicketMDTiming(path, raw string, mutate func(*epicYAML) bool) error {
+func stampTicketMDTiming(path, raw string, mutate func(*epicTiming) bool) error {
 	fm, body, ok := schema.SplitFrontmatter(raw)
 	if !ok {
 		return fmt.Errorf("%s: no frontmatter to stamp timing into", path)
@@ -327,7 +274,7 @@ func stampTicketMDTiming(path, raw string, mutate func(*epicYAML) bool) error {
 	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		return fmt.Errorf("%s: frontmatter is not a mapping", path)
 	}
-	var wire epicYAML
+	var wire epicTiming
 	if err := doc.Content[0].Decode(&wire); err != nil {
 		return fmt.Errorf("parsing %s: %w", path, err)
 	}
@@ -366,7 +313,7 @@ func setMappingTime(mapping *yaml.Node, key string, t time.Time) {
 // Duplicated from ralphloop's/schema's writeFileAtomic (a ~15-line helper)
 // rather than exported cross-package, per
 // .scratch/ralph-tickets-visibility/issues/02-tickets-set-cli.md's Answer.
-// Shared within this package by both epic.yaml sidecar writes and
+// Shared within this package by both ticket.md timing writes and
 // tickets/migrate.go's ticket-file rewrites.
 func writeFileAtomic(path string, data []byte) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")

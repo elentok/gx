@@ -79,6 +79,26 @@ func TestExecute_TicketsValidate_InvalidTicketExitsNonZero(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsValidate_EpicWithoutTicketMDFails(t *testing.T) {
+	t.Parallel()
+	epicDir := filepath.Join(t.TempDir(), "proj", "old-epic")
+	path := filepath.Join(epicDir, "issues", "01-a.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, filepath.Dir(path), "01-a.md", "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	testutil.WriteFile(t, epicDir, "epic.yaml", "started_at: 2026-01-02T03:04:05Z\n")
+
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	err := execute([]string{"tickets", "validate", path}, d)
+	if err == nil {
+		t.Fatal("expected error for an epic directory with no ticket.md, got nil")
+	}
+	if !strings.Contains(err.Error(), epicDir) || !strings.Contains(err.Error(), "ticket.md") {
+		t.Errorf("error = %q, want it to name %s and ticket.md", err.Error(), epicDir)
+	}
+}
+
 func TestExecute_TicketsValidate_MissingFileExitsNonZero(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer

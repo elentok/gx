@@ -162,8 +162,8 @@ func convertTicketFile(path string, raw []byte) []byte {
 	return out
 }
 
-// convertEpics builds a ticket.md for every epic that still has an epic.yaml
-// or map.md and no ticket.md yet. The map's text becomes the body and the epic
+// convertEpics builds a ticket.md for every epic that has none yet, since the
+// loader rejects an epic without one. A map.md's text becomes the body and the epic
 // is marked kind: map; the sidecar's timestamps carry over, and a completed
 // epic is marked done.
 func convertEpics(oldRoot string) ([]storeFile, error) {
@@ -180,11 +180,8 @@ func convertEpics(oldRoot string) ([]storeFile, error) {
 		if _, err := os.Stat(filepath.Join(dir, "ticket.md")); err == nil {
 			continue
 		}
-		sidecar, sidecarErr := os.ReadFile(filepath.Join(dir, "epic.yaml"))
-		body, bodyErr := os.ReadFile(filepath.Join(dir, "map.md"))
-		if sidecarErr != nil && bodyErr != nil {
-			continue
-		}
+		sidecar, _ := os.ReadFile(filepath.Join(dir, "epic.yaml"))
+		body, _ := os.ReadFile(filepath.Join(dir, "map.md"))
 		data, err := epicTicketMD(sidecar, body)
 		if err != nil {
 			return nil, fmt.Errorf("converting epic %s: %w", dir, err)
@@ -195,7 +192,7 @@ func convertEpics(oldRoot string) ([]storeFile, error) {
 }
 
 func epicTicketMD(sidecar, body []byte) ([]byte, error) {
-	var wire epicYAML
+	var wire epicTiming
 	if err := yaml.Unmarshal(sidecar, &wire); err != nil {
 		return nil, err
 	}

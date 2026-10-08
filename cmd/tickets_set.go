@@ -60,9 +60,8 @@ Epic frontmatter fields:
 An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
 never scheduled by the server.
 
-An epic's optional ` + "`.scratch/<epic>/epic.yaml`" + ` sidecar file holds epic-level timing,
-distinct from any ticket's own frontmatter. Both fields are gx-managed, not settable via
-` + "`tickets set`" + `, and an epic with no epic.yaml yet has both unset.
+An epic's ticket.md also holds epic-level timing. Both fields are gx-managed, not
+settable via ` + "`tickets set`" + `, and unset until ralph-loop stamps them.
   started_at (RFC3339 timestamp) — when work on the epic began
   completed_at (RFC3339 timestamp) — when the epic's last ticket landed
 `

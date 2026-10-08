@@ -57,7 +57,7 @@ func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T)
 	if err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	if !strings.Contains(out, `copied 4 file(s) into project "mine"`) {
+	if !strings.Contains(out, `copied 5 file(s) into project "mine"`) {
 		t.Errorf("stdout = %q", out)
 	}
 
