@@ -598,10 +598,27 @@ regardless of which epic the checked tickets belong to. Add widens an already-ru
 scope (`ralphloop.RunScope.Add`) with the checked tickets under that epic, after a confirmation
 naming the count — it requires the epic under the cursor to already have a live run.
 
+## Slots and Caps
+
+**Slot** — one live agent: a node that is claimed and has a running pane. `needs-answer`,
+`needs-repair`, parked and waiting-for-children nodes hold no slot, and landing is daemon work, so it
+takes none. A slot is a plain count, never weighted by model or context window.
+
+**Cap** — a limit on slots in use. A node starts only when every applicable cap has room; there is
+no "which binds first" order. Three caps exist: the **global cap** (`execution-queue.max-agents`,
+`config.json` only), the **per-root cap** (`execution-queue.max-agents-per-root`, counted per root
+node — an epic or a one-off — and project-overridable) and the optional **project cap**
+(`max-agents` in `project.json`; unset means none). Lowering a cap stops new starts only: live
+agents are never stopped, and the daemon applies the new value at its next scheduling decision.
+`explain` names every full cap with its count (`waiting: global cap 4/4`).
+
+**No bypass** — one-offs, `scratch` jobs and `type: investigate` nodes all count against the same
+caps. `--front` sets queue position only. See ADR 0032.
+
 ## Notification Surfaces
 
-The three places a run event can surface. They are distinct destinations, not levels of the same
-thing: an event may reach any combination of them.
+The three places a run event can surface. They are distinct surfaces, not levels of the same
+thing: an event may reach any combination of them. (A **destination** is something else — see below.)
 
 **TUI** — Queue tab state, driven by `reduceLiveEvent`. Everything gx knows shows up here.
 
@@ -612,6 +629,13 @@ screen.
 subset of run events, for a person away from the terminal. The word **push** is retired for this
 sense: it collided with `git push` and with mobile push notifications, and `notify` was already
 taken by the toast package.
+
+**Destination** — a chat transport plus its target (a Telegram chat id or a Slack webhook URL). The
+unit of chat batching, gating and muting: two projects with the same target share one destination.
+A `project.json` `notifications` block replaces the global one whole; with no override a project
+uses the **global destination**, which also receives every server-level event. `gx notify
+--enable/--disable <transport>` acts on every destination of that transport, `--project <name>`
+narrows it to that project's destination.
 
 **Counts line** — the line of state tallies a chat message may carry, in place of a fraction:
 `8 done · 2 in progress · 1 parked: 07 · 10 total`. A **ticket counts line** tallies the ticket
