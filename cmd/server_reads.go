@@ -640,6 +640,20 @@ func newServerTicketsCmd() *cobra.Command {
 	relaunch.Flags().BoolVar(&relaunchJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(relaunch)
 
+	var nudgeJSON bool
+	nudge := &cobra.Command{
+		Use:   "nudge <project:epic/NN> <text>",
+		Short: "type text into the live pane of a ticket's iteration",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketNudge(ctx, args[0], args[1])
+			})
+		},
+	}
+	nudge.Flags().BoolVar(&nudgeJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(nudge)
+
 	var followJSON bool
 	follow := &cobra.Command{
 		Use:   "follow <addr>",

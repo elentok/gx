@@ -43,6 +43,8 @@ const (
 	NotificationSuppressed     Type = "notification-suppressed"
 	ManualLand                 Type = "manual-land"
 	TicketReset                Type = "ticket-reset"
+	// Nudged is text typed into a live iteration pane through the server.
+	Nudged Type = "nudged"
 )
 
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships

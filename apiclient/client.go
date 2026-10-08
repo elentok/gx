@@ -257,6 +257,11 @@ func (c *Client) TicketRelaunch(ctx context.Context, address string) (server.Que
 	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address})
 }
 
+// TicketNudge types text into the live pane of a ticket's iteration.
+func (c *Client) TicketNudge(ctx context.Context, address, text string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/nudge", server.QueueRequest{Address: address, Text: text})
+}
+
 // TicketChanged pings the server that a direct write changed address's file.
 func (c *Client) TicketChanged(ctx context.Context, address string) error {
 	if err := c.CheckWrite(); err != nil {

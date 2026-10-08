@@ -91,6 +91,8 @@ type Event struct {
 	// session-data lookup key alongside AgentSession.
 	Cwd    string `json:"cwd,omitempty"`
 	Reason string `json:"reason,omitempty"`
+	// Text (nudged events only) is what was typed into the pane.
+	Text string `json:"text,omitempty"`
 	// Kind (failure and recovery events) is the closed-enum cause from the
 	// events package; required on the types events.KindRequired names.
 	Kind string `json:"kind,omitempty"`
