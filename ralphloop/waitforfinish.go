@@ -829,6 +829,13 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 				}
 			}
 		}
+		if outstanding && d.GateReleased != nil && d.GateReleased() {
+			for id := range held {
+				p.logAgentEvent(string(events.BackgroundTaskGateReleased), sessionID, fmt.Sprintf("background task %s: recovery forced the release", id))
+			}
+			clear(held)
+			outstanding = false
+		}
 		if !outstanding {
 			if !gated {
 				return true, nil

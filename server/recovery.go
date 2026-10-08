@@ -4,9 +4,11 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -375,6 +377,65 @@ func (v recoveryVerbs) Wait(address string) (recovery.Result, error) {
 		return QueueResult{}, nil
 	})
 	return recoveryResult(res), err
+}
+
+// Refusal reasons of release-gate and finish.
+const (
+	ReasonAgentBusy      = "agent-busy"
+	ReasonWorktreeDirty  = "worktree-dirty"
+	ReasonNoCommitsAhead = "no-commits-ahead"
+	ReasonFinishTimedOut = "finish-timed-out"
+)
+
+func (v recoveryVerbs) ReleaseGate(address string) (recovery.Result, error) {
+	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
+		run, ok := v.s.registry.tracked(ref.addr.String())
+		if !ok {
+			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+		}
+		label, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, v.s.worktreeDir(ref.addr.Project))
+		agent, err := herdr.AgentGet(label)
+		if err != nil {
+			return QueueResult{}, fmt.Errorf("read agent of %s: %w", ref.addr, err)
+		}
+		if agent.AgentStatus != "idle" && agent.AgentStatus != "done" {
+			return refusal(ReasonAgentBusy, ref.addr.String()+" agent is "+agent.AgentStatus), nil
+		}
+		staged, unstaged, untracked, err := git.WorktreeStatusSummary(worktree)
+		if err != nil {
+			return QueueResult{}, fmt.Errorf("status of %s: %w", worktree, err)
+		}
+		if staged+unstaged+untracked > 0 {
+			return refusal(ReasonWorktreeDirty, worktree+" has uncommitted changes"), nil
+		}
+		ahead, err := git.CommitsAhead(worktree, run.Base, "HEAD")
+		if err != nil {
+			return QueueResult{}, fmt.Errorf("commits ahead in %s: %w", worktree, err)
+		}
+		if ahead < 1 {
+			return refusal(ReasonNoCommitsAhead, worktree+" has no commits ahead of its base"), nil
+		}
+		v.s.registry.releaseGate(ref.addr.String())
+		return QueueResult{}, nil
+	})
+	return recoveryResult(res), err
+}
+
+// finishWaitTimeout bounds Finish: a released gate's finish only re-checks
+// idle and lands, so a run still live well past that is stuck elsewhere.
+const finishWaitTimeout = 10 * time.Minute
+
+// finishPoll paces Finish's registry reads; a var so tests can shorten it.
+var finishPoll = time.Second
+
+// Finish holds no ticket lock while it waits: the land it waits for needs it.
+func (v recoveryVerbs) Finish(address string) (recovery.Result, error) {
+	for deadline := time.Now().Add(finishWaitTimeout); v.s.registry.has(address); time.Sleep(finishPoll) {
+		if time.Now().After(deadline) {
+			return recoveryResult(refusal(ReasonFinishTimedOut, address+" is still running after its gate was released")), nil
+		}
+	}
+	return recoveryResult(QueueResult{}), nil
 }
 
 func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {

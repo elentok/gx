@@ -59,6 +59,10 @@ func (c Call) Apply(v Verbs) (Result, error) {
 		return v.ClosePane(c.Address)
 	case "wait":
 		return v.Wait(c.Address)
+	case "release-gate":
+		return v.ReleaseGate(c.Address)
+	case "finish":
+		return v.Finish(c.Address)
 	}
 	return Result{}, fmt.Errorf("unknown proposed verb %q", c.Verb)
 }
@@ -93,6 +97,16 @@ func (r *recorder) ClosePane(address string) (Result, error) {
 
 func (r *recorder) Wait(address string) (Result, error) {
 	r.calls = append(r.calls, Call{Verb: "wait", Address: address})
+	return Result{}, nil
+}
+
+func (r *recorder) ReleaseGate(address string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "release-gate", Address: address})
+	return Result{}, nil
+}
+
+func (r *recorder) Finish(address string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "finish", Address: address})
 	return Result{}, nil
 }
 

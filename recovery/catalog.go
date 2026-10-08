@@ -90,12 +90,24 @@ func Default() Catalog {
 // and the branch has commits ahead before it force-releases the gate and runs
 // the ordinary finish path. It never parks: the commit exists. Medium
 // authority because releasing early finishes an agent that is still working.
-// Launches disabled with no remedy: the S0 holds predate the fix of their
-// cause, and neither a gate-held trigger nor a release verb exists yet.
+// Launches disabled: the S0 holds predate the fix of their cause.
 func r10BackgroundGateHeld() Entry {
 	return Entry{
 		ID: "R10", Type: events.BackgroundTaskGateHeld,
 		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"release-gate", "finish"},
+		Remedy: func(f Failure, v Verbs) error {
+			res, err := v.ReleaseGate(f.Address)
+			if err == nil && !res.Refused {
+				res, err = v.Finish(f.Address)
+			}
+			if err == nil && res.Refused {
+				err = fmt.Errorf("refused: %s", res.Reason)
+			}
+			if err != nil {
+				return fmt.Errorf("releasing the background-task gate: %w", err)
+			}
+			return nil
+		},
 	}
 }
 

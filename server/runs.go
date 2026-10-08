@@ -52,6 +52,9 @@ type runRegistry struct {
 	path string
 	log  *slog.Logger
 	runs map[string]trackedRun
+	// released are the runs whose background-task gate recovery forced open.
+	// In memory only: a reclaimed run starts with its gate closed again.
+	released map[string]bool
 }
 
 // openRuns returns the registry and the handles the previous server left behind.
@@ -163,10 +166,36 @@ func (r *runRegistry) count() int {
 	return len(r.runs)
 }
 
+func (r *runRegistry) tracked(address string) (trackedRun, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.runs[address]
+	return t, ok
+}
+
+func (r *runRegistry) releaseGate(address string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.released == nil {
+		r.released = map[string]bool{}
+	}
+	r.released[address] = true
+}
+
+// gateReleased is the Deps.GateReleased hook of the run at address.
+func (r *runRegistry) gateReleased(address string) func() bool {
+	return func() bool {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		return r.released[address]
+	}
+}
+
 func (r *runRegistry) delete(address string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.runs, address)
+	delete(r.released, address)
 	r.save()
 }
 
@@ -247,7 +276,9 @@ func (s *Server) reclaim(t trackedRun) error {
 	t.Pane, t.Tab = agent.PaneID, agent.TabID
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
-	go s.finishRun(ralphloop.DefaultDeps(), root, mode, one, wt, t.Run, t.Address)
+	deps := ralphloop.DefaultDeps()
+	deps.GateReleased = s.registry.gateReleased(t.Address)
+	go s.finishRun(deps, root, mode, one, wt, t.Run, t.Address)
 	return nil
 }
 

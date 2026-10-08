@@ -18,11 +18,14 @@ type Failure struct {
 
 // Triggers reports whether a failure of this shape may start recovery at all:
 // every needs-repair kind except budget-killed (a deliberate stop), needs-answer
-// zero-commit, needs-answer blocked-pane, and a deadlock. Self-reported parks
-// and commitless finishes are a person's or the ticket's own decision, never
-// recovered; a rate-limit pause (R8) is healthy waiting. Whether a blocked pane actually runs is the matcher's call.
+// zero-commit, needs-answer blocked-pane, a deadlock and a held background-task
+// gate (R10). Self-reported parks and commitless finishes are a person's or the
+// ticket's own decision, never recovered; a rate-limit pause (R8) is healthy
+// waiting. Whether a blocked pane actually runs is the matcher's call.
 func (f Failure) Triggers() bool {
 	switch f.Type {
+	case events.BackgroundTaskGateHeld:
+		return true
 	case events.NeedsRepair:
 		return f.Kind != events.BudgetKilled && f.Kind != events.SelfReported
 	case events.NeedsAnswer:
@@ -58,6 +61,13 @@ type Verbs interface {
 	// Wait waits once, longer than the loop's own compaction wait, for the
 	// iteration's pane to settle; no live pane is a refusal.
 	Wait(address string) (Result, error)
+	// ReleaseGate force-releases the iteration's held background-task gate
+	// after fresh checks: the pane is idle, the worktree clean and the branch
+	// has commits ahead. A failed check is a refusal.
+	ReleaseGate(address string) (Result, error)
+	// Finish waits, bounded, for the released iteration's ordinary finish
+	// path to end; a run still live at the bound is a refusal.
+	Finish(address string) (Result, error)
 	// LaunchPrompt is the prompt a fresh iteration of the ticket is launched
 	// with. It is a read, not a verb: the run log never records the prompt.
 	LaunchPrompt(address string) (string, error)

@@ -2738,6 +2738,47 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 	}
 }
 
+// TestWaitForFinish_RecoveryForceReleasesAHeldGate covers R10's hook: a task
+// that never resolves stops holding once GateReleased reports true.
+func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+	var sleeps, reads int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh}},
+		}, nil
+	}
+	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	d.GateReleased = func() bool { return reads >= 2 }
+
+	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if reads != 2 {
+		t.Errorf("ReadBackgroundTasks calls = %d, want 2 (held, released by recovery)", reads)
+	}
+	events, _, err := ReadEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	var types []string
+	for _, ev := range events {
+		switch ev.Type {
+		case string(eventsc.BackgroundTaskGateHeld), string(eventsc.BackgroundTaskGateReleased):
+			types = append(types, ev.Type+" "+ev.Reason)
+		}
+	}
+	want := []string{
+		string(eventsc.BackgroundTaskGateHeld) + " background task task-1",
+		string(eventsc.BackgroundTaskGateReleased) + " background task task-1: recovery forced the release",
+	}
+	if !slices.Equal(types, want) {
+		t.Errorf("gate events = %q, want %q", types, want)
+	}
+}
+
 // TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough covers the ~2h cap:
 // once a held marker reads outstanding-aged-out, the gate stops holding on
 // it and waitForFinish falls through to a plain finish, logging gate-expired

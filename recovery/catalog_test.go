@@ -3,6 +3,7 @@ package recovery
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/events"
@@ -210,6 +211,16 @@ func (s *stubVerbs) Nudge(address, text string) (Result, error) {
 
 func (s *stubVerbs) ClosePane(address string) (Result, error) {
 	s.calls = append(s.calls, "close-pane "+address)
+	return Result{}, nil
+}
+
+func (s *stubVerbs) ReleaseGate(address string) (Result, error) {
+	s.calls = append(s.calls, "release-gate "+address)
+	return Result{Refused: s.refuse, Reason: "agent-busy"}, nil
+}
+
+func (s *stubVerbs) Finish(address string) (Result, error) {
+	s.calls = append(s.calls, "finish "+address)
 	return Result{}, nil
 }
 
@@ -524,12 +535,33 @@ func TestDefaultR10LaunchesDisabledAsAMediumRule(t *testing.T) {
 		t.Fatalf("R10 entries = %v, want one", r10)
 	}
 	e := r10[0]
-	if e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"release-gate", "finish"}) {
+	if e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"release-gate", "finish"}) || e.Remedy == nil {
 		t.Fatalf("R10 = %+v, want disabled medium rule with release-gate, finish", e)
 	}
 	held := []Event{{Type: events.BackgroundTaskGateHeld, Reason: "background task t1"}}
 	if _, ok := Default().Match(held); ok {
 		t.Error("R10 must not match while disabled")
+	}
+}
+
+func TestR10RemedyReleasesThenFinishesAndNeverParks(t *testing.T) {
+	e := Entry{}
+	for _, c := range Default().Entries {
+		if c.ID == "R10" {
+			e = c
+		}
+	}
+	f := Failure{Address: "p:e/01", Type: events.BackgroundTaskGateHeld}
+	ok := &stubVerbs{}
+	if err := e.Remedy(f, ok); err != nil || !slices.Equal(ok.calls, []string{"release-gate p:e/01", "finish p:e/01"}) {
+		t.Errorf("released: err %v, calls %q; want release-gate then finish", err, ok.calls)
+	}
+	refused := &stubVerbs{refuse: true}
+	if err := e.Remedy(f, refused); err == nil || !strings.Contains(err.Error(), "agent-busy") || !slices.Equal(refused.calls, []string{"release-gate p:e/01"}) {
+		t.Errorf("refused: err %v, calls %q; want the refusal and no finish", err, refused.calls)
+	}
+	if len(refused.recorder.calls) != 0 {
+		t.Errorf("refused remedy called %v, want no park", refused.recorder.calls)
 	}
 }
 

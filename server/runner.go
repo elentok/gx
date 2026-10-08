@@ -360,6 +360,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 	}
 	deps := ralphloop.DefaultDeps()
+	deps.GateReleased = s.registry.gateReleased(ticketAddr)
 	mode := s.iterationModeFor(ticket, t)
 	if mode.commitless && mode.scratchDir == "" {
 		if mode.ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {

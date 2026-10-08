@@ -148,6 +148,9 @@ type Deps struct {
 	// running (see waitForBackgroundTasks). Codex has no equivalent transcript
 	// signal, so callers only ever invoke this for AgentClaude.
 	ReadBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error)
+	// GateReleased reports whether recovery force-released this iteration's
+	// held background-task gate. Nil never releases.
+	GateReleased func() bool
 	// ReadUnexecutedToolCall reports whether the Claude Code session's last
 	// turn ended with a text block shaped like an unexecuted tool call
 	// instead of a real tool_use (see transcript.ReadUnexecutedToolCall) —
