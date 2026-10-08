@@ -116,7 +116,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		HerdrUnavailable: snap.HerdrUnavailable,
 		Budget:           snap.Budget,
 		ExtraUsage:       snap.ExtraUsage,
-		Tickets:         slices.Clone(snap.Tickets),
+		Tickets:          slices.Clone(snap.Tickets),
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		CwdProject:       s.CwdProject,

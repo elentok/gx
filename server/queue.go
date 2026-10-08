@@ -52,8 +52,8 @@ type QueueResult struct {
 	// auto-purchases extra usage.
 	ExtraUsage bool   `json:"extra_usage,omitempty"`
 	Refused    bool   `json:"refused,omitempty"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+	Message    string `json:"message,omitempty"`
 }
 
 func refusal(reason, msg string) QueueResult {

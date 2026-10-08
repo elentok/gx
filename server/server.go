@@ -125,7 +125,7 @@ type Server struct {
 	ledger      *budgetLedger
 	budgetNotes budgetNotes
 	extraUsage  extraUsageNotes
-	costOf     func(IterationInfo) (float64, bool) // swapped in tests
+	costOf      func(IterationInfo) (float64, bool) // swapped in tests
 	events      *broker
 	herdr       herdrWatch
 	parkFold    parkFold
