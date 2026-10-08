@@ -2767,12 +2767,12 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 	for _, ev := range events {
 		switch ev.Type {
 		case string(eventsc.BackgroundTaskGateHeld), string(eventsc.BackgroundTaskGateReleased):
-			types = append(types, ev.Type+" "+ev.Reason)
+			types = append(types, ev.Type+" "+ev.TaskID+" "+ev.Reason)
 		}
 	}
 	want := []string{
-		string(eventsc.BackgroundTaskGateHeld) + " background task task-1",
-		string(eventsc.BackgroundTaskGateReleased) + " background task task-1: recovery forced the release",
+		string(eventsc.BackgroundTaskGateHeld) + " task-1 background task task-1",
+		string(eventsc.BackgroundTaskGateReleased) + " task-1 background task task-1: recovery forced the release",
 	}
 	if !slices.Equal(types, want) {
 		t.Errorf("gate events = %q, want %q", types, want)

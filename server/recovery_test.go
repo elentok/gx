@@ -1274,7 +1274,14 @@ func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applie
 var gateWatchStart = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func gateEvent(typ events.Type, after time.Duration) ralphloop.Event {
-	return ralphloop.Event{Type: string(typ), Reason: "background task task-1", Time: gateWatchStart.Add(after)}
+	return ralphloop.Event{Type: string(typ), TaskID: "task-1", Reason: "background task task-1", Time: gateWatchStart.Add(after)}
+}
+
+func TestGateWatch_TracksTheGateByTaskIDNotReasonText(t *testing.T) {
+	otherReleased := gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)
+	otherReleased.TaskID = "task-2"
+	applied, _ := watchHeldGate(t, "idle", gateEvent(events.BackgroundTaskGateHeld, time.Minute), otherReleased)
+	waitFor(t, func() bool { return applied() == 1 })
 }
 
 func TestGateWatch_HeldGateOnAnIdlePaneIsRaisedOnce(t *testing.T) {
@@ -1295,7 +1302,7 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 		{"busy pane", "working", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute)}},
 		{"released gate", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)}},
 		{"gate recovery forced open", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), {
-			Type: string(events.BackgroundTaskGateReleased), Reason: "background task task-1: recovery forced the release", Time: gateWatchStart.Add(2 * time.Minute),
+			Type: string(events.BackgroundTaskGateReleased), TaskID: "task-1", Reason: "background task task-1: recovery forced the release", Time: gateWatchStart.Add(2 * time.Minute),
 		}}},
 		{"held within the quiet period", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, 59*time.Minute)}},
 		{"held in an earlier iteration", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.IterationStarted, 2*time.Minute)}},

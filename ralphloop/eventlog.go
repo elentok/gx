@@ -155,6 +155,9 @@ type Event struct {
 	// AtticRef (manual-land/ticket-reset only) is the ref that preserves the
 	// commits the command set aside.
 	AtticRef string `json:"attic_ref,omitempty"`
+	// TaskID (background-task gate events only) is the gated task, so readers
+	// never parse it out of Reason.
+	TaskID string `json:"task_id,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each

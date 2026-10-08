@@ -188,7 +188,11 @@ func (p launchAndPromptParams) logLifecycleEvent(eventType, agentSession string)
 }
 
 func (p launchAndPromptParams) logAgentEvent(eventType, agentSession, reason string) {
-	_ = logEvent(p.ScratchDir, p.EpicName, Event{
+	_ = logEvent(p.ScratchDir, p.EpicName, p.agentEvent(eventType, agentSession, reason))
+}
+
+func (p launchAndPromptParams) agentEvent(eventType, agentSession, reason string) Event {
+	return Event{
 		Type:         eventType,
 		Ticket:       p.Ticket,
 		Agent:        p.Agent,
@@ -197,7 +201,14 @@ func (p launchAndPromptParams) logAgentEvent(eventType, agentSession, reason str
 		AgentSession: agentSession,
 		Cwd:          p.SessionCwd,
 		Reason:       reason,
-	})
+	}
+}
+
+// logGateEvent is logAgentEvent for a background-task gate event on taskID.
+func (p launchAndPromptParams) logGateEvent(eventType events.Type, agentSession, taskID, reason string) {
+	ev := p.agentEvent(string(eventType), agentSession, reason)
+	ev.TaskID = taskID
+	_ = logEvent(p.ScratchDir, p.EpicName, ev)
 }
 
 // logAgentStartEvent is logLifecycleEvent for the launch-time start event

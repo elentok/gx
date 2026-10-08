@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/events"
@@ -94,9 +93,9 @@ func (s *Server) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
 		case events.IterationStarted:
 			clear(held)
 		case events.BackgroundTaskGateHeld:
-			held[gateTask(ev.Reason)] = ev
+			held[ev.TaskID] = ev
 		case events.BackgroundTaskGateReleased, events.BackgroundTaskGateExpired:
-			delete(held, gateTask(ev.Reason))
+			delete(held, ev.TaskID)
 		}
 	}
 	var newest ralphloop.Event
@@ -106,12 +105,4 @@ func (s *Server) heldGate(addr tickets.Address) (ralphloop.Event, bool) {
 		}
 	}
 	return newest, len(held) > 0
-}
-
-// gateTask is the task ID a gate event's reason names, e.g. "background task
-// X: recovery forced the release" → "X".
-func gateTask(reason string) string {
-	id := strings.TrimPrefix(reason, "background task ")
-	id, _, _ = strings.Cut(id, ":")
-	return id
 }

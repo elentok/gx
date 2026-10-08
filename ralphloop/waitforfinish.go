@@ -815,23 +815,23 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 				if !held[m.TaskID] {
 					held[m.TaskID] = true
 					gated = true
-					p.logAgentEvent(string(events.BackgroundTaskGateHeld), sessionID, fmt.Sprintf("background task %s", m.TaskID))
+					p.logGateEvent(events.BackgroundTaskGateHeld, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskResolved:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.logAgentEvent(string(events.BackgroundTaskGateReleased), sessionID, fmt.Sprintf("background task %s", m.TaskID))
+					p.logGateEvent(events.BackgroundTaskGateReleased, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			case transcript.BackgroundTaskOutstandingAgedOut:
 				if held[m.TaskID] {
 					delete(held, m.TaskID)
-					p.logAgentEvent(string(events.BackgroundTaskGateExpired), sessionID, fmt.Sprintf("background task %s", m.TaskID))
+					p.logGateEvent(events.BackgroundTaskGateExpired, sessionID, m.TaskID, fmt.Sprintf("background task %s", m.TaskID))
 				}
 			}
 		}
 		if outstanding && d.GateReleased != nil && d.GateReleased() {
 			for id := range held {
-				p.logAgentEvent(string(events.BackgroundTaskGateReleased), sessionID, fmt.Sprintf("background task %s: recovery forced the release", id))
+				p.logGateEvent(events.BackgroundTaskGateReleased, sessionID, id, fmt.Sprintf("background task %s: recovery forced the release", id))
 			}
 			clear(held)
 			outstanding = false
