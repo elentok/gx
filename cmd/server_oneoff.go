@@ -46,6 +46,7 @@ func newServerOneOffCmd() *cobra.Command {
 	cmd.Flags().StringArrayVar(&req.BlockedBy, "blocked-by", nil, "address of a ticket in the same project that must land first (repeatable)")
 	cmd.Flags().IntVar(&req.ExpectedContextWindow, "expected-context-window", 0, "expected context window in tokens")
 	cmd.Flags().BoolVar(&req.Front, "front", false, "queue it at the head instead of the tail")
+	cmd.Flags().BoolVar(&req.Notify, "notify", false, "send the ticket's Result to chat when it succeeds (a park always notifies)")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of the address")
 	return cmd
 }

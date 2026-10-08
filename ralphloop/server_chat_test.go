@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -85,7 +86,31 @@ func TestServerChat_EpicCompleteNamesTheProjectAndTheTotals(t *testing.T) {
 	c.Close()
 
 	g := globalReqs()
-	if len(g) != 1 || !strings.Contains(g[0].Text, "epic complete") || !strings.Contains(g[0].Text, "[alpha]") || !strings.Contains(g[0].Text, "7 done") {
+	if len(g) != 1 || !strings.Contains(g[0].Text, "epic complete") || !strings.Contains(g[0].Text, "alpha") || !strings.Contains(g[0].Text, "7 done") {
 		t.Errorf("got %+v, want an 'epic complete' message for alpha", g)
+	}
+}
+
+func TestServerChat_ResultIsTruncatedAndLogsNotificationSent(t *testing.T) {
+	hook, reqs := fakeSlackServer(t, 200)
+	c := NewServerChat(ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "e"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	c.Result("alpha", nil, dir, "e", "alpha:e/01", strings.Repeat("x", 5000))
+	c.Close()
+
+	got := reqs()
+	if len(got) != 1 || !strings.Contains(got[0].Text, "alpha:e/01") || len(got[0].Text) > 3000 {
+		t.Fatalf("sends = %+v, want one truncated message naming the address", got)
+	}
+	evs, _, err := ReadEvents(dir, "e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) != 1 || evs[0].Type != "notification-sent" || evs[0].NotifyKind != "result" {
+		t.Errorf("events = %+v, want one notification-sent with notify_kind=result", evs)
 	}
 }

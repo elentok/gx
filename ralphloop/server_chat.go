@@ -131,6 +131,29 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 	}
 }
 
+// notifyKindResult tags the message a successful one-off sends on request.
+const notifyKindResult = "result"
+
+// maxResultRunes bounds the Result a chat message carries.
+const maxResultRunes = 1500
+
+// Result sends a one-off's ## Result, truncated, under its project. The
+// server sink has no run log of its own, so the notification-sent event is
+// written to the ticket's epic here, once per destination it was queued for.
+func (c *ServerChat) Result(project string, override *ServerChatConfig, projectDir, epic, address, result string) {
+	if c == nil {
+		return
+	}
+	if r := []rune(result); len(r) > maxResultRunes {
+		result = string(r[:maxResultRunes]) + "…"
+	}
+	for _, s := range c.projectSinks(override) {
+		body := s.style.chatStyle.Message("✅", address+" finished", "", result, s.style.identityLine("server", ""))
+		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindResult, address, "")
+		logNotificationSent(projectDir, epic, s.transport.name(), notifyKindResult, body.String())
+	}
+}
+
 // ParkDigest sends one message listing parks that were held back, each line
 // carrying its own project name.
 func (c *ServerChat) ParkDigest(lines []string) {

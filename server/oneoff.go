@@ -59,6 +59,8 @@ type OneOffRequest struct {
 	ExpectedContextWindow int      `json:"expected_context_window,omitempty"`
 	// Front queues it at the head instead of the tail.
 	Front bool `json:"front,omitempty"`
+	// Notify sends the ticket's Result to chat on success; parks always notify.
+	Notify bool `json:"notify,omitempty"`
 }
 
 // OneOffResult is a submit's answer; a refusal creates nothing.
@@ -110,7 +112,7 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	if _, err := tickets.ParseAddress(addr.String(), tickets.AddressContext{}); err != nil {
 		return oneOffRefusal(ReasonInvalidAddress, "name "+epic+" is not usable in a ticket address"), nil
 	}
-	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Base: req.Base, ExpectedContextWindow: req.ExpectedContextWindow}
+	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Base: req.Base, Notify: req.Notify, ExpectedContextWindow: req.ExpectedContextWindow}
 	if refused := s.oneOffOptionsRefusal(project, dir, tk, req); refused != nil {
 		return *refused, nil
 	}
@@ -141,6 +143,22 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
 	return OneOffResult{Address: addr.String(), Status: OneOffStatusQueued}, nil
+}
+
+// notifyResult sends a landed ticket's ## Result to chat when its submit asked
+// for it. A ticket without the flag stays silent; parks never reach here.
+func (s *Server) notifyResult(addr tickets.Address, ticketPath string) {
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil || !tk.Notify {
+		return
+	}
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		s.log.Warn("read result", "ticket", addr.String(), "err", err)
+		return
+	}
+	dir := filepath.Dir(filepath.Dir(filepath.Dir(ticketPath))) // project/epic/issues/file
+	s.chat.Result(addr.Project, s.chatOverride(addr.Project), dir, addr.Epic, addr.String(), schema.Section(schema.ParseBody(string(raw)), "Result"))
 }
 
 // oneOffOptionsRefusal checks the submit options before anything is written. A

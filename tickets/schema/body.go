@@ -43,6 +43,18 @@ func splitBodySections(body string) (preamble string, sections []bodySection) {
 	return preamble, sections
 }
 
+// Section returns the trimmed content under body's "## heading" (heading given
+// without the "## "), or "" when there is none.
+func Section(body, heading string) string {
+	_, sections := splitBodySections(body)
+	for _, s := range sections {
+		if strings.TrimSpace(strings.TrimPrefix(s.heading, "## ")) == heading {
+			return strings.TrimSpace(s.content)
+		}
+	}
+	return ""
+}
+
 // joinBodySections is splitBodySections's inverse.
 func joinBodySections(preamble string, sections []bodySection) string {
 	parts := []string{}

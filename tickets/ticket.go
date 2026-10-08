@@ -63,6 +63,9 @@ type Ticket struct {
 	// iteration finish is intentional for this ticket, not a stalled agent.
 	Commitless bool
 
+	// Notify mirrors schema.Ticket.Notify.
+	Notify bool
+
 	// ParkKind mirrors schema.Ticket.ParkKind: which of ralph-loop's
 	// needs-answer producers parked this ticket, empty for a ticket parked
 	// before that field existed (or never parked).

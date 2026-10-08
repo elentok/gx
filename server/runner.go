@@ -497,6 +497,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneI
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
+	s.notifyResult(addr, one.Ticket.Path)
 	s.completeRootIfDone(root, one)
 }
 

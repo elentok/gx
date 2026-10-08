@@ -209,6 +209,9 @@ type Ticket struct {
 	// directly — research/grilling/code-review tickets are commitless by
 	// type, without needing the flag set explicitly.
 	Commitless bool
+	// Notify asks the server to send the ticket's ## Result to chat when it
+	// lands; parks notify regardless. Set by a one-off submit's --notify.
+	Notify bool
 	// IterationStatus is the agent's latest self-reported claim state (see
 	// the IterationStatus type doc). Never checked by Validate: the enum rule
 	// is enforced only by the CLI write path that sets it.

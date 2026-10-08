@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // chatServer is a server wired to a fake Slack webhook that records each body.
@@ -178,5 +179,40 @@ func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
 		if strings.Count(all, "["+p+"]")+strings.Count(all, "*"+p+"*") != 1 {
 			t.Errorf("%s not sent exactly once: %s", p, all)
 		}
+	}
+}
+
+func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	dir := filepath.Join(s.cfg.TicketStore, "scratch", "e", "issues")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name string, notify bool) string {
+		tk := schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, Notify: notify}
+		out, err := schema.MarshalTicket(tk, "\nprompt\n\n## Result\n\nthe answer is 42\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, out, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	addr := tickets.Address{Project: "scratch", Epic: "e", ID: "01"}
+
+	s.notifyResult(addr, write("01-quiet.md", false))
+	s.chat.Close()
+	if got := wait(-1); len(got) != 0 {
+		t.Fatalf("a ticket without --notify sent %v", got)
+	}
+
+	s, wait = chatServer(t, 0, 0)
+	s.notifyResult(addr, write("01-loud.md", true))
+	s.chat.Close()
+	got := wait(1)
+	if len(got) != 1 || !strings.Contains(got[0], "the answer is 42") {
+		t.Fatalf("sends = %v, want the Result", got)
 	}
 }
