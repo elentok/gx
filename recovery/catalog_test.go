@@ -346,6 +346,63 @@ func TestR4MatchesOnlyANeedsAnswerBlockedPane(t *testing.T) {
 	}
 }
 
+func TestDefaultR6LaunchesDisabledAsABusyRetryAndATakenNameAgent(t *testing.T) {
+	c := Default()
+	got := map[events.Kind]Entry{}
+	for _, e := range c.Entries {
+		if e.ID == "R6" {
+			got[e.Kind] = e
+		}
+	}
+	if len(got) != 2 {
+		t.Fatalf("R6 entries = %v, want one per launch-failed kind", got)
+	}
+	busy, taken := got[events.AgentPaneBusy], got[events.AgentNameTaken]
+	if busy.Enabled || busy.Executor != ExecutorRule || busy.Authority != AuthorityLow || busy.Remedy == nil || !slices.Equal(busy.Verbs, []string{"relaunch"}) {
+		t.Errorf("R6 busy = %+v, want disabled low rule that relaunches", busy)
+	}
+	if taken.Enabled || taken.Executor != ExecutorAgent || taken.Authority != AuthorityMedium || !slices.Equal(taken.Verbs, []string{"close-pane", "relaunch"}) {
+		t.Errorf("R6 taken = %+v, want disabled medium agent that closes a pane and relaunches", taken)
+	}
+	seq := []Event{{Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, {Type: events.NeedsRepair, Kind: events.AgentPaneBusy}}
+	if _, ok := c.Match(seq); ok {
+		t.Error("disabled R6 must not match")
+	}
+}
+
+func TestR6MatchesAParkedLaunchCollisionOfTheSameKind(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	failed := func(k events.Kind) Event { return Event{Type: events.LaunchFailed, Kind: k} }
+	park := func(k events.Kind) Event { return Event{Type: events.NeedsRepair, Kind: k} }
+	tests := []struct {
+		name     string
+		seq      []Event
+		want     bool
+		executor Executor
+	}{
+		{"pane busy", []Event{failed(events.AgentPaneBusy), park(events.AgentPaneBusy)}, true, ExecutorRule},
+		{"name taken", []Event{failed(events.AgentNameTaken), park(events.AgentNameTaken)}, true, ExecutorAgent},
+		{"retries before the park", []Event{failed(events.AgentNameTaken), failed(events.AgentNameTaken), {Type: events.IterationStarted}, park(events.AgentNameTaken)}, true, ExecutorAgent},
+		{"park with no launch-failed", []Event{park(events.AgentPaneBusy)}, false, ""},
+		{"launch-failed of another kind", []Event{failed(events.AgentPromptStalled), park(events.AgentNameTaken)}, false, ""},
+		{"busy failure, taken park", []Event{failed(events.AgentPaneBusy), park(events.AgentNameTaken)}, false, ""},
+		{"retry storm", []Event{failed(events.AgentPaneBusy), park(events.RetryExhausted)}, false, ""},
+		{"launch-failed with no park", []Event{failed(events.AgentPaneBusy)}, false, ""},
+		{"collision as needs-answer", []Event{failed(events.AgentNameTaken), {Type: events.NeedsAnswer, Kind: events.AgentNameTaken}}, false, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if ok != tt.want || (ok && (e.ID != "R6" || e.Executor != tt.executor)) {
+				t.Fatalf("got (%q, %q, %v), want match=%v executor %q", e.ID, e.Executor, ok, tt.want, tt.executor)
+			}
+		})
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")

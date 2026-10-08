@@ -638,6 +638,69 @@ func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
 	})
 }
 
+// parkLaunchCollision starts a server with the default catalog fully enabled,
+// seeds ticket 01's launch-failed event of kind as the loop would, and parks it
+// with the same kind.
+func parkLaunchCollision(t *testing.T, kind events.Kind) *servertest.Harness {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	seed := ralphloop.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(kind), Attempt: 1, Reason: string(kind)}
+	if err := ralphloop.AppendEvent(filepath.Join(store, "proj"), "epic-a", seed); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+		for i := range c.Recovery.Entries {
+			c.Recovery.Entries[i].Enabled = true
+		}
+	})
+	registerLaunch(h)
+	if err := h.Server.ParkAs("proj:epic-a/01", kind, "launch failed: "+string(kind)); err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+func TestRecovery_R6BusyPaneIsRelaunchedByARule(t *testing.T) {
+	h := parkLaunchCollision(t, events.AgentPaneBusy)
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AgentPaneBusy) && ev.Reason == "R6" && ev.Outcome == "ok" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
+// A taken name needs herdr's candidate block read, so R6 hands it to an
+// investigate fork rather than acting.
+func TestRecovery_R6TakenNameForksAnInvestigateTicketNamingR6(t *testing.T) {
+	h := parkLaunchCollision(t, events.AgentNameTaken)
+	waitFor(t, func() bool {
+		for _, tk := range epicTickets(t, h).Tickets {
+			if tk.Identifier == "01a" && tk.Type == "investigate" {
+				body, _ := os.ReadFile(tk.Path)
+				return strings.Contains(string(body), "R6")
+			}
+		}
+		return false
+	})
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AgentNameTaken) && ev.Outcome == "proj:epic-a/01a" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

@@ -73,7 +73,43 @@ var NotCatalogued = map[string]string{
 func Default() Catalog {
 	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered()}
 	entries = append(entries, r3LandRecoverable()...)
-	return Catalog{Enabled: true, Entries: append(entries, r4BlockedPaneDialog())}
+	entries = append(entries, r4BlockedPaneDialog())
+	return Catalog{Enabled: true, Entries: append(entries, r6LaunchCollision()...)}
+}
+
+// r6LaunchCollision is a ticket parked because herdr refused its launch. A busy
+// pane is transient, so a rule relaunches once. A taken name needs herdr's
+// candidate block read: a leaked pane in this ticket's own worktree is closed
+// and the ticket relaunched, while another ticket's live agent means this
+// second launch is abandoned and the park stands. Clearing the ticket back to
+// open is high authority, so it is outside the grant and the agent may only
+// propose it. Both require a launch-failed event of the same kind, so a park
+// that merely reuses the kind is not a collision. Launches disabled: there is
+// no S0 launch-failed event data behind it yet.
+func r6LaunchCollision() []Entry {
+	busy := Entry{
+		ID: "R6", Type: events.NeedsRepair, Kind: events.AgentPaneBusy,
+		Predicate: afterLaunchFailed(events.AgentPaneBusy),
+		Executor:  ExecutorRule, Authority: AuthorityLow, Verbs: []string{"relaunch"},
+		Remedy: func(f Failure, v Verbs) error {
+			_, err := v.Relaunch(f.Address)
+			return err
+		},
+	}
+	taken := Entry{
+		ID: "R6", Type: events.NeedsRepair, Kind: events.AgentNameTaken,
+		Predicate: afterLaunchFailed(events.AgentNameTaken),
+		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"close-pane", "relaunch"},
+	}
+	return []Entry{busy, taken}
+}
+
+func afterLaunchFailed(kind events.Kind) func(seq []Event) bool {
+	return func(seq []Event) bool {
+		return slices.ContainsFunc(seq[:len(seq)-1], func(ev Event) bool {
+			return ev.Type == events.LaunchFailed && ev.Kind == kind
+		})
+	}
 }
 
 // r4BlockedPaneDialog is a pane parked on a prompt gx did not send. The run
