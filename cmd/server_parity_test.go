@@ -28,6 +28,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/queue":              "server queue list",
 	"GET /v1/queue/items":        "server queue items",
 	"POST /v1/queue/add":         "server queue add",
+	"POST /v1/oneoff":            "server one-off",
 	"POST /v1/queue/remove":      "server queue remove",
 	"POST /v1/queue/move":        "server queue move",
 	"POST /v1/queue/replace":     "server queue replace",

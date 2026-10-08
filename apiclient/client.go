@@ -218,6 +218,14 @@ func (c *Client) QueueAdd(ctx context.Context, address, agent string) (server.Qu
 	return c.queueWrite(ctx, "add", server.QueueRequest{Address: address, Agent: agent})
 }
 
+// OneOff creates a top-level ticket from a prompt and queues it. A refusal is a
+// result (Refused set), not an error.
+func (c *Client) OneOff(ctx context.Context, req server.OneOffRequest) (server.OneOffResult, error) {
+	var res server.OneOffResult
+	err := c.post(ctx, "/v1/oneoff", req, &res)
+	return res, err
+}
+
 // QueueRemove drops a ticket from the queue.
 func (c *Client) QueueRemove(ctx context.Context, address string) (server.QueueResult, error) {
 	return c.queueWrite(ctx, "remove", server.QueueRequest{Address: address})
