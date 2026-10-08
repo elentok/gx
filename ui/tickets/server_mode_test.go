@@ -194,6 +194,50 @@ func TestServerMode_GapAndReconnectResnapshot(t *testing.T) {
 	}
 }
 
+// streamAPI hands out a fresh event stream per Events call and records each
+// subscription's context, so a test can see which streams were cancelled.
+type streamAPI struct {
+	fakeServerAPI
+	ctxs *[]context.Context
+}
+
+func (s streamAPI) Events(ctx context.Context, _ uint64) (<-chan server.Event, error) {
+	*s.ctxs = append(*s.ctxs, ctx)
+	return make(chan server.Event), nil
+}
+
+func TestServerMode_ResnapshotReplacesTheEventStream(t *testing.T) {
+	var ctxs []context.Context
+	m := newServerModel(t).WithServer(streamAPI{ctxs: &ctxs})
+	subscribe := func(m Model) (Model, <-chan server.Event) {
+		t.Helper()
+		m, cmd, _ := m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Seq: m.vm.Seq}})
+		var sub serverSubscribedMsg
+		for _, c := range cmd().(tea.BatchMsg) {
+			if msg, ok := c().(serverSubscribedMsg); ok {
+				sub = msg
+			}
+		}
+		m, _, _ = m.updateServer(sub)
+		return m, sub.events
+	}
+
+	m, first := subscribe(m)
+	m, _ = subscribe(m)
+
+	if len(ctxs) != 2 || ctxs[0].Err() == nil || ctxs[1].Err() != nil {
+		t.Fatalf("first stream must be cancelled, second live: %d subscriptions", len(ctxs))
+	}
+	// The old stream's leftovers neither keep it read nor resnapshot.
+	ev := server.Event{Seq: m.vm.Seq + 1, Type: server.EventTicketChanged}
+	if _, cmd, _ := m.updateServer(serverEventMsg{ev: ev, events: first}); cmd != nil {
+		t.Fatal("event from a replaced stream produced a command")
+	}
+	if _, cmd, _ := m.updateServer(serverStreamEndedMsg{events: first}); cmd != nil {
+		t.Fatal("end of a replaced stream produced a command")
+	}
+}
+
 // toastsOf runs cmd (flattening batches) and returns the toasts it emits.
 func toastsOf(cmd tea.Cmd) []notify.NotifyMsg {
 	if cmd == nil {
@@ -232,13 +276,14 @@ func TestServerMode_ToastsFromLiveEventsOnly(t *testing.T) {
 
 	// A live park event toasts once.
 	park := server.Event{Seq: 5, Type: server.EventIterationParked, Address: "gx:alpha/01"}
-	m, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: closedEvents()})
+	m.streamEvents = closedEvents()
+	m, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: m.streamEvents})
 	if got := toastsOf(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {
 		t.Fatalf("live park toasts = %+v", got)
 	}
 
 	// The same event replayed after a reconnect is a duplicate: no toast.
-	_, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: closedEvents()})
+	_, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: m.streamEvents})
 	if got := toastsOf(cmd); len(got) != 0 {
 		t.Fatalf("replayed event toasted: %+v", got)
 	}

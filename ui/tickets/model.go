@@ -4,6 +4,7 @@
 package tickets
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -190,6 +192,13 @@ type Model struct {
 	// serverLink is how the TUI currently reaches the server (server_link.go).
 	serverLink ServerLink
 	vm         viewmodel.State
+	// streamCtx/streamStop are the current event subscription: every
+	// snapshot cancels the one before, and messages from any other stream
+	// (streamEvents) are dropped. Without this each re-snapshot leaked a
+	// live stream that re-delivered every event and rebuilt the sidebar.
+	streamCtx    context.Context
+	streamStop   context.CancelFunc
+	streamEvents <-chan server.Event
 	// fallbackStop is non-nil while the server is down and the tab reads the
 	// store itself (server_refresh.go); fallbackGen orphans a finished
 	// fallback's in-flight ticks.

@@ -170,6 +170,7 @@ type serverSnapshotMsg struct {
 }
 
 type serverSubscribedMsg struct {
+	ctx    context.Context
 	events <-chan server.Event
 	err    error
 }
@@ -181,7 +182,9 @@ type serverEventMsg struct {
 
 // serverStreamEndedMsg: the stream closed (server dropped us, restarted, or
 // went away). Whatever we missed is unknowable, so re-snapshot.
-type serverStreamEndedMsg struct{}
+type serverStreamEndedMsg struct {
+	events <-chan server.Event
+}
 
 type serverRetryMsg struct{}
 
@@ -230,11 +233,18 @@ func (m Model) cmdServerSnapshot() tea.Cmd {
 	}
 }
 
-func (m Model) cmdServerSubscribe(since uint64) tea.Cmd {
+// subscribe replaces the current event stream with a new one from since:
+// the old stream is cancelled, so it can never deliver into this model again.
+func (m Model) subscribe(since uint64) (Model, tea.Cmd) {
+	if m.streamStop != nil {
+		m.streamStop()
+	}
+	ctx, stop := context.WithCancel(context.Background())
+	m.streamCtx, m.streamStop, m.streamEvents = ctx, stop, nil
 	api := m.serverAPI
-	return func() tea.Msg {
-		ch, err := api.Events(context.Background(), since)
-		return serverSubscribedMsg{events: ch, err: err}
+	return m, func() tea.Msg {
+		ch, err := api.Events(ctx, since)
+		return serverSubscribedMsg{ctx: ctx, events: ch, err: err}
 	}
 }
 
@@ -242,7 +252,7 @@ func cmdServerNextEvent(events <-chan server.Event) tea.Cmd {
 	return func() tea.Msg {
 		ev, ok := <-events
 		if !ok {
-			return serverStreamEndedMsg{}
+			return serverStreamEndedMsg{events: events}
 		}
 		return serverEventMsg{ev: ev, events: events}
 	}
@@ -281,19 +291,27 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		firstLoad := !m.loaded
 		m.vm = m.vm.ApplySnapshot(msg.snap)
 		m.loaded = true
-		cmds := []tea.Cmd{m.cmdServerSubscribe(msg.snap.Seq), m.cmdServerQueue()}
+		m, subscribe := m.subscribe(msg.snap.Seq)
+		cmds := []tea.Cmd{subscribe, m.cmdServerQueue()}
 		if hint := m.vm.UnregisteredHint(); hint != "" && firstLoad && m.scopeKnown {
 			cmds = append(cmds, notify.Info(hint))
 		}
 		return m.applyServerRows(), tea.Batch(cmds...), true
 
 	case serverSubscribedMsg:
+		if msg.ctx != m.streamCtx {
+			return m, nil, true // a newer snapshot already replaced it
+		}
 		if msg.err != nil {
 			return m, m.cmdServerResnapshotLater(), true
 		}
+		m.streamEvents = msg.events
 		return m, cmdServerNextEvent(msg.events), true
 
 	case serverEventMsg:
+		if msg.events != m.streamEvents {
+			return m, nil, true
+		}
 		var effect viewmodel.Effect
 		seqBefore := m.vm.Seq
 		m.vm, effect = m.vm.Reduce(msg.ev)
@@ -308,6 +326,9 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, m.cmdServerSnapshot(), true
 
 	case serverStreamEndedMsg:
+		if msg.events != m.streamEvents {
+			return m, nil, true
+		}
 		return m, m.cmdServerSnapshot(), true
 
 	case serverEnqueuedMsg:
