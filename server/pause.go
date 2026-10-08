@@ -49,6 +49,17 @@ func openPause(stateDir string) (*pauseState, error) {
 	return p, nil
 }
 
+// QueuePaused reports whether the pause persisted in stateDir is on. It reads
+// the same file the server writes, so it answers for a server that is down or
+// an older build that does not report its mode.
+func QueuePaused(stateDir string) (bool, error) {
+	p, err := openPause(stateDir)
+	if err != nil {
+		return false, err
+	}
+	return p.paused, nil
+}
+
 // blocked reports whether claiming a new root is held back.
 func (p *pauseState) blocked() bool {
 	p.mu.Lock()

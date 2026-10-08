@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -89,5 +91,18 @@ func TestPause_RefusedWhileSchedulerIsInProcess(t *testing.T) {
 	res, err := h.Client.QueuePause(context.Background())
 	if err != nil || !res.Refused || res.Reason != server.ReasonSchedulerNotSelected {
 		t.Fatalf("pause = %+v, %v", res, err)
+	}
+}
+
+func TestQueuePaused(t *testing.T) {
+	dir := t.TempDir()
+	if paused, err := server.QueuePaused(dir); err != nil || paused {
+		t.Fatalf("no file: paused = %v, err = %v; want false, nil", paused, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "queue-mode.json"), []byte(`{"paused":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if paused, err := server.QueuePaused(dir); err != nil || !paused {
+		t.Fatalf("paused file: paused = %v, err = %v; want true, nil", paused, err)
 	}
 }

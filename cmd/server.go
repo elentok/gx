@@ -176,6 +176,7 @@ type StatusInfo struct {
 	Pid          int      `json:"pid,omitempty"`
 	Build        string   `json:"build,omitempty"`
 	Orchestrator string   `json:"orchestrator,omitempty"`
+	Paused       bool     `json:"paused,omitempty"`
 	Warnings     []string `json:"warnings,omitempty"`
 }
 
@@ -194,7 +195,15 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 		if cerr != nil {
 			return cerr
 		}
-		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
+		stateDir, serr := config.StateDir()
+		if serr != nil {
+			return serr
+		}
+		paused, perr := server.QueuePaused(stateDir)
+		if perr != nil {
+			return perr
+		}
+		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
 	}
 	if jsonOut {
 		via := viaDirect
@@ -212,6 +221,11 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	}
 	if info.Orchestrator != "" {
 		if _, err = fmt.Fprintf(w, "orchestrator: %s\n", info.Orchestrator); err != nil {
+			return err
+		}
+	}
+	if info.Paused {
+		if _, err = fmt.Fprintln(w, "queue: paused (gx server queue resume)"); err != nil {
 			return err
 		}
 	}
