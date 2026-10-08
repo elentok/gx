@@ -13,11 +13,10 @@ func TestExecute_TicketsEpics_ListsBareSlugsSortedExcludingArchive(t *testing.T)
 	store := isolateTicketStore(t)
 	repo := testutil.TempRepo(t)
 	project := addProject(t, store, "mine", repo)
-	for _, name := range []string{"zebra-epic", "alpha-epic", ".archive"} {
-		if err := os.MkdirAll(filepath.Join(project, name), 0755); err != nil {
-			t.Fatalf("mkdir %s: %v", name, err)
-		}
+	for _, name := range []string{"zebra-epic", "alpha-epic"} {
+		testutil.EnsureEpicTicketMD(t, filepath.Join(project, name))
 	}
+	testutil.Mkdir(t, filepath.Join(project, ".archive"))
 	// A stray file directly under the project should not be treated as an epic.
 	testutil.WriteFile(t, project, "notes.txt", "not an epic")
 

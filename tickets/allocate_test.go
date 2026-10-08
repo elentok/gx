@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/elentok/gx/testutil"
 )
 
 func TestNextTicketID_FlatSibling(t *testing.T) {
@@ -182,9 +184,8 @@ func TestLoadLockedEpic_MissingPathReturnsErrorAndDoesNotLeaveLock(t *testing.T)
 func TestLoadLockedEpic_EmptyEpic(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "my-epic")
-	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
+	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
+	testutil.EnsureEpicTicketMD(t, epicPath)
 
 	epic, unlock, err := LoadLockedEpic(epicPath)
 	if err != nil {
@@ -199,9 +200,8 @@ func TestLoadLockedEpic_EmptyEpic(t *testing.T) {
 func TestLockEpic_SerializesConcurrentAllocation(t *testing.T) {
 	dir := t.TempDir()
 	epicPath := filepath.Join(dir, "my-epic")
-	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
+	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
+	testutil.EnsureEpicTicketMD(t, epicPath)
 
 	const n = 20
 	ids := make([]string, n)

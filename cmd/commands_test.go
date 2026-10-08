@@ -81,8 +81,8 @@ func TestNewEpicScopedCmd_RequiresExactlyOneArg(t *testing.T) {
 func TestNewEpicScopedCmd_ValidArgsFunctionListsEpicNames(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	project := storeProjectFor(t, repoDir)
-	testutil.Mkdir(t, filepath.Join(project, "widget-epic"))
-	testutil.Mkdir(t, filepath.Join(project, "bugs-05"))
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "widget-epic"))
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "bugs-05"))
 
 	d := deps{getwd: func() (string, error) { return repoDir, nil }}
 	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })

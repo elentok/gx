@@ -24,6 +24,7 @@ func setupShowProject(t *testing.T) (repo, project string) {
 	if err := os.MkdirAll(issues, 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "epic"))
 	testutil.WriteFile(t, issues, "06-hello.md", showTicketFixture)
 	return repo, project
 }

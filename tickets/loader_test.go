@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -14,6 +15,9 @@ func writeFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
+	}
+	if issuesDir := filepath.Dir(path); filepath.Base(issuesDir) == "issues" {
+		testutil.EnsureEpicTicketMD(t, filepath.Dir(issuesDir))
 	}
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
@@ -137,9 +141,7 @@ func TestLoad_ExcludesDotPrefixedDirectories(t *testing.T) {
 
 func TestLoad_EpicWithNoIssuesDirHasZeroTickets(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "bare-epic"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(dir, "bare-epic"))
 
 	epics, err := Load(dir)
 	if err != nil {
@@ -260,50 +262,6 @@ func TestLoad_RejectsPreContractionShape(t *testing.T) {
 	}
 }
 
-func TestLoad_EpicYAMLRoundTripsTimestamps(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "timed-epic", "epic.yaml"),
-		"started_at: 2026-01-02T03:04:05Z\ncompleted_at: 2026-01-03T04:05:06Z\n")
-
-	epics, err := Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(epics) != 1 {
-		t.Fatalf("expected 1 epic, got %d", len(epics))
-	}
-
-	wantStarted := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	wantCompleted := time.Date(2026, 1, 3, 4, 5, 6, 0, time.UTC)
-	if !epics[0].StartedAt.Equal(wantStarted) {
-		t.Errorf("StartedAt = %v, want %v", epics[0].StartedAt, wantStarted)
-	}
-	if !epics[0].CompletedAt.Equal(wantCompleted) {
-		t.Errorf("CompletedAt = %v, want %v", epics[0].CompletedAt, wantCompleted)
-	}
-}
-
-func TestLoad_EpicWithNoEpicYAMLLeavesTimestampsZero(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "untimed-epic"), 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	epics, err := Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(epics) != 1 {
-		t.Fatalf("expected 1 epic, got %d", len(epics))
-	}
-	if !epics[0].StartedAt.IsZero() {
-		t.Errorf("StartedAt = %v, want zero", epics[0].StartedAt)
-	}
-	if !epics[0].CompletedAt.IsZero() {
-		t.Errorf("CompletedAt = %v, want zero", epics[0].CompletedAt)
-	}
-}
-
 func TestLoad_DiscoversAlphabeticallySuffixedTicketNumbers(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"10a-first.md", "10b-second.md", "10c-third.md"} {
@@ -365,20 +323,5 @@ func TestLoad_TicketMDKindMapMakesAMapEpic(t *testing.T) {
 	}
 	if epics[1].IsMap {
 		t.Error("ticket.md without kind: map should not be IsMap")
-	}
-}
-
-func TestLoad_OldShapeEpicYAMLStillLoads(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "old-epic", "epic.yaml"), "started_at: 2026-01-02T03:04:05Z\n")
-	writeFile(t, filepath.Join(dir, "old-epic", "issues", "01-first.md"),
-		"---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
-
-	epics, err := Load(dir)
-	if err != nil || len(epics) != 1 {
-		t.Fatalf("Load = %v, %v", epics, err)
-	}
-	if epics[0].HasTicketMD || epics[0].StartedAt.IsZero() || len(epics[0].Tickets) != 1 {
-		t.Errorf("old shape not loaded: %+v", epics[0])
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -382,9 +383,8 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".scratch", "empty-epic", "issues"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	testutil.Mkdir(t, filepath.Join(root, ".scratch", "empty-epic", "issues"))
+	testutil.EnsureEpicTicketMD(t, filepath.Join(root, ".scratch", "empty-epic"))
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -1043,6 +1043,7 @@ func writeTicket(t *testing.T, root, epic, filename, content string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Dir(filepath.Dir(path)))
 	if err := os.WriteFile(path, []byte(LegacyTicketToFrontmatter(filename, content)), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -1114,6 +1115,7 @@ func writeArchivedTicket(t *testing.T, root, epic, filename, content string) {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Dir(filepath.Dir(path)))
 	if err := os.WriteFile(path, []byte(LegacyTicketToFrontmatter(filename, content)), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -1237,10 +1239,8 @@ func TestModel_FailedArchivedLoadRendersInlineErrorAndStaysExpandedThenRetries(t
 	if err := os.WriteFile(archiveDir, []byte("not a directory"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, ".scratch", "my-epic"), 0755); err != nil {
-		t.Fatal(err)
-	}
 
+	testutil.EnsureEpicTicketMD(t, filepath.Join(root, ".scratch", "my-epic"))
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m.archivedEpicCount = 1 // bypass the count-0 short-circuit; CountArchivedEpics itself tolerates the file fine
 	m = deliverLoad(t, m)

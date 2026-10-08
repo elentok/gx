@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/repair"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -56,6 +57,7 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
+	testutil.EnsureEpicTicketMD(t, epicPath)
 
 	var stdout bytes.Buffer
 	if err := runTicketsAdd(epicPath, "", "do-thing", &stdout); err != nil {
@@ -240,6 +242,7 @@ func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
+	testutil.EnsureEpicTicketMD(t, epicPath)
 
 	const n = 15
 	paths := make([]string, n)

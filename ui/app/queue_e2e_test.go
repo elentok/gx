@@ -35,6 +35,7 @@ func TestTicketsReplaceQueueWithoutServerIsDisabled(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "my-epic"))
 	if err := os.WriteFile(filepath.Join(issuesDir, "01-first.md"), []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\nBody.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/repair"
+	"github.com/elentok/gx/testutil"
 )
 
 // Every command that names a ticket in human output prints its canonical
@@ -20,6 +21,7 @@ func TestRunTicketsAdd_PrintsAddressNotPath(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, epicPath)
 	if err := os.WriteFile(filepath.Join(issuesDir, "01-a.md"), []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n"), 0644); err != nil {
 		t.Fatal(err)
 	}

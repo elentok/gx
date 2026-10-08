@@ -6,10 +6,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/testutil"
 )
+
+// ensureIssueEpic gives a ticket at <epic>/issues/<file> its epic's ticket.md.
+func ensureIssueEpic(t *testing.T, path string) {
+	t.Helper()
+	if issuesDir := filepath.Dir(path); filepath.Base(issuesDir) == "issues" {
+		testutil.EnsureEpicTicketMD(t, filepath.Dir(issuesDir))
+	}
+}
 
 func writeTicketFile(t *testing.T, path, content string) {
 	t.Helper()
+	ensureIssueEpic(t, path)
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -19,6 +20,7 @@ func newAddEpic(t *testing.T) (epicPath, issuesDir string) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("mkdir issues: %v", err)
 	}
+	testutil.EnsureEpicTicketMD(t, epicPath)
 	return epicPath, issuesDir
 }
 

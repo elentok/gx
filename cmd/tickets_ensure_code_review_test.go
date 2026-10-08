@@ -45,8 +45,8 @@ func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
 	store := isolateTicketStore(t)
 	repoDir := testutil.TempRepo(t)
 	project := addProject(t, store, "mine", repoDir)
-	testutil.Mkdir(t, filepath.Join(project, "bugs-05"))
-	testutil.Mkdir(t, filepath.Join(project, "widget-epic"))
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "bugs-05"))
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "widget-epic"))
 	testutil.Mkdir(t, filepath.Join(project, ".archive"))
 
 	names, err := completeEpicNames(repoDir)
@@ -149,6 +149,7 @@ func TestExecute_TicketsEnsureCodeReview_StubLandsInStore(t *testing.T) {
 // status, and type.
 func writeTicket(t *testing.T, path, id, status, ticketType string) {
 	t.Helper()
+	ensureIssueEpic(t, path)
 	content := "---\nid: \"" + id + "\"\nstatus: " + status + "\ntype: " + ticketType + "\n---\n\n# " + id + "\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("write ticket %s: %v", path, err)

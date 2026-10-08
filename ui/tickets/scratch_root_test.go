@@ -45,6 +45,7 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(ticketPath), 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(wantScratchRoot, "alpha"))
 	if err := os.WriteFile(ticketPath, []byte(LegacyTicketToFrontmatter("01-first.md", "Status: open\n\nBody.\n")), 0644); err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -23,6 +24,7 @@ func writeFrontmatterTicket(t *testing.T, root, epic, filename, id, status, pare
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Dir(filepath.Dir(path)))
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: implement\n", id, status)
 	if parent != "" {
