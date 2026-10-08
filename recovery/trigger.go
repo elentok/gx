@@ -52,6 +52,12 @@ type Verbs interface {
 	Park(address, reason string) (Result, error)
 	Relaunch(address string) (Result, error)
 	CommitlessDone(address string) (Result, error)
+	Nudge(address, text string) (Result, error)
+	// ClosePane closes the iteration's tab; no live pane is not a refusal.
+	ClosePane(address string) (Result, error)
+	// LaunchPrompt is the prompt a fresh iteration of the ticket is launched
+	// with. It is a read, not a verb: the run log never records the prompt.
+	LaunchPrompt(address string) (string, error)
 }
 
 // Remedy is a rule entry's fix, written in Go against the server's verbs.

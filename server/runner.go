@@ -626,11 +626,16 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), nil
 }
 
-func (s *Server) launch(ticket tickets.Address, skill, note, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
-	prompt := ralphloop.SkillPrompt(agent, skill, ticket.String())
+func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string {
+	prompt := ralphloop.SkillPrompt(agent, skill, address)
 	if note != "" {
 		prompt += "\n\n" + note
 	}
+	return prompt
+}
+
+func (s *Server) launch(ticket tickets.Address, skill, note, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
+	prompt := launchPrompt(agent, skill, note, ticket.String())
 	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticket.String(), Env: s.cfg.TabEnv})
 	if err != nil {
 		return Run{}, err

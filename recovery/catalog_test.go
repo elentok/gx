@@ -89,6 +89,71 @@ func TestDefaultR1IsAnEnabledLowRuleThatNeverNudges(t *testing.T) {
 	}
 }
 
+func TestDefaultR5MatchesAStalledParkAfterAStalledLaunch(t *testing.T) {
+	stalledLaunch := Event{Type: events.LaunchFailed, Kind: events.AgentPromptStalled}
+	stalledPark := Event{Type: events.NeedsRepair, Kind: events.AgentPromptStalled}
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"stalled park after stalled launch", []Event{{Type: events.IterationStarted}, stalledLaunch, stalledLaunch, stalledPark}, true},
+		{"no prior launch-failed", []Event{{Type: events.IterationStarted}, stalledPark}, false},
+		{"prior launch-failed of another kind", []Event{{Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, stalledPark}, false},
+		{"other park kind", []Event{stalledLaunch, {Type: events.NeedsRepair, Kind: events.AgentPaneBusy}}, false},
+		{"stalled kind on another type", []Event{stalledLaunch, {Type: events.NeedsAnswer, Kind: events.AgentPromptStalled}}, false},
+		{"the launch-failed itself", []Event{stalledLaunch}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := Default().Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R5") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestDefaultR5IsAnEnabledLowRuleThatNudgesOrClosesThePane(t *testing.T) {
+	e, _ := Default().Match([]Event{
+		{Type: events.LaunchFailed, Kind: events.AgentPromptStalled},
+		{Type: events.NeedsRepair, Kind: events.AgentPromptStalled},
+	})
+	f := Failure{Address: "p:e/01", Type: events.NeedsRepair, Kind: events.AgentPromptStalled}
+	if e.ID != "R5" || !e.Enabled || !e.Runnable(f) || e.Authority != AuthorityLow || !slices.Equal(e.Verbs, []string{"nudge", "close-pane"}) {
+		t.Fatalf("R5 = %+v, want an enabled runnable low rule with nudge and close-pane", e)
+	}
+
+	delivered := &stubVerbs{prompt: "/gx-implement p:e/01"}
+	if err := e.Remedy(f, delivered); err != nil || !slices.Equal(delivered.calls, []string{"nudge p:e/01 /gx-implement p:e/01"}) {
+		t.Errorf("delivered: err %v, calls %q; want one nudge with the full prompt", err, delivered.calls)
+	}
+	refused := &stubVerbs{prompt: "/gx-implement p:e/01", refuse: true}
+	if err := e.Remedy(f, refused); err == nil || !slices.Equal(refused.calls, []string{"nudge p:e/01 /gx-implement p:e/01", "close-pane p:e/01"}) {
+		t.Errorf("refused: err %v, calls %q; want a failed nudge then close-pane", err, refused.calls)
+	}
+}
+
+// stubVerbs records calls and refuses every nudge when refuse is set.
+type stubVerbs struct {
+	recorder
+	prompt string
+	refuse bool
+	calls  []string
+}
+
+func (s *stubVerbs) Nudge(address, text string) (Result, error) {
+	s.calls = append(s.calls, "nudge "+address+" "+text)
+	return Result{Refused: s.refuse, Reason: "iteration-not-live"}, nil
+}
+
+func (s *stubVerbs) ClosePane(address string) (Result, error) {
+	s.calls = append(s.calls, "close-pane "+address)
+	return Result{}, nil
+}
+
+func (s *stubVerbs) LaunchPrompt(string) (string, error) { return s.prompt, nil }
+
 func TestDefaultR2LaunchesDisabledAsAnAgentEntry(t *testing.T) {
 	c := Default()
 	for _, e := range c.Entries {

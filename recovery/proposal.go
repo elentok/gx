@@ -53,6 +53,10 @@ func (c Call) Apply(v Verbs) (Result, error) {
 		return v.Relaunch(c.Address)
 	case "commitless-done":
 		return v.CommitlessDone(c.Address)
+	case "nudge":
+		return v.Nudge(c.Address, c.Reason)
+	case "close-pane":
+		return v.ClosePane(c.Address)
 	}
 	return Result{}, fmt.Errorf("unknown proposed verb %q", c.Verb)
 }
@@ -74,6 +78,18 @@ func (r *recorder) CommitlessDone(address string) (Result, error) {
 	r.calls = append(r.calls, Call{Verb: "commitless-done", Address: address})
 	return Result{}, nil
 }
+
+func (r *recorder) Nudge(address, text string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "nudge", Address: address, Reason: text})
+	return Result{}, nil
+}
+
+func (r *recorder) ClosePane(address string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "close-pane", Address: address})
+	return Result{}, nil
+}
+
+func (r *recorder) LaunchPrompt(string) (string, error) { return "", nil }
 
 // Proposable reports whether the matched entry is a high-authority rule: it
 // is never applied unattended, but its remedy says what it would do.

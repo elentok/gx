@@ -122,21 +122,26 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if s.herdr.isUnavailable() {
 			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
 		}
-		agent := ralphloop.AgentClaude
-		for _, it := range s.queued.list() {
-			if it.Address == ref.addr.String() {
-				agent = ralphloop.AgentKind(it.Agent)
-			}
-		}
 		epics, err := tickets.Load(ref.projectDir)
 		if err != nil {
 			return QueueResult{}, err
 		}
-		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, agent, epics); err != nil {
+		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, s.queuedAgent(ref.addr.String()), epics); err != nil {
 			return QueueResult{}, err
 		}
 		return QueueResult{}, nil
 	})
+}
+
+// queuedAgent is the agent the ticket is queued with, claude otherwise.
+func (s *Server) queuedAgent(address string) ralphloop.AgentKind {
+	agent := ralphloop.AgentClaude
+	for _, it := range s.queued.list() {
+		if it.Address == address {
+			agent = ralphloop.AgentKind(it.Agent)
+		}
+	}
+	return agent
 }
 
 // ticketCancel withdraws a ticket and every non-terminal ticket forked from it.

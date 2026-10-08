@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
@@ -337,6 +338,36 @@ func (v recoveryVerbs) Relaunch(address string) (recovery.Result, error) {
 func (v recoveryVerbs) CommitlessDone(address string) (recovery.Result, error) {
 	res, err := v.s.ticketCommitlessDone(QueueRequest{Address: address, actor: recovery.ActorRecovery})
 	return recoveryResult(res), err
+}
+
+func (v recoveryVerbs) Nudge(address, text string) (recovery.Result, error) {
+	res, err := v.s.ticketNudge(QueueRequest{Address: address, Text: text, actor: recovery.ActorRecovery})
+	return recoveryResult(res), err
+}
+
+func (v recoveryVerbs) ClosePane(address string) (recovery.Result, error) {
+	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
+		it, live := v.s.liveIteration(ref.addr.String())
+		if !live {
+			return QueueResult{}, nil
+		}
+		if err := herdr.TabClose(it.Tab); err != nil {
+			return QueueResult{}, fmt.Errorf("close pane of %s: %w", ref.addr, err)
+		}
+		return QueueResult{}, nil
+	})
+	return recoveryResult(res), err
+}
+
+func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
+	ref, ok, err := v.s.findTicket(address)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("no ticket %s", address)
+	}
+	return launchPrompt(v.s.queuedAgent(address), launchSkill(ref.ticket), investigatePrompt(ref.ticket), address), nil
 }
 
 // ticketCommitlessDone marks a ticket done with no commits of its own, for work

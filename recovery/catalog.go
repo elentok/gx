@@ -4,6 +4,8 @@
 package recovery
 
 import (
+	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 
@@ -69,7 +71,7 @@ var NotCatalogued = map[string]string{
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
 // they land.
 func Default() Catalog {
-	entries := []Entry{r1Spin(), r2UnexecutedToolCall()}
+	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered()}
 	entries = append(entries, r3LandRecoverable()...)
 	return Catalog{Enabled: true, Entries: append(entries, r4BlockedPaneDialog())}
 }
@@ -154,6 +156,40 @@ func r2UnexecutedToolCall() Entry {
 			return transcript.LooksLikeUnexecutedToolCall(seq[len(seq)-1].Text)
 		},
 		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"relaunch"},
+	}
+}
+
+// r5PromptNeverDelivered is a launch whose pane never took its initial prompt.
+// The park alone is ambiguous, so the predicate wants a stalled launch-failed
+// before it. The remedy retypes the full prompt once (the per-kind guard rail
+// is the cap); when that cannot be delivered it closes the pane, so a reclaim
+// does not collide with the leftover agent. Launches enabled: S0 emits the
+// launch-failed it matches.
+func r5PromptNeverDelivered() Entry {
+	return Entry{
+		ID: "R5", Type: events.NeedsRepair, Kind: events.AgentPromptStalled,
+		Predicate: func(seq []Event) bool {
+			return slices.ContainsFunc(seq[:len(seq)-1], func(e Event) bool {
+				return e.Type == events.LaunchFailed && e.Kind == events.AgentPromptStalled
+			})
+		},
+		Executor: ExecutorRule, Authority: AuthorityLow, Verbs: []string{"nudge", "close-pane"}, Enabled: true,
+		Remedy: func(f Failure, v Verbs) error {
+			prompt, err := v.LaunchPrompt(f.Address)
+			if err == nil {
+				var res Result
+				if res, err = v.Nudge(f.Address, prompt); err == nil && !res.Refused {
+					return nil
+				}
+				if err == nil {
+					err = fmt.Errorf("nudge refused: %s", res.Reason)
+				}
+			}
+			if _, cerr := v.ClosePane(f.Address); cerr != nil {
+				err = errors.Join(err, cerr)
+			}
+			return fmt.Errorf("retyping the prompt: %w", err)
+		},
 	}
 }
 

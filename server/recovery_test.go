@@ -2,9 +2,11 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -143,6 +146,83 @@ func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
 		case events.RecoveryEscalated, events.RecoveryProposed, events.Reclaimed:
 			t.Errorf("unexpected %s after a spinning park", ev.Type)
 		}
+	}
+}
+
+// parkStalledLaunch parks ticket 01 the way a launch whose prompt stalled ends,
+// with the pane answering prompts with promptErr, and returns R5's applied
+// event plus what was typed and which tabs were closed.
+func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, typed, closed []string) {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+	})
+	var mu sync.Mutex
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		typed = append(typed, argv[3])
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1"}}, herdrfake.Identities{}, promptErr
+	})
+	h.Herdr.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		closed = append(closed, argv[2])
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	dir := filepath.Join(store, "proj")
+	stalled := ralphloop.Event{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(events.AgentPromptStalled), Attempt: 1}
+	if err := ralphloop.AppendEvent(dir, "epic-a", stalled); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Server.ParkAs("proj:epic-a/01", events.AgentPromptStalled, "agent_prompt_stalled"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied {
+				applied = ev
+				return true
+			}
+		}
+		return false
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	return applied, typed, closed
+}
+
+func TestRecovery_StalledPromptIsRetypedInFullByR5(t *testing.T) {
+	applied, typed, closed := parkStalledLaunch(t, nil)
+	if applied.Reason != "R5" || applied.Kind != string(events.AgentPromptStalled) || applied.Outcome != "ok" {
+		t.Errorf("applied = %+v, want R5 ok", applied)
+	}
+	if len(typed) != 1 || typed[0] != "/gx-implement proj:epic-a/01" {
+		t.Errorf("typed = %q, want the full launch prompt once", typed)
+	}
+	if len(closed) != 0 {
+		t.Errorf("closed tabs %q after a delivered prompt", closed)
+	}
+}
+
+func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
+	applied, typed, closed := parkStalledLaunch(t, errors.New("agent_prompt_stalled"))
+	if applied.Reason != "R5" || applied.Outcome == "ok" {
+		t.Errorf("applied = %+v, want a failed R5", applied)
+	}
+	if len(typed) != 1 {
+		t.Errorf("typed = %q, want one retype", typed)
+	}
+	if len(closed) != 1 || closed[0] != "tab-1" {
+		t.Errorf("closed = %q, want the iteration's tab", closed)
 	}
 }
 
