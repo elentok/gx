@@ -28,7 +28,7 @@ func loadEpicByName(t *testing.T, scratchDir, name string) tickets.Epic {
 }
 
 // TestRun_StampsEpicStartedAndCompletedAt covers ticket 06's core
-// requirement: a fresh run of a whole epic stamps epic.yaml's started_at the
+// requirement: a fresh run of a whole epic stamps ticket.md's started_at the
 // moment the first ticket is claimed, and completed_at once the last ticket
 // (and thus the whole epic, not just this run's scope) finishes.
 func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
@@ -55,8 +55,7 @@ func TestRun_StampsEpicStartedAndCompletedAt(t *testing.T) {
 }
 
 // TestRun_EpicWithTicketMD_StampsTimingIntoTicketMD: an epic that has a
-// ticket.md gets its stamps there, keeps its other frontmatter and body, and
-// never grows an epic.yaml.
+// ticket.md gets its stamps there and keeps its other frontmatter and body.
 func TestRun_EpicWithTicketMD_StampsTimingIntoTicketMD(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
@@ -80,9 +79,6 @@ func TestRun_EpicWithTicketMD_StampsTimingIntoTicketMD(t *testing.T) {
 	}
 	if epic.Base != "main" {
 		t.Errorf("Base = %q, want main preserved", epic.Base)
-	}
-	if _, err := os.Stat(filepath.Join(scratchDir, "my-epic", "epic.yaml")); !os.IsNotExist(err) {
-		t.Errorf("epic.yaml should not exist for a ticket.md epic, stat err = %v", err)
 	}
 	raw, _ := os.ReadFile(ticketMD)
 	if !strings.HasSuffix(string(raw), "---\n# Epic body\n") {

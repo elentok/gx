@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -188,6 +189,7 @@ func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Dir(dir))
 	write := func(name string, notify bool) string {
 		tk := schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt, Notify: notify}
 		out, err := schema.MarshalTicket(tk, "\nprompt\n\n## Result\n\nthe answer is 42\n")
@@ -231,6 +233,7 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
+		testutil.EnsureEpicTicketMD(t, filepath.Dir(dir))
 		out, err := schema.MarshalTicket(tk, "\nbody\n")
 		if err != nil {
 			t.Fatal(err)

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -26,6 +27,7 @@ func landedInvestigation(t *testing.T, body string, followUps string) (*Server, 
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, epicPath)
 	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(`{"repo":"/x"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}

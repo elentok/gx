@@ -267,6 +267,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	herdrfake.StartState(t, s)
 
 	scratchDir := t.TempDir()
+	testutil.EnsureEpicTicketMD(t, filepath.Join(scratchDir, "main"))
 	d := testDeps()
 	d.Sleep = func(time.Duration) {}
 	d.Now = func() time.Time { return time.Unix(0, 0) }
@@ -447,6 +448,7 @@ func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError
 	if err := os.MkdirAll(filepath.Join(scratchDir, "main", "issues"), 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(scratchDir, "main"))
 
 	p := iterationParams{
 		WorkspaceID:     "ws-1",

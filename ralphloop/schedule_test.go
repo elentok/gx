@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -112,6 +113,7 @@ func TestFrontier_AgainstFixtureEpicDirectory(t *testing.T) {
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Dir(issuesDir))
 
 	files := map[string]string{
 		"01-first.md":       "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",

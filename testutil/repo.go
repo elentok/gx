@@ -187,6 +187,18 @@ func WriteFile(t *testing.T, dir, name, content string) {
 	}
 }
 
+// EnsureEpicTicketMD creates epicDir and gives it a minimal open ticket.md
+// unless it already has one, so a test can still write its own before or after.
+func EnsureEpicTicketMD(t *testing.T, epicDir string) {
+	t.Helper()
+	Mkdir(t, epicDir)
+	path := filepath.Join(epicDir, "ticket.md")
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+	WriteFile(t, epicDir, "ticket.md", "---\nstatus: open\n---\n")
+}
+
 func configUser(t *testing.T, dir string) {
 	t.Helper()
 	mustGit(t, dir, "config", "user.email", "test@test.com")

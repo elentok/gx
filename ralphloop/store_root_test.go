@@ -22,6 +22,7 @@ func TestRun_DefaultTicketDirIsTheStoreProject(t *testing.T) {
 	if err := os.MkdirAll(issues, 0755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Dir(issues))
 	data, _ := json.Marshal(map[string]string{"name": "p", "repo": repo})
 	if err := os.WriteFile(filepath.Join(project, "project.json"), data, 0644); err != nil {
 		t.Fatal(err)

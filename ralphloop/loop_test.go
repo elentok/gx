@@ -15,6 +15,7 @@ import (
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -35,6 +36,7 @@ func writeEpic(t *testing.T, epicName string, tickets map[string]string) string 
 	if err := os.MkdirAll(issuesDir, 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(scratchDir, epicName))
 	for name, content := range tickets {
 		if err := os.WriteFile(filepath.Join(issuesDir, name), []byte(content), 0644); err != nil {
 			t.Fatalf("WriteFile %s: %v", name, err)

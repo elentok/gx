@@ -18,6 +18,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -64,6 +65,7 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 	if err := os.MkdirAll(issues, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(projectDir, epic))
 	// Keep an existing project.json: SetProjectRepo's repo must survive a mid-run write.
 	if _, err := os.Stat(filepath.Join(projectDir, "project.json")); os.IsNotExist(err) {
 		if err := os.WriteFile(filepath.Join(projectDir, "project.json"), []byte(`{"name":"`+project+`"}`), 0o644); err != nil {
