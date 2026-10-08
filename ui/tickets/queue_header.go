@@ -299,10 +299,15 @@ func (m QueueModel) queueRunStateTitle() string {
 func (m QueueModel) queueHeaderCostSuffix() string {
 	total := LiveSpend()
 	soft := m.settings.Budget.SoftLimit
-	text := tickets.FormatCost(total)
+	prefix := ""
+	if m.serverAPI != nil {
+		// The server's ledger is the day's one total; local polling is off.
+		total, soft, prefix = m.serverBudget.Total, m.serverBudget.SoftLimit, "today "
+	}
+	text := prefix + tickets.FormatCost(total)
 	style := lipgloss.NewStyle()
 	if soft > 0 {
-		text = fmt.Sprintf("%s of %s", tickets.FormatCost(total), tickets.FormatCost(soft))
+		text = fmt.Sprintf("%s%s of %s", prefix, tickets.FormatCost(total), tickets.FormatCost(soft))
 		style = budgetTotalStyle(total, soft)
 	}
 	if n := UnpricedRunningCount(); n > 0 {

@@ -192,7 +192,12 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				// (LiveSpendByEpic is scoped to the running set); a completed
 				// epic instead gets its final summed cost (epicCost) appended
 				// alongside "took Xm", and an idle epic gets nothing.
-				if cost, ok := liveByEpic[entry.Value.epic.Name]; ok {
+				if m.serverAPI != nil {
+					// Server mode: the ledger's cost for today, per root.
+					if cost := m.serverBudget.Roots[entry.Value.epic.Name]; cost > 0 {
+						line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
+					}
+				} else if cost, ok := liveByEpic[entry.Value.epic.Name]; ok {
 					line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
 				} else if entry.Value.epic.AllDone() {
 					if cost := epicCost(entry.Value.epic); cost > 0 {

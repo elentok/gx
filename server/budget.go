@@ -38,10 +38,12 @@ type seenCost struct {
 type budgetLedger struct {
 	mu   sync.Mutex
 	path string
-	Days map[string]float64  `json:"days"`
+	Days map[string]float64 `json:"days"`
 	// Projects splits each day's total by project: day -> project -> cost.
 	Projects map[string]map[string]float64 `json:"projects,omitempty"`
-	Seen map[string]seenCost `json:"seen"`
+	// Roots splits each day's total by root (an epic or one-off, "project:epic").
+	Roots map[string]map[string]float64 `json:"roots,omitempty"`
+	Seen  map[string]seenCost           `json:"seen"`
 	// Latch holds the limit state of one budget day. It is persisted so a restart
 	// does not forget a reached limit, and it is dropped when the day changes.
 	Latch budgetLatch `json:"latch"`
@@ -78,6 +80,9 @@ func openLedger(stateDir string) (*budgetLedger, error) {
 	if l.Projects == nil {
 		l.Projects = map[string]map[string]float64{}
 	}
+	if l.Roots == nil {
+		l.Roots = map[string]map[string]float64{}
+	}
 	if l.Seen == nil {
 		l.Seen = map[string]seenCost{}
 	}
@@ -100,6 +105,11 @@ func (l *budgetLedger) day(key string) float64 {
 // splits across both days. Cumulative cost only grows: a lower reading (a
 // restarted session) adds nothing.
 func (l *budgetLedger) record(project, key string, cost float64, now time.Time) {
+	l.recordRoot(project, "", key, cost, now)
+}
+
+// recordRoot is record that also counts the spend toward its root.
+func (l *budgetLedger) recordRoot(project, root, key string, cost float64, now time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	prev, seen := l.Seen[key]
@@ -109,7 +119,7 @@ func (l *budgetLedger) record(project, key string, cost float64, now time.Time) 
 		return
 	}
 	if !seen || !prev.At.Before(now) {
-		l.add(now.Format(budgetDayLayout), project, delta)
+		l.add(now.Format(budgetDayLayout), project, root, delta)
 		return
 	}
 	total := now.Sub(prev.At)
@@ -118,22 +128,34 @@ func (l *budgetLedger) record(project, key string, cost float64, now time.Time) 
 		if to.After(now) {
 			to = now
 		}
-		l.add(from.Format(budgetDayLayout), project, delta*float64(to.Sub(from))/float64(total))
+		l.add(from.Format(budgetDayLayout), project, root, delta*float64(to.Sub(from))/float64(total))
 		from = to
 	}
 }
 
 // add counts spend toward the day's one machine-wide total and, when the
-// project is known, toward its share of it. Callers hold l.mu.
-func (l *budgetLedger) add(day, project string, amount float64) {
+// project and root are known, toward their shares of it. Callers hold l.mu.
+func (l *budgetLedger) add(day, project, root string, amount float64) {
 	l.Days[day] += amount
-	if project == "" {
+	addShare(l.Projects, day, project, amount)
+	addShare(l.Roots, day, root, amount)
+}
+
+func addShare(shares map[string]map[string]float64, day, name string, amount float64) {
+	if name == "" {
 		return
 	}
-	if l.Projects[day] == nil {
-		l.Projects[day] = map[string]float64{}
+	if shares[day] == nil {
+		shares[day] = map[string]float64{}
 	}
-	l.Projects[day][project] += amount
+	shares[day][name] += amount
+}
+
+// byRoot is the budget day's total split per root.
+func (l *budgetLedger) byRoot(key string) map[string]float64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return maps.Clone(l.Roots[key])
 }
 
 // byProject is the budget day's total split per project. Spend recorded before
@@ -184,6 +206,8 @@ type BudgetStatus struct {
 	HardLatched  bool    `json:"hard_latched"`
 	// Projects is each project's share of Total.
 	Projects map[string]float64 `json:"projects,omitempty"`
+	// Roots is each root's ("project:epic") share of Total.
+	Roots map[string]float64 `json:"roots,omitempty"`
 }
 
 func (s *Server) budgetStatus(now time.Time) BudgetStatus {
@@ -193,6 +217,7 @@ func (s *Server) budgetStatus(now time.Time) BudgetStatus {
 		Day:          day,
 		Total:        s.ledger.today(now),
 		Projects:     s.ledger.byProject(day),
+		Roots:        s.ledger.byRoot(day),
 		SoftLimit:    s.cfg.BudgetSoftLimit,
 		HardLimit:    s.cfg.BudgetHardLimit,
 		BudgetPaused: latch.Soft,
@@ -296,11 +321,11 @@ func (s *Server) pollBudget(now time.Time) {
 			continue
 		}
 		if cost, ok := s.costOf(it); ok {
-			var project string
+			var project, root string
 			if addr, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil {
-				project = addr.Project
+				project, root = addr.Project, addr.Project+":"+addr.Epic
 			}
-			s.ledger.record(project, it.Address+"@"+it.Session, cost, now)
+			s.ledger.recordRoot(project, root, it.Address+"@"+it.Session, cost, now)
 		}
 	}
 	hard := s.budgetLatches(now).Hard

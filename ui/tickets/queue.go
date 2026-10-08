@@ -55,8 +55,11 @@ type QueueModel struct {
 	live map[string]map[string]liveTicketState
 	// serverClaimedAt and herdrDown come from the last server load: the claim
 	// time of each running ticket, and whether the server can launch agents.
-	serverClaimedAt  map[string]time.Time
-	herdrDown        bool
+	serverClaimedAt map[string]time.Time
+	herdrDown       bool
+	// serverBudget is the last snapshot's budget: the header's spend and the
+	// root rows' cost in server mode.
+	serverBudget     server.BudgetStatus
 	implementSpinner spinner.Model
 
 	width, height int
@@ -214,6 +217,7 @@ type queueServerLoadedMsg struct {
 	claimedAt map[string]time.Time
 	// herdrDown is the server's own view: it cannot start agents.
 	herdrDown bool
+	budget    server.BudgetStatus
 	err       error
 }
 
@@ -242,7 +246,7 @@ func (m QueueModel) cmdLoadQueue() tea.Cmd {
 			}
 			return queueServerLoadedMsg{
 				epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap)), items: items,
-				claimedAt: claimedAt, herdrDown: snap.HerdrUnavailable, err: err,
+				claimedAt: claimedAt, herdrDown: snap.HerdrUnavailable, budget: snap.Budget, err: err,
 			}
 		}
 	}
@@ -291,7 +295,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil || m.serverDown {
 			return m, nil
 		}
-		m.serverClaimedAt, m.herdrDown = msg.claimedAt, msg.herdrDown
+		m.serverClaimedAt, m.herdrDown, m.serverBudget = msg.claimedAt, msg.herdrDown, msg.budget
 		m.checked = make(map[string]bool, len(msg.items))
 		m.checkOrder = make(map[string]uint64, len(msg.items))
 		for i, item := range msg.items {

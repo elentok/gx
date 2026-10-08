@@ -63,6 +63,21 @@ func TestLedger_PollsAddDeltasToToday(t *testing.T) {
 	near(t, l.today(now), 3.5)
 }
 
+func TestLedger_SplitsTodayPerRoot(t *testing.T) {
+	l, err := openLedger(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
+	l.recordRoot("gx", "gx:alpha", "a", 1.0, now)
+	l.recordRoot("gx", "gx:beta", "b", 2.0, now)
+	l.recordRoot("gx", "gx:alpha", "a", 1.5, now.Add(30*time.Second))
+
+	roots := l.byRoot(now.Format(budgetDayLayout))
+	near(t, roots["gx:alpha"], 1.5)
+	near(t, roots["gx:beta"], 2.0)
+}
+
 func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
 	dir := t.TempDir()
 	l, _ := openLedger(dir)
