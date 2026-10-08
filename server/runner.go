@@ -294,13 +294,13 @@ func (s *Server) projectDir(project string) (string, error) {
 // ticket needs-repair rather than leaving a claim with no agent behind it.
 // launched is false when the ticket parked on an ambiguous base: no agent runs.
 // epics is the project's loaded epics, for the base derivation.
-func (s *Server) claimAndLaunch(root rootRef, addr tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
-	ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
-	rootBase, resolvedBase, leafBase, err := s.resolveBase(addr, t, repo, epics)
+func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
+	ticket := tickets.Address{Project: queued.Project, Epic: queued.Epic, ID: t.Identifier}
+	ticketAddr := ticket.String()
+	rootBase, resolvedBase, leafBase, err := s.resolveBase(queued, t, repo, epics)
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		ticket := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
 		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.AmbiguousBase, reason); perr != nil {
 			return false, fmt.Errorf("park %s: %w", ticketAddr, perr)
 		}
@@ -315,14 +315,13 @@ func (s *Server) claimAndLaunch(root rootRef, addr tickets.Address, t tickets.Ti
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
 	one := ralphloop.OneIteration{
-		RepoDir: repo, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
+		RepoDir: repo, Epic: queued.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 	}
 	deps := ralphloop.DefaultDeps()
-	run, wt, err := s.prepareAndLaunch(deps, &one, addr, ticketAddr)
+	run, wt, err := s.prepareAndLaunch(deps, &one, ticket)
 	if err != nil {
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
-		ticket := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
 		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.IterationError, "launch failed: "+err.Error()); perr != nil {
 			err = errors.Join(err, fmt.Errorf("park: %w", perr))
 		}
@@ -383,8 +382,8 @@ func rootBaseRef(project string, epics []tickets.Epic, epic string, t tickets.Ti
 
 // prepareAndLaunch gives the ticket its own worktree, then launches the agent
 // in it. A launch that fails takes the worktree back out so a retry starts clean.
-func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIteration, addr tickets.Address, ticketAddr string) (Run, ralphloop.IterationWorktree, error) {
-	ws, err := herdr.EnsureWorkspace(addr.Epic, one.RepoDir)
+func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address) (Run, ralphloop.IterationWorktree, error) {
+	ws, err := herdr.EnsureWorkspace(ticket.Epic, one.RepoDir)
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
@@ -393,7 +392,7 @@ func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIterati
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	run, err := s.launch(addr, ticketAddr, ws, wt.Path, one.Agent)
+	run, err := s.launch(ticket, ws, wt.Path, one.Agent)
 	if err != nil {
 		if derr := ralphloop.DiscardIteration(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
@@ -502,18 +501,18 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), nil
 }
 
-func (s *Server) launch(addr tickets.Address, ticketAddr, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
-	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticketAddr, Env: s.cfg.TabEnv})
+func (s *Server) launch(ticket tickets.Address, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
+	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticket.String(), Env: s.cfg.TabEnv})
 	if err != nil {
 		return Run{}, err
 	}
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
 	if _, err := herdr.AgentStart(herdr.AgentStartOptions{
 		Name:      label,
 		Kind:      string(agent),
 		Pane:      tab.RootPaneID,
-		AgentArgs: ralphloop.AgentArgs(agent, s.cfg.TicketStore, addr.Epic, "", ""),
+		AgentArgs: ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", ""),
 	}); err != nil {
 		return Run{}, err
 	}
@@ -522,11 +521,11 @@ func (s *Server) launch(addr tickets.Address, ticketAddr, ws, cwd string, agent 
 	}
 	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{
 		Target: tab.RootPaneID,
-		Text:   ralphloop.SkillPrompt(agent, implementSkill, ticketAddr),
+		Text:   ralphloop.SkillPrompt(agent, implementSkill, ticket.String()),
 		Wait:   true,
 		Until:  []string{"working"},
 	}); err != nil {
 		return Run{}, err
 	}
-	return Run{Address: ticketAddr, Agent: string(agent), Pane: tab.RootPaneID, Tab: tab.TabID}, nil
+	return Run{Address: ticket.String(), Agent: string(agent), Pane: tab.RootPaneID, Tab: tab.TabID}, nil
 }
