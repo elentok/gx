@@ -98,6 +98,9 @@ const (
 	// AmbiguousBase is a claim that found two or more unlanded blockers and no
 	// base: to choose between them.
 	AmbiguousBase Kind = "ambiguous-base"
+	// LandConflict is a land whose cherry-pick conflicted and whose
+	// conflict-resolution child could not resolve it.
+	LandConflict Kind = "land-conflict"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -114,6 +117,7 @@ var kinds = map[Kind]bool{
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
+	LandConflict: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

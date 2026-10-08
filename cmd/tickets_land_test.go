@@ -396,12 +396,40 @@ func TestRunTicketsLand_ContinueRefusedWhenHeadDidNotMove(t *testing.T) {
 	}
 }
 
+// Other tickets landing after the conflict move HEAD too; continue must not
+// read that as this ticket's resolved pick and stamp their commit.
+func TestRunTicketsLand_ContinueRefusedWhenOthersLandedSinceConflict(t *testing.T) {
+	t.Parallel()
+	f := newLandFixture(t, ticketWith("claimed", ""))
+	pendingConflict(t, f)
+	*f.pickActive = false
+	f.deps.RevParse = func(_, _ string) (string, error) { return "post", nil }
+	f.deps.IsAncestor = func(_, _, _ string) (bool, error) { return true, nil }
+	f.deps.TrailerMap = func(_, _, _ string) (map[string]string, error) {
+		return map[string]string{"gx:epic/15": "post"}, nil
+	}
+	stamped := false
+	f.deps.AppendTrailers = func(string, ...git.Trailer) error { stamped = true; return nil }
+	f.in.Continue = true
+	if env := f.refusal(t); env.Reason != ReasonLandSuperseded {
+		t.Errorf("reason = %s", env.Reason)
+	}
+	if stamped {
+		t.Error("stamped another ticket's commit")
+	}
+	if strings.Contains(f.ticketText(t), "status: done") {
+		t.Error("status written on refused continue")
+	}
+}
+
 func TestRunTicketsLand_ContinueStampsMarksDoneAndClears(t *testing.T) {
 	t.Parallel()
 	f := newLandFixture(t, ticketWith("claimed", ""))
 	pendingConflict(t, f)
 	*f.pickActive = false
 	f.deps.RevParse = func(_, _ string) (string, error) { return "post", nil }
+	f.deps.IsAncestor = func(_, _, _ string) (bool, error) { return true, nil }
+	f.deps.TrailerMap = func(_, _, _ string) (map[string]string, error) { return map[string]string{}, nil }
 	stamped := false
 	f.deps.AppendTrailers = func(string, ...git.Trailer) error { stamped = true; return nil }
 	f.in.Continue = true

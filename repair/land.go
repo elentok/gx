@@ -235,6 +235,18 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	if head == marker.PrePickHead {
 		return LandResult{}, "", &RefusalError{Reason: ReasonLandNotResolved, Message: fmt.Sprintf("%s has not moved since the conflict; nothing was committed (use --abort to give up)", epic)}
 	}
+	// HEAD moving is not proof this ticket's pick finished: other landings move
+	// it too, and stamping would then mark one of their commits as this one.
+	// The resolved pick is unstamped, so any ticket trailer since the conflict
+	// is someone else's landing.
+	if ok, err := d.IsAncestor(featurePath, marker.PrePickHead, head); err != nil || !ok {
+		return LandResult{}, "", &RefusalError{Reason: ReasonLandSuperseded, Message: fmt.Sprintf("%s no longer descends from the pre-conflict head %s; the conflicted pick for ticket %s is gone (run --abort, then land again)", epic, marker.PrePickHead, in.ID)}
+	}
+	if others, err := d.TrailerMap(featurePath, marker.PrePickHead+"..HEAD", ralphloop.TicketTrailerKey); err != nil {
+		return LandResult{}, "", fmt.Errorf("reading landings since the conflict on %s: %w", epic, err)
+	} else if len(others) > 0 {
+		return LandResult{}, "", &RefusalError{Reason: ReasonLandSuperseded, Message: fmt.Sprintf("other tickets landed on %s since the conflict; the conflicted pick for ticket %s is gone (run --abort, then land again)", epic, in.ID)}
+	}
 
 	parsed, err := schema.ParseTicket(t.Path)
 	if err != nil {

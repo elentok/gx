@@ -266,7 +266,7 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
 	one := ralphloop.OneIteration{
-		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: ralphloop.AgentKind(t.Agent),
+		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: ralphloop.AgentKind(t.Agent),
 	}
 	for _, e := range epics {
 		for _, tk := range e.Tickets {

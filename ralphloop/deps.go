@@ -107,6 +107,10 @@ type Deps struct {
 	// ticket trailer later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
 	AppendTrailers func(dir string, trailers ...git.Trailer) error
+	// TrailerMap maps each value of trailer key on the commits of ref (any
+	// rev or range) to its commit; `land --continue` reads it to tell its own
+	// unstamped pick from other tickets' landings.
+	TrailerMap func(dir, ref, key string) (map[string]string, error)
 	// WorktreeExists reports whether an iteration worktree still exists at
 	// path, used by startup reconciliation to detect leftover state a crash
 	// left uncleaned.
@@ -247,6 +251,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		IsAncestor:            git.IsAncestor,
 		PatchesApplied:        git.PatchesApplied,
 		AppendTrailers:        git.AppendTrailers,
+		TrailerMap:            git.TrailerMap,
 		WorktreeExists:        worktreeExists,
 		InstallDeps: func(path string) (string, error) {
 			return installDependenciesWith(path, overrides.Path)

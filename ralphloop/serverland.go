@@ -21,6 +21,8 @@ type FinishOutcome struct {
 	Landed bool
 	Status schema.Status // the park status; empty when Landed
 	Kind   events.Kind
+	// Reason is the park's own reason, as its run-log event recorded it.
+	Reason string
 }
 
 // OneIteration is the fixed input of a single-ticket iteration driven from
@@ -152,7 +154,28 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab stri
 	if t.Status == schema.StatusDone {
 		return FinishOutcome{Landed: true}, nil
 	}
-	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
+	kind := events.Kind(t.ParkKind)
+	// A ticket that neither landed nor parked is stuck with nobody told why;
+	// fail the finish so the caller parks it with a reason.
+	if (t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusNeedsRepair) || !kind.Valid() {
+		return FinishOutcome{}, fmt.Errorf("iteration ended with the ticket %s and no park recorded (kind %q)", t.Status, kind)
+	}
+	return FinishOutcome{Status: t.Status, Kind: kind, Reason: latestParkReason(o.ScratchDir, o.Epic, o.Ticket.Identifier)}, nil
+}
+
+// latestParkReason is the reason of the ticket's most recent park event, or ""
+// when the run log has none.
+func latestParkReason(scratchDir, epic, ticket string) string {
+	evs, ok, err := ReadEvents(scratchDir, epic)
+	if err != nil || !ok {
+		return ""
+	}
+	for i := len(evs) - 1; i >= 0; i-- {
+		if evs[i].Ticket == ticket && isParkType(events.Type(evs[i].Type)) {
+			return evs[i].Reason
+		}
+	}
+	return ""
 }
 
 // recordLiveSession reads the native session of the agent still running under
@@ -173,8 +196,9 @@ func recordLiveSession(d Deps, label, ticketPath string) string {
 }
 
 // landDeferCap bounds how long landBuilt waits out a held land lock before it
-// gives up and lets the caller park the ticket.
-const landDeferCap = 30 * time.Minute
+// gives up and lets the caller park the ticket. It outlasts a whole conflict
+// resolution (conflictResolutionTimeoutMs) by the lock holder, plus its own.
+const landDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.Minute
 
 // WaitIterationFinished blocks until the agent in pane has really finished its
 // turn, the way the in-process loop does: a first idle/done is debounced, and
@@ -232,6 +256,19 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 		return r.err
 	case r.landDeferred:
 		return errors.New("land deferred: land lock held")
+	case r.parkedOnChild:
+		// The child's own park says why it failed; the parent would otherwise
+		// stay claimed with nobody told. Its iteration branch is durable, so a
+		// person (or recovery) can land it again.
+		reason := "land conflict not resolved: " + r.childReason +
+			"\nThe cherry-pick was rolled back; the iteration branch " + built.job.branch +
+			" is intact. Land it again with `gx server tickets land`."
+		_, err := park(p.Sink, parkRequest{
+			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
+			Type: events.NeedsRepair, Kind: events.LandConflict, Reason: reason,
+			Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
+		})
+		return err
 	}
 	return nil
 }

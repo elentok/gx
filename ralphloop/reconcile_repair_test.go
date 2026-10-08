@@ -142,7 +142,10 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 
 	d, _, _ := fakeDeps()
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
-	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	// The stale pick is gx's own debris: its commit is on an iteration branch.
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
+		return strings.HasPrefix(descendant, "ralph-loop/"), nil
+	}
 
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
 		return &fakeConflictErr{}

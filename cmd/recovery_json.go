@@ -23,6 +23,7 @@ const (
 	ReasonLandBlocked            = repair.ReasonLandBlocked
 	ReasonNoPendingLand          = repair.ReasonNoPendingLand
 	ReasonLandNotResolved        = repair.ReasonLandNotResolved
+	ReasonLandSuperseded         = repair.ReasonLandSuperseded
 	ReasonReasonRequired         = repair.ReasonReasonRequired
 	ReasonError                  = repair.ReasonError
 )

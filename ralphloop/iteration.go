@@ -764,6 +764,11 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		if marker != nil {
 			return LandResult{}, "", errLandDeferred
 		}
+		// Only gx's own debris is lossless to abort: a pick of some iteration
+		// branch's commit. Anything else is a person's work in progress.
+		if foreign, sha := foreignCherryPick(d, p); foreign {
+			return LandResult{}, "", fmt.Errorf("the feature worktree %s has a cherry-pick of %s in progress that gx did not start; finish or abort it, then land again", p.FeatureWorktree, sha)
+		}
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
 			return LandResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 		}
@@ -811,6 +816,33 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 
 	res, err = stampLanded(ld, lp)
 	return res, resolutionSessionID, err
+}
+
+// foreignCherryPick reports whether the cherry-pick in progress in the feature
+// worktree picks a commit no iteration branch of this epic holds. Anything it
+// cannot tell (no CHERRY_PICK_HEAD, unreadable epic) counts as gx's own, the
+// behaviour before this check existed.
+func foreignCherryPick(d Deps, p iterationParams) (foreign bool, sha string) {
+	sha, err := d.RevParse(p.FeatureWorktree, "CHERRY_PICK_HEAD")
+	if err != nil || sha == "" || d.IsAncestor == nil {
+		return false, sha
+	}
+	epics, err := tickets.Load(p.ScratchDir)
+	if err != nil {
+		return false, sha
+	}
+	for _, e := range epics {
+		if e.Name != p.FeatureBranch {
+			continue
+		}
+		for _, t := range e.Tickets {
+			if ok, err := d.IsAncestor(p.FeatureWorktree, sha, iterBranch(p.FeatureBranch, t.Identifier)); err == nil && ok {
+				return false, sha
+			}
+		}
+		return true, sha
+	}
+	return false, sha
 }
 
 // landParamsFor maps an iteration's landing onto LandParams. The recorded SHA
@@ -1044,5 +1076,5 @@ func parkConflictResolutionChildNeedsRepair(p iterationParams, childPath, childI
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: childID, Path: childPath,
 		Type: events.NeedsRepair, Kind: events.IterationError, Reason: reason, Repair: state,
 	})
-	return errConflictResolutionUnresolved
+	return fmt.Errorf("%w: %s: %s", errConflictResolutionUnresolved, childID, reason)
 }

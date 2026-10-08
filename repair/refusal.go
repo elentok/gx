@@ -26,6 +26,7 @@ const (
 	ReasonLandBlocked            = "land_blocked"
 	ReasonNoPendingLand          = "no_pending_land"
 	ReasonLandNotResolved        = "land_not_resolved"
+	ReasonLandSuperseded         = "land_superseded"
 	ReasonReasonRequired         = "reason_required"
 	// ReasonError is the fallback for a failure that carries no specific code.
 	ReasonError = "error"

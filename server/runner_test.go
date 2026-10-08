@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -817,6 +818,18 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	if strings.Join(seen, ",") != strings.Join(want, ",") {
 		log, _ := os.ReadFile(server.LogPath(h.StateDir))
 		t.Fatalf("events = %v, want %v\nserver log:\n%s", seen, want, log)
+	}
+	// The land writes under the project, where the manual land and the
+	// tickets live, never under a phantom <store>/<epic>.
+	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.CherryPicked) }) {
+		t.Errorf("no cherry-picked event in the project's run log: %v", logged)
+	}
+	if _, err := os.Stat(filepath.Join(store, "epic-a")); !os.IsNotExist(err) {
+		t.Errorf("land wrote under the store root: stat %s: %v", filepath.Join(store, "epic-a"), err)
 	}
 }
 

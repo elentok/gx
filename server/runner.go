@@ -333,11 +333,17 @@ func (s *Server) projectDir(project string) (string, error) {
 func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
 	ticket := tickets.Address{Project: queued.Project, Epic: queued.Epic, ID: t.Identifier}
 	ticketAddr := ticket.String()
+	// The project dir, not the store root: the run log, land lock and
+	// conflict-resolution tickets all live under <project>/<epic>.
+	dir, err := s.projectDir(queued.Project)
+	if err != nil {
+		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
+	}
 	rootBase, resolvedBase, leafBase, err := s.resolveBase(queued, t, repo, epics)
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.AmbiguousBase, reason); perr != nil {
+		if perr := s.parkTicket(dir, ticket, t.Path, events.AmbiguousBase, reason); perr != nil {
 			return false, fmt.Errorf("park %s: %w", ticketAddr, perr)
 		}
 		return false, nil
@@ -351,7 +357,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
 	one := ralphloop.OneIteration{
-		RepoDir: repo, Epic: queued.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
+		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 	}
 	deps := ralphloop.DefaultDeps()
 	mode := s.iterationModeFor(ticket, t)
@@ -364,7 +370,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	if err != nil {
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
-		if perr := s.parkTicket(s.cfg.TicketStore, ticket, t.Path, events.IterationError, "launch failed: "+err.Error()); perr != nil {
+		if perr := s.parkTicket(dir, ticket, t.Path, events.IterationError, "launch failed: "+err.Error()); perr != nil {
 			err = errors.Join(err, fmt.Errorf("park: %w", perr))
 		}
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
@@ -496,13 +502,20 @@ func (s *Server) prepareAndLaunch(
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
 	defer s.kickRunner()
-	defer s.registry.delete(ticketAddr)
+	keepRun := false
+	defer func() {
+		if !keepRun {
+			s.registry.delete(ticketAddr)
+		}
+	}()
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Pane)
 	var out ralphloop.FinishOutcome
 	if err == nil {
-		// A stop that began while the agent settled leaves it for the next server.
+		// A stop that began while the agent settled leaves it for the next
+		// server, which reclaims it from the saved registry: keep it there.
 		if !s.lands.begin() {
+			keepRun = true
 			return
 		}
 		defer s.lands.end()
@@ -511,15 +524,20 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Park it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := s.parkTicket(s.cfg.TicketStore, addr, one.Ticket.Path, events.IterationError, err.Error()); perr != nil {
+		if perr := s.parkTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error()); perr != nil {
 			s.log.Warn("park failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		s.events.publish(EventIterationFailed, ticketAddr)
 		return
 	}
 	if !out.Landed {
+		// The finish path already wrote the park; tell a person its own reason.
+		reason := out.Reason
+		if reason == "" {
+			reason = "iteration ended without landing the ticket"
+		}
 		s.events.publish(EventIterationParked, ticketAddr)
-		s.notifyPark(addr, one.Ticket.Path, out.Kind, "iteration ended without landing the ticket")
+		s.notifyPark(addr, one.Ticket.Path, out.Kind, reason)
 		return
 	}
 	s.events.publish(EventTicketDone, ticketAddr)

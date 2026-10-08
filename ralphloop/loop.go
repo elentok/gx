@@ -23,6 +23,9 @@ import (
 // resort fallback searches for (Deps.TrailerCommitExists).
 const ticketTrailerKey = "Ralph-Loop-Ticket"
 
+// TicketTrailerKey is ticketTrailerKey for the repair verbs.
+const TicketTrailerKey = ticketTrailerKey
+
 // tokensTrailerKey and elapsedTrailerKey are the commit-message trailers
 // landCherryPick stamps alongside ticketTrailerKey whenever the landing
 // session's own metrics are available (see writeLandedMetrics) — the same
@@ -280,6 +283,9 @@ type outcome struct {
 	// failure), so without this flag the results loop can't tell it apart
 	// from a real completed land. Never set on a results (build) outcome.
 	parkedOnChild bool
+	// childReason names the conflict-resolution child and why it failed, on a
+	// parkedOnChild outcome; the server parks the parent with it.
+	childReason string
 	// landDeferred is set by landOne when the land lock was held or a human's
 	// conflict marker is pending; runLandQueue re-queues the job and never
 	// forwards the outcome to landResults.
