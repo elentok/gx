@@ -203,6 +203,91 @@ func TestRecoveryNotify_RecognizedParkStillNotifiesAndIsNotCounted(t *testing.T)
 	}
 }
 
+// escalationMessages are the sends that escalate a recovery.
+func escalationMessages(sent []string) []string {
+	var out []string
+	for _, b := range sent {
+		if strings.Contains(b, "recovery escalated") {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
+func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport(t *testing.T) {
+	rule := func(remedy recovery.Remedy) recovery.Entry {
+		return recovery.Entry{
+			ID: "TEST", Type: events.NeedsRepair, Kind: events.IterationError,
+			Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true, Remedy: remedy,
+		}
+	}
+	ok := func(recovery.Failure, recovery.Verbs) error { return nil }
+	person := rule(nil)
+	person.Executor = recovery.ExecutorPerson
+	unmatched := rule(ok)
+	unmatched.Kind = events.Spinning
+	for _, tc := range []struct {
+		name  string
+		entry recovery.Entry
+		setup func(t *testing.T, h *servertest.Harness)
+		want  string
+	}{
+		{"guard rail", rule(ok), func(t *testing.T, h *servertest.Harness) {
+			ev := applied(events.IterationError)
+			ev.Ticket = "01"
+			if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", ev); err != nil {
+				t.Fatal(err)
+			}
+		}, "TEST"},
+		{"person entry", person, nil, "TEST"},
+		{"failed investigation", unmatched, func(t *testing.T, h *servertest.Harness) {
+			// A map epic refuses the investigate ticket's queueing.
+			testutil.WriteFile(t, filepath.Join(h.TicketStore, "proj", "epic-a"), "map.md", "# map\n")
+		}, "no match"},
+		{"failed held remedy", rule(func(recovery.Failure, recovery.Verbs) error { return errors.New("remedy refused") }), nil, "TEST"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, sent := startNotifyRecoveryWith(t, time.Minute, tc.entry)
+			if tc.setup != nil {
+				tc.setup(t, h)
+			}
+			if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+				t.Fatal(err)
+			}
+			for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(escalationMessages(sent())) == 0; time.Sleep(50 * time.Millisecond) {
+			}
+			time.Sleep(1500 * time.Millisecond) // a wrong second message would show by now
+			got := escalationMessages(sent())
+			if len(got) != 1 || !strings.Contains(got[0], "entry: "+tc.want) || !strings.Contains(got[0], "01-first.md") {
+				t.Fatalf("sends = %v, want one escalation naming %q and the ticket's report", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigation(t *testing.T) {
+	entry := recovery.Entry{ID: "AGENT", Type: events.NeedsRepair, Kind: events.IterationError, Executor: recovery.ExecutorAgent, Enabled: true}
+	h, _ := startNotifyRecoveryWith(t, time.Minute, entry)
+	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(h.TicketStore, "proj")
+	var log []ralphloop.Event
+	appliedAt := func() int {
+		return slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.RecoveryApplied })
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && appliedAt() < 0; time.Sleep(20 * time.Millisecond) {
+		log, _, _ = ralphloop.ReadEvents(dir, "epic-a")
+	}
+	matchedAt := slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.RecoveryMatched })
+	if matchedAt < 0 || matchedAt > appliedAt() {
+		t.Fatalf("log = %+v, want recovery-matched before recovery-applied", log)
+	}
+	if m := log[matchedAt]; m.Reason != "AGENT" || m.Signature != entry.Signature() {
+		t.Errorf("matched = %+v, want entry AGENT with signature %q", m, entry.Signature())
+	}
+}
+
 func TestRecoveryNotify_SlowRecoverySendsTheOriginalParkAfterTheHold(t *testing.T) {
 	release := make(chan struct{})
 	t.Cleanup(func() { close(release) })

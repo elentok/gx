@@ -119,6 +119,23 @@ func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, tick
 	}
 }
 
+// Escalated notifies that recovery gave a failure up to a person. detail names
+// the failure, why recovery stopped, the matched entry and the report.
+func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic, ticketPath, identifier, detail string) {
+	if c == nil {
+		return
+	}
+	// An epic-level escalation has no ticket to write a mute onto.
+	source := ticketPath
+	if source == "" {
+		source = epicSource(project + "/" + epic)
+	}
+	for _, s := range c.projectSinks(override) {
+		body := s.style.chatStyle.Message("⚠️", "recovery escalated", "", detail, s.style.identityLine(project+"/"+epic, identifier))
+		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindTicketNeedsHuman, source, identifier)
+	}
+}
+
 // EpicComplete tells the project's destinations that every ticket of epic
 // landed and the epic's branch went onto its target.
 func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts EpicCounts, elapsedSeconds int, totalCost float64) {

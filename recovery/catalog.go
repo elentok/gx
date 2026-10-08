@@ -63,6 +63,12 @@ type Entry struct {
 	Remedy Remedy `json:"-"`
 }
 
+// Signature names the failure the entry matches. Entries share an ID across
+// signatures, so the ID alone does not say which one matched.
+func (e Entry) Signature() string {
+	return fmt.Sprintf("%s %s, executor %s", e.Type, e.Kind, e.Executor)
+}
+
 // Catalog is the set of entries plus the global kill switch.
 type Catalog struct {
 	Enabled bool    `json:"enabled"`

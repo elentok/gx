@@ -23,7 +23,7 @@ func matchedEntryText(e recovery.Entry, matched bool) string {
 	if !matched {
 		return "No catalog entry matched this failure."
 	}
-	return fmt.Sprintf("%s (%s %s, executor %s)", e.ID, e.Type, e.Kind, e.Executor)
+	return fmt.Sprintf("%s (%s)", e.ID, e.Signature())
 }
 
 // investigatePrompt is what the agent is told on top of the skill command.

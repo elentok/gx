@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -94,31 +95,32 @@ func (s *Server) recoverAsync(f recovery.Failure) {
 
 // recoverFrom runs the planned recovery through the server's own verbs.
 // Failures to record are logged, never fatal: recovery is best effort on top
-// of a park that stands. A failed remedy, or an ok one that leaves the ticket
-// parked, releases the held park message naming the entry; otherwise it is
-// dropped.
+// of a park that stands. A failed remedy, or an ok one that leaves a held park
+// parked, escalates; an ok one drops the held park message.
 func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 	ref, entry := plan.ref, plan.entry
+	if plan.matched {
+		ev := ralphloop.Event{Type: string(events.RecoveryMatched), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entry.ID, Signature: entry.Signature()}
+		s.appendRecoveryEvent(ref, f, ev)
+	}
 	// Recognizing remedies nothing, so the guard rail has nothing to stop.
 	if plan.matched && entry.Executor == recovery.ExecutorRecognize {
-		s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
 		return
 	}
 	if why := guardRailStop(plan.log, f); why != "" {
-		s.recordRecovery(ref, events.RecoveryEscalated, f, why, "")
+		s.escalate(plan, f, why, "")
 		return
 	}
 	if plan.needsJudgment() {
-		s.recoverByInvestigating(ref, f, matchedEntryText(entry, plan.matched))
+		s.recoverByInvestigating(plan, f)
 		return
 	}
-	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
 	if entry.Executor == recovery.ExecutorPerson {
-		s.recordRecovery(ref, events.RecoveryEscalated, f, entry.ID+" is a person's to handle", "")
+		s.escalate(plan, f, entry.ID+" is a person's to handle", "")
 		return
 	}
 	if entry.Proposable(f) {
-		s.propose(ref, entry, f)
+		s.propose(plan, f)
 		return
 	}
 	outcome := "ok"
@@ -127,29 +129,43 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 		outcome = err.Error()
 	}
 	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID, outcome)
-	if outcome != "ok" && f.Type != events.NeedsRepair && f.Type != events.NeedsAnswer {
-		// No park holds a message for this failure, so nothing else tells a
-		// person the remedy failed.
-		s.recordRecovery(ref, events.RecoveryEscalated, f, entry.ID, outcome)
-		return
-	}
-	if !s.parkHold.take(f.Address) {
-		return
-	}
-	note := ""
 	switch {
 	case outcome != "ok":
-		note = fmt.Sprintf("recovery %s failed: %s", entry.ID, outcome)
+		s.escalate(plan, f, entry.ID, outcome)
+	case !s.parkHold.take(f.Address):
 	case s.stillParked(f.Address):
 		// R5 and R7 end ok once their nudge is typed, which unparks nothing.
-		note = fmt.Sprintf("recovery %s left it parked", entry.ID)
+		s.escalate(plan, f, entry.ID+" left it parked", "")
+	default:
+		// A --wait on the ticket reads the hold, so it must hear the hold end.
+		s.events.publish(EventTicketChanged, f.Address)
 	}
-	if note != "" {
+}
+
+// escalate gives the failure to a person: it records recovery-escalated and
+// sends its one message, naming the matched entry and the ticket that reports
+// the failure. For a park the message replaces any park message still held.
+func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome string) {
+	ref := plan.ref
+	s.recordRecovery(ref, events.RecoveryEscalated, f, reason, outcome)
+	if f.Type == events.NeedsRepair || f.Type == events.NeedsAnswer {
+		s.parkHold.take(f.Address)
 		s.parkHold.escalate(f.Address)
-		s.notifyPark(ref.addr, ref.ticket.Path, f.Kind, fmt.Sprintf("%s (%s)", f.Reason, note))
+		// A --wait on the ticket reads the hold, so it must hear the escalation.
+		s.events.publish(EventTicketChanged, f.Address)
 	}
-	// A --wait on the ticket reads the hold, so it must hear the hold end.
-	s.events.publish(EventTicketChanged, f.Address)
+	why, entry, report := reason, "no match", ref.ticket.Path
+	if outcome != "" {
+		why += ": " + outcome
+	}
+	if plan.matched {
+		entry = plan.entry.ID
+	}
+	if report == "" {
+		report = filepath.Join(ref.projectDir, ref.addr.Epic)
+	}
+	detail := fmt.Sprintf("%s: %s\n%s\nentry: %s\nreport: %s", f.Kind, f.Reason, why, entry, report)
+	s.chat.Escalated(ref.addr.Project, s.chatOverride(ref.addr.Project), ref.addr.Epic, ref.ticket.Path, ref.addr.ID, detail)
 }
 
 // holdParkForRecovery starts whatever recovery the park gets and, when a rule
@@ -210,7 +226,8 @@ const proposedRemedyHeading = "Proposed Remedy"
 
 // propose writes what a high-authority remedy would do as an event and as a
 // ticket section, then escalates: a person decides with `tickets approve`.
-func (s *Server) propose(ref ticketRef, entry recovery.Entry, f recovery.Failure) {
+func (s *Server) propose(plan recoveryPlan, f recovery.Failure) {
+	ref, entry := plan.ref, plan.entry
 	calls, err := entry.Propose(f)
 	if err != nil || len(calls) == 0 {
 		s.log.Warn("recovery cannot propose", "entry", entry.ID, "ticket", f.Address, "err", err)
@@ -231,11 +248,9 @@ func (s *Server) propose(ref ticketRef, entry recovery.Entry, f recovery.Failure
 		return
 	}
 	ev := ralphloop.Event{Type: string(events.RecoveryProposed), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entry.ID, Text: text, Fingerprint: fingerprint}
-	if err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ev); err != nil {
-		s.log.Warn("recovery cannot record event", "type", events.RecoveryProposed, "ticket", f.Address, "err", err)
-	}
+	s.appendRecoveryEvent(ref, f, ev)
 	s.events.publish(EventTicketChanged, ref.addr.String())
-	s.recordRecovery(ref, events.RecoveryEscalated, f, entry.ID+" proposes a remedy awaiting approval", "")
+	s.escalate(plan, f, entry.ID+" proposes a remedy awaiting approval", "")
 }
 
 func fileFingerprint(path string) (string, error) {
@@ -304,13 +319,15 @@ func (s *Server) ticketApprove(req QueueRequest) (QueueResult, error) {
 
 // recoverByInvestigating is recovery for a failure that needs judgment. It
 // counts as an applied recovery, so the caps and the failed-recovery check see it.
-func (s *Server) recoverByInvestigating(ref ticketRef, f recovery.Failure, entry string) {
-	outcome, err := s.investigate(ref, f, entry)
+func (s *Server) recoverByInvestigating(plan recoveryPlan, f recovery.Failure) {
+	child, err := s.investigate(plan.ref, f, matchedEntryText(plan.entry, plan.matched))
 	if err != nil {
 		s.log.Warn("recovery cannot create an investigate ticket", "ticket", f.Address, "err", err)
-		outcome = err.Error()
+		s.recordRecovery(plan.ref, events.RecoveryApplied, f, investigateEntry, err.Error())
+		s.escalate(plan, f, investigateEntry, err.Error())
+		return
 	}
-	s.recordRecovery(ref, events.RecoveryApplied, f, investigateEntry, outcome)
+	s.recordRecovery(plan.ref, events.RecoveryApplied, f, investigateEntry, child)
 }
 
 // Guard-rail caps on automatic recovery, counted from the run log so a resume
@@ -410,9 +427,12 @@ func lastAssistantText(ev ralphloop.Event) string {
 }
 
 func (s *Server) recordRecovery(ref ticketRef, typ events.Type, f recovery.Failure, entryID, outcome string) {
-	ev := ralphloop.Event{Type: string(typ), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entryID, Outcome: outcome}
+	s.appendRecoveryEvent(ref, f, ralphloop.Event{Type: string(typ), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entryID, Outcome: outcome})
+}
+
+func (s *Server) appendRecoveryEvent(ref ticketRef, f recovery.Failure, ev ralphloop.Event) {
 	if err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ev); err != nil {
-		s.log.Warn("recovery cannot record event", "type", typ, "ticket", f.Address, "err", err)
+		s.log.Warn("recovery cannot record event", "type", ev.Type, "ticket", f.Address, "err", err)
 	}
 }
 

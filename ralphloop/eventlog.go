@@ -97,6 +97,9 @@ type Event struct {
 	// Fingerprint (recovery-proposed only) is the ticket file's hash right after
 	// the proposal was written; approve refuses a proposal once it differs.
 	Fingerprint string `json:"fingerprint,omitempty"`
+	// Signature (recovery-matched only) is the matched catalog entry's
+	// signature; Reason holds its ID.
+	Signature string `json:"signature,omitempty"`
 	// Kind (failure and recovery events) is the closed-enum cause from the
 	// events package; required on the types events.KindRequired names.
 	Kind string `json:"kind,omitempty"`
