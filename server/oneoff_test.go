@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -22,7 +21,6 @@ func startOneOffHarness(t *testing.T) (*servertest.Harness, string) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 	})
 	if _, err := h.Client.QueuePause(context.Background()); err != nil {

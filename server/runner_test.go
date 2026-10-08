@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
@@ -65,7 +64,7 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	start, prompt, _ := registerLaunch(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -125,7 +124,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "type: implement", "type: code-review", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	_, prompt, _ := registerLaunch(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -159,7 +158,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+			h := servertest.StartWithStore(t, store)
 			_, prompt, _ := registerLaunch(h)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -192,7 +191,6 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.DisableWatch = true // a missed watch event: only the poll catches the edit up
 		c.PollInterval = time.Hour
 	})
@@ -261,7 +259,7 @@ func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	_, _, cwd := registerLaunch(h)
 	// The agent's turn: commit a file in its own worktree.
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
@@ -316,7 +314,7 @@ func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *tes
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	_, _, cwd := registerLaunch(h)
 	// The agent's turn wrecks its own worktree, so the finish cannot read it.
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
@@ -365,7 +363,7 @@ func TestRunner_AmbiguousBaseParksWithoutLaunching(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	registerLaunch(h)
 
 	launched, err := h.Server.ClaimTicket("proj:epic-a/03", "claude")
@@ -390,7 +388,6 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.MaxAgents = 1
 	})
 	_, _, cwd := registerLaunch(h)
@@ -447,7 +444,6 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 		servertest.SetProjectRepo(t, store, "proj", repo)
 		h := servertest.StartWithStore(t, store, func(c *server.Config) {
-			c.Orchestrator = config.OrchestratorServer
 			c.MaxAgentsPerRoot = tc.perRoot
 			c.PollInterval = 50 * time.Millisecond
 		})
@@ -497,7 +493,6 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 	writeProject("proj-a", 1)
 	servertest.SetProjectRepo(t, store, "proj-b", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerLaunch(h)
@@ -541,7 +536,6 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.MaxAgents = 1
 	})
 	registerLaunch(h)
@@ -616,7 +610,6 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgents = 1
 	})
@@ -646,7 +639,6 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj-a", repo)
 	servertest.SetProjectRepo(t, store, "proj-b", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.MaxAgents = 2
 	})
 	registerLaunch(h)
@@ -743,7 +735,7 @@ func TestRunner_RestartParksAHandleWhoseWorktreeIsGone(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	registerLiveAgent(h)
 	wtPath, ticketPath := leaveIteration(t, h, store, repo)
 	if err := os.RemoveAll(wtPath); err != nil {
@@ -792,7 +784,7 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	registerLiveAgent(h)
 	leaveIteration(t, h, store, repo)
 
@@ -850,7 +842,6 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	}))
 	defer chat.Close()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}
 	})
 	registerLaunch(h) // the agent finishes without committing, so the ticket parks

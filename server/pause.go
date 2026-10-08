@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
-	"github.com/elentok/gx/config"
 )
 
 const pauseFileName = "queue-mode.json"
@@ -94,9 +92,6 @@ func (p *pauseState) save() error {
 
 // setMode applies a mode change, persists the pause flag, then publishes.
 func (s *Server) setMode(paused, draining bool) (QueueResult, error) {
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return refusal(ReasonSchedulerNotSelected, `orchestrator is not "server"`), nil
-	}
 	p := s.pause
 	p.mu.Lock()
 	defer p.mu.Unlock()

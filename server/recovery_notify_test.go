@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -48,7 +47,6 @@ func startNotifyRecoveryWith(t *testing.T, hold time.Duration, entry recovery.En
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Catalog{Enabled: true, Entries: []recovery.Entry{entry}}
 		c.RecoverySettings.NotifyHold = hold
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}

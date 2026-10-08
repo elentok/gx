@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -275,9 +274,6 @@ const ReasonNothingLatched = "nothing-latched"
 // budgetOverride lifts the latches so work may resume. The ledger is saved
 // before it returns, so a restart cannot bring the latch back.
 func (s *Server) budgetOverride(now time.Time) (BudgetResult, error) {
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return BudgetResult{Refused: true, Reason: ReasonSchedulerNotSelected, Message: `orchestrator is not "server"`}, nil
-	}
 	if !s.budgetLatches(now).Soft {
 		return BudgetResult{Refused: true, Reason: ReasonNothingLatched, Message: "no budget limit is reached"}, nil
 	}
@@ -305,9 +301,6 @@ const ReasonNotAnIncrease = "not-an-increase"
 // each latch that spend since the override no longer reaches. A soft limit
 // raised past the hard one takes the hard one with it, as config does.
 func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (BudgetResult, error) {
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return BudgetResult{Refused: true, Reason: ReasonSchedulerNotSelected, Message: `orchestrator is not "server"`}, nil
-	}
 	if req.Soft == nil && req.Hard == nil {
 		return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: "name a soft or hard limit"}, nil
 	}

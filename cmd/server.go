@@ -145,7 +145,7 @@ func runServer(ctx context.Context) error {
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, Orchestrator: cfg.Orchestrator, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
 		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
 		Recovery:                  recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
 		RecoverySettings:          cfg.Recovery,
@@ -176,11 +176,10 @@ func serverClient() (*apiclient.Client, error) {
 
 // StatusInfo is the `gx server status --json` payload.
 type StatusInfo struct {
-	Running      bool   `json:"running"`
-	Pid          int    `json:"pid,omitempty"`
-	Build        string `json:"build,omitempty"`
-	Orchestrator string `json:"orchestrator,omitempty"`
-	Paused       bool   `json:"paused,omitempty"`
+	Running bool   `json:"running"`
+	Pid     int    `json:"pid,omitempty"`
+	Build   string `json:"build,omitempty"`
+	Paused  bool   `json:"paused,omitempty"`
 	// Starting: a server holds the lock but does not answer yet. It builds the
 	// ticket index before it opens its socket.
 	Starting bool     `json:"starting,omitempty"`
@@ -212,7 +211,7 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 		if perr != nil {
 			return perr
 		}
-		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
+		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
 		if b, berr := c.Budget(ctx); berr == nil {
 			info.Budget = &b
 		}
@@ -242,11 +241,6 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", info.Pid, info.Build); err != nil {
 		return err
 	}
-	if info.Orchestrator != "" {
-		if _, err = fmt.Fprintf(w, "orchestrator: %s\n", info.Orchestrator); err != nil {
-			return err
-		}
-	}
 	if info.Paused {
 		if _, err = fmt.Fprintln(w, "queue: paused (gx server queue resume)"); err != nil {
 			return err
@@ -266,13 +260,9 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 }
 
 // statusWarnings lists what `gx server status` flags. n.Hint covers the
-// binary-on-disk-vs-running-build mismatch (and API mismatch); configured is
-// config.json's orchestrator, which the server read only when it started.
-func statusWarnings(n apiclient.Negotiation, storePath, configured string) []string {
+// binary-on-disk-vs-running-build mismatch (and API mismatch).
+func statusWarnings(n apiclient.Negotiation, storePath string) []string {
 	var out []string
-	if n.Orchestrator != "" && configured != "" && n.Orchestrator != configured {
-		out = append(out, fmt.Sprintf("server runs with orchestrator %q but config.json says %q; run gx server restart", n.Orchestrator, configured))
-	}
 	if n.TCPAddr != "" {
 		out = append(out, fmt.Sprintf("TCP listener is on (%s): any local process can use the API, no auth", n.TCPAddr))
 	}

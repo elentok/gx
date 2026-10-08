@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -32,7 +31,6 @@ func startReplaceHarness(t *testing.T) *servertest.Harness {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerLaunch(h)

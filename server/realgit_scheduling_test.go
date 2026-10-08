@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -43,7 +42,6 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 	servertest.SetProjectRepo(t, f.store, "proj", f.repo)
 	f.issues = filepath.Join(f.store, "proj", schedEpic, "issues")
 	f.h = servertest.StartWithStore(t, f.store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgentsPerRoot = 1 // these scenarios pin the sequential order
 		for _, o := range cfgOpts {

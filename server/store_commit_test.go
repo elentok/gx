@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -22,7 +21,6 @@ func TestStoreCommits_ServerCommitsEditsMadeWhileDownOnStart(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
 	servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.StoreCommitDebounce = time.Hour
 	})
 	deadline := time.Now().Add(5 * time.Second)

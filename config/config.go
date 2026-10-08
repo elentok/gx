@@ -62,11 +62,8 @@ type Config struct {
 	Agents                AgentsConfig         `json:"agents"`
 	Subscription          SubscriptionConfig   `json:"subscription"`
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
-	// Orchestrator is the temporary switch between the in-process ralph-loop
-	// and the orchestrator server. Global only: never a per-project key.
-	Orchestrator string         `json:"orchestrator"`
-	Server       ServerConfig   `json:"server"`
-	Recovery     RecoveryConfig `json:"recovery"`
+	Server                ServerConfig         `json:"server"`
+	Recovery              RecoveryConfig       `json:"recovery"`
 }
 
 // RecoveryConfig controls the recovery catalog.
@@ -98,11 +95,6 @@ type ServerConfig struct {
 	AutoMergeEpic bool `json:"auto-merge-epic"`
 }
 
-const (
-	OrchestratorInProcess = "in-process"
-	OrchestratorServer    = "server"
-)
-
 // Default returns the default configuration.
 func Default() Config {
 	return Config{
@@ -118,7 +110,6 @@ func Default() Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
-		Orchestrator:          OrchestratorInProcess,
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 	}
 }
@@ -198,8 +189,7 @@ func Load() (Config, error) {
 			CommitDebounce *int    `json:"commit-debounce"`
 			PushRemote     *string `json:"push-remote"`
 		} `json:"ticket-store"`
-		Orchestrator *string `json:"orchestrator"`
-		Server       *struct {
+		Server *struct {
 			TCPListen     *bool    `json:"tcp-listen"`
 			TabEnv        []string `json:"tab-env"`
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
@@ -335,15 +325,6 @@ func Load() (Config, error) {
 			if d, err := time.ParseDuration(*raw.Recovery.NotifyHold); err == nil && d > 0 {
 				cfg.Recovery.NotifyHold = d
 			}
-		}
-	}
-	if raw.Orchestrator != nil {
-		switch *raw.Orchestrator {
-		case OrchestratorInProcess, OrchestratorServer:
-			cfg.Orchestrator = *raw.Orchestrator
-		default:
-			return cfg, fmt.Errorf("config %s: orchestrator must be %q or %q, got %q",
-				path, OrchestratorInProcess, OrchestratorServer, *raw.Orchestrator)
 		}
 	}
 

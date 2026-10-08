@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -21,7 +20,7 @@ import (
 // are skipped as unfinished. Nothing is raised while R14 is off: a raised
 // defect is never raised again, and unmatched it would only fork investigations.
 func (s *Server) scanParentDefects() {
-	if s.cfg.Orchestrator != config.OrchestratorServer || !s.cfg.Recovery.EntryEnabled("R14") {
+	if !s.cfg.Recovery.EntryEnabled("R14") {
 		return
 	}
 	// A rescan from the watch and one from a ping may overlap; one at a time

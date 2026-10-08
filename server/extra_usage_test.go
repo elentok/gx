@@ -5,13 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/subscription"
 )
 
 func TestExtraUsage_EnqueueWarnsAndNotifiesOncePerDay(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
-	s.cfg.Orchestrator = config.OrchestratorServer
 	s.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateEnabled }
 
 	for i := 0; i < 2; i++ {

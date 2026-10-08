@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -24,7 +23,6 @@ func startDeadlock(t *testing.T, cat recovery.Catalog) *servertest.Harness {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	return servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = cat
 	})
 }

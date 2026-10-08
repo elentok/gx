@@ -209,33 +209,6 @@ func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 	}
 }
 
-func TestLoadOrchestrator(t *testing.T) {
-	for _, tc := range []struct {
-		name, body, want string
-		wantErr          bool
-	}{
-		{name: "absent defaults to in-process", body: `{}`, want: OrchestratorInProcess},
-		{name: "server", body: `{"orchestrator":"server"}`, want: OrchestratorServer},
-		{name: "invalid", body: `{"orchestrator":"bogus"}`, wantErr: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			tmp := t.TempDir()
-			prev := userConfigDirFn
-			userConfigDirFn = func() (string, error) { return tmp, nil }
-			t.Cleanup(func() { userConfigDirFn = prev })
-			writeBudgetConfig(t, tmp, tc.body)
-
-			cfg, err := Load()
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("Load error = %v, wantErr %v", err, tc.wantErr)
-			}
-			if !tc.wantErr && cfg.Orchestrator != tc.want {
-				t.Fatalf("Orchestrator = %q, want %q", cfg.Orchestrator, tc.want)
-			}
-		})
-	}
-}
-
 func writeBudgetConfig(t *testing.T, tmp string, body string) {
 	t.Helper()
 	dir := filepath.Join(tmp, "gx")

@@ -186,9 +186,6 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 	if req.Commits {
 		typ = schema.TypeImplement
 	}
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return oneOffRefusal(ReasonSchedulerNotSelected, `orchestrator is not "server"`), nil
-	}
 	project, dir, err := s.oneOffProject(req)
 	if err != nil {
 		return OneOffResult{}, err

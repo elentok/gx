@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
@@ -62,7 +61,7 @@ func startCrashedLand(t *testing.T) (h *servertest.Harness, store, repo, lockDir
 	store, repo = t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h = servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h = servertest.StartWithStore(t, store)
 	// Down, so the lock is only seen by the server that restarts onto it.
 	if err := h.Stop(); err != nil {
 		t.Fatal(err)

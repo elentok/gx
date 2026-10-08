@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -22,7 +21,7 @@ func startTicketWrites(t *testing.T) (*servertest.Harness, string) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	return h, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 }
 

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -76,9 +75,6 @@ func (s *Server) resolvedWrite(req QueueRequest, do func(ticketRef) (QueueResult
 	addr, bad := canonical(req.Address)
 	if bad != nil {
 		return *bad, nil
-	}
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return refusal(ReasonSchedulerNotSelected, `orchestrator is not "server"`), nil
 	}
 	ref, ok, err := s.findTicket(addr)
 	if err != nil {

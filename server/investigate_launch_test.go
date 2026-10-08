@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
@@ -21,7 +20,6 @@ import (
 func parkAndCatchInvestigation(t *testing.T, store string) servertest.Prompt {
 	t.Helper()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 		c.Recovery = recovery.Catalog{Enabled: true}
 	})

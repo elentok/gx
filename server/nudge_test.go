@@ -9,7 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -33,7 +32,7 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	var mu sync.Mutex
 	var typed []string
 	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -88,7 +87,7 @@ func TestNudge_Refusals(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 	for _, c := range []struct{ name, addr, text, reason string }{
 		{"no text", "proj:epic-a/01", " ", server.ReasonTextRequired},

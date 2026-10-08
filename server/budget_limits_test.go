@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -20,7 +19,6 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.BudgetSoftLimit = 5
 	})
 	registerLaunch(h)
@@ -44,7 +42,6 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj-a", repoA)
 	servertest.SetProjectRepo(t, store, "proj-b", repoB)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.BudgetSoftLimit = 5
 	})
 	registerLaunch(h)
@@ -79,7 +76,6 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour

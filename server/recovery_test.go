@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -54,7 +53,6 @@ func startRecoveryWith(t *testing.T, optOut bool, authority recovery.Authority) 
 		},
 	}}}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = cat
 	})
 	registerLaunch(h)
@@ -122,7 +120,6 @@ func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 	})
 	registerLaunch(h)
@@ -157,7 +154,6 @@ func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, 
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 	})
 	var mu sync.Mutex
@@ -234,7 +230,6 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 	})
 	var mu sync.Mutex
@@ -528,7 +523,6 @@ func startUnmatched(t *testing.T) *servertest.Harness {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	return servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Catalog{Enabled: true}
 	})
 }
@@ -590,7 +584,6 @@ func TestRecovery_ZeroCommitParkWithR2DisabledInvestigatesWithoutR2Events(t *tes
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 	})
 	registerLaunch(h)
@@ -622,7 +615,6 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
@@ -660,7 +652,6 @@ func startR3(t *testing.T) *servertest.Harness {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
@@ -798,7 +789,6 @@ func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
@@ -848,7 +838,6 @@ func parkLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type)
 		}
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
@@ -938,7 +927,6 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 		}
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
@@ -985,7 +973,6 @@ func raiseGateHeld(t *testing.T, status string, prepare func(worktree string)) (
 		}
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = cat
 	})
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -1076,7 +1063,6 @@ func startParentDefect(t *testing.T, store string, cat recovery.Catalog) *server
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01a2", "fork", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	return servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = cat
 	})
 }
@@ -1160,7 +1146,6 @@ func TestRecovery_ParentDefectScanSkipsDrafts(t *testing.T) {
 		cat.Entries[i].Enabled = cat.Entries[i].ID == "R14"
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = cat
 	})
 	h.Server.Rescan()
@@ -1276,7 +1261,6 @@ func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applie
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = recovery.Default()
 	})
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {

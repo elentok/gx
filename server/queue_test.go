@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -31,7 +30,7 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	for _, id := range []string{"01", "02", "03"} {
 		servertest.WriteTicket(t, store, "proj", "epic-a", id, "t"+id, "")
 	}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 
 	snap, err := h.Client.Snapshot(ctx)
@@ -89,7 +88,7 @@ func TestQueue_Refusals(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil {
 		t.Fatal(err)
@@ -120,16 +119,15 @@ func TestQueue_Refusals(t *testing.T) {
 	}
 }
 
-func TestQueue_RefusedWhileSchedulerIsInProcess(t *testing.T) {
+// The server is the only scheduler: no config selects it, so a queue write on
+// a default server is never refused for that.
+func TestQueue_AddAcceptedWithoutConfig(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)
 
 	res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "")
-	if err != nil || !res.Refused || res.Reason != server.ReasonSchedulerNotSelected {
-		t.Errorf("add = %+v, %v; want scheduler-not-selected", res, err)
-	}
-	if got := queueAddresses(t, h); len(got) != 0 {
-		t.Errorf("queue = %v, want empty", got)
+	if err != nil || res.Refused {
+		t.Errorf("add = %+v, %v; want accepted", res, err)
 	}
 }

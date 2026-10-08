@@ -135,12 +135,8 @@ func (s *Server) kickRunner() {
 	}
 }
 
-// keepClaiming launches queued roots while the switch says "server". The tick
-// is the guarantee; the kick from a queue write only makes it sooner.
+// keepClaiming launches queued roots. The tick is the guarantee; the kick from a queue write only makes it sooner.
 func (s *Server) keepClaiming(ctx context.Context) {
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return
-	}
 	poll := s.cfg.PollInterval
 	if poll <= 0 {
 		poll = defaultPollInterval

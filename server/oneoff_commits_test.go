@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -28,7 +27,6 @@ func startCommitsOneOff(t *testing.T, noAutoMerge bool) (evs <-chan server.Event
 		servertest.SetProjectRepo(t, store, "proj", repo)
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 	})
 	seen = &oneOffSeen{}

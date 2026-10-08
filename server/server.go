@@ -1,7 +1,6 @@
 // Package server is the orchestrator daemon: HTTP/JSON over a unix socket in
 // the state dir, routes under /v1/. Its writes are the server-wide queue in the
-// state dir and, when the orchestrator switch says "server", the claim of a
-// queued root's frontier ticket.
+// state dir and the claim of a queued root's frontier ticket.
 package server
 
 import (
@@ -44,9 +43,6 @@ type Handshake struct {
 	Pid        int    `json:"pid"`
 	// TCPAddr is the loopback address of the opt-in TCP listener; empty when off.
 	TCPAddr string `json:"tcp_addr,omitempty"`
-	// Orchestrator is the `orchestrator` value the server read at start; it
-	// does not follow later config.json edits.
-	Orchestrator string `json:"orchestrator,omitempty"`
 	// HerdrUnavailable is set while herdr isn't answering, so a client can say
 	// why nothing starts.
 	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
@@ -77,10 +73,6 @@ type Config struct {
 
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
-	// Orchestrator is config.Orchestrator. Queue writes are refused unless it
-	// is "server": the in-process loop owns claiming otherwise.
-	Orchestrator string
-
 	// Recovery is the catalog with the user's kill switch and disables applied.
 	// The zero value is off.
 	Recovery recovery.Catalog
@@ -90,7 +82,7 @@ type Config struct {
 	RecoverySettings config.RecoveryConfig
 
 	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
-	// which runs only when Orchestrator is "server". A zero debounce means 60s.
+	// A zero debounce means 60s.
 	StoreCommitDebounce time.Duration
 	StorePushRemote     string
 	// LandStopTimeout bounds how long a stop waits for a land in flight; zero
@@ -410,7 +402,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), Orchestrator: s.cfg.Orchestrator, HerdrUnavailable: s.herdr.isUnavailable()})
+	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), HerdrUnavailable: s.herdr.isUnavailable()})
 }
 
 // DefaultLandStopTimeout is how long a stop waits for a land in flight.
@@ -430,11 +422,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	for _, ln := range lns {
 		go func() { errc <- s.http.Serve(ln) }()
 	}
-	if s.cfg.Orchestrator == config.OrchestratorServer {
-		s.recoverLands()
-		s.reclaimRuns()
-		s.scanParentDefects()
-	}
+	s.recoverLands()
+	s.reclaimRuns()
+	s.scanParentDefects()
 	stopCommits := func() {}
 	if stop, err := s.startStoreCommits(); err != nil {
 		s.log.Error("store commit loop failed to start", "err", err)
@@ -451,11 +441,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
-	if s.cfg.Orchestrator == config.OrchestratorServer {
-		go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
-	} else {
-		close(gatesDone)
-	}
+	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
 	var err error
 	select {
 	case <-ctx.Done():
@@ -497,10 +483,10 @@ func (s *Server) Serve(ctx context.Context) error {
 	return nil
 }
 
-// startStoreCommits makes the server the store's committer when it is the
-// selected scheduler, and commits edits made while it was down.
+// startStoreCommits makes the server the store's committer and commits edits
+// made while it was down.
 func (s *Server) startStoreCommits() (stop func(), err error) {
-	if s.cfg.Orchestrator != config.OrchestratorServer || s.cfg.TicketStore == "" {
+	if s.cfg.TicketStore == "" {
 		return func() {}, nil
 	}
 	debounce := s.cfg.StoreCommitDebounce

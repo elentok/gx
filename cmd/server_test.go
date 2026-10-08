@@ -69,45 +69,22 @@ func TestStatusWarnings(t *testing.T) {
 	if err := exec.Command("git", "init", "-q", remote).Run(); err != nil {
 		t.Fatal(err)
 	}
-	noRemote := statusWarnings(apiclient.Negotiation{}, remote, "")
+	noRemote := statusWarnings(apiclient.Negotiation{}, remote)
 	if len(noRemote) != 1 || !strings.Contains(noRemote[0], "no push remote") {
 		t.Fatalf("no-remote warnings = %q", noRemote)
 	}
 	if err := exec.Command("git", "-C", remote, "remote", "add", "origin", "x:y").Run(); err != nil {
 		t.Fatal(err)
 	}
-	if got := statusWarnings(apiclient.Negotiation{}, remote, ""); len(got) != 0 {
+	if got := statusWarnings(apiclient.Negotiation{}, remote); len(got) != 0 {
 		t.Fatalf("clean warnings = %q", got)
 	}
 	n := apiclient.Negotiation{Handshake: server.Handshake{TCPAddr: "127.0.0.1:1"}, Hint: "server is an older build"}
-	all := strings.Join(statusWarnings(n, remote, ""), "\n")
+	all := strings.Join(statusWarnings(n, remote), "\n")
 	for _, want := range []string{"TCP listener is on", "older build"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("missing %q in %q", want, all)
 		}
-	}
-}
-
-// The server reads orchestrator only at start, so a config change after that
-// leaves it running the old value until a restart.
-func TestStatusWarnings_OrchestratorMismatch(t *testing.T) {
-	remote := t.TempDir()
-	if err := exec.Command("git", "init", "-q", remote).Run(); err != nil {
-		t.Fatal(err)
-	}
-	if err := exec.Command("git", "-C", remote, "remote", "add", "origin", "x:y").Run(); err != nil {
-		t.Fatal(err)
-	}
-	n := apiclient.Negotiation{Handshake: server.Handshake{Orchestrator: "in-process"}}
-	got := strings.Join(statusWarnings(n, remote, "server"), "\n")
-	for _, want := range []string{`"in-process"`, `"server"`, "gx server restart"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("warnings = %q, want %q", got, want)
-		}
-	}
-	n.Orchestrator = "server"
-	if got := statusWarnings(n, remote, "server"); len(got) != 0 {
-		t.Errorf("matching orchestrator warnings = %q, want none", got)
 	}
 }
 

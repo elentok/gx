@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -23,7 +22,6 @@ const queueFileName = "queue.json"
 
 // Refusal reasons of the queue writes. Stable: clients switch on them.
 const (
-	ReasonSchedulerNotSelected = "scheduler-not-selected"
 	// ReasonServerNotRunning is produced by the CLI, never the server.
 	ReasonServerNotRunning = "server-not-running"
 	ReasonUnknownTicket    = "unknown-ticket"
@@ -137,9 +135,6 @@ func (q *queueStore) list() []QueueItem {
 // writeQueue applies mutate under the lock, persists, then publishes, so events
 // arrive in queue order. A refusal from mutate leaves the queue untouched.
 func (s *Server) writeQueue(address string, mutate func(items []QueueItem) ([]QueueItem, *QueueResult)) (QueueResult, error) {
-	if s.cfg.Orchestrator != config.OrchestratorServer {
-		return refusal(ReasonSchedulerNotSelected, `orchestrator is not "server"`), nil
-	}
 	q := s.queued
 	q.mu.Lock()
 	defer q.mu.Unlock()

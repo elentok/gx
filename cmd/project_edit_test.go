@@ -17,7 +17,7 @@ import (
 func TestProjectRemove_RefusesWhileQueuedKeepsTickets(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "a", "")
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	h := servertest.StartWithStore(t, store)
 	ctx := context.Background()
 	remove := func() error {
 		return runProjectEdit(ctx, &bytes.Buffer{}, false, "removed", h.Client.RemoveProject, server.ProjectRequest{Name: "proj"})

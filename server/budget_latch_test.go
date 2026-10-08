@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -13,7 +12,6 @@ import (
 func startLatchServer(t *testing.T) *servertest.Harness {
 	t.Helper()
 	return servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.BudgetSoftLimit = 5
 		c.BudgetPollInterval = time.Hour
 	})
@@ -138,7 +136,6 @@ func TestBudgetIncrease_KeepsLatchWhenStillReached(t *testing.T) {
 
 func TestBudgetIncrease_SoftPastHardRaisesHard(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.BudgetSoftLimit, c.BudgetHardLimit = 5, 7
 		c.BudgetPollInterval = time.Hour
 	})

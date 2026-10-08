@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -1412,28 +1411,5 @@ func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *te
 	}
 	if !strings.Contains(string(raw), "status: open") {
 		t.Errorf("03-third.md = %q, want it left untouched (never selected)", raw)
-	}
-}
-
-func TestRun_OrchestratorServer_ClaimsNothing(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
-	})
-	d, prompts, _ := fakeDeps()
-
-	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Orchestrator: config.OrchestratorServer}, d, newRecordingEventSink())
-	if !errors.Is(err, ErrOrchestratorServer) {
-		t.Fatalf("Run() error = %v, want ErrOrchestratorServer", err)
-	}
-	if len(*prompts) != 0 {
-		t.Errorf("prompts = %v, want none", *prompts)
-	}
-	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "01-first.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(raw), "status: open") {
-		t.Errorf("ticket was claimed:\n%s", raw)
 	}
 }

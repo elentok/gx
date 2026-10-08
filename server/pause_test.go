@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -19,7 +18,6 @@ func startPauseHarness(t *testing.T) *servertest.Harness {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerLaunch(h)
@@ -84,14 +82,6 @@ func TestDrain_StartsNothingNewAndEndsOnResume(t *testing.T) {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	expectRun(t, h)
-}
-
-func TestPause_RefusedWhileSchedulerIsInProcess(t *testing.T) {
-	h := servertest.StartWithStore(t, t.TempDir())
-	res, err := h.Client.QueuePause(context.Background())
-	if err != nil || !res.Refused || res.Reason != server.ReasonSchedulerNotSelected {
-		t.Fatalf("pause = %+v, %v", res, err)
-	}
 }
 
 func TestQueuePaused(t *testing.T) {
