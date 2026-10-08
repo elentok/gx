@@ -110,6 +110,44 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 	}
 }
 
+// gx-implement asks for commits, which a code-review ticket never makes.
+func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "review", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-review.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "type: implement", "type: code-review", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+	_, prompt, _ := registerLaunch(h)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	for ev := range evs {
+		if ev.Type == server.EventIterationStarted {
+			break
+		}
+	}
+	if got := strings.Join(*prompt, " "); !strings.Contains(got, "$gx-code-review proj:epic-a/01") {
+		t.Errorf("agent prompt = %v, want the gx-code-review skill", got)
+	}
+}
+
 func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextPass(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

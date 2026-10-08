@@ -42,8 +42,18 @@ const (
 	// EventRootParked streams when a finished root cannot fast-forward onto its target.
 	EventRootParked = "root-parked"
 
-	implementSkill = "gx-implement"
+	implementSkill  = "gx-implement"
+	codeReviewSkill = "gx-code-review"
 )
+
+// launchSkill is the skill an agent starts under: code-review tickets get their
+// own, since gx-implement would ask them for commits.
+func launchSkill(t tickets.Ticket) string {
+	if t.IsCodeReview() {
+		return codeReviewSkill
+	}
+	return implementSkill
+}
 
 // VerdictClaimRereadMismatch is the explain verdict for a ticket whose file
 // changed since the index saw it, so the last claim pass skipped it.
@@ -394,7 +404,7 @@ func (s *Server) prepareAndLaunch(deps ralphloop.Deps, one *ralphloop.OneIterati
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	run, err := s.launch(ticket, ws, wt.Path, one.Agent)
+	run, err := s.launch(ticket, launchSkill(one.Ticket), ws, wt.Path, one.Agent)
 	if err != nil {
 		if derr := ralphloop.DiscardIteration(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
@@ -503,7 +513,7 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), nil
 }
 
-func (s *Server) launch(ticket tickets.Address, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
+func (s *Server) launch(ticket tickets.Address, skill, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
 	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticket.String(), Env: s.cfg.TabEnv})
 	if err != nil {
 		return Run{}, err
@@ -523,7 +533,7 @@ func (s *Server) launch(ticket tickets.Address, ws, cwd string, agent ralphloop.
 	}
 	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{
 		Target: tab.RootPaneID,
-		Text:   ralphloop.SkillPrompt(agent, implementSkill, ticket.String()),
+		Text:   ralphloop.SkillPrompt(agent, skill, ticket.String()),
 		Wait:   true,
 		Until:  []string{"working"},
 	}); err != nil {
