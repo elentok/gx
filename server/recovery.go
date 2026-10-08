@@ -18,6 +18,18 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
+// recoveryAction is what recovery does about a failure.
+type recoveryAction int
+
+const (
+	// actionNone only records the match: a recognize entry remedies nothing.
+	actionNone recoveryAction = iota
+	actionInvestigate
+	actionEscalate
+	actionPropose
+	actionRunRule
+)
+
 // recoveryPlan is the recovery a failure gets: a catalog entry, an
 // investigation, a proposal awaiting approval, or an escalation.
 type recoveryPlan struct {
@@ -25,20 +37,46 @@ type recoveryPlan struct {
 	log     []ralphloop.Event
 	entry   recovery.Entry
 	matched bool
-	// diagnose is an epic-level plan: it always investigates.
-	diagnose bool
+	action  recoveryAction
+	// why is an escalation's reason.
+	why string
 }
 
-// needsJudgment reports whether the failure goes to an investigation rather
-// than a rule entry.
-func (p recoveryPlan) needsJudgment() bool {
-	return p.diagnose || !p.matched || p.entry.Executor == recovery.ExecutorAgent
-}
-
-// runsRemedy reports whether a rule remedy will run unattended, so the park's
+// holdsPark reports whether a rule remedy will run unattended, so the park's
 // chat message can wait for its outcome.
-func (p recoveryPlan) runsRemedy(f recovery.Failure) bool {
-	return !p.needsJudgment() && p.entry.Runnable(f) && guardRailStop(p.log, f) == ""
+func (p recoveryPlan) holdsPark() bool { return p.action == actionRunRule }
+
+// decide sets the plan's action, or reports false when the failure gets no
+// recovery at all. diagnose marks an epic-level plan, which always needs
+// judgment. The guard rail is read once, here: the log is fixed at plan time.
+func (p *recoveryPlan) decide(f recovery.Failure, diagnose bool) bool {
+	e := p.entry
+	judgment := diagnose || !p.matched || e.Executor == recovery.ExecutorAgent
+	recognize := p.matched && e.Executor == recovery.ExecutorRecognize
+	acts := e.Runnable(f) || e.Proposable(f) || e.Executor == recovery.ExecutorPerson || e.Executor == recovery.ExecutorRecognize
+	if (!p.matched && f.NeedsMatch()) || (!judgment && !acts) {
+		return false
+	}
+	// Recognizing remedies nothing, so the guard rail has nothing to stop.
+	if recognize {
+		p.action = actionNone
+		return true
+	}
+	if p.why = guardRailStop(p.log, f); p.why != "" {
+		p.action = actionEscalate
+		return true
+	}
+	switch {
+	case judgment:
+		p.action = actionInvestigate
+	case e.Executor == recovery.ExecutorPerson:
+		p.action, p.why = actionEscalate, e.ID+" is a person's to handle"
+	case e.Proposable(f):
+		p.action = actionPropose
+	default:
+		p.action = actionRunRule
+	}
+	return true
 }
 
 // planRecovery reports the recovery a failure would get, if any.
@@ -58,8 +96,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	log := s.ticketEvents(ref, f)
 	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
-	acts := entry.Runnable(f) || entry.Proposable(f) || entry.Executor == recovery.ExecutorPerson || entry.Executor == recovery.ExecutorRecognize
-	if (!matched && f.NeedsMatch()) || (!plan.needsJudgment() && !acts) {
+	if !plan.decide(f, false) {
 		return recoveryPlan{}, false
 	}
 	return plan, true
@@ -81,7 +118,8 @@ func (s *Server) planEpicRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	ref := ticketRef{addr: tickets.Address{Project: root.Project, Epic: root.Epic}, projectDir: projectDir, repo: repo}
 	log := s.ticketEvents(ref, f)
 	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
-	return recoveryPlan{ref: ref, log: log, entry: entry, matched: matched, diagnose: true}, true
+	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
+	return plan, plan.decide(f, true)
 }
 
 // recoverAsync starts recovery for a failure that is already written. It runs
@@ -95,34 +133,29 @@ func (s *Server) recoverAsync(f recovery.Failure) {
 
 // recoverFrom runs the planned recovery through the server's own verbs.
 // Failures to record are logged, never fatal: recovery is best effort on top
-// of a park that stands. A failed remedy, or an ok one that leaves a held park
-// parked, escalates; an ok one drops the held park message.
+// of a park that stands.
 func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
-	ref, entry := plan.ref, plan.entry
 	if plan.matched {
-		ev := ralphloop.Event{Type: string(events.RecoveryMatched), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entry.ID, Signature: entry.Signature()}
-		s.appendRecoveryEvent(ref, f, ev)
+		ev := ralphloop.Event{Type: string(events.RecoveryMatched), Ticket: plan.ref.addr.ID, Kind: string(f.Kind), Reason: plan.entry.ID, Signature: plan.entry.Signature()}
+		s.appendRecoveryEvent(plan.ref, f, ev)
 	}
-	// Recognizing remedies nothing, so the guard rail has nothing to stop.
-	if plan.matched && entry.Executor == recovery.ExecutorRecognize {
-		return
-	}
-	if why := guardRailStop(plan.log, f); why != "" {
-		s.escalate(plan, f, why, "")
-		return
-	}
-	if plan.needsJudgment() {
+	switch plan.action {
+	case actionEscalate:
+		s.escalate(plan, f, plan.why, "")
+	case actionInvestigate:
 		s.recoverByInvestigating(plan, f)
-		return
-	}
-	if entry.Executor == recovery.ExecutorPerson {
-		s.escalate(plan, f, entry.ID+" is a person's to handle", "")
-		return
-	}
-	if entry.Proposable(f) {
+	case actionPropose:
 		s.propose(plan, f)
-		return
+	case actionRunRule:
+		s.runRule(plan, f)
 	}
+}
+
+// runRule runs the entry's remedy unattended. A failed remedy, or an ok one
+// that leaves a held park parked, escalates; an ok one drops the held park
+// message.
+func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
+	ref, entry := plan.ref, plan.entry
 	outcome := "ok"
 	if err := entry.Apply(f, recoveryVerbs{s}); err != nil {
 		s.log.Warn("recovery remedy failed", "entry", entry.ID, "ticket", f.Address, "err", err)
@@ -178,7 +211,7 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 	if !ok {
 		return false
 	}
-	if !plan.runsRemedy(f) {
+	if !plan.holdsPark() {
 		s.parkHold.start(f.Address)
 		go func() {
 			s.recoverFrom(plan, f)
