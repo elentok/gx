@@ -7,19 +7,22 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
 // Seam D: refresh mode follows the connection.
-func TestRefreshMode_FollowsConnection(t *testing.T) {
+func TestRefresh_FollowsConnection(t *testing.T) {
 	m := newServerModel(t)
-	if got := m.refreshMode(); got != refreshStream {
-		t.Fatalf("connected mode = %v, want stream", got)
+	if m.onFallback() {
+		t.Fatal("connected tab is on the fallback")
 	}
 
 	next, cmd := m.Update(ServerDownMsg{})
 	m = next.(Model)
-	if got := m.refreshMode(); got != refreshWatchPoll {
-		t.Fatalf("down mode = %v, want watch+poll", got)
+	if !m.onFallback() {
+		t.Fatal("down tab is not on the fallback")
 	}
 	if cmd == nil {
 		t.Fatal("going down must start the fallback watch and poll")
@@ -27,15 +30,29 @@ func TestRefreshMode_FollowsConnection(t *testing.T) {
 
 	next, cmd = m.Update(ServerUpMsg{})
 	m = next.(Model)
-	if got := m.refreshMode(); got != refreshStream {
-		t.Fatalf("reconnected mode = %v, want stream", got)
+	if m.onFallback() {
+		t.Fatal("reconnected tab is on the fallback")
 	}
 	if cmd == nil {
 		t.Fatal("reconnecting must re-snapshot")
 	}
 }
 
-func TestRefreshMode_NoDiskPollWhileConnected(t *testing.T) {
+// Seam B: with no client the tab starts, and stays, on the down fallback.
+func TestRefresh_NoClientStartsDown(t *testing.T) {
+	m := NewModel(t.TempDir(), ui.Settings{}, keys.Manager{})
+	next, _ := m.Update(m.Init()())
+	m = next.(Model)
+	t.Cleanup(m.fallbackStop)
+	if !m.onFallback() || m.serverLink != ServerLinkDown {
+		t.Fatalf("fallback=%v link=%v, want the down fallback", m.onFallback(), m.serverLink)
+	}
+	if _, blocked := m.serverKeyGuard(bindingTicketsAddToQueue); !blocked {
+		t.Fatal(`"a" is not blocked without a server`)
+	}
+}
+
+func TestRefresh_NoDiskPollWhileConnected(t *testing.T) {
 	m := newServerModel(t)
 	next, cmd := m.Update(epicsLoadedMsg{})
 	if cmd != nil {
@@ -44,7 +61,7 @@ func TestRefreshMode_NoDiskPollWhileConnected(t *testing.T) {
 	_ = next
 }
 
-func TestRefreshMode_DownFallbackPollsAndIgnoresStaleTicks(t *testing.T) {
+func TestRefresh_DownFallbackPollsAndIgnoresStaleTicks(t *testing.T) {
 	m := newServerModel(t)
 	next, _ := m.Update(ServerDownMsg{})
 	m = next.(Model)
@@ -62,7 +79,7 @@ func TestRefreshMode_DownFallbackPollsAndIgnoresStaleTicks(t *testing.T) {
 	}
 }
 
-func TestRefreshMode_DownWatchFiresOnStoreChange(t *testing.T) {
+func TestRefresh_DownWatchFiresOnStoreChange(t *testing.T) {
 	dir := t.TempDir()
 	events, stop, err := watchStore(dir)
 	if err != nil {

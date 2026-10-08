@@ -197,11 +197,9 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 	}
 
 	entries := tree.BuildEntriesFromValues(roots, idFn, childrenFn, m.sidebarTree.CollapsedIDs())
-	if m.serverMode() {
-		for i := range entries {
-			if line, ok := m.pendingSubtext(entries[i]); ok {
-				entries[i].Body = []string{line}
-			}
+	for i := range entries {
+		if line, ok := m.pendingSubtext(entries[i]); ok {
+			entries[i].Body = []string{line}
 		}
 	}
 	return entries
@@ -237,20 +235,13 @@ type epicsLoadedMsg struct {
 	archivedEpicCount int
 }
 
-// cmdLoad reads the tab's `.scratch/` directory in the background. A missing
-// directory is not an error (tickets.Load reports it as zero epics), so it
-// renders the same empty state as an absent `.scratch/`. It also computes
-// the cheap archive count (tickets.CountArchivedEpics — a flat directory
-// listing, no ticket parsing) so the Archived section's up-front count stays
-// current on both manual refresh and the auto-refresh timer, even though
-// ticket 04's lazy load is what actually populates m.archivedEpics. A count
-// error is treated as zero rather than surfaced alongside msg.err, since a
-// missing/unreadable ".archive" just means "nothing archived to show".
+// cmdLoad reloads from wherever the rows currently come from: the server's
+// snapshot, or the store itself while the tab is on the down fallback.
 func (m Model) cmdLoad() tea.Cmd {
-	if m.serverMode() {
-		return m.cmdServerSnapshot()
+	if m.serverAPI == nil || m.onFallback() {
+		return m.cmdLoadDisk()
 	}
-	return m.cmdLoadDisk()
+	return m.cmdServerSnapshot()
 }
 
 // cmdRefresh reloads .scratch/ from disk, matching every other tab's manual

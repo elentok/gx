@@ -27,8 +27,7 @@ import (
 type Settings struct {
 	InitialRoute       nav.ViewState
 	ActiveWorktreePath string
-	// Server is set in server mode (config orchestrator = "server"); nil is in-process.
-	Server *ServerDeps
+	Server             *ServerDeps
 	ui.Settings
 }
 
@@ -75,6 +74,9 @@ func New(repo git.Repo, settings Settings) Model {
 		notifyHistory: notifyhistory.New(),
 		gate:          reloadgate.New(),
 	}
+	if settings.Server == nil {
+		m.serverConn = ServerConn{State: ServerDown}
+	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}
 	}
@@ -89,15 +91,15 @@ func New(repo git.Repo, settings Settings) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	if m.serverMode() {
-		return tea.Batch(m.activePage().model.Init(), m.cmdServerProbe())
+	if m.settings.Server == nil {
+		return m.activePage().model.Init()
 	}
-	return m.activePage().model.Init()
+	return tea.Batch(m.activePage().model.Init(), m.cmdServerProbe())
 }
 
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
 	tm := ticketsui.NewModel(root, s, keys.New(Bindings())).WithServerLink(m.serverConn.link())
-	if m.serverMode() {
+	if m.settings.Server != nil {
 		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(root))
 	}
 	return tm
@@ -115,7 +117,7 @@ func cwdProjectName(root string) string {
 
 func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
 	qm := ticketsui.NewQueueModel(root, s, nil, keys.New(Bindings()))
-	if m.serverMode() {
+	if m.settings.Server != nil {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
 	}
 	return qm

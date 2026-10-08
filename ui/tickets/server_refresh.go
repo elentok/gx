@@ -10,18 +10,9 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// refreshMode is where the Tickets tab's rows come from.
-type refreshMode int
-
-const (
-	// refreshLocalPoll: no server; the tab polls `.scratch/` (auto_refresh.go).
-	refreshLocalPoll refreshMode = iota
-	// refreshStream: connected; stream events only, no watch and no timers.
-	refreshStream
-	// refreshWatchPoll: the server is down; the tab reads the store itself.
-	refreshWatchPoll
-)
-
+// The Tickets tab's rows come from the server's event stream (no watch, no
+// timers) while it is reachable. While it is down — or the tab has no client
+// at all — the tab reads the store itself: a watch plus a slow poll.
 const (
 	// fallbackPollInterval is slow on purpose: the watch is the fast path and
 	// the poll only covers events it lost.
@@ -35,21 +26,14 @@ type (
 	fallbackChangedMsg struct{ gen int }
 )
 
-func (m Model) refreshMode() refreshMode {
-	switch {
-	case !m.serverMode():
-		return refreshLocalPoll
-	case m.fallbackStop != nil:
-		return refreshWatchPoll
-	}
-	return refreshStream
-}
+// onFallback reports whether the tab is reading the store itself.
+func (m Model) onFallback() bool { return m.fallbackStop != nil }
 
 // updateServerLink handles the connection events; ok is false for any other msg.
 func (m Model) updateServerLink(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case ServerDownMsg:
-		if !m.serverMode() || m.fallbackStop != nil {
+		if m.onFallback() {
 			return m, nil, true
 		}
 		m.serverLink = ServerLinkDown
@@ -68,7 +52,7 @@ func (m Model) updateServerLink(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, tea.Batch(cmds...), true
 
 	case ServerUpMsg:
-		if m.fallbackStop == nil {
+		if !m.onFallback() || m.serverAPI == nil {
 			return m, nil, true
 		}
 		m.fallbackStop()
@@ -109,8 +93,9 @@ func cmdFallbackWait(gen int, events <-chan struct{}) tea.Cmd {
 	}
 }
 
-// cmdLoadDisk reads `.scratch/` directly: the non-server loader, also the
-// down-mode fallback.
+// cmdLoadDisk reads `.scratch/` directly: the down-mode loader. A missing
+// directory reads as zero epics, and an unreadable `.archive` as nothing
+// archived.
 func (m Model) cmdLoadDisk() tea.Cmd {
 	scratchDir := m.scratchDir()
 	return func() tea.Msg {

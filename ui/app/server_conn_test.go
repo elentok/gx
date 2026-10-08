@@ -100,18 +100,16 @@ func TestServerMode_VersionMismatchIsReadOnly(t *testing.T) {
 	}
 }
 
-func TestInProcessMode_NoProbe(t *testing.T) {
+// Seam B: no server deps is a server that is down, never an in-process shell.
+func TestNoServerDeps_ShowsDown(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := New(*repo, Settings{ActiveWorktreePath: repoDir})
-	if m.serverMode() {
-		t.Fatal("in-process shell reports server mode")
-	}
-	if got := ansi.Strip(m.tabsView()); strings.Contains(got, "server") {
-		t.Fatalf("tabs = %q", got)
+	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ○ down") {
+		t.Fatalf("tabs = %q, want the down indicator", got)
 	}
 }
 

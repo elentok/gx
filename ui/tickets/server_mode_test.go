@@ -324,7 +324,7 @@ func TestServerMode_EnqueueKeyPicksAgent(t *testing.T) {
 	}}})
 	m.checked = map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}
 
-	next, _ := m.handleAddToQueueKey()
+	next, _ := m.handleServerEnqueueKey()
 	m = next.(Model)
 	if !m.confirm.IsOpen {
 		t.Fatal("confirm not open")
@@ -362,7 +362,7 @@ func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
 	}}})
 	m.checked = map[string]bool{"gx:alpha/01": true}
 
-	next, _ := m.handleReplaceQueueKey()
+	next, _ := m.handleServerReplaceKey()
 	m = next.(Model)
 	if !m.confirm.IsOpen {
 		t.Fatal("confirm not open")

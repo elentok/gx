@@ -141,22 +141,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingTicketsCancelChord:
 			return m, nil
 		case bindingTicketsReplaceQueue:
-			return m.handleReplaceQueueKey()
+			return m.handleServerReplaceKey()
 		case bindingTicketsAddToQueue:
-			return m.handleAddToQueueKey()
+			return m.handleServerEnqueueKey()
 		case bindingTicketsDrainReplace:
-			if !m.serverMode() {
-				return m, nil
-			}
 			return m.handleServerDrainKey()
 		case bindingTicketsToggleCheck:
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:
 			m.toggleHideDone()
 		case bindingTicketsToggleProjectScope:
-			if !m.serverMode() {
-				return m, nil
-			}
 			return m.toggleProjectScope()
 		case bindingTicketsSelectFirst:
 			m.selectFirstRow()

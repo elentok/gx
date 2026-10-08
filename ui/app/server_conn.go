@@ -26,8 +26,8 @@ type ServerClient interface {
 	Negotiate(ctx context.Context, build string) (apiclient.Negotiation, error)
 }
 
-// ServerDeps switches the shell to server mode; nil Settings.Server is the
-// in-process mode.
+// ServerDeps is how the shell reaches the server. A nil Settings.Server (no
+// client could be built) leaves the shell permanently down.
 type ServerDeps struct {
 	Client ServerClient
 	// Build is this client's build id, compared with the server's.
@@ -43,8 +43,6 @@ type serverConnMsg struct {
 	// the last known state stands.
 	slow bool
 }
-
-func (m Model) serverMode() bool { return m.settings.Server != nil }
 
 func (m Model) cmdServerProbe() tea.Cmd {
 	d := m.settings.Server

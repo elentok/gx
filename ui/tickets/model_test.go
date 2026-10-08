@@ -49,16 +49,11 @@ func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
 	}
 }
 
-// deliverLoad runs the model's Init cmd and feeds its result back through
-// Update, mirroring what the runtime does between Init and the first
-// WindowSizeMsg.
+// deliverLoad feeds one disk load of the fixture through Update. It skips
+// Init, whose down fallback would also start a store watch.
 func deliverLoad(t *testing.T, m Model) Model {
 	t.Helper()
-	cmd := m.Init()
-	if cmd == nil {
-		return m
-	}
-	updated, _ := m.Update(cmd())
+	updated, _ := m.Update(m.cmdLoadDisk()())
 	return updated.(Model)
 }
 

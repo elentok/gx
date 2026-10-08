@@ -206,12 +206,11 @@ type serverQueueMsg struct {
 	err   error
 }
 
-// WithServer switches the tab to server mode: rows come from the view model
-// fed by the server's snapshot and event stream, never from `.scratch/`.
+// WithServer connects the tab: rows come from the view model fed by the
+// server's snapshot and event stream. Without it the tab stays on the
+// server-down fallback (server_refresh.go).
 func (m Model) WithServer(api ServerAPI) Model {
 	m.serverAPI = api
-	// The disk poll is the non-server data source; it must never start.
-	m.autoRefreshStarted = true
 	return m
 }
 
@@ -235,8 +234,6 @@ func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
 	}
 	return m.applyServerRows(), notify.Info(label)
 }
-
-func (m Model) serverMode() bool { return m.serverAPI != nil }
 
 func (m Model) cmdServerSnapshot() tea.Cmd {
 	api := m.serverAPI

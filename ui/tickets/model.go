@@ -80,11 +80,6 @@ type Model struct {
 	// every epicsLoadedMsg) auto-invalidates the cache if the archive's count
 	// changed since it was loaded.
 	archivedLazy tree.LazySection[tickets.Epic]
-	// autoRefreshStarted guards cmdAutoRefresh's self-perpetuating poll loop
-	// (auto_refresh.go) against being started more than once per Model
-	// instance — every epicsLoadedMsg, including ones the loop itself
-	// produces, would otherwise spawn another parallel chain.
-	autoRefreshStarted bool
 	// scopeKnown: WithCwdProject ran, so an empty CwdProject means "not in a
 	// registered project" rather than "never told".
 	scopeKnown bool
@@ -144,8 +139,8 @@ type Model struct {
 	// cannot collide.
 	live map[string]map[string]liveTicketState
 
-	// serverAPI is non-nil in server mode (see server_mode.go): vm is then the
-	// only source of rows.
+	// serverAPI feeds vm (server_mode.go); nil keeps the tab on the down
+	// fallback for good.
 	serverAPI ServerAPI
 	// ticketStore locates the ticket files "Answer…" edits directly in server mode.
 	ticketStore string
@@ -222,7 +217,10 @@ func (m Model) ModalOpen() bool {
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.cmdLoad()
+	if m.serverAPI == nil {
+		return func() tea.Msg { return ServerDownMsg{} }
+	}
+	return m.cmdServerSnapshot()
 }
 
 // Update delegates to updateInner then re-syncs the preview viewport
@@ -253,7 +251,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
-		if m.refreshMode() == refreshStream {
+		if m.serverAPI != nil && !m.onFallback() {
 			// A disk read that outlived the fallback must not overwrite stream rows.
 			return m, nil
 		}
@@ -266,18 +264,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.recomputeSearchMatches()
 		}
 		m.clampSelected()
-		var autoRefreshCmd tea.Cmd
-		if !m.autoRefreshStarted {
-			m.autoRefreshStarted = true
-			autoRefreshCmd = cmdAutoRefresh()
-		}
 		if msg.err != nil {
-			return m, tea.Batch(notify.Error("load .scratch/: "+msg.err.Error()), autoRefreshCmd)
+			return m, notify.Error("load .scratch/: " + msg.err.Error())
 		}
-		return m, autoRefreshCmd
-
-	case autoRefreshMsg:
-		return m, tea.Batch(m.cmdLoad(), cmdAutoRefresh())
+		return m, nil
 
 	case tree.LazyResultMsg[tickets.Epic]:
 		if m.archivedLazy.Deliver(msg) {

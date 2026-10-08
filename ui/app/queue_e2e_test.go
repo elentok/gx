@@ -16,8 +16,8 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-// Without a server, "r" on the Tickets tab only asks the user to start one.
-func TestTicketsReplaceQueueWithoutServerNotifies(t *testing.T) {
+// Without server deps the Tickets tab reads the store and "r" is disabled.
+func TestTicketsReplaceQueueWithoutServerIsDisabled(t *testing.T) {
 	// not parallel-safe: points XDG_DATA_HOME at a temp ticket store
 	repoDir := testutil.TempRepo(t)
 	t.Setenv("HOME", t.TempDir())
@@ -55,7 +55,7 @@ func TestTicketsReplaceQueueWithoutServerNotifies(t *testing.T) {
 	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
 	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
 
-	waitForAppText(t, tm, "start the server to queue tickets")
+	waitForAppText(t, tm, "disabled: server is down")
 }
 
 func waitForAppText(t *testing.T, tm *teatest.TestModel, want string) {

@@ -115,7 +115,7 @@ func (msg serverWriteMsg) toast() tea.Cmd {
 // unpark. handled is false for any other row so "enter" keeps its usual meaning.
 func (m Model) handleServerUnparkEnter() (cmd tea.Cmd, handled bool) {
 	r, ok := m.selectedRow()
-	if !m.serverMode() || !ok || r.isEpic() {
+	if m.serverAPI == nil || !ok || r.isEpic() {
 		return nil, false
 	}
 	ticket := m.epicAt(r).Tickets[r.ticketIdx]

@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -25,32 +24,6 @@ func deliverAutoRefreshReload[M tea.Model](t *testing.T, m M, cmd tea.Cmd) M {
 	}
 	updated, _ := m.Update(batch[0]())
 	return updated.(M)
-}
-
-func TestModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-
-	if strings.Contains(m.View().Content, "Second ticket") {
-		t.Fatalf("expected second ticket absent before it's written, got:\n%s", m.View().Content)
-	}
-
-	// Simulate a status change made outside this Update loop (another
-	// process, ralph-loop, a manual edit) between poll ticks.
-	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
-
-	_, cmd := m.Update(autoRefreshMsg{})
-	m = deliverAutoRefreshReload(t, m, cmd)
-
-	if !strings.Contains(m.View().Content, "Second ticket") {
-		t.Fatalf("expected second ticket visible after autoRefreshMsg tick, got:\n%s", m.View().Content)
-	}
 }
 
 func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {

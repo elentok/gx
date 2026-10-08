@@ -111,17 +111,11 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
 	status := epic.RenderedStatus(ticket)
-	epicName := epic.Name
-	var paneLive bool
-	if m.serverMode() {
-		// A row's Path is its address and its epic is "project:epic"; the
-		// herdr launches want the bare epic.
-		epicName, _, _ = tickets.SplitTrailerValue(ticket.Path)
-		_, paneLive = m.serverIteration(ticket.Path)
-		paneLive = paneLive && status == tickets.StatusNeedsAnswer
-	} else {
-		paneLive = ticketPaneLive(status, epic.Name, ticket.DisplayNumber())
-	}
+	// A row's Path is its address and its epic is "project:epic"; the herdr
+	// launches want the bare epic.
+	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
+	_, paneLive := m.serverIteration(ticket.Path)
+	paneLive = paneLive && status == tickets.StatusNeedsAnswer
 	items := suggestedActionItems(status, ticket, paneLive)
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
@@ -144,14 +138,8 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
 	}
-	if m.serverMode() {
-		if cmd, ok := m.serverAnswerActionCmd(result); ok {
-			return m, cmd
-		}
-		return m, nil
-	}
-	if cmd, ok := answerActionCmd(m.worktreeRoot, m.settings, result); ok {
+	if cmd, ok := m.serverAnswerActionCmd(result); ok {
 		return m, cmd
 	}
-	return m, cmdApplySuggestedAction(result.Path, result.Action, func() tea.Msg { return statusChangedMsg{} })
+	return m, nil
 }

@@ -7,23 +7,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
-
-// allStatusMenuOrder is every status the change-status keymap can offer, in
-// menu display order.
-var allStatusMenuOrder = []schema.Status{
-	schema.StatusOpen,
-	schema.StatusClaimed,
-	schema.StatusNeedsAnswer,
-	schema.StatusNeedsRepair,
-	schema.StatusDraft,
-	schema.StatusDone,
-}
 
 // statusMenuLabels renders each schema.Status's menu label. Kept separate
 // from the enum's on-disk spelling so a future rename only has to touch this
@@ -37,20 +25,6 @@ var statusMenuLabels = map[schema.Status]string{
 	schema.StatusDone:        "done",
 }
 
-// newStatusMenu builds the status menu for ticket: every status but ticket's
-// own current one.
-func newStatusMenu(ticket tickets.Ticket) components.MenuState {
-	current := schema.Status(strings.ToLower(strings.TrimSpace(ticket.Status)))
-	items := make([]components.MenuItem, 0, len(allStatusMenuOrder))
-	for _, status := range allStatusMenuOrder {
-		if status == current {
-			continue
-		}
-		items = append(items, components.MenuItem{Label: statusMenuLabels[status], Value: string(status)})
-	}
-	return components.MenuState{Items: items, Cursor: 0}
-}
-
 // handleChangeStatusKey applies the "s" keymap: opens a status menu for the
 // selected ticket row. An epic row (nothing to re-status) or an
 // already-terminal selection is a no-op with a toast rather than opening an
@@ -62,12 +36,7 @@ func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
 	}
 	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
-	var menu components.MenuState
-	if m.serverMode() {
-		menu = newServerStatusMenu(ticket, epic.RenderedStatus(ticket))
-	} else {
-		menu = newStatusMenu(ticket)
-	}
+	menu := newServerStatusMenu(ticket, epic.RenderedStatus(ticket))
 	if len(menu.Items) == 0 {
 		return m, notify.Info("no status changes available for this ticket right now")
 	}

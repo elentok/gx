@@ -1622,7 +1622,7 @@ func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
 }
 
 // TestServerIndicator is seam D: each connection state renders its indicator
-// on the tab bar (shown on every tab), in-process mode renders none, and the
+// on the tab bar (shown on every tab), an unprobed shell renders none, and the
 // queue tab label never carries "(attached)".
 func TestServerIndicator(t *testing.T) {
 	t.Parallel()
@@ -1649,8 +1649,8 @@ func TestServerIndicator(t *testing.T) {
 			t.Errorf("tabs = %q, want it to contain %q", got, tc.want)
 		}
 	}
-	if got := ansi.Strip(base.tabsView()); strings.Contains(got, "server") {
-		t.Errorf("in-process tabs = %q, want no server indicator", got)
+	if got := ansi.Strip(base.WithServerConn(ServerConn{}).tabsView()); strings.Contains(got, "server") {
+		t.Errorf("unprobed tabs = %q, want no server indicator", got)
 	}
 	if got := ansi.Strip(base.tabsView()); strings.Contains(got, "attached") {
 		t.Errorf("tabs = %q, want no \"(attached)\"", got)

@@ -10,8 +10,8 @@ import (
 type ServerState int
 
 const (
-	// ServerInProcess is the old mode: no server indicator is shown.
-	ServerInProcess ServerState = iota
+	// ServerUnknown: not probed yet, so no indicator is shown.
+	ServerUnknown ServerState = iota
 	ServerUp
 	ServerDown
 	// ServerReadOnly: API version mismatch; the client must not write.
@@ -25,7 +25,7 @@ type ServerConn struct {
 	PID   int
 }
 
-// indicator is the text shown on every tab; empty in in-process mode.
+// indicator is the text shown on every tab; empty until the first probe.
 func (c ServerConn) indicator() string {
 	switch c.State {
 	case ServerUp:
