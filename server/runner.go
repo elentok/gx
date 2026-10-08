@@ -427,10 +427,21 @@ func (s *Server) rootBaseRef(project string, epics []tickets.Epic, epic string, 
 	if err != nil {
 		return "", err
 	}
+	def := git.RemoteDefaultBranch(repo)
 	if ref == "" {
-		ref = git.RemoteDefaultBranch(repo)
+		return def, nil
 	}
-	return ref, nil
+	return retargetIfLanded(ref, def, func(a, d string) (bool, error) { return git.IsAncestor(repo, a, d) }), nil
+}
+
+// retargetIfLanded is derived, never stored: once the blocker's branch is
+// reachable from the default branch the dependent targets the default again.
+// An unresolvable branch counts as not landed; never retarget on a guess.
+func retargetIfLanded(ref, def string, isAncestor func(ancestor, descendant string) (bool, error)) string {
+	if landed, err := isAncestor(ref, def); err == nil && landed {
+		return def
+	}
+	return ref
 }
 
 // prepareAndLaunch gives the ticket its own worktree, then launches the agent
