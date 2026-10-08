@@ -44,13 +44,18 @@ const (
 
 	implementSkill  = "gx-implement"
 	codeReviewSkill = "gx-code-review"
+	oneOffSkill     = "gx-one-off"
 )
 
 // launchSkill is the skill an agent starts under: code-review tickets get their
-// own, since gx-implement would ask them for commits.
+// own, since gx-implement would ask them for commits, and prompt tickets (the
+// one-offs) get one that keeps the TDD rules out of the way.
 func launchSkill(t tickets.Ticket) string {
-	if t.IsCodeReview() {
+	switch {
+	case t.IsCodeReview():
 		return codeReviewSkill
+	case t.Type == string(schema.TypePrompt):
+		return oneOffSkill
 	}
 	return implementSkill
 }

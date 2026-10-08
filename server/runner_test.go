@@ -149,6 +149,43 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 	}
 }
 
+func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
+	for _, tc := range []struct{ typ, want string }{
+		{"prompt", "$gx-one-off proj:epic-a/01"},
+		{"implement", "$gx-implement proj:epic-a/01"},
+	} {
+		t.Run(tc.typ, func(t *testing.T) {
+			store, repo := t.TempDir(), testutil.TempRepo(t)
+			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
+			servertest.SetProjectRepo(t, store, "proj", repo)
+			h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Orchestrator = config.OrchestratorServer })
+			_, prompt, _ := registerLaunch(h)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			snap, err := h.Client.Snapshot(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			evs, err := h.Client.Events(ctx, snap.Seq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+				t.Fatalf("add: %+v, %v", res, err)
+			}
+			for ev := range evs {
+				if ev.Type == server.EventIterationStarted {
+					break
+				}
+			}
+			if got := strings.Join(*prompt, " "); !strings.Contains(got, tc.want) {
+				t.Errorf("agent prompt = %q, want it to contain %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextPass(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
