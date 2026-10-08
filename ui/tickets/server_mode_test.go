@@ -100,6 +100,11 @@ func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string) (server
 	return server.QueueResult{}, nil
 }
 
+func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (server.QueueResult, error) {
+	f.record("approve " + address)
+	return server.QueueResult{}, nil
+}
+
 func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
 	f.record(verb + " " + req.Address)
 	return server.RepairResult{}, nil

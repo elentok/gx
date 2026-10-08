@@ -824,6 +824,7 @@ const (
 	bindingQueueDelete           keys.BindingID = "delete"
 	bindingQueueSuggestedActions keys.BindingID = "suggested-actions"
 	bindingQueueStartServer      keys.BindingID = "start-server"
+	bindingQueueApprove          keys.BindingID = "approve-proposal"
 )
 
 func newQueueKeysManager() keys.Manager {
@@ -850,6 +851,7 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueDelete, Seq: []string{"x"}, Categories: []string{"Other"}, Title: "delete"},
 		{ID: bindingQueueSuggestedActions, Seq: []string{"m"}, Categories: []string{"Other"}, Title: "suggested actions"},
 		{ID: bindingQueueStartServer, Seq: []string{"s"}, Categories: []string{"Other"}, Title: "start server (when down)"},
+		{ID: bindingQueueApprove, Seq: []string{"A"}, Categories: []string{"Other"}, Title: "approve recovery proposal"},
 	})
 }
 
@@ -956,6 +958,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleQueueDeleteKey()
 		case bindingQueueSuggestedActions:
 			return m.handleQueueSuggestedActionsKey()
+		case bindingQueueApprove:
+			return m.handleServerApproveKey()
 		case bindingQueueStartServer:
 			return m.openServerStartConfirm(), nil
 		}

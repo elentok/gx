@@ -100,6 +100,33 @@ func TestQueueServerKeys_PauseResumeOverrideReachVerbs(t *testing.T) {
 	}
 }
 
+// Seam D: "A" approves a row with a pending proposal and does nothing on one
+// without.
+func TestQueueServerKeys_ApproveNeedsPendingProposal(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want []string
+	}{
+		{"pending", "## Proposed Remedy\n\nrun it", []string{"approve gx:alpha/01"}},
+		{"none", "## Notes\n\nnothing", nil},
+	} {
+		var calls []string
+		m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls})
+		m.epics[0].Tickets[0].Body = tc.body
+		m.clampSelected()
+		m = pressQueue(t, m, 'A')
+		if tc.want != nil {
+			m = accept(t, m)
+		} else if m.confirm.IsOpen {
+			t.Errorf("%s: confirm opened", tc.name)
+		}
+		if !slices.Equal(calls, tc.want) {
+			t.Errorf("%s: calls = %v, want %v", tc.name, calls, tc.want)
+		}
+	}
+}
+
 func TestQueueServerKeys_DequeueAndDelete(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls}
