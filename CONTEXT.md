@@ -126,12 +126,12 @@ fixed set of user-facing states, each with its own icon:
 - **Needs-answer** — raw `Status: needs-answer`; a person is being asked for something — an answer
   or a decision — and nothing is broken. Written either by an agent that stops to ask, or by gx's
   own interactive-prompt gate when a pane blocks on an involuntary prompt. Says nothing about
-  whether an iteration survives; that's **Reattach**'s question. _Avoid_: Needs-info (retired
+  whether an iteration survives; that's **Reclaim**'s question. _Avoid_: Needs-info (retired
   name, see ADR 0018).
 - **Needs-repair** — raw `Status: needs-repair`; gx hit a fault it can't resolve on its own and a
   person must investigate. Never agent-authored. Also says nothing about whether an iteration
   survives: of its several producers, only the operator-attention gate leaves one. _Avoid_:
-  Needs-attention (retired name, see ADR 0018), treating it as "a pane is alive" — see Reattach.
+  Needs-attention (retired name, see ADR 0018), treating it as "a pane is alive" — see Reclaim.
 - **Done** — the ticket's own work is complete. Says nothing about its fork subtree.
 - **Waiting-for-children** — an overlay on Done, not a raw status: the ticket's own `Status:` is
   done, but its fork subtree isn't. Derived from the graph on every render, never written to a file.
@@ -175,25 +175,19 @@ verb).
 **Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either — a
 genuine dependency error, reported as a failure rather than parked on.
 
-**Reattach** — reconnecting a run to an iteration that is still live and owned. Run at startup for
-tickets found `claimed`, and again when a parked run resumes. Its result, not the ticket's status,
-decides how a park resumes: reattached → `claimed`, the same iteration continues; not reattached →
-`open`, a fresh iteration is launched. A surviving herdr pane is *not* the same thing — a pane
-outlives its goroutine. _Avoid_: "has a pane".
-
 **Background task** — a shell command a Claude agent moved off its own foreground turn (recorded as
 a `backgroundTaskId` in the session transcript), resolved later by a `task-notification` matched on
 task id. "Outstanding" while unresolved, "resolved" once a matching notification is seen (its
 reported status — success, failure, killed — doesn't matter, only that one exists), "aged out" once
 it's stayed outstanding past a generous cap without resolving. Turn-level, inside one still-live
-iteration — distinct from the pane-level Reattach/Live terms above, which describe the iteration as
+iteration — distinct from the pane-level **Reclaim** (see The Server), which describes the iteration as
 a whole. A subagent's (sidechain) background task is never a signal about its parent iteration.
 Claude-only; Codex iterations have no equivalent signal.
 
 **`status` / `iteration_status`** — a ticket's status splits across two fields with different
 owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`
 values above). **`iteration_status`** is agent-owned and reports on the current claim alone
-(`working` / `needs-answer` / `finished`, or absent — gx clears it on every claim and reattach, so
+(`working` / `needs-answer` / `finished`, or absent — gx clears it on every claim and reclaim, so
 a report is never readable outside the claim that produced it). Not to be confused with **herdr's
 `agent_status`** (`idle`/`done`/`blocked`, on the pane payload, `herdr/agent.go`) — the two names
 collided during design specifically because both describe "what is the agent up to," which is why
@@ -274,7 +268,9 @@ diagnostics). _Avoid_: run log.
 are its clients; they reach it over its API (ADR 0028). _Avoid_: daemon, orchestrator.
 
 **Server lock** — the one flock in the state dir that makes the server a singleton. A second
-`gx server start` fails on it instead of racing the first.
+`gx server start` fails on it instead of racing the first. Replaces the per-repo attach lock that
+let one TUI process own the Queue. _Avoid_: Attach / Attached / Detach / SelfAttached, Attach lock,
+Foreign attachment.
 
 **Snapshot** — the full state a server event stream sends first (`GET /v1/snapshot`), tagged with
 the `seq` it was taken at. A client subscribes to the stream from that `seq`; a gap or reconnect
@@ -284,9 +280,10 @@ means taking a new snapshot.
 (`gx server tickets explain`). _Avoid_: diagnose.
 
 **Server queue** — the one server-wide collection of queued top-level tickets, across every
-project, in FIFO order (`gx server queue`). Replaces the per-repo **Queue** and its Attach lock: a
-second gx process can no longer be "foreign" to it, because only the server schedules. Queue
-membership and order live in the server's state dir, not in the tickets.
+project, in FIFO order (`gx server queue`). Replaces the per-repo **Queue** and the per-epic
+ralph-loop run: a second gx process can no longer be "foreign" to it, because only the server
+schedules. Queue membership and order live in the server's state dir, not in the tickets.
+_Avoid_: Epic run.
 
 **Direct write** — a write the CLI makes straight to a ticket's markdown under the per-ticket lock,
 then pings the server. Used for content (`gx tickets show|add|section|set`). The JSON result
@@ -310,7 +307,9 @@ herdr tab and start the agent. _Avoid_: spawn (retired), start (ambiguous with `
 
 **Reclaim** — the server, after a restart, taking back an iteration whose pane is still live and
 owned (found by its recorded handle). A handle that no longer matches parks the ticket
-`needs-repair`. Replaces **Reattach** and Re-adopt; there is no prompt. _Avoid_: reattach.
+`needs-repair`. Replaces **Reattach** and Re-adopt; there is no prompt. A surviving herdr pane alone
+is not a reclaim — the handle must match. _Avoid_: Reattach / Reattach signal, Live (queue sense),
+re-adopt, "has a pane".
 
 **Base** / **Target** — a ticket's **base** is the branch its work starts from; its **target** is
 the branch it lands on. Only `base:` is declared (a branch or a ticket address); the target is
@@ -550,14 +549,11 @@ what is on disk" true even when no event ever arrives (see ADR 0025). Also activ
 tab is active; both watch and poll are started when the tab is activated and are allowed to stop
 when it is deactivated.
 
-## Queue and Attach Lifecycle (Queue Tab)
+## Queue Lifecycle (Queue Tab)
 
 **Queue** — the single, per-repo collection of checked/queued tickets across all epics
 (held only by the orchestrator server; with no server the Queue tab is empty). One Queue per repo,
 not per epic.
-
-**Epic run** — the per-epic ralph-loop execution, owned by the orchestrator server. Several can run
-concurrently, up to the concurrency slot cap.
 
 **Hand-driven epic** / **Loop-driven epic** — the two kinds of epic `.scratch/` holds, distinguished
 by who writes `status`, not by file format or by anything on disk. In a hand-driven epic (a
@@ -566,14 +562,11 @@ wayfinder map, or any epic a person works directly) the person is the sole write
 one format, one validator, and one CLI; nothing marks which is which, because ownership is a
 property of the writer, not of the epic.
 
-**Replace queue** (`r`) / **Add to queue** (`a`) — the two queueing actions from the Tickets tab.
-Replace clears both the not-yet-started (pending) and already-finished (done) queue selection,
-replacing it with the checked tickets, then jumps to the Queue tab — a running or errored entry is
-left untouched (queue safety: a live run's own state isn't something Replace should silently
-discard). It is blocked process-wide ("Can't replace a live queue") while any epic run is live,
-regardless of which epic the checked tickets belong to. Add widens an already-running epic's frozen
-scope (`ralphloop.RunScope.Add`) with the checked tickets under that epic, after a confirmation
-naming the count — it requires the epic under the cursor to already have a live run.
+**Replace queue** (`r`) / **Add to queue** (`a`) — the two queueing actions from the Tickets tab,
+both server writes behind a confirmation. Replace swaps one project's queue for the checked tickets
+(they must all belong to that project); Add enqueues the checked tickets. Neither needs a live run
+first, and neither opens a run-start modal. _Avoid_: drain-and-replace, run-start modal (both
+removed with the in-process loop, no replacement).
 
 ## Slots and Caps
 
