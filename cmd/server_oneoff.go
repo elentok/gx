@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -19,17 +21,28 @@ func newServerOneOffCmd() *cobra.Command {
 	var req server.OneOffRequest
 	var jsonOut bool
 	cmd := &cobra.Command{
-		Use:   `one-off "<prompt>"`,
+		Use:   `one-off ["<prompt>"] [--file <path>]`,
 		Short: "create a top-level ticket from a prompt and queue it",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) == 0 && req.File == "" {
+				return errors.New("a one-off needs a prompt argument or --file")
+			}
 			cl, err := serverClient()
 			if err != nil {
 				return err
 			}
-			req.Prompt = args[0]
+			if len(args) == 1 {
+				req.Prompt = args[0]
+			}
 			if req.Cwd, err = os.Getwd(); err != nil {
 				return err
+			}
+			if req.File != "" {
+				// The server reads the file, so it needs a path valid from its side.
+				if req.File, err = filepath.Abs(req.File); err != nil {
+					return err
+				}
 			}
 			ctx := c.Context()
 			if ctx == nil {
@@ -47,6 +60,7 @@ func newServerOneOffCmd() *cobra.Command {
 	cmd.Flags().IntVar(&req.ExpectedContextWindow, "expected-context-window", 0, "expected context window in tokens")
 	cmd.Flags().BoolVar(&req.Front, "front", false, "queue it at the head instead of the tail")
 	cmd.Flags().BoolVar(&req.Notify, "notify", false, "send the ticket's Result to chat when it succeeds (a park always notifies)")
+	cmd.Flags().StringVar(&req.File, "file", "", "markdown payload (frontmatter + body); flags override its frontmatter. Read by the server, so localhost only")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of the address")
 	return cmd
 }

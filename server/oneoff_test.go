@@ -152,6 +152,37 @@ func TestOneOff_CommitsOptionsLandInFrontmatter(t *testing.T) {
 	}
 }
 
+func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	ctx := context.Background()
+	file := filepath.Join(t.TempDir(), "payload.md")
+	payload := "---\ntype: implement\nbase: main\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
+	if err := os.WriteFile(file, []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Client.OneOff(ctx, server.OneOffRequest{File: file, Cwd: repo, ExpectedContextWindow: 90000})
+	if err != nil || res.Refused {
+		t.Fatalf("one-off: %+v, %v", res, err)
+	}
+	if res.Address != "proj:from-file/01" {
+		t.Errorf("address = %q; want the frontmatter name", res.Address)
+	}
+	raw := readOneOffTicket(t, h, res.Address)
+	for _, want := range []string{"type: implement", "base: main", "expected_context_window: 90000", "build it from the file"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("ticket lacks %q:\n%s", want, raw)
+		}
+	}
+	if strings.Contains(raw, "40000") {
+		t.Errorf("flag should override the frontmatter window:\n%s", raw)
+	}
+
+	res, err = h.Client.OneOff(ctx, server.OneOffRequest{File: filepath.Join(t.TempDir(), "missing.md"), Cwd: repo})
+	if err != nil || !res.Refused || res.Reason != server.ReasonBadFile {
+		t.Errorf("missing file: %+v, %v; want %s refusal", res, err, server.ReasonBadFile)
+	}
+}
+
 func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	ctx := context.Background()

@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"gopkg.in/yaml.v3"
 )
 
 // Refusal reasons of a one-off submit.
@@ -28,6 +29,7 @@ const (
 	ReasonBadBase       = "invalid-base"
 	ReasonBadBlocker    = "invalid-blocker"
 	ReasonBadWindow     = "invalid-context-window"
+	ReasonBadFile       = "invalid-file"
 )
 
 // OneOffStatusQueued is the status a successful submit reports: it is created
@@ -61,6 +63,61 @@ type OneOffRequest struct {
 	Front bool `json:"front,omitempty"`
 	// Notify sends the ticket's Result to chat on success; parks always notify.
 	Notify bool `json:"notify,omitempty"`
+	// File is a server-side path to a markdown payload (frontmatter + body).
+	// Its frontmatter fills every field left unset here; the body is the prompt
+	// when Prompt is empty.
+	File string `json:"file,omitempty"`
+}
+
+// oneOffFileFrontmatter is the subset of a payload file's frontmatter a submit
+// understands.
+type oneOffFileFrontmatter struct {
+	Project               string   `yaml:"project"`
+	Name                  string   `yaml:"name"`
+	Agent                 string   `yaml:"agent"`
+	Type                  string   `yaml:"type"`
+	Commits               bool     `yaml:"commits"`
+	Base                  string   `yaml:"base"`
+	BlockedBy             []string `yaml:"blocked_by"`
+	ExpectedContextWindow int      `yaml:"expected_context_window"`
+	Front                 bool     `yaml:"front"`
+}
+
+// applyFile merges the payload file into req; anything already set on req wins.
+func (req *OneOffRequest) applyFile() error {
+	raw, err := os.ReadFile(req.File)
+	if err != nil {
+		return err
+	}
+	yamlPart, body, hasFM := schema.SplitFrontmatter(string(raw))
+	var fm oneOffFileFrontmatter
+	if hasFM {
+		if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
+			return err
+		}
+	} else {
+		body = string(raw)
+	}
+	setIfEmpty := func(dst *string, v string) {
+		if *dst == "" {
+			*dst = v
+		}
+	}
+	setIfEmpty(&req.Prompt, body)
+	setIfEmpty(&req.Project, fm.Project)
+	setIfEmpty(&req.Name, fm.Name)
+	setIfEmpty(&req.Agent, fm.Agent)
+	setIfEmpty(&req.Type, fm.Type)
+	setIfEmpty(&req.Base, fm.Base)
+	req.Commits = req.Commits || fm.Commits
+	req.Front = req.Front || fm.Front
+	if len(req.BlockedBy) == 0 {
+		req.BlockedBy = fm.BlockedBy
+	}
+	if req.ExpectedContextWindow == 0 {
+		req.ExpectedContextWindow = fm.ExpectedContextWindow
+	}
+	return nil
 }
 
 // OneOffResult is a submit's answer; a refusal creates nothing.
@@ -79,6 +136,11 @@ func oneOffRefusal(reason, msg string) OneOffResult {
 // oneOff creates a top-level ticket carrying the prompt and appends it to the
 // queue in one call.
 func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
+	if req.File != "" {
+		if err := req.applyFile(); err != nil {
+			return oneOffRefusal(ReasonBadFile, err.Error()), nil
+		}
+	}
 	prompt := strings.TrimSpace(req.Prompt)
 	if prompt == "" {
 		return oneOffRefusal(ReasonEmptyPrompt, "a one-off needs a prompt"), nil
