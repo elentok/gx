@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -39,3 +40,21 @@ func acquireLock(path string) (*serverLock, error) {
 }
 
 func (l *serverLock) release() { l.f.Close() }
+
+// LockHeldBy reports the pid of a live server that holds the lock. Unlike
+// acquireLock it never writes the file, so it is safe to call beside a server.
+func LockHeldBy(stateDir string) (int, bool) {
+	path := filepath.Join(stateDir, lockFileName)
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return 0, false
+	}
+	defer f.Close()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		return 0, false
+	}
+	raw, _ := os.ReadFile(path)
+	pid, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
+	return pid, true
+}

@@ -114,15 +114,30 @@ func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 	return ahead, false
 }
 
+// loadResult is one project's load, kept for the length of a pass.
+type loadResult struct {
+	epics []tickets.Epic
+	err   error
+}
+
 // pendingRows explains every queue entry, in queue order.
 func (s *Server) pendingRows() []PendingRow {
 	rows := []PendingRow{}
+	loaded := map[string]loadResult{}
+	load := func(dir string) ([]tickets.Epic, error) {
+		if r, ok := loaded[dir]; ok {
+			return r.epics, r.err
+		}
+		epics, err := tickets.Load(dir)
+		loaded[dir] = loadResult{epics, err}
+		return epics, err
+	}
 	for _, item := range s.queued.list() {
 		addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
 		if err != nil {
 			continue
 		}
-		ex, err := s.explainTicket(addr)
+		ex, err := s.explainTicketWith(addr, load)
 		if err != nil {
 			ex = Explanation{Verdict: "error", Reason: err.Error()}
 		}

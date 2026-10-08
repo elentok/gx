@@ -172,12 +172,15 @@ func serverClient() (*apiclient.Client, error) {
 
 // StatusInfo is the `gx server status --json` payload.
 type StatusInfo struct {
-	Running      bool     `json:"running"`
-	Pid          int      `json:"pid,omitempty"`
-	Build        string   `json:"build,omitempty"`
-	Orchestrator string   `json:"orchestrator,omitempty"`
-	Paused       bool     `json:"paused,omitempty"`
-	Warnings     []string `json:"warnings,omitempty"`
+	Running      bool   `json:"running"`
+	Pid          int    `json:"pid,omitempty"`
+	Build        string `json:"build,omitempty"`
+	Orchestrator string `json:"orchestrator,omitempty"`
+	Paused       bool   `json:"paused,omitempty"`
+	// Starting: a server holds the lock but does not answer yet. It builds the
+	// ticket index before it opens its socket.
+	Starting bool     `json:"starting,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
@@ -205,12 +208,23 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 		}
 		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
 	}
+	if !info.Running {
+		if stateDir, serr := config.StateDir(); serr == nil {
+			if pid, held := server.LockHeldBy(stateDir); held {
+				info.Starting, info.Pid = true, pid
+			}
+		}
+	}
 	if jsonOut {
 		via := viaDirect
 		if info.Running {
 			via = viaServer
 		}
 		return encodeProvenance(w, info, via, callerActor(os.Getwd))
+	}
+	if info.Starting {
+		_, werr := fmt.Fprintf(w, "starting (pid %d): indexing the ticket store, not answering yet\n", info.Pid)
+		return werr
 	}
 	if !info.Running {
 		_, werr := fmt.Fprintln(w, "not running")

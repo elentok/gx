@@ -166,6 +166,12 @@ func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
 // explainTicket gives the stored ticket's verdict: the scheduler's own, then
 // the server's queue and slot state for a ticket nothing else holds back.
 func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
+	return s.explainTicketWith(addr, tickets.Load)
+}
+
+// explainTicketWith is explainTicket with the project loader injected, so a
+// pass over many tickets can load each project once.
+func (s *Server) explainTicketWith(addr tickets.Address, load func(dir string) ([]tickets.Epic, error)) (Explanation, error) {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return Explanation{}, err
@@ -174,7 +180,7 @@ func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
 		if tickets.ProjectName(dir) != addr.Project {
 			continue
 		}
-		epics, err := tickets.Load(dir)
+		epics, err := load(dir)
 		if err != nil {
 			return Explanation{}, err
 		}
