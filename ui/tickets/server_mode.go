@@ -403,7 +403,14 @@ func epicsFromViewModel(vm viewmodel.State) []gxtickets.Epic {
 }
 
 func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
-	n, _ := strconv.Atoi(strings.TrimRight(id, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+	// The number is the leading digits only: a multi-level fork id like
+	// "27a1" ends in a digit, so trimming trailing letters would leave it
+	// unparseable and every parent/blocker lookup for it would miss.
+	digits := strings.IndexFunc(id, func(r rune) bool { return r < '0' || r > '9' })
+	if digits < 0 {
+		digits = len(id)
+	}
+	n, _ := strconv.Atoi(id[:digits])
 	t := gxtickets.Ticket{
 		Number:     n,
 		Identifier: id,

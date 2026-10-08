@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
@@ -538,6 +539,28 @@ func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
 	got := epics[0].Tickets[0]
 	if got.ActualContextWindow != 66395 || got.ElapsedTime != 316 || got.Compactions != 2 {
 		t.Errorf("ticket = %+v, want the landing metrics so the summary can add them up", got)
+	}
+}
+
+func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
+	vm := viewmodel.State{}.ApplySnapshot(server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "proj:epic-a/27", Status: "done"},
+		{Address: "proj:epic-a/27a", Status: "done", Parent: "proj:epic-a/27"},
+		{Address: "proj:epic-a/27a1", Status: "done", Parent: "proj:epic-a/27a"},
+		{Address: "proj:epic-a/27a3", Status: "claimed", Parent: "proj:epic-a/27a1"},
+	}})
+	epics := epicsFromViewModel(vm)
+	if len(epics) != 1 || len(epics[0].Tickets) != 4 {
+		t.Fatalf("epics = %+v", epics)
+	}
+	epic := epics[0]
+	for _, tk := range epic.Tickets {
+		if tk.Number != 27 {
+			t.Errorf("%s: Number = %d, want 27", tk.Identifier, tk.Number)
+		}
+	}
+	if got := epic.RenderedStatus(epic.Tickets[3]); got != gxtickets.StatusClaimed {
+		t.Errorf("27a3 RenderedStatus = %v, want claimed: its parent 27a1 is done", got)
 	}
 }
 
