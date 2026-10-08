@@ -207,17 +207,27 @@ func (s *Server) queueAdd(req QueueRequest) (QueueResult, error) {
 	return s.withExtraUsage(s.queueAddItem(req))
 }
 
+// resolveAgent defaults an empty agent to claude and refuses an unknown one.
+func resolveAgent(name string) (ralphloop.AgentKind, *QueueResult) {
+	agent := ralphloop.AgentKind(name)
+	if name == "" {
+		agent = ralphloop.AgentClaude
+	}
+	if err := ralphloop.ValidateAgentKind(agent); err != nil {
+		r := refusal(ReasonInvalidAgent, err.Error())
+		return "", &r
+	}
+	return agent, nil
+}
+
 func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 	addr, bad := canonical(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
-	agent := ralphloop.AgentKind(req.Agent)
-	if req.Agent == "" {
-		agent = ralphloop.AgentClaude
-	}
-	if err := ralphloop.ValidateAgentKind(agent); err != nil {
-		return refusal(ReasonInvalidAgent, err.Error()), nil
+	agent, badAgent := resolveAgent(req.Agent)
+	if badAgent != nil {
+		return *badAgent, nil
 	}
 	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
 		if !s.hasTicket(addr) {

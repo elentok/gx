@@ -140,9 +140,33 @@ func oneOffRefusal(reason, msg string) OneOffResult {
 	return OneOffResult{Refused: true, Reason: reason, Message: msg}
 }
 
+// oneOffPlan is a fully validated submit, ready to write.
+type oneOffPlan struct {
+	project, dir, epic, prompt string
+	addr                       tickets.Address
+	tk                         schema.Ticket
+	agent                      string
+	front                      bool
+}
+
 // oneOff creates a top-level ticket carrying the prompt and appends it to the
-// queue in one call.
+// queue in one call. Everything that can refuse is checked before the first
+// write, and a refusal after the write removes the ticket again, so a refused
+// submit leaves nothing behind for a retry to collide with.
 func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
+	var plan oneOffPlan
+	if res, err := s.oneOffValidate(req, &plan); err != nil || res.Refused {
+		return res, err
+	}
+	if res, err := oneOffWrite(plan); err != nil || res.Refused {
+		return res, err
+	}
+	return s.oneOffEnqueue(plan)
+}
+
+// oneOffValidate checks the submit and fills plan. A refusal (or error) means
+// plan is unusable; nothing has been written.
+func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResult, error) {
 	if req.File != "" {
 		if err := req.applyFile(); err != nil {
 			return oneOffRefusal(ReasonBadFile, err.Error()), nil
@@ -206,29 +230,61 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 		a, _ := tickets.ParseAddress(b, tickets.AddressContext{})
 		tk.BlockedBy = append(tk.BlockedBy, schema.TicketID(a.Epic+"/"+a.ID))
 	}
-	if err := writeOneOffTicket(dir, epic, tk, prompt); err != nil {
+	// The queue refuses an unknown agent; the new epic can be neither a map epic
+	// nor already queued, so the agent is the only enqueue check left to do here.
+	agent, bad := resolveAgent(req.Agent)
+	if bad != nil {
+		return oneOffRefusal(bad.Reason, bad.Message), nil
+	}
+	*plan = oneOffPlan{project: project, dir: dir, epic: epic, prompt: prompt, addr: addr, tk: tk, agent: string(agent), front: req.Front}
+	return OneOffResult{}, nil
+}
+
+// oneOffWrite puts the ticket on disk.
+func oneOffWrite(p oneOffPlan) (OneOffResult, error) {
+	if err := writeOneOffTicket(p.dir, p.epic, p.tk, p.prompt); err != nil {
 		if os.IsExist(err) {
-			return oneOffRefusal(ReasonNameTaken, project+":"+epic+" already exists"), nil
+			return oneOffRefusal(ReasonNameTaken, p.project+":"+p.epic+" already exists"), nil
 		}
 		return OneOffResult{}, err
 	}
-	if err := ralphloop.AppendEvent(dir, epic, ralphloop.Event{
-		Time: time.Now(), Type: string(events.Submitted), Ticket: addr.ID, Address: addr.String(),
+	return OneOffResult{}, nil
+}
+
+// oneOffEnqueue queues the written ticket and only then records `submitted`.
+// Any failure removes the epic dir again so nothing unqueued stays behind.
+func (s *Server) oneOffEnqueue(p oneOffPlan) (OneOffResult, error) {
+	res, err := s.oneOffQueue(p)
+	if err != nil || res.Refused {
+		if rmErr := os.RemoveAll(filepath.Join(p.dir, p.epic)); rmErr != nil {
+			s.log.Warn("remove unqueued one-off", "ticket", p.addr.String(), "err", rmErr)
+		}
+		if refreshErr := s.idx.refresh(s.cfg.TicketStore); refreshErr != nil {
+			s.log.Warn("refresh after one-off cleanup", "err", refreshErr)
+		}
+		return res, err
+	}
+	if err := ralphloop.AppendEvent(p.dir, p.epic, ralphloop.Event{
+		Time: time.Now(), Type: string(events.Submitted), Ticket: p.addr.ID, Address: p.addr.String(),
 	}); err != nil {
 		return OneOffResult{}, err
 	}
+	return res, nil
+}
+
+func (s *Server) oneOffQueue(p oneOffPlan) (OneOffResult, error) {
 	// queueAdd checks the index, so it must see the new ticket first.
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		return OneOffResult{}, err
 	}
-	q, err := s.queueAdd(QueueRequest{Address: addr.String(), Agent: req.Agent, Front: req.Front})
+	q, err := s.queueAdd(QueueRequest{Address: p.addr.String(), Agent: p.agent, Front: p.front})
 	if err != nil {
 		return OneOffResult{}, err
 	}
 	if q.Refused {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
-	return OneOffResult{Address: addr.String(), Status: OneOffStatusQueued}, nil
+	return OneOffResult{Address: p.addr.String(), Status: OneOffStatusQueued}, nil
 }
 
 // duplicate is the live ticket a submit's dedupe key collides with.

@@ -211,6 +211,28 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 	}
 }
 
+func TestOneOff_InvalidAgentLeavesNoTicketAndRetryIsNotDuplicateLive(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	ctx := context.Background()
+	file := filepath.Join(t.TempDir(), "job.md")
+	if err := os.WriteFile(file, []byte("do the thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	req := server.OneOffRequest{File: file, Cwd: repo, Name: "bad-agent-job", Agent: "gpt"}
+	res, err := h.Client.OneOff(ctx, req)
+	if err != nil || !res.Refused || res.Reason != server.ReasonInvalidAgent {
+		t.Fatalf("got %+v, %v; want refusal %s", res, err, server.ReasonInvalidAgent)
+	}
+	if _, err := os.Stat(filepath.Join(h.TicketStore, "proj", "bad-agent-job")); err == nil {
+		t.Error("a refused submit left an epic (and its submitted event) behind")
+	}
+	req.Agent = ""
+	res, err = h.Client.OneOff(ctx, req)
+	if err != nil || res.Refused {
+		t.Errorf("retry = %+v, %v; want accepted, not duplicate-live", res, err)
+	}
+}
+
 func TestOneOff_DuplicateLiveRefusedByFileKey(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	ctx := context.Background()
