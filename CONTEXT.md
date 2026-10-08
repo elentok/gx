@@ -615,6 +615,29 @@ agents are never stopped, and the daemon applies the new value at its next sched
 **No bypass** — one-offs, `scratch` jobs and `type: investigate` nodes all count against the same
 caps. `--front` sets queue position only. See ADR 0032.
 
+## One-offs
+
+**One-off** — a top-level ticket with no children, usually submitted from outside gx with `gx
+server one-off "<prompt>"` (or `--file <path>`). It defaults to `type: prompt` (commitless);
+`--commits` makes it `type: implement`, which lands through the project's landing policy like an
+epic. The project is `--project`, else the one owning the current directory, else `scratch`. A
+one-off is a queue root and counts against the same caps as an epic. _Avoid_: standalone ticket,
+job. There is one verb and no spool: when the server is down the submit is refused, never queued
+for later. See ADR 0033.
+
+**Dedupe key** — the key (`--unique <key>`; with `--file`, by default the file's absolute,
+symlink-resolved path; `--no-unique` opts out; a plain prompt has none) that refuses a live
+duplicate. Another ticket of the same project with the same key that is not `done` or `cancelled`
+counts as live, parked copies included. The refusal is `duplicate-live`: it returns the existing
+ticket's address and writes a `submit-refused` event.
+
+**Result** — the `## Result` section a one-off's agent writes its answer into (with `gx tickets
+section`, under the `gx-one-off` skill). `--wait` prints it and `--notify` sends it to chat.
+
+**Wait** — `--wait` blocks until the ticket ends and survives a server restart. `--timeout` stops
+only the waiter: the ticket keeps running. On a duplicate-live refusal `--wait` follows the
+existing ticket.
+
 ## Notification Surfaces
 
 The three places a run event can surface. They are distinct surfaces, not levels of the same
