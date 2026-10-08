@@ -19,16 +19,16 @@ type Failure struct {
 // Triggers reports whether a failure of this shape may start recovery at all:
 // every needs-repair kind except budget-killed (a deliberate stop), needs-answer
 // zero-commit, needs-answer blocked-pane, a deadlock, a held background-task
-// gate (R10) and a ticket-graph defect a scan found (R14). Self-reported parks
-// and commitless finishes are a person's or the ticket's own decision, never
-// recovered; a rate-limit pause (R8) is healthy waiting. Whether a blocked pane
-// actually runs is the matcher's call.
+// gate (R10) and a ticket-graph defect a scan found (R14). Self-reported and
+// manual parks and commitless finishes are a person's or the ticket's own
+// decision, never recovered; a rate-limit pause (R8) is healthy waiting. A
+// blocked pane still needs a match (NeedsMatch).
 func (f Failure) Triggers() bool {
 	switch f.Type {
 	case events.BackgroundTaskGateHeld, events.TicketGraphDefect:
 		return true
 	case events.NeedsRepair:
-		return f.Kind != events.BudgetKilled && f.Kind != events.SelfReported
+		return f.Kind != events.BudgetKilled && f.Kind != events.SelfReported && f.Kind != events.ManualPark
 	case events.NeedsAnswer:
 		return f.Kind == events.ZeroCommit || f.Kind == events.BlockedPane
 	case events.Deadlocked:
@@ -36,6 +36,11 @@ func (f Failure) Triggers() bool {
 	}
 	return false
 }
+
+// NeedsMatch is true for failures recovered only when a catalog entry matches:
+// a blocked pane is recovered only on an allow-listed dialog, so an unmatched
+// one stays a person's to answer instead of becoming an investigation.
+func (f Failure) NeedsMatch() bool { return f.Kind == events.BlockedPane }
 
 // DiagnosisOnly is true for failures with no ticket to act on: recovery may
 // diagnose them but no rule remedy runs.

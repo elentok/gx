@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -105,9 +104,6 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
 		}
 		s.events.publish(EventTicketParked, ref.addr.String())
-		if req.actor != recovery.ActorRecovery {
-			s.recoverAsync(recovery.Failure{Address: ref.addr.String(), Type: events.ManualPark.ParkType(), Kind: events.ManualPark, Reason: reason})
-		}
 		return QueueResult{}, nil
 	})
 }

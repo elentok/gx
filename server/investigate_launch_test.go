@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -33,8 +34,8 @@ func parkAndCatchInvestigation(t *testing.T, store string) servertest.Prompt {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
-		t.Fatalf("park = %+v, %v", res, err)
+	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("park: %v", err)
 	}
 	select {
 	case p := <-got:

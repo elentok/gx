@@ -14,7 +14,7 @@ func TestFailure_Triggers(t *testing.T) {
 		want bool
 	}{
 		{"needs-repair iteration error", events.NeedsRepair, events.IterationError, true},
-		{"needs-repair manual park", events.NeedsRepair, events.ManualPark, true},
+		{"needs-repair manual park", events.NeedsRepair, events.ManualPark, false},
 		{"needs-repair budget-killed", events.NeedsRepair, events.BudgetKilled, false},
 		{"needs-repair self-reported", events.NeedsRepair, events.SelfReported, false},
 		{"needs-answer zero-commit", events.NeedsAnswer, events.ZeroCommit, true},
@@ -32,6 +32,15 @@ func TestFailure_Triggers(t *testing.T) {
 		if got := (Failure{Type: tt.typ, Kind: tt.kind}).Triggers(); got != tt.want {
 			t.Errorf("%s: Triggers() = %v, want %v", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestFailure_NeedsMatch(t *testing.T) {
+	if !(Failure{Type: events.NeedsAnswer, Kind: events.BlockedPane}).NeedsMatch() {
+		t.Error("blocked-pane: NeedsMatch() = false, want true")
+	}
+	if (Failure{Type: events.NeedsAnswer, Kind: events.ZeroCommit}).NeedsMatch() {
+		t.Error("zero-commit: NeedsMatch() = true, want false")
 	}
 }
 

@@ -470,6 +470,11 @@ func (c Catalog) WithConfig(enabled bool, disabled []string) Catalog {
 	return out
 }
 
+// EntryEnabled reports whether the catalog and its entry id are both on.
+func (c Catalog) EntryEnabled(id string) bool {
+	return c.Enabled && slices.ContainsFunc(c.Entries, func(e Entry) bool { return e.ID == id && e.Enabled })
+}
+
 // Match returns the first enabled entry matching seq, or false.
 func (c Catalog) Match(seq []Event) (Entry, bool) {
 	if !c.Enabled || len(seq) == 0 {

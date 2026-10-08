@@ -53,7 +53,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
 	acts := entry.Runnable(f) || entry.Proposable(f) || entry.Executor == recovery.ExecutorPerson
-	if f.DiagnosisOnly() || (!plan.needsJudgment() && !acts) {
+	if f.DiagnosisOnly() || (!matched && f.NeedsMatch()) || (!plan.needsJudgment() && !acts) {
 		return recoveryPlan{}, false
 	}
 	return plan, true

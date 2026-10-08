@@ -17,9 +17,11 @@ import (
 // holds the defect is skipped: a remedy that fixed it leaves nothing to find,
 // and one refused or stopped by a guard rail must not be raised again. Done
 // tickets are skipped too: their parent no longer changes scheduling, and an
-// old epic's backlog would otherwise flood recovery on the first scan.
+// old epic's backlog would otherwise flood recovery on the first scan. Drafts
+// are skipped as unfinished. Nothing is raised while R14 is off: a raised
+// defect is never raised again, and unmatched it would only fork investigations.
 func (s *Server) scanParentDefects() {
-	if s.cfg.Orchestrator != config.OrchestratorServer || !s.cfg.Recovery.Enabled {
+	if s.cfg.Orchestrator != config.OrchestratorServer || !s.cfg.Recovery.EntryEnabled("R14") {
 		return
 	}
 	// A rescan from the watch and one from a ping may overlap; one at a time
@@ -33,9 +35,12 @@ func (s *Server) scanParentDefects() {
 	for _, dir := range dirs {
 		epics, _ := s.idx.epicsOf(dir)
 		for _, e := range epics {
+			if e.Status == string(schema.StatusDraft) {
+				continue
+			}
 			for _, t := range e.Tickets {
 				want, defect := recovery.ParentDefect(t.Identifier, t.Parent)
-				if defect && t.Status != string(schema.StatusDone) {
+				if defect && t.Status != string(schema.StatusDone) && t.Status != string(schema.StatusDraft) {
 					s.raiseParentDefect(dir, filepath.Base(e.Path), t.Identifier, want)
 				}
 			}
