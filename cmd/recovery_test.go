@@ -32,7 +32,7 @@ func TestRecoveryCatalog_JSONPrintsCatalog(t *testing.T) {
 
 func TestRecoveryCatalog_EmptyEntriesIsArray(t *testing.T) {
 	var out bytes.Buffer
-	if err := runRecoveryCatalog(recovery.Default(), true, &out); err != nil {
+	if err := runRecoveryCatalog(recovery.Catalog{Enabled: true}, true, &out); err != nil {
 		t.Fatal(err)
 	}
 	var raw map[string]json.RawMessage

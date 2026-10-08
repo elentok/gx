@@ -115,6 +115,37 @@ func TestRecovery_RecoveredParkLeavesMatchedAndAppliedWithKind(t *testing.T) {
 	}
 }
 
+func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+	})
+	registerLaunch(h)
+
+	if err := h.Server.ParkAs("proj:epic-a/01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.Spinning) && ev.Reason == "R1" && ev.Outcome == "ok" {
+				return true
+			}
+		}
+		return false
+	})
+	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	for _, ev := range log {
+		switch events.Type(ev.Type) {
+		case events.RecoveryEscalated, events.RecoveryProposed, events.Reclaimed:
+			t.Errorf("unexpected %s after a spinning park", ev.Type)
+		}
+	}
+}
+
 // parkAfterSeeding appends seed events to ticket 01's run log (as a previous
 // server run would have left them), parks it, and returns the escalation or nil.
 func parkAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, <-chan recovery.Result) {

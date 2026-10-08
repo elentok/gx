@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -28,6 +29,20 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 		return false, err
 	}
 	return s.claimAndLaunch(rootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
+}
+
+// ParkAs parks a ticket as the given kind the way the server's own parks do,
+// including starting recovery.
+func (s *Server) ParkAs(address string, kind events.Kind, reason string) error {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	ref, ok, err := s.findTicket(address)
+	if err != nil || !ok {
+		return errors.Join(err, errors.New("no ticket "+address))
+	}
+	return s.parkTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason)
 }
 
 // SetCostOf swaps how an iteration's cost is read.

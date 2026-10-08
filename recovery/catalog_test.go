@@ -60,6 +60,34 @@ func TestWithConfig(t *testing.T) {
 	}
 }
 
+func TestDefaultR1MatchesOnlyTheSpinningPark(t *testing.T) {
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"spinning park", []Event{{Type: events.IterationStarted}, {Type: events.NeedsRepair, Kind: events.Spinning}}, true},
+		{"other repair kind", []Event{{Type: events.NeedsRepair, Kind: events.RetryExhausted}}, false},
+		{"spinning kind on another type", []Event{{Type: events.NeedsAnswer, Kind: events.Spinning}}, false},
+		{"manual park", []Event{{Type: events.NeedsRepair, Kind: events.ManualPark}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := Default().Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R1") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestDefaultR1IsAnEnabledLowRuleThatNeverNudges(t *testing.T) {
+	e, _ := Default().Match([]Event{{Type: events.NeedsRepair, Kind: events.Spinning}})
+	if !e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityLow || len(e.Verbs) != 0 {
+		t.Errorf("R1 = %+v, want enabled low rule with no verbs", e)
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")

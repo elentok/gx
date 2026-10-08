@@ -60,7 +60,19 @@ var NotCatalogued = map[string]string{
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
 // they land.
 func Default() Catalog {
-	return Catalog{Enabled: true}
+	return Catalog{Enabled: true, Entries: []Entry{r1Spin()}}
+}
+
+// r1Spin records a park/re-claim spin. The S0 spinning park already carries
+// the count and window, so there is no predicate; the remedy does nothing
+// because a nudge would only join the spin and the park already holds it.
+// Launches enabled: S0 emits the event it matches.
+func r1Spin() Entry {
+	return Entry{
+		ID: "R1", Type: events.NeedsRepair, Kind: events.Spinning,
+		Executor: ExecutorRule, Authority: AuthorityLow, Enabled: true,
+		Remedy: func(Failure, Verbs) error { return nil },
+	}
 }
 
 // WithConfig applies the user's kill switch and per-entry disables.
