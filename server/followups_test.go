@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/tickets"
@@ -68,6 +69,64 @@ func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraf
 				t.Error(err)
 			}
 		})
+	}
+}
+
+func followUpTickets(t *testing.T, store string) []tickets.Ticket {
+	t.Helper()
+	epics, err := tickets.Load(filepath.Join(store, "proj"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range epics {
+		if e.Name == "follow-ups" {
+			return e.Tickets
+		}
+	}
+	return nil
+}
+
+func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
+	s, store, addr, path := landedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
+	s.fileFollowUp(addr, path)
+	s.fileFollowUp(addr, path)
+
+	got := followUpTickets(t, store)
+	if len(got) != 1 {
+		t.Fatalf("follow-ups has %d tickets, want 1", len(got))
+	}
+	raw, err := os.ReadFile(got[0].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "## Comments") || !strings.Contains(string(raw), "Seen again in proj:epic-a/02") {
+		t.Errorf("ticket has no occurrence line:\n%s", raw)
+	}
+}
+
+func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
+	s, store, addr, path := landedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
+	s.fileFollowUp(addr, path)
+	_, _, _, other := landedInvestigation(t, investigateReport(proposalOrchestratorFix), "proj:follow-ups")
+	raw, err := os.ReadFile(other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s.fileFollowUp(addr, path)
+
+	if got := followUpTickets(t, store); len(got) != 2 {
+		t.Errorf("follow-ups has %d tickets, want 2", len(got))
+	}
+}
+
+func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
+	s, store, addr, path := landedInvestigation(t, investigateReport(proposalCatalogEntry), "nowhere:follow-ups")
+	s.fileFollowUp(addr, path)
+	if got := followUpTickets(t, store); got != nil {
+		t.Errorf("filed %d tickets with no follow-ups project", len(got))
 	}
 }
 
