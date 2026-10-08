@@ -354,14 +354,13 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: s.cfg.TicketStore, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 	}
 	deps := ralphloop.DefaultDeps()
-	prepare, discard := ralphloop.PrepareIteration, ralphloop.DiscardIteration
-	if commitlessOneOff(ticket.Project, t) {
-		if prepare, err = s.commitlessPrepare(ticket, t, repo, epics); err != nil {
+	mode := s.iterationModeFor(ticket, t)
+	if mode.commitless && mode.scratchDir == "" {
+		if mode.ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {
 			return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 		}
-		discard = ralphloop.DiscardCommitless
 	}
-	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, prepare, discard)
+	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, mode)
 	if err != nil {
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
@@ -375,7 +374,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: time.Now(),
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
-	go s.finishRun(deps, root, one, wt, run, ticketAddr)
+	go s.finishRun(deps, root, mode, one, wt, run, ticketAddr)
 	return true, nil
 }
 
@@ -456,51 +455,36 @@ func retargetIfLanded(ref, def string, isAncestor func(ancestor, descendant stri
 	return ref
 }
 
-// commitlessOneOff reports whether a ticket runs outside the epic's feature
-// branch: a prompt ticket, or anything in the scratch project, which has no VCS.
-func commitlessOneOff(project string, t tickets.Ticket) bool {
-	return project == ScratchProject || schema.TicketType(t.Type) == schema.TypePrompt
-}
-
-// commitlessPrepare picks where a commitless one-off runs: a subdir of the
-// scratch workspace, or a detached worktree at the ref its blockers resolve to.
-func (s *Server) commitlessPrepare(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (func(ralphloop.Deps, ralphloop.OneIteration) (ralphloop.IterationWorktree, error), error) {
-	scratchDir, ref := "", ""
-	if addr.Project == ScratchProject {
-		scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
-	} else {
-		var err error
-		if ref, err = s.rootBaseRef(addr.Project, epics, addr.Epic, t, repo); err != nil {
-			return nil, err
-		}
-		if ref == "" {
-			ref = "HEAD"
-		}
+// commitlessRef is the ref a commitless ticket's detached worktree starts at:
+// where its blockers resolve to.
+func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (string, error) {
+	ref, err := s.rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
+	if err != nil {
+		return "", err
 	}
-	return func(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
-		return ralphloop.PrepareCommitless(d, o, scratchDir, ref)
-	}, nil
+	if ref == "" {
+		ref = "HEAD"
+	}
+	return ref, nil
 }
 
 // prepareAndLaunch gives the ticket somewhere to run, then launches the agent
 // in it. A launch that fails takes that back out so a retry starts clean.
 func (s *Server) prepareAndLaunch(
-	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address,
-	prepare func(ralphloop.Deps, ralphloop.OneIteration) (ralphloop.IterationWorktree, error),
-	discard func(ralphloop.Deps, ralphloop.OneIteration, ralphloop.IterationWorktree) error,
+	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode iterationMode,
 ) (Run, ralphloop.IterationWorktree, error) {
 	ws, err := herdr.EnsureWorkspace(ticket.Epic, one.RepoDir)
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
 	one.WorkspaceID = ws
-	wt, err := prepare(deps, *one)
+	wt, err := mode.prepare(deps, *one)
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
 	run, err := s.launch(ticket, launchSkill(one.Ticket), ws, wt.Path, one.Agent)
 	if err != nil {
-		if derr := discard(deps, *one, wt); derr != nil {
+		if derr := mode.discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
 		}
 		return Run{}, ralphloop.IterationWorktree{}, err
@@ -510,7 +494,7 @@ func (s *Server) prepareAndLaunch(
 
 // finishRun waits for the agent to settle, then lands (or parks) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
-func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
+func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
 	defer s.kickRunner()
 	defer s.registry.delete(ticketAddr)
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
@@ -522,11 +506,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneI
 			return
 		}
 		defer s.lands.end()
-		if commitlessOneOff(addr.Project, one.Ticket) {
-			out, err = ralphloop.FinishCommitless(deps, one, wt, run.Pane, run.Tab)
-		} else {
-			out, err = ralphloop.FinishIteration(deps, one, wt, run.Pane, run.Tab)
-		}
+		out, err = mode.finish(deps, one, wt, run.Pane, run.Tab)
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)

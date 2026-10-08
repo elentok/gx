@@ -236,7 +236,7 @@ func (s *Server) reclaim(t trackedRun) error {
 	if agent.PaneID == "" {
 		return fmt.Errorf("%w: no pane", errHandleMismatch)
 	}
-	one, wt, err := s.resume(t)
+	one, wt, mode, err := s.resume(t)
 	if err != nil {
 		return err
 	}
@@ -247,23 +247,23 @@ func (s *Server) reclaim(t trackedRun) error {
 	t.Pane, t.Tab = agent.PaneID, agent.TabID
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
-	go s.finishRun(ralphloop.DefaultDeps(), root, one, wt, t.Run, t.Address)
+	go s.finishRun(ralphloop.DefaultDeps(), root, mode, one, wt, t.Run, t.Address)
 	return nil
 }
 
 // resume rebuilds the iteration a persisted handle stands for.
-func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, error) {
+func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
-		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, err
+		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
 	dir, _, err := s.projectOf(addr.Project)
 	if err != nil {
-		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, err
+		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
 	epics, err := tickets.Load(dir)
 	if err != nil {
-		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, err
+		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
 	one := ralphloop.OneIteration{
 		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: s.cfg.TicketStore, Agent: ralphloop.AgentKind(t.Agent),
@@ -276,23 +276,15 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 		}
 	}
 	if one.Ticket.Path == "" {
-		return one, ralphloop.IterationWorktree{}, errors.New("ticket gone")
+		return one, ralphloop.IterationWorktree{}, iterationMode{}, errors.New("ticket gone")
 	}
-	var wt ralphloop.IterationWorktree
-	if commitlessOneOff(addr.Project, one.Ticket) {
-		scratchDir := ""
-		if addr.Project == ScratchProject {
-			scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
-		}
-		wt, err = ralphloop.ResumeCommitless(ralphloop.DefaultDeps(), one, scratchDir)
-	} else {
-		wt, err = ralphloop.ResumeIteration(ralphloop.DefaultDeps(), one, t.Base)
-	}
+	mode := s.iterationModeFor(addr, one.Ticket)
+	wt, err := mode.resume(ralphloop.DefaultDeps(), one, t.Base)
 	if err != nil {
-		return one, wt, err
+		return one, wt, mode, err
 	}
 	if _, err := os.Stat(wt.Path); err != nil {
-		return one, wt, fmt.Errorf("%w: worktree: %v", errHandleMismatch, err)
+		return one, wt, mode, fmt.Errorf("%w: worktree: %v", errHandleMismatch, err)
 	}
-	return one, wt, nil
+	return one, wt, mode, nil
 }
