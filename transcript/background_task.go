@@ -64,6 +64,10 @@ type backgroundTaskLine struct {
 	Timestamp     string `json:"timestamp"`
 	ToolUseResult struct {
 		BackgroundTaskID string `json:"backgroundTaskId"`
+		// A Monitor start result: {taskId, timeoutMs, persistent}. The agent
+		// that ends its turn waiting on one is not finished either.
+		MonitorTaskID string `json:"taskId"`
+		TimeoutMs     *int   `json:"timeoutMs"`
 	} `json:"toolUseResult"`
 }
 
@@ -162,7 +166,11 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			}
 		}
 
-		if taskID := entry.ToolUseResult.BackgroundTaskID; taskID != "" {
+		taskID := entry.ToolUseResult.BackgroundTaskID
+		if taskID == "" && entry.ToolUseResult.TimeoutMs != nil {
+			taskID = entry.ToolUseResult.MonitorTaskID
+		}
+		if taskID != "" {
 			ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
 			if tsErr != nil {
 				continue

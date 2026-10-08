@@ -284,3 +284,44 @@ func TestReadBackgroundTasks_AssistantMentioningTheTaskIDDoesNotResolveIt(t *tes
 		t.Errorf("Markers = %+v, want one outstanding-fresh marker", reading.Markers)
 	}
 }
+
+// A Monitor start (taskId + timeoutMs, no backgroundTaskId) holds the finish
+// gate like a backgrounded shell command until its notification arrives.
+func monitorStartLine(taskID, timestamp string) string {
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"type":"tool_result","content":"Monitor started"}]},"toolUseResult":{"taskId":"` + taskID + `","timeoutMs":400000,"persistent":false}}`
+}
+
+func TestReadBackgroundTasks_MonitorStartHoldsUntilItsNotification(t *testing.T) {
+	path := writeTranscript(t, monitorStartLine("mon-1", "2026-08-12T17:00:00.000000000Z"))
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].TaskID != "mon-1" || reading.Markers[0].Status != BackgroundTaskOutstandingFresh {
+		t.Fatalf("Markers = %+v, want mon-1 outstanding-fresh", reading.Markers)
+	}
+
+	path = writeTranscript(t,
+		monitorStartLine("mon-1", "2026-08-12T17:00:00.000000000Z"),
+		notificationLine("mon-1", "tool-1", "completed", "2026-08-12T17:05:00.000000000Z"),
+	)
+	reading, err = ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
+		t.Errorf("Markers = %+v, want mon-1 resolved by its notification", reading.Markers)
+	}
+}
+
+// A taskId without timeoutMs is some other tool's result, not a Monitor.
+func TestReadBackgroundTasks_TaskIDWithoutTimeoutIsNotAMarker(t *testing.T) {
+	line := `{"isSidechain":false,"type":"user","timestamp":"2026-08-12T17:00:00.000000000Z","toolUseResult":{"taskId":"todo-1"}}`
+	reading, err := ReadBackgroundTasks(writeTranscript(t, line), capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 0 {
+		t.Errorf("Markers = %+v, want none", reading.Markers)
+	}
+}
