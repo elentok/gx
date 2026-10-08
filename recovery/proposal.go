@@ -57,6 +57,8 @@ func (c Call) Apply(v Verbs) (Result, error) {
 		return v.Nudge(c.Address, c.Reason)
 	case "close-pane":
 		return v.ClosePane(c.Address)
+	case "wait":
+		return v.Wait(c.Address)
 	}
 	return Result{}, fmt.Errorf("unknown proposed verb %q", c.Verb)
 }
@@ -86,6 +88,11 @@ func (r *recorder) Nudge(address, text string) (Result, error) {
 
 func (r *recorder) ClosePane(address string) (Result, error) {
 	r.calls = append(r.calls, Call{Verb: "close-pane", Address: address})
+	return Result{}, nil
+}
+
+func (r *recorder) Wait(address string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "wait", Address: address})
 	return Result{}, nil
 }
 

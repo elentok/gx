@@ -71,7 +71,7 @@ var NotCatalogued = map[string]string{
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
 // they land.
 func Default() Catalog {
-	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered()}
+	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered(), r7CompactionTimedOut()}
 	entries = append(entries, r3LandRecoverable()...)
 	entries = append(entries, r4BlockedPaneDialog())
 	return Catalog{Enabled: true, Entries: append(entries, r6LaunchCollision()...)}
@@ -225,6 +225,55 @@ func r5PromptNeverDelivered() Entry {
 				err = errors.Join(err, cerr)
 			}
 			return fmt.Errorf("retyping the prompt: %w", err)
+		},
+	}
+}
+
+// compactWaitTimedOutRE is a smart-zone-recovery-failed reason whose herdr
+// wait ran out, as opposed to one the pane or herdr refused.
+var compactWaitTimedOutRE = regexp.MustCompile(`"code":"timeout"|(?i)timed out`)
+
+// FinishUpPrompt is what R7 types once the extended wait sees the compacted
+// pane settle: the finish-up the iteration never got to send.
+const FinishUpPrompt = "Your conversation was compacted after you exceeded the context window. " +
+	"Please finish up quickly; if needed follow the `gx-implement` skill and create follow up tickets."
+
+// r7CompactionTimedOut is an iteration that errored after its smart-zone
+// compaction wait timed out. A timeout cannot tell a slow compaction from a
+// dead pane, so the remedy waits once more, longer, then sends the finish-up.
+// It never re-sends /compact: queued input cancels a running compaction. When
+// the extended wait times out too the park stands and escalates; the per-kind
+// guard rail is the cap on repeats. Launches enabled: S0 emits the event it
+// matches, and it is one of the two failures that dominate the S0 data.
+func r7CompactionTimedOut() Entry {
+	return Entry{
+		ID: "R7", Type: events.NeedsRepair, Kind: events.IterationError,
+		Predicate: func(seq []Event) bool {
+			for _, e := range slices.Backward(seq[:len(seq)-1]) {
+				switch e.Type {
+				case events.SmartZoneRecoveryFailed:
+					if compactWaitTimedOutRE.MatchString(e.Reason) {
+						return true
+					}
+				case events.IterationStarted:
+					return false
+				}
+			}
+			return false
+		},
+		Executor: ExecutorRule, Authority: AuthorityLow, Verbs: []string{"wait", "nudge"}, Enabled: true,
+		Remedy: func(f Failure, v Verbs) error {
+			res, err := v.Wait(f.Address)
+			if err == nil && !res.Refused {
+				res, err = v.Nudge(f.Address, FinishUpPrompt)
+			}
+			if err == nil && res.Refused {
+				err = fmt.Errorf("refused: %s", res.Reason)
+			}
+			if err != nil {
+				return fmt.Errorf("re-waiting for compaction: %w", err)
+			}
+			return nil
 		},
 	}
 }

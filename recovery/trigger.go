@@ -55,6 +55,9 @@ type Verbs interface {
 	Nudge(address, text string) (Result, error)
 	// ClosePane closes the iteration's tab; no live pane is not a refusal.
 	ClosePane(address string) (Result, error)
+	// Wait waits once, longer than the loop's own compaction wait, for the
+	// iteration's pane to settle; no live pane is a refusal.
+	Wait(address string) (Result, error)
 	// LaunchPrompt is the prompt a fresh iteration of the ticket is launched
 	// with. It is a read, not a verb: the run log never records the prompt.
 	LaunchPrompt(address string) (string, error)

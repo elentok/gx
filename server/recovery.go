@@ -359,6 +359,24 @@ func (v recoveryVerbs) ClosePane(address string) (recovery.Result, error) {
 	return recoveryResult(res), err
 }
 
+// compactRewaitTimeoutMs is R7's one extended wait, well past the loop's own
+// compaction wait so a slow compaction can still finish inside it.
+const compactRewaitTimeoutMs = 15 * 60 * 1000
+
+func (v recoveryVerbs) Wait(address string) (recovery.Result, error) {
+	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
+		if _, live := v.s.liveIteration(ref.addr.String()); !live {
+			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
+		}
+		label, _, _ := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, "")
+		if _, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: label, Until: []string{"idle", "done"}, TimeoutMs: compactRewaitTimeoutMs}); err != nil {
+			return QueueResult{}, fmt.Errorf("wait for %s: %w", ref.addr, err)
+		}
+		return QueueResult{}, nil
+	})
+	return recoveryResult(res), err
+}
+
 func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
 	ref, ok, err := v.s.findTicket(address)
 	if err != nil {

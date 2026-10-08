@@ -1,6 +1,7 @@
 package recovery
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -134,12 +135,72 @@ func TestDefaultR5IsAnEnabledLowRuleThatNudgesOrClosesThePane(t *testing.T) {
 	}
 }
 
-// stubVerbs records calls and refuses every nudge when refuse is set.
+func TestDefaultR7MatchesAnIterationErrorAfterATimedOutCompaction(t *testing.T) {
+	timedOut := Event{Type: events.SmartZoneRecoveryFailed, Reason: `compacting p after smart-zone breach: herdr agent wait p --until idle --until done --until blocked --timeout 300000: {"code":"timeout"}`}
+	reprompt := Event{Type: events.SmartZoneRecoveryFailed, Reason: "re-prompting p after smart-zone compact: herdr agent prompt --until working: timed out waiting for agent status"}
+	refused := Event{Type: events.SmartZoneRecoveryFailed, Reason: "confirming /compact submitted for p: pane not found"}
+	started := Event{Type: events.IterationStarted}
+	park := Event{Type: events.NeedsRepair, Kind: events.IterationError, Reason: "compact recovery exhausted"}
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"wait timeout", []Event{started, timedOut, park}, true},
+		{"re-prompt timeout", []Event{started, reprompt, park}, true},
+		{"timeout then other events", []Event{started, timedOut, {Type: events.SmartZoneWaitExpired}, park}, true},
+		{"failure that is not a timeout", []Event{started, refused, park}, false},
+		{"compaction that expired but confirmed", []Event{started, {Type: events.SmartZoneWaitExpired, Reason: "timed out"}, park}, false},
+		{"timeout in an earlier iteration", []Event{timedOut, started, park}, false},
+		{"no smart-zone event", []Event{started, park}, false},
+		{"timeout before another park kind", []Event{started, timedOut, {Type: events.NeedsRepair, Kind: events.Spinning}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := Default().Match(tt.seq)
+			if got := ok && e.ID == "R7"; got != tt.want {
+				t.Fatalf("got (%q, %v), want R7 match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestDefaultR7IsAnEnabledLowRuleThatWaitsOnceThenFinishesUp(t *testing.T) {
+	e, _ := Default().Match([]Event{
+		{Type: events.SmartZoneRecoveryFailed, Reason: `{"code":"timeout"}`},
+		{Type: events.NeedsRepair, Kind: events.IterationError},
+	})
+	f := Failure{Address: "p:e/01", Type: events.NeedsRepair, Kind: events.IterationError}
+	if e.ID != "R7" || !e.Enabled || !e.Runnable(f) || e.Authority != AuthorityLow || !slices.Equal(e.Verbs, []string{"wait", "nudge"}) {
+		t.Fatalf("R7 = %+v, want an enabled runnable low rule with wait and nudge", e)
+	}
+
+	settled := &stubVerbs{}
+	if err := e.Remedy(f, settled); err != nil || !slices.Equal(settled.calls, []string{"wait p:e/01", "nudge p:e/01 " + FinishUpPrompt}) {
+		t.Errorf("settled: err %v, calls %q; want one wait then the finish-up", err, settled.calls)
+	}
+	timedOut := &stubVerbs{waitErr: errors.New("timed out")}
+	if err := e.Remedy(f, timedOut); err == nil || !slices.Equal(timedOut.calls, []string{"wait p:e/01"}) {
+		t.Errorf("timed out: err %v, calls %q; want a failed wait and nothing typed", err, timedOut.calls)
+	}
+	gone := &stubVerbs{refuse: true}
+	if err := e.Remedy(f, gone); err == nil || !slices.Equal(gone.calls, []string{"wait p:e/01"}) {
+		t.Errorf("no pane: err %v, calls %q; want a refused wait and nothing typed", err, gone.calls)
+	}
+}
+
+// stubVerbs records calls and refuses every nudge and wait when refuse is set.
 type stubVerbs struct {
 	recorder
-	prompt string
-	refuse bool
-	calls  []string
+	prompt  string
+	refuse  bool
+	waitErr error
+	calls   []string
+}
+
+func (s *stubVerbs) Wait(address string) (Result, error) {
+	s.calls = append(s.calls, "wait "+address)
+	return Result{Refused: s.refuse, Reason: "iteration-not-live"}, s.waitErr
 }
 
 func (s *stubVerbs) Nudge(address, text string) (Result, error) {

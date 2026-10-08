@@ -226,6 +226,84 @@ func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
 	}
 }
 
+// parkTimedOutCompaction parks ticket 01 the way an iteration ends after its
+// smart-zone compaction wait timed out, with the pane answering the extended
+// wait with waitErr, and returns R7's applied event plus what was typed.
+func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Event, waits int, typed []string) {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+	})
+	var mu sync.Mutex
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		waits++
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "idle"}}, herdrfake.Identities{}, waitErr
+	})
+	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		typed = append(typed, argv[3])
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1"}}, herdrfake.Identities{}, nil
+	})
+	dir := filepath.Join(store, "proj")
+	for _, ev := range []ralphloop.Event{
+		{Type: string(events.IterationStarted), Ticket: "01"},
+		{Type: string(events.SmartZoneRecoveryFailed), Ticket: "01", Reason: `compacting epic-a-01 after smart-zone breach: {"code":"timeout"}`},
+	} {
+		if err := ralphloop.AppendEvent(dir, "epic-a", ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "compact recovery exhausted"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied {
+				applied = ev
+				return true
+			}
+		}
+		return false
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	return applied, waits, typed
+}
+
+func TestRecovery_TimedOutCompactionIsReWaitedOnceThenFinishedUpByR7(t *testing.T) {
+	applied, waits, typed := parkTimedOutCompaction(t, nil)
+	if applied.Reason != "R7" || applied.Kind != string(events.IterationError) || applied.Outcome != "ok" {
+		t.Errorf("applied = %+v, want R7 ok", applied)
+	}
+	if waits != 1 {
+		t.Errorf("waits = %d, want one extended wait", waits)
+	}
+	if len(typed) != 1 || typed[0] != recovery.FinishUpPrompt {
+		t.Errorf("typed = %q, want only the finish-up prompt, never /compact", typed)
+	}
+}
+
+func TestRecovery_SecondCompactionTimeoutLeavesTheParkToAPerson(t *testing.T) {
+	applied, waits, typed := parkTimedOutCompaction(t, errors.New("timed out waiting for agent status"))
+	if applied.Reason != "R7" || applied.Outcome == "ok" {
+		t.Errorf("applied = %+v, want a failed R7", applied)
+	}
+	if waits != 1 || len(typed) != 0 {
+		t.Errorf("waits = %d, typed = %q; want one wait and nothing typed", waits, typed)
+	}
+}
+
 // parkAfterSeeding appends seed events to ticket 01's run log (as a previous
 // server run would have left them), parks it, and returns the escalation or nil.
 func parkAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, <-chan recovery.Result) {
