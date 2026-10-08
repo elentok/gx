@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -103,6 +104,19 @@ func (r *runRegistry) countRoot(root string) int {
 	n := 0
 	for _, t := range r.runs {
 		if t.Root == root {
+			n++
+		}
+	}
+	return n
+}
+
+// countProject is how many iterations of the project's tickets are running.
+func (r *runRegistry) countProject(project string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, t := range r.runs {
+		if strings.HasPrefix(t.Root, project+":") {
 			n++
 		}
 	}

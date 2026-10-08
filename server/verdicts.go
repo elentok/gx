@@ -61,11 +61,14 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	}
 	root := addr.Project + ":" + addr.Epic
 	ahead, queued := s.rootsAhead(root)
+	projectRunning, projectLimit, projectFull := s.projectAtCap(addr.Project)
 	switch {
 	case !queued:
 		ex.Verdict = VerdictNotQueued
 	case s.registry.countRoot(root) >= s.perRootLimit():
 		ex.Verdict, ex.Reason = VerdictConcurrencyCap, fmt.Sprintf("%d of %d agents in use for this epic", s.registry.countRoot(root), s.perRootLimit())
+	case projectFull:
+		ex.Verdict, ex.Reason = VerdictConcurrencyCap, fmt.Sprintf("%d of %d agents in use for this project", projectRunning, projectLimit)
 	case frontierIndex(e, t) >= s.perRootLimit()-s.registry.countRoot(root):
 		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "earlier tickets of the epic go first"
 	default:

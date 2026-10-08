@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -438,6 +439,61 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 			t.Errorf("per-root cap %d: ticket 01 started = %v, want %v", tc.perRoot, started, tc.starts)
 		}
 		cancel()
+	}
+}
+
+// Seam A: a project's max-agents holds it to that many live agents while
+// another project uses the free slots; editing the cap applies at the next
+// decision, with no restart.
+func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj-a", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj-a", "epic-b", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj-b", "epic-c", "01", "first", "")
+	writeProject := func(project string, maxAgents int) {
+		body := fmt.Sprintf(`{"name":%q,"repo":%q,"max-agents":%d}`, project, repo, maxAgents)
+		if err := os.WriteFile(filepath.Join(store, project, "project.json"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeProject("proj-a", 1)
+	servertest.SetProjectRepo(t, store, "proj-b", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.PollInterval = 50 * time.Millisecond
+	})
+	registerLaunch(h)
+	h.Server.PutRun("proj-a:epic-a", server.Run{Address: "proj-a:epic-a/00"}) // proj-a is at its cap
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, addr := range []string{"proj-a:epic-b/01", "proj-b:epic-c/01"} {
+		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", addr, res, err)
+		}
+	}
+	nextStart := func() string {
+		for ev := range evs {
+			if ev.Type == server.EventIterationStarted {
+				return ev.Address
+			}
+		}
+		t.Fatal("event stream ended before an iteration started")
+		return ""
+	}
+	if got := nextStart(); got != "proj-b:epic-c/01" {
+		t.Fatalf("first start = %s, want proj-b:epic-c/01 (proj-a is at its cap)", got)
+	}
+	writeProject("proj-a", 2)
+	if got := nextStart(); got != "proj-a:epic-b/01" {
+		t.Errorf("after raising the cap, start = %s, want proj-a:epic-b/01", got)
 	}
 }
 

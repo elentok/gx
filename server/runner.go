@@ -194,6 +194,22 @@ func (s *Server) perRootLimit() int {
 	return config.DefaultExecutionQueueConfig().MaxConcurrentTicketsPerEpic
 }
 
+// projectAtCap reports whether the project's own max-agents cap is reached. The
+// cap is read from project.json on every call, so an edit applies at the next
+// decision; an absent, unreadable or non-positive cap means no project cap.
+func (s *Server) projectAtCap(project string) (running, limit int, atCap bool) {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return 0, 0, false
+	}
+	pf, err := config.ReadProjectFile(dir)
+	if err != nil || pf.MaxAgents == nil || *pf.MaxAgents <= 0 {
+		return 0, 0, false
+	}
+	running, limit = s.registry.countProject(project), *pf.MaxAgents
+	return running, limit, running >= limit
+}
+
 func (s *Server) concurrencyLimit() int {
 	if s.cfg.MaxAgents > 0 {
 		return s.cfg.MaxAgents
@@ -210,6 +226,9 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	}
 	root := rootOf(addr)
 	if s.registry.countRoot(root.String()) >= s.perRootLimit() {
+		return false, nil
+	}
+	if _, _, atCap := s.projectAtCap(addr.Project); atCap {
 		return false, nil
 	}
 	if _, missing := s.unavailablePath(addr.Project); missing {
