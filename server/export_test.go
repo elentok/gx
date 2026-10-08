@@ -94,6 +94,9 @@ func (s *Server) DropRun(address string) { s.registry.delete(address) }
 // RecoverAsync is recoverAsync for a failure the test raises itself.
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recoverAsync(f) }
 
+// WatchGates runs one gate watchdog pass as of now.
+func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
+
 // WorktreeDir is where the project's iteration worktrees live.
 func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(project) }
 

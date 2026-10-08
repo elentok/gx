@@ -144,6 +144,7 @@ type Server struct {
 	parkFold    parkFold
 	parkHold    recoveryHold
 	defectScan  sync.Mutex
+	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 	rewatch     func() // set by keepFresh when the watch is active
 
 	chat        *ralphloop.ServerChat // nil when no chat destination is configured
@@ -450,6 +451,12 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
+	gatesDone := make(chan struct{})
+	if s.cfg.Orchestrator == config.OrchestratorServer {
+		go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
+	} else {
+		close(gatesDone)
+	}
 	var err error
 	select {
 	case <-ctx.Done():
@@ -471,6 +478,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-herdrDone
 	<-claimDone
 	<-budgetDone
+	<-gatesDone
 	timeout := s.cfg.LandStopTimeout
 	if timeout <= 0 {
 		timeout = DefaultLandStopTimeout

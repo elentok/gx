@@ -1068,6 +1068,83 @@ func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
 	}
 }
 
+// watchHeldGate seeds ticket 01's run log, puts its run in the registry with a
+// pane reporting status, and runs one watchdog pass an hour after the start.
+// It returns a counter of the recovery-applied events on 01 and a rerun.
+func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applied func() int, pass func()) {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+	})
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": status}}, herdrfake.Identities{}, nil
+	})
+	dir := filepath.Join(store, "proj")
+	for _, ev := range seed {
+		ev.Ticket = "01"
+		if err := ralphloop.AppendEvent(dir, "epic-a", ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01"})
+	pass = func() { h.Server.WatchGates(gateWatchStart.Add(time.Hour)) }
+	applied = func() int {
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		n := 0
+		for _, ev := range log {
+			if ev.Ticket == "01" && events.Type(ev.Type) == events.RecoveryApplied {
+				n++
+			}
+		}
+		return n
+	}
+	pass()
+	return applied, pass
+}
+
+var gateWatchStart = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+func gateEvent(typ events.Type, after time.Duration) ralphloop.Event {
+	return ralphloop.Event{Type: string(typ), Reason: "background task task-1", Time: gateWatchStart.Add(after)}
+}
+
+func TestGateWatch_HeldGateOnAnIdlePaneIsRaisedOnce(t *testing.T) {
+	applied, pass := watchHeldGate(t, "idle", gateEvent(events.IterationStarted, 0), gateEvent(events.BackgroundTaskGateHeld, time.Minute))
+	waitFor(t, func() bool { return applied() == 1 })
+	pass()
+	time.Sleep(300 * time.Millisecond)
+	if n := applied(); n != 1 {
+		t.Errorf("recoveries after a second pass = %d, want 1", n)
+	}
+}
+
+func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
+	for _, tc := range []struct {
+		name, status string
+		seed         []ralphloop.Event
+	}{
+		{"busy pane", "working", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute)}},
+		{"released gate", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)}},
+		{"gate recovery forced open", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), {
+			Type: string(events.BackgroundTaskGateReleased), Reason: "background task task-1: recovery forced the release", Time: gateWatchStart.Add(2 * time.Minute),
+		}}},
+		{"held within the quiet period", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, 59*time.Minute)}},
+		{"held in an earlier iteration", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.IterationStarted, 2*time.Minute)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			applied, _ := watchHeldGate(t, tc.status, tc.seed...)
+			time.Sleep(300 * time.Millisecond)
+			if n := applied(); n != 0 {
+				t.Errorf("recoveries = %d, want 0", n)
+			}
+		})
+	}
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
