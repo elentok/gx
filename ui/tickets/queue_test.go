@@ -14,7 +14,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -538,41 +537,6 @@ func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
 	}
 }
 
-func TestQueueModelBannerWhenCompletedAggregatesLandedTicketMetrics(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-second.md", "Status: claimed\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-third.md", "Status: claimed\n\nBody.\n")
-
-	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"):  true,
-		ticketPath(root, "alpha", "02-second.md"): true,
-		ticketPath(root, "beta", "01-third.md"):   true,
-	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
-	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
-	m.now = func() time.Time { return now }
-	m.runningEpics = map[string]bool{"beta": true}
-	m.executionTickets = map[string]bool{"alpha/01": true, "alpha/02": true, "beta/01": true}
-
-	writeRawQueueTicket(t, root, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "alpha", "02-second.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nactual_context_window: 7000\n---\n\nBody.\n")
-	writeRawQueueTicket(t, root, "beta", "01-third.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 5000\n---\n\nBody.\n")
-
-	updated, cmd := m.Update(implementPollMsg{epicName: "beta"})
-	m = deliverQueueCommands(t, updated.(QueueModel), cmd)
-
-	content := m.View().Content
-	wantTitle := "Queue · done, took 1h03m"
-	wantBody := "context windows: total 24.0k tok, avg 8.0k tok, max 12.0k tok"
-	if !strings.Contains(content, wantTitle) || !strings.Contains(content, wantBody) {
-		done, total := m.completedExecutionProgress()
-		t.Fatalf("completion header missing %q and/or %q (completed=%v, progress=%d/%d):\n%s", wantTitle, wantBody, m.executionCompletedAt, done, total, content)
-	}
-}
-
 // TestQueueHeaderStateMatchesPrototype covers ticket 05's Option B redesign
 // (.scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md): the
 // title always encodes run state, and the body carries at most one
@@ -676,22 +640,6 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		emptyLine := m.queueRenderOpts(80).EmptyLine
 		if emptyLine != "" {
 			t.Fatalf("tree EmptyLine = %q, want empty (header banner already covers no-selection case)", emptyLine)
-		}
-	})
-
-	t.Run("foreign attach overrides state", func(t *testing.T) {
-		m := base
-		m.foreignAttachPID = 12345
-		if got, want := m.queueHeaderTitle(), "Queue · attached to gx pid 12345"; got != want {
-			t.Fatalf("title = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("no foreign attach uses normal state", func(t *testing.T) {
-		m := base
-		m.foreignAttachPID = 0
-		if got, want := m.queueHeaderTitle(), "Queue · $0.00"; got != want {
-			t.Fatalf("title = %q, want %q", got, want)
 		}
 	})
 
@@ -926,47 +874,6 @@ func TestQueueModelIncludesSelectionsAddedAfterLoad(t *testing.T) {
 	}
 }
 
-func TestQueueModelReactivationRecoversTwoConcurrentEpicsFromRegistry(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-first.md", "Status: claimed\n\nBody.\n")
-	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-first.md"): true,
-		ticketPath(root, "beta", "01-first.md"):  true,
-	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-
-	r := newLoopRegistry(2)
-	r.tryStart("alpha", 0, 1)
-	r.tryStart("beta", 0, 1)
-	r.reduceLiveEvent("alpha", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"})
-	r.reduceLiveEvent("beta", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: "01"})
-	r.reduceLiveEvent("alpha", ralphloop.LiveEvent{Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 4000})
-	r.reduceLiveEvent("beta", ralphloop.LiveEvent{Kind: ralphloop.LiveEventContextOccupancy, Identifier: "01", Tokens: 6000})
-	previous := ralphLoopRegistry
-	ralphLoopRegistry = r
-	t.Cleanup(func() {
-		r.finish("alpha", nil)
-		r.finish("beta", nil)
-		ralphLoopRegistry = previous
-	})
-
-	// This model never received implementStartedMsg for either epic — as if
-	// both runs were launched while the Queue tab was backgrounded elsewhere.
-	// OnPageActivated must recover both from the registry's snapshots alone.
-	updated, _ := m.Update(m.OnPageActivated()())
-	m = updated.(QueueModel)
-
-	if !m.runningEpics["alpha"] || !m.runningEpics["beta"] {
-		t.Fatalf("expected both epics reflected as running from registry snapshots, got %v", m.runningEpics)
-	}
-	content := m.View().Content
-	if !strings.Contains(content, "0 of 2 done") {
-		t.Fatalf("expected aggregated progress across both concurrent epics:\n%s", content)
-	}
-}
-
 func deliverQueueCommands(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
 	t.Helper()
 	if cmd == nil {
@@ -981,40 +888,6 @@ func deliverQueueCommands(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
 	}
 	updated, _ := m.Update(msg)
 	return updated.(QueueModel)
-}
-
-// deliverQueueCommandsWithFollowup is deliverQueueCommands plus one extra
-// level of delivery for the returned cmd, for confirm-dialog flows whose
-// accepted handler itself returns a further cmd (e.g. resume's
-// startAvailableEpics) — bounded to one extra hop rather than recursing
-// generically, since some production cmds (e.g. polling ticks) never
-// terminate and would hang the test if delivered forever.
-func deliverQueueCommandsWithFollowup(t *testing.T, m QueueModel, cmd tea.Cmd) QueueModel {
-	t.Helper()
-	if cmd == nil {
-		return m
-	}
-	msg := cmd()
-	if batch, ok := msg.(tea.BatchMsg); ok {
-		for _, nested := range batch {
-			m = deliverQueueCommandsWithFollowup(t, m, nested)
-		}
-		return m
-	}
-	updated, nextCmd := m.Update(msg)
-	return deliverQueueCommands(t, updated.(QueueModel), nextCmd)
-}
-
-func waitForEpicToFinish(t *testing.T, epicName string) {
-	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		if !ralphLoopRegistry.isRunningEpic(epicName) {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for epic %q to finish", epicName)
 }
 
 func loadQueueModel(t *testing.T, m QueueModel) QueueModel {

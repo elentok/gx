@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -194,7 +193,6 @@ const (
 	queueRunIdle queueRunStateKind = iota
 	queueRunRunning
 	queueRunPaused
-	queueRunParked
 	queueRunCompleted
 )
 
@@ -203,12 +201,6 @@ const (
 // (m.checkedProgress total > 0) — m.paused alone can be set by the bare `p`
 // key with no run-state guard, so a queue that was never started must still
 // classify as idle even while globally paused.
-//
-// Parked wins over running: park is tracked per run (loopRegistry.parkedEpics)
-// independently of m.runningEpics, so a queue can have some epics actively
-// running and others parked at the same time. A parked epic needs a human to
-// look at it, so the header leads with that rather than the generic
-// "implementing..." text.
 func (m QueueModel) queueRunState() queueRunStateKind {
 	if !m.executionCompletedAt.IsZero() {
 		done, total := m.completedExecutionProgress()
@@ -221,37 +213,10 @@ func (m QueueModel) queueRunState() queueRunStateKind {
 			return queueRunPaused
 		}
 	}
-	if len(ralphLoopRegistry.parkedEpics()) > 0 {
-		return queueRunParked
-	}
 	if len(m.runningEpics) > 0 {
 		return queueRunRunning
 	}
 	return queueRunIdle
-}
-
-// lowestParkedEpicAndTicket picks a deterministic (epic, ticket) pair to name
-// in the header title when one or more epics are parked: the lowest parked
-// epic name, and within it the lowest ticket identifier among its stalled
-// tickets — so the title doesn't flicker between different tickets across
-// renders due to map iteration order.
-func (m QueueModel) lowestParkedEpicAndTicket() (epicName, ticketID string, ok bool) {
-	parked := ralphLoopRegistry.parkedEpics()
-	if len(parked) == 0 {
-		return "", "", false
-	}
-	names := make([]string, 0, len(parked))
-	for name := range parked {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	epicName = names[0]
-	for _, s := range parked[epicName] {
-		if ticketID == "" || s.Identifier < ticketID {
-			ticketID = s.Identifier
-		}
-	}
-	return epicName, ticketID, true
 }
 
 // queueHeaderTitle and queueHeaderBodyLines together implement the Option B
@@ -259,9 +224,6 @@ func (m QueueModel) lowestParkedEpicAndTicket() (epicName, ticketID string, ok b
 // the title always encodes run state, and the body carries at most one
 // state-specific line instead of the old always-present banner row.
 func (m QueueModel) queueHeaderTitle() string {
-	if m.foreignAttachPID != 0 {
-		return fmt.Sprintf("Queue · attached to gx pid %d", m.foreignAttachPID)
-	}
 	return m.queueRunStateTitle() + " · " + m.queueHeaderCostSuffix()
 }
 
@@ -276,11 +238,6 @@ func (m QueueModel) queueRunStateTitle() string {
 	case queueRunPaused:
 		done, total := m.checkedProgress()
 		return fmt.Sprintf("Queue · paused (%d of %d done)", done, total)
-	case queueRunParked:
-		if _, ticketID, ok := m.lowestParkedEpicAndTicket(); ok && ticketID != "" {
-			return fmt.Sprintf("Queue · parked, waiting on %s", ticketID)
-		}
-		return "Queue · parked"
 	case queueRunRunning:
 		done, total := m.checkedProgress()
 		glyph := strings.TrimRight(m.implementSpinner.View(), " ")
@@ -366,10 +323,6 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 		if len(m.runningEpics) > 0 {
 			return []string{"Queue paused — in-flight iterations will finish"}
 		}
-		return []string{""}
-	case queueRunParked:
-		// The title (queueHeaderTitle) already names the parked epic/ticket;
-		// no separate body line needed.
 		return []string{""}
 	case queueRunRunning:
 		return []string{""}

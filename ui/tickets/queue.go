@@ -94,12 +94,6 @@ type QueueModel struct {
 	actionsMenu  actionsMenuModel
 	runningEpics map[string]bool
 	paused       bool
-	// foreignAttachPID is the pid of a different process currently holding
-	// the per-repo attach lock (ticket 05), refreshed alongside the epics
-	// reload (cmdLoadQueue) since checking it shells out to `ps`. Zero when
-	// unattached or when this process itself holds the lock — see
-	// ForeignAttachPID.
-	foreignAttachPID int
 
 	// search backs "/"-triggered filtering over buildQueueEntries, mirroring
 	// the Tickets tab's own m.search (see ui/tickets/search.go).
@@ -172,7 +166,6 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		live:             map[string]map[string]liveTicketState{},
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},
-		paused:           ralphLoopRegistry.isPaused(),
 		confirm:          confirm.New(),
 		search:           search.NewModel(),
 		keys:             km,
@@ -196,9 +189,8 @@ func (m QueueModel) Init() tea.Cmd {
 }
 
 type queueEpicsLoadedMsg struct {
-	epics            []tickets.Epic
-	err              error
-	foreignAttachPID int
+	epics []tickets.Epic
+	err   error
 }
 
 // queueServerLoadedMsg is a server-mode load: the server's tickets and its
@@ -246,7 +238,7 @@ func (m QueueModel) cmdLoadQueue() tea.Cmd {
 	scratchDir := scratchDirFor(m.worktreeRoot)
 	return func() tea.Msg {
 		epics, err := tickets.Load(scratchDir)
-		return queueEpicsLoadedMsg{epics: epics, err: err, foreignAttachPID: ForeignAttachPID(scratchDir)}
+		return queueEpicsLoadedMsg{epics: epics, err: err}
 	}
 }
 
@@ -314,7 +306,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.loaded = true
 		m.epics = msg.epics
-		m.foreignAttachPID = msg.foreignAttachPID
 		m.candidates = make(map[string]bool, len(m.checked))
 		for path := range m.checked {
 			m.candidates[path] = true
@@ -335,31 +326,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case autoRefreshMsg:
 		return m, tea.Batch(m.cmdLoadQueue(), cmdAutoRefresh())
-	case implementPollMsg:
-		snapshot, ok := ralphLoopRegistry.runSnapshot(msg.epicName)
-		if ok {
-			m.syncExecutionScope(msg.epicName, snapshot)
-		}
-		closeCmd := m.syncRunSnapshot(msg.epicName)
-		if ok && snapshot.State == RunStateParked {
-			delete(m.runningEpics, msg.epicName)
-			return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
-		}
-		if ralphLoopRegistry.isRunningEpic(msg.epicName) {
-			m.runningEpics[msg.epicName] = true
-			return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
-		}
-		m.finalizeEpicTicketStatus(msg.epicName)
-		delete(m.runningEpics, msg.epicName)
-		delete(m.live, msg.epicName)
-		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(ralphLoopRegistry.parkedEpics()) == 0
-		if executionComplete {
-			m.executionCompletedAt = m.now()
-			return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.cmdLoadQueue())
-		}
-		return m, implementFinishedNotifyCmd(msg.epicName)
-	case queueSyncMsg:
-		return m.handleQueueSync(msg)
 	case spinner.TickMsg:
 		return m.handleQueueSpinnerTick(msg)
 	case tea.MouseWheelMsg:
@@ -370,12 +336,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseWheel(msg)
 	case queueClearConfirmedMsg:
 		return m.handleQueueClearConfirmed(msg)
-	case queuePauseConfirmedMsg:
-		return m.handleQueuePauseConfirmed(msg)
-	case queueResumeConfirmedMsg:
-		return m.handleQueueResumeConfirmed(msg)
-	case budgetOverrideConfirmedMsg:
-		return m.handleBudgetOverrideConfirmed(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case answerEditorFinishedMsg:
@@ -501,120 +461,6 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 	return m, nil
 }
 
-// queueSyncMsg reports ralphLoopRegistry's full state as observed when the
-// Queue tab (re)gains focus. A poll chain's tea.Msg is dropped by the app
-// shell while this tab is backgrounded (see implementPollInterval's doc
-// comment), which would otherwise strand m.runningEpics on whatever it was
-// the moment focus left. OnPageActivated re-derives everything this tab needs
-// from the registry's durable snapshots instead of trusting the messages that
-// arrived while it was away.
-type queueSyncMsg struct {
-	snapshots []RunSnapshot
-	paused    bool
-}
-
-// OnPageActivated implements the app shell's pageActivationAware duck-type
-// (see ui/app/model_tabs.go): every time the Queue tab (re)gains focus,
-// including the very first time, it re-syncs from the registry.
-func (m QueueModel) OnPageActivated() tea.Cmd {
-	return func() tea.Msg {
-		return queueSyncMsg{snapshots: ralphLoopRegistry.runSnapshots(), paused: ralphLoopRegistry.isPaused()}
-	}
-}
-
-// byNameSnapshot indexes the loop registry's current run snapshots by epic
-// name.
-func byNameSnapshot() map[string]RunSnapshot {
-	snapshots := ralphLoopRegistry.runSnapshots()
-	byName := make(map[string]RunSnapshot, len(snapshots))
-	for _, s := range snapshots {
-		byName[s.EpicName] = s
-	}
-	return byName
-}
-
-func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
-	m.paused = msg.paused
-	byName := byNameSnapshot()
-	var cmds []tea.Cmd
-	for _, plan := range m.checkedEpicPlans() {
-		name := plan.epic.Name
-		snapshot, ok := byName[name]
-		if !ok {
-			continue
-		}
-		// Baseline: the checked selection this Model instance knows about.
-		// Idempotent — recordExecutionTicket dedups.
-		for _, ticketID := range plan.ticketIDs {
-			m.recordExecutionTicket(name, ticketID)
-		}
-		// Growth: widen to the run's live RunScope, so a ticket added mid-run
-		// via "a" (cmdAddToLiveQueue, ralphloop.RunScope.Add) is picked up
-		// without waiting for this Model's own checked selection to change.
-		m.syncExecutionScope(name, snapshot)
-		cmds = append(cmds, m.syncRunSnapshot(name))
-		if !snapshot.StartedAt.IsZero() && (m.executionStartedAt.IsZero() || snapshot.StartedAt.Before(m.executionStartedAt)) {
-			m.executionStartedAt = snapshot.StartedAt
-		}
-		wasRunning := m.runningEpics[name]
-		if snapshot.State == RunStateParked {
-			delete(m.runningEpics, name)
-			cmds = append(cmds, cmdPollImplement(name))
-			continue
-		}
-		if snapshot.State == RunStateRunning {
-			m.runningEpics[name] = true
-			m.markEpicTicketsRunning(name)
-			cmds = append(cmds, cmdPollImplement(name))
-			continue
-		}
-		delete(m.runningEpics, name)
-		delete(m.live, name)
-		if wasRunning {
-			m.finalizeEpicTicketStatus(name)
-			cmds = append(cmds, implementFinishedNotifyCmd(name))
-		}
-	}
-	if len(m.runningEpics) > 0 {
-		cmds = append(cmds, m.implementSpinner.Tick)
-	}
-	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(ralphLoopRegistry.parkedEpics()) == 0 {
-		m.executionCompletedAt = m.now()
-		cmds = append(cmds, m.cmdLoadQueue())
-	}
-	return m, tea.Batch(cmds...)
-}
-
-// syncRunSnapshot mirrors Model.syncRunSnapshot (ui/tickets/model_live.go)
-// for the Queue tab's own poll loop; see closeNotifyCmd there.
-func (m *QueueModel) syncRunSnapshot(epicName string) tea.Cmd {
-	snapshot, ok := ralphLoopRegistry.runSnapshot(epicName)
-	if !ok {
-		return nil
-	}
-	if m.live == nil {
-		m.live = map[string]map[string]liveTicketState{}
-	}
-	live := projectLiveTickets(snapshot)
-	for identifier, ticket := range snapshot.Tickets {
-		if ticket.Completed {
-			if path, ok := m.ticketPathFor(epicName, identifier); ok {
-				m.setItemStatus(path, queueStatusDone)
-			}
-		}
-	}
-	m.live[epicName] = live
-	var reloadCmd tea.Cmd
-	if ralphLoopRegistry.drainPendingReload(epicName) {
-		reloadCmd = m.cmdLoadQueue()
-	}
-	return tea.Batch(
-		closeNotifyCmd(ralphLoopRegistry.drainPendingNotifyCloses(epicName)),
-		toastNotifyCmd(ralphLoopRegistry.drainPendingToasts(epicName)),
-		reloadCmd,
-	)
-}
-
 // ticketPathFor resolves an epicName/identifier pair (the registry's
 // addressing scheme) to the ticket's file path (the queue store's key).
 func (m QueueModel) ticketPathFor(epicName, identifier string) (string, bool) {
@@ -649,84 +495,6 @@ func (m *QueueModel) setItemStatus(path string, status queueItemStatus) {
 		m.queueStatus = map[string]queueItemStatus{}
 	}
 	m.queueStatus[path] = status
-}
-
-// syncExecutionScope widens m.executionTickets/m.runTicketIDs to match
-// epicName's live RunScope, so a ticket added mid-run via "a"
-// (cmdAddToLiveQueue in implement.go, which calls ralphloop.RunScope.Add)
-// appears in the Queue tab's list/count/header instead of staying frozen to
-// the kickoff snapshot (ticket 06). Only ever grows the set: a ticket already
-// recorded stays recorded.
-//
-// scopeFor returns ok=false once the registry's r.runs entry for epicName is
-// gone (loopRegistry.finish, run completed/failed) — the run's own
-// r.snapshots entry survives that, though (see loopRegistry doc comment), so
-// a Queue tab reattached after the run already finished falls back to
-// snapshot's captured ticket set instead of missing it entirely.
-func (m *QueueModel) syncExecutionScope(epicName string, snapshot RunSnapshot) {
-	if scope, ok := ralphLoopRegistry.scopeFor(epicName); ok {
-		for _, epic := range m.epics {
-			if epic.Name != epicName {
-				continue
-			}
-			for _, ticket := range epic.Tickets {
-				if scope.Contains(ticket, epic) {
-					m.recordExecutionTicket(epicName, ticket.Identifier)
-				}
-			}
-			return
-		}
-		return
-	}
-	for identifier := range snapshot.Tickets {
-		m.recordExecutionTicket(epicName, identifier)
-	}
-}
-
-// recordExecutionTicket adds epicName/identifier to m.executionTickets and
-// m.runTicketIDs if not already present.
-func (m *QueueModel) recordExecutionTicket(epicName, identifier string) {
-	key := epicName + "/" + identifier
-	if m.executionTickets[key] {
-		return
-	}
-	m.executionTickets[key] = true
-	m.runTicketIDs[epicName] = append(m.runTicketIDs[epicName], identifier)
-}
-
-// markEpicTicketsRunning transitions epicName's captured ticket subset
-// (m.runTicketIDs, fixed at kickoff) to running as its ralph-loop starts.
-func (m *QueueModel) markEpicTicketsRunning(epicName string) {
-	for _, identifier := range m.runTicketIDs[epicName] {
-		if path, ok := m.ticketPathFor(epicName, identifier); ok {
-			m.setItemStatus(path, queueStatusRunning)
-		}
-	}
-}
-
-// finalizeEpicTicketStatus settles epicName's captured ticket subset once its
-// run has stopped: a ticket the registry marked completed lands on done,
-// otherwise on errored if the run ended with an error (registry.finish keeps
-// the epic's final snapshot around, see loopRegistry.finish's doc comment) —
-// left untouched otherwise, e.g. a ticket the concurrency cap never started.
-func (m *QueueModel) finalizeEpicTicketStatus(epicName string) {
-	snapshot, ok := ralphLoopRegistry.runSnapshot(epicName)
-	for _, identifier := range m.runTicketIDs[epicName] {
-		path, pathOK := m.ticketPathFor(epicName, identifier)
-		if !pathOK {
-			continue
-		}
-		if !ok {
-			continue
-		}
-		if ticket, tok := snapshot.Tickets[identifier]; tok && ticket.Completed {
-			m.setItemStatus(path, queueStatusDone)
-			continue
-		}
-		if snapshot.FinalError != "" {
-			m.setItemStatus(path, queueStatusErrored)
-		}
-	}
 }
 
 // bindingQueueToggleHideDone is the Queue tab's "tc" chord (ticket 09),
@@ -855,29 +623,6 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.serverAPI != nil {
 				return m.handleServerPauseKey()
 			}
-			hardBudgetPaused := ralphLoopRegistry.isHardLimitPaused()
-			softBudgetPaused := ralphLoopRegistry.isSoftLimitPaused()
-			var prompt string
-			var acceptCmd tea.Cmd
-			switch {
-			case hardBudgetPaused:
-				prompt = budgetHardPauseConfirmPrompt(LiveSpend(), m.settings.Budget.HardLimit)
-				acceptCmd = cmdConfirmBudgetOverride()
-			case softBudgetPaused:
-				prompt = budgetPauseConfirmPrompt(LiveSpend(), m.settings.Budget.SoftLimit)
-				acceptCmd = cmdConfirmBudgetOverride()
-			case m.paused:
-				prompt = "Resume the queue?"
-				acceptCmd = cmdConfirmQueueResume()
-			case ralphLoopRegistry.rateLimitPausedCount() > 0:
-				prompt = fmt.Sprintf("Resume %d agent(s) paused for a rate limit?", ralphLoopRegistry.rateLimitPausedCount())
-				acceptCmd = cmdConfirmQueueResume()
-			default:
-				prompt = "Pause the queue?"
-				acceptCmd = cmdConfirmQueuePause()
-			}
-			m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: acceptCmd})
-			return m, nil
 		case bindingQueueClearChecked:
 			if paths := m.checkedPaths(); len(paths) > 0 {
 				if m.serverAPI != nil {
@@ -912,18 +657,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	switch msg.String() {
-	case "q", "esc":
+	if s := msg.String(); s == "q" || s == "esc" {
 		return m, nav.Back()
-	case "enter":
-		// A parked row's "enter" resumes that epic (cosmetic wake via
-		// Gate.WakeParked, not reattach) rather than toggling focus.
-		if row, ok := m.selectedQueueRow(); ok {
-			if _, parked := ralphLoopRegistry.parkedStalledFor(row.epic.Name); parked {
-				ralphLoopRegistry.resumeParked(row.epic.Name)
-				return m, nil
-			}
-		}
 	}
 
 	// Expand-on-already-expanded: tree.Model's own Update reports ExpandNoop

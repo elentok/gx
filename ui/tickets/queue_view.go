@@ -173,8 +173,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicSeparator:
 				return ""
 			case nodeEpicStatus:
-				parkedStalled, _ := ralphLoopRegistry.parkedStalledFor(entry.Value.epic.Name)
-				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, parkedStalled)
+				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, nil)
 				line := " " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
 				// Ticket 10: the epic's own running total, appended dim italic
 				// (metricsLineStyle) regardless of the status line's color — the

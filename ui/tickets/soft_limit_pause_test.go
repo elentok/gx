@@ -4,12 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/keys"
 )
 
 // withBudgetSoftLimit swaps budgetConfig for the duration of the test and
@@ -224,52 +220,5 @@ func TestCheckBudgetSoftLimit_OverrideRearms(t *testing.T) {
 				t.Fatalf("sent after climbing past the re-arm point = %v, want exactly 2", sent())
 			}
 		})
-	}
-}
-
-func TestQueueModelPauseKey_AlwaysOpensConfirm(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
-	m = updated.(QueueModel)
-	if !m.confirm.IsOpen {
-		t.Fatal("expected \"p\" to open a confirmation instead of toggling instantly")
-	}
-	if m.paused {
-		t.Fatal("expected no pause to have happened before the confirmation is accepted")
-	}
-}
-
-func TestQueueModelPauseKey_BudgetPausedShowsBudgetCopy(t *testing.T) {
-	t.Parallel()
-	r := startTestRegistry(t)
-	r.pauseSoftLimit()
-	t.Cleanup(r.resumeSoftLimit)
-
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
-	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	settings := ui.Settings{Budget: config.BudgetConfig{SoftLimit: 10.0}}
-	m := loadQueueModel(t, NewQueueModel(root, settings, checked, keys.Manager{}))
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'p', Text: "p"})
-	m = updated.(QueueModel)
-	if !m.confirm.IsOpen {
-		t.Fatal("expected \"p\" to open a confirmation")
-	}
-	view := m.confirm.View(80)
-	if !strings.Contains(view, "10.00") {
-		t.Fatalf("expected budget-specific copy naming the limit in the confirm view:\n%s", view)
-	}
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	m = updated.(QueueModel)
-	m = deliverQueueCommands(t, m, cmd)
-	if r.isSoftLimitPaused() {
-		t.Fatal("expected accepting the confirmation to override the soft-limit pause")
 	}
 }

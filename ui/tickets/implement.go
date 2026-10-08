@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -11,23 +10,6 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
-
-// implementPollInterval is how often a tickets.Model polls ralphLoopRegistry
-// for completion. Polling (rather than a done-channel the launching Model
-// alone waits on) is what lets *any* tickets.Model instance — including one
-// rebuilt by a tab switch away and back, see OnPageActivated — pick up an
-// in-flight run's state: the app shell only routes tea.Msgs to the active
-// page, so a message sent to a backgrounded page's model is silently
-// dropped, and the done-channel-blocking Cmd would rebind to a fresh model
-// value each time OnPageActivated fires without an independent way to check
-// "is it still running" first.
-const implementPollInterval = 300 * time.Millisecond
-
-// implementPollMsg drives the poll loop started by OnPageActivated: on each
-// tick it re-checks ralphLoopRegistry for epicName.
-type implementPollMsg struct {
-	epicName string
-}
 
 // handleReplaceQueueKey applies bugs-05/03's "r" ("Replace queue") action: it
 // opens a confirmation step naming what's about to happen; accepting it runs
@@ -154,15 +136,6 @@ func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.C
 	return m, cmd
 }
 
-// implementFinishedNotifyCmd reports epicName's just-finished run: an error
-// toast if ralphloop.Run returned one, otherwise the plain completion toast.
-func implementFinishedNotifyCmd(epicName string) tea.Cmd {
-	if err := ralphLoopRegistry.lastError(epicName); err != nil {
-		return notify.Error(fmt.Sprintf("ralph-loop failed for epic %q: %v", epicName, err))
-	}
-	return notify.Info(fmt.Sprintf("ralph-loop finished for epic %q", epicName))
-}
-
 func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
 	if len(m.implementingEpics) == 0 {
 		return m, nil
@@ -180,12 +153,4 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 // notification gets rechecked every time the tab regains focus.
 func (m Model) OnPageActivated() tea.Cmd {
 	return tea.Batch(m.cmdReattachScan(), m.cmdReattachRescan())
-}
-
-// cmdPollImplement re-checks ralphLoopRegistry after implementPollInterval;
-// see handleImplementPoll.
-func cmdPollImplement(epicName string) tea.Cmd {
-	return tea.Tick(implementPollInterval, func(time.Time) tea.Msg {
-		return implementPollMsg{epicName: epicName}
-	})
 }
