@@ -122,7 +122,7 @@ func TestR2MatchesOnlyAZeroCommitEndingInABareCallLiteral(t *testing.T) {
 		{"prose mentioning a call", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "I would run Bash({ command }) next."}}, false},
 		{"plain answer", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Done."}}, false},
 		{"no text", []Event{{Type: events.NeedsAnswer, Kind: events.ZeroCommit}}, false},
-		{"call literal on another kind", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane, Text: "Bash({})"}}, false},
+		{"call literal on another kind", []Event{{Type: events.NeedsAnswer, Kind: events.SelfReported, Text: "Bash({})"}}, false},
 		{"call literal on another type", []Event{{Type: events.NeedsRepair, Kind: events.ZeroCommit, Text: "Bash({})"}}, false},
 		{"literal only on an earlier event", []Event{{Type: events.IterationStarted, Text: "Bash({})"}, {Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Done."}}, false},
 	}
@@ -180,7 +180,7 @@ func TestR3MatchesAnUnrecoverableDoneTicketOrAZeroCommitClaimingPresence(t *test
 		{"claim in mixed case", zero("Already merged via the sibling ticket."), true},
 		{"zero-commit with no claim", zero("Done."), false},
 		{"zero-commit with no text", zero(""), false},
-		{"claim on another kind", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane, Text: "already implemented"}}, false},
+		{"claim on another kind", []Event{{Type: events.NeedsAnswer, Kind: events.SelfReported, Text: "already implemented"}}, false},
 		{"claim on another type", []Event{{Type: events.NeedsRepair, Kind: events.ZeroCommit, Text: "already implemented"}}, false},
 		{"unrelated needs-repair kind", []Event{{Type: events.NeedsRepair, Kind: events.BudgetKilled}}, false},
 		{"claim only on an earlier event", []Event{{Type: events.IterationFinished, Text: "already implemented"}, {Type: events.NeedsAnswer, Kind: events.ZeroCommit, Text: "Done."}}, false},
@@ -231,6 +231,53 @@ func TestR3LostCommitsOnlyEscalate(t *testing.T) {
 	}
 	if e, _ := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Reason: "verify cannot tell whether it landed: unknown"}}); e.Executor != ExecutorAgent {
 		t.Errorf("an ambiguous land with its branch = %+v, want the agent entry", e)
+	}
+}
+
+func TestDefaultR4LaunchesDisabledAsAMediumAgentEntryThatAnswers(t *testing.T) {
+	c := Default()
+	var n int
+	for _, e := range c.Entries {
+		if e.ID != "R4" {
+			continue
+		}
+		n++
+		if e.Enabled || e.Executor != ExecutorAgent || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"answer"}) {
+			t.Errorf("R4 = %+v, want disabled medium agent entry with answer", e)
+		}
+	}
+	if n != 1 {
+		t.Fatalf("R4 entries = %d, want 1", n)
+	}
+	if _, ok := c.Match([]Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane}}); ok {
+		t.Error("disabled R4 must not match")
+	}
+}
+
+func TestR4MatchesOnlyANeedsAnswerBlockedPane(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"blocked pane", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane}}, true},
+		{"blocked pane with any last text", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane, Text: "Do you trust this folder?"}}, true},
+		{"blocked pane after other events", []Event{{Type: events.IterationFinished}, {Type: events.NeedsAnswer, Kind: events.BlockedPane}}, true},
+		{"blocked pane as needs-repair", []Event{{Type: events.NeedsRepair, Kind: events.BlockedPane}}, false},
+		{"other needs-answer kind", []Event{{Type: events.NeedsAnswer, Kind: events.SelfReported}}, false},
+		{"blocked pane only on an earlier event", []Event{{Type: events.NeedsAnswer, Kind: events.BlockedPane}, {Type: events.IterationFinished}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R4") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
 	}
 }
 

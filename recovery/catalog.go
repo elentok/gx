@@ -70,7 +70,23 @@ var NotCatalogued = map[string]string{
 // they land.
 func Default() Catalog {
 	entries := []Entry{r1Spin(), r2UnexecutedToolCall()}
-	return Catalog{Enabled: true, Entries: append(entries, r3LandRecoverable()...)}
+	entries = append(entries, r3LandRecoverable()...)
+	return Catalog{Enabled: true, Entries: append(entries, r4BlockedPaneDialog())}
+}
+
+// r4BlockedPaneDialog is a pane parked on a prompt gx did not send. The run
+// log carries no pane text, so the matcher cannot tell a known dialog from an
+// operator's own: an agent reads the pane and answers only an allow-listed,
+// content-free dialog (trust-this-folder, a benign "continue?"), escalating
+// everything else. A wrong answer is irreversible, which is why the allow-list
+// lives with the agent and not in a predicate guessing from the reason.
+// Launches disabled: the few S0 events behind it never showed which dialog
+// the pane held, so nothing yet justifies the allow-list.
+func r4BlockedPaneDialog() Entry {
+	return Entry{
+		ID: "R4", Type: events.NeedsAnswer, Kind: events.BlockedPane,
+		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"answer"},
+	}
 }
 
 var (

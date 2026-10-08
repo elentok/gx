@@ -519,6 +519,45 @@ func TestRecovery_R3LostCommitsEscalateWithoutAnInvestigation(t *testing.T) {
 	}
 }
 
+// R4 is an agent entry: an enabled match hands the blocked pane to an
+// investigate fork named for R4, which reads the pane and answers only an
+// allow-listed dialog.
+func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+		for i := range c.Recovery.Entries {
+			c.Recovery.Entries[i].Enabled = true
+		}
+	})
+	registerLaunch(h)
+
+	if err := h.Server.ParkAs("proj:epic-a/01", events.BlockedPane, "epic-a-01 is blocked on a prompt gx did not send; answer it in the pane"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		for _, tk := range epicTickets(t, h).Tickets {
+			if tk.Identifier == "01a" && tk.Type == "investigate" {
+				body, _ := os.ReadFile(tk.Path)
+				return strings.Contains(string(body), "R4")
+			}
+		}
+		return false
+	})
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.BlockedPane) && ev.Outcome == "proj:epic-a/01a" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
