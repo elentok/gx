@@ -450,7 +450,8 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneI
 
 // completeRootIfDone lands the root's feature branch once every ticket in its
 // epic is done, then dequeues it. A branch that needs a rebase parks the root
-// instead: a person runs gx-merge.
+// instead: a person runs gx-merge. With AutoMergeEpic off the branch is left
+// alone: the root is dequeued as complete and a person runs gx-merge.
 func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 	project := root.Project
 	dir, repo, err := s.projectOf(project)
@@ -467,17 +468,19 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
 			continue
 		}
-		if reason, err := s.landRoot(project, epics, one, repo); err != nil {
-			s.log.Warn("land root", "root", root, "err", err)
-			s.events.publish(EventIterationFailed, root.String())
-			return
-		} else if reason != "" {
-			s.events.publish(EventRootParked, root.String())
-			s.log.Warn("root parked", "root", root, "reason", reason)
-			if s.chat != nil {
-				s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
+		if s.cfg.AutoMergeEpic {
+			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
+				s.log.Warn("land root", "root", root, "err", err)
+				s.events.publish(EventIterationFailed, root.String())
+				return
+			} else if reason != "" {
+				s.events.publish(EventRootParked, root.String())
+				s.log.Warn("root parked", "root", root, "reason", reason)
+				if s.chat != nil {
+					s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
+				}
+				return
 			}
-			return
 		}
 		if removed, err := s.queued.removeRoot(root); err != nil {
 			s.log.Warn("dequeue completed root", "root", root, "err", err)

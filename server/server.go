@@ -53,6 +53,9 @@ type Config struct {
 	Build       string
 	TicketStore string   // ticket-store root; kept fresh by watch + poll
 	TabEnv      []string // KEY=VALUE entries set on each iteration tab
+	// AutoMergeEpic merges a finished epic's branch into its target; off leaves
+	// the merge to gx-merge.
+	AutoMergeEpic bool
 
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only

@@ -75,6 +75,9 @@ type ServerConfig struct {
 	// TabEnv is KEY=VALUE entries set on every iteration tab's shell, for
 	// overriding what the user's shell rc would otherwise decide (e.g. PATH).
 	TabEnv []string `json:"tab-env"`
+	// AutoMergeEpic merges an epic's branch into its target once every ticket
+	// is done. Off by default: a person runs gx-merge.
+	AutoMergeEpic bool `json:"auto-merge-epic"`
 }
 
 const (
@@ -179,8 +182,9 @@ func Load() (Config, error) {
 		} `json:"ticket-store"`
 		Orchestrator *string `json:"orchestrator"`
 		Server       *struct {
-			TCPListen *bool    `json:"tcp-listen"`
-			TabEnv    []string `json:"tab-env"`
+			TCPListen     *bool    `json:"tcp-listen"`
+			TabEnv        []string `json:"tab-env"`
+			AutoMergeEpic *bool    `json:"auto-merge-epic"`
 		} `json:"server"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -289,6 +293,9 @@ func Load() (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.TCPListen != nil {
 		cfg.Server.TCPListen = *raw.Server.TCPListen
+	}
+	if raw.Server != nil && raw.Server.AutoMergeEpic != nil {
+		cfg.Server.AutoMergeEpic = *raw.Server.AutoMergeEpic
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

@@ -230,6 +230,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	herdrfake.StartState(t, h.Herdr)
 
 	h.cfg = server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
+	// The product default is off; most tests exercise the landing.
+	h.cfg.AutoMergeEpic = true
 	for _, o := range opts {
 		o(&h.cfg)
 	}

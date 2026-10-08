@@ -34,7 +34,7 @@ type schedFixture struct {
 	order       []string
 }
 
-func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, agentTurn func(f *schedFixture, p servertest.Prompt, id string)) *schedFixture {
+func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, agentTurn func(f *schedFixture, p servertest.Prompt, id string), cfgOpts ...func(*server.Config)) *schedFixture {
 	t.Helper()
 	f := &schedFixture{store: t.TempDir(), repo: testutil.TempRepo(t)}
 	for id, opts := range tickets {
@@ -46,6 +46,9 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 		c.Orchestrator = config.OrchestratorServer
 		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgentsPerRoot = 1 // these scenarios pin the sequential order
+		for _, o := range cfgOpts {
+			o(c)
+		}
 	})
 	t.Cleanup(func() {
 		if t.Failed() {
