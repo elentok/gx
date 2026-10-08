@@ -174,7 +174,8 @@ func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
 		t.Fatalf("digests = %d, want 1: %s", n, all)
 	}
 	for _, p := range []string{"p1", "p2", "p3", "p4"} {
-		if strings.Count(all, "["+p+"]") != 1 {
+		// Digest lines carry "[p]"; a live park sits under a bold "*p*" header.
+		if strings.Count(all, "["+p+"]")+strings.Count(all, "*"+p+"*") != 1 {
 			t.Errorf("%s not sent exactly once: %s", p, all)
 		}
 	}

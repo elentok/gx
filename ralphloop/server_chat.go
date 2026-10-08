@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-
-	"github.com/elentok/gx/chatmarkup"
 )
 
 // ServerChatConfig names the chat destinations a server notifies. An empty
@@ -113,8 +111,7 @@ func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, tick
 	}
 	for _, s := range c.projectSinks(override) {
 		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, reason, counts)
-		prefix := s.style.chatStyle.Escape(fmt.Sprintf("[%s] ", project))
-		s.send(chatmarkup.Join(chatmarkup.Text{}, []chatmarkup.Text{prefix, body}), notifyKindTicketNeedsHuman, ticketPath, identifier)
+		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindTicketNeedsHuman, ticketPath, identifier)
 	}
 }
 
@@ -126,8 +123,7 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 	}
 	for _, s := range c.projectSinks(override) {
 		body := s.style.epicCompleteText(project+"/"+epic, counts, counts.Done, elapsedSeconds, totalCost)
-		prefix := s.style.chatStyle.Escape(fmt.Sprintf("[%s] ", project))
-		s.send(chatmarkup.Join(chatmarkup.Text{}, []chatmarkup.Text{prefix, body}), notifyKindEpicComplete, epicSource(project+"/"+epic), "")
+		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindEpicComplete, epicSource(project+"/"+epic), "")
 	}
 }
 

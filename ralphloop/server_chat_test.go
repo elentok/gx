@@ -27,6 +27,31 @@ func TestServerChat_ParksGoToTheirOwnDestinationAndSharedTargetsShareABatch(t *t
 	}
 }
 
+func TestServerChat_MultiProjectBatchGroupsUnderOneHeaderPerProject(t *testing.T) {
+	srv, reqs := fakeSlackServer(t, 200)
+	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
+
+	c.Park("alpha", nil, "e", "/t/1.md", "A1", "needs-answer", "r", EpicCounts{})
+	c.Park("beta", nil, "e", "/t/2.md", "B1", "needs-answer", "r", EpicCounts{})
+	c.Park("alpha", nil, "e", "/t/3.md", "A2", "needs-answer", "r", EpicCounts{})
+	c.Close()
+
+	got := reqs()
+	if len(got) != 1 {
+		t.Fatalf("got %d sends, want one batch", len(got))
+	}
+	text := got[0].Text
+	if n := strings.Count(text, "*alpha*"); n != 1 {
+		t.Errorf("alpha header appears %d times, want 1:\n%s", n, text)
+	}
+	if n := strings.Count(text, "*beta*"); n != 1 {
+		t.Errorf("beta header appears %d times, want 1:\n%s", n, text)
+	}
+	if !(strings.Index(text, "A1") < strings.Index(text, "A2") && strings.Index(text, "A2") < strings.Index(text, "B1")) {
+		t.Errorf("alpha's parks should sit together before beta's:\n%s", text)
+	}
+}
+
 func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})

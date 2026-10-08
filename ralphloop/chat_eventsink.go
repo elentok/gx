@@ -149,6 +149,9 @@ type batchedMessage struct {
 	text  chatmarkup.Text
 	kind  string
 	count int
+	// group is the header renderBatch files this message under (a project
+	// name on a server); the zero Text means ungrouped.
+	group chatmarkup.Text
 	// requeued marks an entry that came back from a failed flush send (see
 	// chatEventSink.requeue) rather than a fresh enqueue — flush uses it to
 	// decide whether a retry attempt needs a new gate recordSend charge (see
@@ -284,15 +287,21 @@ func (s *chatEventSink) cancelInFlight(deadline time.Time) {
 // the dedup ×N behavior. kind is recorded so a suppressed close-time flush
 // can name what it dropped.
 func (s *chatEventSink) enqueue(text chatmarkup.Text, kind string) {
+	s.enqueueIn(chatmarkup.Text{}, text, kind)
+}
+
+// enqueueIn is enqueue under a group header; identical texts only collapse
+// within the same group.
+func (s *chatEventSink) enqueueIn(group, text chatmarkup.Text, kind string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.queue {
-		if s.queue[i].text == text {
+		if s.queue[i].text == text && s.queue[i].group == group {
 			s.queue[i].count++
 			return
 		}
 	}
-	s.queue = append(s.queue, batchedMessage{text: text, kind: kind, count: 1})
+	s.queue = append(s.queue, batchedMessage{text: text, kind: kind, count: 1, group: group})
 }
 
 // drainQueue empties the queue and returns what it held, so flush/closeFlush
@@ -406,16 +415,42 @@ const batchSeparatorRaw = "---"
 // (see enqueue), but the separator is renderBatch's own literal, so it needs
 // the same treatment; chatmarkup.Join only accepts already-safe Text values,
 // so the separator physically cannot reach the wire unescaped.
+//
+// Grouped messages (see batchedMessage.group) collapse into one block per
+// group, in first-seen order: the group's header, then its messages. Ungrouped
+// messages stay one block each.
 func renderBatch(style mrkdwnStyle, items []batchedMessage) chatmarkup.Text {
-	texts := make([]chatmarkup.Text, len(items))
-	for i, it := range items {
-		texts[i] = it.text
+	type block struct {
+		header chatmarkup.Text
+		texts  []chatmarkup.Text
+	}
+	var blocks []*block
+	byGroup := map[chatmarkup.Text]*block{}
+	for _, it := range items {
+		text := it.text
 		if it.count > 1 {
-			texts[i] = it.text.WithSuffix(fmt.Sprintf(" ×%d", it.count), style.chatStyle)
+			text = it.text.WithSuffix(fmt.Sprintf(" ×%d", it.count), style.chatStyle)
+		}
+		b := byGroup[it.group]
+		if it.group == (chatmarkup.Text{}) || b == nil {
+			b = &block{header: it.group}
+			blocks = append(blocks, b)
+			if it.group != (chatmarkup.Text{}) {
+				byGroup[it.group] = b
+			}
+		}
+		b.texts = append(b.texts, text)
+	}
+	parts := make([]chatmarkup.Text, len(blocks))
+	blank := style.chatStyle.Escape("\n\n")
+	for i, b := range blocks {
+		parts[i] = chatmarkup.Join(blank, b.texts)
+		if b.header != (chatmarkup.Text{}) {
+			parts[i] = chatmarkup.Join(blank, []chatmarkup.Text{b.header, parts[i]})
 		}
 	}
 	separator := style.chatStyle.Escape("\n\n" + batchSeparatorRaw + "\n\n")
-	return chatmarkup.Join(separator, texts)
+	return chatmarkup.Join(separator, parts)
 }
 
 // distinctKinds returns items' notifyKinds in first-seen order, deduped —
@@ -578,16 +613,21 @@ func (s *chatEventSink) DrainComplete(epicName string, completed int, elapsedSec
 // delivery on its own bookkeeping succeeding, so text is still queued as if
 // the gate weren't there.
 func (s *chatEventSink) send(text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
+	s.sendIn(chatmarkup.Text{}, text, notifyKind, source, ticketIdentifier)
+}
+
+// sendIn is send with the message filed under a group header in the batch.
+func (s *chatEventSink) sendIn(group, text chatmarkup.Text, notifyKind, source, ticketIdentifier string) {
 	result, err := s.gate(notifyKind, source, false)
 	if err != nil {
 		logger.Debug("%s: notification gate: %v\n", s.transport.name(), err)
-		s.enqueue(text, notifyKind)
+		s.enqueueIn(group, text, notifyKind)
 		return
 	}
 
 	switch result.Decision {
 	case Allowed:
-		s.enqueue(text, notifyKind)
+		s.enqueueIn(group, text, notifyKind)
 	case PerSourceMuted:
 		if result.EdgeTriggered {
 			s.enqueue(s.style.mutedText(s.epicName, ticketIdentifier), notifyKindMuted)
@@ -656,7 +696,7 @@ func (s *chatEventSink) requeue(items []batchedMessage) {
 		item.requeued = true
 		merged := false
 		for i := range s.queue {
-			if s.queue[i].text == item.text {
+			if s.queue[i].text == item.text && s.queue[i].group == item.group {
 				s.queue[i].count += item.count
 				merged = true
 				break

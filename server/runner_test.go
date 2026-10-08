@@ -818,7 +818,7 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	if len(bodies) != 1 {
 		t.Fatalf("chat sends = %d, want exactly 1: %v", len(bodies), bodies)
 	}
-	if !strings.Contains(bodies[0], "[proj] ") {
-		t.Errorf("message lacks the project prefix: %s", bodies[0])
+	if !strings.Contains(bodies[0], "*proj*") {
+		t.Errorf("message lacks the project header: %s", bodies[0])
 	}
 }
