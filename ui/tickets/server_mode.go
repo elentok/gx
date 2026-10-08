@@ -11,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/subscription"
@@ -374,16 +373,6 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	return m, nil, false
-}
-
-// notificationsForRun is the chat config a TUI-started run wires sinks from.
-// In server mode it is empty: the server sends chat once, and a TUI sink
-// would duplicate it.
-func (m Model) notificationsForRun() config.NotificationsConfig {
-	if m.serverMode() {
-		return config.NotificationsConfig{}
-	}
-	return m.settings.Notifications
 }
 
 // pendingSubtext is a queued ticket row's explain verdict, indented under the

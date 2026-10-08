@@ -10,7 +10,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -311,15 +310,6 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	}
 	if len(body) != 1 || !strings.Contains(body[0], "blocked: waiting on 00") {
 		t.Fatalf("subtext = %q", body)
-	}
-}
-
-func TestServerMode_StartImplementSendsNoChat(t *testing.T) {
-	m := newServerModel(t)
-	m.settings.Notifications.Telegram = config.TelegramConfig{BotToken: "tok", ChatID: "42"}
-	// The server sends chat once; the TUI path must not wire a sink.
-	if got := m.notificationsForRun(); got.Telegram.BotToken != "" {
-		t.Fatalf("server mode kept chat sink: %+v", got)
 	}
 }
 

@@ -376,14 +376,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleMouseWheel(msg)
 
-	case implementStartedMsg:
-		return m.handleImplementStarted(msg)
 	case implementPollMsg:
 		return m.handleImplementPoll(msg)
 	case implementSyncMsg:
 		return m.handleImplementSync(msg)
-	case implementFailedMsg:
-		return m, notify.Error(msg.err.Error())
 	case spinner.TickMsg:
 		return m.handleImplementSpinnerTick(msg)
 	case reattachSignalsMsg:

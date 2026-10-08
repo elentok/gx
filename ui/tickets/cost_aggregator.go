@@ -11,8 +11,7 @@ import (
 )
 
 // epicLandedCostsFn/sessionCostFn are swapped in tests so a stubbed
-// aggregation tick never touches real epic/transcript files, mirroring
-// runRalphLoop's own seam-swap pattern (see loop_registry.go).
+// aggregation tick never touches real epic/transcript files.
 var (
 	epicLandedCostsFn = ralphloop.EpicLandedCosts
 	sessionCostFn     = ralphloop.SessionCost

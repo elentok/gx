@@ -2,11 +2,9 @@ package tickets
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -86,32 +84,6 @@ func TestLoopRegistryPauseReasons_IndependentAndAnyPaused(t *testing.T) {
 	r.mu.Unlock()
 	if anyPaused {
 		t.Fatal("expected the run to report unpaused once every reason is cleared")
-	}
-}
-
-func TestLoopRegistryConcurrencyCanBeReconfigured(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(2)
-	r.Acquire()
-	r.Acquire()
-
-	r.setMaxConcurrent(1)
-	blocked := make(chan struct{})
-	go func() {
-		r.Acquire()
-		close(blocked)
-	}()
-	select {
-	case <-blocked:
-		t.Fatal("Acquire above reconfigured cap: want it to block")
-	case <-time.After(20 * time.Millisecond):
-	}
-
-	r.setMaxConcurrent(3)
-	select {
-	case <-blocked:
-	case <-time.After(time.Second):
-		t.Fatal("Acquire after raising cap: want it to unblock")
 	}
 }
 
@@ -246,104 +218,6 @@ func TestFinishPreservesCompletionAndFailureSnapshots(t *testing.T) {
 	failed, ok := r.runSnapshot("epic-b")
 	if !ok || failed.State != RunStateFailed || failed.FinalError != "agent failed" {
 		t.Fatalf("failed snapshot = %#v, %v", failed, ok)
-	}
-}
-
-// fakeFailureNotifier records every EpicFailed call, and (for
-// TestFinish_EpicFailed_FiresAfterSinkDrain) lets the test observe registry
-// state from inside the callback — while the callback runs, finish has not
-// yet re-acquired the lock to delete the run, so the drained snapshot is
-// still readable.
-type fakeFailureNotifier struct {
-	mu     sync.Mutex
-	calls  []string
-	onCall func()
-}
-
-func (f *fakeFailureNotifier) EpicFailed(epicName string, err error) {
-	f.mu.Lock()
-	f.calls = append(f.calls, fmt.Sprintf("%s:%v", epicName, err))
-	f.mu.Unlock()
-	if f.onCall != nil {
-		f.onCall()
-	}
-}
-
-func (f *fakeFailureNotifier) snapshot() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	out := make([]string, len(f.calls))
-	copy(out, f.calls)
-	return out
-}
-
-// TestFinish_EpicFailed_FiresAfterSinkDrain is the ordering test ticket 25
-// requires: a run that returns an error produces exactly one failure
-// message, and it is emitted only once the sink's queued events have all
-// been drained (reduceLiveEvent applied) — not concurrently with the drain,
-// and not before it.
-func TestFinish_EpicFailed_FiresAfterSinkDrain(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-	sink, ok := r.tryStart("epic-a", 0, 1)
-	if !ok {
-		t.Fatal("tryStart failed")
-	}
-	notifier := &fakeFailureNotifier{}
-	r.setFailureNotifier("epic-a", notifier)
-
-	sink.IterationStarted(tickets.Ticket{Identifier: "01"}, "iter-01", "", "", "", "", "")
-
-	notifier.onCall = func() {
-		snap, ok := r.runSnapshot("epic-a")
-		if !ok || snap.Tickets["01"].Label != "iter-01" {
-			t.Errorf("notifier fired before the drain applied its event: snapshot = %#v, ok=%v", snap, ok)
-		}
-	}
-
-	r.finish("epic-a", errors.New("agent failed"))
-
-	if got := notifier.snapshot(); len(got) != 1 || got[0] != "epic-a:agent failed" {
-		t.Fatalf("notifier calls = %v, want exactly one epic-a:agent failed", got)
-	}
-}
-
-// TestFinish_EpicFailed_NotDroppedAfterSinkAlreadyClosed is the
-// dropped-message regression the ticket calls out: the failure reporter's
-// whole reason to exist is that a message fired through the run's own
-// (already-closed) sink would be silently dropped. This asserts the
-// registry's own send path — through the notifier, not the sink — still
-// produces the message even though run.sink has already been torn down by
-// the time finish's caller could ever reach it again.
-func TestFinish_EpicFailed_NotDroppedAfterSinkAlreadyClosed(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
-		t.Fatal("tryStart failed")
-	}
-	notifier := &fakeFailureNotifier{}
-	r.setFailureNotifier("epic-a", notifier)
-
-	r.finish("epic-a", errors.New("boom"))
-
-	if got := notifier.snapshot(); len(got) != 1 || got[0] != "epic-a:boom" {
-		t.Fatalf("notifier calls = %v, want exactly one epic-a:boom despite the sink already being drained/closed", got)
-	}
-}
-
-func TestFinish_NoError_DoesNotNotify(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
-		t.Fatal("tryStart failed")
-	}
-	notifier := &fakeFailureNotifier{}
-	r.setFailureNotifier("epic-a", notifier)
-
-	r.finish("epic-a", nil)
-
-	if got := notifier.snapshot(); len(got) != 0 {
-		t.Fatalf("notifier calls = %v, want none for a successful finish", got)
 	}
 }
 
@@ -631,52 +505,6 @@ func TestTryStartDifferentEpicsUpToCapSucceed(t *testing.T) {
 	}
 }
 
-func TestTryStartBeyondCapFailsUntilSlotFrees(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(2)
-
-	r.Acquire()
-	r.Acquire()
-
-	blocked := make(chan struct{})
-	go func() {
-		r.Acquire()
-		close(blocked)
-	}()
-	select {
-	case <-blocked:
-		t.Fatalf("Acquire beyond cap: want it to block")
-	case <-time.After(20 * time.Millisecond):
-	}
-
-	r.Release()
-
-	select {
-	case <-blocked:
-	case <-time.After(time.Second):
-		t.Fatalf("Acquire after a slot freed: want it to unblock")
-	}
-}
-
-func TestParkedEpicDoesNotCountTowardCap(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-
-	r.Acquire()
-	if slots := r.availableSlots(); slots != 0 {
-		t.Fatalf("availableSlots while holding the only permit = %d, want 0", slots)
-	}
-
-	r.Release() // simulates a park: the epic is still in r.runs, but no longer holds a permit
-	if slots := r.availableSlots(); slots != 1 {
-		t.Fatalf("availableSlots after releasing (parking) = %d, want 1", slots)
-	}
-
-	if _, ok := r.tryStart("epic-other", 0, 1); !ok {
-		t.Fatal("tryStart for a different epic once the parked one freed the slot: want ok")
-	}
-}
-
 func TestTryStartBeyondCapIsRefusedSynchronously(t *testing.T) {
 	t.Parallel()
 	r := newLoopRegistry(1)
@@ -695,33 +523,6 @@ func TestTryStartBeyondCapIsRefusedSynchronously(t *testing.T) {
 	}
 }
 
-func TestStartedRunAcquiresTheSlotReservedForIt(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
-		t.Fatal("tryStart epic-a: want ok")
-	}
-
-	acquired := make(chan struct{})
-	go func() {
-		r.permitFor("epic-a").Acquire()
-		close(acquired)
-	}()
-	select {
-	case <-acquired:
-	case <-time.After(time.Second):
-		t.Fatal("a started run's Acquire: want it to claim its reserved slot without blocking")
-	}
-	if slots := r.availableSlots(); slots != 0 {
-		t.Fatalf("availableSlots after the reserved slot was claimed = %d, want 0 (no double counting)", slots)
-	}
-
-	r.permitFor("epic-a").Release()
-	if slots := r.availableSlots(); slots != 1 {
-		t.Fatalf("availableSlots after the run released its slot = %d, want 1", slots)
-	}
-}
-
 func TestFinishReturnsAnUnclaimedReservation(t *testing.T) {
 	t.Parallel()
 	r := newLoopRegistry(1)
@@ -736,95 +537,6 @@ func TestFinishReturnsAnUnclaimedReservation(t *testing.T) {
 	}
 	if _, ok := r.tryStart("epic-b", 0, 1); !ok {
 		t.Fatal("tryStart epic-b into the freed slot: want ok")
-	}
-}
-
-func TestMismatchedReleaseIsReportedAndCannotInflateTheCap(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-
-	r.Release()
-
-	if err := r.permitError(); err == nil {
-		t.Fatal("permitError after releasing a permit that was never acquired: want an error")
-	}
-	if slots := r.availableSlots(); slots != 1 {
-		t.Fatalf("availableSlots after a mismatched release = %d, want the configured cap 1", slots)
-	}
-	if _, ok := r.tryStart("epic-a", 0, 1); !ok {
-		t.Fatal("tryStart epic-a: want ok")
-	}
-	if _, ok := r.tryStart("epic-b", 0, 1); ok {
-		t.Fatal("tryStart epic-b: want !ok, a mismatched release must not have widened the cap")
-	}
-}
-
-func TestQueuedEpicStartsWhenRunningEpicParks(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-
-	r.Acquire()
-
-	blocked := make(chan struct{})
-	go func() {
-		r.Acquire()
-		close(blocked)
-	}()
-	select {
-	case <-blocked:
-		t.Fatal("second Acquire at cap 1: want it to block")
-	case <-time.After(20 * time.Millisecond):
-	}
-
-	r.Release() // first epic parks, freeing its permit
-
-	select {
-	case <-blocked:
-	case <-time.After(time.Second):
-		t.Fatal("second Acquire after first Release (park): want it to unblock")
-	}
-}
-
-func TestResumingEpicWaitsForPermitWhenCapIsFullThenProceeds(t *testing.T) {
-	t.Parallel()
-	r := newLoopRegistry(1)
-
-	r.Acquire()
-	r.Release() // "park"
-
-	firstDone := make(chan struct{})
-	secondDone := make(chan struct{})
-	go func() {
-		r.Acquire()
-		close(firstDone)
-	}()
-	go func() {
-		r.Acquire()
-		close(secondDone)
-	}()
-
-	var proceeded, blocked chan struct{}
-	select {
-	case <-firstDone:
-		proceeded, blocked = firstDone, secondDone
-	case <-secondDone:
-		proceeded, blocked = secondDone, firstDone
-	case <-time.After(time.Second):
-		t.Fatal("neither resuming epic's Acquire proceeded")
-	}
-	_ = proceeded
-
-	select {
-	case <-blocked:
-		t.Fatal("the second resuming epic's Acquire: want it still blocked")
-	case <-time.After(20 * time.Millisecond):
-	}
-
-	r.Release()
-	select {
-	case <-blocked:
-	case <-time.After(time.Second):
-		t.Fatal("the second resuming epic's Acquire after Release: want it to unblock")
 	}
 }
 

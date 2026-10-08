@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -182,13 +181,6 @@ func TestTryStartFailsAndLeavesRegistryUntouchedWhenForeignAttached(t *testing.T
 	}
 	if len(r.runs) != 0 || len(r.snapshots) != 0 {
 		t.Fatalf("registry mutated on rejected start: runs=%#v snapshots=%#v", r.runs, r.snapshots)
-	}
-	err := r.takeAttachError()
-	if err == nil {
-		t.Fatal("takeAttachError(): want non-nil error naming the foreign pid")
-	}
-	if want := "424245"; !strings.Contains(err.Error(), want) {
-		t.Fatalf("attach error = %q, want it to name pid %s", err.Error(), want)
 	}
 }
 

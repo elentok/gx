@@ -74,22 +74,11 @@ func TestQueueServerMode_EnterNeverStartsInProcessRun(t *testing.T) {
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	nm := next.(QueueModel)
 
-	if len(nm.pendingEpics) != 0 || len(nm.runningEpics) != 0 || nm.confirm.IsOpen {
-		t.Errorf("enter opened an in-process run: pending=%v running=%v confirm=%v",
-			nm.pendingEpics, nm.runningEpics, nm.confirm.IsOpen)
+	if len(nm.runningEpics) != 0 || nm.confirm.IsOpen {
+		t.Errorf("enter opened an in-process run: running=%v confirm=%v",
+			nm.runningEpics, nm.confirm.IsOpen)
 	}
 	_ = cmd
-}
-
-func TestQueueServerMode_NoLocalReattachOrStrandedChecks(t *testing.T) {
-	m, _ := loadedServerQueue(t, "open")
-
-	if msg := m.cmdCheckStrandedPending(); msg != nil {
-		t.Error("stranded-pending check ran in server mode")
-	}
-	if cmd := m.startAvailableEpics(); cmd != nil {
-		t.Error("startAvailableEpics launched an in-process run in server mode")
-	}
 }
 
 func TestQueueServerMode_TimerCountsFromServerClaimTime(t *testing.T) {

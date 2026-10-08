@@ -8,11 +8,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -29,14 +25,8 @@ import (
 // "is it still running" first.
 const implementPollInterval = 300 * time.Millisecond
 
-// implementStartedMsg reports that a ralph-loop launch was accepted and its
-// background goroutine is now running.
-type implementStartedMsg struct {
-	epicName string
-}
-
-// implementPollMsg drives the poll loop started by implementStartedMsg/
-// OnPageActivated: on each tick it re-checks ralphLoopRegistry for epicName.
+// implementPollMsg drives the poll loop started by OnPageActivated: on each
+// tick it re-checks ralphLoopRegistry for epicName.
 type implementPollMsg struct {
 	epicName string
 }
@@ -47,12 +37,6 @@ type implementPollMsg struct {
 // active can catch up on all of them at once.
 type implementSyncMsg struct {
 	runningEpics []string
-}
-
-// implementFailedMsg reports that a launch never made it to a background
-// goroutine at all (already running, or couldn't resolve the repo).
-type implementFailedMsg struct {
-	err error
 }
 
 // handleReplaceQueueKey applies bugs-05/03's "r" ("Replace queue") action:
@@ -234,12 +218,6 @@ func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.C
 	return m, cmd
 }
 
-func (m Model) handleImplementStarted(msg implementStartedMsg) (tea.Model, tea.Cmd) {
-	m.implementEpic = msg.epicName
-	closeCmd := m.syncRunSnapshot(msg.epicName)
-	return m, tea.Batch(m.implementSpinner.Tick, cmdPollImplement(msg.epicName), closeCmd)
-}
-
 // handleImplementPoll projects active registry state and reloads disk state
 // after completion. Errors remain in the registry for every observer.
 func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
@@ -327,138 +305,10 @@ func (m Model) OnPageActivated() tea.Cmd {
 	return tea.Batch(syncCmd, m.cmdReattachScan(), m.cmdReattachRescan())
 }
 
-// cmdStartImplement launches the producer while the registry owns the sole
-// event consumer and publishes durable snapshots to presentation models.
-func (m Model) cmdStartImplement(epicName string, agent ralphloop.AgentKind, done, total int) tea.Cmd {
-	return cmdStartImplement(
-		m.worktreeRoot, epicName, agent, done, total,
-		m.settings.MaxConcurrentTicketsPerEpic(), nil, m.notificationsForRun(), m.settings.ImplementSkill(),
-		m.settings.ResolvedAgents(), m.settings.ExecutionQueue,
-	)
-}
-
-func cmdStartImplement(
-	worktreeRoot string,
-	epicName string,
-	agent ralphloop.AgentKind,
-	done, total int,
-	maxParallel int,
-	ticketIDs []string,
-	notifications config.NotificationsConfig,
-	skill string,
-	agents config.AgentsConfig,
-	queue config.ExecutionQueueConfig,
-) tea.Cmd {
-	return func() tea.Msg {
-		sink, ok := ralphLoopRegistry.tryStart(epicName, done, total, scratchDirFor(worktreeRoot))
-		if !ok {
-			if attachErr := ralphLoopRegistry.takeAttachError(); attachErr != nil {
-				return implementFailedMsg{err: attachErr}
-			}
-			return implementFailedMsg{err: fmt.Errorf("a ralph-loop is already running")}
-		}
-		scratchDir := scratchDirFor(worktreeRoot)
-		if notifications.Telegram.BotToken != "" || notifications.Slack.WebhookURL != "" {
-			reporter := ralphloop.NewEpicFailureReporter(scratchDir)
-			if notifications.Telegram.BotToken != "" {
-				reporter.AddTelegram(notifications.Telegram.BotToken, notifications.Telegram.ChatID)
-			}
-			if notifications.Slack.WebhookURL != "" {
-				reporter.AddSlack(notifications.Slack.WebhookURL)
-			}
-			ralphLoopRegistry.setFailureNotifier(epicName, reporter)
-		}
-		opts, err := buildImplementRunOptionsForTickets(worktreeRoot, epicName, agent, maxParallel, ticketIDs, skill, agents, queue)
-		if err != nil {
-			ralphLoopRegistry.finish(epicName, err)
-			return implementFailedMsg{err: err}
-		}
-		opts.Gate = ralphLoopRegistry.gateFor(epicName)
-		opts.Permit = ralphLoopRegistry.permitFor(epicName)
-		opts.OnScopeResolved = func(scope ralphloop.RunScope) {
-			ralphLoopRegistry.setScope(epicName, scope)
-		}
-		_ = ralphloop.LogNotificationsConfigured(
-			opts.ScratchDir, epicName,
-			notifications.Telegram.BotToken != "", notifications.Slack.WebhookURL != "",
-		)
-		var runSink ralphloop.EventSink = sink
-		var chatClosers []func()
-		if notifications.Telegram.BotToken != "" {
-			tg := ralphloop.NewTelegramEventSink(runSink, notifications.Telegram.BotToken, notifications.Telegram.ChatID, opts.ScratchDir, epicName)
-			runSink = tg
-			if c, ok := tg.(ralphloop.ChatEventSink); ok {
-				chatClosers = append(chatClosers, c.Close)
-			}
-		}
-		if notifications.Slack.WebhookURL != "" {
-			sl := ralphloop.NewSlackEventSink(runSink, notifications.Slack.WebhookURL, opts.ScratchDir, epicName)
-			runSink = sl
-			if c, ok := sl.(ralphloop.ChatEventSink); ok {
-				chatClosers = append(chatClosers, c.Close)
-			}
-		}
-		go func() {
-			err := runRalphLoop(opts, ralphloop.DefaultDeps(), runSink)
-			// Flush each chat sink's queued batch (bounded by the transport
-			// timeout) before the run is reported finished, so a run ending
-			// mid-window doesn't drop its last batch.
-			for _, closeChat := range chatClosers {
-				closeChat()
-			}
-			ralphLoopRegistry.finish(epicName, err)
-		}()
-		return implementStartedMsg{epicName: epicName}
-	}
-}
-
 // cmdPollImplement re-checks ralphLoopRegistry after implementPollInterval;
 // see handleImplementPoll.
 func cmdPollImplement(epicName string) tea.Cmd {
 	return tea.Tick(implementPollInterval, func(time.Time) tea.Msg {
 		return implementPollMsg{epicName: epicName}
 	})
-}
-
-func buildImplementRunOptions(worktreeRoot, epicName string, agent ralphloop.AgentKind) (ralphloop.RunOptions, error) {
-	settings := ui.Settings{}
-	return buildImplementRunOptionsForTickets(
-		worktreeRoot, epicName, agent,
-		settings.MaxConcurrentTicketsPerEpic(), nil, settings.ImplementSkill(),
-		settings.ResolvedAgents(), settings.ExecutionQueue,
-	)
-}
-
-func buildImplementRunOptionsForTickets(
-	worktreeRoot, epicName string,
-	agent ralphloop.AgentKind,
-	maxParallel int,
-	ticketIDs []string,
-	skill string,
-	agents config.AgentsConfig,
-	queue config.ExecutionQueueConfig,
-) (ralphloop.RunOptions, error) {
-	repo, err := git.FindRepo(worktreeRoot)
-	if err != nil {
-		return ralphloop.RunOptions{}, err
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		return ralphloop.RunOptions{}, err
-	}
-	return ralphloop.RunOptions{
-		StoreDir:            cfg.TicketStore.Path,
-		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second,
-		EpicName:            epicName,
-		Agent:               agent,
-		Agents:              agents,
-		Orchestrator:        cfg.Orchestrator,
-		SpinCycles:          queue.SpinCycles,
-		SpinWindow:          queue.SpinWindow,
-		Skill:               skill,
-		RepoDir:             repo.Root,
-		ScratchDir:          scratchDirFor(worktreeRoot),
-		MaxParallel:         max(maxParallel, 1),
-		TicketIDs:           ticketIDs,
-	}, nil
 }

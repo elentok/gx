@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -29,8 +28,7 @@ func TestModel_ScratchDirResolvesThroughStore(t *testing.T) {
 }
 
 // TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo verifies the
-// Tickets tab (Model), Queue tab (QueueModel), and implement run options all
-// resolve the same canonical `.scratch` regardless of which linked worktree
+// Tickets tab (Model) and Queue tab (QueueModel) both resolve the same canonical `.scratch` regardless of which linked worktree
 // of a bare-repo checkout they're scoped to.
 func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 	outer := testutil.TempDotBareRepoWithWorktrees(t, "feature", "other")
@@ -63,14 +61,6 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 		qm := loadQueueModel(t, NewQueueModel(wt, ui.Settings{}, map[string]bool{}, keys.Manager{}))
 		if len(qm.epics) != 1 {
 			t.Fatalf("QueueModel from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(qm.epics))
-		}
-
-		opts, err := buildImplementRunOptions(wt, "alpha", ralphloop.AgentClaude)
-		if err != nil {
-			t.Fatalf("buildImplementRunOptions from %q: %v", wt, err)
-		}
-		if opts.ScratchDir != wantScratchRoot {
-			t.Errorf("buildImplementRunOptions from %q: ScratchDir = %q, want %q", wt, opts.ScratchDir, wantScratchRoot)
 		}
 	}
 }

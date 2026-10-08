@@ -9,9 +9,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -33,43 +30,6 @@ func TestTicketProgressSpinnerFillsAndDrainsAtDocumentedCodepoints(t *testing.T)
 		if TicketProgressSpinner.Frames[i] != frame {
 			t.Errorf("frame %d: got %q, want %q", i, TicketProgressSpinner.Frames[i], frame)
 		}
-	}
-}
-
-func TestBuildImplementRunOptionsUsesSelectedAgent(t *testing.T) {
-	root := testutil.TempRepo(t)
-	linkStoreProject(t, root)
-	opts, err := buildImplementRunOptions(root, "my-epic", ralphloop.AgentCodex)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if opts.Agent != ralphloop.AgentCodex {
-		t.Fatalf("agent = %q, want %q", opts.Agent, ralphloop.AgentCodex)
-	}
-}
-
-func TestBuildImplementRunOptionsUsesConfiguredTicketConcurrency(t *testing.T) {
-	root := testutil.TempRepo(t)
-	linkStoreProject(t, root)
-	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentCodex, 5, nil, "gx-implement", config.AgentsConfig{}, config.ExecutionQueueConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if opts.MaxParallel != 5 {
-		t.Fatalf("MaxParallel = %d, want 5", opts.MaxParallel)
-	}
-}
-
-func TestBuildImplementRunOptionsForTicketsPassesResolvedAgentsConfig(t *testing.T) {
-	root := testutil.TempRepo(t)
-	linkStoreProject(t, root)
-	agents := config.AgentsConfig{Claude: config.AgentConfig{Model: "opus", Effort: "high"}}
-	opts, err := buildImplementRunOptionsForTickets(root, "my-epic", ralphloop.AgentClaude, 1, nil, "gx-implement", agents, config.ExecutionQueueConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if opts.Agents != agents {
-		t.Fatalf("Agents = %+v, want %+v", opts.Agents, agents)
 	}
 }
 

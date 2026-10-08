@@ -9,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -93,9 +92,7 @@ type QueueModel struct {
 	// Model.actionsMenu — a deliberate, narrow exception to this tab's
 	// otherwise read-only selection (ticket 08).
 	actionsMenu  actionsMenuModel
-	pendingEpics []checkedEpicPlan
 	runningEpics map[string]bool
-	runningAgent ralphloop.AgentKind
 	paused       bool
 	// foreignAttachPID is the pid of a different process currently holding
 	// the per-repo attach lock (ticket 05), refreshed alongside the epics
@@ -315,7 +312,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.checkOrder = snapshot.Order
 			m.queueStatus = snapshot.Status
 		}
-		firstLoad := !m.loaded
 		m.loaded = true
 		m.epics = msg.epics
 		m.foreignAttachPID = msg.foreignAttachPID
@@ -332,18 +328,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.autoRefreshStarted = true
 			cmds = append(cmds, cmdAutoRefresh())
 		}
-		// The initial OnPageActivated (fired from the very same tab-switch
-		// batch that triggers this load, see applySwitch) can race ahead of
-		// this msg — it reads the registry synchronously while epics are
-		// still loading async, so cmdCheckStrandedPending would otherwise
-		// scan an empty m.epics. Re-run it here, now that epics are
-		// definitely loaded, but only on the first load — a checked epic
-		// legitimately sits "checked, not running" between being checked and
-		// the user pressing Enter, so this can't fire on every reload without
-		// nagging mid-selection.
-		if firstLoad {
-			cmds = append(cmds, m.cmdCheckStrandedPending())
-		}
 		if m.serverAPI != nil {
 			cmds = append(cmds, m.syncServerRunState())
 		}
@@ -351,14 +335,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case autoRefreshMsg:
 		return m, tea.Batch(m.cmdLoadQueue(), cmdAutoRefresh())
-	case implementStartedMsg:
-		if m.executionStartedAt.IsZero() {
-			m.executionStartedAt = m.now()
-		}
-		m.runningEpics[msg.epicName] = true
-		m.markEpicTicketsRunning(msg.epicName)
-		closeCmd := m.syncRunSnapshot(msg.epicName)
-		return m, tea.Batch(cmdPollImplement(msg.epicName), m.implementSpinner.Tick, closeCmd)
 	case implementPollMsg:
 		snapshot, ok := ralphLoopRegistry.runSnapshot(msg.epicName)
 		if ok {
@@ -376,15 +352,12 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.finalizeEpicTicketStatus(msg.epicName)
 		delete(m.runningEpics, msg.epicName)
 		delete(m.live, msg.epicName)
-		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(ralphLoopRegistry.parkedEpics()) == 0
-		startCmd := m.startAvailableEpics()
+		executionComplete := !m.executionStartedAt.IsZero() && len(m.runningEpics) == 0 && len(ralphLoopRegistry.parkedEpics()) == 0
 		if executionComplete {
 			m.executionCompletedAt = m.now()
-			return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), startCmd, m.cmdLoadQueue())
+			return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.cmdLoadQueue())
 		}
-		return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), startCmd)
-	case implementFailedMsg:
-		return m, notify.Error(msg.err.Error())
+		return m, implementFinishedNotifyCmd(msg.epicName)
 	case queueSyncMsg:
 		return m.handleQueueSync(msg)
 	case spinner.TickMsg:
@@ -445,14 +418,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseClick(msg)
 	case cascadeDeleteConfirmedMsg:
 		return m.handleCascadeDeleteConfirmed(msg)
-	case queueDetachedLiveMsg:
-		return m.handleDetachedLiveDetected(msg)
-	case detachedLiveConfirmedMsg:
-		return m.handleDetachedLiveConfirmed(msg)
-	case queueStrandedPendingMsg:
-		return m.handleStrandedPendingDetected(msg)
-	case strandedPendingConfirmedMsg:
-		return m.handleStrandedPendingConfirmed(msg)
 	case queueActionAppliedMsg:
 		return m, m.cmdLoadQueue()
 	}
@@ -539,9 +504,8 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 // queueSyncMsg reports ralphLoopRegistry's full state as observed when the
 // Queue tab (re)gains focus. A poll chain's tea.Msg is dropped by the app
 // shell while this tab is backgrounded (see implementPollInterval's doc
-// comment), which would otherwise strand m.runningEpics/m.pendingEpics on
-// whatever they were the moment focus left — including never noticing a slot
-// freed up for backfill. OnPageActivated re-derives everything this tab needs
+// comment), which would otherwise strand m.runningEpics on whatever it was
+// the moment focus left. OnPageActivated re-derives everything this tab needs
 // from the registry's durable snapshots instead of trusting the messages that
 // arrived while it was away.
 type queueSyncMsg struct {
@@ -559,9 +523,7 @@ func (m QueueModel) OnPageActivated() tea.Cmd {
 }
 
 // byNameSnapshot indexes the loop registry's current run snapshots by epic
-// name, for callers (handleQueueSync, cmdCheckStrandedPending) that need to
-// know which epics the registry already considers running before deciding
-// what else to requeue.
+// name.
 func byNameSnapshot() map[string]RunSnapshot {
 	snapshots := ralphLoopRegistry.runSnapshots()
 	byName := make(map[string]RunSnapshot, len(snapshots))
@@ -581,10 +543,8 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 		if !ok {
 			continue
 		}
-		// Baseline: the checked selection this Model instance knows about,
-		// recorded even if it's reattaching to a run the registry never
-		// reported an OnScopeResolved callback for yet (e.g. right after
-		// tryStart). Idempotent — recordExecutionTicket dedups.
+		// Baseline: the checked selection this Model instance knows about.
+		// Idempotent — recordExecutionTicket dedups.
 		for _, ticketID := range plan.ticketIDs {
 			m.recordExecutionTicket(name, ticketID)
 		}
@@ -618,13 +578,9 @@ func (m QueueModel) handleQueueSync(msg queueSyncMsg) (tea.Model, tea.Cmd) {
 	if len(m.runningEpics) > 0 {
 		cmds = append(cmds, m.implementSpinner.Tick)
 	}
-	cmds = append(cmds, m.startAvailableEpics())
-	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(m.pendingEpics) == 0 && len(ralphLoopRegistry.parkedEpics()) == 0 {
+	if !m.executionStartedAt.IsZero() && m.executionCompletedAt.IsZero() && len(m.runningEpics) == 0 && len(ralphLoopRegistry.parkedEpics()) == 0 {
 		m.executionCompletedAt = m.now()
 		cmds = append(cmds, m.cmdLoadQueue())
-	}
-	if m.serverAPI == nil {
-		cmds = append(cmds, cmdCheckDetachedLive(m.worktreeRoot))
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -999,21 +955,11 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 type checkedEpicPlan struct {
 	epic tickets.Epic
-	// ticketIDs is the checked-set snapshot, always used for this Model's own
-	// progress accounting (executionTickets, runTicketIDs) regardless of
-	// dynamic.
+	// ticketIDs is the checked-set snapshot, used for this Model's own
+	// progress accounting (executionTickets, runTicketIDs).
 	ticketIDs []string
-	// dynamic reports whether ticketIDs covers every currently-eligible
-	// (non-done) ticket in epic, in which case startAvailableEpics launches
-	// with an empty RunOptions.TicketIDs so the run stays dynamic (rescans the
-	// epic on disk every claim, per ralphloop.ResolveRunScope) instead of
-	// freezing scope to this snapshot — matching the single-epic "i" launch
-	// path. A genuine subset (some eligible ticket deliberately left
-	// unchecked) still freezes to exactly ticketIDs.
-	dynamic bool
-	done    int
-	ordinal uint64
-	ordered bool
+	ordinal   uint64
+	ordered   bool
 }
 
 func (m QueueModel) checkedEpicPlans() []checkedEpicPlan {
@@ -1024,31 +970,20 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 	plans := make([]checkedEpicPlan, 0, len(epics))
 	for _, epic := range epics {
 		var ticketIDs []string
-		done := 0
-		eligible := 0
 		var ordinal uint64
 		ordered := false
 		for _, idx := range sortedTicketIndexes(epic) {
 			ticket := epic.Tickets[idx]
-			if !epic.RenderedStatus(ticket).Terminal() {
-				eligible++
-			}
 			if !checked[ticket.Path] {
 				continue
 			}
 			ticketIDs = append(ticketIDs, ticket.Identifier)
-			if epic.RenderedStatus(ticket).Terminal() {
-				done++
-			}
 			if checkedAt, ok := checkOrder[ticket.Path]; ok && (!ordered || checkedAt < ordinal) {
 				ordinal, ordered = checkedAt, true
 			}
 		}
 		if len(ticketIDs) > 0 {
-			plans = append(plans, checkedEpicPlan{
-				epic: epic, ticketIDs: ticketIDs, dynamic: len(ticketIDs) == eligible,
-				done: done, ordinal: ordinal, ordered: ordered,
-			})
+			plans = append(plans, checkedEpicPlan{epic: epic, ticketIDs: ticketIDs, ordinal: ordinal, ordered: ordered})
 		}
 	}
 	sort.SliceStable(plans, func(i, j int) bool {
@@ -1061,37 +996,6 @@ func checkedEpicPlansFor(epics []tickets.Epic, checked map[string]bool, checkOrd
 		return plans[i].epic.Name < plans[j].epic.Name
 	})
 	return plans
-}
-
-func (m *QueueModel) startAvailableEpics() tea.Cmd {
-	if m.serverAPI != nil {
-		return nil // the server claims queued tickets; the in-process loop must not
-	}
-	count := min(ralphLoopRegistry.availableSlots(), len(m.pendingEpics))
-	cmds := make([]tea.Cmd, 0, count)
-	for _, plan := range m.pendingEpics[:count] {
-		runTicketIDs := plan.ticketIDs
-		if plan.dynamic {
-			runTicketIDs = nil
-		}
-		cmds = append(cmds, cmdStartImplement(
-			m.worktreeRoot, plan.epic.Name, m.runningAgent, plan.done, len(plan.ticketIDs),
-			m.settings.MaxConcurrentTicketsPerEpic(), runTicketIDs, m.settings.Notifications,
-			m.settings.ImplementSkill(), m.settings.ResolvedAgents(), m.settings.ExecutionQueue,
-		))
-	}
-	m.pendingEpics = m.pendingEpics[count:]
-	if len(cmds) == 1 {
-		return cmds[0]
-	}
-	return func() tea.Msg {
-		messages := make(tea.BatchMsg, 0, len(cmds))
-		for _, cmd := range cmds {
-			msg := cmd()
-			messages = append(messages, func() tea.Msg { return msg })
-		}
-		return messages
-	}
 }
 
 // selectFirstRow/selectLastRow implement "gg"/"G": jump the queue selection

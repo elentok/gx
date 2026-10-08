@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -301,89 +300,5 @@ func TestModel_AddToQueueKeyNothingChecked(t *testing.T) {
 	}
 	if m.confirm.IsOpen {
 		t.Fatal("expected no confirmation with nothing checked")
-	}
-}
-
-// TestModel_AddToQueueKeyOpensConfirmationWithCount covers ticket 10: "a"
-// against a running epic with checked tickets opens the confirmation naming
-// the checked count, and never widens the scope before it's accepted.
-func TestModel_AddToQueueKeyOpensConfirmationWithCount(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
-	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
-		{Number: 1, Identifier: "01", Path: "/alpha/01.md", Status: "open"},
-		{Number: 2, Identifier: "02", Path: "/alpha/02.md", Status: "open"},
-	}}
-	r := newLoopRegistry(1)
-	r.tryStart("alpha", 0, 1)
-	scope, err := ralphloop.ResolveRunScope(epic, []string{"01"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.setScope("alpha", scope)
-	previous := ralphLoopRegistry
-	ralphLoopRegistry = r
-	t.Cleanup(func() {
-		r.finish("alpha", nil)
-		ralphLoopRegistry = previous
-	})
-
-	m := Model{epics: []tickets.Epic{epic}, checked: map[string]bool{"/alpha/02.md": true}}
-
-	updated, cmd := m.handleAddToQueueKey()
-	m = updated.(Model)
-	if cmd != nil {
-		t.Fatal("expected no cmd until the confirmation is accepted")
-	}
-	if !m.confirm.IsOpen {
-		t.Fatal("expected the confirmation modal to open")
-	}
-	if !strings.Contains(m.confirm.View(80), "Add 1 ticket(s) to the live queue?") {
-		t.Fatalf("confirm view = %q, want it to name the checked count", m.confirm.View(80))
-	}
-	if scope.Contains(epic.Tickets[1], epic) {
-		t.Fatal("expected the scope untouched before the confirmation is accepted")
-	}
-}
-
-// TestCmdAddToLiveQueueWidensRunningScope covers ticket 10's core mechanism:
-// accepting "a"'s confirmation widens the targeted epic's live RunScope via
-// ralphloop.RunScope.Add (ticket 09), making the added ticket claimable.
-func TestCmdAddToLiveQueueWidensRunningScope(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
-	epic := tickets.Epic{Name: "alpha", Tickets: []tickets.Ticket{
-		{Number: 1, Identifier: "01", Status: "open"},
-		{Number: 2, Identifier: "02", Status: "open"},
-	}}
-	r := newLoopRegistry(1)
-	r.tryStart("alpha", 0, 1)
-	scope, err := ralphloop.ResolveRunScope(epic, []string{"01"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	r.setScope("alpha", scope)
-	previous := ralphLoopRegistry
-	ralphLoopRegistry = r
-	t.Cleanup(func() {
-		r.finish("alpha", nil)
-		ralphLoopRegistry = previous
-	})
-
-	ticket02 := epic.Tickets[1]
-	if scope.Contains(ticket02, epic) {
-		t.Fatal("precondition: ticket 02 should not yet be in scope")
-	}
-
-	msg := cmdAddToLiveQueue("alpha", []string{"02"})()
-	notifyMsg, ok := msg.(notify.NotifyMsg)
-	if !ok || notifyMsg.Kind != notify.KindInfo {
-		t.Fatalf("cmdAddToLiveQueue msg = %#v, want an info notification", msg)
-	}
-
-	widened, ok := r.scopeFor("alpha")
-	if !ok {
-		t.Fatal("expected alpha still running")
-	}
-	if !widened.Contains(ticket02, epic) {
-		t.Fatal("expected ticket 02 to be in the widened scope after accepting")
 	}
 }

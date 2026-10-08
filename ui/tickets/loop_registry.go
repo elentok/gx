@@ -20,20 +20,13 @@ type epicRun struct {
 	done, total    int
 	sink           *ralphloop.ChannelEventSink
 	gate           *ralphloop.Gate
-	// scope is written once, by RunOptions.OnScopeResolved shortly after the
-	// run starts (see cmdStartImplement) — until then it's the zero RunScope,
-	// on which Add is a documented no-op.
+	// scope is the zero RunScope now that nothing starts a run in-process;
+	// Add on it is a documented no-op. 03b deletes it with the registry.
 	scope      ralphloop.RunScope
 	state      RunState
 	finalError string
-	// failureNotifier is set once, by cmdStartImplement right after
-	// tryStart, and used only by finish, after the drain below completes:
-	// it must stay live across the sink close/drain since the run has
-	// already returned by the time finish runs, so sink itself is nil by
-	// then (see ralphloop.EpicFailureReporter / EventSink.EpicFailed).
-	failureNotifier ralphloop.EpicFailureNotifier
-	tickets         map[string]RunTicketSnapshot
-	startedAt       time.Time
+	tickets    map[string]RunTicketSnapshot
+	startedAt  time.Time
 	// pendingNotifyCloses queues reattach-scan notification ids to close,
 	// populated by reduceLiveEvent (running in the event-drain goroutine,
 	// which has no way to send a tea.Cmd itself) and drained into an actual
@@ -58,11 +51,6 @@ type epicRun struct {
 	// parkedStalled is the human-clearable ticket list from the most recent
 	// LiveEventEpicParked, valid only while state == RunStateParked.
 	parkedStalled []ralphloop.StalledTicket
-	// permitReserved marks the concurrency slot tryStart took on this run's
-	// behalf as still unclaimed: the run's first Acquire consumes it instead of
-	// competing for a fresh slot, and finish gives it back if the run ended
-	// without ever acquiring.
-	permitReserved bool
 	// scratchDir is this run's repo `.scratch` dir, set unconditionally in
 	// tryStart (even "" when the caller omitted it) — the live cost
 	// aggregator's tick reads it to load the epic's on-disk state without
@@ -149,106 +137,20 @@ type loopRegistry struct {
 	// released once attachCount drops back to 0 in finish.
 	attachCount      int
 	attachScratchDir string
-	// attachErr carries the reason the most recent tryStart was rejected by
-	// the attach lock specifically (as opposed to same-process double-start
-	// or capacity), for the caller to surface instead of the generic
-	// "already running" message. Cleared at the start of every tryStart.
-	attachErr error
-	// activeCount/permitCond back Acquire/Release (ralphloop.Permit) and count
-	// slots tryStart has reserved but whose run has not acquired yet, so a
-	// parked run can hold a runs[] entry forever (ticket 08) without counting
-	// toward maxConcurrent while a just-started one still does.
+	// activeCount is the slots held by runs tryStart admitted and finish has
+	// not yet released.
 	activeCount int
-	permitCond  *sync.Cond
-	// permitErr records the most recent mismatched Release (see release), which
-	// would otherwise be invisible: the release is refused rather than allowed
-	// to drive activeCount negative and inflate the cap for the rest of the
-	// process's life.
-	permitErr error
 }
 
 func newLoopRegistry(maxConcurrent int) *loopRegistry {
-	r := &loopRegistry{
+	return &loopRegistry{
 		maxConcurrent: maxConcurrent,
 		runs:          map[string]*epicRun{},
 		snapshots:     map[string]*epicRun{},
 		lastErr:       map[string]error{},
 		pauseReasons:  map[string]bool{},
 	}
-	r.permitCond = sync.NewCond(&r.mu)
-	return r
 }
-
-// Acquire blocks until fewer than maxConcurrent epics currently hold a
-// permit, then takes one. Implements ralphloop.Permit for RunOptions.Permit.
-func (r *loopRegistry) Acquire() {
-	r.acquireFor("")
-}
-
-// acquireFor takes epicName's slot: the one tryStart already reserved for it
-// if that reservation is still unclaimed (so a started run never queues behind
-// the very cap it was admitted under), otherwise a fresh slot, blocking until
-// one frees. An epicName with no reservation — including "" — always takes the
-// blocking path.
-func (r *loopRegistry) acquireFor(epicName string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if run := r.runs[epicName]; run != nil && run.permitReserved {
-		run.permitReserved = false
-		return
-	}
-	for r.activeCount >= r.maxConcurrent {
-		r.permitCond.Wait()
-	}
-	r.activeCount++
-}
-
-// Release frees one permit this process previously acquired via Acquire,
-// waking any run currently blocked waiting for a slot.
-func (r *loopRegistry) Release() {
-	if err := r.release(); err != nil {
-		r.mu.Lock()
-		r.permitErr = err
-		r.mu.Unlock()
-	}
-}
-
-// release is Release's reportable form: it refuses a release that has no
-// matching acquire instead of decrementing past zero.
-func (r *loopRegistry) release() error {
-	r.mu.Lock()
-	if r.activeCount <= 0 {
-		r.mu.Unlock()
-		return fmt.Errorf("release of a concurrency permit that was never acquired")
-	}
-	r.activeCount--
-	r.mu.Unlock()
-	r.permitCond.Broadcast()
-	return nil
-}
-
-// permitError reports the most recent mismatched Release, or nil if every
-// release so far had a matching acquire.
-func (r *loopRegistry) permitError() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.permitErr
-}
-
-// permitFor is the ralphloop.Permit to hand epicName's run: its first Acquire
-// claims the slot tryStart reserved at start time, later ones (after a park
-// released it) queue like any other.
-func (r *loopRegistry) permitFor(epicName string) ralphloop.Permit {
-	return runPermit{registry: r, epicName: epicName}
-}
-
-type runPermit struct {
-	registry *loopRegistry
-	epicName string
-}
-
-func (p runPermit) Acquire() { p.registry.acquireFor(p.epicName) }
-func (p runPermit) Release() { p.registry.Release() }
 
 var ralphLoopRegistry = newLoopRegistry(ui.Settings{}.MaxConcurrentEpics())
 
@@ -262,7 +164,6 @@ func (r *loopRegistry) setMaxConcurrent(maxConcurrent int) {
 	r.mu.Lock()
 	r.maxConcurrent = max(maxConcurrent, 1)
 	r.mu.Unlock()
-	r.permitCond.Broadcast()
 }
 
 // budgetConfig is process-wide and write-once, loaded from config at
@@ -287,10 +188,10 @@ func SetNotificationsConfig(cfg config.NotificationsConfig) {
 	notificationsConfig = cfg
 }
 
-var runRalphLoop = ralphloop.Run
-
 // tryStart claims an epic slot and starts the stream drain before returning
 // the producer sink. Snapshots, rather than the channel, are shared with views.
+// Nothing in production starts a run any more; tests still use it to seed
+// registry state for the readers 03b deletes.
 //
 // scratchDir is variadic-as-optional so the many pre-existing callers
 // (mostly tests exercising slot/pause/concurrency logic, not the attach
@@ -301,17 +202,12 @@ var runRalphLoop = ralphloop.Run
 func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...string) (*ralphloop.ChannelEventSink, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.attachErr = nil
 	if r.anyPausedLocked() {
 		return nil, false
 	}
 	if _, exists := r.runs[epicName]; exists {
 		return nil, false
 	}
-	// Reserve the slot here, under the same lock that records the run: the run
-	// goroutine only reaches its own Acquire seconds later, after worktree and
-	// reconcile work, and until then a poll tick that saw free capacity would
-	// keep draining the pending list into runs that just block.
 	if r.activeCount >= r.maxConcurrent {
 		return nil, false
 	}
@@ -323,13 +219,8 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 	holdsAttach := false
 	if dir != "" {
 		if r.attachCount == 0 {
-			foreignPID, ok, err := acquireAttachLock(dir)
-			if err != nil {
-				r.attachErr = err
-				return nil, false
-			}
-			if !ok {
-				r.attachErr = fmt.Errorf("a ralph-loop is already running (attached by process %d)", foreignPID)
+			_, ok, err := acquireAttachLock(dir)
+			if err != nil || !ok {
 				return nil, false
 			}
 			r.attachScratchDir = dir
@@ -344,8 +235,7 @@ func (r *loopRegistry) tryStart(epicName string, done, total int, scratchDir ...
 		eventDrainDone: make(chan struct{}),
 		done:           done, total: total, sink: sink, gate: ralphloop.NewGate(),
 		state: RunStateRunning, tickets: map[string]RunTicketSnapshot{},
-		startedAt: time.Now(), holdsAttach: holdsAttach, permitReserved: true,
-		scratchDir: dir,
+		startedAt: time.Now(), holdsAttach: holdsAttach, scratchDir: dir,
 	}
 	r.activeCount++
 	r.runs[epicName] = run
@@ -645,36 +535,6 @@ func (r *loopRegistry) resumeParked(epicName string) {
 	run.gate.WakeParked()
 }
 
-func (r *loopRegistry) gateFor(epicName string) *ralphloop.Gate {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if run := r.runs[epicName]; run != nil {
-		return run.gate
-	}
-	return nil
-}
-
-// setScope records epicName's resolved RunScope, called back from
-// RunOptions.OnScopeResolved once Run has loaded the epic and resolved it.
-func (r *loopRegistry) setScope(epicName string, scope ralphloop.RunScope) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if run := r.runs[epicName]; run != nil {
-		run.scope = scope
-	}
-}
-
-// setFailureNotifier records the reporter finish will call, after the
-// drain, if the run ends in error. Called once by cmdStartImplement right
-// after tryStart, mirroring setScope.
-func (r *loopRegistry) setFailureNotifier(epicName string, notifier ralphloop.EpicFailureNotifier) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if run := r.runs[epicName]; run != nil {
-		run.failureNotifier = notifier
-	}
-}
-
 // scopeFor returns epicName's live RunScope, for "add to queue" (ticket 10)
 // to widen via RunScope.Add. ok is false once the epic is no longer running.
 func (r *loopRegistry) scopeFor(epicName string) (ralphloop.RunScope, bool) {
@@ -832,13 +692,6 @@ func (r *loopRegistry) finish(epicName string, err error) {
 		run.sink.Close()
 		<-run.eventDrainDone
 	}
-	if run != nil && err != nil && run.failureNotifier != nil {
-		// Fired after the drain completes, from a reporter that was
-		// constructed independently of the sink just closed above — the
-		// one way to still reach chat once the run has already returned
-		// (see ralphloop.EventSink.EpicFailed's doc comment).
-		run.failureNotifier.EpicFailed(epicName, err)
-	}
 
 	r.mu.Lock()
 	stopAggregator := false
@@ -849,11 +702,7 @@ func (r *loopRegistry) finish(epicName string, err error) {
 			run.finalError = err.Error()
 		}
 		run.sink = nil
-		if run.permitReserved {
-			run.permitReserved = false
-			r.activeCount--
-			r.permitCond.Broadcast()
-		}
+		r.activeCount--
 		if run.holdsAttach {
 			r.attachCount--
 			if r.attachCount <= 0 {
@@ -884,16 +733,6 @@ func (r *loopRegistry) lastError(epicName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.lastErr[epicName]
-}
-
-// takeAttachError returns and clears the reason the most recent tryStart was
-// rejected by the attach lock, or nil if that rejection had another cause.
-func (r *loopRegistry) takeAttachError() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	err := r.attachErr
-	r.attachErr = nil
-	return err
 }
 
 // isRunning reports whether any epic currently has a run in flight.

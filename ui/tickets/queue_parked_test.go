@@ -99,7 +99,10 @@ func TestQueueModelEnterOnParkedRowResumesEvenWhenCheckedAndLaunchable(t *testin
 		ralphLoopRegistry = previous
 	})
 
-	wake := r.gateFor("alpha").ParkWake()
+	r.mu.Lock()
+	gate := r.runs["alpha"].gate
+	r.mu.Unlock()
+	wake := gate.ParkWake()
 
 	m.View() // populate m.queueTree.Entries()
 	m = selectFirstQueueTicketRow(t, m)
