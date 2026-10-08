@@ -142,6 +142,7 @@ type Server struct {
 	parkFold    parkFold
 	parkHold    recoveryHold
 	defectScan  sync.Mutex
+	deadlocks   deadlocks
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 	rewatch     func()            // set by keepFresh when the watch is active
 

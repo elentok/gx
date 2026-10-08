@@ -24,12 +24,14 @@ type recoveryPlan struct {
 	log     []ralphloop.Event
 	entry   recovery.Entry
 	matched bool
+	// diagnose is an epic-level plan: it always investigates.
+	diagnose bool
 }
 
 // needsJudgment reports whether the failure goes to an investigation rather
 // than a rule entry.
 func (p recoveryPlan) needsJudgment() bool {
-	return !p.matched || p.entry.Executor == recovery.ExecutorAgent
+	return p.diagnose || !p.matched || p.entry.Executor == recovery.ExecutorAgent
 }
 
 // runsRemedy reports whether a rule remedy will run unattended, so the park's
@@ -43,6 +45,9 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	if !s.cfg.Recovery.Enabled || !f.Triggers() {
 		return recoveryPlan{}, false
 	}
+	if f.DiagnosisOnly() {
+		return s.planEpicRecovery(f)
+	}
 	ref, ok, err := s.findTicket(f.Address)
 	// An investigate ticket's own failure is a person's to handle, never another
 	// investigation: recovery must not recurse.
@@ -53,10 +58,29 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
 	acts := entry.Runnable(f) || entry.Proposable(f) || entry.Executor == recovery.ExecutorPerson
-	if f.DiagnosisOnly() || (!matched && f.NeedsMatch()) || (!plan.needsJudgment() && !acts) {
+	if (!matched && f.NeedsMatch()) || (!plan.needsJudgment() && !acts) {
 		return recoveryPlan{}, false
 	}
 	return plan, true
+}
+
+// planEpicRecovery plans an epic-level investigation for a diagnosis-only
+// failure, addressed by its root: no rule remedy runs on it, so a match only
+// names the entry the investigation is told about. Its run-log events are the
+// epic's own, with no ticket.
+func (s *Server) planEpicRecovery(f recovery.Failure) (recoveryPlan, bool) {
+	root, err := parseRootRef(f.Address)
+	if err != nil {
+		return recoveryPlan{}, false
+	}
+	projectDir, repo, err := s.projectOf(root.Project)
+	if err != nil {
+		return recoveryPlan{}, false
+	}
+	ref := ticketRef{addr: tickets.Address{Project: root.Project, Epic: root.Epic}, projectDir: projectDir, repo: repo}
+	log := s.ticketEvents(ref, f)
+	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
+	return recoveryPlan{ref: ref, log: log, entry: entry, matched: matched, diagnose: true}, true
 }
 
 // recoverAsync starts recovery for a failure that is already written. It runs
@@ -269,7 +293,9 @@ const (
 	maxRecoveriesPerTicket = 3
 )
 
-// ticketEvents is the ticket's run-log events, oldest first.
+// ticketEvents is the ticket's run-log events, oldest first. An epic-level ref
+// also gets every ticket's landing, reset and manual land: progress anywhere in
+// the epic clears its earlier recovery.
 func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Event {
 	log, _, err := ralphloop.ReadEvents(ref.projectDir, ref.addr.Epic)
 	if err != nil {
@@ -277,7 +303,7 @@ func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Eve
 	}
 	var mine []ralphloop.Event
 	for _, ev := range log {
-		if ev.Ticket == ref.addr.ID {
+		if ev.Ticket == ref.addr.ID || (ref.addr.ID == "" && clearsRecovery(events.Type(ev.Type))) {
 			mine = append(mine, ev)
 		}
 	}
@@ -301,7 +327,8 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 			if ev.Kind == string(f.Kind) && ev.Reason != investigateEntry && ev.Kind != string(events.ParentDefect) {
 				last = &log[i]
 			}
-		case events.CherryPicked, events.TicketReset, events.ManualLand:
+		}
+		if clearsRecovery(events.Type(ev.Type)) {
 			last = nil
 		}
 	}
@@ -314,6 +341,10 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 		return fmt.Sprintf("already recovered this ticket %d times", applied)
 	}
 	return ""
+}
+
+func clearsRecovery(t events.Type) bool {
+	return t == events.CherryPicked || t == events.TicketReset || t == events.ManualLand
 }
 
 // failureSequence is the ticket's events as the matcher sees them, ending in

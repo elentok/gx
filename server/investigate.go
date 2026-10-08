@@ -85,13 +85,22 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 	return child.String(), nil
 }
 
+// writeInvestigateTicket forks the investigation off the failed ticket, or, for
+// an epic-level ref, adds it as a top-level ticket of the epic.
 func writeInvestigateTicket(ref ticketRef, f recovery.Failure, entry string) (path, id string, err error) {
-	parent := schema.TicketID(ref.addr.ID)
+	subject, what, done := ref.addr.ID, "Ticket "+ref.addr.ID+" parked with", "the parked ticket recovered"
+	var parent *schema.TicketID
+	if ref.addr.ID == "" {
+		subject, what, done = "epic "+ref.addr.Epic, "Epic "+ref.addr.Epic+" is", "the epic moving again"
+	} else {
+		p := schema.TicketID(ref.addr.ID)
+		parent = &p
+	}
 	return writeNewTicket(filepath.Join(ref.projectDir, ref.addr.Epic), ref.addr.ID, "investigate", func(id string) (schema.Ticket, string) {
-		child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: &parent}
+		child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: parent}
 		body := fmt.Sprintf(
-			"\n# %s — Investigate %s\n\n## What to build\n\nTicket %s parked with %s (%s): %s\n\nFind out why and fix it or report what a person must do.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and the parked ticket recovered, or the findings reported\n",
-			id, parent, parent, f.Type, f.Kind, f.Reason, matchedEntryHeading, entry,
+			"\n# %s — Investigate %s\n\n## What to build\n\n%s %s (%s): %s\n\nFind out why and fix it or report what a person must do.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and %s, or the findings reported\n",
+			id, subject, what, f.Type, f.Kind, f.Reason, matchedEntryHeading, entry, done,
 		)
 		return child, body
 	})

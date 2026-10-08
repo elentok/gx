@@ -239,7 +239,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	if _, missing := s.unavailablePath(addr.Project); missing {
 		return false, nil
 	}
-	_, repo, err := s.projectOf(addr.Project)
+	projectDir, repo, err := s.projectOf(addr.Project)
 	if err != nil {
 		return false, err
 	}
@@ -253,6 +253,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		if filepath.Base(e.Path) != addr.Epic {
 			continue
 		}
+		s.checkDeadlock(root, projectDir, e)
 		frontier := ralphloop.Frontier(e)
 		if len(frontier) == 0 {
 			return false, nil

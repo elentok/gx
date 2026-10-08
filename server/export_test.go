@@ -91,6 +91,9 @@ func (s *Server) GateReleased(address string) bool { return s.registry.gateRelea
 // DropRun forgets a run the way its finish does.
 func (s *Server) DropRun(address string) { s.registry.delete(address) }
 
+// ClaimNext runs one claim pass now.
+func (s *Server) ClaimNext() { s.claimNext() }
+
 // RecoverAsync is recoverAsync for a failure the test raises itself.
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recoverAsync(f) }
 
