@@ -108,8 +108,32 @@ result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`
 `commitless`, `land_conflict_pending`, …), never on `message`.
 
 **Go-ahead.** Every write (`land`, `reset`, `unpark`, `land --continue/--abort`, a nudge) needs the
-human's explicit go-ahead in this session. `verify` is read-only and always free. An unattended
-auto-investigate agent has no go-ahead: it diagnoses, proposes the exact command, and stops.
+human's explicit go-ahead in this session. `verify` is read-only and always free. In attended mode
+this is the only rule; unattended mode is below.
+
+## Unattended mode
+
+An investigate ticket (`type: investigate`) runs this skill with no human in the session. Its prompt
+begins `Matched catalog entry: …` and names the entry. Everything above (background, state,
+diagnosis) applies unchanged; only the writes differ.
+
+<unattended-verbs>
+
+- allowed: `park`, `relaunch` — and only those the matched entry lists in its `verbs`. The entry's
+  verbs are the whole grant; the prompt's entry is the authority, not your own judgment of what
+  would help.
+- never: `land`, `reset`, `unpark`, `land --continue/--abort`, a pane nudge, or editing product code.
+
+</unattended-verbs>
+
+- **Entry matched** → diagnose, then apply only the entry's verbs against the failed ticket (the
+  investigate ticket's `parent`). Report at the action, as above.
+- **`No catalog entry matched`** → report the diagnosis and park the failed ticket. Do nothing else;
+  propose any other command in the report for a human to run.
+- Never wait for a go-ahead, and never ask: an unattended session has no one to answer.
+
+Attended mode (`m` → Investigate opens an interactive tab, not a ticket) keeps the human go-ahead
+exactly as before.
 
 **Completeness is your job, not `land`'s.** `land` always leaves the ticket `done`, so judge first:
 

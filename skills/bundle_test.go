@@ -233,6 +233,39 @@ func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
 	}
 }
 
+// TestInvestigateUnattendedVerbs pins the verbs the unattended gx-investigate
+// mode may apply to recovery.Verbs' two methods, and that the state-repair
+// commands stay forbidden.
+func TestInvestigateUnattendedVerbs(t *testing.T) {
+	raw := readFile(t, "gx-investigate/SKILL.md")
+	block := regexp.MustCompile(`(?s)<unattended-verbs>(.*?)</unattended-verbs>`).FindStringSubmatch(raw)
+	if block == nil {
+		t.Fatal("gx-investigate/SKILL.md has no <unattended-verbs> block")
+	}
+	var allowed, never string
+	for _, line := range strings.Split(block[1], "\n") {
+		switch {
+		case strings.HasPrefix(line, "- allowed:"):
+			allowed = line
+		case strings.HasPrefix(line, "- never:"):
+			never = line
+		}
+	}
+	for _, verb := range []string{"park", "relaunch"} {
+		if !strings.Contains(allowed, "`"+verb+"`") {
+			t.Errorf("allowed line missing verb %q: %q", verb, allowed)
+		}
+	}
+	for _, cmd := range []string{"land", "reset", "unpark"} {
+		if strings.Contains(allowed, "`"+cmd+"`") {
+			t.Errorf("allowed line must not list %q", cmd)
+		}
+		if !strings.Contains(never, "`"+cmd+"`") {
+			t.Errorf("never line missing %q: %q", cmd, never)
+		}
+	}
+}
+
 // bundleMarkdownFiles is every markdown file in the bundle directory, not
 // just requiredFiles — a skill that isn't a required runtime file still
 // instructs an agent.
