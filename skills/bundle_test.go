@@ -207,7 +207,7 @@ func TestRelativeReferencesResolve(t *testing.T) {
 // substring ban on "agent_status" would break the docs whose job is to
 // describe herdr's own pane-status field of that name. Requiring the
 // trailing colon catches the frontmatter-style mistake (`agent_status:` as a
-// YAML key) while leaving `` `agent_status` `` in prose and quoted JSON
+// YAML key) while leaving “ `agent_status` “ in prose and quoted JSON
 // payloads (`"agent_status": "blocked"`, where the colon follows a quote,
 // not the bare word) writable.
 var retiredTrackerTerms = []string{
