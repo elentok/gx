@@ -138,6 +138,29 @@ func TestSortedTicketIndexes_LetteredSiblingsFollowOriginalInFilenameOrder(t *te
 // itself has a child (03) nests two levels deep via ui/tree's entry-builder,
 // leaving an unrelated ticket (04) at the top level; collapsing the
 // grandparent hides both descendants while leaving 04 visible.
+func TestModel_TicketRows_NestsInvestigateChildUnderOneOff(t *testing.T) {
+	t.Parallel()
+	parent := "01"
+	epic := tickets.Epic{Path: "epic", Tickets: []tickets.Ticket{
+		{Number: 1, Identifier: "01", Path: "01", Status: "needs-answer", Type: "prompt"},
+		{Number: 2, Identifier: "02", Path: "02", Status: "open", Type: "investigate", Parent: &parent},
+	}}
+	m := Model{epics: []tickets.Epic{epic}}
+
+	var rows []row
+	for _, e := range m.buildSidebarEntries() {
+		if e.Value.kind != nodeTicket {
+			continue
+		}
+		if r, ok := rowFromEntry(e); ok {
+			rows = append(rows, r)
+		}
+	}
+	if len(rows) != 2 || rows[0].depth != 0 || !rows[0].hasChildren || rows[1].depth != 1 {
+		t.Fatalf("expected investigate child nested under its one-off, got %+v", rows)
+	}
+}
+
 func TestModel_TicketRows_NestsChildrenAtArbitraryDepthAndRespectsCollapse(t *testing.T) {
 	t.Parallel()
 	parent01, parent02 := "01", "02"

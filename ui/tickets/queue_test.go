@@ -165,6 +165,32 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 	}
 }
 
+// An investigate child nests under its one-off exactly as any fork child nests
+// under an epic ticket.
+func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "fix-it", "01-prompt.md", "Status: needs-answer\n\nBody.\n")
+	writeRawQueueTicket(t, root, "fix-it", "02-investigate.md", "---\nid: \"02\"\nstatus: open\ntype: investigate\nparent: \"01\"\n---\n\nBody.\n")
+
+	checked := map[string]bool{
+		ticketPath(root, "fix-it", "01-prompt.md"):      true,
+		ticketPath(root, "fix-it", "02-investigate.md"): true,
+	}
+	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+
+	rows := queueTicketEntries(m)
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d: %+v", len(rows), rows)
+	}
+	if rows[0].Value.ticket.ticket.Identifier != "01" || rows[0].Depth != 0 || !rows[0].HasChildren {
+		t.Fatalf("expected one-off 01 at depth 0 with children, got %+v", rows[0])
+	}
+	if rows[1].Value.ticket.ticket.Identifier != "02" || rows[1].Depth != 1 {
+		t.Fatalf("expected investigate child 02 nested at depth 1, got %+v", rows[1])
+	}
+}
+
 // queueTicketEntries filters m.queueTree.Entries() down to nodeQueueTicket
 // rows, dropping the per-epic separator/status/context/error entries
 // buildQueueEntries interleaves — the tree's own Depth/HasChildren/
