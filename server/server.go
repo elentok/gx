@@ -145,7 +145,7 @@ type Server struct {
 	parkHold    recoveryHold
 	defectScan  sync.Mutex
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
-	rewatch     func() // set by keepFresh when the watch is active
+	rewatch     func()            // set by keepFresh when the watch is active
 
 	chat        *ralphloop.ServerChat // nil when no chat destination is configured
 	registry    *runRegistry
