@@ -26,6 +26,7 @@ type ticketYAML struct {
 	Compactions           int          `yaml:"compactions,omitempty"`
 	Commitless            bool         `yaml:"commitless,omitempty"`
 	Notify                bool         `yaml:"notify,omitempty"`
+	Unique                string       `yaml:"unique,omitempty"`
 	SessionIDs            []string     `yaml:"session_ids,omitempty"`
 	IterationStatus       string       `yaml:"iteration_status,omitempty"`
 	ParkKind              string       `yaml:"park_kind,omitempty"`
@@ -63,6 +64,7 @@ func (w ticketYAML) toTicket() Ticket {
 		Compactions:           w.Compactions,
 		Commitless:            w.Commitless,
 		Notify:                w.Notify,
+		Unique:                w.Unique,
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       IterationStatus(w.IterationStatus),
 		ParkKind:              ParkKind(w.ParkKind),
@@ -90,6 +92,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Compactions:           t.Compactions,
 		Commitless:            t.Commitless,
 		Notify:                t.Notify,
+		Unique:                t.Unique,
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
 		ParkKind:              string(t.ParkKind),

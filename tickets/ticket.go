@@ -66,6 +66,9 @@ type Ticket struct {
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool
 
+	// Unique mirrors schema.Ticket.Unique.
+	Unique string
+
 	// ParkKind mirrors schema.Ticket.ParkKind: which of ralph-loop's
 	// needs-answer producers parked this ticket, empty for a ticket parked
 	// before that field existed (or never parked).

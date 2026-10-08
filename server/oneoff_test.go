@@ -210,3 +210,37 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 		t.Error("a refused submit left an epic behind")
 	}
 }
+
+func TestOneOff_DuplicateLiveRefusedByFileKey(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	ctx := context.Background()
+	dir := t.TempDir()
+	file := filepath.Join(dir, "payload.md")
+	if err := os.WriteFile(file, []byte("do the thing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.md")
+	if err := os.Symlink(file, link); err != nil {
+		t.Fatal(err)
+	}
+	first, err := h.Client.OneOff(ctx, server.OneOffRequest{File: file, Cwd: repo})
+	if err != nil || first.Refused {
+		t.Fatalf("first: %+v, %v", first, err)
+	}
+	for name, f := range map[string]string{"same file": file, "symlink": link} {
+		res, err := h.Client.OneOff(ctx, server.OneOffRequest{File: f, Cwd: repo})
+		if err != nil || !res.Refused || res.Reason != server.ReasonDuplicateLive || res.Address != first.Address {
+			t.Errorf("%s: %+v, %v; want duplicate-live naming %s", name, res, err, first.Address)
+		}
+	}
+	if res, err := h.Client.OneOff(ctx, server.OneOffRequest{File: file, Cwd: repo, NoUnique: true}); err != nil || res.Refused {
+		t.Errorf("--no-unique: %+v, %v; want accepted", res, err)
+	}
+	if res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "plain", Cwd: repo}); err != nil || res.Refused {
+		t.Errorf("plain prompt: %+v, %v; want accepted", res, err)
+	}
+	evs, err := os.ReadFile(filepath.Join(h.TicketStore, "proj", strings.Split(strings.TrimPrefix(first.Address, "proj:"), "/")[0], "run-log.jsonl"))
+	if err != nil || !strings.Contains(string(evs), `"type":"submit-refused"`) || !strings.Contains(string(evs), `"kind":"duplicate-live"`) {
+		t.Errorf("run log lacks the submit-refused event: %v\n%s", err, evs)
+	}
+}

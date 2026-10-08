@@ -17,6 +17,10 @@ import (
 // exitServerNotRunning is the one-off submit's exit code when the server is down.
 const exitServerNotRunning = 8
 
+// exitDuplicateLive is the one-off submit's exit code when a live ticket has the
+// same dedupe key.
+const exitDuplicateLive = 7
+
 func newServerOneOffCmd() *cobra.Command {
 	var req server.OneOffRequest
 	var jsonOut bool
@@ -61,6 +65,9 @@ func newServerOneOffCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&req.Front, "front", false, "queue it at the head instead of the tail")
 	cmd.Flags().BoolVar(&req.Notify, "notify", false, "send the ticket's Result to chat when it succeeds (a park always notifies)")
 	cmd.Flags().StringVar(&req.File, "file", "", "markdown payload (frontmatter + body); flags override its frontmatter. Read by the server, so localhost only")
+	cmd.Flags().StringVar(&req.Unique, "unique", "", "dedupe key: refuse while a live ticket of the project has it (--file defaults to its resolved path)")
+	cmd.Flags().BoolVar(&req.NoUnique, "no-unique", false, "do not dedupe, even with --file")
+	cmd.MarkFlagsMutuallyExclusive("unique", "no-unique")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of the address")
 	return cmd
 }
@@ -76,6 +83,7 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	down := res.Refused && res.Reason == server.ReasonServerNotRunning
+	dup := res.Refused && res.Reason == server.ReasonDuplicateLive
 	if jsonOut {
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
@@ -90,6 +98,11 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 	if down {
 		fmt.Fprintf(errW, "refused (%s): %s\n", res.Reason, res.Message)
 		return &ExitError{Code: exitServerNotRunning}
+	}
+	if dup {
+		fmt.Fprintf(errW, "refused (%s): %s\n", res.Reason, res.Message)
+		fmt.Fprintln(w, res.Address)
+		return &ExitError{Code: exitDuplicateLive}
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)

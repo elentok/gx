@@ -30,6 +30,7 @@ const (
 	ReasonBadBlocker    = "invalid-blocker"
 	ReasonBadWindow     = "invalid-context-window"
 	ReasonBadFile       = "invalid-file"
+	ReasonDuplicateLive = "duplicate-live"
 )
 
 // OneOffStatusQueued is the status a successful submit reports: it is created
@@ -67,6 +68,10 @@ type OneOffRequest struct {
 	// Its frontmatter fills every field left unset here; the body is the prompt
 	// when Prompt is empty.
 	File string `json:"file,omitempty"`
+	// Unique is the dedupe key; a --file submit defaults it to the file's
+	// resolved path unless NoUnique is set. A plain prompt has none.
+	Unique   string `json:"unique,omitempty"`
+	NoUnique bool   `json:"no_unique,omitempty"`
 }
 
 // oneOffFileFrontmatter is the subset of a payload file's frontmatter a submit
@@ -81,6 +86,7 @@ type oneOffFileFrontmatter struct {
 	BlockedBy             []string `yaml:"blocked_by"`
 	ExpectedContextWindow int      `yaml:"expected_context_window"`
 	Front                 bool     `yaml:"front"`
+	Unique                string   `yaml:"unique"`
 }
 
 // applyFile merges the payload file into req; anything already set on req wins.
@@ -109,6 +115,7 @@ func (req *OneOffRequest) applyFile() error {
 	setIfEmpty(&req.Agent, fm.Agent)
 	setIfEmpty(&req.Type, fm.Type)
 	setIfEmpty(&req.Base, fm.Base)
+	setIfEmpty(&req.Unique, fm.Unique)
 	req.Commits = req.Commits || fm.Commits
 	req.Front = req.Front || fm.Front
 	if len(req.BlockedBy) == 0 {
@@ -140,6 +147,18 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 		if err := req.applyFile(); err != nil {
 			return oneOffRefusal(ReasonBadFile, err.Error()), nil
 		}
+		if req.Unique == "" && !req.NoUnique {
+			resolved, err := filepath.EvalSymlinks(req.File)
+			if err != nil {
+				return oneOffRefusal(ReasonBadFile, err.Error()), nil
+			}
+			if req.Unique, err = filepath.Abs(resolved); err != nil {
+				return oneOffRefusal(ReasonBadFile, err.Error()), nil
+			}
+		}
+	}
+	if req.NoUnique {
+		req.Unique = ""
 	}
 	prompt := strings.TrimSpace(req.Prompt)
 	if prompt == "" {
@@ -174,7 +193,12 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	if _, err := tickets.ParseAddress(addr.String(), tickets.AddressContext{}); err != nil {
 		return oneOffRefusal(ReasonInvalidAddress, "name "+epic+" is not usable in a ticket address"), nil
 	}
-	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Base: req.Base, Notify: req.Notify, ExpectedContextWindow: req.ExpectedContextWindow}
+	if dup, err := s.liveDuplicate(dir, req.Unique); err != nil {
+		return OneOffResult{}, err
+	} else if dup != nil {
+		return dup.refusal(project, dir)
+	}
+	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Base: req.Base, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
 	if refused := s.oneOffOptionsRefusal(project, dir, tk, req); refused != nil {
 		return *refused, nil
 	}
@@ -205,6 +229,48 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
 	return OneOffResult{Address: addr.String(), Status: OneOffStatusQueued}, nil
+}
+
+// duplicate is the live ticket a submit's dedupe key collides with.
+type duplicate struct {
+	epic, id string
+}
+
+// liveDuplicate finds a ticket of the project carrying key that is not done or
+// cancelled; parked copies count as live. Reads the files, not the index, so a
+// just-written ticket is seen.
+func (s *Server) liveDuplicate(projectDir, key string) (*duplicate, error) {
+	if key == "" {
+		return nil, nil
+	}
+	epics, err := tickets.Load(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range epics {
+		for _, t := range e.Tickets {
+			terminal := t.Status == string(schema.StatusDone) || t.Status == string(schema.StatusCancelled)
+			if t.Unique == key && !terminal {
+				return &duplicate{epic: filepath.Base(e.Path), id: t.DisplayNumber()}, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+// refusal records the refusal in the duplicate's epic log (a refused submit
+// has no epic of its own) and answers with the duplicate's address.
+func (d *duplicate) refusal(project, projectDir string) (OneOffResult, error) {
+	addr := tickets.Address{Project: project, Epic: d.epic, ID: d.id}.String()
+	if err := ralphloop.AppendEvent(projectDir, d.epic, ralphloop.Event{
+		Time: time.Now(), Type: string(events.SubmitRefused), Ticket: d.id, Address: addr,
+		Kind: string(events.DuplicateLive), Reason: "a live ticket already has this dedupe key",
+	}); err != nil {
+		return OneOffResult{}, err
+	}
+	res := oneOffRefusal(ReasonDuplicateLive, addr+" already has this dedupe key")
+	res.Address = addr
+	return res, nil
 }
 
 // notifyResult sends a landed ticket's ## Result to chat when its submit asked
