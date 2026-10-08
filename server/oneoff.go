@@ -24,6 +24,10 @@ const (
 	ReasonEmptyPrompt   = "empty-prompt"
 	ReasonUnknownProj   = "unknown-project"
 	ReasonBadTicketType = "invalid-type"
+	ReasonNoCommits     = "commits-unsupported"
+	ReasonBadBase       = "invalid-base"
+	ReasonBadBlocker    = "invalid-blocker"
+	ReasonBadWindow     = "invalid-context-window"
 )
 
 // OneOffStatusQueued is the status a successful submit reports: it is created
@@ -46,6 +50,15 @@ type OneOffRequest struct {
 	Agent string `json:"agent,omitempty"`
 	// Type defaults to prompt.
 	Type string `json:"type,omitempty"`
+	// Commits makes the ticket type implement; a project without a VCS refuses it.
+	Commits bool `json:"commits,omitempty"`
+	// Base overrides the derived base; only a commit-landing ticket has one.
+	Base string `json:"base,omitempty"`
+	// BlockedBy are addresses of tickets in the same project.
+	BlockedBy             []string `json:"blocked_by,omitempty"`
+	ExpectedContextWindow int      `json:"expected_context_window,omitempty"`
+	// Front queues it at the head instead of the tail.
+	Front bool `json:"front,omitempty"`
 }
 
 // OneOffResult is a submit's answer; a refusal creates nothing.
@@ -71,8 +84,11 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	typ := schema.TicketType(req.Type)
 	if req.Type == "" {
 		typ = schema.TypePrompt
+		if req.Commits {
+			typ = schema.TypeImplement
+		}
 	}
-	if !typ.Valid() {
+	if !typ.Valid() || (req.Commits && typ != schema.TypeImplement) {
 		return oneOffRefusal(ReasonBadTicketType, fmt.Sprintf("unknown ticket type %q", req.Type)), nil
 	}
 	if s.cfg.Orchestrator != config.OrchestratorServer {
@@ -94,7 +110,15 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	if _, err := tickets.ParseAddress(addr.String(), tickets.AddressContext{}); err != nil {
 		return oneOffRefusal(ReasonInvalidAddress, "name "+epic+" is not usable in a ticket address"), nil
 	}
-	if err := writeOneOffTicket(dir, epic, typ, prompt); err != nil {
+	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Base: req.Base, ExpectedContextWindow: req.ExpectedContextWindow}
+	if refused := s.oneOffOptionsRefusal(project, dir, tk, req); refused != nil {
+		return *refused, nil
+	}
+	for _, b := range req.BlockedBy {
+		a, _ := tickets.ParseAddress(b, tickets.AddressContext{})
+		tk.BlockedBy = append(tk.BlockedBy, schema.TicketID(a.Epic+"/"+a.ID))
+	}
+	if err := writeOneOffTicket(dir, epic, tk, prompt); err != nil {
 		if os.IsExist(err) {
 			return oneOffRefusal(ReasonNameTaken, project+":"+epic+" already exists"), nil
 		}
@@ -109,7 +133,7 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		return OneOffResult{}, err
 	}
-	q, err := s.queueAdd(QueueRequest{Address: addr.String(), Agent: req.Agent})
+	q, err := s.queueAdd(QueueRequest{Address: addr.String(), Agent: req.Agent, Front: req.Front})
 	if err != nil {
 		return OneOffResult{}, err
 	}
@@ -117,6 +141,46 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
 	return OneOffResult{Address: addr.String(), Status: OneOffStatusQueued}, nil
+}
+
+// oneOffOptionsRefusal checks the submit options before anything is written. A
+// blocker must be a ticket of the same project (no cross-project blocking).
+func (s *Server) oneOffOptionsRefusal(project, dir string, tk schema.Ticket, req OneOffRequest) *OneOffResult {
+	refuse := func(reason, msg string) *OneOffResult {
+		r := oneOffRefusal(reason, msg)
+		return &r
+	}
+	if req.Commits {
+		pf, err := config.ReadProjectFile(dir)
+		if err == nil && pf.VCS != nil && *pf.VCS == config.VCSNone {
+			return refuse(ReasonNoCommits, project+" has no VCS, so its tickets never commit")
+		}
+	}
+	if req.ExpectedContextWindow < 0 {
+		return refuse(ReasonBadWindow, "expected context window must be non-negative")
+	}
+	if req.Base != "" && tk.IsCommitless() {
+		return refuse(ReasonBadBase, "--base needs --commits: a commitless ticket has no branch to base")
+	}
+	if len(req.BlockedBy) == 0 {
+		return nil
+	}
+	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+		r := oneOffRefusal(ReasonBadBlocker, err.Error())
+		return &r
+	}
+	for _, b := range req.BlockedBy {
+		a, err := tickets.ParseAddress(b, tickets.AddressContext{})
+		switch {
+		case err != nil:
+			return refuse(ReasonBadBlocker, err.Error())
+		case a.Project != project:
+			return refuse(ReasonBadBlocker, b+" is in another project (cross-project blocking not supported)")
+		case !s.hasTicket(a.String()):
+			return refuse(ReasonBadBlocker, "no ticket "+b)
+		}
+	}
+	return nil
 }
 
 // oneOffProject picks the project: the explicit one, else the registered
@@ -188,7 +252,7 @@ func defaultOneOffName(prompt string) string {
 
 // writeOneOffTicket creates the epic directory and its single ticket. The
 // directory creation is the uniqueness check: an existing epic is os.ErrExist.
-func writeOneOffTicket(projectDir, epic string, typ schema.TicketType, prompt string) error {
+func writeOneOffTicket(projectDir, epic string, tk schema.Ticket, prompt string) error {
 	epicDir := filepath.Join(projectDir, epic)
 	if err := os.MkdirAll(projectDir, 0o755); err != nil {
 		return err
@@ -200,7 +264,7 @@ func writeOneOffTicket(projectDir, epic string, typ schema.TicketType, prompt st
 	if err := os.Mkdir(issues, 0o755); err != nil {
 		return err
 	}
-	out, err := schema.MarshalTicket(schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ}, "\n"+prompt+"\n")
+	out, err := schema.MarshalTicket(tk, "\n"+prompt+"\n")
 	if err != nil {
 		return err
 	}

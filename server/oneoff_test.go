@@ -104,3 +104,78 @@ func TestOneOff_RefusesEmptyPromptAndUnknownProject(t *testing.T) {
 		t.Fatalf("unknown project: %+v, %v", res, err)
 	}
 }
+
+func readOneOffTicket(t *testing.T, h *servertest.Harness, addr string) string {
+	t.Helper()
+	a, err := tickets.ParseAddress(addr, tickets.AddressContext{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join(h.TicketStore, a.Project, a.Epic, "issues", "01-*.md"))
+	if len(files) != 1 {
+		t.Fatalf("ticket files = %v", files)
+	}
+	raw, _ := os.ReadFile(files[0])
+	return string(raw)
+}
+
+func TestOneOff_FrontQueuesAtHead(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	ctx := context.Background()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+		t.Fatalf("seed queue: %+v, %v", res, err)
+	}
+	res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "urgent", Cwd: repo, Front: true})
+	if err != nil || res.Refused {
+		t.Fatalf("one-off: %+v, %v", res, err)
+	}
+	q, _ := h.Client.QueueItems(ctx)
+	if len(q) != 2 || q[0].Address != res.Address {
+		t.Fatalf("queue = %+v; want the one-off first", q)
+	}
+}
+
+func TestOneOff_CommitsOptionsLandInFrontmatter(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	res, err := h.Client.OneOff(context.Background(), server.OneOffRequest{
+		Prompt: "build it", Cwd: repo, Commits: true, Base: "main",
+		BlockedBy: []string{"proj:epic-a/01"}, ExpectedContextWindow: 40000,
+	})
+	if err != nil || res.Refused {
+		t.Fatalf("one-off: %+v, %v", res, err)
+	}
+	raw := readOneOffTicket(t, h, res.Address)
+	for _, want := range []string{"type: implement", "base: main", "epic-a/01", "expected_context_window: 40000"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("ticket lacks %q:\n%s", want, raw)
+		}
+	}
+}
+
+func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	ctx := context.Background()
+	cases := []struct {
+		name   string
+		req    server.OneOffRequest
+		reason string
+	}{
+		{"commits in a vcs none project", server.OneOffRequest{Prompt: "x", Commits: true}, server.ReasonNoCommits},
+		{"base without commits", server.OneOffRequest{Prompt: "x", Cwd: repo, Base: "main"}, server.ReasonBadBase},
+		{"unknown blocker", server.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"proj:epic-a/09"}}, server.ReasonBadBlocker},
+		{"cross-project blocker", server.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"scratch:e/01"}}, server.ReasonBadBlocker},
+	}
+	for _, c := range cases {
+		c.req.Name = "refused-job"
+		res, err := h.Client.OneOff(ctx, c.req)
+		if err != nil || !res.Refused || res.Reason != c.reason {
+			t.Errorf("%s: %+v, %v; want refusal %s", c.name, res, err, c.reason)
+		}
+	}
+	if q, _ := h.Client.QueueItems(ctx); len(q) != 0 {
+		t.Errorf("queue = %+v; want empty", q)
+	}
+	if _, err := os.Stat(filepath.Join(h.TicketStore, "proj", "refused-job")); err == nil {
+		t.Error("a refused submit left an epic behind")
+	}
+}

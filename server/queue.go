@@ -73,6 +73,8 @@ type QueueRequest struct {
 	ParkReason string `json:"park_reason,omitempty"`
 	// Stop lets a cancel stop the live pane of a claimed ticket instead of refusing.
 	Stop bool `json:"stop,omitempty"`
+	// Front makes an add land at the head of the queue instead of the tail.
+	Front bool `json:"front,omitempty"`
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a
@@ -231,7 +233,11 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 				return nil, &r
 			}
 		}
-		return append(items, QueueItem{Address: addr, Agent: string(agent)}), nil
+		item := QueueItem{Address: addr, Agent: string(agent)}
+			if req.Front {
+				return append([]QueueItem{item}, items...), nil
+			}
+			return append(items, item), nil
 	})
 }
 
