@@ -91,8 +91,12 @@ type Event struct {
 	// session-data lookup key alongside AgentSession.
 	Cwd    string `json:"cwd,omitempty"`
 	Reason string `json:"reason,omitempty"`
-	// Text (nudged events only) is what was typed into the pane.
+	// Text is what was typed into the pane (nudged) or the exact verbs a
+	// recovery proposes, one per line (recovery-proposed).
 	Text string `json:"text,omitempty"`
+	// Fingerprint (recovery-proposed only) is the ticket file's hash right after
+	// the proposal was written; approve refuses a proposal once it differs.
+	Fingerprint string `json:"fingerprint,omitempty"`
 	// Kind (failure and recovery events) is the closed-enum cause from the
 	// events package; required on the types events.KindRequired names.
 	Kind string `json:"kind,omitempty"`

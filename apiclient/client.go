@@ -252,6 +252,11 @@ func (c *Client) TicketCancel(ctx context.Context, address string, stop bool) (s
 	return c.queueWriteTo(ctx, "/v1/tickets/cancel", server.QueueRequest{Address: address, Stop: stop})
 }
 
+// TicketApprove runs the ticket's latest recovery proposal.
+func (c *Client) TicketApprove(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/approve", server.QueueRequest{Address: address})
+}
+
 // TicketRelaunch starts a fresh iteration of a ticket.
 func (c *Client) TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address})

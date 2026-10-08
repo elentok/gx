@@ -626,6 +626,20 @@ func newServerTicketsCmd() *cobra.Command {
 	cancel.Flags().BoolVar(&cancelJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(cancel)
 
+	var approveJSON bool
+	approve := &cobra.Command{
+		Use:   "approve <project:epic/NN>",
+		Short: "run a ticket's latest recovery proposal",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketApprove(ctx, args[0])
+			})
+		},
+	}
+	approve.Flags().BoolVar(&approveJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(approve)
+
 	var relaunchJSON bool
 	relaunch := &cobra.Command{
 		Use:   "relaunch <project:epic/NN>",

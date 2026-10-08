@@ -171,7 +171,7 @@ func TestSetSection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := setSection(tt.body, tt.heading, tt.content); got != tt.want {
+			if got := schema.SetSection(tt.body, tt.heading, tt.content); got != tt.want {
 				t.Errorf("got:\n%q\nwant:\n%q", got, tt.want)
 			}
 		})

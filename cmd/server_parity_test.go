@@ -42,6 +42,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/tickets/verify":    "server tickets verify",
 	"POST /v1/tickets/cancel":    "server tickets cancel",
 	"POST /v1/tickets/park":      "server tickets park",
+	"POST /v1/tickets/approve":   "server tickets approve",
 	"POST /v1/tickets/relaunch":  "server tickets relaunch",
 	"POST /v1/tickets/nudge":     "server tickets nudge",
 }

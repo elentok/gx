@@ -21,6 +21,11 @@ import (
 // rule that relaunches a manually parked ticket, and reports each remedy result.
 func startRecovery(t *testing.T, optOut bool) (*servertest.Harness, <-chan recovery.Result) {
 	t.Helper()
+	return startRecoveryWith(t, optOut, recovery.AuthorityLow)
+}
+
+func startRecoveryWith(t *testing.T, optOut bool, authority recovery.Authority) (*servertest.Harness, <-chan recovery.Result) {
+	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -34,7 +39,7 @@ func startRecovery(t *testing.T, optOut bool) (*servertest.Harness, <-chan recov
 	results := make(chan recovery.Result, 4)
 	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{
 		ID: "TEST", Type: events.NeedsRepair, Kind: events.ManualPark,
-		Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true,
+		Executor: recovery.ExecutorRule, Authority: authority, Enabled: true,
 		Remedy: func(f recovery.Failure, v recovery.Verbs) error {
 			res, err := v.Relaunch(f.Address)
 			results <- res
@@ -187,5 +192,84 @@ func TestRecovery_TicketOptOutNeverTriggers(t *testing.T) {
 	case res := <-results:
 		t.Fatalf("recover: false ticket ran a remedy: %+v", res)
 	case <-time.After(500 * time.Millisecond):
+	}
+}
+
+// proposeByParking parks ticket 01 under a high-authority rule and waits for
+// its proposal.
+func proposeByParking(t *testing.T) (h *servertest.Harness, results <-chan recovery.Result, ticketPath string) {
+	t.Helper()
+	h, results = startRecoveryWith(t, false, recovery.AuthorityHigh)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+		t.Fatalf("park = %+v, %v", res, err)
+	}
+	dir := filepath.Join(h.TicketStore, "proj")
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryProposed {
+				if ev.Text != "relaunch proj:epic-a/01" {
+					t.Fatalf("proposed text = %q, want the exact relaunch verb", ev.Text)
+				}
+				return h, results, filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("no recovery-proposed event")
+	return
+}
+
+func TestRecovery_HighAuthorityMatchProposesWithoutActing(t *testing.T) {
+	_, results, path := proposeByParking(t)
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "## Proposed Remedy") || !strings.Contains(string(data), "relaunch proj:epic-a/01") {
+		t.Errorf("ticket lacks the Proposed Remedy section:\n%s", data)
+	}
+	select {
+	case res := <-results:
+		// The proposal itself runs the remedy against a recorder, which has no actor.
+		if res.Actor != "" {
+			t.Fatalf("high-authority remedy ran: %+v", res)
+		}
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+func TestRecovery_ApproveRunsTheLatestProposal(t *testing.T) {
+	h, results, _ := proposeByParking(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// Approve only runs what the proposal recorded.
+	res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01")
+	if err != nil || res.Refused {
+		t.Fatalf("approve = %+v, %v", res, err)
+	}
+	_ = results
+	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	var got *ralphloop.Event
+	for i, ev := range log {
+		if events.Type(ev.Type) == events.RecoveryApplied {
+			got = &log[i]
+		}
+	}
+	if got == nil || got.Outcome != "ok" {
+		t.Fatalf("applied = %+v, want ok", got)
+	}
+}
+
+func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
+	h, _, path := proposeByParking(t)
+	data, _ := os.ReadFile(path)
+	if err := os.WriteFile(path, append(data, []byte("\nhand edit\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Reason != server.ReasonProposalStale {
+		t.Errorf("approve = %+v, %v, want proposal-stale", res, err)
 	}
 }
