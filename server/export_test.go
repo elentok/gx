@@ -50,6 +50,9 @@ func (s *Server) ParkAs(address string, kind events.Kind, reason string) error {
 // SetCostOf swaps how an iteration's cost is read.
 func (s *Server) SetCostOf(f func(IterationInfo) (float64, bool)) { s.costOf = f }
 
+// Rescan rescans the store now, as a ping or the watch would.
+func (s *Server) Rescan() { s.rescan() }
+
 // PollBudget runs one budget poll now.
 func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
 

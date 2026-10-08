@@ -18,13 +18,14 @@ type Failure struct {
 
 // Triggers reports whether a failure of this shape may start recovery at all:
 // every needs-repair kind except budget-killed (a deliberate stop), needs-answer
-// zero-commit, needs-answer blocked-pane, a deadlock and a held background-task
-// gate (R10). Self-reported parks and commitless finishes are a person's or the
-// ticket's own decision, never recovered; a rate-limit pause (R8) is healthy
-// waiting. Whether a blocked pane actually runs is the matcher's call.
+// zero-commit, needs-answer blocked-pane, a deadlock, a held background-task
+// gate (R10) and a ticket-graph defect a scan found (R14). Self-reported parks
+// and commitless finishes are a person's or the ticket's own decision, never
+// recovered; a rate-limit pause (R8) is healthy waiting. Whether a blocked pane
+// actually runs is the matcher's call.
 func (f Failure) Triggers() bool {
 	switch f.Type {
-	case events.BackgroundTaskGateHeld:
+	case events.BackgroundTaskGateHeld, events.TicketGraphDefect:
 		return true
 	case events.NeedsRepair:
 		return f.Kind != events.BudgetKilled && f.Kind != events.SelfReported
@@ -68,6 +69,9 @@ type Verbs interface {
 	// Finish waits, bounded, for the released iteration's ordinary finish
 	// path to end; a run still live at the bound is a refusal.
 	Finish(address string) (Result, error)
+	// SetParent writes the ticket's parent, refusing when the ticket's parent
+	// is no longer a defect or the named parent is not in the epic.
+	SetParent(address, parent string) (Result, error)
 	// LaunchPrompt is the prompt a fresh iteration of the ticket is launched
 	// with. It is a read, not a verb: the run log never records the prompt.
 	LaunchPrompt(address string) (string, error)

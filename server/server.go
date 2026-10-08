@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/config"
@@ -142,6 +143,7 @@ type Server struct {
 	herdr       herdrWatch
 	parkFold    parkFold
 	parkHold    recoveryHold
+	defectScan  sync.Mutex
 	rewatch     func() // set by keepFresh when the watch is active
 
 	chat        *ralphloop.ServerChat // nil when no chat destination is configured
@@ -431,6 +433,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	if s.cfg.Orchestrator == config.OrchestratorServer {
 		s.recoverLands()
 		s.reclaimRuns()
+		s.scanParentDefects()
 	}
 	stopCommits := func() {}
 	if stop, err := s.startStoreCommits(); err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // startRecovery starts a server whose catalog has one test-only low-authority
@@ -949,6 +950,121 @@ func TestRecovery_HeldGateThatCannotBeReleasedEscalatesWithoutAPark(t *testing.T
 				t.Errorf("escalated = %v, want R10 with the applied outcome %q", escalated, applied.Outcome)
 			}
 		})
+	}
+}
+
+// startParentDefect writes 01, 01a, 01a1 and a 01a2 missing its parent, then
+// starts a server with the given catalog.
+func startParentDefect(t *testing.T, store string, cat recovery.Catalog) *servertest.Harness {
+	t.Helper()
+	repo := testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01a", "fork", servertest.TicketOpts{Parent: "01"})
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01a1", "fork", servertest.TicketOpts{Parent: "01a"})
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01a2", "fork", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	return servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = cat
+	})
+}
+
+// parentDefectEvents is the run log's events of kind parent-defect, by type.
+func parentDefectEvents(h *servertest.Harness) map[events.Type][]ralphloop.Event {
+	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	byType := map[events.Type][]ralphloop.Event{}
+	for _, ev := range log {
+		if ev.Kind == string(events.ParentDefect) {
+			byType[events.Type(ev.Type)] = append(byType[events.Type(ev.Type)], ev)
+		}
+	}
+	return byType
+}
+
+func ticketParent(t *testing.T, h *servertest.Harness, id string) string {
+	t.Helper()
+	for _, tk := range epicTickets(t, h).Tickets {
+		if tk.Identifier == id && tk.Parent != nil {
+			return *tk.Parent
+		}
+	}
+	return ""
+}
+
+// A lettered ticket missing its parent is found by the scan and backfilled by
+// R14, and the scan the write triggers raises nothing again.
+func TestRecovery_R14BackfillsTheParentAScanFoundMissing(t *testing.T) {
+	cat := recovery.Default()
+	for i := range cat.Entries {
+		cat.Entries[i].Enabled = cat.Entries[i].ID == "R14"
+	}
+	h := startParentDefect(t, t.TempDir(), cat)
+	waitFor(t, func() bool { return len(parentDefectEvents(h)[events.RecoveryApplied]) > 0 })
+	if got := ticketParent(t, h, "01a2"); got != "01a" {
+		t.Errorf("01a2 parent = %q, want 01a backfilled", got)
+	}
+	h.Server.Rescan()
+	byType := parentDefectEvents(h)
+	applied := byType[events.RecoveryApplied]
+	if len(applied) != 1 || applied[0].Ticket != "01a2" || applied[0].Reason != "R14" || applied[0].Outcome != "ok" {
+		t.Errorf("recovery-applied = %+v, want one R14 ok for 01a2", applied)
+	}
+	if raised := byType[events.TicketGraphDefect]; len(raised) != 1 || raised[0].Reason != "01a" {
+		t.Errorf("ticket-graph-defect = %+v, want one naming 01a", raised)
+	}
+}
+
+// A parent that changed between the scan and the remedy is refused, not
+// overwritten.
+func TestRecovery_SetParentRefusesAParentChangedSinceTheScan(t *testing.T) {
+	store := t.TempDir()
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01a2-fork.md")
+	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{
+		ID: "TEST", Type: events.TicketGraphDefect, Kind: events.ParentDefect,
+		Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true,
+		Remedy: func(f recovery.Failure, v recovery.Verbs) error {
+			// A person re-parents onto another ancestor the ID allows first.
+			err := schema.UpdateTicket(path, func(t *schema.Ticket) { id := schema.TicketID("01a1"); t.Parent = &id })
+			if err != nil {
+				return err
+			}
+			res, err := v.SetParent(f.Address, f.Reason)
+			if err == nil && res.Refused {
+				err = errors.New("refused: " + res.Reason)
+			}
+			return err
+		},
+	}}}
+	h := startParentDefect(t, store, cat)
+	waitFor(t, func() bool { return len(parentDefectEvents(h)[events.RecoveryApplied]) > 0 })
+	h.Server.Rescan()
+	applied := parentDefectEvents(h)[events.RecoveryApplied]
+	if len(applied) != 1 || !strings.Contains(applied[0].Outcome, server.ReasonParentChanged) {
+		t.Errorf("recovery-applied = %+v, want one parent-changed refusal", applied)
+	}
+	if got := ticketParent(t, h, "01a2"); got != "01a1" {
+		t.Errorf("01a2 parent = %q, want the person's 01a1 kept", got)
+	}
+}
+
+// A defect the remedy failed to fix stays on disk and the failure is escalated
+// once, as no park reports it, yet later rescans neither raise it again nor
+// send it to the guard rails.
+func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
+	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{
+		ID: "TEST", Type: events.TicketGraphDefect, Kind: events.ParentDefect,
+		Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true,
+		Remedy: func(recovery.Failure, recovery.Verbs) error { return errors.New("refused") },
+	}}}
+	h := startParentDefect(t, t.TempDir(), cat)
+	waitFor(t, func() bool { return len(parentDefectEvents(h)[events.RecoveryApplied]) > 0 })
+	h.Server.Rescan()
+	h.Server.Rescan()
+	time.Sleep(100 * time.Millisecond)
+	byType := parentDefectEvents(h)
+	escalated := byType[events.RecoveryEscalated]
+	if len(byType[events.TicketGraphDefect]) != 1 || len(byType[events.RecoveryApplied]) != 1 || len(escalated) != 1 || escalated[0].Reason != "TEST" {
+		t.Errorf("events = %+v, want one defect, one applied and one TEST escalation", byType)
 	}
 }
 

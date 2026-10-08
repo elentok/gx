@@ -63,6 +63,8 @@ func (c Call) Apply(v Verbs) (Result, error) {
 		return v.ReleaseGate(c.Address)
 	case "finish":
 		return v.Finish(c.Address)
+	case "set-parent":
+		return v.SetParent(c.Address, c.Reason)
 	}
 	return Result{}, fmt.Errorf("unknown proposed verb %q", c.Verb)
 }
@@ -107,6 +109,11 @@ func (r *recorder) ReleaseGate(address string) (Result, error) {
 
 func (r *recorder) Finish(address string) (Result, error) {
 	r.calls = append(r.calls, Call{Verb: "finish", Address: address})
+	return Result{}, nil
+}
+
+func (r *recorder) SetParent(address, parent string) (Result, error) {
+	r.calls = append(r.calls, Call{Verb: "set-parent", Address: address, Reason: parent})
 	return Result{}, nil
 }
 

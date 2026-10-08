@@ -103,12 +103,21 @@ func ParentDefect(id string, parent *string) (want string, defect bool) {
 // intended parent, so a rule backfills it with a direct write; medium authority
 // because a wrong parent changes scheduling scope and Queue-tab nesting, though
 // visibly rather than as a deadlock. Launches disabled: both live cases were
-// fixed in code, so there is no S0 event data behind it, and nothing emits the
-// event or offers the verb yet.
+// fixed in code, so there is no S0 event data behind it.
 func r14ParentDefect() Entry {
 	return Entry{
 		ID: "R14", Type: events.TicketGraphDefect, Kind: events.ParentDefect,
 		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"set-parent"},
+		Remedy: func(f Failure, v Verbs) error {
+			res, err := v.SetParent(f.Address, f.Reason)
+			if err == nil && res.Refused {
+				err = fmt.Errorf("refused: %s", res.Reason)
+			}
+			if err != nil {
+				return fmt.Errorf("backfilling parent %s: %w", f.Reason, err)
+			}
+			return nil
+		},
 	}
 }
 

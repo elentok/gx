@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/elentok/gx/config"
@@ -446,6 +447,45 @@ func (v recoveryVerbs) Finish(address string) (recovery.Result, error) {
 		}
 	}
 	return recoveryResult(QueueResult{}), nil
+}
+
+// Refusal reasons of set-parent.
+const (
+	ReasonParentChanged = "parent-changed"
+	ReasonInvalidParent = "invalid-parent"
+)
+
+// SetParent re-checks and writes under the epic lock `gx tickets set --parent`
+// takes, so a re-parent between the scan and the write is seen, not clobbered.
+func (v recoveryVerbs) SetParent(address, parent string) (recovery.Result, error) {
+	res, err := v.s.resolvedWrite(QueueRequest{Address: address, actor: recovery.ActorRecovery}, func(ref ticketRef) (QueueResult, error) {
+		epic, unlock, err := tickets.LoadLockedEpic(ref.epic.Path)
+		if err != nil {
+			return QueueResult{}, fmt.Errorf("lock epic of %s: %w", ref.addr, err)
+		}
+		defer unlock()
+		i := slices.IndexFunc(epic.Tickets, func(t tickets.Ticket) bool { return t.Identifier == ref.addr.ID })
+		if i < 0 {
+			return refusal(ReasonUnknownTicket, "no ticket "+address), nil
+		}
+		target := &epic.Tickets[i]
+		if _, defect := recovery.ParentDefect(target.Identifier, target.Parent); !defect {
+			return refusal(ReasonParentChanged, address+" has a parent its ID allows"), nil
+		}
+		target.Parent = &parent
+		if err := epic.ValidateParentGraph(); err != nil {
+			return refusal(ReasonInvalidParent, err.Error()), nil
+		}
+		err = schema.UpdateTicket(target.Path, func(t *schema.Ticket) {
+			id := schema.TicketID(parent)
+			t.Parent = &id
+		})
+		if err != nil {
+			return QueueResult{}, fmt.Errorf("set parent of %s: %w", ref.addr, err)
+		}
+		return QueueResult{}, nil
+	})
+	return recoveryResult(res), err
 }
 
 func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {

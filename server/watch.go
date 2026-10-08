@@ -110,6 +110,7 @@ func (s *Server) rescan() {
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		s.log.Warn("rescan ticket store", "err", err)
 	}
+	s.scanParentDefects()
 }
 
 // WatchTree adds every directory under root. fsnotify is not recursive, and

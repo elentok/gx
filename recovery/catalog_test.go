@@ -225,6 +225,11 @@ func (s *stubVerbs) Finish(address string) (Result, error) {
 	return Result{}, nil
 }
 
+func (s *stubVerbs) SetParent(address, parent string) (Result, error) {
+	s.calls = append(s.calls, "set-parent "+address+" "+parent)
+	return Result{Refused: s.refuse, Reason: "parent-changed"}, nil
+}
+
 func (s *stubVerbs) LaunchPrompt(string) (string, error) { return s.prompt, nil }
 
 func TestDefaultR2LaunchesDisabledAsAnAgentEntry(t *testing.T) {
@@ -729,6 +734,24 @@ func TestDefaultR14LaunchesDisabledAsAMediumRuleThatSetsTheParent(t *testing.T) 
 	c.Entries[i].Enabled = true
 	if got, ok := c.Match(seq); !ok || got.ID != "R14" {
 		t.Errorf("enabled R14: got (%q, %v), want R14", got.ID, ok)
+	}
+}
+
+func TestR14RemedySetsTheIDDerivedParentAndReturnsARefusal(t *testing.T) {
+	e := Entry{}
+	for _, c := range Default().Entries {
+		if c.ID == "R14" {
+			e = c
+		}
+	}
+	f := Failure{Address: "p:e/12a", Type: events.TicketGraphDefect, Kind: events.ParentDefect, Reason: "12"}
+	ok := &stubVerbs{}
+	if err := e.Remedy(f, ok); err != nil || !slices.Equal(ok.calls, []string{"set-parent p:e/12a 12"}) {
+		t.Errorf("set: err %v, calls %q; want one set-parent to 12", err, ok.calls)
+	}
+	refused := &stubVerbs{refuse: true}
+	if err := e.Remedy(f, refused); err == nil || !strings.Contains(err.Error(), "parent-changed") {
+		t.Errorf("refused: err %v, want the refusal", err)
 	}
 }
 

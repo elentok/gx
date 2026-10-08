@@ -26,6 +26,7 @@ func TestFailure_Triggers(t *testing.T) {
 		{"rate-limit pause is healthy waiting", events.PausedRateLimit, "", false},
 		{"notification-failed", events.NotificationFailed, "", false},
 		{"background gate held", events.BackgroundTaskGateHeld, events.BackgroundTaskGate, true},
+		{"ticket-graph defect", events.TicketGraphDefect, events.ParentDefect, true},
 	}
 	for _, tt := range tests {
 		if got := (Failure{Type: tt.typ, Kind: tt.kind}).Triggers(); got != tt.want {
