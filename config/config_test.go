@@ -152,6 +152,39 @@ func TestLoadSubscriptionConfigSuppressWarning(t *testing.T) {
 	}
 }
 
+func TestLoadRecoveryNotifyHold(t *testing.T) {
+	for _, tc := range []struct {
+		name, json string
+		want       time.Duration
+	}{
+		{"absent", `{}`, DefaultRecoveryNotifyHold},
+		{"set", `{"recovery":{"notify-hold":"90s"}}`, 90 * time.Second},
+		{"invalid", `{"recovery":{"notify-hold":"soon"}}`, DefaultRecoveryNotifyHold},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			prev := userConfigDirFn
+			userConfigDirFn = func() (string, error) { return tmp, nil }
+			t.Cleanup(func() { userConfigDirFn = prev })
+			dir := filepath.Join(tmp, "gx")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatalf("MkdirAll: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(tc.json), 0644); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.Recovery.NotifyHold != tc.want {
+				t.Fatalf("NotifyHold = %v, want %v", cfg.Recovery.NotifyHold, tc.want)
+			}
+		})
+	}
+}
+
 func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn

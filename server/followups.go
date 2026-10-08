@@ -106,7 +106,7 @@ func dedupeLine(key string) string { return "Dedupe key: " + key }
 // writeFollowUp files the follow-up, or adds an occurrence line to the open
 // draft that already has the same key.
 func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) (string, error) {
-	target := s.cfg.FollowUps
+	target := s.cfg.RecoverySettings.FollowUps
 	if target == "" {
 		target = DefaultFollowUps
 	}

@@ -7,7 +7,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -129,11 +128,7 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 		go s.recoverFrom(plan, f)
 		return false
 	}
-	hold := s.cfg.RecoveryNotifyHold
-	if hold <= 0 {
-		hold = config.DefaultRecoveryNotifyHold
-	}
-	s.parkHold.hold(f.Address, hold, func() {
+	s.parkHold.hold(f.Address, s.cfg.RecoverySettings.NotifyHold, func() {
 		s.events.publish(EventTicketChanged, f.Address)
 		s.notifyPark(addr, ticketPath, kind, reason)
 	})

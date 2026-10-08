@@ -44,7 +44,7 @@ func startNotifyRecovery(t *testing.T, hold time.Duration, remedy recovery.Remed
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Orchestrator = config.OrchestratorServer
 		c.Recovery = cat
-		c.RecoveryNotifyHold = hold
+		c.RecoverySettings.NotifyHold = hold
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}
 	})
 	return h, func() []string {
