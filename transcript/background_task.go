@@ -132,6 +132,8 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		taskID    string
 		startedAt time.Time
 		resolved  bool
+		// cap is how long this marker may stay outstanding before it ages out.
+		cap time.Duration
 	}
 	markers := map[string]*markerState{}
 	var order []string
@@ -166,9 +168,12 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			}
 		}
 
-		taskID := entry.ToolUseResult.BackgroundTaskID
+		taskID, markerCap := entry.ToolUseResult.BackgroundTaskID, cap
 		if taskID == "" && entry.ToolUseResult.TimeoutMs != nil {
 			taskID = entry.ToolUseResult.MonitorTaskID
+			// A Monitor expires on its own timeout; waiting longer than that
+			// (plus a minute for its notice) only strands a finished agent.
+			markerCap = min(cap, time.Duration(*entry.ToolUseResult.TimeoutMs)*time.Millisecond+time.Minute)
 		}
 		if taskID != "" {
 			ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
@@ -176,7 +181,7 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 				continue
 			}
 			if _, exists := markers[taskID]; !exists {
-				markers[taskID] = &markerState{taskID: taskID, startedAt: ts}
+				markers[taskID] = &markerState{taskID: taskID, startedAt: ts, cap: markerCap}
 				order = append(order, taskID)
 			}
 		}
@@ -195,7 +200,7 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		switch {
 		case m.resolved:
 			status = BackgroundTaskResolved
-		case now.Sub(m.startedAt) > cap:
+		case now.Sub(m.startedAt) > m.cap:
 			status = BackgroundTaskOutstandingAgedOut
 		}
 		reading.Markers = append(reading.Markers, BackgroundTaskMarker{

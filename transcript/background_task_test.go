@@ -292,8 +292,9 @@ func monitorStartLine(taskID, timestamp string) string {
 }
 
 func TestReadBackgroundTasks_MonitorStartHoldsUntilItsNotification(t *testing.T) {
+	soon := mustParseTime("2026-08-12T17:02:00.000000000Z") // inside the Monitor's own timeout
 	path := writeTranscript(t, monitorStartLine("mon-1", "2026-08-12T17:00:00.000000000Z"))
-	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	reading, err := ReadBackgroundTasks(path, capDuration, soon)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +306,7 @@ func TestReadBackgroundTasks_MonitorStartHoldsUntilItsNotification(t *testing.T)
 		monitorStartLine("mon-1", "2026-08-12T17:00:00.000000000Z"),
 		notificationLine("mon-1", "tool-1", "completed", "2026-08-12T17:05:00.000000000Z"),
 	)
-	reading, err = ReadBackgroundTasks(path, capDuration, readAt)
+	reading, err = ReadBackgroundTasks(path, capDuration, soon)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,5 +324,26 @@ func TestReadBackgroundTasks_TaskIDWithoutTimeoutIsNotAMarker(t *testing.T) {
 	}
 	if len(reading.Markers) != 0 {
 		t.Errorf("Markers = %+v, want none", reading.Markers)
+	}
+}
+
+// A Monitor that never reported expires on its own timeout (400s here), long
+// before the 2h cap of a backgrounded shell command.
+func TestReadBackgroundTasks_MonitorAgesOutAtItsOwnTimeout(t *testing.T) {
+	path := writeTranscript(t, monitorStartLine("mon-1", "2026-08-12T17:00:00.000000000Z"))
+	for _, tc := range []struct {
+		now  string
+		want BackgroundTaskStatus
+	}{
+		{"2026-08-12T17:07:00.000000000Z", BackgroundTaskOutstandingFresh}, // 400s + 1m not yet over
+		{"2026-08-12T17:09:00.000000000Z", BackgroundTaskOutstandingAgedOut},
+	} {
+		reading, err := ReadBackgroundTasks(path, capDuration, mustParseTime(tc.now))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reading.Markers) != 1 || reading.Markers[0].Status != tc.want {
+			t.Errorf("at %s: Markers = %+v, want %s", tc.now, reading.Markers, tc.want)
+		}
 	}
 }
