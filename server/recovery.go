@@ -28,12 +28,13 @@ func (s *Server) recoverFrom(f recovery.Failure) {
 	if !ok || !entry.Runnable(f) {
 		return
 	}
-	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID)
+	s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
+	outcome := "ok"
 	if err := entry.Remedy(f, recoveryVerbs{s}); err != nil {
 		s.log.Warn("recovery remedy failed", "entry", entry.ID, "ticket", f.Address, "err", err)
-		return
+		outcome = err.Error()
 	}
-	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID)
+	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID, outcome)
 }
 
 // failureSequence is the ticket's run-log events, oldest first, ending in the
@@ -55,8 +56,8 @@ func (s *Server) failureSequence(ref ticketRef, f recovery.Failure) []recovery.E
 	return seq
 }
 
-func (s *Server) recordRecovery(ref ticketRef, typ events.Type, f recovery.Failure, entryID string) {
-	ev := ralphloop.Event{Type: string(typ), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entryID}
+func (s *Server) recordRecovery(ref ticketRef, typ events.Type, f recovery.Failure, entryID, outcome string) {
+	ev := ralphloop.Event{Type: string(typ), Ticket: ref.addr.ID, Kind: string(f.Kind), Reason: entryID, Outcome: outcome}
 	if err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ev); err != nil {
 		s.log.Warn("recovery cannot record event", "type", typ, "ticket", f.Address, "err", err)
 	}

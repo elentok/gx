@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -63,6 +64,48 @@ func TestRecovery_MatchingParkRunsItsRemedyThroughAServerVerb(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("remedy never ran")
+	}
+}
+
+func TestRecovery_RecoveredParkLeavesMatchedAndAppliedWithKind(t *testing.T) {
+	h, results := startRecovery(t, false)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+		t.Fatalf("park = %+v, %v", res, err)
+	}
+	select {
+	case <-results:
+	case <-time.After(5 * time.Second):
+		t.Fatal("remedy never ran")
+	}
+
+	var matched, applied *ralphloop.Event
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && (matched == nil || applied == nil) {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		matched, applied = nil, nil
+		for i, ev := range log {
+			switch events.Type(ev.Type) {
+			case events.RecoveryMatched:
+				matched = &log[i]
+			case events.RecoveryApplied:
+				applied = &log[i]
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if matched == nil || applied == nil {
+		t.Fatalf("matched = %v, applied = %v, want both recorded", matched, applied)
+	}
+	for _, ev := range []*ralphloop.Event{matched, applied} {
+		if ev.Ticket != "01" || ev.Kind != string(events.ManualPark) || ev.Reason != "TEST" {
+			t.Errorf("%s = %+v, want ticket 01, kind manual-park, entry TEST", ev.Type, *ev)
+		}
+	}
+	if applied.Outcome != "ok" {
+		t.Errorf("applied outcome = %q, want ok", applied.Outcome)
 	}
 }
 

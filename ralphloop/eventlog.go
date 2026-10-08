@@ -142,8 +142,8 @@ type Event struct {
 	// turn" from "idle because it never left this launch state" (see
 	// stalledSinceLaunch).
 	StateChangeSeq int `json:"state_change_seq,omitempty"`
-	// Outcome (manual-land/ticket-reset only) is what the recovery command
-	// concluded for the ticket.
+	// Outcome (manual-land/ticket-reset, recovery-applied) is what the
+	// recovery command or remedy concluded: "ok" or the remedy's error.
 	Outcome string `json:"outcome,omitempty"`
 	// TrailerValue (manual-land/ticket-reset only) is the trailer value the
 	// command matched or wrote on the landed commits.
