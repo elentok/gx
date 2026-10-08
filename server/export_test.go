@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -75,6 +76,23 @@ func (s *Server) ParkTicket(project, epic, id string, kind events.Kind, reason s
 	path := filepath.Join(dir, epic, "issues", id+"-first.md")
 	return s.parkTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason)
 }
+
+// PutRunFrom is PutRun with the base the iteration branched from.
+func (s *Server) PutRunFrom(root string, r Run, base string) {
+	s.registry.put(trackedRun{Run: r, Root: root, Base: base})
+}
+
+// GateReleased reports whether the run's background-task gate was released.
+func (s *Server) GateReleased(address string) bool { return s.registry.gateReleased(address)() }
+
+// DropRun forgets a run the way its finish does.
+func (s *Server) DropRun(address string) { s.registry.delete(address) }
+
+// RecoverAsync is recoverAsync for a failure the test raises itself.
+func (s *Server) RecoverAsync(f recovery.Failure) { s.recoverAsync(f) }
+
+// WorktreeDir is where the project's iteration worktrees live.
+func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(project) }
 
 // RecoveredCount is recoveredCount for tests.
 func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }

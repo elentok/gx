@@ -50,13 +50,13 @@ const (
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships
 // with the final wire codes.
 const (
-	LaunchFailed      Type = "launch-failed"
-	Reclaimed         Type = "reclaimed"
-	HerdrUnavailable  Type = "herdr-unavailable"
-	HerdrAvailable    Type = "herdr-available"
-	Submitted         Type = "submitted"
-	SubmitRefused     Type = "submit-refused"
-	Deadlocked        Type = "deadlocked"
+	LaunchFailed     Type = "launch-failed"
+	Reclaimed        Type = "reclaimed"
+	HerdrUnavailable Type = "herdr-unavailable"
+	HerdrAvailable   Type = "herdr-available"
+	Submitted        Type = "submitted"
+	SubmitRefused    Type = "submit-refused"
+	Deadlocked       Type = "deadlocked"
 	// TicketGraphDefect is a ticket file whose graph fields contradict its ID,
 	// found by a scan of the epic's issue files rather than by a run.
 	TicketGraphDefect Type = "ticket-graph-defect"
@@ -109,6 +109,9 @@ const (
 	// ParentDefect is a lettered ticket whose parent is missing or is not an
 	// ancestor its ID allows.
 	ParentDefect Kind = "parent-defect"
+	// BackgroundTaskGate is a finish held on a background task. The loop logs
+	// the hold kind-less; the failure recovery raises from it carries this.
+	BackgroundTaskGate Kind = "background-task-gate"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -125,7 +128,7 @@ var kinds = map[Kind]bool{
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
-	LandConflict: true, ParentDefect: true,
+	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

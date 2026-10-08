@@ -539,7 +539,7 @@ func TestDefaultR10LaunchesDisabledAsAMediumRule(t *testing.T) {
 	if e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"release-gate", "finish"}) || e.Remedy == nil {
 		t.Fatalf("R10 = %+v, want disabled medium rule with release-gate, finish", e)
 	}
-	held := []Event{{Type: events.BackgroundTaskGateHeld, Reason: "background task t1"}}
+	held := []Event{{Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: "background task t1"}}
 	if _, ok := Default().Match(held); ok {
 		t.Error("R10 must not match while disabled")
 	}
@@ -552,7 +552,7 @@ func TestR10RemedyReleasesThenFinishesAndNeverParks(t *testing.T) {
 			e = c
 		}
 	}
-	f := Failure{Address: "p:e/01", Type: events.BackgroundTaskGateHeld}
+	f := Failure{Address: "p:e/01", Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate}
 	ok := &stubVerbs{}
 	if err := e.Remedy(f, ok); err != nil || !slices.Equal(ok.calls, []string{"release-gate p:e/01", "finish p:e/01"}) {
 		t.Errorf("released: err %v, calls %q; want release-gate then finish", err, ok.calls)
@@ -571,7 +571,7 @@ func TestR10MatchesOnlyAGateStillHeld(t *testing.T) {
 	for i := range c.Entries {
 		c.Entries[i].Enabled = true
 	}
-	held := Event{Type: events.BackgroundTaskGateHeld, Reason: "background task t1"}
+	held := Event{Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: "background task t1"}
 	released := Event{Type: events.BackgroundTaskGateReleased, Reason: "background task t1"}
 	expired := Event{Type: events.BackgroundTaskGateExpired, Reason: "background task t1"}
 	tests := []struct {

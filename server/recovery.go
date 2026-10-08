@@ -96,6 +96,12 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 		outcome = err.Error()
 	}
 	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID, outcome)
+	if outcome != "ok" && f.Type != events.NeedsRepair && f.Type != events.NeedsAnswer {
+		// No park holds a message for this failure, so nothing else tells a
+		// person the remedy failed.
+		s.recordRecovery(ref, events.RecoveryEscalated, f, entry.ID, outcome)
+		return
+	}
 	if !s.parkHold.take(f.Address) {
 		return
 	}
@@ -303,14 +309,18 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 }
 
 // failureSequence is the ticket's events as the matcher sees them, ending in
-// the failure itself (already appended by the park).
+// the failure itself (already appended by the park). A logged failure with no
+// kind, like the loop's gate hold, takes the failure's.
 func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
 	var seq []recovery.Event
 	for _, ev := range log {
 		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason, Time: ev.Time})
 	}
-	if len(seq) == 0 || seq[len(seq)-1].Type != f.Type {
+	switch n := len(seq); {
+	case n == 0 || seq[n-1].Type != f.Type:
 		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind, Reason: f.Reason, Time: time.Now()})
+	case seq[n-1].Kind == "":
+		seq[n-1].Kind = f.Kind
 	}
 	return seq
 }

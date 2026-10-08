@@ -855,6 +855,103 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 	})
 }
 
+// raiseGateHeld raises a held background-task gate on ticket 01 against a
+// catalog with R10 enabled. The iteration has a real worktree, shaped by
+// prepare, and a pane reporting status. It stands in for the loop's finish by
+// dropping the run once the gate is released, and returns R10's applied event
+// plus the escalation, if any.
+func raiseGateHeld(t *testing.T, status string, prepare func(worktree string)) (applied ralphloop.Event, escalated *ralphloop.Event) {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	cat := recovery.Default()
+	for i := range cat.Entries {
+		if cat.Entries[i].ID == "R10" {
+			cat.Entries[i].Enabled = true
+		}
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = cat
+	})
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": status}}, herdrfake.Identities{}, nil
+	})
+	_, branch, worktree := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
+	testutil.MustGitExported(t, repo, "worktree", "add", "-b", branch, worktree)
+	prepare(worktree)
+
+	const addr = "proj:epic-a/01"
+	h.Server.PutRunFrom("proj:epic-a", server.Run{Address: addr}, "main")
+	dir := filepath.Join(store, "proj")
+	held := ralphloop.Event{Type: string(events.BackgroundTaskGateHeld), Ticket: "01", Reason: "background task task-1"}
+	if err := ralphloop.AppendEvent(dir, "epic-a", held); err != nil {
+		t.Fatal(err)
+	}
+	h.Server.RecoverAsync(recovery.Failure{Address: addr, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
+	waitFor(t, func() bool {
+		if h.Server.GateReleased(addr) {
+			h.Server.DropRun(addr)
+		}
+		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		var done bool
+		for i, ev := range log {
+			switch events.Type(ev.Type) {
+			case events.RecoveryApplied:
+				applied, done = ev, ev.Outcome == "ok"
+			case events.RecoveryEscalated:
+				escalated, done = &log[i], true
+			}
+		}
+		return done
+	})
+	return applied, escalated
+}
+
+func commitInWorktree(t *testing.T) func(string) {
+	return func(worktree string) {
+		testutil.WriteFile(t, worktree, "work.txt", "done")
+		testutil.CommitAll(t, worktree, "work")
+	}
+}
+
+func TestRecovery_HeldGateWithCommittedIdleWorkIsReleasedAndFinishedByR10(t *testing.T) {
+	applied, escalated := raiseGateHeld(t, "idle", commitInWorktree(t))
+	if applied.Reason != "R10" || applied.Outcome != "ok" {
+		t.Errorf("applied = %+v, want R10 ok", applied)
+	}
+	if escalated != nil {
+		t.Errorf("escalated = %+v after a finished release", *escalated)
+	}
+}
+
+func TestRecovery_HeldGateThatCannotBeReleasedEscalatesWithoutAPark(t *testing.T) {
+	for _, tc := range []struct {
+		name, status, reason string
+		prepare              func(*testing.T) func(string)
+	}{
+		{"busy pane", "working", server.ReasonAgentBusy, commitInWorktree},
+		{"dirty worktree", "idle", server.ReasonWorktreeDirty, func(t *testing.T) func(string) {
+			return func(worktree string) {
+				commitInWorktree(t)(worktree)
+				testutil.WriteFile(t, worktree, "stray.txt", "uncommitted")
+			}
+		}},
+		{"no commits ahead", "idle", server.ReasonNoCommitsAhead, func(*testing.T) func(string) { return func(string) {} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			applied, escalated := raiseGateHeld(t, tc.status, tc.prepare(t))
+			if applied.Reason != "R10" || !strings.Contains(applied.Outcome, tc.reason) {
+				t.Errorf("applied = %+v, want a failed R10 naming %s", applied, tc.reason)
+			}
+			if escalated == nil || escalated.Reason != "R10" || escalated.Outcome != applied.Outcome {
+				t.Errorf("escalated = %v, want R10 with the applied outcome %q", escalated, applied.Outcome)
+			}
+		})
+	}
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)

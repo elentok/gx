@@ -122,7 +122,7 @@ func r14ParentDefect() Entry {
 // Launches disabled: the S0 holds predate the fix of their cause.
 func r10BackgroundGateHeld() Entry {
 	return Entry{
-		ID: "R10", Type: events.BackgroundTaskGateHeld,
+		ID: "R10", Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate,
 		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"release-gate", "finish"},
 		Remedy: func(f Failure, v Verbs) error {
 			res, err := v.ReleaseGate(f.Address)
