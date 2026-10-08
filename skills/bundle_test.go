@@ -243,7 +243,7 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 		t.Fatal("gx-investigate/SKILL.md has no <unattended-verbs> block")
 	}
 	var allowed, never string
-	for _, line := range strings.Split(block[1], "\n") {
+	for _, line := range strings.SplitSeq(block[1], "\n") {
 		switch {
 		case strings.HasPrefix(line, "- allowed:"):
 			allowed = line
