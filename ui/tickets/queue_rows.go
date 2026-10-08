@@ -71,7 +71,7 @@ type queueEntriesCache struct {
 	hideComplete bool
 	project      string
 	collapsed    map[string]bool
-	entries     []tree.Entry[queueNode]
+	entries      []tree.Entry[queueNode]
 }
 
 // buildQueueEntriesCached returns buildQueueEntries' result, reusing the

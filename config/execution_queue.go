@@ -33,7 +33,7 @@ func DefaultExecutionQueueConfig() ExecutionQueueConfig {
 		MaxConcurrentEpics:          defaultExecutionQueueConcurrency,
 		MaxAgents:                   defaultMaxAgents,
 		RetryStormLaunches:          defaultRetryStormLaunches,
-		SpinCycles:                 defaultSpinCycles,
+		SpinCycles:                  defaultSpinCycles,
 		SpinWindow:                  defaultSpinWindow,
 	}
 }
