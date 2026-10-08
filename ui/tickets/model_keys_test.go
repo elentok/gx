@@ -90,7 +90,7 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 		t.Fatalf("expected archived ticket to remain unchecked after space")
 	}
 	afterQueue := m.queueStore.Snapshot()
-	if len(afterQueue.TicketChecked) != len(queueBefore.TicketChecked) {
+	if len(afterQueue.Status) != len(queueBefore.Status) {
 		t.Fatalf("expected queue store unaffected by mutating keys on archived row")
 	}
 }

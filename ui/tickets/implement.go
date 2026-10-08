@@ -72,10 +72,9 @@ func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
 // (not-yet-started) and done (already-finished) queue entry is dropped and
 // replaced by the current checked selection. Running/errored entries are left
 // exactly as they are, whether or not they're still checked, since a live
-// run's own state isn't something Replace should silently discard. Ticket
-// 15's EnqueueAndClearChecked also clears every just-queued path from the
-// Tickets tab's independent checked set in the same atomic write, so the
-// checkboxes visually reset the moment their tickets are queued.
+// run's own state isn't something Replace should silently discard. The
+// checked set is cleared once the queue write succeeds, so the checkboxes
+// visually reset the moment their tickets are queued.
 func (m *Model) replaceQueuedSelection() error {
 	snapshot := m.queueStore.Snapshot()
 	next := make(map[string]queueItemStatus, len(snapshot.Status))
@@ -87,9 +86,7 @@ func (m *Model) replaceQueuedSelection() error {
 		next[path] = status
 		order[path] = snapshot.Order[path]
 	}
-	clearedPaths := make([]string, 0, len(m.checked))
 	for path := range m.checked {
-		clearedPaths = append(clearedPaths, path)
 		if m.isTicketDone(path) {
 			continue
 		}
@@ -99,9 +96,10 @@ func (m *Model) replaceQueuedSelection() error {
 		next[path] = queueStatusPending
 		order[path] = m.checkOrder[path]
 	}
-	if err := m.queueStore.EnqueueAndClearChecked(next, order, clearedPaths); err != nil {
+	if err := m.queueStore.Replace(next, order); err != nil {
 		return err
 	}
+	m.checked, m.checkOrder = map[string]bool{}, map[string]uint64{}
 	m.refreshQueueSnapshot()
 	return nil
 }

@@ -34,10 +34,7 @@ func TestCrossTabCheckThenQueueResetsTicketsCheckboxWhileQueueTabKeepsEntries(t 
 	updated, _ := tm.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	tm = updated.(Model)
 
-	if err := store.SetTicketChecked([]string{first, second}, true); err != nil {
-		t.Fatal(err)
-	}
-	tm.refreshQueueSnapshot()
+	tm.setPathsChecked([]string{first, second}, true)
 	if len(tm.checked) != 2 {
 		t.Fatalf("Tickets checked set before queueing = %v, want both tickets checked", tm.checked)
 	}

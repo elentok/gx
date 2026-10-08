@@ -1001,14 +1001,6 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 	if err := store.SetStatus(queuedPath, queueStatusDone); err != nil {
 		t.Fatal(err)
 	}
-	// checkedPath exercises the independent Tickets-tab checked set (ticket
-	// 15's decoupling): it's checked without being queued, so it must not
-	// show up in queueFirst.checked (queue membership) at all.
-	checkedPath := ticketPath(root, "alpha", "01-first.md") + "-checked-only"
-	if err := store.SetTicketChecked([]string{checkedPath}, true); err != nil {
-		t.Fatal(err)
-	}
-
 	queueFirst := loadQueueModel(t, NewQueueModelWithStore(root, ui.Settings{}, keys.New(nil), store))
 	ticketsModel := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
 	ticketsModel = deliverLoad(t, ticketsModel)
@@ -1019,12 +1011,6 @@ func TestTicketsAndQueueMatchAfterRestartRegardlessOfNavigationOrder(t *testing.
 	}
 	if queueFirst.queueStatus[queuedPath] != ticketsModel.queueStatus[queuedPath] {
 		t.Fatalf("status mismatch: queue=%v tickets=%v", queueFirst.queueStatus[queuedPath], ticketsModel.queueStatus[queuedPath])
-	}
-	if queueFirst.checked[checkedPath] {
-		t.Fatalf("checked-only ticket must not appear as queued: %#v", queueFirst.checked)
-	}
-	if !ticketsModel.isChecked(checkedPath) {
-		t.Fatalf("expected checked-only ticket to be checked on the Tickets tab")
 	}
 }
 

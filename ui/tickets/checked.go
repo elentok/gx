@@ -8,7 +8,6 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/confirm"
-	"github.com/elentok/gx/ui/notify"
 )
 
 // checkAddConfirmedMsg carries a blocked-confirmation modal's acceptance
@@ -22,23 +21,32 @@ type checkAddConfirmedMsg struct {
 }
 
 // isChecked reports whether the ticket at path is in the Tickets tab's
-// independent checked set (ticket 13's decoupled design) — separate from
-// queue membership.
+// checked set — separate from queue membership.
 func (m Model) isChecked(path string) bool {
-	return m.queueStore.IsTicketChecked(path)
+	return m.checked[path]
 }
 
-func (m *Model) setPathsChecked(paths []string, checked bool) error {
-	if err := m.queueStore.SetTicketChecked(paths, checked); err != nil {
-		return err
+// setPathsChecked mutates the in-memory checked set. The server has no
+// "checked" concept, so the selection deliberately does not survive a restart.
+func (m *Model) setPathsChecked(paths []string, checked bool) {
+	if m.checked == nil {
+		m.checked, m.checkOrder = map[string]bool{}, map[string]uint64{}
 	}
-	m.refreshQueueSnapshot()
-	return nil
+	for _, path := range paths {
+		if !checked {
+			markUnchecked(m.checked, m.checkOrder, path)
+			continue
+		}
+		if m.checked[path] {
+			continue
+		}
+		m.checked[path] = true
+		m.checkOrder[path] = nextCheckOrdinal(m.checkOrder)
+	}
 }
 
 func (m *Model) refreshQueueSnapshot() {
-	snapshot := m.queueStore.Snapshot()
-	m.queueStatus, m.checked, m.checkOrder = snapshot.Status, snapshot.TicketChecked, snapshot.TicketCheckOrder
+	m.queueStatus = m.queueStore.Snapshot().Status
 }
 
 func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
@@ -67,9 +75,7 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if r.isEpic() {
-		if err := m.toggleEpicChecked(r); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
+		m.toggleEpicChecked(r)
 		return m, nil
 	}
 	return m.toggleTicketChecked(r)
@@ -112,17 +118,14 @@ func epicFullyMember(epic tickets.Epic, isMember func(string) bool) bool {
 // checkbox-group behavior, except a StatusDone ticket is never added to the
 // checked set (it has nothing left to queue). A zero-ticket or all-done epic
 // is a no-op either way.
-func (m *Model) toggleEpicChecked(r row) error {
+func (m *Model) toggleEpicChecked(r row) {
 	epic := m.epicAt(r)
 	eligible := eligibleEpicTickets(epic)
-	if len(eligible) == 0 {
-		return nil
-	}
 	paths := make([]string, len(eligible))
 	for i, t := range eligible {
 		paths[i] = t.Path
 	}
-	return m.setPathsChecked(paths, !epicFullyMember(epic, m.isChecked))
+	m.setPathsChecked(paths, !epicFullyMember(epic, m.isChecked))
 }
 
 // toggleTicketChecked toggles r's ticket. Unchecking is always immediate.
@@ -137,9 +140,7 @@ func (m Model) toggleTicketChecked(r row) (tea.Model, tea.Cmd) {
 	epic := m.epicAt(r)
 	t := epic.Tickets[r.ticketIdx]
 	if m.isChecked(t.Path) {
-		if err := m.setPathsChecked([]string{t.Path}, false); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
+		m.setPathsChecked([]string{t.Path}, false)
 		return m, nil
 	}
 	if epic.RenderedStatus(t).Terminal() {
@@ -153,9 +154,7 @@ func (m Model) toggleTicketChecked(r row) (tea.Model, tea.Cmd) {
 		}
 	}
 	if len(blockers) == 0 {
-		if err := m.setPathsChecked([]string{t.Path}, true); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
+		m.setPathsChecked([]string{t.Path}, true)
 		return m, nil
 	}
 
@@ -190,25 +189,22 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 	paths := make([]string, 0, len(msg.blockerPaths)+1)
 	paths = append(paths, msg.ticketPath)
 	paths = append(paths, msg.blockerPaths...)
-	if err := m.setPathsChecked(paths, true); err != nil {
-		return m, notify.Error("save queue: " + err.Error())
-	}
+	m.setPathsChecked(paths, true)
 	return m, nil
 }
 
-// autoCheckForkedChildren compares oldEpics (this Model's epics before a
-// reload) against newEpics (the reload's result): every ticket that appeared
-// since oldEpics whose `parent` names a checked ticket — a mid-flight fork,
-// per implement/SKILL.md's convention — joins the Tickets tab's independent
-// checked set automatically, no confirmation modal (ticket 06), unlike
-// toggleTicketChecked's blocked-ticket confirmation. A fork of an unchecked
-// ticket is a no-op: only a fork of already-checked work needs its
-// continuation auto-added.
-func autoCheckForkedChildren(oldEpics, newEpics []tickets.Epic, store *QueueStore) error {
-	if store == nil {
+// autoCheckForkedChildren compares m.epics (before a reload) against newEpics
+// (the reload's result): every ticket that appeared since whose `parent`
+// names a checked ticket — a mid-flight fork, per implement/SKILL.md's
+// convention — joins the checked set automatically, no confirmation modal
+// (ticket 06), unlike toggleTicketChecked's blocked-ticket confirmation. A
+// fork of an unchecked ticket is a no-op: only a fork of already-checked work
+// needs its continuation auto-added.
+func (m *Model) autoCheckForkedChildren(newEpics []tickets.Epic) {
+	_ = applyForkedChildren(m.epics, newEpics, m.isChecked, func(paths []string, checked bool) error {
+		m.setPathsChecked(paths, checked)
 		return nil
-	}
-	return applyForkedChildren(oldEpics, newEpics, store.IsTicketChecked, store.SetTicketChecked)
+	})
 }
 
 // autoQueueForkedChildren mirrors autoCheckForkedChildren for the Queue

@@ -515,55 +515,50 @@ func TestModel_CheckedRowsRenderDistinctMarker(t *testing.T) {
 	}
 }
 
-func TestModel_CachedModelsRenderSelectionFromSharedQueueStore(t *testing.T) {
+func TestModel_CheckOrderFollowsCheckSequence(t *testing.T) {
 	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
+	var m Model
+	m.setPathsChecked([]string{"b"}, true)
+	m.setPathsChecked([]string{"a"}, true)
+	m.setPathsChecked([]string{"b"}, true)
 
-	first := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
-	first = deliverLoad(t, first)
-	updated, _ := first.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	first = updated.(Model)
-	updated, _ = first.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	first = updated.(Model)
-
-	cached := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
-	cached = deliverLoad(t, cached)
-	updated, _ = cached.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	cached = updated.(Model)
-
-	ticket := first.epics[0].Tickets[0]
-	updated, _ = first.Update(spacePress())
-	first = updated.(Model)
-
-	if !cached.isChecked(ticket.Path) {
-		t.Fatal("cached model did not observe shared ticket selection")
+	if m.checkOrder["b"] >= m.checkOrder["a"] {
+		t.Fatalf("check order = %v, want b before a and a re-check of b not to move it", m.checkOrder)
 	}
-	if !cached.epicChecked(cached.epics[0]) {
-		t.Fatal("cached model did not observe shared epic selection")
+
+	m.setPathsChecked([]string{"b"}, false)
+	if m.isChecked("b") || m.checkOrder["b"] != 0 {
+		t.Fatalf("unchecked b still tracked: checked=%v order=%v", m.checked, m.checkOrder)
 	}
 }
 
-func TestModel_BlockedConfirmationFailureKeepsPriorQueue(t *testing.T) {
+// The checked set lives in the model alone: a checkbox toggle must leave the
+// queue store untouched, and a fresh model never inherits a selection from it.
+func TestModel_CheckedSetBypassesQueueStore(t *testing.T) {
 	t.Parallel()
-	store := loadQueueStoreAt(t.TempDir() + "/queue.json")
-	if err := store.SetTicketChecked([]string{"keep"}, true); err != nil {
-		t.Fatal(err)
-	}
-	store.path = t.TempDir()
-	m := Model{queueStore: store}
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	statePath := filepath.Join(t.TempDir(), "queue.json")
+	store := loadQueueStoreAt(statePath)
 
-	updated, cmd := m.handleCheckAddConfirmed(checkAddConfirmedMsg{
-		ticketPath:   "ticket",
-		blockerPaths: []string{"blocker-a", "blocker-b"},
-	})
-	if cmd == nil {
-		t.Fatal("expected save failure notification")
-	}
+	m := NewModelWithStore(root, ui.Settings{}, keys.New(nil), store)
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	snapshot := m.queueStore.Snapshot()
-	if len(snapshot.TicketChecked) != 1 || !snapshot.TicketChecked["keep"] {
-		t.Fatalf("failed confirmation changed checked set: %#v", snapshot)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	updated, _ = m.Update(spacePress())
+	m = updated.(Model)
+	ticket := m.epics[0].Tickets[0]
+	if !m.isChecked(ticket.Path) {
+		t.Fatal("expected ticket checked after space")
+	}
+
+	if _, err := os.Stat(statePath); !os.IsNotExist(err) {
+		t.Fatalf("checking a ticket wrote the queue store: stat err=%v", err)
+	}
+	restarted := deliverLoad(t, NewModelWithStore(root, ui.Settings{}, keys.New(nil), store))
+	if restarted.isChecked(ticket.Path) {
+		t.Fatal("a fresh model inherited the checked set")
 	}
 }

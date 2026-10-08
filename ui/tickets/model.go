@@ -110,10 +110,9 @@ type Model struct {
 	// (renderEpicRow), so they're unaffected by this filter.
 	hideDone bool
 	// checked is the Tickets tab's own selection (ticket 04), independent of
-	// queue membership since ticket 15's decoupling (ticket 13's design):
-	// tickets the user has marked with "space", keyed by Ticket.Path so it
-	// survives a reload's re-sorting/index-shuffling. Pressing "i"
-	// (handleReplaceQueueKey) pushes this set into the queue and clears it.
+	// queue membership: tickets the user has marked with "space", keyed by
+	// Ticket.Path so it survives a reload's re-sorting/index-shuffling. Held
+	// in memory only (see setPathsChecked).
 	checked map[string]bool
 	// checkOrder records when each path joined checked.
 	checkOrder map[string]uint64
@@ -186,7 +185,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager, store *QueueStore) Model {
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
-	snapshot := store.Snapshot()
 	km := newTicketsManager()
 	sidebarTree := tree.NewModel[sidebarNode]()
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
@@ -208,9 +206,9 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 		implementingEpics: map[string]bool{},
 		implementSpinner:  sp,
 		live:              map[string]map[string]liveTicketState{},
-		checked:           snapshot.TicketChecked,
-		checkOrder:        snapshot.TicketCheckOrder,
-		queueStatus:       snapshot.Status,
+		checked:           map[string]bool{},
+		checkOrder:        map[string]uint64{},
+		queueStatus:       store.Snapshot().Status,
 		queueStore:        store,
 		explicitCollapsed: map[string]bool{},
 		archivedLazy:      archivedLazy,
@@ -273,9 +271,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// A disk read that outlived the fallback must not overwrite stream rows.
 			return m, nil
 		}
-		if err := autoCheckForkedChildren(m.epics, msg.epics, m.queueStore); err != nil {
-			return m, notify.Error("save queue: " + err.Error())
-		}
+		m.autoCheckForkedChildren(msg.epics)
 		m.refreshQueueSnapshot()
 		m.loaded = true
 		m.epics = msg.epics

@@ -256,10 +256,7 @@ func withQueueStateDir(t *testing.T) string {
 	return tmp
 }
 
-// TestModel_CheckingTicketPersistsToCheckedSet covers ticket 15's decoupling:
-// "space" persists to the independent Tickets-tab checked set, not to queue
-// membership/status (that's "i"'s job — see implement_test.go).
-func TestModel_CheckingTicketPersistsToCheckedSet(t *testing.T) {
+func TestModel_RestoresQueueStatusOnStartup(t *testing.T) {
 	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
 	withQueueStateDir(t)
 	root := t.TempDir()
@@ -273,62 +270,6 @@ func TestModel_CheckingTicketPersistsToCheckedSet(t *testing.T) {
 	m = updated.(Model)
 	ticket := m.epics[0].Tickets[0]
 
-	updated, _ = m.Update(spacePress())
-	m = updated.(Model)
-
-	snapshot := LoadQueueStore().Snapshot()
-	if !snapshot.TicketChecked[ticket.Path] {
-		t.Fatalf("expected ticket persisted to the independent checked set, got %#v", snapshot.TicketChecked)
-	}
-	if _, queued := snapshot.Status[ticket.Path]; queued {
-		t.Fatalf("checking a ticket must not queue it: %#v", snapshot.Status)
-	}
-}
-
-func TestModel_UncheckingTicketRemovesFromCheckedSet(t *testing.T) {
-	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
-	withQueueStateDir(t)
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	ticket := m.epics[0].Tickets[0]
-
-	updated, _ = m.Update(spacePress())
-	m = updated.(Model)
-	updated, _ = m.Update(spacePress())
-	m = updated.(Model)
-
-	got := LoadQueueStore().Snapshot().TicketChecked
-	if _, ok := got[ticket.Path]; ok {
-		t.Fatalf("expected ticket removed from persisted checked set after uncheck, got %v", got)
-	}
-}
-
-// TestModel_RestoresCheckedSetAndQueueStatusOnStartup covers ticket 15's
-// decoupling: the independent checked set and queue membership/status are
-// two separate persisted concepts, and both survive a restart independently.
-func TestModel_RestoresCheckedSetAndQueueStatusOnStartup(t *testing.T) {
-	// not parallel-safe: reassigns the package-level queueStateDirFn singleton
-	withQueueStateDir(t)
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	ticket := m.epics[0].Tickets[0]
-
-	updated, _ = m.Update(spacePress())
-	m = updated.(Model)
 	if err := m.queueStore.SetQueued([]string{ticket.Path}, true); err != nil {
 		t.Fatal(err)
 	}
@@ -342,9 +283,6 @@ func TestModel_RestoresCheckedSetAndQueueStatusOnStartup(t *testing.T) {
 	updated, _ = restarted.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	restarted = updated.(Model)
 
-	if !restarted.isChecked(ticket.Path) {
-		t.Fatalf("expected ticket still checked after restart")
-	}
 	if restarted.queueStatus[ticket.Path] != queueStatusDone {
 		t.Fatalf("status after restart = %v, want done", restarted.queueStatus[ticket.Path])
 	}
