@@ -545,6 +545,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
 	s.notifyResult(addr, one.Ticket.Path)
+	s.fileFollowUp(addr, one.Ticket.Path)
 	s.completeRootIfDone(root, one)
 }
 

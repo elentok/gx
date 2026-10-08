@@ -86,33 +86,44 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 }
 
 func writeInvestigateTicket(ref ticketRef, f recovery.Failure, entry string) (path, id string, err error) {
-	epicPath := filepath.Join(ref.projectDir, ref.addr.Epic)
+	parent := schema.TicketID(ref.addr.ID)
+	return writeNewTicket(filepath.Join(ref.projectDir, ref.addr.Epic), ref.addr.ID, "investigate", func(id string) (schema.Ticket, string) {
+		child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: &parent}
+		body := fmt.Sprintf(
+			"\n# %s — Investigate %s\n\n## What to build\n\nTicket %s parked with %s (%s): %s\n\nFind out why and fix it or report what a person must do.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and the parked ticket recovered, or the findings reported\n",
+			id, parent, parent, f.Type, f.Kind, f.Reason, matchedEntryHeading, entry,
+		)
+		return child, body
+	})
+}
+
+// writeNewTicket allocates the next id under the epic lock (a child of parent
+// when parent is set) and writes the ticket build returns for it.
+func writeNewTicket(epicPath, parent, slug string, build func(id string) (schema.Ticket, string)) (path, id string, err error) {
 	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
 	if err != nil {
 		return "", "", fmt.Errorf("load epic %s: %w", epicPath, err)
 	}
 	defer unlock()
 
-	id, err = tickets.NextTicketID(*epic, ref.addr.ID)
+	id, err = tickets.NextTicketID(*epic, parent)
 	if err != nil {
-		return "", "", fmt.Errorf("allocate investigate id: %w", err)
+		return "", "", fmt.Errorf("allocate %s id: %w", slug, err)
 	}
-	parent := schema.TicketID(ref.addr.ID)
-	child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: &parent}
-	body := fmt.Sprintf(
-		"\n# %s — Investigate %s\n\n## What to build\n\nTicket %s parked with %s (%s): %s\n\nFind out why and fix it or report what a person must do.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and the parked ticket recovered, or the findings reported\n",
-		id, parent, parent, f.Type, f.Kind, f.Reason, matchedEntryHeading, entry,
-	)
-	out, err := schema.MarshalTicket(child, body)
+	tk, body := build(id)
+	out, err := schema.MarshalTicket(tk, body)
 	if err != nil {
-		return "", "", fmt.Errorf("marshal investigate ticket %s: %w", id, err)
+		return "", "", fmt.Errorf("marshal %s ticket %s: %w", slug, id, err)
 	}
-	path = filepath.Join(epicPath, "issues", fmt.Sprintf("%s-investigate.md", id))
+	path = filepath.Join(epicPath, "issues", fmt.Sprintf("%s-%s.md", id, slug))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", "", err
+	}
 	if err := os.WriteFile(path, out, 0o644); err != nil {
 		return "", "", fmt.Errorf("write %s: %w", path, err)
 	}
 	if _, err := schema.ParseTicket(path); err != nil {
-		return "", "", fmt.Errorf("investigate ticket %s failed validation: %w", path, err)
+		return "", "", fmt.Errorf("%s ticket %s failed validation: %w", slug, path, err)
 	}
 	return path, id, nil
 }

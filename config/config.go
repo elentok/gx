@@ -75,6 +75,9 @@ type RecoveryConfig struct {
 	Enabled bool `json:"enabled"`
 	// Disabled lists catalog entry IDs to switch off.
 	Disabled []string `json:"disabled,omitempty"`
+	// FollowUps is the epic (project:epic) that receives the draft research
+	// tickets an investigate ticket's report files. Empty means the default.
+	FollowUps string `json:"follow-ups,omitempty"`
 }
 
 // ServerConfig configures the orchestrator server.
@@ -197,7 +200,8 @@ func Load() (Config, error) {
 		} `json:"server"`
 		Recovery *struct {
 			Enabled  *bool    `json:"enabled"`
-			Disabled []string `json:"disabled"`
+			Disabled  []string `json:"disabled"`
+			FollowUps *string  `json:"follow-ups"`
 		} `json:"recovery"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -316,6 +320,9 @@ func Load() (Config, error) {
 		}
 		if raw.Recovery.Disabled != nil {
 			cfg.Recovery.Disabled = raw.Recovery.Disabled
+		}
+		if raw.Recovery.FollowUps != nil {
+			cfg.Recovery.FollowUps = *raw.Recovery.FollowUps
 		}
 	}
 	if raw.Orchestrator != nil {

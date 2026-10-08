@@ -82,6 +82,9 @@ type Config struct {
 	// Recovery is the catalog with the user's kill switch and disables applied.
 	// The zero value is off.
 	Recovery recovery.Catalog
+	// FollowUps is config recovery.follow-ups: the project:epic that receives
+	// an investigate report's draft follow-ups. Empty means DefaultFollowUps.
+	FollowUps string
 
 	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
 	// which runs only when Orchestrator is "server". A zero debounce means 60s.
