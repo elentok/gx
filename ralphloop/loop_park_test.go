@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -405,5 +406,69 @@ func TestGate_WakeParked_ShortensParkWait(t *testing.T) {
 	case <-woke:
 	case <-time.After(5 * time.Second):
 		t.Fatal("WakeParked() did not interrupt an in-progress park wait")
+	}
+}
+
+// deadlockedKinds lists the kind of every deadlocked event in epicName's run log.
+func deadlockedKinds(t *testing.T, scratchDir, epicName string) []string {
+	t.Helper()
+	evs, _, err := ReadEvents(scratchDir, epicName)
+	if err != nil {
+		t.Fatalf("ReadEvents: %v", err)
+	}
+	var kinds []string
+	for _, ev := range evs {
+		if ev.Type == string(events.Deadlocked) {
+			kinds = append(kinds, ev.Kind)
+		}
+	}
+	return kinds
+}
+
+// TestRun_Park_EmitsDeadlockedOncePerEntry is the all-parked half of the
+// deadlocked seam: entering the park emits one event, the repeated park polls
+// do not, and the epic can enter deadlock again after it left.
+func TestRun_Park_EmitsDeadlockedOncePerEntry(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
+	})
+	d, _, _ := fakeDeps()
+	path := ticketPath(scratchDir, "my-epic", "01-stuck.md")
+	polls := 0
+	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
+		assertParkInterval(t, dur)
+		polls++
+		if polls == 3 {
+			if got := deadlockedKinds(t, scratchDir, "my-epic"); !slices.Equal(got, []string{"all-parked"}) {
+				t.Errorf("deadlocked events after repeated polls = %v, want one all-parked", got)
+			}
+			if err := SetStatus(path, "open"); err != nil {
+				t.Errorf("SetStatus: %v", err)
+			}
+		}
+		return readyTimer(dur)
+	}
+
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+}
+
+// TestRun_BlockedCycle_EmitsDeadlocked is the other kind: nothing runnable and
+// nothing a person could clear.
+func TestRun_BlockedCycle_EmitsDeadlocked(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-cycle-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by: [\"02\"]\n---\n# A\n",
+		"02-cycle-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\"]\n---\n# B\n",
+	})
+	d, _, _ := fakeDeps()
+
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{}); err == nil {
+		t.Fatal("Run() error = nil, want a deadlock error")
+	}
+	if got := deadlockedKinds(t, scratchDir, "my-epic"); !slices.Equal(got, []string{"blocked-cycle"}) {
+		t.Errorf("deadlocked events = %v, want one blocked-cycle", got)
 	}
 }

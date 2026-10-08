@@ -186,6 +186,16 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	return appendLine(runLogPath(scratchDir, epicName), data)
 }
 
+// logDeadlocked records an epic entering deadlock. Callers invoke it on the
+// transition only. A failed log is only debug-logged: the deadlock itself is
+// already being handled.
+func logDeadlocked(scratchDir, epicName string, kind events.Kind, reason string) {
+	err := logEvent(scratchDir, epicName, Event{Type: string(events.Deadlocked), Kind: string(kind), Reason: reason, Time: time.Now()})
+	if err != nil {
+		logger.Debug("logging deadlocked: %v\n", err)
+	}
+}
+
 // logSchedulerScan appends one claimNext pass's scan as scheduler-scan events.
 // A big epic's scan doesn't fit one events.MaxLineBytes line, so it is split
 // across as many lines as needed; every line of one pass shares one Time.
