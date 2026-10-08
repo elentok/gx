@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,7 +23,6 @@ import (
 const (
 	ReasonEmptyPrompt   = "empty-prompt"
 	ReasonUnknownProj   = "unknown-project"
-	ReasonBadTicketType = "invalid-type"
 	ReasonNoCommits     = "commits-unsupported"
 	ReasonBadBase       = "invalid-base"
 	ReasonBadBlocker    = "invalid-blocker"
@@ -51,9 +49,7 @@ type OneOffRequest struct {
 	Cwd   string `json:"cwd,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Agent string `json:"agent,omitempty"`
-	// Type defaults to prompt.
-	Type string `json:"type,omitempty"`
-	// Commits makes the ticket type implement; a project without a VCS refuses it.
+	// Commits makes the ticket type implement (prompt otherwise); a project without a VCS refuses it.
 	Commits bool `json:"commits,omitempty"`
 	// Base overrides the derived base; only a commit-landing ticket has one.
 	Base string `json:"base,omitempty"`
@@ -80,7 +76,6 @@ type oneOffFileFrontmatter struct {
 	Project               string   `yaml:"project"`
 	Name                  string   `yaml:"name"`
 	Agent                 string   `yaml:"agent"`
-	Type                  string   `yaml:"type"`
 	Commits               bool     `yaml:"commits"`
 	Base                  string   `yaml:"base"`
 	BlockedBy             []string `yaml:"blocked_by"`
@@ -113,7 +108,6 @@ func (req *OneOffRequest) applyFile() error {
 	setIfEmpty(&req.Project, fm.Project)
 	setIfEmpty(&req.Name, fm.Name)
 	setIfEmpty(&req.Agent, fm.Agent)
-	setIfEmpty(&req.Type, fm.Type)
 	setIfEmpty(&req.Base, fm.Base)
 	setIfEmpty(&req.Unique, fm.Unique)
 	req.Commits = req.Commits || fm.Commits
@@ -188,15 +182,9 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 	if prompt == "" {
 		return oneOffRefusal(ReasonEmptyPrompt, "a one-off needs a prompt"), nil
 	}
-	typ := schema.TicketType(req.Type)
-	if req.Type == "" {
-		typ = schema.TypePrompt
-		if req.Commits {
-			typ = schema.TypeImplement
-		}
-	}
-	if !typ.Valid() || (req.Commits && typ != schema.TypeImplement) {
-		return oneOffRefusal(ReasonBadTicketType, fmt.Sprintf("unknown ticket type %q", req.Type)), nil
+	typ := schema.TypePrompt
+	if req.Commits {
+		typ = schema.TypeImplement
 	}
 	if s.cfg.Orchestrator != config.OrchestratorServer {
 		return oneOffRefusal(ReasonSchedulerNotSelected, `orchestrator is not "server"`), nil

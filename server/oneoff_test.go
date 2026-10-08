@@ -152,11 +152,26 @@ func TestOneOff_CommitsOptionsLandInFrontmatter(t *testing.T) {
 	}
 }
 
+func TestOneOff_FileTypeKeyIsIgnored(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	file := filepath.Join(t.TempDir(), "payload.md")
+	if err := os.WriteFile(file, []byte("---\ntype: implement\n---\njust a prompt\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Client.OneOff(context.Background(), server.OneOffRequest{File: file, Cwd: repo})
+	if err != nil || res.Refused {
+		t.Fatalf("one-off: %+v, %v", res, err)
+	}
+	if raw := readOneOffTicket(t, h, res.Address); !strings.Contains(raw, "type: prompt") {
+		t.Errorf("type key changed the ticket type:\n%s", raw)
+	}
+}
+
 func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	ctx := context.Background()
 	file := filepath.Join(t.TempDir(), "payload.md")
-	payload := "---\ntype: implement\nbase: main\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
+	payload := "---\ncommits: true\nbase: main\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
 	if err := os.WriteFile(file, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
