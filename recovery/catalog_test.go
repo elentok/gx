@@ -513,6 +513,55 @@ func TestR8MatchesOnlyARateLimitPauseThatResets(t *testing.T) {
 	}
 }
 
+func TestDefaultR10LaunchesDisabledAsAMediumRule(t *testing.T) {
+	var r10 []Entry
+	for _, e := range Default().Entries {
+		if e.ID == "R10" {
+			r10 = append(r10, e)
+		}
+	}
+	if len(r10) != 1 {
+		t.Fatalf("R10 entries = %v, want one", r10)
+	}
+	e := r10[0]
+	if e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"release-gate", "finish"}) {
+		t.Fatalf("R10 = %+v, want disabled medium rule with release-gate, finish", e)
+	}
+	held := []Event{{Type: events.BackgroundTaskGateHeld, Reason: "background task t1"}}
+	if _, ok := Default().Match(held); ok {
+		t.Error("R10 must not match while disabled")
+	}
+}
+
+func TestR10MatchesOnlyAGateStillHeld(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	held := Event{Type: events.BackgroundTaskGateHeld, Reason: "background task t1"}
+	released := Event{Type: events.BackgroundTaskGateReleased, Reason: "background task t1"}
+	expired := Event{Type: events.BackgroundTaskGateExpired, Reason: "background task t1"}
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"gate held", []Event{{Type: events.IterationStarted}, held}, true},
+		{"held again after an earlier release", []Event{held, released, held}, true},
+		{"gate released", []Event{held, released}, false},
+		{"gate expired", []Event{held, expired}, false},
+		{"held then finished", []Event{held, released, {Type: events.IterationFinished}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R10") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")

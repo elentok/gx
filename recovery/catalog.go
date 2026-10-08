@@ -78,7 +78,23 @@ func Default() Catalog {
 	entries = append(entries, r3LandRecoverable()...)
 	entries = append(entries, r4BlockedPaneDialog())
 	entries = append(entries, r6LaunchCollision()...)
-	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause())}
+	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause(), r10BackgroundGateHeld())}
+}
+
+// r10BackgroundGateHeld is a finish gated on a background task nothing ever
+// reported ended, so the gate never releases. The run log cannot tell that
+// from a task still running: the remedy, not a predicate, must re-check the
+// pane is idle (a fresh read, never a cached status), the worktree is clean
+// and the branch has commits ahead before it force-releases the gate and runs
+// the ordinary finish path. It never parks: the commit exists. Medium
+// authority because releasing early finishes an agent that is still working.
+// Launches disabled with no remedy: the S0 holds predate the fix of their
+// cause, and neither a gate-held trigger nor a release verb exists yet.
+func r10BackgroundGateHeld() Entry {
+	return Entry{
+		ID: "R10", Type: events.BackgroundTaskGateHeld,
+		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"release-gate", "finish"},
+	}
 }
 
 // rateLimitResetsRE is a pause gx waits out itself: Claude's rate limit (its
