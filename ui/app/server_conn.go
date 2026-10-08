@@ -14,8 +14,10 @@ import (
 // serverProbeInterval spaces connection checks; a down daemon is polled, not spun on.
 const serverProbeInterval = 2 * time.Second
 
-// serverProbeTimeout bounds one handshake so a wedged server reads as down.
-const serverProbeTimeout = time.Second
+// serverProbeTimeout bounds one handshake. A server that is merely slow (a
+// loaded machine) keeps its last state; only a refused or missing socket reads
+// as down.
+const serverProbeTimeout = 5 * time.Second
 
 // ServerClient is what the shell needs from the API client: everything the
 // tabs use, plus the handshake that tells up from down.
@@ -35,7 +37,12 @@ type ServerDeps struct {
 }
 
 // serverConnMsg is one probe's outcome.
-type serverConnMsg struct{ conn ServerConn }
+type serverConnMsg struct {
+	conn ServerConn
+	// slow: the handshake failed for a reason other than "nothing listens", so
+	// the last known state stands.
+	slow bool
+}
 
 func (m Model) serverMode() bool { return m.settings.Server != nil }
 
@@ -46,14 +53,16 @@ func (m Model) cmdServerProbe() tea.Cmd {
 		defer cancel()
 		n, err := d.Client.Negotiate(ctx, d.Build)
 		switch {
+		case err != nil && !apiclient.IsNotRunning(err):
+			return serverConnMsg{slow: true}
 		case err != nil:
-			return serverConnMsg{ServerConn{State: ServerDown}}
+			return serverConnMsg{conn: ServerConn{State: ServerDown}}
 		case n.ReadOnly:
-			return serverConnMsg{ServerConn{State: ServerReadOnly, PID: n.Pid}}
+			return serverConnMsg{conn: ServerConn{State: ServerReadOnly, PID: n.Pid}}
 		case n.HerdrUnavailable:
-			return serverConnMsg{ServerConn{State: ServerHerdrUnavailable, PID: n.Pid}}
+			return serverConnMsg{conn: ServerConn{State: ServerHerdrUnavailable, PID: n.Pid}}
 		}
-		return serverConnMsg{ServerConn{State: ServerUp, PID: n.Pid}}
+		return serverConnMsg{conn: ServerConn{State: ServerUp, PID: n.Pid}}
 	}
 }
 
@@ -69,6 +78,9 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 	case serverProbeTickMsg:
 		return m, m.cmdServerProbe(), true
 	case serverConnMsg:
+		if msg.slow {
+			return m, m.cmdServerProbeLater(), true
+		}
 		prev := m.serverConn
 		m.serverConn = msg.conn
 		cmds := []tea.Cmd{m.cmdServerProbeLater()}

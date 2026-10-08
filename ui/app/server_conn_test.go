@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"syscall"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,6 +26,7 @@ type fakeServerClient struct {
 	down     bool
 	readOnly bool
 	herdr    bool
+	slow     bool
 }
 
 func (f *fakeServerClient) Snapshot(context.Context) (server.Snapshot, error) {
@@ -31,8 +34,11 @@ func (f *fakeServerClient) Snapshot(context.Context) (server.Snapshot, error) {
 }
 
 func (f *fakeServerClient) Negotiate(context.Context, string) (apiclient.Negotiation, error) {
+	if f.slow {
+		return apiclient.Negotiation{}, context.DeadlineExceeded
+	}
 	if f.down {
-		return apiclient.Negotiation{}, errors.New("connection refused")
+		return apiclient.Negotiation{}, fmt.Errorf("dial: %w", syscall.ECONNREFUSED)
 	}
 	return apiclient.Negotiation{Handshake: server.Handshake{Pid: 4242, HerdrUnavailable: f.herdr}, ReadOnly: f.readOnly}, nil
 }
@@ -133,5 +139,16 @@ func TestServerMode_ConnectionDropAfterTabSwitchDoesNotPanic(t *testing.T) {
 
 	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ● pid 4242") {
 		t.Errorf("tabs = %q, want the server back up", got)
+	}
+}
+
+func TestServerMode_SlowHandshakeKeepsLastState(t *testing.T) {
+	client := &fakeServerClient{}
+	m := probe(t, newServerShell(t, client))
+
+	client.slow = true
+	m = probe(t, m)
+	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ● pid 4242") {
+		t.Fatalf("slow handshake flipped the state: tabs = %q", got)
 	}
 }
