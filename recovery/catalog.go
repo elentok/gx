@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"time"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/transcript"
@@ -39,6 +40,7 @@ type Event struct {
 	Text string
 	// Reason is the event's reason as the run log recorded it.
 	Reason string
+	Time   time.Time
 }
 
 // Entry is one catalogued failure. It matches when the newest event in the
@@ -74,7 +76,8 @@ var NotCatalogued = map[string]string{
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
 // they land.
 func Default() Catalog {
-	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered(), r7CompactionTimedOut()}
+	// R12 is a narrower zero-commit park than R2's and R3's, so it goes first.
+	entries := []Entry{r12StalledReclaim(), r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered(), r7CompactionTimedOut()}
 	entries = append(entries, r3LandRecoverable()...)
 	entries = append(entries, r4BlockedPaneDialog())
 	// R11 is a narrower name-taken park than R6's, so it goes first.
@@ -144,6 +147,48 @@ func r11ClaimClobbered() Entry {
 			return false
 		},
 		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"reclaim"},
+	}
+}
+
+// reclaimStallWindow is how soon after a reclaim a zero-commit finish means the
+// pane was idle because it never started, not because it finished.
+const reclaimStallWindow = 2 * time.Second
+
+// r12StalledReclaim is a reclaim onto a pane that stalled earlier: the idle
+// pane reads as finished, so the reclaimed iteration parks zero-commit almost
+// at once while the stalled agent sits untouched. The fix closes that stale tab
+// and relaunches fresh (R5's path). An agent acts because the run log carries
+// neither the pane's state_change_seq nor the stalled session, and it must see
+// both unchanged before closing: a tab whose agent was idle between turns
+// loses its context. Launches disabled: reclaimed is only streamed, never
+// written to the run log, so there is no S0 event data and no real log can
+// match it yet.
+func r12StalledReclaim() Entry {
+	return Entry{
+		ID: "R12", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		Predicate: func(seq []Event) bool {
+			park := seq[len(seq)-1]
+			reclaimed := false
+			for _, e := range slices.Backward(seq[:len(seq)-1]) {
+				switch {
+				case e.Type == events.CherryPicked || e.Type == events.ManualLand || e.Type == events.TicketReset:
+					return false
+				case reclaimed:
+					if e.Kind == events.AgentPromptStalled {
+						return true
+					}
+				case e.Type == events.Reclaimed:
+					if e.Time.IsZero() || park.Time.IsZero() || park.Time.Sub(e.Time) >= reclaimStallWindow {
+						return false
+					}
+					reclaimed = true
+				case e.Type == events.IterationStarted || e.Type == events.NeedsAnswer || e.Type == events.NeedsRepair || e.Type == events.Commitless:
+					return false
+				}
+			}
+			return false
+		},
+		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"close-pane", "relaunch"},
 	}
 }
 

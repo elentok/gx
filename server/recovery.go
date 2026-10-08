@@ -307,10 +307,10 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
 	var seq []recovery.Event
 	for _, ev := range log {
-		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason})
+		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason, Time: ev.Time})
 	}
 	if len(seq) == 0 || seq[len(seq)-1].Type != f.Type {
-		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind, Reason: f.Reason})
+		seq = append(seq, recovery.Event{Type: f.Type, Kind: f.Kind, Reason: f.Reason, Time: time.Now()})
 	}
 	return seq
 }

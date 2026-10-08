@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/events"
 )
@@ -639,6 +640,72 @@ func TestR11MatchesANameTakenRelaunchOfAStillLiveIteration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e, ok := c.Match(tt.seq)
 			if (tt.want == "") == ok || e.ID != tt.want {
+				t.Fatalf("got (%q, %v), want %q", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestDefaultR12LaunchesDisabledAsAMediumAgentThatClosesAndRelaunches(t *testing.T) {
+	c := Default()
+	i := slices.IndexFunc(c.Entries, func(e Entry) bool { return e.ID == "R12" })
+	if i < 0 {
+		t.Fatal("R12 not in the default catalog")
+	}
+	e := c.Entries[i]
+	if e.Enabled || e.Executor != ExecutorAgent || e.Authority != AuthorityMedium || e.Remedy != nil || !slices.Equal(e.Verbs, []string{"close-pane", "relaunch"}) {
+		t.Errorf("R12 = %+v, want disabled medium agent that closes the pane and relaunches", e)
+	}
+	t0 := time.Now()
+	seq := []Event{
+		{Type: events.LaunchFailed, Kind: events.AgentPromptStalled, Time: t0},
+		{Type: events.Reclaimed, Time: t0.Add(time.Minute)},
+		{Type: events.NeedsAnswer, Kind: events.ZeroCommit, Time: t0.Add(time.Minute + time.Second)},
+	}
+	if got, ok := c.Match(seq); ok && got.ID == "R12" {
+		t.Error("disabled R12 must not match")
+	}
+}
+
+func TestR12MatchesAQuickZeroCommitFinishOfAReclaimAfterAStall(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	t0 := time.Now()
+	at := func(typ events.Type, kind events.Kind, d time.Duration) Event {
+		return Event{Type: typ, Kind: kind, Time: t0.Add(d)}
+	}
+	stall := at(events.LaunchFailed, events.AgentPromptStalled, 0)
+	reclaimed := at(events.Reclaimed, "", time.Minute)
+	park := at(events.NeedsAnswer, events.ZeroCommit, time.Minute+time.Second)
+	tests := []struct {
+		name string
+		seq  []Event
+		want string
+	}{
+		{"stall, reclaim, quick zero-commit park", []Event{stall, reclaimed, park}, "R12"},
+		{"stall parked, then reclaimed", []Event{stall, at(events.NeedsRepair, events.AgentPromptStalled, time.Second), reclaimed, park}, "R12"},
+		{"finished logged before the park", []Event{stall, reclaimed, at(events.IterationFinished, "", time.Minute+time.Second), park}, "R12"},
+		{"reclaim finished slowly", []Event{stall, reclaimed, at(events.NeedsAnswer, events.ZeroCommit, 2*time.Minute)}, ""},
+		{"no earlier stall", []Event{at(events.IterationStarted, "", 0), reclaimed, park}, ""},
+		{"fresh launch, not a reclaim", []Event{stall, at(events.IterationStarted, "", time.Minute), park}, ""},
+		{"reclaim of an older iteration", []Event{stall, reclaimed, at(events.IterationStarted, "", time.Minute), park}, ""},
+		{"a person reset after the stall", []Event{stall, at(events.TicketReset, "", time.Second), reclaimed, park}, ""},
+		{"landed after the stall", []Event{stall, at(events.CherryPicked, "", time.Second), reclaimed, park}, ""},
+		{"reclaim with no time", []Event{stall, {Type: events.Reclaimed}, park}, ""},
+		{"stall of another kind", []Event{at(events.LaunchFailed, events.AgentPaneBusy, 0), reclaimed, park}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if tt.want == "" {
+				if ok && e.ID == "R12" {
+					t.Fatal("R12 matched a near-miss")
+				}
+				return
+			}
+			if !ok || e.ID != tt.want {
 				t.Fatalf("got (%q, %v), want %q", e.ID, ok, tt.want)
 			}
 		})

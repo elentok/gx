@@ -809,6 +809,52 @@ func TestRecovery_R11ClobberedClaimForksAnInvestigateTicketNamingR11(t *testing.
 	})
 }
 
+// A reclaim that parks zero-commit at once after an earlier prompt stall is a
+// stalled pane read as finished, so R12 forks the investigation that closes it
+// and relaunches.
+func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	for _, seed := range []ralphloop.Event{
+		{Type: string(events.LaunchFailed), Ticket: "01", Kind: string(events.AgentPromptStalled), Attempt: 1, Reason: "prompt stalled"},
+		{Type: string(events.Reclaimed), Ticket: "01"},
+	} {
+		if err := ralphloop.AppendEvent(filepath.Join(store, "proj"), "epic-a", seed); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.Recovery = recovery.Default()
+		for i := range c.Recovery.Entries {
+			c.Recovery.Entries[i].Enabled = true
+		}
+	})
+	registerLaunch(h)
+	if err := h.Server.ParkAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		for _, tk := range epicTickets(t, h).Tickets {
+			if tk.Identifier == "01a" && tk.Type == "investigate" {
+				body, _ := os.ReadFile(tk.Path)
+				return strings.Contains(string(body), "R12")
+			}
+		}
+		return false
+	})
+	waitFor(t, func() bool {
+		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+		for _, ev := range log {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.ZeroCommit) && ev.Outcome == "proj:epic-a/01a" {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
