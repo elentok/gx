@@ -13,6 +13,8 @@ import (
 
 const (
 	defaultPollInterval = 2 * time.Second
+	// watchedPollInterval is the backstop poll while fsnotify is working.
+	watchedPollInterval = 15 * time.Second
 	// A burst of writes (an editor's save, a gx command) becomes one rescan.
 	watchDebounce = 50 * time.Millisecond
 )
@@ -28,6 +30,7 @@ func (s *Server) keepFresh(ctx context.Context) {
 	if poll <= 0 {
 		poll = defaultPollInterval
 	}
+	pollUnset := s.cfg.PollInterval <= 0
 	var events <-chan fsnotify.Event
 	if !s.cfg.DisableWatch {
 		w, err := fsnotify.NewWatcher()
@@ -50,6 +53,12 @@ func (s *Server) keepFresh(ctx context.Context) {
 			}()
 			s.rewatch = func() { WatchTree(w, s.cfg.TicketStore) }
 		}
+	}
+
+	// With a live watch the poll is only a backstop for lost events, and each
+	// scan reads and hashes every ticket file, so it can be slow.
+	if pollUnset && events != nil {
+		poll = watchedPollInterval
 	}
 
 	// Edits made before the watch was armed produced no event.

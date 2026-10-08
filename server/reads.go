@@ -166,38 +166,45 @@ func (s *Server) explain(w http.ResponseWriter, r *http.Request) {
 // explainTicket gives the stored ticket's verdict: the scheduler's own, then
 // the server's queue and slot state for a ticket nothing else holds back.
 func (s *Server) explainTicket(addr tickets.Address) (Explanation, error) {
-	return s.explainTicketWith(addr, tickets.Load)
-}
-
-// explainTicketWith is explainTicket with the project loader injected, so a
-// pass over many tickets can load each project once.
-func (s *Server) explainTicketWith(addr tickets.Address, load func(dir string) ([]tickets.Epic, error)) (Explanation, error) {
-	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	epics, err := s.projectEpics(addr.Project)
 	if err != nil {
 		return Explanation{}, err
 	}
+	return s.explainIn(epics, addr)
+}
+
+// projectEpics is the named project's epics as of the last store scan; a
+// project the scan has not seen yet is read from disk.
+func (s *Server) projectEpics(project string) ([]tickets.Epic, error) {
+	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	if err != nil {
+		return nil, err
+	}
 	for _, dir := range dirs {
-		if tickets.ProjectName(dir) != addr.Project {
+		if tickets.ProjectName(dir) != project {
 			continue
 		}
-		epics, err := load(dir)
-		if err != nil {
-			return Explanation{}, err
+		if epics, ok := s.idx.epicsOf(dir); ok {
+			return epics, nil
 		}
-		for _, e := range epics {
-			if e.Name != addr.Epic {
-				continue
-			}
-			for _, t := range e.Tickets {
-				if t.DisplayNumber() != addr.ID {
-					continue
-				}
+		return tickets.Load(dir)
+	}
+	return nil, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + project}
+}
+
+// explainIn is explainTicket's lookup inside one project's epics.
+func (s *Server) explainIn(epics []tickets.Epic, addr tickets.Address) (Explanation, error) {
+	for _, e := range epics {
+		if e.Name != addr.Epic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			if t.DisplayNumber() == addr.ID {
 				return s.verdictOf(e, t, addr), nil
 			}
 		}
-		return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}
 	}
-	return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + addr.Project}
+	return Explanation{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: "no ticket " + addr.String()}
 }
 
 func (s *Server) readHistory(addr tickets.Address) ([]ralphloop.Event, error) {

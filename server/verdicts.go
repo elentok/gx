@@ -114,22 +114,31 @@ func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 	return ahead, false
 }
 
-// loadResult is one project's load, kept for the length of a pass.
+// loadResult is one project's epics (or the error getting them) for a pass.
 type loadResult struct {
 	epics []tickets.Epic
 	err   error
 }
 
+// explainQueued is explainTicket with the project lookup shared across a pass.
+func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (Explanation, error) {
+	epics, err := epicsOf(addr.Project)
+	if err != nil {
+		return Explanation{}, err
+	}
+	return s.explainIn(epics, addr)
+}
+
 // pendingRows explains every queue entry, in queue order.
 func (s *Server) pendingRows() []PendingRow {
 	rows := []PendingRow{}
-	loaded := map[string]loadResult{}
-	load := func(dir string) ([]tickets.Epic, error) {
-		if r, ok := loaded[dir]; ok {
+	byProject := map[string]loadResult{}
+	epicsOf := func(project string) ([]tickets.Epic, error) {
+		if r, ok := byProject[project]; ok {
 			return r.epics, r.err
 		}
-		epics, err := tickets.Load(dir)
-		loaded[dir] = loadResult{epics, err}
+		epics, err := s.projectEpics(project)
+		byProject[project] = loadResult{epics, err}
 		return epics, err
 	}
 	for _, item := range s.queued.list() {
@@ -137,7 +146,7 @@ func (s *Server) pendingRows() []PendingRow {
 		if err != nil {
 			continue
 		}
-		ex, err := s.explainTicketWith(addr, load)
+		ex, err := s.explainQueued(addr, epicsOf)
 		if err != nil {
 			ex = Explanation{Verdict: "error", Reason: err.Error()}
 		}

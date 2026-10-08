@@ -56,25 +56,30 @@ type index struct {
 	mu     sync.RWMutex
 	events *broker
 	list   []TicketInfo
+	// loaded is each project's epics as the last scan read them, by project
+	// dir. Treated as read-only: readers share it until the next scan.
+	loaded map[string][]tickets.Epic
 }
 
 // scanStore reads every project in the ticket store. Always a full read of the
 // files: the index never merges, so the file wins on every rescan.
-func scanStore(storePath string) ([]TicketInfo, error) {
+func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error) {
 	list := []TicketInfo{}
+	loaded := map[string][]tickets.Epic{}
 	if storePath == "" {
-		return list, nil
+		return list, loaded, nil
 	}
 	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		epics, err := tickets.Load(dir)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		loaded[dir] = epics
 		for _, e := range epics {
 			for _, t := range e.Tickets {
 				list = append(list, ticketInfo(project, filepath.Base(e.Path), t))
@@ -82,23 +87,23 @@ func scanStore(storePath string) ([]TicketInfo, error) {
 		}
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Address < list[j].Address })
-	return list, nil
+	return list, loaded, nil
 }
 
 // buildIndex does the initial scan.
 func buildIndex(storePath string, events *broker) (*index, error) {
-	list, err := scanStore(storePath)
+	list, loaded, err := scanStore(storePath)
 	if err != nil {
 		return nil, err
 	}
-	return &index{list: list, events: events}, nil
+	return &index{list: list, loaded: loaded, events: events}, nil
 }
 
 // refresh rescans the store and replaces the index, publishing one
 // ticket-changed event per ticket that differs. Publishing happens under the
 // lock so a snapshot's seq always matches the list it carries.
 func (i *index) refresh(storePath string) error {
-	list, err := scanStore(storePath)
+	list, loaded, err := scanStore(storePath)
 	if err != nil {
 		return err
 	}
@@ -107,8 +112,16 @@ func (i *index) refresh(storePath string) error {
 	for _, addr := range changedAddresses(i.list, list) {
 		i.events.publish(EventTicketChanged, addr)
 	}
-	i.list = list
+	i.list, i.loaded = list, loaded
 	return nil
+}
+
+// epicsOf is the project's epics as of the last scan.
+func (i *index) epicsOf(dir string) ([]tickets.Epic, bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	epics, ok := i.loaded[dir]
+	return epics, ok
 }
 
 // changedAddresses lists, in address order, tickets added, removed or edited
