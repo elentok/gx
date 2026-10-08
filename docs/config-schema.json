@@ -65,18 +65,6 @@
           "minimum": 1,
           "default": 2
         },
-        "max-concurrent-tickets-per-epic": {
-          "type": "integer",
-          "description": "Deprecated alias of max-agents-per-epic; warns when used.",
-          "minimum": 1,
-          "default": 2
-        },
-        "max-concurrent-epics": {
-          "type": "integer",
-          "description": "Deprecated: ignored, warns when used.",
-          "minimum": 1,
-          "default": 2
-        },
         "retry-storm-launches": {
           "type": "integer",
           "description": "Consecutive failed launches of one ticket before it is parked needs-repair as retry-exhausted. Default: 3.",
@@ -96,8 +84,7 @@
         }
       },
       "default": {
-        "max-concurrent-tickets-per-epic": 2,
-        "max-concurrent-epics": 2,
+        "max-agents-per-epic": 2,
         "retry-storm-launches": 3,
         "spin-cycles": 3,
         "spin-window": "5m"

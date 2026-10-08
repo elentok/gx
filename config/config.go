@@ -139,13 +139,11 @@ func Load() (Config, error) {
 		NameAliases           map[string]string `json:"name-aliases"`
 		Log                   *LogConfig        `json:"log"`
 		ExecutionQueue        *struct {
-			MaxAgentsPerEpic            *int    `json:"max-agents-per-epic"`
-			MaxConcurrentTicketsPerEpic *int    `json:"max-concurrent-tickets-per-epic"` // deprecated alias
-			MaxConcurrentEpics          *int    `json:"max-concurrent-epics"`            // deprecated, ignored
-			MaxAgents                   *int    `json:"max-agents"`
-			RetryStormLaunches          *int    `json:"retry-storm-launches"`
-			SpinCycles                  *int    `json:"spin-cycles"`
-			SpinWindow                  *string `json:"spin-window"`
+			MaxAgentsPerEpic   *int    `json:"max-agents-per-epic"`
+			MaxAgents          *int    `json:"max-agents"`
+			RetryStormLaunches *int    `json:"retry-storm-launches"`
+			SpinCycles         *int    `json:"spin-cycles"`
+			SpinWindow         *string `json:"spin-window"`
 		} `json:"execution-queue"`
 		Budget *struct {
 			SoftLimit              *float64  `json:"soft-limit"`
@@ -220,15 +218,8 @@ func Load() (Config, error) {
 		}
 	}
 	if raw.ExecutionQueue != nil {
-		if old := raw.ExecutionQueue.MaxConcurrentTicketsPerEpic; old != nil {
-			cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*old)
-			cfg.Warnings = append(cfg.Warnings, "execution-queue.max-concurrent-tickets-per-epic is deprecated: use execution-queue.max-agents-per-epic")
-		}
-		if raw.ExecutionQueue.MaxAgentsPerEpic != nil { // wins over the alias
+		if raw.ExecutionQueue.MaxAgentsPerEpic != nil {
 			cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxAgentsPerEpic)
-		}
-		if raw.ExecutionQueue.MaxConcurrentEpics != nil {
-			cfg.Warnings = append(cfg.Warnings, "execution-queue.max-concurrent-epics is deprecated and ignored: use execution-queue.max-agents to cap running agents")
 		}
 		if raw.ExecutionQueue.MaxAgents != nil {
 			cfg.ExecutionQueue.MaxAgents = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxAgents)

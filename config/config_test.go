@@ -60,7 +60,7 @@ func TestLoadExecutionQueueConfigPreservesUnspecifiedDefault(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	path := filepath.Join(dir, "config.json")
-	if err := os.WriteFile(path, []byte(`{"execution-queue":{"max-concurrent-tickets-per-epic":4}}`), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"execution-queue":{"max-agents-per-epic":4}}`), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -76,16 +76,16 @@ func TestLoadExecutionQueueConfigPreservesUnspecifiedDefault(t *testing.T) {
 	}
 }
 
-func TestLoadDeprecatedCapKeys(t *testing.T) {
+// The old cap keys are treated like any other unknown key: no effect, no warning.
+func TestLoadOldCapKeysAreUnknown(t *testing.T) {
 	cases := []struct {
-		name, json   string
-		wantPerEpic  int
-		wantWarnings int
+		name, json  string
+		wantPerEpic int
 	}{
-		{"old per-epic key applies with a warning", `{"execution-queue":{"max-concurrent-tickets-per-epic":4}}`, 4, 1},
-		{"new key applies silently", `{"execution-queue":{"max-agents-per-epic":3}}`, 3, 0},
-		{"new key wins over the old one", `{"execution-queue":{"max-agents-per-epic":3,"max-concurrent-tickets-per-epic":4}}`, 3, 1},
-		{"max-concurrent-epics is ignored with a warning", `{"execution-queue":{"max-concurrent-epics":9}}`, 2, 1},
+		{"new key applies", `{"execution-queue":{"max-agents-per-epic":3}}`, 3},
+		{"old per-epic key has no effect", `{"execution-queue":{"max-concurrent-tickets-per-epic":4}}`, 2},
+		{"old per-epic key does not override the new one", `{"execution-queue":{"max-agents-per-epic":3,"max-concurrent-tickets-per-epic":4}}`, 3},
+		{"max-concurrent-epics has no effect", `{"execution-queue":{"max-concurrent-epics":9}}`, 2},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -109,8 +109,8 @@ func TestLoadDeprecatedCapKeys(t *testing.T) {
 			if got := cfg.ExecutionQueue.MaxConcurrentEpics; got != 2 {
 				t.Errorf("MaxConcurrentEpics = %d, want default 2", got)
 			}
-			if len(cfg.Warnings) != tc.wantWarnings {
-				t.Errorf("warnings = %q, want %d", cfg.Warnings, tc.wantWarnings)
+			if len(cfg.Warnings) != 0 {
+				t.Errorf("warnings = %q, want none", cfg.Warnings)
 			}
 		})
 	}

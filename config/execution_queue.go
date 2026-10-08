@@ -12,8 +12,9 @@ const (
 
 // ExecutionQueueConfig controls parallel execution from the Tickets and Queue tabs.
 type ExecutionQueueConfig struct {
-	MaxConcurrentTicketsPerEpic int `json:"max-concurrent-tickets-per-epic"`
-	MaxConcurrentEpics          int `json:"max-concurrent-epics"`
+	MaxConcurrentTicketsPerEpic int `json:"max-agents-per-epic"`
+	// MaxConcurrentEpics is only used by the legacy TUI; it has no config key.
+	MaxConcurrentEpics int `json:"-"`
 	// MaxAgents caps live agents across every project (the daemon's slot cap).
 	MaxAgents int `json:"max-agents"`
 	// RetryStormLaunches is how many consecutive failed launches park a ticket

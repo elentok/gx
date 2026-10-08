@@ -83,8 +83,11 @@ func TestExecute_ConfigDefaults_PrintsJSON(t *testing.T) {
 	if !strings.Contains(out, "use-nerdfont-icons") {
 		t.Fatalf("expected config key in output, got: %q", out)
 	}
-	if !strings.Contains(out, "max-concurrent-tickets-per-epic") || !strings.Contains(out, "max-concurrent-epics") {
+	if !strings.Contains(out, "max-agents-per-epic") {
 		t.Fatalf("expected execution queue config keys in output, got: %q", out)
+	}
+	if strings.Contains(out, "max-concurrent-tickets-per-epic") || strings.Contains(out, "max-concurrent-epics") {
+		t.Fatalf("old cap keys must not be printed, got: %q", out)
 	}
 	var v map[string]any
 	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &v); err != nil {
