@@ -66,8 +66,6 @@ type Config struct {
 	// and the orchestrator server. Global only: never a per-project key.
 	Orchestrator string       `json:"orchestrator"`
 	Server       ServerConfig `json:"server"`
-	// Warnings are problems Load found but tolerated, such as deprecated keys.
-	Warnings []string `json:"-"`
 }
 
 // ServerConfig configures the orchestrator server.

@@ -140,9 +140,6 @@ func runServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, w := range cfg.Warnings {
-		fmt.Fprintln(os.Stderr, "warning: config:", w)
-	}
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr

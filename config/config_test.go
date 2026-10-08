@@ -109,9 +109,6 @@ func TestLoadOldCapKeysAreUnknown(t *testing.T) {
 			if got := cfg.ExecutionQueue.MaxConcurrentEpics; got != 2 {
 				t.Errorf("MaxConcurrentEpics = %d, want default 2", got)
 			}
-			if len(cfg.Warnings) != 0 {
-				t.Errorf("warnings = %q, want none", cfg.Warnings)
-			}
 		})
 	}
 }
