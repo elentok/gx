@@ -221,7 +221,10 @@ _Avoid_: "runner" alone, "backend"; never "run", which is an epic run.
 
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
 multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
-agent but never take it over. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
+agent read-only and act on it with one-shot prompt, interrupt and answer verbs, but never attach to its terminal. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
+
+**Session** — one agent hosted by an agent runner, identified by its label. Replaces herdr's
+tab, pane and workspace triple as what ralph-loop holds on to. _Avoid_: "pane", "tab" outside herdr.
 
 **Headless runner** — the native agent runner that drives claude through its non-interactive,
 structured-event mode. The default native choice.
