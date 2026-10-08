@@ -92,8 +92,8 @@ func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
 		statuses, recoveries []string
 		want                 int
 	}{
-		"recovered":   {[]string{"claimed", "needs-repair", "needs-repair", "claimed", "cancelled"}, []string{"", pending, pending}, 5},
-		"escalated":   {[]string{"claimed", "needs-repair", "needs-repair"}, []string{"", pending, escalated}, exitWaitEscalated},
+		"recovered":    {[]string{"claimed", "needs-repair", "needs-repair", "claimed", "cancelled"}, []string{"", pending, pending}, 5},
+		"escalated":    {[]string{"claimed", "needs-repair", "needs-repair"}, []string{"", pending, escalated}, exitWaitEscalated},
 		"hold expired": {[]string{"claimed", "needs-answer", "needs-answer"}, []string{"", pending, ""}, 3},
 	} {
 		if _, code := runWait(t, &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries}); code != tc.want {
