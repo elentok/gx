@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.30.0 - 2026-10-08
+
+- Added the `gx server` orchestrator daemon. It owns the queue, the ticket store and the chat sink:
+  - Added `gx server start`, `stop`, `restart`, `status` (with `--json`), `logs` (rotating `server.log`) and `install`. `install` sets up a launchd agent, and the agent gets the shell's `PATH`.
+  - The server listens on a unix socket, with an opt-in loopback TCP listener. Clients and server check versions when they connect.
+  - Added an SSE event stream with a contiguous `seq`. Clients take a fresh snapshot after a gap or a reconnect. Added `gx server tickets follow`.
+  - Added `gx server queue add`, `remove`, `move`, `replace`, `pause`, `resume` and `drain`, and `gx server tickets cancel` (with `--stop`, and it also cancels forks).
+  - Queue writes are refused with a start hint when the server is not running. Added the global `orchestrator` config key (`in-process` or `server`). With `server`, the in-process loop will not claim tickets.
+  - The server claims and launches each queued root's frontier ticket. It fills free slots under `max-concurrent-epics` and takes back live iterations on start.
+  - A finished root lands through the merge core and parks on `needs_rebase` when it can't land. A land cut off by a crash is recovered on start. `server.auto-merge-epic` (default off) controls the epic merge.
+  - Bases are worked out at claim time and stamped as `resolved_base`. An unclear base parks the ticket as `needs-answer`. The server resolves cross-epic and epic-level `blocked_by`.
+  - The server commits the ticket store and pushes to the remote when it can. A graceful stop waits for any land to finish and flushes the store commit first.
+  - A launch failure now parks the ticket as `needs-repair` with the launch error, instead of rolling it back to open. Every park goes through one path that publishes a park event and sends a notification.
+  - Park messages show the project name and the epic counts. A landed epic sends "epic complete", and a landed ticket sends a chat message. Server notices go to the global destination: start, herdr outages, budget limits and a daily summary.
+  - The four repair verbs (`land`, `verify`, `reset`, `unpark`) run as server writes, and still run directly when the server is down. The old repair verbs remain as hidden aliases.
+  - Starting while herdr is down works: the server reports the outage and retries every 30s. Outage parks are folded into one digest.
+- Added budgets: soft and hard limits, a saved ledger that splits at midnight, and saved latches. Added `gx budget status` (broken down by project) and `gx budget override`. `explain` shows where the override applies, and you can raise the limit while the server runs. The Queue header shows today's spend.
+- Added TUI support for server mode:
+  - Every tab shows a server indicator. The Queue tab shows a banner when the server is down, reconnects in the background and offers to start the server.
+  - `a` adds to the queue (with an agent picker). `D`, `p`, `c`/`C` and `x` drain, pause/resume, override and dequeue. `r` replaces a project's pending entries.
+  - The `s` menu runs server actions. The `m` menu can answer and resume a parked ticket. `A` approves a pending recovery proposal.
+  - While connected, the Tickets tab updates from the event stream. While the server is down, it falls back to a file watch plus a 30s poll.
+- Added projects:
+  - Added `gx project add`, `remove` and `set-path`. The hint for an unregistered repo now points at `gx project add .`.
+  - `project.json` can override an allowed set of config keys. Projects whose path is missing are shown as unavailable.
+  - Added a global `max-agents` slot cap (default 4) shared across projects, plus a per-project `max-agents` cap.
+  - Added a built-in `scratch` project and `type: prompt`.
+  - The Tickets and Queue tabs show the current directory's project, with an all-projects toggle and a project filter.
+  - Notifications are batched and muted per destination. A project's notify block replaces the global one. Added `gx notify --project` and a per-destination `--status`.
+- Added one-off tickets with `gx server one-off`:
+  - Flags: `--file`, `--commits`, `--base`, `--blocked-by`, `--front`, `--notify`, `--timeout`, `--wait` and `--json`. Front matter in `--file` fills any field not set, and flags win over it.
+  - Exit codes: `--wait` exits with 0, 3, 4 or 5. A `--timeout` exits with 6. A duplicate of a live ticket is refused with 7. A down server exits with 8. An escalated recovery exits with 9.
+  - A one-off without commits runs in a detached worktree or in its own scratch subdir. A new `gx-one-off` skill is picked by ticket type.
+- Added landing policies `on-done` and `on-landed`. With `on-done`, dependents start from a finished blocker's branch until it lands. Added an opt-in auto fast-forward merge of a finished epic.
+- Added the recovery engine:
+  - Added `gx recovery catalog`, with entries R1 to R14. Most are off by default. R1, R3 (proposal only), R5, R7 and R8 are active.
+  - Added the `nudge` verb (logged, streamed, rate-limited), the `set-parent` verb, and the release-gate and finish verbs.
+  - Guard rails limit automatic recoveries and escalate failed ones. A high-authority remedy proposes a fix, and `tickets approve` runs it.
+  - When a failure needs judgment, recovery queues an investigate ticket. `gx-investigate` gains an unattended mode that is limited to the matched entry's verbs.
+  - Added `deadlocked`, `recovery-matched` and `recovery-applied` events. `--wait` waits through a pending recovery.
+- Changed `tickets --body` to merge the body's front matter. Map epics are now driven by hand.
+- Fixed the Tickets tab getting slower the longer gx ran. Each re-snapshot left the old server event stream open, so every event was handled many times.
+- Fixed ralph-loop pausing on messages that were not real rate limits. It now also reads the reset time correctly.
+- Fixed ralph-loop landing an interrupted landing again on restart. It now finishes it.
+- Fixed a background Monitor task not holding the finish gate. It now holds the gate like a backgrounded command and expires at its own timeout. An agent naming its background task no longer counts as resolving it.
+- Fixed the server parking a ticket too early. `finish` now waits for a real finish, and a held land lock is retried instead of parked.
+- Fixed TUI display bugs: multi-level fork IDs in server mode, conflict-resolution children (now shown as resolving), and a slow server handshake shown as "server down".
+- Breaking: removed the old agent-cap config key aliases.
+- Added `github.com/fsnotify/fsnotify` v1.9.0 for the ticket store watch.
+- Added ADR 0031 (two native agent runners) and CONTEXT.md slices for the server, projects, one-offs and recovery.
+
 ## v0.29.0 - 2026-10-06
 
 - Added a global, git-backed ticket store. Tickets now live in `<store>/<project>/<epic>/…` instead of each repo's `.bare/.scratch`:
