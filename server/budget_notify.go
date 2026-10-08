@@ -34,6 +34,15 @@ func (b *budgetNotes) seed(day string, total, soft, hard float64) {
 	b.hard = hard > 0 && total >= hard
 }
 
+// rearm forgets each announced limit that a raise put back above total, so
+// crossing the new limit is announced again.
+func (b *budgetNotes) rearm(total, soft, hard float64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.soft = b.soft && total >= soft
+	b.hard = b.hard && total >= hard
+}
+
 func (s *Server) seedBudgetNotes(now time.Time) {
 	st := s.budgetStatus(now)
 	s.budgetNotes.seed(st.Day, st.Total, st.SoftLimit, st.HardLimit)

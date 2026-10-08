@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/elentok/gx/events"
 	"maps"
 	"net/http"
@@ -47,6 +48,9 @@ type budgetLedger struct {
 	// Latch holds the limit state of one budget day. It is persisted so a restart
 	// does not forget a reached limit, and it is dropped when the day changes.
 	Latch budgetLatch `json:"latch"`
+	// soft and hard are the live daily limits: config.Budget's at startup,
+	// raised by an increase. Not persisted; a restart reads config again.
+	soft, hard float64
 }
 
 // budgetLatch is sticky: once a limit is reached it stays reached until an
@@ -63,8 +67,8 @@ type budgetLatch struct {
 	Notified int `json:"notified,omitempty"`
 }
 
-func openLedger(stateDir string) (*budgetLedger, error) {
-	l := &budgetLedger{path: filepath.Join(stateDir, ledgerFileName)}
+func openLedger(stateDir string, soft, hard float64) (*budgetLedger, error) {
+	l := &budgetLedger{path: filepath.Join(stateDir, ledgerFileName), soft: soft, hard: hard}
 	data, err := os.ReadFile(l.path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -166,9 +170,16 @@ func (l *budgetLedger) byProject(key string) map[string]float64 {
 	return maps.Clone(l.Projects[key])
 }
 
+// limits returns the live soft and hard limits.
+func (l *budgetLedger) limits() (soft, hard float64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.soft, l.hard
+}
+
 // latches rolls the latch to now's day, sets any limit that spend since the
 // override has reached, and returns the result. Limits of zero are off.
-func (l *budgetLedger) latches(now time.Time, soft, hard float64) budgetLatch {
+func (l *budgetLedger) latches(now time.Time) budgetLatch {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	day := now.Format(budgetDayLayout)
@@ -176,13 +187,28 @@ func (l *budgetLedger) latches(now time.Time, soft, hard float64) budgetLatch {
 		l.Latch = budgetLatch{Day: day}
 	}
 	spent := l.Days[day] - l.Latch.Override
-	if hard > 0 && spent >= hard {
+	if l.hard > 0 && spent >= l.hard {
 		l.Latch.Hard = true
 	}
-	if soft > 0 && spent >= soft || l.Latch.Hard {
+	if l.soft > 0 && spent >= l.soft || l.Latch.Hard {
 		l.Latch.Soft = true
 	}
 	return l.Latch
+}
+
+// raise sets the live limits, then drops each latch that spend since the
+// override no longer reaches. The override point stays where it is.
+func (l *budgetLedger) raise(now time.Time, soft, hard float64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.soft, l.hard = soft, hard
+	day := now.Format(budgetDayLayout)
+	if l.Latch.Day != day {
+		return
+	}
+	spent := l.Days[day] - l.Latch.Override
+	l.Latch.Hard = l.Latch.Hard && hard > 0 && spent >= hard
+	l.Latch.Soft = l.Latch.Hard || l.Latch.Soft && soft > 0 && spent >= soft
 }
 
 // override clears the latches and moves the override point to today's total.
@@ -204,6 +230,9 @@ type BudgetStatus struct {
 	HardLimit    float64 `json:"hard_limit"`
 	BudgetPaused bool    `json:"budget_paused"`
 	HardLatched  bool    `json:"hard_latched"`
+	// Override is today's total at the last override; zero means none today.
+	// Limits count only spend beyond it.
+	Override float64 `json:"override,omitempty"`
 	// Projects is each project's share of Total.
 	Projects map[string]float64 `json:"projects,omitempty"`
 	// Roots is each root's ("project:epic") share of Total.
@@ -212,21 +241,23 @@ type BudgetStatus struct {
 
 func (s *Server) budgetStatus(now time.Time) BudgetStatus {
 	latch := s.budgetLatches(now)
+	soft, hard := s.ledger.limits()
 	day := now.Format(budgetDayLayout)
 	return BudgetStatus{
 		Day:          day,
 		Total:        s.ledger.today(now),
 		Projects:     s.ledger.byProject(day),
 		Roots:        s.ledger.byRoot(day),
-		SoftLimit:    s.cfg.BudgetSoftLimit,
-		HardLimit:    s.cfg.BudgetHardLimit,
+		SoftLimit:    soft,
+		HardLimit:    hard,
 		BudgetPaused: latch.Soft,
 		HardLatched:  latch.Hard,
+		Override:     latch.Override,
 	}
 }
 
 func (s *Server) budgetLatches(now time.Time) budgetLatch {
-	return s.ledger.latches(now, s.cfg.BudgetSoftLimit, s.cfg.BudgetHardLimit)
+	return s.ledger.latches(now)
 }
 
 // BudgetResult is the outcome of a budget write: the status after it, or a
@@ -258,6 +289,74 @@ func (s *Server) budgetOverride(now time.Time) (BudgetResult, error) {
 	s.kickRunner()
 	status := s.budgetStatus(now)
 	return BudgetResult{Budget: &status}, nil
+}
+
+// BudgetIncreaseRequest raises the live daily limits, in dollars. A nil field
+// leaves that limit as it is.
+type BudgetIncreaseRequest struct {
+	Soft *float64 `json:"soft,omitempty"`
+	Hard *float64 `json:"hard,omitempty"`
+}
+
+// ReasonNotAnIncrease refuses a limit that is off or not raised.
+const ReasonNotAnIncrease = "not-an-increase"
+
+// budgetIncrease raises the live limits until the server restarts, then lifts
+// each latch that spend since the override no longer reaches. A soft limit
+// raised past the hard one takes the hard one with it, as config does.
+func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (BudgetResult, error) {
+	if s.cfg.Orchestrator != config.OrchestratorServer {
+		return BudgetResult{Refused: true, Reason: ReasonSchedulerNotSelected, Message: `orchestrator is not "server"`}, nil
+	}
+	if req.Soft == nil && req.Hard == nil {
+		return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: "name a soft or hard limit"}, nil
+	}
+	soft, hard := s.ledger.limits()
+	for _, l := range []struct {
+		name string
+		cur  float64
+		next *float64
+	}{{"soft", soft, req.Soft}, {"hard", hard, req.Hard}} {
+		switch {
+		case l.next == nil:
+		case l.cur == 0:
+			return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: l.name + " limit is off; any limit would lower it"}, nil
+		case *l.next <= l.cur:
+			return BudgetResult{Refused: true, Reason: ReasonNotAnIncrease, Message: fmt.Sprintf("%s limit is already %s", l.name, tickets.FormatCost(l.cur))}, nil
+		}
+	}
+	if req.Soft != nil {
+		soft = *req.Soft
+	}
+	if req.Hard != nil {
+		hard = *req.Hard
+	}
+	if soft > 0 && hard > 0 && hard < soft {
+		hard = soft
+	}
+	s.ledger.raise(now, soft, hard)
+	if err := s.ledger.save(now); err != nil {
+		return BudgetResult{}, err
+	}
+	s.budgetNotes.rearm(s.ledger.today(now), soft, hard)
+	s.events.publish(EventQueueChanged, "")
+	s.kickRunner()
+	status := s.budgetStatus(now)
+	return BudgetResult{Budget: &status}, nil
+}
+
+func (s *Server) budgetIncreaseWrite(w http.ResponseWriter, r *http.Request) {
+	var req BudgetIncreaseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.budgetIncrease(time.Now(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
 }
 
 func (s *Server) budgetOverrideWrite(w http.ResponseWriter, _ *http.Request) {

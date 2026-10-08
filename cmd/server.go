@@ -182,6 +182,8 @@ type StatusInfo struct {
 	// ticket index before it opens its socket.
 	Starting bool     `json:"starting,omitempty"`
 	Warnings []string `json:"warnings,omitempty"`
+	// Budget is today's spend and limits; nil when the server did not answer.
+	Budget *server.BudgetStatus `json:"budget,omitempty"`
 }
 
 func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
@@ -208,6 +210,9 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 			return perr
 		}
 		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Orchestrator: n.Orchestrator, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path, cfg.Orchestrator)}
+		if b, berr := c.Budget(ctx); berr == nil {
+			info.Budget = &b
+		}
 	}
 	if !info.Running {
 		if stateDir, serr := config.StateDir(); serr == nil {
@@ -241,6 +246,11 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	}
 	if info.Paused {
 		if _, err = fmt.Fprintln(w, "queue: paused (gx server queue resume)"); err != nil {
+			return err
+		}
+	}
+	if info.Budget != nil {
+		if _, err = fmt.Fprintln(w, "budget: "+budgetLine(*info.Budget)); err != nil {
 			return err
 		}
 	}

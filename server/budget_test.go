@@ -52,7 +52,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 }
 
 func TestLedger_PollsAddDeltasToToday(t *testing.T) {
-	l, err := openLedger(t.TempDir())
+	l, err := openLedger(t.TempDir(), 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestLedger_PollsAddDeltasToToday(t *testing.T) {
 }
 
 func TestLedger_SplitsTodayPerRoot(t *testing.T) {
-	l, err := openLedger(t.TempDir())
+	l, err := openLedger(t.TempDir(), 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,14 +80,14 @@ func TestLedger_SplitsTodayPerRoot(t *testing.T) {
 
 func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
 	dir := t.TempDir()
-	l, _ := openLedger(dir)
+	l, _ := openLedger(dir, 0, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	l.record("", "a", 1.0, now)
 	if err := l.save(now); err != nil {
 		t.Fatal(err)
 	}
 
-	l, err := openLedger(dir)
+	l, err := openLedger(dir, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
 }
 
 func TestLedger_DeltaSpanningMidnightSplits(t *testing.T) {
-	l, _ := openLedger(t.TempDir())
+	l, _ := openLedger(t.TempDir(), 0, 0)
 	before := time.Date(2026, 10, 6, 23, 59, 30, 0, time.Local)
 	l.record("", "a", 1.0, before)
 	l.record("", "a", 2.0, before.Add(60*time.Second)) // 30s each side of midnight

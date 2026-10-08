@@ -182,7 +182,7 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, fmt.Errorf("load queue pause: %w", err)
 	}
-	ledger, err := openLedger(cfg.StateDir)
+	ledger, err := openLedger(cfg.StateDir, cfg.BudgetSoftLimit, cfg.BudgetHardLimit)
 	if err != nil {
 		lock.release()
 		return nil, fmt.Errorf("load budget ledger: %w", err)
@@ -274,6 +274,7 @@ var routeTable = []struct {
 	{"GET /v1/locks", (*Server).locks},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
+	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/iterations", (*Server).iterations},

@@ -316,6 +316,14 @@ func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error
 	return res, err
 }
 
+// BudgetIncrease raises the live budget limits until the server restarts. A
+// refusal is a result (Refused set), not an error.
+func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {
+	var res server.BudgetResult
+	err := c.post(ctx, "/v1/budget/increase", req, &res)
+	return res, err
+}
+
 // Repair runs a repair verb ("land", "reset", "unpark" or "verify"). A refusal
 // is a result (Refused set), not an error.
 func (c *Client) Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {

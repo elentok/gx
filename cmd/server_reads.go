@@ -14,9 +14,11 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"text/tabwriter"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
 
@@ -203,12 +205,49 @@ func newBudgetCmd(_ deps) *cobra.Command {
 	}
 	override.Flags().BoolVar(&overrideJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(override)
+	cmd.AddCommand(newBudgetIncreaseCmd())
 	return cmd
 }
 
-// runBudgetOverride mirrors runServerQueueWrite: with --json the result or
-// refusal is the output; otherwise a refusal is an error.
+func newBudgetIncreaseCmd() *cobra.Command {
+	var soft, hard float64
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "increase --soft|--hard <dollars>",
+		Short: "raise a daily limit on the running server until it restarts (edit config.json to keep it)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			var req server.BudgetIncreaseRequest
+			if c.Flags().Changed("soft") {
+				req.Soft = &soft
+			}
+			if c.Flags().Changed("hard") {
+				req.Hard = &hard
+			}
+			if req.Soft == nil && req.Hard == nil {
+				return fmt.Errorf("pass --soft or --hard")
+			}
+			return runBudgetWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
+				return cl.BudgetIncrease(ctx, req)
+			})
+		},
+	}
+	cmd.Flags().Float64Var(&soft, "soft", 0, "new soft limit in dollars (pauses new starts)")
+	cmd.Flags().Float64Var(&hard, "hard", 0, "new hard limit in dollars (stops live agents)")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+// runBudgetOverride mirrors runServerQueueWrite.
 func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
+	return runBudgetWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
+		return cl.BudgetOverride(ctx)
+	})
+}
+
+// runBudgetWrite runs one budget write: with --json the result or refusal is
+// the output; otherwise a refusal is an error.
+func runBudgetWrite(c *cobra.Command, jsonOut bool, write func(context.Context, *apiclient.Client) (server.BudgetResult, error)) error {
 	ctx := c.Context()
 	if ctx == nil {
 		ctx = context.Background()
@@ -217,7 +256,7 @@ func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
 	if err != nil {
 		return err
 	}
-	res, err := cl.BudgetOverride(ctx)
+	res, err := write(ctx, cl)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = server.BudgetResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
@@ -235,15 +274,56 @@ func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
 }
 
 func printBudget(w io.Writer, b server.BudgetStatus) error {
-	if _, err := fmt.Fprintf(w, "%s\t$%.2f\tsoft $%.2f\thard $%.2f\n", b.Day, b.Total, b.SoftLimit, b.HardLimit); err != nil {
-		return err
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(tw, "budget %s: %s\n", b.Day, budgetState(b))
+	fmt.Fprintf(tw, "  spent\t%s\n", tickets.FormatCost(b.Total))
+	if b.Override > 0 {
+		fmt.Fprintf(tw, "  overridden at\t%s\t%s counts toward the limits\n", tickets.FormatCost(b.Override), tickets.FormatCost(b.Total-b.Override))
 	}
-	for _, project := range slices.Sorted(maps.Keys(b.Projects)) {
-		if _, err := fmt.Fprintf(w, "  %s\t$%.2f\n", project, b.Projects[project]); err != nil {
-			return err
+	fmt.Fprintf(tw, "  soft limit\t%s\n", budgetLimit(b.SoftLimit, b.Total-b.Override, "pauses new starts"))
+	fmt.Fprintf(tw, "  hard limit\t%s\n", budgetLimit(b.HardLimit, b.Total-b.Override, "stops live agents"))
+	if len(b.Projects) > 0 {
+		fmt.Fprintln(tw, "\n  by project")
+		tracked := 0.0
+		for _, project := range slices.Sorted(maps.Keys(b.Projects)) {
+			fmt.Fprintf(tw, "    %s\t%s\n", project, tickets.FormatCost(b.Projects[project]))
+			tracked += b.Projects[project]
+		}
+		if untracked := b.Total - tracked; untracked >= 0.005 {
+			fmt.Fprintf(tw, "    (untracked)\t%s\n", tickets.FormatCost(untracked))
 		}
 	}
-	return nil
+	return tw.Flush()
+}
+
+// budgetLimit renders one limit and what is left of it; counted is the spend
+// since the override, the only spend a limit counts.
+func budgetLimit(limit, counted float64, does string) string {
+	if limit <= 0 {
+		return "off"
+	}
+	left := max(limit-counted, 0)
+	return fmt.Sprintf("%s\t%s left\t(%s)", tickets.FormatCost(limit), tickets.FormatCost(left), does)
+}
+
+// budgetLine is the one-line budget summary `gx server status` prints.
+func budgetLine(b server.BudgetStatus) string {
+	line := fmt.Sprintf("%s spent today, %s", tickets.FormatCost(b.Total), budgetState(b))
+	if b.Override > 0 {
+		line += fmt.Sprintf(", overridden at %s", tickets.FormatCost(b.Override))
+	}
+	return line
+}
+
+// budgetState is the budget's effect on the queue right now.
+func budgetState(b server.BudgetStatus) string {
+	switch {
+	case b.HardLatched:
+		return "STOPPED: hard limit reached (gx budget override)"
+	case b.BudgetPaused:
+		return "PAUSED: soft limit reached (gx budget override)"
+	}
+	return "ok"
 }
 
 func newServerLocksCmd() *cobra.Command {
