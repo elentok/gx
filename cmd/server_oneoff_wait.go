@@ -37,7 +37,8 @@ type eventSource interface {
 }
 
 // waitForTicket blocks until address is done, parked or cancelled; a park
-// whose recovery is still pending is not an end yet. A dropped
+// whose recovery is still pending (held remedy or open investigation) is not
+// an end yet. A dropped
 // stream or a dead server is not an end: it re-snapshots after a pause, so a
 // restart mid-wait only delays the answer. Events carry no status, so any
 // event for the ticket just triggers a fresh snapshot.
@@ -63,7 +64,13 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 	if err != nil {
 		return server.TicketInfo{}, false, err
 	}
+	// The ticket's forks include its investigations, whose progress is its
+	// recovery's.
+	watched := map[string]bool{address: true}
 	for _, t := range snap.Tickets {
+		if t.Parent == address {
+			watched[t.Address] = true
+		}
 		if t.Address != address {
 			continue
 		}
@@ -78,7 +85,7 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 		return server.TicketInfo{}, false, err
 	}
 	for ev := range evs {
-		if ev.Address == address {
+		if watched[ev.Address] {
 			return server.TicketInfo{}, false, nil
 		}
 	}

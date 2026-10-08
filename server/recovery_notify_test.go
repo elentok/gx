@@ -143,6 +143,46 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 	})
 }
 
+func TestRecoveryState_FromInvestigations(t *testing.T) {
+	inv := func(status string) server.TicketInfo {
+		return server.TicketInfo{Address: "p:e/01a", Type: "investigate", Status: status, Parent: "p:e/01"}
+	}
+	other := server.TicketInfo{Address: "p:e/01b", Type: "implement", Status: "claimed", Parent: "p:e/01"}
+	for name, tc := range map[string]struct {
+		held string
+		all  []server.TicketInfo
+		want string
+	}{
+		"none":              {"", []server.TicketInfo{other}, ""},
+		"open":              {"", []server.TicketInfo{inv("open")}, server.RecoveryPending},
+		"claimed":           {"", []server.TicketInfo{inv("claimed")}, server.RecoveryPending},
+		"parked":            {"", []server.TicketInfo{inv("needs-repair")}, server.RecoveryEscalated},
+		"landed":            {"", []server.TicketInfo{inv("done")}, ""},
+		"open beats parked": {"", []server.TicketInfo{inv("needs-answer"), inv("claimed")}, server.RecoveryPending},
+		"hold wins":         {server.RecoveryEscalated, []server.TicketInfo{inv("claimed")}, server.RecoveryEscalated},
+	} {
+		if got := server.RecoveryState(tc.held, "p:e/01", tc.all); got != tc.want {
+			t.Errorf("%s: state = %q; want %q", name, got, tc.want)
+		}
+	}
+}
+
+// The investigation's own launch fails here (no herdr), which parks it: that
+// is recovery escalating. Its later landing leaves the park's own state.
+func TestRecoveryNotify_SnapshotFollowsTheInvestigation(t *testing.T) {
+	unmatched := recovery.Entry{ID: "TEST", Type: events.NeedsRepair, Kind: events.Spinning, Executor: recovery.ExecutorRule, Enabled: true}
+	h, _ := startNotifyRecoveryWith(t, time.Minute, unmatched)
+	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		t.Fatal(err)
+	}
+	waitRecoveryState(t, h, server.RecoveryEscalated)
+	child := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01a-investigate.md")
+	if err := schema.UpdateTicket(child, func(tk *schema.Ticket) { tk.Status = schema.StatusDone }); err != nil {
+		t.Fatal(err)
+	}
+	waitRecoveryState(t, h, "")
+}
+
 func TestRecoveryNotify_RecoveredParkSendsNothingAndIsCounted(t *testing.T) {
 	done := make(chan struct{})
 	var h *servertest.Harness

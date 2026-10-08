@@ -16,13 +16,18 @@ import (
 // fakeSource serves one ticket whose status advances one step per snapshot.
 // failFirst snapshots fail first, standing in for a server restart. recoveries,
 // when set, is the ticket's recovery state at each step alongside statuses.
+// investigation, when set, adds an investigate child that alone gets events,
+// on a stream that then stays open.
 type fakeSource struct {
-	file       string
-	statuses   []string
-	recoveries []string
-	failFirst  int
-	snaps      int
+	file          string
+	statuses      []string
+	recoveries    []string
+	failFirst     int
+	snaps         int
+	investigation bool
 }
+
+const investigationAddr = "gx:p/1a"
 
 func (f *fakeSource) Snapshot(context.Context) (server.Snapshot, error) {
 	f.snaps++
@@ -34,14 +39,26 @@ func (f *fakeSource) Snapshot(context.Context) (server.Snapshot, error) {
 	if i < len(f.recoveries) {
 		t.Recovery = f.recoveries[i]
 	}
-	return server.Snapshot{Seq: uint64(f.snaps), Tickets: []server.TicketInfo{t}}, nil
+	snap := server.Snapshot{Seq: uint64(f.snaps), Tickets: []server.TicketInfo{t}}
+	if f.investigation {
+		snap.Tickets = append(snap.Tickets, server.TicketInfo{Address: investigationAddr, Status: "claimed", Type: "investigate", Parent: "gx:p/1"})
+	}
+	return snap, nil
 }
 
 // Events delivers one event for the ticket, then ends like a dropped stream.
-func (f *fakeSource) Events(context.Context, uint64) (<-chan server.Event, error) {
+func (f *fakeSource) Events(ctx context.Context, _ uint64) (<-chan server.Event, error) {
 	ch := make(chan server.Event, 1)
-	ch <- server.Event{Address: "gx:p/1"}
-	close(ch)
+	if !f.investigation {
+		ch <- server.Event{Address: "gx:p/1"}
+		close(ch)
+		return ch, nil
+	}
+	ch <- server.Event{Address: investigationAddr}
+	go func() {
+		<-ctx.Done()
+		close(ch)
+	}()
 	return ch, nil
 }
 
@@ -97,6 +114,22 @@ func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
 		"hold expired": {[]string{"claimed", "needs-answer", "needs-answer"}, []string{"", pending, ""}, 3},
 	} {
 		if _, code := runWait(t, &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries}); code != tc.want {
+			t.Errorf("%s: code = %d; want %d", name, code, tc.want)
+		}
+	}
+}
+
+func TestOneOffWait_WakesOnItsInvestigation(t *testing.T) {
+	const pending, escalated = server.RecoveryPending, server.RecoveryEscalated
+	for name, tc := range map[string]struct {
+		statuses, recoveries []string
+		want                 int
+	}{
+		"escalated": {[]string{"needs-repair", "needs-repair"}, []string{pending, escalated}, exitWaitEscalated},
+		"landed":    {[]string{"needs-repair", "needs-repair", "done"}, []string{pending, pending}, 0},
+	} {
+		f := &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries, investigation: true}
+		if _, code := runWait(t, f); code != tc.want {
 			t.Errorf("%s: code = %d; want %d", name, code, tc.want)
 		}
 	}

@@ -355,7 +355,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)
 		case string(schema.StatusNeedsAnswer), string(schema.StatusNeedsRepair):
-			snap.Tickets[i].Recovery = s.parkHold.state(t.Address)
+			snap.Tickets[i].Recovery = recoveryState(s.parkHold.state(t.Address), t.Address, snap.Tickets)
 		}
 	}
 	snap.Budget = s.budgetStatus(time.Now())

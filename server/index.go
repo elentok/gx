@@ -29,8 +29,8 @@ type TicketInfo struct {
 	// ClaimedAt is when the server launched the claimed ticket's iteration;
 	// filled in by the snapshot handler, zero while the ticket is not running.
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
-	// Recovery is RecoveryPending or RecoveryEscalated for a parked ticket whose
-	// park message recovery holds or held; filled in by the snapshot handler.
+	// Recovery is RecoveryPending or RecoveryEscalated for a parked ticket that
+	// recovery is working on or gave up on; filled in by the snapshot handler.
 	Recovery string `json:"recovery,omitempty"`
 	// The landing-time metrics the Queue header and the preview sum up; zero
 	// until the ticket lands.

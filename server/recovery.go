@@ -179,7 +179,14 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 		return false
 	}
 	if !plan.runsRemedy(f) {
-		go s.recoverFrom(plan, f)
+		s.parkHold.start(f.Address)
+		go func() {
+			s.recoverFrom(plan, f)
+			// An opened investigation keeps it pending from here: see recoveryState.
+			if s.parkHold.started(f.Address) {
+				s.events.publish(EventTicketChanged, f.Address)
+			}
+		}()
 		return false
 	}
 	s.parkHold.hold(f.Address, s.cfg.RecoverySettings.NotifyHold, func() {
