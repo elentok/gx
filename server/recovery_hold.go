@@ -5,12 +5,21 @@ import (
 	"time"
 )
 
+// TicketInfo.Recovery values.
+const (
+	RecoveryPending   = "pending"
+	RecoveryEscalated = "escalated"
+)
+
 // recoveryHold keeps a park's chat message back while recovery works on the
 // ticket. Exactly one of three things then happens to it: recovery succeeds
 // and drops it, recovery fails and sends it, or the cap expires and sends it.
 type recoveryHold struct {
 	mu   sync.Mutex
 	held map[string]*time.Timer // ticket address -> cap timer
+	// escalated are the tickets whose held park ended in a failed remedy, until
+	// their next park.
+	escalated map[string]bool
 }
 
 // hold arms the cap timer; send runs if the cap expires before take.
@@ -49,4 +58,34 @@ func (h *recoveryHold) take(key string) bool {
 		delete(h.held, key)
 	}
 	return ok
+}
+
+// escalate marks the ticket's held park as given up on by recovery.
+func (h *recoveryHold) escalate(key string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.escalated == nil {
+		h.escalated = map[string]bool{}
+	}
+	h.escalated[key] = true
+}
+
+// forget clears an escalation, for a new park of the ticket.
+func (h *recoveryHold) forget(key string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.escalated, key)
+}
+
+// state is the ticket's TicketInfo.Recovery.
+func (h *recoveryHold) state(key string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	switch {
+	case h.held[key] != nil:
+		return RecoveryPending
+	case h.escalated[key]:
+		return RecoveryEscalated
+	}
+	return ""
 }

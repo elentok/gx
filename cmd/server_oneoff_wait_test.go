@@ -14,12 +14,14 @@ import (
 )
 
 // fakeSource serves one ticket whose status advances one step per snapshot.
-// failFirst snapshots fail first, standing in for a server restart.
+// failFirst snapshots fail first, standing in for a server restart. recoveries,
+// when set, is the ticket's recovery state at each step alongside statuses.
 type fakeSource struct {
-	file      string
-	statuses  []string
-	failFirst int
-	snaps     int
+	file       string
+	statuses   []string
+	recoveries []string
+	failFirst  int
+	snaps      int
 }
 
 func (f *fakeSource) Snapshot(context.Context) (server.Snapshot, error) {
@@ -28,9 +30,11 @@ func (f *fakeSource) Snapshot(context.Context) (server.Snapshot, error) {
 		return server.Snapshot{}, errors.New("connection refused")
 	}
 	i := min(f.snaps-f.failFirst-1, len(f.statuses)-1)
-	return server.Snapshot{Seq: uint64(f.snaps), Tickets: []server.TicketInfo{
-		{Address: "gx:p/1", Status: f.statuses[i], File: f.file},
-	}}, nil
+	t := server.TicketInfo{Address: "gx:p/1", Status: f.statuses[i], File: f.file}
+	if i < len(f.recoveries) {
+		t.Recovery = f.recoveries[i]
+	}
+	return server.Snapshot{Seq: uint64(f.snaps), Tickets: []server.TicketInfo{t}}, nil
 }
 
 // Events delivers one event for the ticket, then ends like a dropped stream.
@@ -78,6 +82,22 @@ func TestOneOffWait_ExitCodesByStatus(t *testing.T) {
 	for status, want := range map[string]int{"needs-answer": 3, "needs-repair": 4, "cancelled": 5} {
 		if _, code := runWait(t, &fakeSource{statuses: []string{"open", status}}); code != want {
 			t.Errorf("%s: code = %d; want %d", status, code, want)
+		}
+	}
+}
+
+func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
+	const pending, escalated = server.RecoveryPending, server.RecoveryEscalated
+	for name, tc := range map[string]struct {
+		statuses, recoveries []string
+		want                 int
+	}{
+		"recovered":   {[]string{"claimed", "needs-repair", "needs-repair", "claimed", "cancelled"}, []string{"", pending, pending}, 5},
+		"escalated":   {[]string{"claimed", "needs-repair", "needs-repair"}, []string{"", pending, escalated}, exitWaitEscalated},
+		"hold expired": {[]string{"claimed", "needs-answer", "needs-answer"}, []string{"", pending, ""}, 3},
+	} {
+		if _, code := runWait(t, &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries}); code != tc.want {
+			t.Errorf("%s: code = %d; want %d", name, code, tc.want)
 		}
 	}
 }

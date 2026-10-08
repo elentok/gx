@@ -88,9 +88,15 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 		outcome = err.Error()
 	}
 	s.recordRecovery(ref, events.RecoveryApplied, f, entry.ID, outcome)
-	if s.parkHold.take(f.Address) && outcome != "ok" {
+	if !s.parkHold.take(f.Address) {
+		return
+	}
+	if outcome != "ok" {
+		s.parkHold.escalate(f.Address)
 		s.notifyPark(ref.addr, ref.ticket.Path, f.Kind, fmt.Sprintf("%s (recovery %s failed: %s)", f.Reason, entry.ID, outcome))
 	}
+	// A --wait on the ticket reads the hold, so it must hear the hold end.
+	s.events.publish(EventTicketChanged, f.Address)
 }
 
 // holdParkForRecovery starts whatever recovery the park gets and, when a rule
@@ -98,6 +104,7 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 // reports false when nothing is held: the caller then notifies at once.
 func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
 	f := recovery.Failure{Address: addr.String(), Type: kind.ParkType(), Kind: kind, Reason: reason}
+	s.parkHold.forget(f.Address)
 	plan, ok := s.planRecovery(f)
 	if !ok {
 		return false
@@ -110,7 +117,10 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 	if hold <= 0 {
 		hold = config.DefaultRecoveryNotifyHold
 	}
-	s.parkHold.hold(f.Address, hold, func() { s.notifyPark(addr, ticketPath, kind, reason) })
+	s.parkHold.hold(f.Address, hold, func() {
+		s.events.publish(EventTicketChanged, f.Address)
+		s.notifyPark(addr, ticketPath, kind, reason)
+	})
 	go s.recoverFrom(plan, f)
 	return true
 }

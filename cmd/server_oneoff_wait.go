@@ -21,8 +21,12 @@ var waitExitCodes = map[string]int{
 	string(schema.StatusCancelled):   5,
 }
 
-// exitWaitTimeout is the exit code when --timeout expires before the ticket ends.
-const exitWaitTimeout = 6
+const (
+	// exitWaitTimeout is the exit code when --timeout expires before the ticket ends.
+	exitWaitTimeout = 6
+	// exitWaitEscalated is the exit code when recovery of a park gave up on it.
+	exitWaitEscalated = 9
+)
 
 var waitRetry = time.Second
 
@@ -32,7 +36,8 @@ type eventSource interface {
 	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
 }
 
-// waitForTicket blocks until address is done, parked or cancelled. A dropped
+// waitForTicket blocks until address is done, parked or cancelled; a park
+// whose recovery is still pending is not an end yet. A dropped
 // stream or a dead server is not an end: it re-snapshots after a pause, so a
 // restart mid-wait only delays the answer. Events carry no status, so any
 // event for the ticket just triggers a fresh snapshot.
@@ -62,7 +67,7 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 		if t.Address != address {
 			continue
 		}
-		if _, stop := waitExitCodes[t.Status]; stop {
+		if _, stop := waitExitCodes[t.Status]; stop && t.Recovery != server.RecoveryPending {
 			return t, true, nil
 		}
 	}
@@ -98,6 +103,10 @@ func runOneOffWait(ctx context.Context, src eventSource, w, errW io.Writer, addr
 		return err
 	}
 	code := waitExitCodes[t.Status]
+	if t.Recovery == server.RecoveryEscalated {
+		fmt.Fprintf(errW, "%s: %s, recovery escalated\n", address, t.Status)
+		return &ExitError{Code: exitWaitEscalated}
+	}
 	if code == 0 {
 		if res := readResultSection(t.File); res != "" {
 			fmt.Fprintln(w, res)

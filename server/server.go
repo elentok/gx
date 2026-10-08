@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/subscription"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
@@ -348,8 +349,11 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap := s.idx.snapshot()
 	snap.HerdrUnavailable = s.herdr.isUnavailable()
 	for i, t := range snap.Tickets {
-		if t.Status == "claimed" {
+		switch t.Status {
+		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)
+		case string(schema.StatusNeedsAnswer), string(schema.StatusNeedsRepair):
+			snap.Tickets[i].Recovery = s.parkHold.state(t.Address)
 		}
 	}
 	snap.Budget = s.budgetStatus(time.Now())

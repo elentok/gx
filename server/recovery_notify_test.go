@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -62,6 +63,55 @@ func parkMessages(sent []string) []string {
 		}
 	}
 	return out
+}
+
+// waitRecoveryState polls the snapshot until the parked ticket shows want.
+func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
+	t.Helper()
+	var got server.TicketInfo
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		snap, err := h.Client.Snapshot(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, ti := range snap.Tickets {
+			if ti.Address == "proj:epic-a/01" {
+				got = ti
+			}
+		}
+		if got.Status == "needs-repair" && got.Recovery == want {
+			return
+		}
+	}
+	t.Fatalf("ticket = %s, recovery %q; want needs-repair, recovery %q", got.Status, got.Recovery, want)
+}
+
+func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
+	t.Run("escalated after a failed remedy", func(t *testing.T) {
+		release := make(chan struct{})
+		h, _ := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error {
+			<-release
+			return errors.New("remedy refused")
+		})
+		if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+			t.Fatal(err)
+		}
+		waitRecoveryState(t, h, server.RecoveryPending)
+		close(release)
+		waitRecoveryState(t, h, server.RecoveryEscalated)
+	})
+	t.Run("cleared when the hold expires", func(t *testing.T) {
+		release := make(chan struct{})
+		t.Cleanup(func() { close(release) })
+		h, _ := startNotifyRecovery(t, 300*time.Millisecond, func(recovery.Failure, recovery.Verbs) error {
+			<-release
+			return nil
+		})
+		if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+			t.Fatal(err)
+		}
+		waitRecoveryState(t, h, "")
+	})
 }
 
 func TestRecoveryNotify_RecoveredParkSendsNothingAndIsCounted(t *testing.T) {

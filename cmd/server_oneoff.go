@@ -70,7 +70,7 @@ func newServerOneOffCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.Unique, "unique", "", "dedupe key: refuse while a live ticket of the project has it (--file defaults to its resolved path)")
 	cmd.Flags().BoolVar(&req.NoUnique, "no-unique", false, "do not dedupe, even with --file")
 	cmd.MarkFlagsMutuallyExclusive("unique", "no-unique")
-	cmd.Flags().BoolVar(&wait, "wait", false, "block until the ticket is done or parked, print its Result; exit 0 done, 3 needs-answer, 4 needs-repair, 5 cancelled, 6 timeout; a duplicate-live refusal waits on the existing ticket")
+	cmd.Flags().BoolVar(&wait, "wait", false, "block until the ticket is done or parked, print its Result; a park waits out pending recovery; exit 0 done, 3 needs-answer, 4 needs-repair, 5 cancelled, 6 timeout, 9 recovery escalated; a duplicate-live refusal waits on the existing ticket")
 	cmd.Flags().DurationVar(&timeout, "timeout", 0, "with --wait, stop waiting after this long and exit 6; the ticket keeps running")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of the address")
 	return cmd
