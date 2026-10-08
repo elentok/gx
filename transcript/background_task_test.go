@@ -266,3 +266,21 @@ func TestReadBackgroundTasks_MissingFile(t *testing.T) {
 		t.Errorf("Markers = %+v, want none for a missing file", reading.Markers)
 	}
 }
+
+// An agent that watches its own background task (a Monitor on the task's output
+// path) names the id in its tool call; that is not the task finishing.
+func TestReadBackgroundTasks_AssistantMentioningTheTaskIDDoesNotResolveIt(t *testing.T) {
+	mention := `{"isSidechain":false,"type":"assistant","timestamp":"2026-08-12T17:00:05.000000000Z","message":{"content":[{"type":"tool_use","name":"Monitor","input":{"command":"until rg -q ok /tmp/tasks/task-1.output; do sleep 5; done"}}]}}`
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
+		mention,
+	)
+
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatalf("ReadBackgroundTasks() error = %v", err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskOutstandingFresh {
+		t.Errorf("Markers = %+v, want one outstanding-fresh marker", reading.Markers)
+	}
+}

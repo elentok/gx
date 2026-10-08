@@ -59,6 +59,7 @@ type BackgroundTaskReading struct {
 // any particular field — see ReadBackgroundTasks — so nothing else needs
 // parsing.
 type backgroundTaskLine struct {
+	Type          string `json:"type"`
 	IsSidechain   bool   `json:"isSidechain"`
 	Timestamp     string `json:"timestamp"`
 	ToolUseResult struct {
@@ -151,9 +152,12 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			continue
 		}
 
+		// The agent's own tool calls name its task (a Monitor on the output
+		// path, say) without the task having finished: only what the CLI
+		// reports back can resolve it.
 		for _, taskID := range order {
 			m := markers[taskID]
-			if !m.resolved && containsTaskIDToken(raw, taskID) {
+			if !m.resolved && entry.Type != "assistant" && containsTaskIDToken(raw, taskID) {
 				m.resolved = true
 			}
 		}
