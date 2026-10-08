@@ -5,11 +5,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -110,6 +112,7 @@ func TestQueueServerKeys_ApproveNeedsPendingProposal(t *testing.T) {
 	}{
 		{"pending", "## Proposed Remedy\n\nrun it", []string{"approve gx:alpha/01"}},
 		{"none", "## Notes\n\nnothing", nil},
+		{"approved", schema.DemoteSection("## Proposed Remedy\n\nrun it", "## Proposed Remedy", time.Now()), nil},
 	} {
 		var calls []string
 		m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls})

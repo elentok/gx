@@ -444,6 +444,27 @@ func TestRecovery_ApproveRunsTheLatestProposal(t *testing.T) {
 	}
 }
 
+func proposedRemedy(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return schema.Section(schema.ParseBody(string(data)), "Proposed Remedy")
+}
+
+func TestRecovery_ApproveRetiresTheProposalSection(t *testing.T) {
+	h, _, path := proposeByParking(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+		t.Fatalf("approve = %+v, %v", res, err)
+	}
+	if got := proposedRemedy(t, path); got != "" {
+		t.Errorf("Proposed Remedy still pending after approve:\n%s", got)
+	}
+}
+
 func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
 	h, _, path := proposeByParking(t)
 	data, _ := os.ReadFile(path)
@@ -454,6 +475,9 @@ func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
 	defer cancel()
 	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Reason != server.ReasonProposalStale {
 		t.Errorf("approve = %+v, %v, want proposal-stale", res, err)
+	}
+	if proposedRemedy(t, path) == "" {
+		t.Error("a stale approve retired the proposal")
 	}
 }
 

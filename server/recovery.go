@@ -244,6 +244,14 @@ func (s *Server) ticketApprove(req QueueRequest) (QueueResult, error) {
 		if outcome != "ok" {
 			return refusal(ReasonRemedyFailed, outcome), nil
 		}
+		// Retired into Comments rather than deleted, so the ticket keeps what ran.
+		err = schema.UpdateTicketWithBody(ref.ticket.Path, func(_ *schema.Ticket, b *string) {
+			*b = schema.DemoteSection(*b, "## "+proposedRemedyHeading, time.Now())
+		})
+		if err != nil {
+			return QueueResult{}, err
+		}
+		s.events.publish(EventTicketChanged, ref.addr.String())
 		return QueueResult{}, nil
 	})
 }
