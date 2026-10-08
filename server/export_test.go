@@ -39,8 +39,13 @@ func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
 // BudgetStatusAt is the budget status as of now.
 func (s *Server) BudgetStatusAt(now time.Time) BudgetStatus { return s.budgetStatus(now) }
 
+// RecordProjectSpend adds spend attributed to a project to today's ledger.
+func (s *Server) RecordProjectSpend(project, key string, cost float64) {
+	s.ledger.record(project, key, cost, time.Now())
+}
+
 // RecordSpend adds spend to today's ledger.
-func (s *Server) RecordSpend(key string, cost float64) { s.ledger.record(key, cost, time.Now()) }
+func (s *Server) RecordSpend(key string, cost float64) { s.ledger.record("", key, cost, time.Now()) }
 
 // PutRunAt is PutRun with the time the iteration was launched.
 func (s *Server) PutRunAt(root string, r Run, at time.Time) {

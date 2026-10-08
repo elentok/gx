@@ -37,6 +37,43 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	}
 }
 
+func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
+	store, repoA, repoB := t.TempDir(), testutil.TempRepo(t), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj-a", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj-b", "epic-b", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj-a", repoA)
+	servertest.SetProjectRepo(t, store, "proj-b", repoB)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Orchestrator = config.OrchestratorServer
+		c.BudgetSoftLimit = 5
+	})
+	registerLaunch(h)
+	h.Server.RecordProjectSpend("proj-a", "a", 3)
+	h.Server.RecordProjectSpend("proj-b", "b", 3)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	status, err := h.Client.Budget(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Total != 6 || !status.BudgetPaused {
+		t.Errorf("status = %+v, want total 6 and paused", status)
+	}
+	if status.Projects["proj-a"] != 3 || status.Projects["proj-b"] != 3 {
+		t.Errorf("projects = %v, want 3 each", status.Projects)
+	}
+	for _, addr := range []string{"proj-a:epic-a/01", "proj-b:epic-b/01"} {
+		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", addr, res, err)
+		}
+	}
+	time.Sleep(500 * time.Millisecond)
+	if runs := h.Server.Runs(); len(runs) != 0 {
+		t.Fatalf("runs = %+v, want none in either project past the soft limit", runs)
+	}
+}
+
 func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

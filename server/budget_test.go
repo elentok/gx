@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.ledger.record("a", 4.25, time.Now())
+	s.ledger.record("", "a", 4.25, time.Now())
 
 	var snap Snapshot
 	rec := httptest.NewRecorder()
@@ -42,7 +43,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if snap.Budget != status {
+	if !reflect.DeepEqual(snap.Budget, status) {
 		t.Fatalf("snapshot budget %+v != budget route %+v", snap.Budget, status)
 	}
 	near(t, status.Total, 4.25)
@@ -56,9 +57,9 @@ func TestLedger_PollsAddDeltasToToday(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	l.record("a", 1.0, now)
-	l.record("a", 1.5, now.Add(30*time.Second))
-	l.record("b", 2.0, now.Add(30*time.Second))
+	l.record("", "a", 1.0, now)
+	l.record("", "a", 1.5, now.Add(30*time.Second))
+	l.record("", "b", 2.0, now.Add(30*time.Second))
 	near(t, l.today(now), 3.5)
 }
 
@@ -66,7 +67,7 @@ func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
 	dir := t.TempDir()
 	l, _ := openLedger(dir)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	l.record("a", 1.0, now)
+	l.record("", "a", 1.0, now)
 	if err := l.save(now); err != nil {
 		t.Fatal(err)
 	}
@@ -76,15 +77,15 @@ func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
 		t.Fatal(err)
 	}
 	near(t, l.today(now), 1.0)
-	l.record("a", 1.25, now.Add(30*time.Second))
+	l.record("", "a", 1.25, now.Add(30*time.Second))
 	near(t, l.today(now), 1.25)
 }
 
 func TestLedger_DeltaSpanningMidnightSplits(t *testing.T) {
 	l, _ := openLedger(t.TempDir())
 	before := time.Date(2026, 10, 6, 23, 59, 30, 0, time.Local)
-	l.record("a", 1.0, before)
-	l.record("a", 2.0, before.Add(60*time.Second)) // 30s each side of midnight
+	l.record("", "a", 1.0, before)
+	l.record("", "a", 2.0, before.Add(60*time.Second)) // 30s each side of midnight
 	near(t, l.today(before), 1.5)
 	near(t, l.today(before.Add(time.Minute)), 0.5)
 }

@@ -90,11 +90,11 @@ func TestServerNotices_BudgetLimitLatchesOncePerDay(t *testing.T) {
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	s.seedBudgetNotes(now)
 
-	s.ledger.record("a", 11, now)
+	s.ledger.record("", "a", 11, now)
 	s.notifyBudget(now)
-	s.ledger.record("a", 12, now.Add(time.Minute))
+	s.ledger.record("", "a", 12, now.Add(time.Minute))
 	s.notifyBudget(now.Add(time.Minute)) // still over the soft limit: no repeat
-	s.ledger.record("a", 21, now.Add(2*time.Minute))
+	s.ledger.record("", "a", 21, now.Add(2*time.Minute))
 	s.notifyBudget(now.Add(2 * time.Minute))
 
 	s.chat.Close()
@@ -110,7 +110,7 @@ func TestServerNotices_BudgetLimitLatchesOncePerDay(t *testing.T) {
 func TestServerNotices_BudgetAlreadyOverAtStartIsNotAnnounced(t *testing.T) {
 	s, wait := chatServer(t, 10, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
-	s.ledger.record("a", 11, now)
+	s.ledger.record("", "a", 11, now)
 	s.seedBudgetNotes(now)
 	s.notifyBudget(now)
 
@@ -124,7 +124,7 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	now := time.Date(2026, 10, 6, 23, 59, 0, 0, time.Local)
 	s.seedBudgetNotes(now)
-	s.ledger.record("a", 4, now)
+	s.ledger.record("", "a", 4, now)
 	s.notifyBudget(now) // same day: nothing
 
 	s.notifyBudget(now.Add(2 * time.Minute))

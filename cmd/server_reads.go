@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -233,8 +235,15 @@ func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
 }
 
 func printBudget(w io.Writer, b server.BudgetStatus) error {
-	_, err := fmt.Fprintf(w, "%s\t$%.2f\tsoft $%.2f\thard $%.2f\n", b.Day, b.Total, b.SoftLimit, b.HardLimit)
-	return err
+	if _, err := fmt.Fprintf(w, "%s\t$%.2f\tsoft $%.2f\thard $%.2f\n", b.Day, b.Total, b.SoftLimit, b.HardLimit); err != nil {
+		return err
+	}
+	for _, project := range slices.Sorted(maps.Keys(b.Projects)) {
+		if _, err := fmt.Fprintf(w, "  %s\t$%.2f\n", project, b.Projects[project]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func newServerLocksCmd() *cobra.Command {

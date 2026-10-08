@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/elentok/gx/events"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -38,6 +39,8 @@ type budgetLedger struct {
 	mu   sync.Mutex
 	path string
 	Days map[string]float64  `json:"days"`
+	// Projects splits each day's total by project: day -> project -> cost.
+	Projects map[string]map[string]float64 `json:"projects,omitempty"`
 	Seen map[string]seenCost `json:"seen"`
 	// Latch holds the limit state of one budget day. It is persisted so a restart
 	// does not forget a reached limit, and it is dropped when the day changes.
@@ -72,6 +75,9 @@ func openLedger(stateDir string) (*budgetLedger, error) {
 	if l.Days == nil {
 		l.Days = map[string]float64{}
 	}
+	if l.Projects == nil {
+		l.Projects = map[string]map[string]float64{}
+	}
 	if l.Seen == nil {
 		l.Seen = map[string]seenCost{}
 	}
@@ -93,7 +99,7 @@ func (l *budgetLedger) day(key string) float64 {
 // in proportion to the time spent in each, so an iteration crossing midnight
 // splits across both days. Cumulative cost only grows: a lower reading (a
 // restarted session) adds nothing.
-func (l *budgetLedger) record(key string, cost float64, now time.Time) {
+func (l *budgetLedger) record(project, key string, cost float64, now time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	prev, seen := l.Seen[key]
@@ -103,7 +109,7 @@ func (l *budgetLedger) record(key string, cost float64, now time.Time) {
 		return
 	}
 	if !seen || !prev.At.Before(now) {
-		l.Days[now.Format(budgetDayLayout)] += delta
+		l.add(now.Format(budgetDayLayout), project, delta)
 		return
 	}
 	total := now.Sub(prev.At)
@@ -112,9 +118,30 @@ func (l *budgetLedger) record(key string, cost float64, now time.Time) {
 		if to.After(now) {
 			to = now
 		}
-		l.Days[from.Format(budgetDayLayout)] += delta * float64(to.Sub(from)) / float64(total)
+		l.add(from.Format(budgetDayLayout), project, delta*float64(to.Sub(from))/float64(total))
 		from = to
 	}
+}
+
+// add counts spend toward the day's one machine-wide total and, when the
+// project is known, toward its share of it. Callers hold l.mu.
+func (l *budgetLedger) add(day, project string, amount float64) {
+	l.Days[day] += amount
+	if project == "" {
+		return
+	}
+	if l.Projects[day] == nil {
+		l.Projects[day] = map[string]float64{}
+	}
+	l.Projects[day][project] += amount
+}
+
+// byProject is the budget day's total split per project. Spend recorded before
+// projects were tracked is in the total only.
+func (l *budgetLedger) byProject(key string) map[string]float64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return maps.Clone(l.Projects[key])
 }
 
 // latches rolls the latch to now's day, sets any limit that spend since the
@@ -155,13 +182,17 @@ type BudgetStatus struct {
 	HardLimit    float64 `json:"hard_limit"`
 	BudgetPaused bool    `json:"budget_paused"`
 	HardLatched  bool    `json:"hard_latched"`
+	// Projects is each project's share of Total.
+	Projects map[string]float64 `json:"projects,omitempty"`
 }
 
 func (s *Server) budgetStatus(now time.Time) BudgetStatus {
 	latch := s.budgetLatches(now)
+	day := now.Format(budgetDayLayout)
 	return BudgetStatus{
-		Day:          now.Format(budgetDayLayout),
+		Day:          day,
 		Total:        s.ledger.today(now),
+		Projects:     s.ledger.byProject(day),
 		SoftLimit:    s.cfg.BudgetSoftLimit,
 		HardLimit:    s.cfg.BudgetHardLimit,
 		BudgetPaused: latch.Soft,
@@ -265,7 +296,11 @@ func (s *Server) pollBudget(now time.Time) {
 			continue
 		}
 		if cost, ok := s.costOf(it); ok {
-			s.ledger.record(it.Address+"@"+it.Session, cost, now)
+			var project string
+			if addr, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil {
+				project = addr.Project
+			}
+			s.ledger.record(project, it.Address+"@"+it.Session, cost, now)
 		}
 	}
 	hard := s.budgetLatches(now).Hard
