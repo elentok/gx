@@ -15,8 +15,7 @@ import (
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
-// findIterationTab is a package-level seam so tests can fake herdr, same as
-// reattachFindWorkspace/reattachTabList.
+// findIterationTab is a package-level seam so tests can fake herdr.
 var findIterationTab = func(epicName, identifier string) (herdr.Tab, bool) {
 	return ralphloop.FindIterationTab(herdr.FindWorkspace, herdr.TabList, epicName, identifier)
 }

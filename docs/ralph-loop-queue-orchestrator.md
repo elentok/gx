@@ -32,7 +32,6 @@ Ticket Forking sections) this doc expands on.
 | **Fork subtree** | A ticket plus every ticket reached by following `parent` reverse-edges down from it, at any depth. The unit `Blocking` recurses over: a `blocked_by` token resolves only once the named ticket's whole fork subtree is done. |
 | **Reconcile** | The pass that runs once at the start of every epic run, before scheduling starts, reconciling on-disk `status:` against live herdr sessions and git reality (crash recovery). |
 | **Gate** | The in-process pause/resume coordinator for one epic run. Something can be paused for rate-limit or needs-repair reasons; a smart-zone breach is handled differently and does **not** use the Gate (see §6). |
-| **Attach / Attached** | At most one `gx` process, repo-wide, may be "attached" to the Queue at a time — the process running the first live epic. Recorded in `.scratch/queue-attach.json` (pid + start time). |
 | **RenderedStatus** | The Queue/Tickets UI's collapse of raw `status:` + graph-derived overlays into: Open, Claimed, Blocked, NeedsAnswer, NeedsRepair, Done, Draft, Waiting-for-children, Error. Blocked and Waiting-for-children are overlays — derived per render, never written to a file. |
 
 ## 2. The core loop
@@ -300,35 +299,17 @@ rejected every epic-complete send with a deterministic 400. Diagnosed straight f
 `run-log.jsonl`: iteration-finished sends showed `notification-sent`, epic-complete showed
 `notification-failed`. Fixed by dropping the offending punctuation from the template.
 
-## 7. Queue tab: attach, live, reattach
+## 7. Queue tab
 
-One Queue per repo (not per epic), keyed off `.scratch`. At most one `gx` process may be
-**attached** at a time — the process running the epic's first live run. This is a soft lock
-against two processes scheduling the same epic concurrently, not a hard filesystem lock: it's
-tracked in `.scratch/queue-attach.json` (pid + process start time, so a reused pid after reboot
-isn't mistaken for the same process).
-
-```mermaid
-flowchart TD
-    Start["gx TUI opens Queue tab"] --> A{queue-attach.json\nheld by a live process?}
-    A -->|yes, foreign| B["blocked: cannot start new epic run here"]
-    A -->|no| C{checked/queued tickets with\nclaimed/needs-repair status\nand a live session?}
-    C -->|yes| D["Found detached live queue.\nReattach? (confirm)"]
-    C -->|no| E{checked epics never\nclaimed, this process is new?}
-    E -->|yes| F["Found N epic(s) checked/queued\nbefore this process (re)started.\nResume? (confirm)"]
-    E -->|no| G[normal queue state]
-    D -->|confirm| H[reattach: scan tabs, resume iterations]
-    F -->|confirm| I[requeue: re-enter pendingEpics]
-```
+One Queue per repo (not per epic), keyed off `.scratch`. The orchestrator server owns every epic
+run; the TUI only views and steers it. There is no attach lock and no TUI reattach flow: when the
+server restarts mid-iteration it reclaims the still-live agent sessions itself.
 
 - **Replace queue** (`r`) clears pending+done selection and replaces it with the checked
   tickets — blocked repo-wide while *any* epic run is live, so a running epic's own state can't be
   silently discarded.
 - **Add to queue** (`a`) widens an already-running epic's `RunScope` with newly-checked tickets —
   requires a live run under the cursor's epic already.
-- **Live** = a claimed/needs-repair ticket whose herdr session is still alive, as found by
-  `ralphloop.ScanForReattachable`. This is what "reattach" recovers from: the *process* died but
-  the tmux/herdr session it launched didn't.
 
 ## 8. Edge case: process-restart-stranded pending epics
 
@@ -344,14 +325,13 @@ from it on the next load.
 The subtlety: **"checked, Enter never pressed" and "checked, was queued, restarted before its
 turn" look identical on disk.** A first fix attempt auto-requeued on the checked signal alone and
 broke a test by auto-starting epics whose Enter had genuinely never been pressed. The shipped fix
-mirrors the existing detached-live-queue pattern instead of trying to disambiguate silently: scan
-once per process on first Queue-tab load for checked-but-unclaimed-and-not-running epics
-(excluding anything already covered by the live-reattach scan), and surface an explicit confirm
-dialog rather than resuming automatically.
+doesn't try to disambiguate silently: it scans once per process on first Queue-tab load for
+checked-but-unclaimed-and-not-running epics, and surfaces an explicit confirm dialog rather than
+resuming automatically.
 
 **Lesson for future edge cases in this system**: when on-disk state can't distinguish two
 histories that call for different actions, don't guess — surface a confirm prompt naming what was
-found, the same pattern used for live-session reattach.
+found.
 
 ## 9. File map
 
@@ -365,4 +345,4 @@ found, the same pattern used for live-session reattach.
 | Wave preview | `ralphloop/plan.go` |
 | Ticket status/blocking | `tickets/status.go`, `tickets/epic.go`, `tickets/allocate.go` |
 | Fork/review skills | `skills/gx-implement/SKILL.md`, `skills/gx-code-review/SKILL.md` |
-| Queue tab UI | `ui/tickets/queue*.go`, `loop_registry.go`, `attach_lock.go`, `reattach_scan.go` |
+| Queue tab UI | `ui/tickets/queue*.go` |

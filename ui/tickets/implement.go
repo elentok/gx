@@ -144,13 +144,3 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 	m.implementSpinner, cmd = m.implementSpinner.Update(msg)
 	return m, cmd
 }
-
-// OnPageActivated implements the app shell's pageActivationAware duck-type
-// (see ui/app/model_tabs.go), firing every time this tab (re)gains focus —
-// including the very first time. It fires cmdReattachScan (once-per-process
-// detection) and cmdReattachRescan (repeatable clearing, see
-// reattach_scan.go) so a still-open "recoverable session detected"
-// notification gets rechecked every time the tab regains focus.
-func (m Model) OnPageActivated() tea.Cmd {
-	return tea.Batch(m.cmdReattachScan(), m.cmdReattachRescan())
-}

@@ -34,9 +34,8 @@ type Deps struct {
 	VerifySkill           func(agent AgentKind, skill string) error
 	FindOrCreateWorkspace func(label, cwd string) (string, error)
 	// FindWorkspace looks up an epic's herdr workspace without creating one,
-	// used by the restart-recovery reattach scan (see ScanForReattachable),
-	// which must never bring a workspace into existence just to discover it
-	// doesn't have one.
+	// for callers that must never bring a workspace into existence just to
+	// discover it doesn't have one.
 	FindWorkspace func(label string) (string, error)
 	// WorktreeDir returns the directory linked worktrees for repoDir's repo
 	// are created in (see git.Repo.LinkedWorktreeDir).

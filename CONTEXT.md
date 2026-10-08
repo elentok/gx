@@ -555,23 +555,8 @@ when it is deactivated.
 **Queue** — the single, per-repo collection of checked/queued tickets across all epics
 (`QueueStore`, keyed off the repo's `.scratch` dir). One Queue per repo, not per epic.
 
-**Attach / Attached / Detach** — at most one gx process, repo-wide, may be Attached to the Queue at
-a time. A process attaches when its first epic run starts (`loopRegistry.tryStart` acquiring the
-attach lock while its internal `attachCount` is 0) and detaches when its last running epic run ends
-(`attachCount` returning to 0 in `loopRegistry.finish`). Attachment doesn't limit how many epics that
-one process runs concurrently — only the separate `maxConcurrent` slot cap does that. `SelfAttached`
-reports this process's own attachment for the Queue tab label's "(attached)" suffix.
-
-**Attach lock** — the on-disk record of the attached process, one per repo:
-`.scratch/queue-attach.json`, holding the holder's pid and process start time (so a reused pid after
-reboot isn't mistaken for the same process — see `attachLockIsStale`).
-
-**Foreign attachment** — the Queue is attached to a different gx process (`ForeignAttachPID` returns
-a nonzero pid). Hard-blocks starting a new epic run in this process with `"a ralph-loop is already
-running (attached by process %d)"`.
-
-**Epic run** — the per-epic ralph-loop execution (`loopRegistry.runs[epicName]`). Several can run
-concurrently inside whichever process holds the attachment, up to the concurrency slot cap.
+**Epic run** — the per-epic ralph-loop execution, owned by the orchestrator server. Several can run
+concurrently, up to the concurrency slot cap.
 
 **Hand-driven epic** / **Loop-driven epic** — the two kinds of epic `.scratch/` holds, distinguished
 by who writes `status`, not by file format or by anything on disk. In a hand-driven epic (a
@@ -579,15 +564,6 @@ wayfinder map, or any epic a person works directly) the person is the sole write
 `gx tickets set` is their channel. In a loop-driven epic gx owns `status` in-process. The two share
 one format, one validator, and one CLI; nothing marks which is which, because ownership is a
 property of the writer, not of the epic.
-
-**Reattach / Reattach signal** — per-ticket detection that a specific ticket's session is still
-alive, checked via `ralphloop.ScanForReattachable`. A special case of Attach: it only fires when the
-Queue is Detached (`attachLockHeld` false) and at least one ticket is left `claimed`/
-`needs-repair`, and only proceeds after the user confirms the "Found a detached live queue…
-Reattach?" prompt (`handleDetachedLiveDetected`) — there is no silent auto-reattach.
-
-**Live** — the Queue (or a specific ticket) has at least one `claimed`/`needs-repair` ticket with
-a still-alive session, as found by a Reattach signal scan (`cmdCheckDetachedLive`'s `alive` count).
 
 **Replace queue** (`r`) / **Add to queue** (`a`) — the two queueing actions from the Tickets tab.
 Replace clears both the not-yet-started (pending) and already-finished (done) queue selection,
