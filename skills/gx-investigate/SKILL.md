@@ -119,10 +119,11 @@ diagnosis) applies unchanged; only the writes differ.
 
 <unattended-verbs>
 
-- allowed: `park`, `relaunch` — and only those the matched entry lists in its `verbs`. The entry's
-  verbs are the whole grant; the prompt's entry is the authority, not your own judgment of what
-  would help.
-- never: `land`, `reset`, `unpark`, `land --continue/--abort`, a pane nudge, or editing product code.
+- allowed: exactly the verbs the matched entry lists in its `verbs` (as named in the prompt),
+  whatever they are — e.g. R3's entry grants its `land`. The entry's verbs are the whole grant; the
+  prompt's entry is the authority, not your own judgment of what would help.
+- never: a pane nudge or any other verb the matched entry does not list (an unlisted `land`,
+  `reset`, `unpark` or `land --continue/--abort` included), or editing product code.
 
 </unattended-verbs>
 

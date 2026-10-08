@@ -233,9 +233,9 @@ func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
 	}
 }
 
-// TestInvestigateUnattendedVerbs pins the verbs the unattended gx-investigate
-// mode may apply to recovery.Verbs' two methods, and that the state-repair
-// commands stay forbidden.
+// TestInvestigateUnattendedVerbs pins that the unattended gx-investigate grant
+// is the matched entry's verbs and nothing else: a fixed list in the skill
+// would block an entry's own verbs (R3's land) or grant ones it doesn't list.
 func TestInvestigateUnattendedVerbs(t *testing.T) {
 	raw := readFile(t, "gx-investigate/SKILL.md")
 	block := regexp.MustCompile(`(?s)<unattended-verbs>(.*?)</unattended-verbs>`).FindStringSubmatch(raw)
@@ -243,26 +243,30 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 		t.Fatal("gx-investigate/SKILL.md has no <unattended-verbs> block")
 	}
 	var allowed, never string
+	var cur *string
 	for line := range strings.SplitSeq(block[1], "\n") {
 		switch {
 		case strings.HasPrefix(line, "- allowed:"):
-			allowed = line
+			cur = &allowed
 		case strings.HasPrefix(line, "- never:"):
-			never = line
+			cur = &never
+		case !strings.HasPrefix(line, "  "):
+			cur = nil
 		}
+		if cur != nil {
+			*cur += strings.TrimSpace(line) + " "
+		}
+	}
+	if !strings.Contains(allowed, "matched entry lists in its `verbs`") {
+		t.Errorf("allowed bullet must defer to the matched entry's verbs: %q", allowed)
 	}
 	for _, verb := range []string{"park", "relaunch"} {
-		if !strings.Contains(allowed, "`"+verb+"`") {
-			t.Errorf("allowed line missing verb %q: %q", verb, allowed)
+		if strings.Contains(allowed, "`"+verb+"`") {
+			t.Errorf("allowed bullet pins a fixed verb %q: %q", verb, allowed)
 		}
 	}
-	for _, cmd := range []string{"land", "reset", "unpark"} {
-		if strings.Contains(allowed, "`"+cmd+"`") {
-			t.Errorf("allowed line must not list %q", cmd)
-		}
-		if !strings.Contains(never, "`"+cmd+"`") {
-			t.Errorf("never line missing %q: %q", cmd, never)
-		}
+	if !strings.Contains(never, "any other verb the matched entry does not list") {
+		t.Errorf("never bullet must forbid every unlisted verb: %q", never)
 	}
 }
 
