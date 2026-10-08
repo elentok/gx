@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +20,9 @@ var waitExitCodes = map[string]int{
 	string(schema.StatusNeedsRepair): 4,
 	string(schema.StatusCancelled):   5,
 }
+
+// exitWaitTimeout is the exit code when --timeout expires before the ticket ends.
+const exitWaitTimeout = 6
 
 var waitRetry = time.Second
 
@@ -77,9 +81,19 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 }
 
 // runOneOffWait waits for address, prints its ## Result, and maps its status to
-// the exit code. A parked ticket has no result worth printing.
-func runOneOffWait(ctx context.Context, src eventSource, w, errW io.Writer, address string) error {
+// the exit code. A parked ticket has no result worth printing. A positive
+// timeout only stops this waiter: the server is never told, so the ticket runs on.
+func runOneOffWait(ctx context.Context, src eventSource, w, errW io.Writer, address string, timeout time.Duration) error {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	t, err := waitForTicket(ctx, src, address)
+	if errors.Is(err, context.DeadlineExceeded) {
+		fmt.Fprintf(errW, "%s: still running after %s; it keeps running\n", address, timeout)
+		return &ExitError{Code: exitWaitTimeout}
+	}
 	if err != nil {
 		return err
 	}

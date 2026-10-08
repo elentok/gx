@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -24,6 +25,7 @@ const exitDuplicateLive = 7
 func newServerOneOffCmd() *cobra.Command {
 	var req server.OneOffRequest
 	var jsonOut, wait bool
+	var timeout time.Duration
 	cmd := &cobra.Command{
 		Use:   `one-off ["<prompt>"] [--file <path>]`,
 		Short: "create a top-level ticket from a prompt and queue it",
@@ -52,7 +54,7 @@ func newServerOneOffCmd() *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runServerOneOff(ctx, cl, c.OutOrStdout(), c.ErrOrStderr(), jsonOut, wait, req)
+			return runServerOneOff(ctx, cl, c.OutOrStdout(), c.ErrOrStderr(), jsonOut, wait, timeout, req)
 		},
 	}
 	cmd.Flags().StringVar(&req.Project, "project", "", "project to create the ticket in (default: the project owning the current directory, else scratch)")
@@ -68,14 +70,15 @@ func newServerOneOffCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.Unique, "unique", "", "dedupe key: refuse while a live ticket of the project has it (--file defaults to its resolved path)")
 	cmd.Flags().BoolVar(&req.NoUnique, "no-unique", false, "do not dedupe, even with --file")
 	cmd.MarkFlagsMutuallyExclusive("unique", "no-unique")
-	cmd.Flags().BoolVar(&wait, "wait", false, "block until the ticket is done or parked, print its Result; exit 0 done, 3 needs-answer, 4 needs-repair, 5 cancelled")
+	cmd.Flags().BoolVar(&wait, "wait", false, "block until the ticket is done or parked, print its Result; exit 0 done, 3 needs-answer, 4 needs-repair, 5 cancelled, 6 timeout; a duplicate-live refusal waits on the existing ticket")
+	cmd.Flags().DurationVar(&timeout, "timeout", 0, "with --wait, stop waiting after this long and exit 6; the ticket keeps running")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of the address")
 	return cmd
 }
 
 // runServerOneOff never starts the server: a dead socket is a refusal with a
 // `gx server start` hint, exit code 8, and nothing spooled.
-func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, req server.OneOffRequest) error {
+func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, req server.OneOffRequest) error {
 	res, err := cl.OneOff(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
@@ -94,9 +97,12 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 		if down {
 			return &ExitError{Code: exitServerNotRunning}
 		}
-		if wait && !res.Refused {
+		if wait && (!res.Refused || dup) {
+			if dup {
+				fmt.Fprintf(errW, "duplicate: waiting on %s\n", res.Address)
+			}
 			// stdout stays pure JSON, so the Result is not printed.
-			return runOneOffWait(ctx, cl, io.Discard, errW, res.Address)
+			return runOneOffWait(ctx, cl, io.Discard, errW, res.Address, timeout)
 		}
 		return nil
 	}
@@ -105,8 +111,12 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 		return &ExitError{Code: exitServerNotRunning}
 	}
 	if dup {
-		fmt.Fprintf(errW, "refused (%s): %s\n", res.Reason, res.Message)
 		fmt.Fprintln(w, res.Address)
+		if wait {
+			fmt.Fprintf(errW, "duplicate: waiting on %s\n", res.Address)
+			return runOneOffWait(ctx, cl, w, errW, res.Address, timeout)
+		}
+		fmt.Fprintf(errW, "refused (%s): %s\n", res.Reason, res.Message)
 		return &ExitError{Code: exitDuplicateLive}
 	}
 	if res.Refused {
@@ -115,5 +125,5 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 	if _, err = fmt.Fprintln(w, res.Address); err != nil || !wait {
 		return err
 	}
-	return runOneOffWait(ctx, cl, w, errW, res.Address)
+	return runOneOffWait(ctx, cl, w, errW, res.Address, timeout)
 }

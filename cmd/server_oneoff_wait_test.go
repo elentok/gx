@@ -43,10 +43,15 @@ func (f *fakeSource) Events(context.Context, uint64) (<-chan server.Event, error
 
 func runWait(t *testing.T, f *fakeSource) (stdout string, code int) {
 	t.Helper()
+	return runWaitTimeout(t, f, 0)
+}
+
+func runWaitTimeout(t *testing.T, f *fakeSource, timeout time.Duration) (stdout string, code int) {
+	t.Helper()
 	var out, errOut bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	err := runOneOffWait(ctx, f, &out, &errOut, "gx:p/1")
+	err := runOneOffWait(ctx, f, &out, &errOut, "gx:p/1", timeout)
 	var exitErr *ExitError
 	if errors.As(err, &exitErr) {
 		return out.String(), exitErr.Code
@@ -74,6 +79,13 @@ func TestOneOffWait_ExitCodesByStatus(t *testing.T) {
 		if _, code := runWait(t, &fakeSource{statuses: []string{"open", status}}); code != want {
 			t.Errorf("%s: code = %d; want %d", status, code, want)
 		}
+	}
+}
+
+func TestOneOffWait_TimeoutExitsSix(t *testing.T) {
+	f := &fakeSource{statuses: []string{"claimed"}}
+	if _, code := runWaitTimeout(t, f, 50*time.Millisecond); code != exitWaitTimeout {
+		t.Errorf("code = %d; want %d", code, exitWaitTimeout)
 	}
 }
 
