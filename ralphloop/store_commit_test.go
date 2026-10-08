@@ -31,7 +31,7 @@ func TestPark_CommitsStoreWithAddressAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := park(NoopEventSink(), parkRequest{
+	if _, err := park(noopEventSink{}, parkRequest{
 		ScratchDir: store, EpicName: "myepic", Ticket: "01", Path: path,
 		Type: events.NeedsAnswer, Kind: events.Kind("ticket-answered"), Reason: "q",
 	}); err != nil {

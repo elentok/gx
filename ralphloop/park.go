@@ -33,10 +33,6 @@ func isParkType(t events.Type) bool {
 	return t == events.NeedsAnswer || t == events.NeedsRepair
 }
 
-// NoopEventSink is the sink for park callers with no live TUI to notify
-// (the CLI, the Queue tab's budget kill, which sends its own notification).
-func NoopEventSink() EventSink { return noopEventSink{} }
-
 // RecordManualLand writes done through the park path and appends the one
 // manual-land event. Only the ticket write's error is returned, matching park.
 func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone bool, ev Event) error {

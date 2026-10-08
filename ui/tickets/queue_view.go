@@ -157,10 +157,6 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 	for i, e := range entries {
 		idxByID[e.ID] = i
 	}
-	// liveByEpic backs ticket 10's per-epic cost append below — fetched once
-	// per render rather than once per row.
-	liveByEpic := LiveSpendByEpic()
-
 	return tree.RenderOpts[queueNode]{
 		AccentColor: ui.ColorBlue,
 		Active:      m.focus == focusSidebar,
@@ -179,17 +175,14 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				// (metricsLineStyle) regardless of the status line's color — the
 				// configured limits are session-wide, so coloring one epic's
 				// slice against them would misleadingly suggest that epic alone
-				// is over budget. Only present for a currently-running epic
-				// (LiveSpendByEpic is scoped to the running set); a completed
-				// epic instead gets its final summed cost (epicCost) appended
-				// alongside "took Xm", and an idle epic gets nothing.
+				// is over budget. In server mode it is the ledger's cost for
+				// today, per root; otherwise a completed epic gets its final
+				// summed cost (epicCost) appended alongside "took Xm", and an
+				// idle epic gets nothing.
 				if m.serverAPI != nil {
-					// Server mode: the ledger's cost for today, per root.
 					if cost := m.serverBudget.Roots[entry.Value.epic.Name]; cost > 0 {
 						line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
 					}
-				} else if cost, ok := liveByEpic[entry.Value.epic.Name]; ok {
-					line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
 				} else if entry.Value.epic.AllDone() {
 					if cost := epicCost(entry.Value.epic); cost > 0 {
 						line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)

@@ -250,29 +250,18 @@ func (m QueueModel) queueRunStateTitle() string {
 // queueHeaderCostSuffix renders ticket 10's live-total segment appended to
 // the title line in every local run state: "$X of $Y" colored against the
 // configured soft limit when one is set (config.BudgetConfig.SoftLimit != 0),
-// bare unstyled "$X" when the budget is off. A nonzero UnpricedRunningCount
-// (a live Codex iteration, which has no cost source) appends a short note so
-// the operator knows the total doesn't cover everything currently spending.
+// bare unstyled "$X" when the budget is off. The total is the server
+// ledger's, from the snapshot.
 func (m QueueModel) queueHeaderCostSuffix() string {
-	total := LiveSpend()
-	soft := m.settings.Budget.SoftLimit
-	prefix := ""
+	total, soft, prefix := m.serverBudget.Total, m.settings.Budget.SoftLimit, ""
 	if m.serverAPI != nil {
-		// The server's ledger is the day's one total; local polling is off.
-		total, soft, prefix = m.serverBudget.Total, m.serverBudget.SoftLimit, "today "
+		soft, prefix = m.serverBudget.SoftLimit, "today "
 	}
 	text := prefix + tickets.FormatCost(total)
 	style := lipgloss.NewStyle()
 	if soft > 0 {
 		text = fmt.Sprintf("%s%s of %s", prefix, tickets.FormatCost(total), tickets.FormatCost(soft))
 		style = budgetTotalStyle(total, soft)
-	}
-	if n := UnpricedRunningCount(); n > 0 {
-		run := "run"
-		if n != 1 {
-			run = "runs"
-		}
-		text += fmt.Sprintf(" (+%d unpriced Codex %s)", n, run)
 	}
 	return style.Render(text)
 }
