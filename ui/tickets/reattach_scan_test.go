@@ -264,3 +264,22 @@ func TestHandleReattachSignals_NoSignals_NoOp(t *testing.T) {
 		t.Fatal("handleReattachSignals: want nil cmd when there are no signals")
 	}
 }
+
+// findCloseMsg recursively unwraps a (possibly batched) tea.Cmd looking for
+// a notify.CloseMsg with the given id.
+func findCloseMsg(cmd tea.Cmd, id string) bool {
+	if cmd == nil {
+		return false
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if findCloseMsg(c, id) {
+				return true
+			}
+		}
+		return false
+	}
+	closeMsg, ok := msg.(notify.CloseMsg)
+	return ok && closeMsg.ID == id
+}

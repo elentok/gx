@@ -134,26 +134,14 @@ type Model struct {
 	// keep reading/writing its fields as m.focus, m.previewVP, etc.
 	previewFocus
 
-	// confirm, implementEpic and implementSpinner back the "i"-triggered
-	// ralph-loop launch (see implement.go): implementEpic is the name of the
-	// epic this tab's own launch (re)started tracking most recently, "" when
-	// none — the process-wide "is anything running" check goes through
-	// ralphLoopRegistry instead, since that must hold even if this Model gets
-	// rebuilt mid-run (e.g. a worktree-context switch). implementingEpics is
-	// the actual set this Model is live-tracking (ticket 05): with
-	// ralphLoopRegistry now allowing more than one epic in flight
-	// process-wide (ticket 03), a resync (OnPageActivated) can hand this
-	// Model a second epic's event stream alongside its own launch, so
-	// gutter-highlighting/live-row rendering has to check set membership
-	// rather than equality against one name.
+	// implementingEpics is the set of epics rendered as live, more than one
+	// at a time.
 	confirm           confirm.Model
-	implementEpic     string
 	implementingEpics map[string]bool
 	implementSpinner  spinner.Model
 
 	// statusMenuOpen/statusMenu back the "s"-triggered change-status menu (see
-	// status_menu.go): built fresh from the selected row and the live loop
-	// registry each time "s" opens it.
+	// status_menu.go): built fresh from the selected row each time "s" opens it.
 	statusMenuOpen bool
 	statusMenu     components.MenuState
 
@@ -162,10 +150,9 @@ type Model struct {
 	// row's rendered status each time "m" opens it.
 	actionsMenu actionsMenuModel
 
-	// Live state is projected from registry snapshots and scoped by epic before
-	// ticket identity so concurrent epics cannot collide.
-	live            map[string]map[string]liveTicketState
-	labelIdentifier map[string]map[string]string
+	// Live state is scoped by epic before ticket identity so concurrent epics
+	// cannot collide.
+	live map[string]map[string]liveTicketState
 
 	// reattachPending is every "recoverable session detected" notification
 	// currently open (see handleReattachSignals), rechecked by
@@ -228,7 +215,6 @@ func NewModelWithStore(worktreeRoot string, settings ui.Settings, extraKeys keys
 		implementingEpics: map[string]bool{},
 		implementSpinner:  sp,
 		live:              map[string]map[string]liveTicketState{},
-		labelIdentifier:   map[string]map[string]string{},
 		checked:           snapshot.TicketChecked,
 		checkOrder:        snapshot.TicketCheckOrder,
 		queueStatus:       snapshot.Status,
@@ -376,10 +362,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleMouseWheel(msg)
 
-	case implementPollMsg:
-		return m.handleImplementPoll(msg)
-	case implementSyncMsg:
-		return m.handleImplementSync(msg)
 	case spinner.TickMsg:
 		return m.handleImplementSpinnerTick(msg)
 	case reattachSignalsMsg:

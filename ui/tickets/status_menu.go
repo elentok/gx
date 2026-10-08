@@ -14,18 +14,6 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// liveOwnedStatuses is what ralph-loop itself writes while it is actively
-// scheduling an epic (claiming a ticket, then marking it done) — see ADR
-// 0023 (status ownership by writer). Offering either of these in the status
-// menu during a live run would invite a person to assert something only gx
-// can know mid-run; the rest of the vocabulary (including "open", the write
-// unparking needs) stays a person's to set regardless of whether a loop is
-// live.
-var liveOwnedStatuses = map[schema.Status]bool{
-	schema.StatusClaimed: true,
-	schema.StatusDone:    true,
-}
-
 // allStatusMenuOrder is every status the change-status keymap can offer, in
 // menu display order.
 var allStatusMenuOrder = []schema.Status{
@@ -50,16 +38,12 @@ var statusMenuLabels = map[schema.Status]string{
 }
 
 // newStatusMenu builds the status menu for ticket: every status but ticket's
-// own current one, minus liveOwnedStatuses when live is true (a loop is
-// currently scheduling ticket's epic).
-func newStatusMenu(ticket tickets.Ticket, live bool) components.MenuState {
+// own current one.
+func newStatusMenu(ticket tickets.Ticket) components.MenuState {
 	current := schema.Status(strings.ToLower(strings.TrimSpace(ticket.Status)))
 	items := make([]components.MenuItem, 0, len(allStatusMenuOrder))
 	for _, status := range allStatusMenuOrder {
 		if status == current {
-			continue
-		}
-		if live && liveOwnedStatuses[status] {
 			continue
 		}
 		items = append(items, components.MenuItem{Label: statusMenuLabels[status], Value: string(status)})
@@ -78,12 +62,11 @@ func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
 	}
 	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
-	live := ralphLoopRegistry.isRunningEpic(epic.Name)
 	var menu components.MenuState
 	if m.serverMode() {
 		menu = newServerStatusMenu(ticket, epic.RenderedStatus(ticket))
 	} else {
-		menu = newStatusMenu(ticket, live)
+		menu = newStatusMenu(ticket)
 	}
 	if len(menu.Items) == 0 {
 		return m, notify.Info("no status changes available for this ticket right now")

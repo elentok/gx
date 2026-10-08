@@ -2,13 +2,11 @@ package tickets
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -31,32 +29,13 @@ type implementPollMsg struct {
 	epicName string
 }
 
-// implementSyncMsg reports every epic ralphLoopRegistry has running, as
-// observed when this tab (re)gained focus (see OnPageActivated), so a Model
-// that missed completion messages for one or more epics while another tab was
-// active can catch up on all of them at once.
-type implementSyncMsg struct {
-	runningEpics []string
-}
-
-// handleReplaceQueueKey applies bugs-05/03's "r" ("Replace queue") action:
-// "r" is blocked only when the epic under the cursor itself has a live run —
-// a live run on some other epic no longer stops it, mirroring "a"'s
-// per-epic scoping (handleAddToQueueKey) instead of the old process-wide
-// IsLoopRunning() check. With no epic under the cursor there's nothing to
-// scope the guard to, so the check is simply skipped. Once past the guard,
-// "r" opens a confirmation step naming what's about to happen; accepting it
-// runs replaceQueuedSelection via handleReplaceQueueConfirmed and switches to
-// the Queue tab.
+// handleReplaceQueueKey applies bugs-05/03's "r" ("Replace queue") action: it
+// opens a confirmation step naming what's about to happen; accepting it runs
+// replaceQueuedSelection via handleReplaceQueueConfirmed and switches to the
+// Queue tab.
 func (m Model) handleReplaceQueueKey() (tea.Model, tea.Cmd) {
 	if m.serverMode() {
 		return m.handleServerReplaceKey()
-	}
-	if r, ok := m.selectedRow(); ok {
-		epic := m.epicAt(r)
-		if ralphLoopRegistry.isRunningEpic(epic.Name) {
-			return m, notify.Info("Can't replace a live queue")
-		}
 	}
 	if len(m.checked) == 0 {
 		return m, notify.Info("check at least one ticket to build an execution plan")
@@ -93,12 +72,8 @@ func (m Model) handleReplaceQueueConfirmed(msg replaceQueueConfirmedMsg) (tea.Mo
 	return m, cmdOpenQueueTab(msg.worktreeRoot)
 }
 
-// handleAddToQueueKey applies ticket 10's "a" ("Add to queue") action: the
-// epic under the cursor must already have a live run, and the checked
-// tickets belonging to it are added to that run's scope after confirmation —
-// widening a frozen scope via ralphloop.RunScope.Add (ticket 09) so each
-// becomes claimable on the run's next iteration. Unlike "r", "a" always
-// confirms first, naming the count about to be added.
+// handleAddToQueueKey applies ticket 10's "a" ("Add to queue") action. Only
+// the server runs epics, so without one there is no live run to add to.
 func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
 	if m.serverMode() {
 		return m.handleServerEnqueueKey()
@@ -107,46 +82,7 @@ func (m Model) handleAddToQueueKey() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	epic := m.epicAt(r)
-	if !ralphLoopRegistry.isRunningEpic(epic.Name) {
-		return m, notify.Info(fmt.Sprintf("epic %q isn't running", epic.Name))
-	}
-	ticketIDs := checkedTicketIDsForEpic(epic, m.checked)
-	if len(ticketIDs) == 0 {
-		return m, notify.Info("check at least one ticket in the epic to add")
-	}
-	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    fmt.Sprintf("Add %d ticket(s) to the live queue?", len(ticketIDs)),
-		AcceptCmd: cmdAddToLiveQueue(epic.Name, ticketIDs),
-	})
-	return m, nil
-}
-
-// checkedTicketIDsForEpic collects DisplayNumber identifiers (the form
-// ralphloop.RunScope.Add expects) for epic's checked, not-yet-done tickets —
-// a done ticket has nothing left to add to a live run's scope.
-func checkedTicketIDsForEpic(epic tickets.Epic, checked map[string]bool) []string {
-	var ids []string
-	for _, t := range epic.Tickets {
-		if !checked[t.Path] || epic.RenderedStatus(t).Terminal() {
-			continue
-		}
-		ids = append(ids, t.DisplayNumber())
-	}
-	return ids
-}
-
-// cmdAddToLiveQueue widens epicName's live RunScope to include ticketIDs
-// once the "a" confirmation modal is accepted.
-func cmdAddToLiveQueue(epicName string, ticketIDs []string) tea.Cmd {
-	return func() tea.Msg {
-		scope, ok := ralphLoopRegistry.scopeFor(epicName)
-		if !ok {
-			return notify.Error(fmt.Sprintf("epic %q is no longer running", epicName))()
-		}
-		scope.Add(ticketIDs...)
-		return notify.Info(fmt.Sprintf("added %d ticket(s) to epic %q", len(ticketIDs), epicName))()
-	}
+	return m, notify.Info(fmt.Sprintf("epic %q isn't running", m.epicAt(r).Name))
 }
 
 // replaceQueuedSelection applies ticket 10's "r" replace logic, per bugs-06/03's
@@ -218,17 +154,6 @@ func (m Model) handleConfirmMouseUpdate(msg tea.MouseClickMsg) (tea.Model, tea.C
 	return m, cmd
 }
 
-// handleImplementPoll projects active registry state and reloads disk state
-// after completion. Errors remain in the registry for every observer.
-func (m Model) handleImplementPoll(msg implementPollMsg) (tea.Model, tea.Cmd) {
-	if ralphLoopRegistry.isRunningEpic(msg.epicName) {
-		closeCmd := m.syncRunSnapshot(msg.epicName)
-		return m, tea.Batch(cmdPollImplement(msg.epicName), closeCmd)
-	}
-	m.clearLiveTrackingFor(msg.epicName)
-	return m, tea.Batch(implementFinishedNotifyCmd(msg.epicName), m.cmdLoad())
-}
-
 // implementFinishedNotifyCmd reports epicName's just-finished run: an error
 // toast if ralphloop.Run returned one, otherwise the plain completion toast.
 func implementFinishedNotifyCmd(epicName string) tea.Cmd {
@@ -236,46 +161,6 @@ func implementFinishedNotifyCmd(epicName string) tea.Cmd {
 		return notify.Error(fmt.Sprintf("ralph-loop failed for epic %q: %v", epicName, err))
 	}
 	return notify.Info(fmt.Sprintf("ralph-loop finished for epic %q", epicName))
-}
-
-// handleImplementSync answers OnPageActivated's resync Cmd: it reconciles
-// every epic this Model was tracking against ralphLoopRegistry's live state,
-// which may have changed while this tab was in the background (a plain
-// tea.Msg sent to a backgrounded page is dropped by the app shell, so the
-// model that launched a run can't rely on ever seeing its own completion
-// message if the user switched away in the meantime) — and it also starts
-// tracking any epic that's running but that this Model instance never saw
-// start, e.g. one launched before this Model was rebuilt by a tab switch.
-func (m Model) handleImplementSync(msg implementSyncMsg) (tea.Model, tea.Cmd) {
-	running := make(map[string]bool, len(msg.runningEpics))
-	var cmds []tea.Cmd
-	for _, epicName := range msg.runningEpics {
-		running[epicName] = true
-		cmds = append(cmds, m.syncRunSnapshot(epicName), cmdPollImplement(epicName))
-	}
-	if len(msg.runningEpics) > 0 {
-		cmds = append(cmds, m.implementSpinner.Tick)
-	}
-
-	finished := make([]string, 0, len(m.implementingEpics))
-	for epicName := range m.implementingEpics {
-		if !running[epicName] {
-			finished = append(finished, epicName)
-		}
-	}
-	sort.Strings(finished)
-	for _, epicName := range finished {
-		m.clearLiveTrackingFor(epicName)
-		cmds = append(cmds, implementFinishedNotifyCmd(epicName))
-	}
-	if len(finished) > 0 {
-		cmds = append(cmds, m.cmdLoad())
-	}
-
-	if len(cmds) == 0 {
-		return m, nil
-	}
-	return m, tea.Batch(cmds...)
 }
 
 func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
@@ -289,20 +174,12 @@ func (m Model) handleImplementSpinnerTick(msg spinner.TickMsg) (tea.Model, tea.C
 
 // OnPageActivated implements the app shell's pageActivationAware duck-type
 // (see ui/app/model_tabs.go), firing every time this tab (re)gains focus —
-// including the very first time. It fires an implementSyncMsg listing every
-// epic ralphLoopRegistry currently has running, so this Model can recover
-// every running epic's live state deterministically — including a completion
-// it missed, or an epic it never even saw start — without opening an event
-// reader of its own or depending on messages that arrived while another tab
-// was active. It also fires cmdReattachScan (once-per-process detection) and
-// cmdReattachRescan (repeatable clearing, see reattach_scan.go) so a
-// still-open "recoverable session detected" notification gets rechecked
-// every time the tab regains focus.
+// including the very first time. It fires cmdReattachScan (once-per-process
+// detection) and cmdReattachRescan (repeatable clearing, see
+// reattach_scan.go) so a still-open "recoverable session detected"
+// notification gets rechecked every time the tab regains focus.
 func (m Model) OnPageActivated() tea.Cmd {
-	syncCmd := func() tea.Msg {
-		return implementSyncMsg{runningEpics: ralphLoopRegistry.runningEpicNames()}
-	}
-	return tea.Batch(syncCmd, m.cmdReattachScan(), m.cmdReattachRescan())
+	return tea.Batch(m.cmdReattachScan(), m.cmdReattachRescan())
 }
 
 // cmdPollImplement re-checks ralphLoopRegistry after implementPollInterval;

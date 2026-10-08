@@ -3,9 +3,9 @@ package tickets
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
@@ -47,20 +47,12 @@ func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 }
 
 func TestServerLink_DownBlanksLiveColumnsKeepsMarkdownRow(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
 	m := loadedModelWithTicket(t)
 	identifier := m.epics[0].Tickets[0].Identifier
-	r := newLoopRegistry(1)
-	r.tryStart("my-epic", 0, 1)
-	r.reduceLiveEvent("my-epic", ralphloop.LiveEvent{Kind: ralphloop.LiveEventIterationStarted, Label: "iter-01", Identifier: identifier})
-	previous := ralphLoopRegistry
-	ralphLoopRegistry = r
-	t.Cleanup(func() {
-		r.finish("my-epic", nil)
-		ralphLoopRegistry = previous
-	})
 	m.implementingEpics = map[string]bool{"my-epic": true}
-	m.syncRunSnapshot("my-epic")
+	m.live = map[string]map[string]liveTicketState{"my-epic": {
+		identifier: {running: true, label: "iter-01", phase: livePhaseImplementing, startedAt: time.Now()},
+	}}
 	if !strings.Contains(m.View().Content, "iter-01") {
 		t.Fatalf("precondition: live suffix should render while the link is up")
 	}

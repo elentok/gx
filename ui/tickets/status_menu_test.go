@@ -55,42 +55,6 @@ func TestModel_ChangeStatusKeyOpensMenuWithoutLiveLoop(t *testing.T) {
 	assertSameSet(t, got, want)
 }
 
-func TestModel_ChangeStatusKeyMenuExcludesGxOwnedStatusesWhileEpicIsLive(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry singleton
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	m = selectTicketRow(t, m)
-
-	previousRegistry := ralphLoopRegistry
-	r := newLoopRegistry(1)
-	r.tryStart("my-epic", 0, 1)
-	ralphLoopRegistry = r
-	t.Cleanup(func() {
-		r.finish("my-epic", nil)
-		ralphLoopRegistry = previousRegistry
-	})
-
-	updated, _ = m.Update(sPress())
-	m = updated.(Model)
-
-	if !m.statusMenuOpen {
-		t.Fatalf("expected status menu open after 's'")
-	}
-	got := menuValues(m.statusMenu)
-	want := []string{"open", "needs-repair", "draft"}
-	assertSameSet(t, got, want)
-	for _, v := range got {
-		if v == "claimed" || v == "done" {
-			t.Fatalf("expected live-run menu to exclude gx-owned statuses, got %v", got)
-		}
-	}
-}
-
 func TestModel_ChangeStatusKeyUnparksTicketBackToOpen(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
