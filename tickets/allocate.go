@@ -119,6 +119,52 @@ func NextTicketID(epic Epic, parent string) (string, error) {
 	return fmt.Sprintf("%s%d", prefix, nextNumber(epic.Tickets, prefix)), nil
 }
 
+// IDParent is the fork parent id's spelling implies: "12" for "12a", "12b"
+// for "12b1". ok is false for an ID that is not a fork child.
+func IDParent(id string) (parent string, ok bool) {
+	m := parentIDRe.FindStringSubmatch(strings.ToLower(id))
+	if m == nil || m[2] == "" {
+		return "", false
+	}
+	if m[3] == "" {
+		return m[1], true
+	}
+	return m[1] + m[2], true
+}
+
+// anyPaddingIDRe is parentIDRe for a parent token, whose padding the
+// parent resolver ignores (see siblingKey).
+var anyPaddingIDRe = regexp.MustCompile(`^(\d+)([a-z]?)(\d*)$`)
+
+// ParentAllowed reports whether parent may be id's fork parent: IDParent(id),
+// or an earlier number under the same letter, since NextTicketID numbers a
+// fork of "12b1" under "12b".
+func ParentAllowed(id, parent string) bool {
+	if _, ok := IDParent(id); !ok {
+		return false
+	}
+	c := parentIDRe.FindStringSubmatch(strings.ToLower(id))
+	p := anyPaddingIDRe.FindStringSubmatch(strings.ToLower(parent))
+	if p == nil {
+		return false
+	}
+	cNum, _ := strconv.Atoi(c[1])
+	pNum, _ := strconv.Atoi(p[1])
+	switch {
+	case cNum != pNum:
+		return false
+	case p[2] == "":
+		return c[3] == ""
+	case p[2] != c[2] || c[3] == "":
+		return false
+	case p[3] == "":
+		return true
+	}
+	cSeq, _ := strconv.Atoi(c[3])
+	pSeq, _ := strconv.Atoi(p[3])
+	return pSeq < cSeq
+}
+
 // nextLetter returns the next unused single-letter suffix after prefix
 // among existing (e.g. "b" when "12a" already exists under prefix "12"),
 // starting at "a" when none exist yet.

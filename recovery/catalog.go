@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -83,7 +84,32 @@ func Default() Catalog {
 	// R11 is a narrower name-taken park than R6's, so it goes first.
 	entries = append(entries, r11ClaimClobbered())
 	entries = append(entries, r6LaunchCollision()...)
-	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause(), r10BackgroundGateHeld())}
+	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause(), r10BackgroundGateHeld(), r14ParentDefect())}
+}
+
+// ParentDefect is R14's signature, checked per ticket file with no log: a
+// lettered ticket whose parent is missing or is not an ancestor its ID
+// allows. want is the ID-derived parent to backfill.
+func ParentDefect(id string, parent *string) (want string, defect bool) {
+	want, lettered := tickets.IDParent(id)
+	if !lettered || (parent != nil && tickets.ParentAllowed(id, *parent)) {
+		return "", false
+	}
+	return want, true
+}
+
+// r14ParentDefect is a ticket-graph defect a scan of the epic's issue files
+// found (ParentDefect), so the event alone is the signature. The ID encodes the
+// intended parent, so a rule backfills it with a direct write; medium authority
+// because a wrong parent changes scheduling scope and Queue-tab nesting, though
+// visibly rather than as a deadlock. Launches disabled: both live cases were
+// fixed in code, so there is no S0 event data behind it, and nothing emits the
+// event or offers the verb yet.
+func r14ParentDefect() Entry {
+	return Entry{
+		ID: "R14", Type: events.TicketGraphDefect, Kind: events.ParentDefect,
+		Executor: ExecutorRule, Authority: AuthorityMedium, Verbs: []string{"set-parent"},
+	}
 }
 
 // r10BackgroundGateHeld is a finish gated on a background task nothing ever

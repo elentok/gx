@@ -712,6 +712,61 @@ func TestR12MatchesAQuickZeroCommitFinishOfAReclaimAfterAStall(t *testing.T) {
 	}
 }
 
+func TestDefaultR14LaunchesDisabledAsAMediumRuleThatSetsTheParent(t *testing.T) {
+	c := Default()
+	i := slices.IndexFunc(c.Entries, func(e Entry) bool { return e.ID == "R14" })
+	if i < 0 {
+		t.Fatal("R14 not in the default catalog")
+	}
+	e := c.Entries[i]
+	if e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"set-parent"}) {
+		t.Errorf("R14 = %+v, want disabled medium rule that sets the parent", e)
+	}
+	seq := []Event{{Type: events.TicketGraphDefect, Kind: events.ParentDefect}}
+	if got, ok := c.Match(seq); ok && got.ID == "R14" {
+		t.Error("disabled R14 must not match")
+	}
+	c.Entries[i].Enabled = true
+	if got, ok := c.Match(seq); !ok || got.ID != "R14" {
+		t.Errorf("enabled R14: got (%q, %v), want R14", got.ID, ok)
+	}
+}
+
+func TestR14ParentDefectFlagsALetteredTicketWhoseParentItsIDDoesNotAllow(t *testing.T) {
+	p := func(s string) *string { return &s }
+	tests := []struct {
+		name   string
+		id     string
+		parent *string
+		want   string
+	}{
+		{"lettered, parent missing", "02a", nil, "02"},
+		{"numbered fork, parent missing", "06b1", nil, "06b"},
+		{"lettered, parent empty", "02a", p(""), "02"},
+		{"parent of another number", "02a", p("03"), "02"},
+		{"parent is itself", "02a", p("02a"), "02"},
+		{"parent skips a level", "06b1", p("06"), "06b"},
+		{"parent under another letter", "06b1", p("06a"), "06b"},
+		{"parent is a later fork", "27a1", p("27a3"), "27a"},
+		{"parent is a sibling letter", "02b", p("02a"), "02"},
+		{"lettered, ID parent", "02a", p("02"), ""},
+		{"parent padded differently", "02a", p("2"), ""},
+		{"numbered fork, ID parent", "06b1", p("06b"), ""},
+		{"numbered fork of an earlier sibling", "27a3", p("27a1"), ""},
+		{"upper-case ID", "02A", p("02"), ""},
+		{"bare number, no parent", "02", nil, ""},
+		{"bare number with a parent", "02", p("01"), ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want, defect := ParentDefect(tt.id, tt.parent)
+			if defect != (tt.want != "") || want != tt.want {
+				t.Errorf("ParentDefect(%q) = (%q, %v), want %q", tt.id, want, defect, tt.want)
+			}
+		})
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")

@@ -57,6 +57,9 @@ const (
 	Submitted         Type = "submitted"
 	SubmitRefused     Type = "submit-refused"
 	Deadlocked        Type = "deadlocked"
+	// TicketGraphDefect is a ticket file whose graph fields contradict its ID,
+	// found by a scan of the epic's issue files rather than by a run.
+	TicketGraphDefect Type = "ticket-graph-defect"
 	RecoveryMatched   Type = "recovery-matched"
 	RecoveryApplied   Type = "recovery-applied"
 	RecoveryProposed  Type = "recovery-proposed"
@@ -103,6 +106,9 @@ const (
 	// LandConflict is a land whose cherry-pick conflicted and whose
 	// conflict-resolution child could not resolve it.
 	LandConflict Kind = "land-conflict"
+	// ParentDefect is a lettered ticket whose parent is missing or is not an
+	// ancestor its ID allows.
+	ParentDefect Kind = "parent-defect"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -119,7 +125,7 @@ var kinds = map[Kind]bool{
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
-	LandConflict: true,
+	LandConflict: true, ParentDefect: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes
@@ -171,6 +177,7 @@ var kindRequired = map[Type]bool{
 	LaunchFailed:      true,
 	SubmitRefused:     true,
 	Deadlocked:        true,
+	TicketGraphDefect: true,
 	RecoveryMatched:   true,
 	RecoveryApplied:   true,
 	RecoveryProposed:  true,
