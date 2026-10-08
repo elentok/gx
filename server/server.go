@@ -161,6 +161,10 @@ func New(cfg Config) (*Server, error) {
 			lock.release()
 			return nil, fmt.Errorf("create scratch project: %w", err)
 		}
+		if err := pruneScratchWorkspace(cfg.TicketStore); err != nil {
+			lock.release()
+			return nil, fmt.Errorf("prune scratch workspace: %w", err)
+		}
 	}
 	events := newBroker(cfg.SubscriberBuffer)
 	idx, err := buildIndex(cfg.TicketStore, events)

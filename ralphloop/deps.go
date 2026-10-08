@@ -49,6 +49,9 @@ type Deps struct {
 	// resumed Run can call it again for a worktree a prior invocation already
 	// created.
 	AddWorktree func(repoDir, path, branch, base string) error
+	// AddDetachedWorktree creates a worktree at path with a detached HEAD at
+	// ref, for a commitless ticket that must not leave a branch behind.
+	AddDetachedWorktree func(repoDir, path, ref string) error
 	// RemoveWorktree removes the git worktree checked out at path.
 	RemoveWorktree func(repoDir, path string, force bool) error
 	// DeleteBranch force-deletes an iteration's now-redundant branch once its
@@ -222,6 +225,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		FindWorkspace:         herdr.FindWorkspace,
 		WorktreeDir:           worktreeDir,
 		AddWorktree:           addWorktree,
+		AddDetachedWorktree:   addDetachedWorktree,
 		RemoveWorktree:        removeWorktree,
 		DeleteBranch:          deleteBranch,
 		RenameBranch:          renameBranch,
@@ -668,6 +672,15 @@ func addWorktree(repoDir, path, branch, base string) error {
 		return git.AddWorktreeOnBranch(*repo, branch, path)
 	}
 	return git.AddWorktree(*repo, branch, path, base)
+}
+
+// addDetachedWorktree implements Deps.AddDetachedWorktree against the real git package.
+func addDetachedWorktree(repoDir, path, ref string) error {
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	return git.AddDetachedWorktree(*repo, path, ref)
 }
 
 // removeWorktree implements Deps.RemoveWorktree against the real git package.

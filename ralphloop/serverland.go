@@ -49,6 +49,9 @@ type IterationWorktree struct {
 	base            string
 	featureWorktree string
 	worktreeDir     string
+	// keep marks a plain directory (a commitless scratch one-off) that is not a
+	// git worktree and so is never removed when the ticket ends.
+	keep bool
 }
 
 // worktreeLock serializes git worktree add/remove per process, as Run's

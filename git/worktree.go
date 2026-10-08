@@ -94,6 +94,16 @@ func AddWorktree(repo Repo, newName, newPath, fromRef string) error {
 	return err
 }
 
+// AddDetachedWorktree creates a linked worktree at newPath with a detached HEAD
+// at ref, so no branch is created and nothing is left behind to delete.
+func AddDetachedWorktree(repo Repo, newPath, ref string) error {
+	if err := excludeWorktreeDir(repo); err != nil {
+		return err
+	}
+	_, _, err := run(repo.Root, []string{"worktree", "add", "--detach", newPath, ref})
+	return err
+}
+
 // AddWorktreeOnBranch creates a linked worktree at newPath attached to the
 // existing local branch branch (no -b, no new branch created) — the
 // resume-after-park counterpart to AddWorktree's always-fresh-branch

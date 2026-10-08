@@ -278,7 +278,16 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 	if one.Ticket.Path == "" {
 		return one, ralphloop.IterationWorktree{}, errors.New("ticket gone")
 	}
-	wt, err := ralphloop.ResumeIteration(ralphloop.DefaultDeps(), one, t.Base)
+	var wt ralphloop.IterationWorktree
+	if commitlessOneOff(addr.Project, one.Ticket) {
+		scratchDir := ""
+		if addr.Project == ScratchProject {
+			scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
+		}
+		wt, err = ralphloop.ResumeCommitless(ralphloop.DefaultDeps(), one, scratchDir)
+	} else {
+		wt, err = ralphloop.ResumeIteration(ralphloop.DefaultDeps(), one, t.Base)
+	}
 	if err != nil {
 		return one, wt, err
 	}
