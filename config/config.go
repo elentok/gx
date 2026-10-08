@@ -64,8 +64,17 @@ type Config struct {
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
 	// Orchestrator is the temporary switch between the in-process ralph-loop
 	// and the orchestrator server. Global only: never a per-project key.
-	Orchestrator string       `json:"orchestrator"`
-	Server       ServerConfig `json:"server"`
+	Orchestrator string         `json:"orchestrator"`
+	Server       ServerConfig   `json:"server"`
+	Recovery     RecoveryConfig `json:"recovery"`
+}
+
+// RecoveryConfig controls the recovery catalog.
+type RecoveryConfig struct {
+	// Enabled is the global kill switch.
+	Enabled bool `json:"enabled"`
+	// Disabled lists catalog entry IDs to switch off.
+	Disabled []string `json:"disabled,omitempty"`
 }
 
 // ServerConfig configures the orchestrator server.
@@ -101,6 +110,7 @@ func Default() Config {
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
 		Orchestrator:          OrchestratorInProcess,
+		Recovery:              RecoveryConfig{Enabled: true},
 	}
 }
 
@@ -185,6 +195,10 @@ func Load() (Config, error) {
 			TabEnv        []string `json:"tab-env"`
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
 		} `json:"server"`
+		Recovery *struct {
+			Enabled  *bool    `json:"enabled"`
+			Disabled []string `json:"disabled"`
+		} `json:"recovery"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse config %s: %w", path, err)
@@ -295,6 +309,14 @@ func Load() (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv
+	}
+	if raw.Recovery != nil {
+		if raw.Recovery.Enabled != nil {
+			cfg.Recovery.Enabled = *raw.Recovery.Enabled
+		}
+		if raw.Recovery.Disabled != nil {
+			cfg.Recovery.Disabled = raw.Recovery.Disabled
+		}
 	}
 	if raw.Orchestrator != nil {
 		switch *raw.Orchestrator {
