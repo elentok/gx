@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -167,6 +169,41 @@ func recordLiveSession(d Deps, label, ticketPath string) string {
 	return agent.AgentSession
 }
 
+// landDeferCap bounds how long landBuilt waits out a held land lock before it
+// gives up and lets the caller park the ticket.
+const landDeferCap = 30 * time.Minute
+
+// WaitIterationFinished blocks until the agent in pane has really finished its
+// turn, the way the in-process loop does: a first idle/done is debounced, and
+// an outstanding backgrounded shell command in the transcript keeps holding.
+// Without this a long test run in the background reads as a finish, and the
+// ticket is parked zero-commit before the agent commits.
+func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, pane string) error {
+	until := []string{"idle", "done"}
+	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Pane: pane, SessionCwd: w.Path, Sink: noopEventSink{}}
+	elapsedMs := 0
+	for {
+		if _, err := d.AgentWait(herdr.AgentWaitOptions{Target: pane, Until: until}); err != nil {
+			return err
+		}
+		confirmed, err := confirmFinished(d, pane, until)
+		if err != nil {
+			return fmt.Errorf("confirming %s finished: %w", w.Label, err)
+		}
+		if !confirmed {
+			continue
+		}
+		sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
+		confirmed, err = waitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
+		if err != nil {
+			return err
+		}
+		if confirmed {
+			return nil
+		}
+	}
+}
+
 // landBuilt lands a built iteration that was waiting on the land queue.
 func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 	lp := landQueueParams{
@@ -176,6 +213,17 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 		SmartZone: p.SmartZone, Gate: p.Gate, Sink: p.Sink,
 	}
 	r := landOne(d, lp, built.job)
+	// A held land lock is routine (another landing, a person's conflict
+	// resolution), so retry as runLandQueue does instead of failing the finish.
+	logged := false
+	for waited := time.Duration(0); r.landDeferred && waited < landDeferCap; waited += landDeferRetryInterval {
+		if !logged {
+			logged = true
+			logLandDeferred(p)
+		}
+		d.Sleep(landDeferRetryInterval)
+		r = landOne(d, lp, built.job)
+	}
 	switch {
 	case r.err != nil:
 		return r.err

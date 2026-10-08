@@ -667,6 +667,9 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	var bodies []string
 	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(b), "server started") { // the start notice is not a park message
+			return
+		}
 		mu.Lock()
 		bodies = append(bodies, string(b))
 		mu.Unlock()

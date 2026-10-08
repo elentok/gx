@@ -410,7 +410,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, one ralphloop.OneI
 	defer s.kickRunner()
 	defer s.registry.delete(ticketAddr)
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: run.Pane, Until: []string{"idle", "done"}})
+	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Pane)
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next server.
