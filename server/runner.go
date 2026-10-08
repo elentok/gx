@@ -378,7 +378,7 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	ref, err = rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
+	ref, err = s.rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -399,9 +399,20 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	return ref, ref + "@" + sha, leaf, nil
 }
 
+// landingOnLanded reports whether the project uses the on-landed landing policy.
+// An unreadable project file falls back to the default policy.
+func (s *Server) landingOnLanded(project string) bool {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return true
+	}
+	pf, _ := config.ReadProjectFile(dir)
+	return pf.LandingPolicy() == config.LandingOnLanded
+}
+
 // rootBaseRef is the branch a root's feature branch starts from and lands back onto.
-func rootBaseRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
-	ref, err := tickets.DeriveRootBase(project, epics, epic, t)
+func (s *Server) rootBaseRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
+	ref, err := tickets.DeriveRootBase(project, epics, epic, t, s.landingOnLanded(project))
 	if err != nil {
 		return "", err
 	}
@@ -517,7 +528,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 // landRoot fast-forwards the root's target to its feature branch through the
 // merge core. A non-empty reason means the root must park, not land.
 func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, err error) {
-	target, err := rootBaseRef(project, epics, one.Epic, one.Ticket, repoDir)
+	target, err := s.rootBaseRef(project, epics, one.Epic, one.Ticket, repoDir)
 	if err != nil {
 		return "", err
 	}

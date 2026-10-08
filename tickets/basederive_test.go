@@ -46,6 +46,18 @@ func baseEpics(blockerStatus string) []Epic {
 	}
 }
 
+func TestDeriveRootBase_OnLandedIsAlwaysTrunk(t *testing.T) {
+	e := baseEpics("open")
+	got, err := DeriveRootBase("p", e, "b", e[1].Tickets[0], true)
+	if err != nil || got != "" {
+		t.Errorf("got (%q, %v), want trunk", got, err)
+	}
+	e[1].Base = "release/1.0"
+	if got, _ := DeriveRootBase("p", e, "b", e[1].Tickets[0], true); got != "release/1.0" {
+		t.Errorf("explicit base lost: %q", got)
+	}
+}
+
 func TestDeriveRootBase(t *testing.T) {
 	for name, tc := range map[string]struct {
 		epics   []Epic
@@ -86,7 +98,7 @@ func TestDeriveRootBase(t *testing.T) {
 		}(), want: "release/1.0"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, err := DeriveRootBase("p", tc.epics, "b", tc.epics[1].Tickets[0])
+			got, err := DeriveRootBase("p", tc.epics, "b", tc.epics[1].Tickets[0], false)
 			if (err != nil) != tc.wantErr || got != tc.want {
 				t.Errorf("got (%q, %v), want (%q, err=%v)", got, err, tc.want, tc.wantErr)
 			}

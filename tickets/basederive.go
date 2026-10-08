@@ -14,8 +14,10 @@ import (
 // and anything that is not a node ref is a raw branch. Otherwise the base is
 // the one unlanded commitful blocker's feature branch, or trunk when there is
 // none. Two or more unlanded blockers are ambiguous; see the leaf tickets for
-// parking that.
-func DeriveRootBase(project string, epics []Epic, epic string, t Ticket) (string, error) {
+// parking that. Under the on-landed landing policy (onLanded) a blocker
+// releases its dependents only once it has landed, so a derived base is always
+// trunk; only an explicit base: can point elsewhere.
+func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLanded bool) (string, error) {
 	g := newProjectGraph(project, epics)
 	var e Epic
 	for _, c := range epics {
@@ -29,6 +31,9 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket) (string
 			return base, nil
 		}
 		return unlandedBranch(g, key), nil
+	}
+	if onLanded {
+		return "", nil
 	}
 	var branches []string
 	for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {

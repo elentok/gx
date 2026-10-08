@@ -56,6 +56,18 @@ type ProjectFile struct {
 	} `json:"execution-queue"`
 }
 
+// LandingOnLanded is the landing policy where a blocker releases its dependents
+// once it has landed on trunk. It is the default.
+const LandingOnLanded = "on-landed"
+
+// LandingPolicy is the project's landing policy; absent or empty means the default.
+func (pf ProjectFile) LandingPolicy() string {
+	if pf.Landing == nil || *pf.Landing == "" {
+		return LandingOnLanded
+	}
+	return *pf.Landing
+}
+
 // VCSNone is the project.json vcs value for a project with no repository.
 const VCSNone = "none"
 
