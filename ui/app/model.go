@@ -68,7 +68,6 @@ type Model struct {
 var loadQueueStore = ticketsui.LoadQueueStore
 
 func New(repo git.Repo, settings Settings) Model {
-	ticketsui.ConfigureMaxConcurrentEpics(settings.MaxConcurrentEpics())
 	ticketsui.SetBudgetConfig(settings.Budget)
 	ticketsui.SetNotificationsConfig(settings.Notifications)
 	m := Model{

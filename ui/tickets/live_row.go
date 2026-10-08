@@ -17,7 +17,7 @@ import (
 // liveTicketState is a ticket's in-memory-only orchestrator state — which
 // iteration is running/paused and why — layered on top of its on-disk
 // Status: line (ticket 01 keeps ticket status itself on disk; only this
-// lives in the registry's run snapshot). A ticket absent from Model.live has
+// comes from the server's ticket snapshot). A ticket absent from Model.live has
 // had no snapshot touch it yet, so its row falls back to ticket 03's
 // disk-only rendering unchanged.
 type liveTicketState struct {
@@ -30,8 +30,8 @@ type liveTicketState struct {
 	// waitingOn is the conflict-resolution child a landing ticket waits on;
 	// when set it replaces the phase text.
 	waitingOn string
-	// startedAt is this ticket's own start time (RunTicketSnapshot.StartedAt),
-	// stamped when its iteration begins, so elapsed time keeps climbing across
+	// startedAt is this ticket's own start time, stamped when its iteration
+	// begins, so elapsed time keeps climbing across
 	// a pause/resume instead of resetting, and doesn't conflate two tickets in
 	// the same run. Zero if the ticket hasn't started.
 	startedAt time.Time

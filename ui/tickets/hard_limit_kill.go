@@ -22,12 +22,6 @@ func budgetHardLimitKilledText(total, limit float64) string {
 	return fmt.Sprintf("Budget alert: session spend ($%.2f) has crossed the hard limit ($%.2f) — every live iteration was stopped", total, limit)
 }
 
-// budgetHardPauseConfirmPrompt is the "p" key's confirm-dialog copy while a
-// hard-limit pause is active.
-func budgetHardPauseConfirmPrompt(spend, limit float64) string {
-	return fmt.Sprintf("Budget hard limit reached (spend $%.2f / limit $%.2f). Override and resume the queue?", spend, limit)
-}
-
 // checkBudgetHardLimit is called from tick() right after checkBudgetSoftLimit,
 // mirroring checkBudgetSoftLimit's latch-until-cleared shape (ticket 06) but
 // killing every live iteration across every running epic the moment it trips
@@ -45,21 +39,16 @@ func (a *costAggregator) checkBudgetHardLimit(total float64, snapshot []epicCost
 		return
 	}
 
-	// Pause before killing to close the race window where a new
-	// epic/iteration could start during the kill's grace period.
-	ralphLoopRegistry.pauseHardLimit()
 	killLiveIterations(snapshot)
 	_, _ = sendBudgetNotificationFn(notificationsConfig, ralphloop.BudgetHardLimitKilled, budgetHardLimitKilledText(total, limit))
 }
 
 // overrideHardLimit accepts the operator's confirm-dialog override of an
-// active hard-limit trip, exposed via OverrideHardLimitPause. It only
-// un-pauses new starts — already-stopped iterations are never relaunched.
+// active hard-limit trip. Already-stopped iterations are never relaunched.
 func (a *costAggregator) overrideHardLimit() {
 	a.mu.Lock()
 	a.hardLimitLatch.override(a.total)
 	a.mu.Unlock()
-	ralphLoopRegistry.resumeHardLimit()
 }
 
 // killLiveIterations calls ticket 07's stop-and-repair seam once per live

@@ -10,8 +10,8 @@ import (
 )
 
 // syncServerRunState derives the Queue tab's running state from the server's
-// ticket snapshot: in server mode no in-process run registers with
-// ralphLoopRegistry, so a claimed ticket is the only sign that an epic runs.
+// ticket snapshot: no run happens in-process, so a claimed ticket is the
+// only sign that an epic runs.
 // It fills runningEpics and live so the header, row spinners and timers behave
 // as they do for an in-process run, and returns the spinner tick when the tab
 // goes from idle to running. A ticket's timer counts from the server's claim

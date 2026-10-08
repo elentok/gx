@@ -32,8 +32,16 @@ func resetSoftLimitState(t *testing.T) {
 	})
 }
 
+// oneRunningEpic is the tick input the soft/hard-limit tests share: one epic
+// with one running Claude ticket.
+func oneRunningEpic() []epicCostSnapshot {
+	return []epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket("", "", ralphloop.AgentClaude),
+	})}
+}
+
 func TestCheckBudgetSoftLimit_TripsExactlyOnce(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withBudgetSoftLimit(t, 10.0, nil)
 	sent := captureBudgetNotifications(t)
 
@@ -42,27 +50,15 @@ func TestCheckBudgetSoftLimit_TripsExactlyOnce(t *testing.T) {
 		func(scratchDir, epicName string) (float64, map[string]float64, error) { return landed, map[string]float64{}, nil },
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
+	snap := oneRunningEpic()
 
-	costAgg.tick() // baseline == 0, spend == 0, no trip
-
-	if r.isSoftLimitPaused() {
-		t.Fatal("expected no soft-limit pause before crossing the limit")
+	costAgg.tick(snap) // baseline == 0, spend == 0, no trip
+	if len(*sent) != 0 {
+		t.Fatalf("sent before crossing the limit = %v, want none", *sent)
 	}
 
 	landed = 12.0
-	costAgg.tick() // spend == 12, crosses $10
-
-	if !r.isSoftLimitPaused() {
-		t.Fatal("expected soft-limit pause after crossing the limit")
-	}
-	if _, ok := r.tryStart("epic-b", 0, 5, t.TempDir()); ok {
-		t.Fatal("tryStart(epic-b): want refused while soft-limit paused")
-	}
+	costAgg.tick(snap) // spend == 12, crosses $10
 	if len(*sent) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 message", *sent)
 	}
@@ -72,83 +68,33 @@ func TestCheckBudgetSoftLimit_TripsExactlyOnce(t *testing.T) {
 
 	// A further tick still over the limit sends no second notification.
 	landed = 14.0
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*sent) != 1 {
 		t.Fatalf("sent after a second over-limit tick = %v, want still exactly 1", *sent)
 	}
 }
 
-func TestCheckBudgetSoftLimit_IndependentFromManualPause(t *testing.T) {
-	r := startTestRegistry(t)
-	withBudgetSoftLimit(t, 10.0, nil)
-	captureBudgetNotifications(t)
-
-	landed := 0.0
-	withStubbedCostReads(t,
-		func(scratchDir, epicName string) (float64, map[string]float64, error) { return landed, map[string]float64{}, nil },
-		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
-	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-	costAgg.tick() // baseline == 0
-	landed = 12.0
-	costAgg.tick() // spend == 12, crosses $10
-	if !r.isSoftLimitPaused() {
-		t.Fatal("expected soft-limit pause to be tripped")
-	}
-
-	r.pause() // manual pause
-	if !r.isPaused() || !r.isSoftLimitPaused() {
-		t.Fatal("expected both pauses to be set")
-	}
-
-	r.resume() // manual resume must not clear the soft-limit pause
-	if r.isPaused() {
-		t.Fatal("expected manual resume to clear the manual pause")
-	}
-	if !r.isSoftLimitPaused() {
-		t.Fatal("expected manual resume to leave the soft-limit pause untouched")
-	}
-
-	r.pause()
-	costAgg.overrideSoftLimit() // override must not clear the manual pause
-	if r.isSoftLimitPaused() {
-		t.Fatal("expected override to clear the soft-limit pause")
-	}
-	if !r.isPaused() {
-		t.Fatal("expected override to leave the manual pause untouched")
-	}
-}
-
 func TestCheckBudgetSoftLimit_LatchDoesNotSelfClear(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withBudgetSoftLimit(t, 10.0, nil)
-	captureBudgetNotifications(t)
+	sent := captureBudgetNotifications(t)
 
 	landed := 0.0
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) { return landed, map[string]float64{}, nil },
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-	costAgg.tick() // baseline == 0
+	snap := oneRunningEpic()
+	costAgg.tick(snap) // baseline == 0
 	landed = 12.0
-	costAgg.tick() // spend == 12, crosses $10
-	if !r.isSoftLimitPaused() {
-		t.Fatal("expected soft-limit pause to be tripped")
-	}
+	costAgg.tick(snap) // spend == 12, crosses $10
 
 	landed = 0.0 // spend now reported back under the limit
-	costAgg.tick()
-	if !r.isSoftLimitPaused() {
-		t.Fatal("expected the latch to stay tripped when spend drops back under the limit")
+	costAgg.tick(snap)
+	landed = 12.0 // and back over it: a self-cleared latch would re-trip here
+	costAgg.tick(snap)
+	if len(*sent) != 1 {
+		t.Fatalf("sent = %v, want exactly 1 (latch stays tripped when spend dips under the limit)", *sent)
 	}
 }
 
@@ -163,7 +109,7 @@ func TestCheckBudgetSoftLimit_OverrideRearms(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := startTestRegistry(t)
+			resetCostAgg(t)
 			withBudgetSoftLimit(t, 10.0, tc.thresholds)
 			allSent := captureBudgetNotifications(t)
 			sent := func() []string {
@@ -181,41 +127,24 @@ func TestCheckBudgetSoftLimit_OverrideRearms(t *testing.T) {
 				func(scratchDir, epicName string) (float64, map[string]float64, error) { return landed, map[string]float64{}, nil },
 				func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 			)
-			if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-				t.Fatal("tryStart(epic-a): want success")
-			}
-			t.Cleanup(func() { r.finish("epic-a", nil) })
-			startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-			costAgg.tick() // baseline == 0
+			snap := oneRunningEpic()
+			costAgg.tick(snap) // baseline == 0
 			landed = 12.0
-			costAgg.tick() // spend == 12, trips at $10
+			costAgg.tick(snap) // spend == 12, trips at $10
 			if len(sent()) != 1 {
 				t.Fatalf("sent before override = %v, want exactly 1", sent())
 			}
 
 			costAgg.overrideSoftLimit() // override point == 12, re-arm == 12 + 1.0 == 13
-			if r.isSoftLimitPaused() {
-				t.Fatal("expected override to clear the pause")
-			}
-			if _, ok := r.tryStart("epic-b", 0, 5, t.TempDir()); !ok {
-				t.Fatal("tryStart(epic-b) after override: want success")
-			}
-			t.Cleanup(func() { r.finish("epic-b", nil) })
 
 			landed = 12.5 // still below the $13 re-arm point
-			costAgg.tick()
-			if r.isSoftLimitPaused() {
-				t.Fatal("expected no re-trip below the re-arm point")
-			}
+			costAgg.tick(snap)
 			if len(sent()) != 1 {
 				t.Fatalf("sent while still below re-arm = %v, want still exactly 1", sent())
 			}
 
 			landed = 13.5 // climbs past the $13 re-arm point
-			costAgg.tick()
-			if !r.isSoftLimitPaused() {
-				t.Fatal("expected a fresh trip once spend climbs past the re-arm point")
-			}
+			costAgg.tick(snap)
 			if len(sent()) != 2 {
 				t.Fatalf("sent after climbing past the re-arm point = %v, want exactly 2", sent())
 			}

@@ -22,7 +22,7 @@ func budgetThresholdCrossedText(total, threshold float64) string {
 // collapses to a single notification naming the current total and the
 // highest threshold just crossed. budgetHighWaterMark is the in-memory dedup
 // state: once a threshold has fired, it never re-fires while spend stays
-// above it, and only resets on reattach (costAggregator.start/stop).
+// above it, and only resets on reattach (costAggregator.reset).
 func (a *costAggregator) checkBudgetThresholds(total float64) {
 	thresholds := append([]float64(nil), budgetConfig.NotificationThresholds...)
 	if len(thresholds) == 0 {

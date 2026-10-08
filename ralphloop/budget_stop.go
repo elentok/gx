@@ -14,12 +14,12 @@ import (
 // budget hard-limit kill (ticket 08) calls into: stop this iteration's agent,
 // then mark its ticket needs-repair. It is the only place that writes a
 // ticket's terminal status as part of a budget kill — a caller outside
-// ralphloop (the Queue tab's registry) triggers it but never writes ticket
+// ralphloop (the Queue tab's cost aggregator) triggers it but never writes ticket
 // frontmatter itself, avoiding a race with ralphloop's own land-time writes
 // to the same file.
 //
-// paneID/tabID identify the running iteration (see ui/tickets.RunTicketSnapshot,
-// populated from ticket 02's IterationStarted plumbing). The graceful stop
+// paneID/tabID identify the running iteration, populated from ticket 02's
+// IterationStarted plumbing. The graceful stop
 // signal (ctrl+c) is sent to paneID, then — after grace elapses — the pane is
 // closed unconditionally: a quiet-after-signal pane is not distinguishable
 // from a naturally-finished one by any signal available here, so every

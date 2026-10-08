@@ -13,9 +13,7 @@ import (
 )
 
 // reattachFindWorkspace/reattachTabList are package-level so tests can swap
-// in fakes (see ralphLoopRegistry for the same swap-and-restore pattern
-// elsewhere in this package) instead of cmdReattachScan shelling out to a
-// real herdr process.
+// in fakes instead of cmdReattachScan shelling out to a real herdr process.
 var (
 	reattachFindWorkspace = herdr.FindWorkspace
 	reattachTabList       = herdr.TabList
@@ -76,9 +74,8 @@ func (m Model) cmdReattachScan() tea.Cmd {
 // cmdReattachScan it is not gated by reattachScanOnce and is safe to call on
 // every OnPageActivated: it's how a notification opened by
 // handleReattachSignals eventually clears once the session it points at is
-// no longer live, without needing loopRegistry.reduceLiveEvent to ever fire
-// (ticket 04's fix, preserved — see handleReattachRescan). A no-op (nil cmd)
-// once nothing is pending.
+// no longer live (see handleReattachRescan). A no-op (nil cmd) once nothing
+// is pending.
 func (m Model) cmdReattachRescan() tea.Cmd {
 	if len(m.reattachPending) == 0 {
 		return nil
@@ -101,10 +98,8 @@ func (m Model) cmdReattachRescan() tea.Cmd {
 // persistent (notify.KindProgress) notification, keyed so a ticket already
 // signaled doesn't duplicate, and records it in m.reattachPending so a later
 // cmdReattachRescan can tell when it's safe to clear (handleReattachRescan).
-// KindProgress alone would leave the notification stuck forever if
-// loopRegistry.reduceLiveEvent's Close never fires (e.g. an epic with no
-// active run) — cmdReattachRescan is the self-clearing half that doesn't
-// depend on it, restoring ticket 04's guarantee alongside ticket 12's
+// KindProgress alone would leave the notification stuck forever —
+// cmdReattachRescan is the self-clearing half, alongside ticket 12's
 // persist-until-cleared requirement. This is detect-only: no ticket state is
 // touched and nothing is auto-resumed or auto-navigated to, matching
 // ScanForReattachable's own contract — resuming happens only via the Queue
@@ -156,9 +151,8 @@ func (m Model) handleReattachRescan(msg reattachRescanMsg) (tea.Model, tea.Cmd) 
 
 // reattachNotifyID is the notification id for a signaled ticket's
 // "recoverable session detected" notification — shared by
-// handleReattachSignals (which opens it) and loopRegistry.reduceLiveEvent
-// (which closes it early once that ticket's session is actually reattached
-// or resumed), so the two ends can never drift out of sync.
+// handleReattachSignals (which opens it) and handleReattachRescan (which
+// closes it), so the two ends can never drift out of sync.
 func reattachNotifyID(epicName, identifier string) string {
 	return "reattach-scan-" + epicName + "-" + identifier
 }

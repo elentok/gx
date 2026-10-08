@@ -29,7 +29,7 @@ func withBudgetThresholds(t *testing.T, thresholds []float64) {
 }
 
 func TestCostAggregatorTick_JumpsPastMultipleThresholds_SendsOneMessageNamingHighest(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withBudgetThresholds(t, []float64{5, 10, 15})
 	sent := captureBudgetNotifications(t)
 
@@ -38,18 +38,16 @@ func TestCostAggregatorTick_JumpsPastMultipleThresholds_SendsOneMessageNamingHig
 		func(scratchDir, epicName string) (float64, map[string]float64, error) { return landed, map[string]float64{}, nil },
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
+	snap := []epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket("", "", ralphloop.AgentClaude),
+	})}
 
 	// First tick baselines the epic at landed=0 with nothing in-flight, so
 	// LiveSpend is 0 on this tick — bump landed further on tick 2 so the sum
 	// actually crosses thresholds.
-	costAgg.tick()
+	costAgg.tick(snap)
 	landed = 12.0
-	costAgg.tick()
+	costAgg.tick(snap)
 
 	if len(*sent) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 message", *sent)
@@ -59,14 +57,14 @@ func TestCostAggregatorTick_JumpsPastMultipleThresholds_SendsOneMessageNamingHig
 	}
 
 	// Spend stays above $10 (still below $15) on the next tick: no renotify.
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*sent) != 1 {
 		t.Fatalf("sent after steady-above-threshold tick = %v, want still exactly 1", *sent)
 	}
 
 	// Climbing past $15 fires exactly one more message naming $15.
 	landed = 18.0
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*sent) != 2 {
 		t.Fatalf("sent after climbing past $15 = %v, want exactly 2", *sent)
 	}
@@ -76,7 +74,7 @@ func TestCostAggregatorTick_JumpsPastMultipleThresholds_SendsOneMessageNamingHig
 }
 
 func TestCostAggregatorTick_ReattachResetsHighWaterMark_RenotifiesOnlyAfterClimbingBackPastThreshold(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withBudgetThresholds(t, []float64{10})
 	sent := captureBudgetNotifications(t)
 
@@ -85,36 +83,26 @@ func TestCostAggregatorTick_ReattachResetsHighWaterMark_RenotifiesOnlyAfterClimb
 		func(scratchDir, epicName string) (float64, map[string]float64, error) { return landed, map[string]float64{}, nil },
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	costAgg.tick() // baseline == 12, LiveSpend == 0, no crossing yet
+	snap := []epicCostSnapshot{costEpic("epic-a", nil)}
+	costAgg.tick(snap) // baseline == 12, LiveSpend == 0, no crossing yet
 	landed = 24.0
-	costAgg.tick() // spend == 12, crosses $10 -> notifies once
+	costAgg.tick(snap) // spend == 12, crosses $10 -> notifies once
 	if len(*sent) != 1 {
 		t.Fatalf("sent before reattach = %v, want exactly 1", *sent)
 	}
 
-	// Reattach: stop resets the aggregator (including the high-water-mark),
-	// start's fresh baseline means the next tick's spend is 0 again even
+	// Reattach: reset clears the aggregator (including the high-water-mark),
+	// so the fresh baseline means the next tick's spend is 0 again even
 	// though the epic is still running and still over $10 in absolute terms.
-	r.finish("epic-a", nil)
-	costAgg.stop()
-	costAgg.start()
-	t.Cleanup(costAgg.stop)
+	costAgg.reset()
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a) after reattach: want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-
-	costAgg.tick() // fresh baseline == 24, LiveSpend == 0 again, no renotify
+	costAgg.tick(snap) // fresh baseline == 24, LiveSpend == 0 again, no renotify
 	if len(*sent) != 1 {
 		t.Fatalf("sent right after reattach = %v, want still exactly 1", *sent)
 	}
 
 	landed = 36.0 // post-reattach spend climbs back past $10
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*sent) != 2 {
 		t.Fatalf("sent after post-reattach climb past threshold = %v, want exactly 2", *sent)
 	}

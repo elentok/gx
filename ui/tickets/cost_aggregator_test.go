@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/transcript"
@@ -24,31 +23,25 @@ func withStubbedCostReads(t *testing.T, epicFn func(scratchDir, epicName string)
 	})
 }
 
-// startTestRegistry installs a fresh registry as the package-level singleton
-// (the seam every other loop_registry test uses) and returns it.
-func startTestRegistry(t *testing.T) *loopRegistry {
+// resetCostAgg starts the test from a clean aggregator and leaves a clean one
+// behind, since costAgg is a package-level singleton.
+func resetCostAgg(t *testing.T) {
 	t.Helper()
-	r := newLoopRegistry(4)
-	previous := ralphLoopRegistry
-	ralphLoopRegistry = r
-	t.Cleanup(func() { ralphLoopRegistry = previous })
-	return r
+	costAgg.reset()
+	t.Cleanup(costAgg.reset)
 }
 
-func startRunningTicket(t *testing.T, r *loopRegistry, epicName, identifier, cwd, sessionID string, agent ralphloop.AgentKind) {
-	t.Helper()
-	r.reduceLiveEvent(epicName, ralphloop.LiveEvent{
-		Kind:       ralphloop.LiveEventIterationStarted,
-		Identifier: identifier,
-		Label:      identifier,
-		Cwd:        cwd,
-		SessionID:  sessionID,
-		AgentKind:  agent,
-	})
+// costEpic builds one epic's tick input; tickets maps identifier to ticket.
+func costEpic(epicName string, tickets map[string]costTicketSnapshot) epicCostSnapshot {
+	return epicCostSnapshot{EpicName: epicName, ScratchDir: "/scratch", Tickets: tickets}
+}
+
+func runningTicket(cwd, sessionID string, agent ralphloop.AgentKind) costTicketSnapshot {
+	return costTicketSnapshot{Running: true, Cwd: cwd, SessionID: sessionID, Agent: agent}
 }
 
 func TestCostAggregatorTickBaselinesEpicOnFirstObservation(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
 			return 4.0, map[string]float64{}, nil
@@ -56,12 +49,7 @@ func TestCostAggregatorTickBaselinesEpicOnFirstObservation(t *testing.T) {
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-
-	costAgg.tick()
+	costAgg.tick([]epicCostSnapshot{costEpic("epic-a", nil)})
 
 	if got := LiveSpend(); got != 0 {
 		t.Fatalf("LiveSpend() = %v after baselining tick, want 0 (baseline == current landed cost)", got)
@@ -73,7 +61,7 @@ func TestCostAggregatorTickBaselinesEpicOnFirstObservation(t *testing.T) {
 
 func TestCostAggregatorTickSumsLandedSinceBaselinePlusInFlight(t *testing.T) {
 	// not parallel-safe: writeFakeTranscript sets the process HOME env var
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	landed := 4.0
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
@@ -86,16 +74,13 @@ func TestCostAggregatorTickSumsLandedSinceBaselinePlusInFlight(t *testing.T) {
 	sessionID := "sess-1"
 	writeFakeTranscript(t, cwd, sessionID)
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", cwd, sessionID, ralphloop.AgentClaude)
-
-	costAgg.tick() // baseline == 4.0
+	snap := []epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket(cwd, sessionID, ralphloop.AgentClaude),
+	})}
+	costAgg.tick(snap) // baseline == 4.0
 
 	landed = 6.0 // epic-wide landed cost rose by $2 since baseline
-	costAgg.tick()
+	costAgg.tick(snap)
 
 	want := (6.0 - 4.0) + 1.5
 	if got := LiveSpend(); got != want {
@@ -107,7 +92,7 @@ func TestCostAggregatorTickSumsLandedSinceBaselinePlusInFlight(t *testing.T) {
 }
 
 func TestCostAggregatorRelaunchWithinSessionKeepsOriginalBaseline(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	landed := 4.0
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
@@ -116,27 +101,16 @@ func TestCostAggregatorRelaunchWithinSessionKeepsOriginalBaseline(t *testing.T) 
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
 
-	dir := t.TempDir()
-	// A second epic holds the attach lock across epic-a's finish/relaunch so
-	// the Attach session (and the aggregator's baselines) never resets — the
-	// scenario this test is about.
-	if _, ok := r.tryStart("epic-keepalive", 0, 1, dir); !ok {
-		t.Fatal("tryStart(epic-keepalive): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-keepalive", nil) })
-
-	if _, ok := r.tryStart("epic-a", 0, 5, dir); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	costAgg.tick() // baseline == 4.0
-	r.finish("epic-a", nil)
+	// A second epic keeps the Attach session (and the aggregator's
+	// baselines) alive across epic-a's finish/relaunch — the scenario this
+	// test is about.
+	keepalive := costEpic("epic-keepalive", nil)
+	costAgg.tick([]epicCostSnapshot{keepalive, costEpic("epic-a", nil)}) // baseline == 4.0
+	costAgg.tick([]epicCostSnapshot{keepalive})                          // epic-a finished
 
 	landed = 5.0 // epic finished this tick's iteration, landed cost rose $1
-	if _, ok := r.tryStart("epic-a", 0, 5, dir); !ok {
-		t.Fatal("relaunch tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	costAgg.tick()
+
+	costAgg.tick([]epicCostSnapshot{keepalive, costEpic("epic-a", nil)}) // relaunched
 
 	want := 5.0 - 4.0 // baseline stayed at the original 4.0, not reset to 5.0
 	if got := LiveSpendByEpic()["epic-a"]; got != want {
@@ -145,7 +119,7 @@ func TestCostAggregatorRelaunchWithinSessionKeepsOriginalBaseline(t *testing.T) 
 }
 
 func TestCostAggregatorDoesNotDoubleCountLandedTicketAsInFlight(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	inFlightCalls := 0
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
@@ -157,13 +131,9 @@ func TestCostAggregatorDoesNotDoubleCountLandedTicketAsInFlight(t *testing.T) {
 		},
 	)
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "/repo", "sess-1", ralphloop.AgentClaude)
-
-	costAgg.tick()
+	costAgg.tick([]epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket("/repo", "sess-1", ralphloop.AgentClaude),
+	})})
 
 	if inFlightCalls != 0 {
 		t.Fatalf("sessionCostFn called %d times for a ticket whose landed cost is already nonzero, want 0", inFlightCalls)
@@ -171,7 +141,7 @@ func TestCostAggregatorDoesNotDoubleCountLandedTicketAsInFlight(t *testing.T) {
 }
 
 func TestCostAggregatorExcludesCodexFromTotalAndCountsUnpriced(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
 			return 0, map[string]float64{}, nil
@@ -182,13 +152,9 @@ func TestCostAggregatorExcludesCodexFromTotalAndCountsUnpriced(t *testing.T) {
 		},
 	)
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "/repo", "sess-1", ralphloop.AgentCodex)
-
-	costAgg.tick()
+	costAgg.tick([]epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket("/repo", "sess-1", ralphloop.AgentCodex),
+	})})
 
 	if got := LiveSpend(); got != 0 {
 		t.Fatalf("LiveSpend() = %v with only a Codex iteration running, want 0", got)
@@ -199,7 +165,7 @@ func TestCostAggregatorExcludesCodexFromTotalAndCountsUnpriced(t *testing.T) {
 }
 
 func TestCostAggregatorClaudeIterationDoesNotCountAsUnpriced(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
 			return 0, map[string]float64{}, nil
@@ -207,13 +173,9 @@ func TestCostAggregatorClaudeIterationDoesNotCountAsUnpriced(t *testing.T) {
 		func(cwd, sessionID string) (float64, bool, error) { return 1.0, true, nil },
 	)
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "/repo", "sess-1", ralphloop.AgentClaude)
-
-	costAgg.tick()
+	costAgg.tick([]epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket("/repo", "sess-1", ralphloop.AgentClaude),
+	})})
 
 	if got := UnpricedRunningCount(); got != 0 {
 		t.Fatalf("UnpricedRunningCount() = %d for a running Claude iteration, want 0", got)
@@ -222,7 +184,7 @@ func TestCostAggregatorClaudeIterationDoesNotCountAsUnpriced(t *testing.T) {
 
 func TestCostAggregatorMtimeUnchangedSkipsReparse(t *testing.T) {
 	// not parallel-safe: writeFakeTranscript sets the process HOME env var
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	calls := 0
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
@@ -238,14 +200,11 @@ func TestCostAggregatorMtimeUnchangedSkipsReparse(t *testing.T) {
 	sessionID := "sess-mtime"
 	writeFakeTranscript(t, cwd, sessionID)
 
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", cwd, sessionID, ralphloop.AgentClaude)
-
-	costAgg.tick()
-	costAgg.tick()
+	snap := []epicCostSnapshot{costEpic("epic-a", map[string]costTicketSnapshot{
+		"01": runningTicket(cwd, sessionID, ralphloop.AgentClaude),
+	})}
+	costAgg.tick(snap)
+	costAgg.tick(snap)
 
 	if calls != 1 {
 		t.Fatalf("sessionCostFn called %d times across two ticks with an unchanged transcript mtime, want 1", calls)
@@ -253,7 +212,7 @@ func TestCostAggregatorMtimeUnchangedSkipsReparse(t *testing.T) {
 }
 
 func TestCostAggregatorFailingReadContributesZeroWithoutAffectingOtherEpics(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withStubbedCostReads(t,
 		func(scratchDir, epicName string) (float64, map[string]float64, error) {
 			if epicName == "epic-fail" {
@@ -264,63 +223,13 @@ func TestCostAggregatorFailingReadContributesZeroWithoutAffectingOtherEpics(t *t
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
 
-	if _, ok := r.tryStart("epic-fail", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-fail): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-fail", nil) })
-	if _, ok := r.tryStart("epic-ok", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-ok): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-ok", nil) })
-
-	costAgg.tick()
+	costAgg.tick([]epicCostSnapshot{costEpic("epic-fail", nil), costEpic("epic-ok", nil)})
 
 	if got := LiveSpendByEpic()["epic-fail"]; got != 0 {
 		t.Fatalf("LiveSpendByEpic()[epic-fail] = %v after a failed load, want 0", got)
 	}
 	if got := LiveSpendByEpic()["epic-ok"]; got != 0 {
 		t.Fatalf("LiveSpendByEpic()[epic-ok] = %v, want 0 (baselined on this same tick)", got)
-	}
-}
-
-func TestCostAggregatorPollerStartsAndStopsWithAttachTransitions(t *testing.T) {
-	// not parallel-safe: reassigns the package-level ralphLoopRegistry
-	r := startTestRegistry(t)
-	withStubbedCostReads(t,
-		func(scratchDir, epicName string) (float64, map[string]float64, error) {
-			return 0, map[string]float64{}, nil
-		},
-		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
-	)
-
-	costAgg.mu.Lock()
-	costAgg.tickInterval = time.Millisecond
-	costAgg.mu.Unlock()
-
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-
-	costAgg.mu.Lock()
-	running := costAgg.running
-	doneCh := costAgg.doneCh
-	costAgg.mu.Unlock()
-	if !running {
-		t.Fatal("costAgg.running = false after the zero-to-one attach transition, want true")
-	}
-
-	r.finish("epic-a", nil)
-
-	costAgg.mu.Lock()
-	stillRunning := costAgg.running
-	costAgg.mu.Unlock()
-	if stillRunning {
-		t.Fatal("costAgg.running = true after the one-to-zero attach transition, want false")
-	}
-	select {
-	case <-doneCh:
-	default:
-		t.Fatal("poller goroutine's doneCh not closed after finish returned, want the goroutine to have exited")
 	}
 }
 

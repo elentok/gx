@@ -10,9 +10,8 @@ import (
 	"strings"
 )
 
-// attachLockFileName is the per-repo attach lock (see loopRegistry's
-// attachCount/attachScratchDir): at most one gx process, repo-wide, may be
-// Attached to the Queue (actively driving epic runs out of it) at a time.
+// attachLockFileName is the per-repo attach lock: at most one gx process,
+// repo-wide, may be Attached to the Queue (actively driving epic runs out of it) at a time.
 const attachLockFileName = "queue-attach.json"
 
 type attachLockInfo struct {

@@ -48,7 +48,7 @@ func (l *budgetLimitLatch) override(total float64) {
 }
 
 // reset clears the latch back to its zero value, for reattach (see
-// costAggregator.start/stop).
+// costAggregator.reset).
 func (l *budgetLimitLatch) reset() {
 	*l = budgetLimitLatch{}
 }

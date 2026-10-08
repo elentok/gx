@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/transcript"
 )
@@ -17,7 +18,41 @@ var (
 	sessionCostFn     = ralphloop.SessionCost
 )
 
-const defaultTickInterval = 30 * time.Second
+// budgetConfig is process-wide and write-once, loaded from config at
+// startup — there is no hot-reload, matching every other config section in
+// the codebase.
+var budgetConfig config.BudgetConfig
+
+func SetBudgetConfig(cfg config.BudgetConfig) {
+	budgetConfig = cfg
+}
+
+// notificationsConfig is process-wide and write-once like budgetConfig —
+// budget notifications sum across every running epic, so they use this
+// shared config rather than any one epic's own chat wiring.
+var notificationsConfig config.NotificationsConfig
+
+func SetNotificationsConfig(cfg config.NotificationsConfig) {
+	notificationsConfig = cfg
+}
+
+// epicCostSnapshot is one running epic's state as the cost aggregator needs
+// it: enough to load the epic's on-disk landed costs and locate each running
+// ticket's live session.
+type epicCostSnapshot struct {
+	EpicName   string
+	ScratchDir string
+	Tickets    map[string]costTicketSnapshot
+}
+
+type costTicketSnapshot struct {
+	Running   bool
+	Agent     ralphloop.AgentKind
+	Cwd       string
+	SessionID string
+	PaneID    string
+	TabID     string
+}
 
 // transcriptCacheKey identifies one Claude session's transcript. Codex never
 // reaches this cache — sessionCostFn is only called for Claude tickets, see
@@ -32,14 +67,10 @@ type transcriptCacheEntry struct {
 }
 
 // costAggregator computes the estimated API-equivalent dollar spend across
-// every epic running under the current Attach session, polled on a fixed
-// interval for the poller's lifetime (see ticket 04's "What to build"). All
-// figures it produces are estimated, not literal billed dollars.
+// every epic running under the current Attach session. All figures it
+// produces are estimated, not literal billed dollars.
 type costAggregator struct {
-	mu      sync.Mutex
-	stopCh  chan struct{}
-	doneCh  chan struct{}
-	running bool
+	mu sync.Mutex
 
 	total    float64
 	perEpic  map[string]float64
@@ -49,10 +80,9 @@ type costAggregator struct {
 	// had any failed epic-load or transcript read, reset on a clean tick.
 	consecutiveMisses int
 
-	// baselines lives for the whole poller lifetime, not per epicRun, so an
-	// epic that finishes and relaunches within the same Attach session keeps
-	// its original baseline (epicRun itself is deleted from loopRegistry.runs
-	// on finish, then recreated fresh on relaunch).
+	// baselines lives until the next reset, not per run, so an epic that
+	// finishes and relaunches within the same Attach session keeps its
+	// original baseline.
 	baselines       map[string]float64
 	transcriptCache map[transcriptCacheKey]transcriptCacheEntry
 
@@ -70,26 +100,9 @@ type costAggregator struct {
 	// 08) — a separate latch so an override of one limit never affects the
 	// other.
 	hardLimitLatch budgetLimitLatch
-
-	// tickInterval is a field, not a hardcoded const in the ticker call, so
-	// tests can inject a short interval instead of waiting out a real 30s.
-	tickInterval time.Duration
 }
 
-var costAgg = &costAggregator{tickInterval: defaultTickInterval}
-
-// startCostAggregator starts costAgg's poller goroutine if it isn't already
-// running, called from tryStart at the attach zero-to-one transition.
-func startCostAggregator() {
-	costAgg.start()
-}
-
-// stopCostAggregator stops costAgg's poller goroutine and blocks until it has
-// fully exited, called from finish at the attach one-to-zero transition so a
-// caller like a test can rely on it being gone once finish returns.
-func stopCostAggregator() {
-	costAgg.stop()
-}
+var costAgg = &costAggregator{}
 
 // LiveSpend returns the current Attach session's estimated API-equivalent
 // cost, summed across every running epic's (landed-since-baseline +
@@ -111,76 +124,9 @@ func UnpricedRunningCount() int {
 	return costAgg.unpricedRunningCount()
 }
 
-// OverrideSoftLimitPause accepts the operator's confirm-dialog override of an
-// active soft-limit pause, mirroring LiveSpend's package-function wrapper
-// shape over costAgg.
-func OverrideSoftLimitPause() {
-	costAgg.overrideSoftLimit()
-}
-
-// OverrideHardLimitPause accepts the operator's confirm-dialog override of an
-// active hard-limit pause, mirroring OverrideSoftLimitPause.
-func OverrideHardLimitPause() {
-	costAgg.overrideHardLimit()
-}
-
-func (a *costAggregator) start() {
-	a.mu.Lock()
-	if a.running {
-		a.mu.Unlock()
-		return
-	}
-	a.running = true
-	a.total = 0
-	a.perEpic = map[string]float64{}
-	a.unpriced = 0
-	a.consecutiveMisses = 0
-	a.baselines = map[string]float64{}
-	a.transcriptCache = map[transcriptCacheKey]transcriptCacheEntry{}
-	a.budgetHighWaterMark = 0
-	a.softLimitLatch.reset()
-	a.hardLimitLatch.reset()
-	a.stopCh = make(chan struct{})
-	a.doneCh = make(chan struct{})
-	interval := a.tickInterval
-	if interval <= 0 {
-		interval = defaultTickInterval
-	}
-	stopCh := a.stopCh
-	doneCh := a.doneCh
-	a.mu.Unlock()
-
-	go func() {
-		defer close(doneCh)
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-stopCh:
-				return
-			case <-ticker.C:
-				a.tick()
-			}
-		}
-	}()
-}
-
-func (a *costAggregator) stop() {
-	a.mu.Lock()
-	if !a.running {
-		a.mu.Unlock()
-		return
-	}
-	a.running = false
-	stopCh := a.stopCh
-	doneCh := a.doneCh
-	a.mu.Unlock()
-
-	close(stopCh)
-	<-doneCh
-
-	// Reset so a later Attach session in the same process starts clean —
-	// baselines/transcriptCache are scoped to one poller lifetime.
+// reset clears every per-session figure, baseline, cache and latch, so a
+// later Attach session in the same process starts clean.
+func (a *costAggregator) reset() {
 	a.mu.Lock()
 	a.total = 0
 	a.perEpic = map[string]float64{}
@@ -216,13 +162,8 @@ func (a *costAggregator) unpricedRunningCount() int {
 
 // tick runs one aggregation pass: for every running epic, baseline it on
 // first observation, then sum (landed-since-baseline + in-flight) across
-// epics into the cached total/perEpic/unpriced getters. Reads the registry's
-// running-epic state in one locked snapshot up front, then does its own
-// (unlocked, potentially slow) disk I/O against that copy — see
-// loopRegistry.costSnapshot.
-func (a *costAggregator) tick() {
-	snapshot := ralphLoopRegistry.costSnapshot()
-
+// epics into the cached total/perEpic/unpriced getters.
+func (a *costAggregator) tick(snapshot []epicCostSnapshot) {
 	a.mu.Lock()
 	baselines := a.baselines
 	perEpic := make(map[string]float64, len(snapshot))

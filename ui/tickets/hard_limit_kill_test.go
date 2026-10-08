@@ -67,7 +67,7 @@ func captureStoppedIterations(t *testing.T) *[]tickets.Ticket {
 }
 
 func TestCheckBudgetHardLimit_KillsEveryLiveIterationOnce(t *testing.T) {
-	r := startTestRegistry(t)
+	resetCostAgg(t)
 	withBudgetHardLimit(t, 10.0, nil)
 	sentNotifications := captureBudgetNotifications(t)
 	stopped := captureStoppedIterations(t)
@@ -80,26 +80,21 @@ func TestCheckBudgetHardLimit_KillsEveryLiveIterationOnce(t *testing.T) {
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
 	scratchDir := t.TempDir()
-	if _, ok := r.tryStart("epic-a", 0, 5, scratchDir); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
 	writeHardLimitTicket(t, scratchDir, "epic-a", "01")
 	writeHardLimitTicket(t, scratchDir, "epic-a", "02")
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-	startRunningTicket(t, r, "epic-a", "02", "", "", ralphloop.AgentCodex)
+	snap := []epicCostSnapshot{{EpicName: "epic-a", ScratchDir: scratchDir, Tickets: map[string]costTicketSnapshot{
+		"01": runningTicket("", "", ralphloop.AgentClaude),
+		"02": runningTicket("", "", ralphloop.AgentCodex),
+	}}}
 
-	costAgg.tick() // baseline == 0, no trip
+	costAgg.tick(snap) // baseline == 0, no trip
 	if len(*stopped) != 0 {
 		t.Fatalf("stopped before crossing the limit = %v, want none", *stopped)
 	}
 
 	landed = 12.0
-	costAgg.tick() // spend == 12, crosses $10
+	costAgg.tick(snap) // spend == 12, crosses $10
 
-	if !r.isHardLimitPaused() {
-		t.Fatal("expected hard-limit pause after crossing the limit")
-	}
 	if len(*stopped) != 2 {
 		t.Fatalf("stopped = %v, want exactly 2 (including the Codex iteration)", *stopped)
 	}
@@ -110,7 +105,7 @@ func TestCheckBudgetHardLimit_KillsEveryLiveIterationOnce(t *testing.T) {
 	// A further tick still over the limit stops nothing new and sends no
 	// second notification.
 	landed = 14.0
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*stopped) != 2 {
 		t.Fatalf("stopped after a second over-limit tick = %v, want still exactly 2", *stopped)
 	}
@@ -119,41 +114,8 @@ func TestCheckBudgetHardLimit_KillsEveryLiveIterationOnce(t *testing.T) {
 	}
 }
 
-func TestCheckBudgetHardLimit_RefusesNewStartsDuringAndAfterKill(t *testing.T) {
-	r := startTestRegistry(t)
-	withBudgetHardLimit(t, 10.0, nil)
-	captureBudgetNotifications(t)
-	captureStoppedIterations(t)
-
-	landed := 0.0
-	withStubbedCostReads(t,
-		func(scratchDir, epicName string) (float64, map[string]float64, error) {
-			return landed, map[string]float64{}, nil
-		},
-		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
-	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-	costAgg.tick()
-	landed = 12.0
-	costAgg.tick()
-
-	if _, ok := r.tryStart("epic-b", 0, 5, t.TempDir()); ok {
-		t.Fatal("tryStart(epic-b): want refused while hard-limit paused")
-	}
-
-	landed = 14.0
-	costAgg.tick() // still over the limit, well after the kill completed
-	if _, ok := r.tryStart("epic-b", 0, 5, t.TempDir()); ok {
-		t.Fatal("tryStart(epic-b): want still refused after the kill")
-	}
-}
-
-func TestCheckBudgetHardLimit_OverridePermitsNewStartsWithoutReinvokingSeam(t *testing.T) {
-	r := startTestRegistry(t)
+func TestCheckBudgetHardLimit_OverrideDoesNotReinvokeSeam(t *testing.T) {
+	resetCostAgg(t)
 	withBudgetHardLimit(t, 10.0, nil)
 	captureBudgetNotifications(t)
 	stopped := captureStoppedIterations(t)
@@ -166,80 +128,27 @@ func TestCheckBudgetHardLimit_OverridePermitsNewStartsWithoutReinvokingSeam(t *t
 		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
 	)
 	scratchDir := t.TempDir()
-	if _, ok := r.tryStart("epic-a", 0, 5, scratchDir); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
 	writeHardLimitTicket(t, scratchDir, "epic-a", "01")
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-	costAgg.tick()
+	snap := []epicCostSnapshot{{EpicName: "epic-a", ScratchDir: scratchDir, Tickets: map[string]costTicketSnapshot{
+		"01": runningTicket("", "", ralphloop.AgentClaude),
+	}}}
+	costAgg.tick(snap)
 	landed = 12.0
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*stopped) != 1 {
 		t.Fatalf("stopped = %v, want exactly 1", *stopped)
 	}
 
 	costAgg.overrideHardLimit()
-	if r.isHardLimitPaused() {
-		t.Fatal("expected override to clear the hard-limit pause")
-	}
-	if _, ok := r.tryStart("epic-b", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-b) after override: want success")
-	}
-	t.Cleanup(func() { r.finish("epic-b", nil) })
 
-	// The already-stopped epic-a iteration is still marked Running in the
-	// registry snapshot (killLiveIterations doesn't clear it — that's the
-	// seam's job via the real TabClose path); a later tick while still
-	// below the re-arm point must not re-invoke the seam on it again.
+	// The already-stopped iteration is still marked Running in the snapshot
+	// (killLiveIterations doesn't clear it — that's the seam's job via the
+	// real TabClose path); a later tick while still below the re-arm point
+	// must not re-invoke the seam on it again.
 	landed = 12.5
-	costAgg.tick()
+	costAgg.tick(snap)
 	if len(*stopped) != 1 {
 		t.Fatalf("stopped after override, below re-arm = %v, want still exactly 1", *stopped)
 	}
 }
 
-func TestCheckBudgetHardLimit_IndependentFromSoftLimitAndManualPause(t *testing.T) {
-	r := startTestRegistry(t)
-	previous := budgetConfig
-	SetBudgetConfig(config.BudgetConfig{SoftLimit: 5.0, HardLimit: 10.0})
-	t.Cleanup(func() { SetBudgetConfig(previous) })
-	resetSoftLimitState(t)
-	costAgg.mu.Lock()
-	costAgg.hardLimitLatch.reset()
-	costAgg.mu.Unlock()
-	captureBudgetNotifications(t)
-	captureStoppedIterations(t)
-
-	landed := 0.0
-	withStubbedCostReads(t,
-		func(scratchDir, epicName string) (float64, map[string]float64, error) {
-			return landed, map[string]float64{}, nil
-		},
-		func(cwd, sessionID string) (float64, bool, error) { return 0, false, nil },
-	)
-	if _, ok := r.tryStart("epic-a", 0, 5, t.TempDir()); !ok {
-		t.Fatal("tryStart(epic-a): want success")
-	}
-	t.Cleanup(func() { r.finish("epic-a", nil) })
-	startRunningTicket(t, r, "epic-a", "01", "", "", ralphloop.AgentClaude)
-	costAgg.tick()
-
-	landed = 12.0
-	costAgg.tick() // crosses both soft ($5) and hard ($10)
-	if !r.isSoftLimitPaused() || !r.isHardLimitPaused() {
-		t.Fatal("expected both soft and hard limit pauses to be set")
-	}
-
-	r.pause()
-	costAgg.overrideHardLimit() // must not clear the soft-limit or manual pause
-	if !r.isSoftLimitPaused() {
-		t.Fatal("expected hard-limit override to leave the soft-limit pause untouched")
-	}
-	if !r.isPaused() {
-		t.Fatal("expected hard-limit override to leave the manual pause untouched")
-	}
-	if r.isHardLimitPaused() {
-		t.Fatal("expected hard-limit override to clear the hard-limit pause")
-	}
-}
