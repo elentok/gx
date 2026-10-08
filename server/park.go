@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -19,6 +20,7 @@ func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath 
 	}
 	s.events.publish(EventTicketParked, addr.String())
 	s.notifyPark(addr, ticketPath, kind, reason)
+	s.recoverAsync(recovery.Failure{Address: addr.String(), Type: kind.ParkType(), Kind: kind, Reason: reason})
 	return nil
 }
 

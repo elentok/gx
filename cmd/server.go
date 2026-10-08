@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
@@ -146,6 +147,7 @@ func runServer(ctx context.Context) error {
 	}
 	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, Orchestrator: cfg.Orchestrator, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
 		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
+		Recovery:                  recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
 		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
 		StoreCommitDebounce:       time.Duration(cfg.TicketStore.CommitDebounce) * time.Second, StorePushRemote: cfg.TicketStore.PushRemote,
 		Chat: ralphloop.ServerChatConfig{

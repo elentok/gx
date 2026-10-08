@@ -77,6 +77,10 @@ type QueueRequest struct {
 	Front bool `json:"front,omitempty"`
 	// Text is what a nudge types into the live pane.
 	Text string `json:"text,omitempty"`
+
+	// actor is set only by the server's own recovery calls, never decoded from a
+	// client: a park made by recovery must not trigger recovery again.
+	actor string
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a

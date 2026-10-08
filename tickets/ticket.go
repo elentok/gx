@@ -66,6 +66,9 @@ type Ticket struct {
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool
 
+	// NoRecover mirrors schema.Ticket.NoRecover.
+	NoRecover bool
+
 	// Unique mirrors schema.Ticket.Unique.
 	Unique string
 

@@ -212,6 +212,9 @@ type Ticket struct {
 	// Notify asks the server to send the ticket's ## Result to chat when it
 	// lands; parks notify regardless. Set by a one-off submit's --notify.
 	Notify bool
+	// NoRecover is `recover: false` in the frontmatter: the server's recovery
+	// never acts on this ticket. Stored inverted so the zero value recovers.
+	NoRecover bool
 	// Unique is a one-off submit's dedupe key: a submit in the same project with
 	// the same key is refused while this ticket is not done or cancelled.
 	Unique string

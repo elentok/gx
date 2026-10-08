@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/subscription"
 )
@@ -77,6 +78,10 @@ type Config struct {
 	// Orchestrator is config.Orchestrator. Queue writes are refused unless it
 	// is "server": the in-process loop owns claiming otherwise.
 	Orchestrator string
+
+	// Recovery is the catalog with the user's kill switch and disables applied.
+	// The zero value is off.
+	Recovery recovery.Catalog
 
 	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
 	// which runs only when Orchestrator is "server". A zero debounce means 60s.

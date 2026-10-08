@@ -42,6 +42,8 @@ type Entry struct {
 	// Verbs are the remedy verbs the entry may apply.
 	Verbs   []string `json:"verbs"`
 	Enabled bool     `json:"enabled"`
+	// Remedy is the Go fix of a rule entry; nil for agent entries.
+	Remedy Remedy `json:"-"`
 }
 
 // Catalog is the set of entries plus the global kill switch.
