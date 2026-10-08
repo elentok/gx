@@ -107,14 +107,27 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, gateStatePath
 // Park notifies that a person must look at a ticket the server could not land.
 // Every message starts with the project name: one server notifies for many.
 // override is the project's own notification block, nil to use the global one.
-func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, ticketPath, identifier, status, reason string) {
+func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, ticketPath, identifier, status, reason string, counts EpicCounts) {
 	if c == nil {
 		return
 	}
 	for _, s := range c.projectSinks(override) {
-		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, reason, EpicCounts{})
+		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, reason, counts)
 		prefix := s.style.chatStyle.Escape(fmt.Sprintf("[%s] ", project))
 		s.send(chatmarkup.Join(chatmarkup.Text{}, []chatmarkup.Text{prefix, body}), notifyKindTicketNeedsHuman, ticketPath, identifier)
+	}
+}
+
+// EpicComplete tells the project's destinations that every ticket of epic
+// landed and the epic's branch went onto its target.
+func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts EpicCounts, elapsedSeconds int, totalCost float64) {
+	if c == nil {
+		return
+	}
+	for _, s := range c.projectSinks(override) {
+		body := s.style.epicCompleteText(project+"/"+epic, counts, counts.Done, elapsedSeconds, totalCost)
+		prefix := s.style.chatStyle.Escape(fmt.Sprintf("[%s] ", project))
+		s.send(chatmarkup.Join(chatmarkup.Text{}, []chatmarkup.Text{prefix, body}), notifyKindEpicComplete, epicSource(project+"/"+epic), "")
 	}
 }
 

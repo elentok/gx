@@ -475,7 +475,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			s.events.publish(EventRootParked, root.String())
 			s.log.Warn("root parked", "root", root, "reason", reason)
 			if s.chat != nil {
-				s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason)
+				s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
 			}
 			return
 		}
@@ -485,6 +485,10 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			s.events.publish(EventQueueChanged, root.String())
 		}
 		s.events.publish(EventRootCompleted, root.String())
+		if s.chat != nil {
+			elapsed, cost := ralphloop.EpicTotals(e)
+			s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, ralphloop.CountsOf(e), elapsed, cost)
+		}
 	}
 }
 

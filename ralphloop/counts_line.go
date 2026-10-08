@@ -138,3 +138,16 @@ func joinParkedIdentifiers(identifiers []string) string {
 	shown := strings.Join(identifiers[:parkedIdentifierCap], ", ")
 	return fmt.Sprintf("%s, +%d more", shown, len(identifiers)-parkedIdentifierCap)
 }
+
+// CountsOf tallies a whole epic the way the chat messages show it.
+func CountsOf(e tickets.Epic) EpicCounts { return RunScope{wholeEpic: true}.Counts(e) }
+
+// EpicTotals is the epic's summed landing time (seconds) and cost, for the
+// "epic complete" message of a run that did not time it itself.
+func EpicTotals(e tickets.Epic) (elapsedSeconds int, cost float64) {
+	for _, t := range e.Tickets {
+		elapsedSeconds += t.ElapsedTime
+		cost += t.ActualCost
+	}
+	return elapsedSeconds, cost
+}

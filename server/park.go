@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
@@ -32,5 +33,33 @@ func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events
 		s.holdPark(addr, status, kind, reason)
 		return
 	}
-	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, fmt.Sprintf("%s: %s", kind, reason))
+	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, fmt.Sprintf("%s: %s", kind, reason), s.epicCounts(addr.Project, addr.Epic))
+}
+
+// epicCounts tallies the epic from disk, fresh: a park has just rewritten a
+// ticket, so the scanned view may not have it yet. Zero when the epic cannot be read.
+func (s *Server) epicCounts(project, epic string) ralphloop.EpicCounts {
+	e, ok := s.freshEpic(project, epic)
+	if !ok {
+		return ralphloop.EpicCounts{}
+	}
+	return ralphloop.CountsOf(e)
+}
+
+// freshEpic loads one epic straight from its project's directory.
+func (s *Server) freshEpic(project, epic string) (tickets.Epic, bool) {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return tickets.Epic{}, false
+	}
+	epics, err := tickets.Load(dir)
+	if err != nil {
+		return tickets.Epic{}, false
+	}
+	for _, e := range epics {
+		if filepath.Base(e.Path) == epic {
+			return e, true
+		}
+	}
+	return tickets.Epic{}, false
 }
