@@ -57,7 +57,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	log := s.ticketEvents(ref, f)
 	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
-	acts := entry.Runnable(f) || entry.Proposable(f) || entry.Executor == recovery.ExecutorPerson
+	acts := entry.Runnable(f) || entry.Proposable(f) || entry.Executor == recovery.ExecutorPerson || entry.Executor == recovery.ExecutorRecognize
 	if (!matched && f.NeedsMatch()) || (!plan.needsJudgment() && !acts) {
 		return recoveryPlan{}, false
 	}
@@ -94,10 +94,16 @@ func (s *Server) recoverAsync(f recovery.Failure) {
 
 // recoverFrom runs the planned recovery through the server's own verbs.
 // Failures to record are logged, never fatal: recovery is best effort on top
-// of a park that stands. A failed remedy releases the held park message
-// naming the entry; a successful one drops it.
+// of a park that stands. A failed remedy, or an ok one that leaves the ticket
+// parked, releases the held park message naming the entry; otherwise it is
+// dropped.
 func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 	ref, entry := plan.ref, plan.entry
+	// Recognizing remedies nothing, so the guard rail has nothing to stop.
+	if plan.matched && entry.Executor == recovery.ExecutorRecognize {
+		s.recordRecovery(ref, events.RecoveryMatched, f, entry.ID, "")
+		return
+	}
 	if why := guardRailStop(plan.log, f); why != "" {
 		s.recordRecovery(ref, events.RecoveryEscalated, f, why, "")
 		return
@@ -130,9 +136,17 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 	if !s.parkHold.take(f.Address) {
 		return
 	}
-	if outcome != "ok" {
+	note := ""
+	switch {
+	case outcome != "ok":
+		note = fmt.Sprintf("recovery %s failed: %s", entry.ID, outcome)
+	case s.stillParked(f.Address):
+		// R5 and R7 end ok once their nudge is typed, which unparks nothing.
+		note = fmt.Sprintf("recovery %s left it parked", entry.ID)
+	}
+	if note != "" {
 		s.parkHold.escalate(f.Address)
-		s.notifyPark(ref.addr, ref.ticket.Path, f.Kind, fmt.Sprintf("%s (recovery %s failed: %s)", f.Reason, entry.ID, outcome))
+		s.notifyPark(ref.addr, ref.ticket.Path, f.Kind, fmt.Sprintf("%s (%s)", f.Reason, note))
 	}
 	// A --wait on the ticket reads the hold, so it must hear the hold end.
 	s.events.publish(EventTicketChanged, f.Address)
@@ -158,6 +172,19 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 	})
 	go s.recoverFrom(plan, f)
 	return true
+}
+
+// stillParked re-reads the ticket: a remedy's verbs may have moved it on.
+func (s *Server) stillParked(address string) bool {
+	ref, ok, err := s.findTicket(address)
+	if err != nil || !ok {
+		return false
+	}
+	switch schema.Status(ref.ticket.Status) {
+	case schema.StatusNeedsRepair, schema.StatusNeedsAnswer:
+		return true
+	}
+	return false
 }
 
 // recoveredCount is how many remedies in the epic's run log ended ok.

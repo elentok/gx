@@ -85,10 +85,18 @@ func TestDefaultR1MatchesOnlyTheSpinningPark(t *testing.T) {
 	}
 }
 
-func TestDefaultR1IsAnEnabledLowRuleThatNeverNudges(t *testing.T) {
+func TestDefaultR1IsEnabledAndOnlyRecognizesTheSpin(t *testing.T) {
 	e, _ := Default().Match([]Event{{Type: events.NeedsRepair, Kind: events.Spinning}})
-	if !e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityLow || len(e.Verbs) != 0 {
-		t.Errorf("R1 = %+v, want enabled low rule with no verbs", e)
+	if !e.Enabled || e.Executor != ExecutorRecognize || len(e.Verbs) != 0 || e.Remedy != nil {
+		t.Errorf("R1 = %+v, want enabled recognize-only with no verbs or remedy", e)
+	}
+}
+
+func TestDefaultNoEntryRunsARemedyItDoesNotOwn(t *testing.T) {
+	for _, e := range Default().Entries {
+		if (e.Remedy != nil) != (e.Executor == ExecutorRule) {
+			t.Errorf("%s: executor %s with remedy %v; only rule entries carry a remedy", e.ID, e.Executor, e.Remedy != nil)
+		}
 	}
 }
 
@@ -481,7 +489,7 @@ func TestR6MatchesAParkedLaunchCollisionOfTheSameKind(t *testing.T) {
 	}
 }
 
-func TestDefaultR8LaunchesEnabledAsANoOpRule(t *testing.T) {
+func TestDefaultR8LaunchesEnabledAsRecognizeOnly(t *testing.T) {
 	var r8 []Entry
 	for _, e := range Default().Entries {
 		if e.ID == "R8" {
@@ -492,11 +500,8 @@ func TestDefaultR8LaunchesEnabledAsANoOpRule(t *testing.T) {
 		t.Fatalf("R8 entries = %v, want one", r8)
 	}
 	e := r8[0]
-	if !e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityLow || len(e.Verbs) != 0 || e.Remedy == nil {
-		t.Fatalf("R8 = %+v, want enabled low rule with no verbs", e)
-	}
-	if err := e.Remedy(Failure{}, nil); err != nil {
-		t.Errorf("R8 remedy = %v, want a no-op", err)
+	if !e.Enabled || e.Executor != ExecutorRecognize || len(e.Verbs) != 0 || e.Remedy != nil || e.Runnable(Failure{Type: events.NeedsRepair}) {
+		t.Fatalf("R8 = %+v, want enabled recognize-only with no verbs or remedy", e)
 	}
 }
 

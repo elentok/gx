@@ -13,7 +13,10 @@ Each catalog entry carries an authority level, and the level decides who acts:
 | `low`, `medium` | applied unattended, by a recovery rule or an investigate ticket |
 | `high` | nobody unattended: recovery writes a `## Proposed Remedy` and escalates; a person runs it with `gx server tickets approve` (key `A`) |
 
-An entry with `executor: person` only escalates, whatever its authority. `high` is for remedies that
+An entry with `executor: person` only escalates, whatever its authority. An entry with `executor:
+recognize` is only recorded as matched: the park and its message stand, and it never counts as
+recovered. A rule remedy that ends ok but leaves the ticket parked releases the park message too.
+`high` is for remedies that
 can lose work or hide a real failure, such as marking a ticket commitless-done or clearing it back
 to `open`.
 

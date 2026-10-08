@@ -133,7 +133,7 @@ func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
-			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.Spinning) && ev.Reason == "R1" && ev.Outcome == "ok" {
+			if events.Type(ev.Type) == events.RecoveryMatched && ev.Kind == string(events.Spinning) && ev.Reason == "R1" {
 				return true
 			}
 		}
@@ -142,7 +142,7 @@ func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
 	log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 	for _, ev := range log {
 		switch events.Type(ev.Type) {
-		case events.RecoveryEscalated, events.RecoveryProposed, events.Reclaimed:
+		case events.RecoveryApplied, events.RecoveryEscalated, events.RecoveryProposed, events.Reclaimed:
 			t.Errorf("unexpected %s after a spinning park", ev.Type)
 		}
 	}

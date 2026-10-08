@@ -22,6 +22,9 @@ const (
 	ExecutorAgent Executor = "agent"
 	// ExecutorPerson entries only escalate: neither a rule nor an agent may act.
 	ExecutorPerson Executor = "person"
+	// ExecutorRecognize entries are matched and recorded, nothing more: the park
+	// and its message stand, and a match never counts as recovered.
+	ExecutorRecognize Executor = "recognize"
 )
 
 type Authority string
@@ -235,14 +238,12 @@ var rateLimitResetsRE = regexp.MustCompile(`^(rate limit detected|Codex \S+ quot
 // r8RateLimitPause is healthy waiting, not a failure: gx already blocks the
 // iteration until the reset and logs resumed. It is catalogued only so recovery
 // recognizes a deliberately idle pane and never nudges it, which is also why a
-// pause never triggers recovery and the remedy does nothing. Launches enabled:
-// S0 emits the pause it matches.
+// pause never triggers recovery. Launches enabled: S0 emits the pause it matches.
 func r8RateLimitPause() Entry {
 	return Entry{
 		ID: "R8", Type: events.PausedRateLimit,
 		Predicate: func(seq []Event) bool { return rateLimitResetsRE.MatchString(seq[len(seq)-1].Reason) },
-		Executor:  ExecutorRule, Authority: AuthorityLow, Enabled: true,
-		Remedy: func(Failure, Verbs) error { return nil },
+		Executor:  ExecutorRecognize, Authority: AuthorityLow, Enabled: true,
 	}
 }
 
@@ -448,14 +449,13 @@ func r7CompactionTimedOut() Entry {
 }
 
 // r1Spin records a park/re-claim spin. The S0 spinning park already carries
-// the count and window, so there is no predicate; the remedy does nothing
-// because a nudge would only join the spin and the park already holds it.
-// Launches enabled: S0 emits the event it matches.
+// the count and window, so there is no predicate; it only recognizes the spin
+// because a nudge would only join it and the park already holds it. A person
+// still hears of the park. Launches enabled: S0 emits the event it matches.
 func r1Spin() Entry {
 	return Entry{
 		ID: "R1", Type: events.NeedsRepair, Kind: events.Spinning,
-		Executor: ExecutorRule, Authority: AuthorityLow, Enabled: true,
-		Remedy: func(Failure, Verbs) error { return nil },
+		Executor: ExecutorRecognize, Authority: AuthorityLow, Enabled: true,
 	}
 }
 
