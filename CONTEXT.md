@@ -638,6 +638,35 @@ section`, under the `gx-one-off` skill). `--wait` prints it and `--notify` sends
 only the waiter: the ticket keeps running. On a duplicate-live refusal `--wait` follows the
 existing ticket.
 
+## Recovery
+
+When a ticket parks, the server tries to get it moving again without a person. Recovery repairs the
+orchestration, never the work: it may nudge a pane or call the server's own verbs, but it never
+writes code or commits. See ADR 0034.
+
+**Recovery catalog** — the known failure signatures, as Go data in the `recovery` package and
+printed by `gx recovery catalog`. Each entry names a `(type, kind)` signature, an executor (`rule`,
+`agent` or `person`), an authority (`low`, `medium`, `high`), the remedy verbs it may use, and
+whether it is enabled. `recovery.enabled` is the global kill switch.
+
+**Recovery rule** — a catalog entry the server applies itself, in Go (`executor: rule`). It calls the
+same verbs as a person, with the same refusals and land lock, stamped `actor: recovery`. _Avoid_:
+bare "rule".
+
+**Investigate ticket** — a `type: investigate` child the server opens when a failure needs judgment
+(`executor: agent`) or matches no entry. It runs `gx-investigate` in unattended mode, is queued
+`--front`, and is commitless by type, so nothing it commits can land. Its report is its `## Result`.
+It is never itself recovered; any other ticket opts out with `recover: false`.
+
+**Authority** — how far recovery may act on a matched entry. `low` and `medium` apply on their own.
+`high` never does: recovery writes the remedy it would run as a `## Proposed Remedy` section and a
+`recovery-proposed` event, then escalates. A person runs it with `gx server tickets approve <addr>` (key
+`A` on the Queue tab), which refuses `proposal-stale` if the ticket changed since.
+
+**Escalation** — recovery giving the ticket back to a person: no match, a `person` entry, a high
+proposal, a cap reached, or a **failed recovery** (the recovered ticket fails again in its next
+iteration). Recovery runs at most once per `(ticket, kind)` and three times per ticket.
+
 ## Notification Surfaces
 
 The three places a run event can surface. They are distinct surfaces, not levels of the same
