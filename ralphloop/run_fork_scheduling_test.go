@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,15 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
+
+// writeChildTicket writes a fresh open child ticket file (filename
+// "{id}-child.md") under issuesDir, with parent recorded as parentID - the
+// fake agent's stand-in for a real implement skill turn that decides to split
+// its ticket into subtickets mid-run.
+func writeChildTicket(issuesDir, id, parentID string) error {
+	content := fmt.Sprintf("---\nid: %q\nstatus: open\ntype: implement\nparent: %q\n---\n# Child %s\n", id, parentID, id)
+	return os.WriteFile(filepath.Join(issuesDir, id+"-child.md"), []byte(content), 0644)
+}
 
 // claimOrderSink wraps an EventSink and records the identifier of every
 // ticket TicketClaimed fires for, in call order. claimNext calls

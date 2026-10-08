@@ -1,7 +1,7 @@
 package server_test
 
 // Server-harness ports of ralphloop's run_realgit_codex_launch scenarios
-// (seam A). The originals stay in ralphloop until cutover.
+// (seam A).
 
 import (
 	"context"

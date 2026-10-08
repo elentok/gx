@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/testutil/herdrctl"
 )
 
-// TestServerTUI_ShowsServerModeAndDropsOnStop boots the real TUI with
-// orchestrator = "server" against a running server: the tickets come from the
+// TestServerTUI_ShowsServerModeAndDropsOnStop boots the real TUI against a
+// running server: the tickets come from the
 // server and the indicator names its pid, then goes down when the server stops.
 func TestServerTUI_ShowsServerModeAndDropsOnStop(t *testing.T) {
 	herdrctl.RequireHerdr(t)
@@ -30,13 +30,6 @@ func TestServerTUI_ShowsServerModeAndDropsOnStop(t *testing.T) {
 		"HOME=" + home,
 		herdrSocketEnv(),
 	}}
-	configDir := filepath.Join(home, ".config", "gx")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(`{"orchestrator":"server"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
 	store := filepath.Join(root, "data", "gx", "tickets")
 	const project, epic = "tuiproj", "visible-epic"

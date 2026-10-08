@@ -6,9 +6,9 @@ production.
 
 There is no standalone `gx ralph-loop` CLI command anymore — a loop is started from the TUI's
 Queue tab: check tickets/epics in the Tickets tab, add them to the queue, and start the run from
-there. The Queue tab's `loopRegistry.tryStart` (`ui/tickets/loop_registry.go`) calls
-`ralphloop.Run(...)` in-process; everything below describes what that call does once started,
-regardless of how it was started.
+there. The Queue tab is a client of the orchestrator server (`gx server`, `server/`), which is
+the only scheduler; everything below describes the scheduling mechanics it runs, regardless of
+how a run was started.
 
 Code pointers throughout are relative to the repo root. This doc describes mechanics as
 implemented; see `CONTEXT.md` for the shorter user-facing glossary (Queue/Attach Lifecycle,
@@ -286,8 +286,9 @@ flowchart TD
 Gate mechanics: any iteration can call `pause(label, reason)` independently. While any label is
 paused, the scheduler refuses new claims. Every paused iteration blocks on a shared channel and is
 released together the instant `ForceResume` clears the last paused label. Resume is entirely
-in-process (`Gate.ForceResume`) — there is no headless/file-based resume path. The Queue tab UI
-drives a dedicated `QueuePauseLabel` through the same mechanism for its own pause/resume button.
+in-process (`Gate.ForceResume`) — there is no headless/file-based resume path. The Queue tab's
+pause/resume button goes through the server's queue pause (`server/pause.go`), which stops new
+claims.
 
 **Notifications** (`ralphloop/notify.go`, `notification_text.go`): `EventSink` is the single
 interface every lifecycle event flows through. A Telegram/Slack sink wraps another sink, forwards

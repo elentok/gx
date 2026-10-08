@@ -20,7 +20,6 @@ func TestReadProjectFile_RejectsNonWhitelistedKeysByName(t *testing.T) {
 	cases := map[string]string{
 		"use-nerdfont-icons":                   `{"use-nerdfont-icons": true}`,
 		"budget":                               `{"budget": {"soft-limit": 1}}`,
-		"orchestrator":                         `{"orchestrator": "x"}`,
 		"bogus":                                `{"bogus": 1}`,
 		"execution-queue.max-concurrent-epics": `{"execution-queue": {"max-concurrent-epics": 3}}`,
 		"execution-queue.max-agents":           `{"execution-queue": {"max-agents": 3}}`,

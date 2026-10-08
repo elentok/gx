@@ -1,5 +1,8 @@
 # A temporary global switch picks the in-process loop or the server, and the other refuses to claim
 
+> Superseded: removed at the orchestrator-daemon cutover. The server is the only scheduler; the
+> `orchestrator` config key and the TUI's in-process mode are gone. Kept as history.
+
 While the server is being built, gx keeps both schedulers. A global `config.json` key,
 `orchestrator: in-process | server`, selects one. The non-selected scheduler refuses to claim any
 ticket.

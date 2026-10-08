@@ -150,7 +150,7 @@ func TestServerLifecycle_StartEnqueueLandStopRestartReclaims(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfgJSON := fmt.Sprintf(`{"orchestrator":"server","server":{"tab-env":%s}}`, tabEnv)
+	cfgJSON := fmt.Sprintf(`{"server":{"tab-env":%s}}`, tabEnv)
 	if err := os.WriteFile(filepath.Join(configDir, "config.json"), []byte(cfgJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}

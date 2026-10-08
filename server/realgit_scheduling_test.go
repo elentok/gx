@@ -1,7 +1,7 @@
 package server_test
 
 // Server-harness ports of ralphloop's run_realgit_subtickets / scheduling
-// scenarios (seam A). The originals stay in ralphloop until cutover.
+// scenarios (seam A).
 
 import (
 	"context"
