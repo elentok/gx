@@ -20,7 +20,7 @@ type Failure struct {
 // every needs-repair kind except budget-killed (a deliberate stop), needs-answer
 // zero-commit, needs-answer blocked-pane, and a deadlock. Self-reported parks
 // and commitless finishes are a person's or the ticket's own decision, never
-// recovered. Whether a blocked pane actually runs is the matcher's call.
+// recovered; a rate-limit pause (R8) is healthy waiting. Whether a blocked pane actually runs is the matcher's call.
 func (f Failure) Triggers() bool {
 	switch f.Type {
 	case events.NeedsRepair:

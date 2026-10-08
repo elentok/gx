@@ -74,7 +74,27 @@ func Default() Catalog {
 	entries := []Entry{r1Spin(), r2UnexecutedToolCall(), r5PromptNeverDelivered(), r7CompactionTimedOut()}
 	entries = append(entries, r3LandRecoverable()...)
 	entries = append(entries, r4BlockedPaneDialog())
-	return Catalog{Enabled: true, Entries: append(entries, r6LaunchCollision()...)}
+	entries = append(entries, r6LaunchCollision()...)
+	return Catalog{Enabled: true, Entries: append(entries, r8RateLimitPause())}
+}
+
+// rateLimitResetsRE is a pause gx waits out itself: Claude's rate limit (its
+// reset time is optional) or a Codex quota with a known reset. A Codex quota
+// with no reset is a policy stop, not waiting, so it stays uncatalogued.
+var rateLimitResetsRE = regexp.MustCompile(`^(rate limit detected|Codex \S+ quota exhausted, resets )`)
+
+// r8RateLimitPause is healthy waiting, not a failure: gx already blocks the
+// iteration until the reset and logs resumed. It is catalogued only so recovery
+// recognizes a deliberately idle pane and never nudges it, which is also why a
+// pause never triggers recovery and the remedy does nothing. Launches enabled:
+// S0 emits the pause it matches.
+func r8RateLimitPause() Entry {
+	return Entry{
+		ID: "R8", Type: events.PausedRateLimit,
+		Predicate: func(seq []Event) bool { return rateLimitResetsRE.MatchString(seq[len(seq)-1].Reason) },
+		Executor:  ExecutorRule, Authority: AuthorityLow, Enabled: true,
+		Remedy: func(Failure, Verbs) error { return nil },
+	}
 }
 
 // r6LaunchCollision is a ticket parked because herdr refused its launch. A busy

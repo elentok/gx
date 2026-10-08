@@ -464,6 +464,55 @@ func TestR6MatchesAParkedLaunchCollisionOfTheSameKind(t *testing.T) {
 	}
 }
 
+func TestDefaultR8LaunchesEnabledAsANoOpRule(t *testing.T) {
+	var r8 []Entry
+	for _, e := range Default().Entries {
+		if e.ID == "R8" {
+			r8 = append(r8, e)
+		}
+	}
+	if len(r8) != 1 {
+		t.Fatalf("R8 entries = %v, want one", r8)
+	}
+	e := r8[0]
+	if !e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityLow || len(e.Verbs) != 0 || e.Remedy == nil {
+		t.Fatalf("R8 = %+v, want enabled low rule with no verbs", e)
+	}
+	if err := e.Remedy(Failure{}, nil); err != nil {
+		t.Errorf("R8 remedy = %v, want a no-op", err)
+	}
+}
+
+func TestR8MatchesOnlyARateLimitPauseThatResets(t *testing.T) {
+	c := Default()
+	for i := range c.Entries {
+		c.Entries[i].Enabled = true
+	}
+	pause := func(reason string) Event { return Event{Type: events.PausedRateLimit, Reason: reason} }
+	tests := []struct {
+		name string
+		seq  []Event
+		want bool
+	}{
+		{"claude rate limit", []Event{pause("rate limit detected")}, true},
+		{"claude rate limit with reset", []Event{pause("rate limit detected, resets 3pm")}, true},
+		{"codex quota with reset", []Event{pause("Codex 5h quota exhausted, resets 2026-10-08T15:00:00Z")}, true},
+		{"after an earlier pause", []Event{pause("rate limit detected"), {Type: events.Resumed}, pause("rate limit detected")}, true},
+		{"codex quota without reset", []Event{pause("Codex weekly quota exhausted")}, false},
+		{"unknown pause reason", []Event{pause("budget exhausted")}, false},
+		{"smart-zone pause", []Event{{Type: events.PausedSmartZone, Reason: "rate limit detected"}}, false},
+		{"resumed after the pause", []Event{pause("rate limit detected"), {Type: events.Resumed}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e, ok := c.Match(tt.seq)
+			if ok != tt.want || (ok && e.ID != "R8") {
+				t.Fatalf("got (%q, %v), want match=%v", e.ID, ok, tt.want)
+			}
+		})
+	}
+}
+
 func TestDefaultIsOnAndRecordsR13(t *testing.T) {
 	if !Default().Enabled {
 		t.Error("default catalog must be enabled")

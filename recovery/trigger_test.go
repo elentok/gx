@@ -23,6 +23,7 @@ func TestFailure_Triggers(t *testing.T) {
 		{"needs-answer ambiguous-base", events.NeedsAnswer, events.AmbiguousBase, false},
 		{"commitless finish", events.Commitless, "", false},
 		{"deadlocked", events.Deadlocked, events.AllParked, true},
+		{"rate-limit pause is healthy waiting", events.PausedRateLimit, "", false},
 	}
 	for _, tt := range tests {
 		if got := (Failure{Type: tt.typ, Kind: tt.kind}).Triggers(); got != tt.want {
