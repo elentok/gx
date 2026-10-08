@@ -440,6 +440,14 @@ func defaultOneOffName(prompt string) string {
 	return slug + "-" + hex.EncodeToString(b[:])
 }
 
+// oneOffFile is the name of a one-off's single ticket; nothing else writes it.
+const oneOffFile = "01-one-off.md"
+
+// isOneOffTicket reports whether ticketPath is a one-off's ticket.
+func isOneOffTicket(ticketPath string) bool {
+	return filepath.Base(ticketPath) == oneOffFile
+}
+
 // writeOneOffTicket creates the epic directory and its single ticket. The
 // directory creation is the uniqueness check: an existing epic is os.ErrExist.
 func writeOneOffTicket(projectDir, epic string, tk schema.Ticket, prompt string) error {
@@ -458,7 +466,7 @@ func writeOneOffTicket(projectDir, epic string, tk schema.Ticket, prompt string)
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(issues, "01-one-off.md")
+	path := filepath.Join(issues, oneOffFile)
 	if err := os.WriteFile(path, out, 0o644); err != nil {
 		return err
 	}

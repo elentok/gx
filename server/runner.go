@@ -549,8 +549,27 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
 	s.notifyResult(addr, one.Ticket.Path)
+	s.notifyDone(addr, one.Ticket.Path)
 	s.fileFollowUp(addr, one.Ticket.Path)
 	s.completeRootIfDone(root, one)
+}
+
+// notifyDone tells chat a ticket landed. A one-off stays silent: it speaks
+// only through notifyResult, when its submit asked for it.
+func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
+	if s.chat == nil || isOneOffTicket(ticketPath) {
+		return
+	}
+	e, ok := s.freshEpic(addr.Project, addr.Epic)
+	if !ok {
+		return
+	}
+	for _, t := range e.Tickets {
+		if t.Identifier == addr.ID {
+			s.chat.TicketDone(addr.Project, s.chatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
+			return
+		}
+	}
 }
 
 // completeRootIfDone lands the root's feature branch once every ticket in its

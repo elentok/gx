@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // ServerChatConfig names the chat destinations a server notifies. An empty
@@ -145,6 +147,22 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 	for _, s := range c.projectSinks(override) {
 		body := s.style.epicCompleteText(project+"/"+epic, counts, counts.Done, elapsedSeconds, totalCost)
 		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindEpicComplete, epicSource(project+"/"+epic), "")
+	}
+}
+
+// TicketDone tells the project's destinations that a ticket landed, with the
+// metrics the land wrote onto it and the epic's counts after it.
+func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic string, t tickets.Ticket, counts EpicCounts) {
+	if c == nil {
+		return
+	}
+	stats := IterationStats{
+		ElapsedSeconds: t.ElapsedTime, PeakContextTokens: t.ActualContextWindow, Cost: t.ActualCost,
+		InProgress: counts.InProgress, Completed: counts.Done, Total: counts.Total,
+	}
+	for _, s := range c.projectSinks(override) {
+		body := s.style.iterationFinishedText(t, project+"/"+epic, stats)
+		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindIterationFinished, t.Path, t.Identifier)
 	}
 }
 

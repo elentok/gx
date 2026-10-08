@@ -216,3 +216,45 @@ func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 		t.Fatalf("sends = %v, want the Result", got)
 	}
 }
+
+func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	proj := filepath.Join(s.cfg.TicketStore, "p")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "project.json"), []byte(`{"repo":"/x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	write := func(epic, name string, tk schema.Ticket) string {
+		dir := filepath.Join(proj, epic, "issues")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		out, err := schema.MarshalTicket(tk, "\nbody\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, out, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	landed := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeTask})
+	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeTask})
+	oneOff := write("cron", oneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
+
+	s.notifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)
+	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, landed)
+	s.chat.Close()
+	got := wait(1)
+	if len(got) != 1 {
+		t.Fatalf("sends = %v, want only the epic ticket's", got)
+	}
+	for _, want := range []string{"*p*", "Landed ticket", "1 done · 2 total", "p/epic/01"} {
+		if !strings.Contains(got[0], want) {
+			t.Errorf("done message lacks %q: %s", want, got[0])
+		}
+	}
+}
