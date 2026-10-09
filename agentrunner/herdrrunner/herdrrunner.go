@@ -105,8 +105,12 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 	compact := text == "/compact"
 	until := []string{"working"}
 	if compact {
-		// Codex asks to confirm a compact before it starts.
-		until = append(until, "blocked")
+		// Codex asks to confirm a compact before it starts. A premature-idle
+		// Claude pane reports idle/done while still compacting and never
+		// "working"; accepting those keeps PromptWithNudge from Enter-nudging it
+		// (which could cancel the compaction) and leaves the transcript gate to
+		// decide when compaction has really finished.
+		until = append(until, "blocked", "idle", "done")
 	}
 	prompt := PromptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now)
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})

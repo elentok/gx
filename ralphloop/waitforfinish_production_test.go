@@ -291,7 +291,6 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 // and would instead exercise the gated give-up path, so the virtual-time
 // assertion below is load-bearing, not decorative.
 func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
-	t.Skip("known regression: Runner.Prompt(\"/compact\") waits for working/blocked, which a premature-idle pane never reports, so recovery fails before the gate runs")
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
 	const pane = "pane-1"
@@ -486,7 +485,6 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 // The run must instead end at errCompactRecoveryExhausted, which loop.go
 // persists as needs-repair for an operator.
 func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
-	t.Skip("known regression: Runner.Prompt(\"/compact\") fails on a premature-idle pane, the failure is non-gated, and the next idle poll is taken as a finish mid-compaction")
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
 	const pane = "pane-1"
