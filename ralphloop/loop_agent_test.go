@@ -506,7 +506,7 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, noopEventSink{})
+		}, withAgentWaitRunner(d), noopEventSink{})
 	}()
 
 	pane1 := <-started
@@ -549,7 +549,7 @@ func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 1, Gate: gate,
-		}, d, noopEventSink{})
+		}, withAgentWaitRunner(d), noopEventSink{})
 	}()
 
 	first := <-started

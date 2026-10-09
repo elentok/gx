@@ -244,7 +244,7 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 	}
 	sink := &recordingSink{}
 
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), sink); err != nil {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 

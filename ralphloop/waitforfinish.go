@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
@@ -17,6 +18,10 @@ import (
 // running iteration's context occupancy is checked against --smart-zone at
 // roughly this cadence instead of only once the agent settles.
 const smartZonePollMs = 30_000
+
+// waitForFinishStates are the states that end one waitForFinish poll. Blocked
+// is among them because it needs its own quota/park handling.
+var waitForFinishStates = append(append([]agentrunner.State{}, runnerFinishStates...), agentrunner.StateBlocked)
 
 // finishDebounceMs is how long waitForFinish and finishIteration each pause
 // before re-checking a just-reached "finished" signal, and finishConfirmMs is
@@ -63,14 +68,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		until := append(append([]string{}, plainFinishStates...), "blocked")
-		agent, err := d.AgentWait(herdr.AgentWaitOptions{
-			Target:    p.Pane,
-			Until:     until,
-			TimeoutMs: pollMs,
-		})
+		status, err := d.Runner.Wait(p.session(), waitForFinishStates, time.Duration(pollMs)*time.Millisecond)
 		if err == nil {
-			if agent.AgentStatus == "blocked" {
+			if status.State == agentrunner.StateBlocked {
 				if recovery.consumeJustRecovered() {
 					elapsedMs = 0
 					continue
@@ -129,7 +129,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				}
 			}
 
-			confirmed, err := confirmFinished(d, p.Pane, until)
+			confirmed, err := confirmFinished(d, p.session(), waitForFinishStates)
 			if err != nil {
 				return fmt.Errorf("confirming %s finished: %w", p.Label, err)
 			}
@@ -141,7 +141,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				continue
 			}
 			if !recovery.pendingUnresolved(d, p, sessionID) {
-				finished, err := waitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
+				finished, err := waitForBackgroundTasks(d, p, sessionID, waitForFinishStates, &elapsedMs)
 				if err != nil {
 					return err
 				}
@@ -168,7 +168,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			d.Sleep(smartZonePollMs * time.Millisecond)
 			elapsedMs += smartZonePollMs
 			if !recovery.pendingUnresolved(d, p, sessionID) {
-				finished, err := waitForBackgroundTasks(d, p, sessionID, until, &elapsedMs)
+				finished, err := waitForBackgroundTasks(d, p, sessionID, waitForFinishStates, &elapsedMs)
 				if err != nil {
 					return err
 				}
@@ -184,7 +184,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 			continue
 		}
-		if !herdrrunner.IsPollTimeout(err) {
+		if !errors.Is(err, agentrunner.ErrTimeout) {
 			return fmt.Errorf("waiting for agent to finish: %w", err)
 		}
 		elapsedMs += pollMs
@@ -746,17 +746,13 @@ func waitForCompactionSignal(
 // whether the agent is still in one of until's finish states. A poll timeout
 // (the agent went back to "working" in the meantime) means the original
 // signal was a transient blip, not a real finish.
-func confirmFinished(d Deps, pane string, until []string) (bool, error) {
+func confirmFinished(d Deps, s agentrunner.Session, until []agentrunner.State) (bool, error) {
 	d.Sleep(finishDebounceMs * time.Millisecond)
-	_, err := d.AgentWait(herdr.AgentWaitOptions{
-		Target:    pane,
-		Until:     until,
-		TimeoutMs: finishConfirmMs,
-	})
+	_, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond)
 	if err == nil {
 		return true, nil
 	}
-	if herdrrunner.IsPollTimeout(err) {
+	if errors.Is(err, agentrunner.ErrTimeout) {
 		return false, nil
 	}
 	return false, err
@@ -787,7 +783,7 @@ func confirmFinished(d Deps, pane string, until []string) (bool, error) {
 // FinishTimeoutMs instead of resetting it, and it paces re-reads at
 // smartZonePollMs instead of spinning — same reasoning as
 // waitForCompactionSignal's own pacing.
-func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, until []string, elapsedMs *int) (bool, error) {
+func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, until []agentrunner.State, elapsedMs *int) (bool, error) {
 	if p.Agent != AgentClaude || d.ReadBackgroundTasks == nil || sessionID == "" {
 		return true, nil
 	}
@@ -833,7 +829,7 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 			if !gated {
 				return true, nil
 			}
-			confirmed, err := confirmFinished(d, p.Pane, until)
+			confirmed, err := confirmFinished(d, p.session(), until)
 			if err != nil {
 				return false, fmt.Errorf("confirming %s still finished after background task gate: %w", p.Label, err)
 			}

@@ -4,11 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
+
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -273,7 +274,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 // its own frontmatter (written by landCherryPick's writeLandedMetrics before
 // this event fires), and EpicComplete's elapsedSeconds is the run's real
 // wall-clock duration rather than a hardcoded 0. Ticket 01 is deliberately
-// held back from finishing (a fake AgentWait blocks on a channel) until
+// held back from finishing (a Runner wait hook blocks on a channel) until
 // ticket 02's own IterationFinished has already been recorded, so ticket 02's
 // stats are captured while ticket 01 is still genuinely in progress.
 func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
@@ -288,12 +289,11 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 
 	d, _, _ := fakeDeps()
 	release01 := make(chan struct{})
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if strings.Contains(opts.Target, iterLabel("epic", "01")) {
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if s.Label == iterLabel("epic", "01") {
 			<-release01
 		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	})
 
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeFakeTranscript(t, "", iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-"+iterLabel("epic", "01"), start,

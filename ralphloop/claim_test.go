@@ -1,9 +1,8 @@
 package ralphloop
 
 import (
-	"errors"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -573,7 +572,7 @@ func TestSetStatus_ConcurrentWritesAndReads_NeverExposesATornFile(t *testing.T) 
 func TestRecordLiveSession_AppendsOnceAndReturnsSession(t *testing.T) {
 	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
-	d := Deps{AgentGet: func(string) (herdr.Agent, error) { return herdr.Agent{AgentSession: "sess-1"}, nil }}
+	d := Deps{Runner: idleRunner("iter-01")}
 
 	for range 2 { // a reclaimed run finishes twice
 		if got := recordLiveSession(d, "iter-01", path); got != "sess-1" {
@@ -589,7 +588,7 @@ func TestRecordLiveSession_AppendsOnceAndReturnsSession(t *testing.T) {
 func TestRecordLiveSession_NoLiveAgentLeavesTicketAlone(t *testing.T) {
 	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
-	d := Deps{AgentGet: func(string) (herdr.Agent, error) { return herdr.Agent{}, errors.New("no agent") }}
+	d := Deps{Runner: runnerfake.NewRunner()}
 
 	if got := recordLiveSession(d, "iter-01", path); got != "" {
 		t.Errorf("recordLiveSession = %q, want empty", got)

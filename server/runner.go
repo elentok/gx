@@ -511,7 +511,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 		}
 	}()
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Session.ID)
+	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Session)
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next

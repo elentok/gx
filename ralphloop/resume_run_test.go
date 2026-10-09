@@ -72,7 +72,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, sink)
+		}, withAgentWaitRunner(d), sink)
 	}()
 
 	keys := <-sendKeysCh
@@ -200,7 +200,7 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 1, Gate: gate,
-		}, d, noopEventSink{})
+		}, withAgentWaitRunner(d), noopEventSink{})
 	}()
 
 	for i := range 2 {

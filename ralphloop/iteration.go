@@ -234,14 +234,14 @@ func reattachIteration(d Deps, p iterationParams) error {
 		// still-working agent - which is how both real park/reopen/reattach
 		// incidents actually looped, since this short-circuit used to skip
 		// waitForFinish (and its gate) entirely.
-		confirmed, err := confirmFinished(d, agent.PaneID, plainFinishStates)
+		confirmed, err := confirmFinished(d, launchParams.session(), runnerFinishStates)
 		if err != nil {
 			return fmt.Errorf("confirming %s already finished at reattach: %w", label, err)
 		}
 		if confirmed {
 			sessionID := resolveReattachSessionID(p, agent.AgentSession, preClear.SessionIDs)
 			elapsedMs := 0
-			finishedAfterGate, err := waitForBackgroundTasks(d, launchParams, sessionID, plainFinishStates, &elapsedMs)
+			finishedAfterGate, err := waitForBackgroundTasks(d, launchParams, sessionID, runnerFinishStates, &elapsedMs)
 			if err != nil {
 				return err
 			}

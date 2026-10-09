@@ -92,7 +92,7 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
-	}, d, noopEventSink{})
+	}, withAgentWaitRunner(d), noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	if !strings.Contains(contents, "status: needs-repair") {
@@ -124,7 +124,7 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
-	}, d, noopEventSink{})
+	}, withAgentWaitRunner(d), noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	if !strings.Contains(contents, "status: needs-repair") ||

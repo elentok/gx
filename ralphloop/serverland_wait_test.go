@@ -1,12 +1,12 @@
 package ralphloop
 
 import (
-	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -25,11 +25,11 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 		}
 		return transcript.BackgroundTaskReading{Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}}}, nil
 	}, &sleeps)
-	d.AgentGet = func(string) (herdr.Agent, error) { return herdr.Agent{AgentSession: "sess-1"}, nil }
+	d.Runner = idleRunner("iter-27")
 
 	one := OneIteration{Agent: AgentClaude}
 	wt := IterationWorktree{Label: "iter-27", Path: "/repo/iter-27"}
-	if err := WaitIterationFinished(d, one, wt, "pane-1"); err != nil {
+	if err := WaitIterationFinished(d, one, wt, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
 	}
 	if reads != 3 {
@@ -41,27 +41,32 @@ func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 // not end the wait.
 func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 	t.Parallel()
-	var waits int
-	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			// 1st: idle. 2nd (the debounce re-poll): still working, so it times out.
-			// 3rd: idle again. 4th: the re-poll confirms.
-			if waits == 2 {
-				return herdr.Agent{}, errors.New("timed out")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentGet: func(string) (herdr.Agent, error) { return herdr.Agent{}, nil },
-		Sleep:    func(time.Duration) {},
-	}
+	r := &blipRunner{Runner: idleRunner("iter-27"), timeoutOn: 2}
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 	one := OneIteration{Agent: AgentClaude}
-	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-27"}, "pane-1"); err != nil {
+	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-27"}, agentrunner.Session{Label: "iter-27", ID: "pane-1"}); err != nil {
 		t.Fatalf("WaitIterationFinished: %v", err)
 	}
-	if waits != 4 {
-		t.Errorf("AgentWait calls = %d, want 4 (idle, blip, idle, confirmed)", waits)
+	if r.waits != 4 {
+		t.Errorf("Runner.Wait calls = %d, want 4 (idle, blip, idle, confirmed)", r.waits)
 	}
+}
+
+// blipRunner times out its timeoutOn-th Wait: a finish recheck finds the
+// agent back at work. runnerfake can't script that without a real-time
+// timeout.
+type blipRunner struct {
+	*runnerfake.Runner
+	timeoutOn int
+	waits     int
+}
+
+func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
+	r.waits++
+	if r.waits == r.timeoutOn {
+		return agentrunner.Status{State: agentrunner.StateWorking}, agentrunner.ErrTimeout
+	}
+	return r.Runner.Wait(s, states, timeout)
 }
 
 // A held land lock is routine; landBuilt retries instead of failing the finish.

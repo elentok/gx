@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -185,14 +185,18 @@ func latestParkReason(scratchDir, epic, ticket string) string {
 // the closing occupancy, elapsed time and cost from and writes none of them.
 // Best-effort: "" (no live agent, no session yet) leaves the ticket as it was.
 func recordLiveSession(d Deps, label, ticketPath string) string {
-	agent, err := d.AgentGet(label)
-	if err != nil || agent.AgentSession == "" {
+	s, ok, err := d.Runner.Find(label)
+	if err != nil || !ok {
 		return ""
 	}
-	if t, err := schema.ParseTicket(ticketPath); err == nil && !slices.Contains(t.SessionIDs, agent.AgentSession) {
-		_ = AppendSessionID(ticketPath, agent.AgentSession)
+	status, err := d.Runner.Status(s)
+	if err != nil || status.SessionID == "" {
+		return ""
 	}
-	return agent.AgentSession
+	if t, err := schema.ParseTicket(ticketPath); err == nil && !slices.Contains(t.SessionIDs, status.SessionID) {
+		_ = AppendSessionID(ticketPath, status.SessionID)
+	}
+	return status.SessionID
 }
 
 // landDeferCap bounds how long landBuilt waits out a held land lock before it
@@ -200,20 +204,23 @@ func recordLiveSession(d Deps, label, ticketPath string) string {
 // resolution (conflictResolutionTimeoutMs) by the lock holder, plus its own.
 const landDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.Minute
 
-// WaitIterationFinished blocks until the agent in pane has really finished its
-// turn, the way the in-process loop does: a first idle/done is debounced, and
-// an outstanding backgrounded shell command in the transcript keeps holding.
-// Without this a long test run in the background reads as a finish, and the
-// ticket is parked zero-commit before the agent commits.
-func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, pane string) error {
-	until := []string{"idle", "done"}
-	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Pane: pane, SessionCwd: w.Path, Sink: noopEventSink{}}
+// WaitIterationFinished blocks until the agent in session s has really
+// finished its turn, the way the in-process loop does: a first idle/done is
+// debounced, and an outstanding backgrounded shell command in the transcript
+// keeps holding. Without this a long test run in the background reads as a
+// finish, and the ticket is parked zero-commit before the agent commits.
+func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
+	until := runnerFinishStates
+	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: noopEventSink{}}
 	elapsedMs := 0
 	for {
-		if _, err := d.AgentWait(herdr.AgentWaitOptions{Target: pane, Until: until}); err != nil {
+		if _, err := d.Runner.Wait(s, until, smartZonePollMs*time.Millisecond); err != nil {
+			if errors.Is(err, agentrunner.ErrTimeout) {
+				continue
+			}
 			return err
 		}
-		confirmed, err := confirmFinished(d, pane, until)
+		confirmed, err := confirmFinished(d, s, until)
 		if err != nil {
 			return fmt.Errorf("confirming %s finished: %w", w.Label, err)
 		}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -281,6 +282,19 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 		<-ticket02Gate
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 	}
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if !strings.Contains(s.Label, "iter-01") {
+			<-ticket02Gate
+			return
+		}
+		mu.Lock()
+		state := agentrunner.StateBlocked
+		if unblocked01 {
+			state = agentrunner.StateIdle
+		}
+		mu.Unlock()
+		fakeRunner(d).SetState(s.Label, state, "")
+	})
 
 	sink := &recordingSink{}
 	done := make(chan error, 1)

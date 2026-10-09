@@ -154,7 +154,7 @@ func TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *test
 		return 0, nil
 	}
 
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), &recordingSink{})
 
 	wantPrompts := 1
 	if len(*prompts) != wantPrompts {

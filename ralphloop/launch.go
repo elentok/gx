@@ -127,6 +127,16 @@ func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, c
 	})
 }
 
+// session is the Runner session hosting the agent. Herdr-only paths
+// (reattach, attach to a live agent) leave Session zero; herdrrunner's
+// Session.ID is the pane id, so those still address the right agent.
+func (p launchAndPromptParams) session() agentrunner.Session {
+	if p.Session != (agentrunner.Session{}) {
+		return p.Session
+	}
+	return agentrunner.Session{Label: p.Label, ID: p.Pane}
+}
+
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
 type launchAndPromptParams struct {
 	Label string // agent name/tab label, used in error messages
@@ -559,6 +569,9 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 // these for every agent kind, which needs its own quota/park handling rather
 // than being treated as finished.
 var plainFinishStates = []string{"idle", "done"}
+
+// runnerFinishStates is plainFinishStates for Runner.Wait.
+var runnerFinishStates = []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}
 
 // alreadyFinished reports whether status (a herdr tab's current agent_status,
 // e.g. from TabList) already matches one of waitForFinish's plain-completion

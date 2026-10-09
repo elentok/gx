@@ -46,7 +46,7 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentClaude,
 		Pane:       "pane-1",
@@ -103,7 +103,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
 		Label:      "iter-09",
 		Agent:      AgentCodex,
 		Pane:       "pane-9",
@@ -165,7 +165,7 @@ func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentClaude,
 		Pane:       "fresh-pane",
@@ -299,7 +299,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt(t *test
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentClaude,
 		Pane:       "fresh-pane",
@@ -535,7 +535,7 @@ func TestLaunchAndPrompt_AgentNotReady_TrustDirectory_DismissesAndProceeds(t *te
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
+	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
 		Label:      "iter-06",
 		Agent:      AgentClaude,
 		Pane:       "pane-6",

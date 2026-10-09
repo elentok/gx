@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -158,6 +159,8 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	// Panes are named like TabCreate's below.
 	runner.IDs = func(label string) (string, string) { return "pane-" + label, "sess-pane-" + label }
 	runner.Adopt = true
+	// Agents finish their turn right away, as fakeDeps' AgentWait reports.
+	runner.PromptState = agentrunner.StateDone
 	d = Deps{
 		Runner: recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
 		AgentGet: func(target string) (herdr.Agent, error) {
@@ -204,6 +207,10 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return nil, nil
 		},
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			// Herdr-only launches (the conflict resolver) still wait through
+			// the Runner, so host their pane there too. A label the Runner
+			// already hosts is ErrLabelTaken, which is fine.
+			_, _ = runner.Start(agentrunner.StartOptions{Label: strings.TrimPrefix(opts.Pane, "pane-")})
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
@@ -282,6 +289,26 @@ type runnerHooks struct {
 	mu      sync.Mutex
 	starts  []func(opts agentrunner.StartOptions) error
 	prompts []func(s agentrunner.Session, text string) error
+	waits   []func(s agentrunner.Session)
+}
+
+// onRunnerWait runs hook before every Runner wait of fakeDeps' d, e.g. to
+// hold an agent back from finishing.
+func onRunnerWait(d Deps, hook func(s agentrunner.Session)) {
+	h := d.Runner.(recordingRunner).hooks
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.waits = append(h.waits, hook)
+}
+
+func (r recordingRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
+	r.hooks.mu.Lock()
+	fns := slices.Clone(r.hooks.waits)
+	r.hooks.mu.Unlock()
+	for _, fn := range fns {
+		fn(s)
+	}
+	return r.Runner.Wait(s, states, timeout)
 }
 
 // onRunnerStart runs hook before every Runner start of fakeDeps' d, after
@@ -327,6 +354,34 @@ func (r recordingRunner) Prompt(s agentrunner.Session, text string) error {
 	}
 	r.record(text)
 	return nil
+}
+
+// withAgentWaitRunner serves d.Runner's Wait from d's AgentWait stub, for
+// tests still scripted against AgentWait. Temporary: agent-runner-phase1-impl
+// ticket 03b11 moves them to runnerfake.
+func withAgentWaitRunner(d Deps) Deps {
+	d.Runner = agentWaitRunner{Runner: d.Runner, wait: d.AgentWait}
+	return d
+}
+
+type agentWaitRunner struct {
+	agentrunner.Runner
+	wait func(herdr.AgentWaitOptions) (herdr.Agent, error)
+}
+
+func (r agentWaitRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
+	until := make([]string, len(states))
+	for i, st := range states {
+		until[i] = string(st)
+	}
+	a, err := r.wait(herdr.AgentWaitOptions{Target: s.ID, Until: until, TimeoutMs: int(timeout.Milliseconds())})
+	if herdrrunner.IsPollTimeout(err) {
+		return agentrunner.Status{}, agentrunner.ErrTimeout
+	}
+	if err != nil {
+		return agentrunner.Status{}, err
+	}
+	return agentrunner.Status{State: agentrunner.State(a.AgentStatus), SessionID: a.AgentSession}, nil
 }
 
 // fakeRunner is the runnerfake behind fakeDeps' Runner.
@@ -950,24 +1005,23 @@ func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(
 	gate := NewGate()
 	var drainOnce sync.Once
 	drained := make(chan struct{})
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if strings.Contains(opts.Target, iterLabel("my-epic", "01")) {
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if s.Label == iterLabel("my-epic", "01") {
 			drainOnce.Do(func() {
 				gate.Drain()
 				close(drained)
 			})
 		} else {
 			// Ticket 02 runs concurrently with 01 (maxParallel defaults to 2)
-			// with no guaranteed order between its own AgentWait call and 01's.
+			// with no guaranteed order between its own wait and 01's.
 			// Block here until 01 has drained, so 02's iteration can never
 			// finish (freeing its slot) before the gate closes to new claims —
 			// otherwise this test flakes under scheduling pressure, racing
 			// whether ticket 03 gets claimed into that freed slot before 01's
-			// goroutine gets around to calling AgentWait.
+			// goroutine gets around to waiting.
 			<-drained
 		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	})
 
 	sink := &recordingSink{}
 	err := Run(RunOptions{
@@ -1171,7 +1225,7 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 		OnScopeResolved: func(s RunScope) {
 			scope = s
 		},
-	}, d, sink)
+	}, withAgentWaitRunner(d), sink)
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}

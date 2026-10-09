@@ -9,9 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
@@ -57,7 +59,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
 		SessionCwd: "/repo/iter-20", SmartZone: 150_000, ScratchDir: scratchDir,
 		EpicName: "epic", Gate: NewGate(),
@@ -110,7 +112,7 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-20")
@@ -150,7 +152,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-21")
@@ -193,7 +195,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-21")
@@ -236,7 +238,7 @@ func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T
 				Sleep: func(time.Duration) {},
 			}
 
-			err := waitForFinish(d, launchAndPromptParams{
+			err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 				Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
 				SmartZone: 150_000, Gate: NewGate(),
 			}, "codex-session-20")
@@ -297,7 +299,7 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentCodex,
 		Pane:       "pane-1",
@@ -1179,7 +1181,7 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
 		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
 	}, "sess-19")
@@ -1208,7 +1210,7 @@ func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 		Sleep:           func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
 		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
 	}, "sess-19")
@@ -1271,7 +1273,7 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := waitForFinish(withAgentWaitRunner(d), boundGiveUpParams(), "sess-19")
 	if !errors.Is(err, errCompactRecoveryExhausted) {
 		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted", err)
 	}
@@ -1325,7 +1327,7 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := waitForFinish(withAgentWaitRunner(d), boundGiveUpParams(), "sess-19")
 	if !errors.Is(err, errCompactRecoveryExhausted) {
 		t.Fatalf("waitForFinish error = %v, want one wrapping errCompactRecoveryExhausted, not a successful finish", err)
 	}
@@ -1399,7 +1401,7 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	if err := waitForFinish(d, boundGiveUpParams(), "sess-19"); err != nil {
+	if err := waitForFinish(withAgentWaitRunner(d), boundGiveUpParams(), "sess-19"); err != nil {
 		t.Fatalf("waitForFinish: %v, want no escalation: the successful second recovery reset the counter", err)
 	}
 	if got := countPrompts(prompts, "/compact"); got != 3 {
@@ -1461,7 +1463,7 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
+	err := waitForFinish(withAgentWaitRunner(d), boundGiveUpParams(), "sess-19")
 	if !errors.Is(err, errCompactRecoveryExhausted) {
 		t.Fatalf("waitForFinish error = %v, want escalation: the middle failure was not a recovery and must not reset the counter", err)
 	}
@@ -1714,7 +1716,7 @@ func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
 		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(), Sink: sink,
 	}, "sess-19")
@@ -1747,7 +1749,7 @@ func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil }
 	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-19", Agent: AgentClaude, Pane: "pane-1", Ticket: "19",
 		SessionCwd: "/repo/iter-19", SmartZone: 100, Gate: NewGate(),
 	}, "sess-19")
@@ -1840,7 +1842,7 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01",
 		SessionCwd: "/repo/iter-01", SmartZone: 1_000_000, Gate: NewGate(), Sink: sink,
 	}, "sess-1")
@@ -1890,7 +1892,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 				Sleep: func(d time.Duration) { slept = append(slept, d) },
 			}
 
-			err := waitForFinish(d, launchAndPromptParams{
+			err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 				Label: "iter-01", Agent: agentKind, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 				ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
 			}, "sess-1")
@@ -1970,7 +1972,7 @@ func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testin
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		Gate: NewGate(),
 	}, "sess-1")
@@ -2008,7 +2010,7 @@ func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		Gate: NewGate(),
 	}, "sess-1")
@@ -2073,7 +2075,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		SmartZone: 1_000_000, Gate: NewGate(),
 	}, "sess-1")
@@ -2112,7 +2114,7 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		Gate: NewGate(),
 	}, "sess-1")
@@ -2175,7 +2177,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 				Now:   time.Now,
 			}
 
-			err := waitForFinish(d, launchAndPromptParams{
+			err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 				Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 				ScratchDir: scratchDir, EpicName: "epic", Gate: gate, Sink: sink,
 			}, "codex-session-1")
@@ -2314,7 +2316,7 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 		},
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
 	}, "session-1")
 	if err == nil || !strings.Contains(err.Error(), "rollout unreadable") {
@@ -2354,7 +2356,7 @@ func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	if err := waitForFinish(d, launchAndPromptParams{
+	if err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: gate, Sink: sink,
 	}, "session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -2387,7 +2389,7 @@ func TestWaitForFinish_CodexPaneReadErrorPreservesClaimedTicket(t *testing.T) {
 		ReadPaneRecent: func(string) (string, error) { return "", errors.New("pane unreadable") },
 	}
 
-	err := waitForFinish(d, launchAndPromptParams{
+	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
 	}, "session-1")
 	if err == nil || !strings.Contains(err.Error(), "pane unreadable") {
@@ -2421,7 +2423,7 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 		Sleep:          func(time.Duration) {},
 	}
 
-	if err := waitForFinish(d, launchAndPromptParams{
+	if err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Gate: NewGate(),
 	}, "codex-session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
@@ -2668,9 +2670,21 @@ func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (tra
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
+		Runner:              idleRunner("iter-30"),
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { *sleeps++ },
 	}
+}
+
+// idleRunner hosts one idle session under label, with ID "pane-1" and
+// SessionID "sess-1".
+func idleRunner(label string) *runnerfake.Runner {
+	r := runnerfake.NewRunner()
+	r.IDs = func(string) (string, string) { return "pane-1", "sess-1" }
+	if _, err := r.Start(agentrunner.StartOptions{Label: label}); err != nil {
+		panic(err)
+	}
+	return r
 }
 
 func backgroundTaskGateParams(scratchDir string) launchAndPromptParams {
@@ -2835,7 +2849,7 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	t.Parallel()
 	scratchDir := epicScratchDir(t, "epic")
-	var sleeps, reads, waits int
+	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
 		status := transcript.BackgroundTaskOutstandingFresh
@@ -2846,20 +2860,15 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: status}},
 		}, nil
 	}
+	// waits: 1 = outer loop's first wait (idle); 2 = that idle's own
+	// confirmFinished recheck (still idle); 3 = the gate-release recheck this
+	// fix adds (agent resumed work, not idle); 4 = outer loop's second wait,
+	// once the agent is genuinely done; 5 = that second idle's own
+	// confirmFinished recheck (idle; no gate re-hold since ReadBackgroundTasks
+	// already reports resolved).
+	r := &blipRunner{Runner: idleRunner("iter-30"), timeoutOn: 3}
 	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			// waits: 1 = outer loop's first AgentWait (idle); 2 = that idle's
-			// own confirmFinished recheck (still idle); 3 = the gate-release
-			// recheck this fix adds (agent resumed work, not idle); 4 = outer
-			// loop's second AgentWait, once the agent is genuinely done; 5 =
-			// that second idle's own confirmFinished recheck (idle; no gate
-			// re-hold since ReadBackgroundTasks already reports resolved).
-			if waits == 3 {
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+		Runner:              r,
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { sleeps++ },
 	}
@@ -2867,8 +2876,8 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
-	if waits < 4 {
-		t.Errorf("AgentWait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send waitForFinish back around its outer poll loop", waits)
+	if r.waits < 4 {
+		t.Errorf("Runner.Wait calls = %d, want at least 4: the gate-release recheck finding the pane busy must send waitForFinish back around its outer poll loop", r.waits)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, "epic")

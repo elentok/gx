@@ -62,7 +62,7 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 	// reported.
 	d.AgentWait = reportIterationStatus(t, path, "epic-iter-01", "needs-answer")
 
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), &recordingSink{})
 
 	if cherryPickCalled {
 		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted needs-answer report")

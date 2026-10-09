@@ -94,7 +94,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, d, sink)
+		}, withAgentWaitRunner(d), sink)
 	}()
 
 	// epic-iter-01 and epic-iter-02 both claimed and started (2 slots); either order.
