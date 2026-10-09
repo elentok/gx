@@ -356,7 +356,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 	}
-	deps := ralphloop.DefaultDeps()
+	deps := s.depsFor(ticket.Project)
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
 	mode := s.iterationModeFor(ticket, t)
 	if mode.commitless && mode.scratchDir == "" {
@@ -648,10 +648,35 @@ func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string
 	return prompt
 }
 
+// runnerFor is the runner hosting project's iterations.
+func (s *Server) runnerFor(project string) agentrunner.Runner {
+	if s.cfg.RunnerFor != nil {
+		if r := s.cfg.RunnerFor(project); r != nil {
+			return r
+		}
+	}
+	return s.cfg.Runner
+}
+
+func (s *Server) runnerName() string {
+	if s.cfg.RunnerName == "" {
+		return runnerHerdr
+	}
+	return s.cfg.RunnerName
+}
+
+// depsFor is the default deps with the project's runner, so launch, wait and
+// finish all talk to the runner that hosts the agent.
+func (s *Server) depsFor(project string) ralphloop.Deps {
+	deps := ralphloop.DefaultDeps()
+	deps.Runner = s.runnerFor(project)
+	return deps
+}
+
 func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
-	session, err := ralphloop.StartAndPrompt(s.cfg.Runner, agentrunner.StartOptions{
+	session, err := ralphloop.StartAndPrompt(s.runnerFor(ticket.Project), agentrunner.StartOptions{
 		Label: label,
 		Epic:  ticket.Epic,
 		Cwd:   cwd,
@@ -662,7 +687,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note
 	if err != nil {
 		return Run{}, err
 	}
-	run := Run{Address: ticket.String(), Agent: string(agent), Runner: runnerHerdr, Session: session}
+	run := Run{Address: ticket.String(), Agent: string(agent), Runner: s.runnerName(), Session: session}
 	if deps.TabID != nil {
 		// Only herdr has tabs; a failed lookup just skips the tab cleanup later.
 		run.Tab, _ = deps.TabID(label)

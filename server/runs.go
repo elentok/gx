@@ -309,7 +309,11 @@ func (s *Server) reclaim(t trackedRun) error {
 	t.Tab = agent.TabID
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
-	deps := ralphloop.DefaultDeps()
+	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	deps := s.depsFor(addr.Project)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	go s.finishRun(deps, root, mode, one, wt, t.Run, t.Address)
 	return nil

@@ -17,12 +17,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -914,5 +916,55 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	}
 	if !strings.Contains(bodies[0], "*proj*") {
 		t.Errorf("message lacks the project header: %s", bodies[0])
+	}
+}
+
+func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	fake := runnerfake.NewRunner()
+	var projects []string
+	var mu sync.Mutex
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.RunnerName = "fake"
+		c.RunnerFor = func(project string) agentrunner.Runner {
+			mu.Lock()
+			defer mu.Unlock()
+			projects = append(projects, project)
+			return fake
+		}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	for ev := range evs {
+		if ev.Type == server.EventIterationStarted {
+			break
+		}
+	}
+	runs := h.Server.Runs()
+	if len(runs) != 1 || runs[0].Runner != "fake" {
+		t.Fatalf("runs = %+v, want one recorded as fake", runs)
+	}
+	if _, ok, _ := fake.Find(runs[0].Session.Label); !ok {
+		t.Error("the agent was not started on the configured runner")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	for _, p := range projects {
+		if p != "proj" {
+			t.Errorf("RunnerFor asked for project %q", p)
+		}
 	}
 }

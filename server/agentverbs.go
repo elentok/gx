@@ -20,14 +20,15 @@ const (
 func (s *Server) agentVerb(req QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (QueueResult, error)) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		label, _, _ := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, "")
-		sess, ok, err := s.cfg.Runner.Find(label)
+		runner := s.runnerFor(ref.addr.Project)
+		sess, ok, err := runner.Find(label)
 		if err != nil {
 			return QueueResult{}, err
 		}
 		if !ok {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
-		return do(s.cfg.Runner, sess)
+		return do(runner, sess)
 	})
 }
 

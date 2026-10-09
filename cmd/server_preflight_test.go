@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/nativerunner"
 )
 
 func TestPreflightAgentRunner(t *testing.T) {
@@ -61,5 +62,26 @@ func TestPreflightAgentRunner(t *testing.T) {
 				t.Errorf("log err = %v, want containing %q", rec["err"], tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestServerRunner_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
+	state := t.TempDir()
+	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, state)
+	h, ok := runnerFor("proj").(*nativerunner.Headless)
+	if !ok {
+		t.Fatalf("runnerFor(proj) = %T, want *Headless", runnerFor("proj"))
+	}
+	if want := nativerunner.AgentsRoot(state, "proj"); h.Root != want {
+		t.Errorf("Root = %q, want %q", h.Root, want)
+	}
+	if runnerFor("proj") != agentrunner.Runner(h) {
+		t.Error("a project must keep one Headless: its live sessions are in memory")
+	}
+}
+
+func TestServerRunner_HerdrNeedsNoPerProjectRunner(t *testing.T) {
+	if _, runnerFor := serverRunner(agentrunner.ChoiceHerdr, t.TempDir()); runnerFor != nil {
+		t.Error("herdr has no per-project state")
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -51,11 +52,24 @@ func preflightAgentRunner(setting string, p agentrunner.Probe, logPath string) (
 	return choice, nil
 }
 
-// serverRunner is the runner the server reports host health for. Launches
-// still go through herdr directly, so a native runner needs no setup yet.
-func serverRunner(c agentrunner.Choice) agentrunner.Runner {
+// serverRunner is the runner the server launches through. A headless runner
+// keeps its agent dirs per project, so runnerFor hands out one Headless per
+// project (kept, because its live sessions are in memory); it is nil for herdr.
+func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, runnerFor func(project string) agentrunner.Runner) {
 	if c == agentrunner.ChoiceHerdr {
-		return herdrrunner.New()
+		return herdrrunner.New(), nil
 	}
-	return &nativerunner.Headless{}
+	var mu sync.Mutex
+	byProject := map[string]*nativerunner.Headless{}
+	runnerFor = func(project string) agentrunner.Runner {
+		mu.Lock()
+		defer mu.Unlock()
+		h, ok := byProject[project]
+		if !ok {
+			h = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project)}
+			byProject[project] = h
+		}
+		return h
+	}
+	return &nativerunner.Headless{}, runnerFor
 }

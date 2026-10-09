@@ -67,6 +67,12 @@ type Config struct {
 	// Runner is the configured agent runner; nil means herdr. Herdr health
 	// is only probed when it reports health (agentrunner.HealthChecker).
 	Runner agentrunner.Runner
+	// RunnerName is recorded in Run.Runner; empty means herdr.
+	RunnerName string
+	// RunnerFor, when set, picks the runner of a project's launches. Runners
+	// that keep per-project state on disk (headless agent dirs) need it;
+	// Runner still answers host health and any project RunnerFor returns nil for.
+	RunnerFor func(project string) agentrunner.Runner
 
 	BudgetPollInterval time.Duration // zero means the default
 
