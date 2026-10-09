@@ -3,7 +3,6 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -202,7 +201,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				continue
 			}
 			if evidence != "" {
-				if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
+				if err := d.Runner.Interrupt(p.session()); err != nil {
 					return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
 				}
 				if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
@@ -227,22 +226,10 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	}
 }
 
-// smartZoneRecoveryTimeoutMs bounds recoverSmartZoneBreach's finish-up
-// AgentPrompt call. herdr's own --wait already fails fast (within ~5s) if it
-// never observes a state change after submission, but once it does observe
-// one it waits indefinitely for --until to match — and a submission that
-// never actually gets typed into the pane (observed in production: the
-// text only appears once something else, like an operator's own keypress,
-// nudges herdr's terminal-state detection) can wedge this call, and with it
-// this iteration's whole goroutine, forever. Bounding it here means a
-// persistent problem shows up as a repeated smart-zone breach on the same
-// ticket instead of a stuck loop.
-const smartZoneRecoveryTimeoutMs = 30_000
-
 // smartZoneCompactTimeoutMs bounds recoverSmartZoneBreach's wait for the
 // "/compact" command itself to finish (pane back to idle/done), as opposed
 // to merely starting (pane reaching "working"). Compacting a near-full
-// context can take minutes, well past smartZoneRecoveryTimeoutMs. Once this
+// context can take minutes. Once this
 // elapses without the pane confirming completion, waitForCompactionSignal
 // starts consulting the transcript's compaction-boundary signal on every
 // further poll tick (see smartZoneCompactExtendedTimeoutMs) instead of
@@ -299,59 +286,6 @@ func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 		label, errCompactRecoveryExhausted, giveUps, cause)
 }
 
-// smartZoneCompactSubmitPollMs is the tick size for confirmCompactSubmitted's
-// retry loop; smartZoneCompactSubmitTimeoutMs is its total budget. herdr's
-// idle/done sample can be taken before Enter's effect has rendered "/compact"
-// as submitted in the pane, so a completion signal alone doesn't mean the
-// finish-up prompt is safe to send — it can still land concatenated with an
-// unsubmitted "/compact". Each tick re-checks after a plain Sleep (not an
-// AgentWait — the pane's status is irrelevant to whether "/compact" has
-// rendered, and treating a "working" transition as a poll result would burn
-// through the retry budget in one tick instead of pacing it) rather than
-// sending a fresh keypress: a blind Enter here risks canceling a genuine
-// in-progress compaction.
-const (
-	smartZoneCompactSubmitPollMs    = 5_000
-	smartZoneCompactSubmitTimeoutMs = 30_000
-)
-
-// confirmCompactSubmitted reports whether "/compact" has actually rendered as
-// submitted in pane, by reading its trailing line via AgentRead. A trailing
-// line still reading "/compact" means Enter's effect on the pane hasn't
-// rendered yet.
-func confirmCompactSubmitted(d Deps, pane string) (bool, error) {
-	out, err := d.AgentRead(pane, herdr.AgentReadOptions{Source: "recent-unwrapped"})
-	if err != nil {
-		return false, err
-	}
-	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	trailing := strings.TrimSpace(lines[len(lines)-1])
-	return trailing != "/compact", nil
-}
-
-// confirmCompactSubmittedWithRetry gates entry into recoverSmartZoneBreach's
-// finish-up phase behind confirmCompactSubmitted, bounded to
-// smartZoneCompactSubmitTimeoutMs total. It never sends a nudge keypress or
-// resubmits "/compact" — only sleeps between polls to give the pane a chance
-// to render the submission.
-func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
-	elapsedMs := 0
-	for {
-		submitted, err := confirmCompactSubmitted(d, pane)
-		if err != nil {
-			return err
-		}
-		if submitted {
-			return nil
-		}
-		if elapsedMs >= smartZoneCompactSubmitTimeoutMs {
-			return fmt.Errorf("/compact still unsubmitted in pane after %ds", smartZoneCompactSubmitTimeoutMs/1000)
-		}
-		d.Sleep(smartZoneCompactSubmitPollMs * time.Millisecond)
-		elapsedMs += smartZoneCompactSubmitPollMs
-	}
-}
-
 // recoverSmartZoneBreach compacts the conversation and re-prompts the agent
 // to finish up after a smart-zone breach, deliberately never calling
 // Gate.pause: the scheduler keeps claiming and running other tickets while
@@ -359,83 +293,40 @@ func confirmCompactSubmittedWithRetry(d Deps, pane string) error {
 // SmartZoneCompactStarted/SmartZoneFinishingUp/SmartZoneRecovered rather than
 // IterationPaused/IterationResumed, since this is a phase change on a still-
 // running iteration, not something an operator could ever "resume" — see
-// PauseKind's own doc comment. Either AgentPrompt call timing out (see
-// smartZoneRecoveryTimeoutMs) is treated as best-effort and logged rather
-// than propagated as a hard error: crashing the whole Run() over a stuck
-// compaction would take down every other running iteration with it, and the
-// agent may well still finish on its own even without this nudge.
+// PauseKind's own doc comment. Either Prompt failing is treated as
+// best-effort and logged rather than propagated as a hard error: crashing the
+// whole Run() over a stuck compaction would take down every other running
+// iteration with it, and the agent may well still finish on its own even
+// without this nudge.
 //
-// The "/compact" prompt waits for the pane to reach idle/done — i.e. for the
-// compaction to actually finish, not merely start — before the finish-up
-// prompt is sent. Codex may first report blocked while waiting for compact
-// confirmation; that state belongs to this flow, so recovery observes the
-// confirmation and compaction transitions passively instead of treating them
-// as operator intervention. Waiting only for "working" let the finish-up text
-// land mid-compaction and get swallowed as fresh input, canceling compaction.
-// recoverSmartZoneBreach's bool return reports whether the compact/finish-up
-// contract actually completed (true) or was abandoned as best-effort after
-// one of its two failure branches (false) — callers that must not silently
-// treat a failed recovery as a normal finish (see
-// recoverOrFailCodexContextExhaustion) need that distinction; the plain
-// proactive smart-zone breach caller still treats both outcomes the same way
-// and ignores it.
+// Runner.Prompt("/compact") returns once the compaction started, having
+// waited out any confirmation the agent asks for and checked the submission
+// rendered. Recovery then waits for the compaction to actually finish before
+// sending the finish-up prompt: sending it as soon as the turn started let the
+// finish-up text land mid-compaction and get swallowed as fresh input,
+// canceling compaction. recoverSmartZoneBreach's bool return reports whether
+// the compact/finish-up contract actually completed (true) or was abandoned
+// as best-effort (false) — callers that must not silently treat a failed
+// recovery as a normal finish (see recoverOrFailCodexContextExhaustion) need
+// that distinction; the plain proactive smart-zone breach caller still treats
+// both outcomes the same way and ignores it.
 //
 // The compact-completion wait polls in smartZonePollMs ticks (via
-// waitForCompactionSignal) rather than blocking on one long AgentPrompt/
-// AgentWait call, so a pane-status wait that times out past
-// smartZoneCompactTimeoutMs can still be confirmed successful from the
-// transcript's compaction-boundary signal instead of being misreported as a
-// failure — see waitForCompactionSignal's doc comment.
-//
-// Neither AgentPrompt call below reads the pane back to confirm "/compact" or
-// the finish-up text was actually submitted before treating the wait as
-// meaningful. That's safe only because every call here passes Wait: true:
-// herdr's own --wait (as of 0.8.0) captures a state_change_seq baseline at
-// submission and refuses to match Until against anything until that sequence
-// actually advances, so a prompt sitting typed-but-unsubmitted in the pane
-// (herdr's `agent prompt` sends the trailing Enter from a task delayed up to
-// 300ms after returning, see herdr's AGENT_PROMPT_SUBMIT_DELAY) can't be
-// mistaken for a state that predates it. This is herdr behavior, not
-// something gx enforces — an AgentPrompt call added here without Wait: true
-// would reintroduce the race this comment is warning about.
+// waitForCompactionSignal) rather than blocking on one long Wait, so a
+// pane-status wait that times out past smartZoneCompactTimeoutMs can still be
+// confirmed successful from the transcript's compaction-boundary signal
+// instead of being misreported as a failure — see waitForCompactionSignal's
+// doc comment.
 func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason string, smartZone int) (bool, error) {
 	p.sink().SmartZoneCompactStarted(p.Ticket)
 	p.logAgentEvent(string(events.PausedSmartZone), sessionID, reason)
 
 	baseline := newStickyBaseline(d, p, sessionID)
 
-	compactStates := append(append([]string{}, plainFinishStates...), "blocked")
-	agent, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target:    p.Pane,
-		Text:      "/compact",
-		Wait:      true,
-		Until:     compactStates,
-		TimeoutMs: smartZonePollMs,
-	})
+	err := d.Runner.Prompt(p.session(), "/compact")
 	completion := compactPaneConfirmed
-	if unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, sessionID, err, baseline); unconfirmed {
-		agent, completion, err = waitForCompactionSignal(d, p, sessionID, compactStates, smartZonePollMs, baseline, gateHeld)
-	}
-	// "blocked" is Codex's compact-confirmation state, and Codex is exactly the
-	// agent with no compaction-boundary signal, so with the gate in place this
-	// branch is reachable only from the unsupported snapshot state: a gated
-	// wait never returns success until the transcript itself confirms.
-	if err == nil && agent.AgentStatus == "blocked" {
-		_, err = d.AgentWait(herdr.AgentWaitOptions{
-			Target:    p.Pane,
-			Until:     []string{"working"},
-			TimeoutMs: smartZoneCompactTimeoutMs,
-		})
-		if err == nil {
-			_, err = d.AgentWait(herdr.AgentWaitOptions{
-				Target:    p.Pane,
-				Until:     plainFinishStates,
-				TimeoutMs: smartZonePollMs,
-			})
-			if err != nil && herdrrunner.IsPollTimeout(err) {
-				_, completion, err = waitForCompactionSignal(d, p, sessionID, plainFinishStates, smartZonePollMs, baseline, false)
-			}
-		}
+	if err == nil {
+		completion, err = waitForCompactionSignal(d, p, sessionID, runnerFinishStates, baseline)
 	}
 	if err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
@@ -452,12 +343,6 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 		p.logAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary landed", p.Label))
 	}
 
-	if err := confirmCompactSubmittedWithRetry(d, p.Pane); err != nil {
-		p.sink().SmartZoneRecovered(p.Ticket)
-		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("confirming /compact submitted for %s: %v", p.Label, err))
-		return false, nil
-	}
-
 	p.sink().SmartZoneFinishingUp(p.Ticket)
 
 	finishText := fmt.Sprintf(
@@ -466,13 +351,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 			"`gx-implement` skill and create follow up tickets",
 		smartZone,
 	)
-	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target:    p.Pane,
-		Text:      finishText,
-		Wait:      true,
-		Until:     []string{"working"},
-		TimeoutMs: smartZoneRecoveryTimeoutMs,
-	}); err != nil {
+	if err := d.Runner.Prompt(p.session(), finishText); err != nil {
 		p.sink().SmartZoneRecovered(p.Ticket)
 		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("re-prompting %s after smart-zone compact: %v", p.Label, err))
 		return false, nil
@@ -639,32 +518,10 @@ const (
 	compactTimeoutConfirmed
 )
 
-// compactSignalUnconfirmed reports whether the immediate "/compact"
-// AgentPrompt result (err) needs a fallthrough to waitForCompactionSignal
-// rather than being trusted as-is: either the prompt's own wait timed out, or
-// the gate is engaged and the transcript hasn't recorded a new compaction
-// boundary yet — a premature idle/done report, not proof the compact actually
-// finished. gateHeld distinguishes those two reasons, so a completion reached
-// later can still name the route it came by.
-func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baseline *stickyBaseline) (unconfirmed, gateHeld bool) {
-	if err != nil {
-		return herdrrunner.IsPollTimeout(err), false
-	}
-	if !baseline.gates() {
-		return false, false
-	}
-	if baseline.advancedPast(d, p, sessionID) {
-		return false, false
-	}
-	return true, true
-}
-
-// waitForCompactionSignal polls Pane in smartZonePollMs ticks for one of
-// until's states instead of blocking on a single long AgentWait call, so a
+// waitForCompactionSignal polls the session in smartZonePollMs ticks for one
+// of until's states instead of blocking on a single long Wait, so a
 // still-genuinely-running compact isn't indistinguishable from a stuck one
-// just because herdr's own pane-status wait timed out. startElapsedMs is the
-// time already spent by the caller's own first poll tick before handing off
-// here.
+// just because the pane-status wait timed out.
 //
 // While baseline gates (see compactBoundarySnapshot), the transcript is
 // authoritative in both directions. A pane that reports completion is believed
@@ -678,11 +535,10 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 // extended bound like any other unconfirmed tick. The baseline itself is fixed
 // for the whole recovery and never re-read here — see stickyBaseline.
 //
-// gateHeld carries in whether the caller's own first check was already refused
-// by the gate, and the returned compactCompletion names the route taken. A gate
-// that held at any point wins over the timeout route: the pane having lied
-// about being idle is the more specific finding, and the one an investigator
-// reading the run log needs to see.
+// The returned compactCompletion names the route taken. A gate that held at
+// any point wins over the timeout route: the pane having lied about being idle
+// is the more specific finding, and the one an investigator reading the run
+// log needs to see.
 //
 // Only once smartZoneCompactExtendedTimeoutMs of accumulated time elapses with
 // neither signal showing completion does this give up: with the pane's own
@@ -692,51 +548,47 @@ func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string,
 // the finish-up prompt and reintroduce the bug ten minutes later.
 func waitForCompactionSignal(
 	d Deps, p launchAndPromptParams, sessionID string,
-	until []string, startElapsedMs int,
-	baseline *stickyBaseline, gateHeld bool,
-) (agent herdr.Agent, completion compactCompletion, err error) {
-	elapsedMs := startElapsedMs
+	until []agentrunner.State, baseline *stickyBaseline,
+) (compactCompletion, error) {
+	gateHeld := false
+	elapsedMs := 0
 	for {
-		agent, err = d.AgentWait(herdr.AgentWaitOptions{
-			Target:    p.Pane,
-			Until:     until,
-			TimeoutMs: smartZonePollMs,
-		})
-		if err != nil && !herdrrunner.IsPollTimeout(err) {
-			return agent, compactPaneConfirmed, err
+		_, err := d.Runner.Wait(p.session(), until, smartZonePollMs*time.Millisecond)
+		if err != nil && !errors.Is(err, agentrunner.ErrTimeout) {
+			return compactPaneConfirmed, err
 		}
 		if err == nil {
 			if !baseline.gates() || baseline.advancedPast(d, p, sessionID) {
 				if gateHeld {
-					return agent, compactGateConfirmed, nil
+					return compactGateConfirmed, nil
 				}
-				return agent, compactPaneConfirmed, nil
+				return compactPaneConfirmed, nil
 			}
 			gateHeld = true
 			// This wait returned immediately (that premature idle report is the
 			// whole reason the gate exists), so it consumed none of the poll
-			// interval the timeout branch below consumes inside AgentWait
-			// itself. Pace it here instead — and only here: sleeping on both
-			// branches would double-pace the timeout path and stretch the
-			// extended bound to twice its wall-clock budget.
+			// interval the timeout branch below consumes inside Wait itself.
+			// Pace it here instead — and only here: sleeping on both branches
+			// would double-pace the timeout path and stretch the extended bound
+			// to twice its wall-clock budget.
 			d.Sleep(smartZonePollMs * time.Millisecond)
 		}
 		elapsedMs += smartZonePollMs
 
 		if err != nil && elapsedMs >= smartZoneCompactTimeoutMs && baseline.advancedPast(d, p, sessionID) {
 			if gateHeld {
-				return agent, compactGateConfirmed, nil
+				return compactGateConfirmed, nil
 			}
-			return agent, compactTimeoutConfirmed, nil
+			return compactTimeoutConfirmed, nil
 		}
 
 		if elapsedMs >= smartZoneCompactExtendedTimeoutMs {
 			if err == nil {
-				return agent, compactPaneConfirmed, fmt.Errorf(
+				return compactPaneConfirmed, fmt.Errorf(
 					"compacting %s: the pane kept reporting completion but the transcript recorded no compaction boundary: %w",
 					p.Label, errCompactNeverConfirmed)
 			}
-			return agent, compactPaneConfirmed, err
+			return compactPaneConfirmed, err
 		}
 	}
 }
@@ -1077,7 +929,7 @@ func recoverCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID st
 	if !exhausted {
 		return false, nil
 	}
-	if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
+	if err := d.Runner.Interrupt(p.session()); err != nil {
 		return false, fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
 	}
 	if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {

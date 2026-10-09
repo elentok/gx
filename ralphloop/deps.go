@@ -77,13 +77,9 @@ type Deps struct {
 	AgentExplain  func(target string) (herdr.AgentExplainResult, error)
 	AgentWait     func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
 	AgentSendKeys func(target string, keys ...string) error
-	// AgentRead reads pane's terminal output, used to confirm a submitted
-	// prompt has actually rendered rather than still sitting unsubmitted (see
-	// confirmCompactSubmitted).
-	AgentRead    func(target string, opts herdr.AgentReadOptions) (string, error)
-	RevParse     func(dir, ref string) (string, error)
-	MergeBase    func(dir, refA, refB string) (string, error)
-	CommitsAhead func(dir, fromExclusive, toRef string) (int, error)
+	RevParse      func(dir, ref string) (string, error)
+	MergeBase     func(dir, refA, refB string) (string, error)
+	CommitsAhead  func(dir, fromExclusive, toRef string) (int, error)
 	// CommitSubjects lists fromExclusive..toRef's subjects, oldest first, so
 	// startup reconciliation can tell an interrupted landing's commits from
 	// anything else that reached the feature branch.
@@ -247,7 +243,6 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		AgentPrompt:           herdrrunner.PromptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now),
 		AgentWait:             herdr.AgentWait,
 		AgentSendKeys:         herdr.AgentSendKeys,
-		AgentRead:             herdr.AgentRead,
 		RevParse:              git.RevParse,
 		MergeBase:             git.MergeBase,
 		CommitsAhead:          git.CommitsAhead,

@@ -22,24 +22,10 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	t.Parallel()
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
 	scratchDir := epicScratchDir(t, "epic")
-	var paneReads, interruptions int
-	var prompts []string
+	var paneReads int
+	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20"), timeoutOn: 1}
 	d := Deps{
-		Runner: &blipRunner{Runner: paneRunner("iter-20", "pane-1", "codex-session-20"), timeoutOn: 1},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(string, ...string) error {
-			interruptions++
-			return nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			if opts.Text == "/compact" {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
+		Runner: r,
 		ReadPaneRecent: func(string) (string, error) {
 			paneReads++
 			if paneReads == 1 {
@@ -49,9 +35,6 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 		},
 		ReadCodexContext: func(string, string) (int, bool, error) {
 			return 1_000, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -64,10 +47,10 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
-	if interruptions != 1 {
-		t.Errorf("pane interruptions = %d, want 1", interruptions)
+	if r.interrupts != 1 {
+		t.Errorf("pane interruptions = %d, want 1", r.interrupts)
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-20"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want compact then finish-up", prompts)
 	}
 	events, ok, err := ReadEvents(scratchDir, "epic")
@@ -81,31 +64,16 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 
 func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T) {
 	t.Parallel()
-	var paneReads, interruptions int
+	var paneReads int
+	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20")}
 	d := Deps{
-		Runner: paneRunner("iter-20", "pane-1", "codex-session-20"),
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(string, ...string) error {
-			interruptions++
-			return nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			if opts.Text == "/compact" {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
+		Runner: r,
 		ReadPaneRecent: func(string) (string, error) {
 			paneReads++
 			if paneReads == 1 {
 				return `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`, nil
 			}
 			return "", nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -117,30 +85,19 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
-	if interruptions != 1 {
-		t.Errorf("pane interruptions = %d, want 1 before accepting settled state", interruptions)
+	if r.interrupts != 1 {
+		t.Errorf("pane interruptions = %d, want 1 before accepting settled state", r.interrupts)
 	}
 }
 
 func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *testing.T) {
 	t.Parallel()
 	const failure = "■ Codex ran out of room in the model's context window."
-	var paneReads, interruptions int
+	var paneReads int
+	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21")}
+	r.FailNextPrompts("iter-21", 1, errors.New("compact never landed"))
 	d := Deps{
-		Runner: paneRunner("iter-21", "pane-1", "codex-session-21"),
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(string, ...string) error {
-			interruptions++
-			return nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			if opts.Text == "/compact" {
-				return herdr.Agent{}, errors.New("compact never landed")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
+		Runner: r,
 		ReadPaneRecent: func(string) (string, error) {
 			paneReads++
 			if paneReads == 1 {
@@ -161,8 +118,8 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 	if !strings.Contains(err.Error(), "recovery failed") || !strings.Contains(err.Error(), "context window") {
 		t.Errorf("waitForFinish error = %q, want it to name the failed recovery and evidence", err.Error())
 	}
-	if interruptions != 1 {
-		t.Errorf("pane interruptions = %d, want 1", interruptions)
+	if r.interrupts != 1 {
+		t.Errorf("pane interruptions = %d, want 1", r.interrupts)
 	}
 }
 
@@ -173,18 +130,10 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	// existing to fire — the native exhaustion text is itself the evidence.
 	const failure = `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`
 	var paneReads int
+	r := idlePromptRunner("iter-21", "codex-session-21")
+	r.FailNextPrompts("iter-21", 1, errors.New("compact never landed"))
 	d := Deps{
-		Runner: paneRunner("iter-21", "pane-1", "codex-session-21"),
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(string, ...string) error { return nil },
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			if opts.Text == "/compact" {
-				return herdr.Agent{}, errors.New("compact never landed")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
+		Runner: r,
 		ReadPaneRecent: func(string) (string, error) {
 			paneReads++
 			if paneReads == 1 {
@@ -213,22 +162,10 @@ func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T
 	} {
 		t.Run(text, func(t *testing.T) {
 			t.Parallel()
-			var paneReads, interruptions int
+			var paneReads int
+			r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20")}
 			d := Deps{
-				Runner: paneRunner("iter-20", "pane-1", "codex-session-20"),
-				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-					return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-				},
-				AgentSendKeys: func(string, ...string) error {
-					interruptions++
-					return nil
-				},
-				AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-					if opts.Text == "/compact" {
-						return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-					}
-					return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-				},
+				Runner: r,
 				ReadPaneRecent: func(string) (string, error) {
 					paneReads++
 					if paneReads == 1 {
@@ -246,56 +183,24 @@ func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T
 			if err != nil {
 				t.Fatalf("waitForFinish: %v", err)
 			}
-			if interruptions != 0 {
-				t.Errorf("pane interruptions = %d, want no recovery for discussion/error text", interruptions)
+			if r.interrupts != 0 || len(r.Prompts("iter-20")) != 0 {
+				t.Errorf("pane interruptions = %d, prompts = %v, want no recovery for discussion/error text", r.interrupts, r.Prompts("iter-20"))
 			}
 		})
 	}
 }
 
-func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmation(t *testing.T) {
+func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
-	var waits int
-	var sentKeys [][]string
 	var observedCwd, observedSession string
-	var prompts []string
-	var promptUntils [][]string
-	var recoveryWaitUntils [][]string
+	r := &blipRunner{Runner: idlePromptRunner("iter-01", "codex-session-1"), timeoutOn: 1}
 	d := Deps{
-		Runner: &blipRunner{Runner: paneRunner("iter-01", "pane-1", "codex-session-1"), timeoutOn: 1},
-		// Recovery's own waits, which still go through herdr.
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			switch waits {
-			case 1:
-				recoveryWaitUntils = append(recoveryWaitUntils, opts.Until)
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-			case 2:
-				recoveryWaitUntils = append(recoveryWaitUntils, opts.Until)
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(target string, keys ...string) error {
-			sentKeys = append(sentKeys, keys)
-			return nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			promptUntils = append(promptUntils, opts.Until)
-			if opts.Text == "/compact" {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
+		Runner: r,
 		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
 			observedCwd, observedSession = cwd, sessionID
 			return 150001, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -313,30 +218,21 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
-	if len(sentKeys) != 1 || !slices.Equal(sentKeys[0], []string{"ctrl+c"}) {
-		t.Errorf("AgentSendKeys calls = %v, want one pre-compact ctrl+c", sentKeys)
+	if r.interrupts != 1 {
+		t.Errorf("interrupts = %d, want one before /compact", r.interrupts)
 	}
 	if observedCwd != "/repo/iter-01" || observedSession != "codex-session-1" {
 		t.Errorf("ReadCodexContext(%q, %q), want (/repo/iter-01, codex-session-1)", observedCwd, observedSession)
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "150000") {
+	if prompts := r.Prompts("iter-01"); len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "150000") {
 		t.Errorf("prompts = %v, want [/compact, <finish-up prompt mentioning 150000>]", prompts)
-	}
-	compactStates := append(append([]string{}, plainFinishStates...), "blocked")
-	if len(promptUntils) != 2 || !slices.Equal(promptUntils[0], compactStates) {
-		t.Errorf("/compact Until = %v, want %v", promptUntils, compactStates)
-	}
-	if len(recoveryWaitUntils) != 2 ||
-		!slices.Equal(recoveryWaitUntils[0], []string{"working"}) ||
-		!slices.Equal(recoveryWaitUntils[1], plainFinishStates) {
-		t.Errorf("compact confirmation waits = %v, want [[working] %v]", recoveryWaitUntils, plainFinishStates)
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if strings.Contains(string(raw), "needs-repair") {
-		t.Errorf("ticket status = %s, compact confirmation must not become needs-repair", raw)
+		t.Errorf("ticket status = %s, a recovered breach must not become needs-repair", raw)
 	}
 	if gate.isPaused() {
 		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")
@@ -352,55 +248,33 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 	t.Parallel()
 	scratchDir := epicScratchDir(t, "epic")
-	var waits, prompts int
 	var compactionCount int
+	r := breachRunner(func(wait int) bool {
+		// Ticks past smartZoneCompactTimeoutMs before the transcript records
+		// the compaction finishing, so recovery must stop polling on its own
+		// rather than needing the pane to ever confirm completion.
+		if wait == 12 {
+			compactionCount = 1
+		}
+		return true
+	})
 	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			// Ticks past smartZoneCompactTimeoutMs (past the 10th
-			// smartZonePollMs-sized tick) before the transcript records the
-			// compaction finishing, so recovery must stop polling on its own
-			// rather than needing the pane to ever confirm completion.
-			if waits == 11 {
-				compactionCount = 1
-			}
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts++
-			if opts.Text == "/compact" {
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
 
-	p := launchAndPromptParams{
-		Label:      "iter-19",
-		Agent:      AgentClaude,
-		Pane:       "pane-1",
-		Ticket:     "19",
-		SessionCwd: "/repo/iter-19",
-		ScratchDir: scratchDir,
-		EpicName:   "epic",
-	}
-
-	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
 	if err != nil {
 		t.Fatalf("recoverSmartZoneBreach: %v", err)
 	}
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the transcript confirms compaction completed")
 	}
-	if prompts != 2 {
-		t.Errorf("prompts sent = %d, want 2 (/compact, then finish-up)", prompts)
+	if prompts := r.Prompts("iter-19"); len(prompts) != 2 {
+		t.Errorf("prompts = %v, want 2 (/compact, then finish-up)", prompts)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
@@ -437,40 +311,24 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *testing.T) {
 	t.Parallel()
 	scratchDir := epicScratchDir(t, "epic")
-	var prompts int
+	r := breachRunner(alwaysTimeout)
 	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts++
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return 0, true, nil
 		},
 		Sleep: func(time.Duration) {},
 	}
 
-	p := launchAndPromptParams{
-		Label:      "iter-19",
-		Agent:      AgentClaude,
-		Pane:       "pane-1",
-		Ticket:     "19",
-		SessionCwd: "/repo/iter-19",
-		ScratchDir: scratchDir,
-		EpicName:   "epic",
-	}
-
-	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
 	if err != nil {
 		t.Fatalf("recoverSmartZoneBreach: %v", err)
 	}
 	if recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=true, want false: compaction never completed on either signal")
 	}
-	if prompts != 1 {
-		t.Errorf("prompts sent = %d, want 1 (/compact only, no finish-up after failure)", prompts)
+	if prompts := r.Prompts("iter-19"); len(prompts) != 1 {
+		t.Errorf("prompts = %v, want /compact only, no finish-up after failure", prompts)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
@@ -498,54 +356,35 @@ func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *tes
 func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()
-	var prompts []string
-	var waits int
 	var compactionCount int
+	r := breachRunner(func(wait int) bool {
+		if wait == 2 {
+			// The real compaction lands between the second and third poll
+			// tick, after the first tick's premature idle was refused.
+			compactionCount = 1
+			return true
+		}
+		return false
+	})
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			if waits == 1 {
-				// The real compaction lands between the first and second poll
-				// tick of the fallthrough wait.
-				compactionCount = 1
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
 
-	p := launchAndPromptParams{
-		Label:      "iter-19",
-		Agent:      AgentClaude,
-		Pane:       "pane-1",
-		Ticket:     "19",
-		SessionCwd: "/repo/iter-19",
-		ScratchDir: scratchDir,
-		EpicName:   "epic",
-	}
-
-	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
 	if err != nil {
 		t.Fatalf("recoverSmartZoneBreach: %v", err)
 	}
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the transcript confirms compaction completed")
 	}
-	if waits == 0 {
-		t.Error("AgentWait never called, want the premature idle/done report to fall through to waitForCompactionSignal")
+	if r.waits != 3 {
+		t.Errorf("Runner.Wait calls = %d, want 3: the premature idle must keep polling until the transcript confirms", r.waits)
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up] with finish-up sent only after the fallthrough poll confirms compaction", prompts)
 	}
 }
@@ -558,167 +397,34 @@ func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *te
 func TestRecoverSmartZoneBreach_ImmediateSuccessTrustedWhenAlreadyAdvanced(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()
-	var prompts []string
-	var waits int
+	var sleeps int
 	var readCompactionsCalls int
+	r := breachRunner(nil)
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			readCompactionsCalls++
 			if readCompactionsCalls == 1 {
 				return 0, true, nil // baseline, taken before "/compact" is sent
 			}
-			return 1, true, nil // already advanced by the time the prompt returns
+			return 1, true, nil // already advanced by the first poll tick
 		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
-		},
-		Sleep: func(time.Duration) {},
+		Sleep: func(time.Duration) { sleeps++ },
 	}
 
-	p := launchAndPromptParams{
-		Label:      "iter-19",
-		Agent:      AgentClaude,
-		Pane:       "pane-1",
-		Ticket:     "19",
-		SessionCwd: "/repo/iter-19",
-		ScratchDir: scratchDir,
-		EpicName:   "epic",
-	}
-
-	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
 	if err != nil {
 		t.Fatalf("recoverSmartZoneBreach: %v", err)
 	}
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true")
 	}
-	if waits != 0 {
-		t.Errorf("AgentWait calls = %d, want 0: a genuine immediate success must not fall through to extra polling", waits)
+	if r.waits != 1 || sleeps != 0 {
+		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: a genuine immediate success must not keep polling", r.waits, sleeps)
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
 	}
-}
-
-func TestCompactSignalUnconfirmed(t *testing.T) {
-	t.Parallel()
-	p := launchAndPromptParams{Agent: AgentClaude, SessionCwd: "/repo/iter-19"}
-	confirmedBaseline := &stickyBaseline{snapshot: compactBoundarySnapshot{state: compactBoundaryConfirmed}}
-
-	t.Run("poll timeout is unconfirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{}
-		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", errors.New("timed out waiting for agent status"), confirmedBaseline)
-		if !unconfirmed {
-			t.Error("unconfirmed = false, want true: a poll timeout must always fall through")
-		}
-		if gateHeld {
-			t.Error("gateHeld = true, want false: nothing was gated, the pane simply hadn't reported yet")
-		}
-	})
-
-	t.Run("non-timeout error is confirmed (not re-polled here)", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{}
-		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", errors.New("boom"), confirmedBaseline)
-		if unconfirmed {
-			t.Error("unconfirmed = true, want false: a genuine non-timeout error is handled by the caller, not waitForCompactionSignal")
-		}
-	})
-
-	t.Run("success with baseline not yet advanced is unconfirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
-				return 0, true, nil
-			},
-		}
-		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
-		if !unconfirmed {
-			t.Error("unconfirmed = false, want true: transcript hasn't advanced past baseline yet")
-		}
-		if !gateHeld {
-			t.Error("gateHeld = false, want true: the pane reported completion and the gate refused it")
-		}
-	})
-
-	t.Run("success with baseline already advanced is confirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
-				return 1, true, nil
-			},
-		}
-		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
-		if unconfirmed {
-			t.Error("unconfirmed = true, want false: transcript already confirms compaction advanced")
-		}
-	})
-
-	t.Run("success on an unsupported agent is confirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{}
-		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, &stickyBaseline{snapshot: compactBoundarySnapshot{state: compactBoundaryUnsupported}})
-		if unconfirmed {
-			t.Error("unconfirmed = true, want false: no boundary signal exists for this agent, trust the immediate success")
-		}
-	})
-
-	t.Run("success with a re-fetch error is unconfirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
-				return 0, false, errors.New("read failed")
-			},
-		}
-		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", nil, confirmedBaseline)
-		if !unconfirmed {
-			t.Error("unconfirmed = false, want true: a read that fails now proves nothing about the compaction")
-		}
-		if !gateHeld {
-			t.Error("gateHeld = false, want true: an unreadable transcript refuses the pane's report just as a stale count does")
-		}
-	})
-
-	t.Run("success on an unavailable baseline with no boundary since submission is unconfirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
-				return 3, true, nil
-			},
-			ReadCompactionsAfter: func(cwd, sessionID string, since time.Time) (int, bool, error) {
-				return 0, true, nil
-			},
-		}
-		unconfirmed, gateHeld := compactSignalUnconfirmed(d, p, "sess-19", nil, &stickyBaseline{snapshot: compactBoundarySnapshot{state: compactBoundaryUnavailable}})
-		if !unconfirmed || !gateHeld {
-			t.Errorf("unconfirmed = %v, gateHeld = %v; want both true: no boundary has landed since /compact was submitted", unconfirmed, gateHeld)
-		}
-	})
-
-	t.Run("success on an unavailable baseline with a boundary since submission is confirmed", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
-				return 3, true, nil
-			},
-			ReadCompactionsAfter: func(cwd, sessionID string, since time.Time) (int, bool, error) {
-				return 1, true, nil
-			},
-		}
-		unconfirmed, _ := compactSignalUnconfirmed(d, p, "sess-19", nil, &stickyBaseline{snapshot: compactBoundarySnapshot{state: compactBoundaryUnavailable}})
-		if unconfirmed {
-			t.Error("unconfirmed = true, want false: a boundary written after submission is this compaction, no pre-submission count needed")
-		}
-	})
 }
 
 func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
@@ -790,6 +496,12 @@ func gatedBreachParams(scratchDir string) launchAndPromptParams {
 	}
 }
 
+// breachRunner hosts gatedBreachParams' session. Its agent reports idle the
+// moment it is prompted, and timeoutIf scripts which compact polls time out.
+func breachRunner(timeoutIf func(wait int) bool) *blipRunner {
+	return &blipRunner{Runner: idlePromptRunner("iter-19", "sess-19"), timeoutIf: timeoutIf}
+}
+
 // TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline verifies
 // the live incident from research ticket 15: a pane that reports idle the
 // instant "/compact" is typed, over and over, while the transcript's
@@ -800,21 +512,12 @@ func gatedBreachParams(scratchDir string) launchAndPromptParams {
 func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()
-	var prompts []string
 	var sleeps []time.Duration
+	r := breachRunner(nil)
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return 0, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(d time.Duration) { sleeps = append(sleeps, d) },
 	}
@@ -826,12 +529,10 @@ func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing
 	if recovered {
 		t.Error("recoverSmartZoneBreach returned recovered=true, want false: the transcript never confirmed the compaction")
 	}
-	if len(prompts) != 1 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only: the finish-up prompt cancels an in-progress compaction", prompts)
 	}
-	// recoverSmartZoneBreach hands the wait its first tick already spent, so
-	// the gated loop pays for every remaining tick up to the extended bound.
-	wantSleeps := smartZoneCompactExtendedTimeoutMs/smartZonePollMs - 1
+	wantSleeps := smartZoneCompactExtendedTimeoutMs / smartZonePollMs
 	if len(sleeps) != wantSleeps {
 		t.Errorf("gated sleeps = %d, want %d (one poll interval per gated tick)", len(sleeps), wantSleeps)
 	}
@@ -849,27 +550,18 @@ func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing
 func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()
-	var prompts []string
 	var sleeps []time.Duration
-	var waits int
 	compactionCount := 0
+	r := breachRunner(func(wait int) bool {
+		if wait == 4 {
+			compactionCount = 1
+		}
+		return false
+	})
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			if waits == 3 {
-				compactionCount = 1
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(d time.Duration) { sleeps = append(sleeps, d) },
 	}
@@ -881,11 +573,11 @@ func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once the boundary count advances")
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
 	}
-	if len(sleeps) != 2 {
-		t.Errorf("gated sleeps = %d, want 2 (the two ticks the transcript held the gate)", len(sleeps))
+	if len(sleeps) != 3 {
+		t.Errorf("gated sleeps = %d, want 3 (one per tick the transcript held the gate)", len(sleeps))
 	}
 }
 
@@ -913,24 +605,16 @@ func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 	t.Parallel()
 	scratchDir := epicScratchDir(t, "epic")
-	var waits int
 	compactionCount := 0
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			if waits == 3 {
+		Runner: breachRunner(func(wait int) bool {
+			if wait == 4 {
 				compactionCount = 1
 			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+			return false
+		}),
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -954,27 +638,16 @@ func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing.T) {
 	t.Parallel()
 	scratchDir := epicScratchDir(t, "epic")
-	var waits int
 	compactionCount := 0
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			if opts.Text == "/compact" {
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			if waits == 11 {
+		Runner: breachRunner(func(wait int) bool {
+			if wait == 12 {
 				compactionCount = 1
 			}
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
+			return true
+		}),
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return compactionCount, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -1001,21 +674,13 @@ func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testi
 	scratchDir := epicScratchDir(t, "epic")
 	var reads int
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+		Runner: breachRunner(nil),
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			reads++
 			if reads == 1 {
 				return 0, true, nil
 			}
 			return 1, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -1036,22 +701,16 @@ func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testi
 
 // TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced pins the pacing
 // asymmetry: a pane wait that times out has already consumed its poll interval
-// inside AgentWait, so the gate must not sleep for it too. Sleeping on both
-// branches would double every tick and stretch the extended bound to twenty
-// minutes of wall clock.
+// inside Runner.Wait, so the gate must not sleep for it too. Sleeping on both
+// branches would double every tick and stretch the extended bound to twice its
+// wall-clock budget.
 func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()
 	var sleeps []time.Duration
-	var waits int
+	r := breachRunner(alwaysTimeout)
 	d := Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
+		Runner: r,
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			return 0, true, nil
 		},
@@ -1068,9 +727,9 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 	if len(sleeps) != 0 {
 		t.Errorf("sleeps = %v, want none: the pane wait itself consumed each tick", sleeps)
 	}
-	wantWaits := smartZoneCompactExtendedTimeoutMs/smartZonePollMs - 1
-	if waits != wantWaits {
-		t.Errorf("AgentWait calls = %d, want %d (the extended bound reached in ten minutes of ticks, not twenty)", waits, wantWaits)
+	wantWaits := smartZoneCompactExtendedTimeoutMs / smartZonePollMs
+	if r.waits != wantWaits {
+		t.Errorf("Runner.Wait calls = %d, want %d (one poll tick per interval up to the extended bound)", r.waits, wantWaits)
 	}
 }
 
@@ -1082,44 +741,35 @@ func TestRecoverSmartZoneBreach_TimeoutPathIsNotDoublePaced(t *testing.T) {
 // must not be trusted on the pane's word.
 func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *testing.T) {
 	t.Parallel()
-	newDeps := func(prompts *[]string, readCompactions func(string, string) (int, bool, error)) Deps {
+	newDeps := func(r *blipRunner, readCompactions func(string, string) (int, bool, error)) Deps {
 		return Deps{
-			AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-				*prompts = append(*prompts, opts.Text)
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-			},
-			AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-			},
+			Runner:          r,
 			ReadCompactions: readCompactions,
-			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-				return "compaction complete", nil
-			},
-			Sleep: func(time.Duration) {},
+			Sleep:           func(time.Duration) {},
 		}
 	}
 
 	t.Run("no boundary signal at all trusts the idle pane", func(t *testing.T) {
 		t.Parallel()
-		var prompts []string
-		recovered, err := recoverSmartZoneBreach(newDeps(&prompts, nil), gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
+		r := breachRunner(nil)
+		recovered, err := recoverSmartZoneBreach(newDeps(r, nil), gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
 		if err != nil {
 			t.Fatalf("recoverSmartZoneBreach: %v", err)
 		}
-		if !recovered || len(prompts) != 2 {
+		if prompts := r.Prompts("iter-19"); !recovered || len(prompts) != 2 {
 			t.Errorf("recovered = %v, prompts = %v; want the pre-gate behavior: recovered with a finish-up prompt", recovered, prompts)
 		}
 	})
 
 	t.Run("unidentified session holds the gate closed", func(t *testing.T) {
 		t.Parallel()
-		var prompts []string
-		d := newDeps(&prompts, func(string, string) (int, bool, error) { return 0, true, nil })
+		r := breachRunner(nil)
+		d := newDeps(r, func(string, string) (int, bool, error) { return 0, true, nil })
 		recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "", "smart-zone breach", 100)
 		if !errors.Is(err, errCompactNeverConfirmed) {
 			t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
 		}
-		if recovered || len(prompts) != 1 {
+		if prompts := r.Prompts("iter-19"); recovered || len(prompts) != 1 {
 			t.Errorf("recovered = %v, prompts = %v; want no finish-up prompt: an empty session id is unavailable, not unsupported", recovered, prompts)
 		}
 	})
@@ -1132,46 +782,38 @@ func TestRecoverSmartZoneBreach_UnsupportedFailsOpenButUnavailableDoesNot(t *tes
 // Any other error around the breach path still aborts the iteration.
 func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 	t.Parallel()
-	var prompts []string
 	boundaries := 0
+	r := boundGiveUpRunner(func(wait int) bool {
+		if wait == 1 {
+			return true
+		}
+		// The compaction lands for real once recovery has already given up
+		// on it, which is what makes the pane's idle report a genuine finish.
+		boundaries = 1
+		return false
+	})
 	d := Deps{
-		Runner: boundGiveUpRunner(func(wait int) bool {
-			if wait == 1 {
-				return true
-			}
-			// The compaction lands for real once recovery has already given up
-			// on it, which is what makes the pane's idle report a genuine finish.
-			boundaries = 1
-			return false
-		}),
-		AgentWait: idleRecoveryWait,
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
-		},
-		Sleep: func(time.Duration) {},
+		Sleep:           func(time.Duration) {},
 	}
 
 	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v, want the gated give-up absorbed", err)
 	}
-	if len(prompts) != 1 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only: no finish-up prompt may be sent on a gated give-up", prompts)
 	}
 }
 
 func TestWaitForFinish_PropagatesNonGatedRecoveryErrors(t *testing.T) {
 	t.Parallel()
+	r := boundGiveUpRunner(func(wait int) bool { return wait == 1 })
+	r.interruptErr = errors.New("pane is gone")
 	d := Deps{
-		Runner:          boundGiveUpRunner(func(wait int) bool { return wait == 1 }),
-		AgentSendKeys:   func(string, ...string) error { return errors.New("pane is gone") },
+		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
 		Sleep:           func(time.Duration) {},
@@ -1194,18 +836,14 @@ func boundGiveUpParams() launchAndPromptParams {
 }
 
 // boundGiveUpRunner hosts boundGiveUpParams' session; its finish polls time
-// out wherever timeoutIf says.
+// out wherever timeoutIf says. Recovery's own compact-completion polls see the
+// agent idle right after "/compact": the premature idle the gate exists to
+// distrust.
 func boundGiveUpRunner(timeoutIf func(wait int) bool) *blipRunner {
-	return &blipRunner{Runner: paneRunner("iter-19", "pane-1", "sess-19"), timeoutIf: timeoutIf}
+	return &blipRunner{Runner: idlePromptRunner("iter-19", "sess-19"), timeoutIf: timeoutIf, finishPollsOnly: true}
 }
 
 func alwaysTimeout(int) bool { return true }
-
-// idleRecoveryWait answers recovery's own compact-completion polls with the
-// premature idle the gate exists to distrust.
-func idleRecoveryWait(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-	return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-}
 
 // countPrompts reports how many of prompts were the given text.
 func countPrompts(prompts []string, text string) int {
@@ -1227,21 +865,12 @@ func countPrompts(prompts []string, text string) int {
 // cancellation the gate exists to prevent.
 func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 	t.Parallel()
-	var prompts []string
+	r := boundGiveUpRunner(alwaysTimeout)
 	d := Deps{
-		Runner:    boundGiveUpRunner(alwaysTimeout),
-		AgentWait: idleRecoveryWait,
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
-		},
-		Sleep: func(time.Duration) {},
+		Sleep:           func(time.Duration) {},
 	}
 
 	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
@@ -1251,6 +880,7 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 	if !errors.Is(err, errCompactNeverConfirmed) {
 		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved", err)
 	}
+	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != maxConsecutiveGatedGiveUps {
 		t.Errorf("/compact prompts = %d, want %d: the bound stops the loop instead of breaching again", got, maxConsecutiveGatedGiveUps)
 	}
@@ -1268,33 +898,16 @@ func TestWaitForFinish_EscalatesAfterTwoConsecutiveGatedGiveUps(t *testing.T) {
 // ever be counted.
 func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 	t.Parallel()
-	var prompts []string
 	// Once compacted, every poll — the compact-completion polls and the
 	// ordinary finish poll alike — reports idle, which is the pane shape this
 	// test exists to distrust.
-	compacted := false
+	r := boundGiveUpRunner(nil)
+	r.timeoutIf = func(int) bool { return len(r.Prompts("iter-19")) == 0 }
 	d := Deps{
-		Runner: boundGiveUpRunner(func(int) bool { return !compacted }),
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if compacted {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-			}
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			if opts.Text == "/compact" {
-				compacted = true
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
+		Runner:          r,
 		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return 0, true, nil },
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
-		},
-		Sleep: func(time.Duration) {},
+		Sleep:           func(time.Duration) {},
 	}
 
 	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
@@ -1304,6 +917,7 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 	if !errors.Is(err, errCompactNeverConfirmed) {
 		t.Errorf("waitForFinish error = %v, want the underlying gated give-up preserved", err)
 	}
+	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != 1 {
 		t.Errorf("/compact prompts = %d, want 1: an idle pane never reaches a second breach, so the finish poll itself must carry the count", got)
 	}
@@ -1317,41 +931,32 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 // iteration on two unrelated give-ups it had already recovered from.
 func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	t.Parallel()
-	var prompts []string
-	attempt := 0
-	boundaries := 0
-	settled := false
+	thirdLanded := false
+	r := boundGiveUpRunner(nil)
+	compacts := func() int { return countPrompts(r.Prompts("iter-19"), "/compact") }
+	r.timeoutIf = func(int) bool {
+		// The agent wraps up on its own after the third breach, so the run
+		// must reach a normal finish rather than escalating.
+		if compacts() < 3 {
+			return true
+		}
+		// The third compaction lands only once recovery has given up on it,
+		// so the finish the pane then reports is corroborated.
+		thirdLanded = true
+		return false
+	}
 	d := Deps{
-		Runner: boundGiveUpRunner(func(int) bool {
-			if !settled {
-				return true
+		Runner:        r,
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		// Only the second compaction lands while its own recovery is watching.
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			switch {
+			case thirdLanded:
+				return 2, true, nil
+			case compacts() >= 2:
+				return 1, true, nil
 			}
-			// The third compaction lands only once recovery has given up on it,
-			// so the finish the pane then reports is corroborated.
-			boundaries = 2
-			return false
-		}),
-		AgentWait: idleRecoveryWait,
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			if opts.Text == "/compact" {
-				attempt++
-				switch attempt {
-				case 2:
-					boundaries++
-				case 3:
-					// The agent wraps up on its own after the third breach, so
-					// the run must reach a normal finish rather than escalating.
-					settled = true
-				}
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
-		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
-		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
+			return 0, true, nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -1359,6 +964,7 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	if err := waitForFinish(d, boundGiveUpParams(), "sess-19"); err != nil {
 		t.Fatalf("waitForFinish: %v, want no escalation: the successful second recovery reset the counter", err)
 	}
+	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != 3 {
 		t.Errorf("/compact prompts = %d, want 3", got)
 	}
@@ -1369,37 +975,28 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 
 // TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets covers the
 // discrimination the reset is easy to get backwards on: recoverSmartZoneBreach
-// reports a failed submit confirmation as (false, nil), so a reset keyed on a
-// nil error would clear the counter for exactly the failures that say nothing
+// reports a failed finish-up prompt as (false, nil), so a reset keyed on a nil
+// error would clear the counter for exactly the failures that say nothing
 // about whether compaction is progressing.
 func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.T) {
 	t.Parallel()
-	var prompts []string
-	attempt := 0
-	boundaries := 0
+	r := boundGiveUpRunner(alwaysTimeout)
+	failArmed := false
 	d := Deps{
-		Runner:    boundGiveUpRunner(alwaysTimeout),
-		AgentWait: idleRecoveryWait,
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			if opts.Text == "/compact" {
-				attempt++
-				if attempt == 2 {
-					boundaries++
-				}
+		Runner:        r,
+		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
+		// The middle attempt compacts for real but its finish-up prompt fails,
+		// so recovery abandons it without completing. The first read after its
+		// "/compact" lands arms that failure.
+		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
+			if countPrompts(r.Prompts("iter-19"), "/compact") < 2 {
+				return 0, true, nil
 			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys:   func(string, ...string) error { return nil },
-		ReadOccupancy:   func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
-		ReadCompactions: func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil },
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			// The middle attempt compacts for real but its submission never
-			// renders, so recovery abandons it before the finish-up prompt.
-			if attempt == 2 {
-				return "earlier output\n/compact", nil
+			if !failArmed {
+				failArmed = true
+				r.FailNextPrompts("iter-19", 1, errors.New("finish-up never submitted"))
 			}
-			return "compaction complete", nil
+			return 1, true, nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -1408,6 +1005,7 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 	if !errors.Is(err, errCompactRecoveryExhausted) {
 		t.Fatalf("waitForFinish error = %v, want escalation: the middle failure was not a recovery and must not reset the counter", err)
 	}
+	prompts := r.Prompts("iter-19")
 	if got := countPrompts(prompts, "/compact"); got != 3 {
 		t.Errorf("/compact prompts = %d, want 3 (two gated give-ups either side of one non-gated failure)", got)
 	}
@@ -1416,190 +1014,28 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 	}
 }
 
-func TestConfirmCompactSubmitted(t *testing.T) {
-	t.Parallel()
-	t.Run("trailing /compact line reports not yet submitted", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-				return "some earlier output\n/compact", nil
-			},
-		}
-		submitted, err := confirmCompactSubmitted(d, "pane-1")
-		if err != nil {
-			t.Fatalf("confirmCompactSubmitted: %v", err)
-		}
-		if submitted {
-			t.Error("submitted = true, want false while /compact is still the trailing line")
-		}
-	})
-
-	t.Run("rendered output past /compact reports submitted", func(t *testing.T) {
-		t.Parallel()
-		d := Deps{
-			AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-				return "/compact\nCompacting conversation...\nworking", nil
-			},
-		}
-		submitted, err := confirmCompactSubmitted(d, "pane-1")
-		if err != nil {
-			t.Fatalf("confirmCompactSubmitted: %v", err)
-		}
-		if !submitted {
-			t.Error("submitted = false, want true once the pane has rendered past /compact")
-		}
-	})
-}
-
-// TestConfirmCompactSubmittedWithRetry_PacesWithSleep verifies the retry loop
-// paces itself via d.Sleep, not AgentWait: a sequence of not-yet-submitted
-// AgentRead results should drive exactly one Sleep call per retry, each of
-// smartZoneCompactSubmitPollMs, with no AgentWait call at all.
-func TestConfirmCompactSubmittedWithRetry_PacesWithSleep(t *testing.T) {
-	t.Parallel()
-	var reads int
-	var sleeps []time.Duration
-	d := Deps{
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			reads++
-			if reads <= 3 {
-				return "/compact", nil
-			}
-			return "/compact\nCompacting conversation...", nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			t.Fatal("confirmCompactSubmittedWithRetry must not call AgentWait")
-			return herdr.Agent{}, nil
-		},
-		Sleep: func(d time.Duration) {
-			sleeps = append(sleeps, d)
-		},
-	}
-
-	if err := confirmCompactSubmittedWithRetry(d, "pane-1"); err != nil {
-		t.Fatalf("confirmCompactSubmittedWithRetry: %v", err)
-	}
-
-	wantSleeps := []time.Duration{
-		smartZoneCompactSubmitPollMs * time.Millisecond,
-		smartZoneCompactSubmitPollMs * time.Millisecond,
-		smartZoneCompactSubmitPollMs * time.Millisecond,
-	}
-	if !slices.Equal(sleeps, wantSleeps) {
-		t.Errorf("sleeps = %v, want %v", sleeps, wantSleeps)
-	}
-}
-
-// TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation verifies
-// the prompt-submission race from research ticket 03: a compact-completion
-// signal sampled before Enter's effect has rendered "/compact" as submitted
-// must not let the finish-up prompt go out on top of it. The finish-up
-// prompt must wait until confirmCompactSubmitted confirms.
-func TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation(t *testing.T) {
-	t.Parallel()
-	scratchDir := t.TempDir()
-	var prompts []string
-	var sentKeys [][]string
-	var reads int
-	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(target string, keys ...string) error {
-			sentKeys = append(sentKeys, keys)
-			return nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			reads++
-			if reads <= 2 {
-				return "/compact", nil
-			}
-			return "/compact\nCompacting conversation...", nil
-		},
-		Sleep: func(time.Duration) {},
-	}
-
-	p := launchAndPromptParams{
-		Label:      "iter-19",
-		Agent:      AgentClaude,
-		Pane:       "pane-1",
-		Ticket:     "19",
-		SessionCwd: "/repo/iter-19",
-		ScratchDir: scratchDir,
-		EpicName:   "epic",
-	}
-
-	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
-	if err != nil {
-		t.Fatalf("recoverSmartZoneBreach: %v", err)
-	}
-	if !recovered {
-		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true once submission is confirmed")
-	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
-		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
-	}
-	if reads < 3 {
-		t.Errorf("AgentRead calls = %d, want at least 3 (unsubmitted polls before confirmation)", reads)
-	}
-	if len(sentKeys) != 0 {
-		t.Errorf("AgentSendKeys calls = %v, want none: the gate must never nudge or resubmit", sentKeys)
-	}
-}
-
-// TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout verifies the
-// gate's bound: if the pane never renders /compact as submitted, the retry
-// loop gives up after smartZoneCompactSubmitTimeoutMs without ever nudging or
-// resubmitting, and no finish-up prompt is sent.
-func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
+// TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort verifies that a
+// finish-up prompt the runner refuses is logged and abandoned rather than
+// failing the iteration: the agent may still finish on its own.
+func TestRecoverSmartZoneBreach_FailedFinishUpPromptIsBestEffort(t *testing.T) {
 	t.Parallel()
 	scratchDir := epicScratchDir(t, "epic")
-	var prompts []string
-	var sentKeys [][]string
-	d := Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts = append(prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(target string, keys ...string) error {
-			sentKeys = append(sentKeys, keys)
-			return nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "/compact", nil
-		},
-		Sleep: func(time.Duration) {},
-	}
+	var r *blipRunner
+	r = breachRunner(func(int) bool {
+		r.FailNextPrompts("iter-19", 1, errors.New("finish-up never submitted"))
+		return false
+	})
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
-	p := launchAndPromptParams{
-		Label:      "iter-19",
-		Agent:      AgentClaude,
-		Pane:       "pane-1",
-		Ticket:     "19",
-		SessionCwd: "/repo/iter-19",
-		ScratchDir: scratchDir,
-		EpicName:   "epic",
-	}
-
-	recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(scratchDir), "sess-19", "smart-zone breach", 100)
 	if err != nil {
 		t.Fatalf("recoverSmartZoneBreach: %v", err)
 	}
 	if recovered {
-		t.Fatal("recoverSmartZoneBreach returned recovered=true, want false: /compact never confirmed submitted")
+		t.Fatal("recoverSmartZoneBreach returned recovered=true, want false: the finish-up prompt never went out")
 	}
-	if len(prompts) != 1 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only, no finish-up", prompts)
-	}
-	if len(sentKeys) != 0 {
-		t.Errorf("AgentSendKeys calls = %v, want none: the gate must never nudge or resubmit", sentKeys)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
@@ -1613,7 +1049,7 @@ func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
 		}
 	}
 	if !sawFailed {
-		t.Error("missing smart-zone-recovery-failed event when submission never confirms")
+		t.Error("missing smart-zone-recovery-failed event when the finish-up prompt fails")
 	}
 }
 
@@ -1622,8 +1058,7 @@ func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
 // to poll: one timing-out tick, then idle.
 func staleReadingDeps(tokens int, stale bool) Deps {
 	return Deps{
-		Runner:    boundGiveUpRunner(func(wait int) bool { return wait == 1 }),
-		AgentWait: idleRecoveryWait,
+		Runner: boundGiveUpRunner(func(wait int) bool { return wait == 1 }),
 		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
 			return transcript.OccupancyReading{
 				Usage: transcript.Usage{InputTokens: tokens},
@@ -1640,20 +1075,19 @@ func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T
 	t.Parallel()
 	sink := &occupancySink{}
 	d := staleReadingDeps(200, true)
-	d.AgentSendKeys = func(string, ...string) error {
-		t.Error("pane interrupted, want the over-budget pre-compaction number treated as unknown for breach purposes")
-		return nil
-	}
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		t.Errorf("prompt %q sent, want no second compaction", opts.Text)
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
+	r := d.Runner.(*blipRunner)
 
 	p := boundGiveUpParams()
 	p.Sink = sink
 	err := waitForFinish(d, p, "sess-19")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
+	}
+	if r.interrupts != 0 {
+		t.Error("pane interrupted, want the over-budget pre-compaction number treated as unknown for breach purposes")
+	}
+	if prompts := r.Prompts("iter-19"); len(prompts) != 0 {
+		t.Errorf("prompts = %v, want no second compaction", prompts)
 	}
 	if len(sink.calls) != 1 || sink.calls[0].tokens != 200 {
 		t.Errorf("ContextOccupancy calls = %+v, want the last known 200 still emitted for display", sink.calls)
@@ -1662,31 +1096,20 @@ func TestWaitForFinish_StaleOccupancyAfterCompactionDoesNotRebreach(t *testing.T
 
 func TestWaitForFinish_FreshOccupancyStillBreaches(t *testing.T) {
 	t.Parallel()
-	var interruptions, boundaries int
-	var prompts []string
 	d := staleReadingDeps(200, false)
-	d.AgentSendKeys = func(string, ...string) error {
-		interruptions++
-		return nil
+	r := d.Runner.(*blipRunner)
+	// The recovery this breach starts completes normally; the breach itself is
+	// what this test is about.
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) {
+		return countPrompts(r.Prompts("iter-19"), "/compact"), true, nil
 	}
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		prompts = append(prompts, opts.Text)
-		if opts.Text == "/compact" {
-			// The recovery this breach starts completes normally; the breach
-			// itself is what this test is about.
-			boundaries++
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
-	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return boundaries, true, nil }
-	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }
 
 	err := waitForFinish(d, boundGiveUpParams(), "sess-19")
 	if err != nil {
 		t.Fatalf("waitForFinish: %v", err)
 	}
-	if interruptions != 1 || len(prompts) == 0 || prompts[0] != "/compact" {
-		t.Errorf("interruptions = %d, prompts = %v, want one breach recovery", interruptions, prompts)
+	if prompts := r.Prompts("iter-19"); r.interrupts != 1 || len(prompts) == 0 || prompts[0] != "/compact" {
+		t.Errorf("interruptions = %d, prompts = %v, want one breach recovery", r.interrupts, prompts)
 	}
 }
 
@@ -1947,8 +1370,9 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	var readCompactionsCalls int
 	fake := idleRunner("iter-01")
+	fake.PromptState = agentrunner.StateIdle
 	d := Deps{
-		Runner: &blipRunner{Runner: fake, timeoutIf: func(wait int) bool {
+		Runner: &blipRunner{Runner: fake, finishPollsOnly: true, timeoutIf: func(wait int) bool {
 			switch wait {
 			case 1:
 				// Times out, driving the smart-zone breach branch.
@@ -1962,10 +1386,6 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 			}
 			return false
 		}},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentSendKeys: func(string, ...string) error { return nil },
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 2_000_000, true, nil
 		},
@@ -1975,17 +1395,14 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 		},
 		// The first two reads are the pre-"/compact" baselines (waitForFinish's
 		// own, then recoverSmartZoneBreach's own newStickyBaseline); the third
-		// is the post-"/compact" advancement check, so the compaction reads as
-		// already confirmed and recoverSmartZoneBreach never needs to poll.
+		// is the advancement check on recovery's first poll tick, so the
+		// compaction reads as already confirmed.
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			readCompactionsCalls++
 			if readCompactionsCalls <= 2 {
 				return 0, true, nil
 			}
 			return 1, true, nil
-		},
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
 		},
 		Sleep: func(time.Duration) {},
 	}
@@ -2337,31 +1754,19 @@ func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
 }
 
 // stickyBaselineDeps is the premature-idle pane the sticky-baseline tests
-// share: "/compact" and every subsequent pane wait report idle immediately, so
-// the only thing that can ever end the recovery is the transcript.
+// share: with r a breachRunner that never times out, "/compact" and every
+// subsequent poll report idle immediately, so the only thing that can ever end
+// the recovery is the transcript.
 func stickyBaselineDeps(
-	prompts *[]string, sleeps *int,
+	r *blipRunner, sleeps *int,
 	readCompactions func(string, string) (int, bool, error),
 	readCompactionsAfter func(string, string, time.Time) (int, bool, error),
-	onWait func(),
 ) Deps {
 	return Deps{
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			*prompts = append(*prompts, opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			if onWait != nil {
-				onWait()
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
+		Runner:               r,
 		ReadCompactions:      readCompactions,
 		ReadCompactionsAfter: readCompactionsAfter,
-		AgentRead: func(string, herdr.AgentReadOptions) (string, error) {
-			return "compaction complete", nil
-		},
-		Sleep: func(time.Duration) { *sleeps++ },
+		Sleep:                func(time.Duration) { *sleeps++ },
 	}
 }
 
@@ -2376,21 +1781,20 @@ func noBoundarySinceSubmission(string, string, time.Time) (int, bool, error) { r
 // still refuses the pane's premature idle report until one is.
 func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmission(t *testing.T) {
 	t.Parallel()
-	var prompts []string
-	var sleeps, waits int
+	var sleeps int
 	landed := 0
-	d := stickyBaselineDeps(&prompts, &sleeps,
+	r := breachRunner(func(wait int) bool {
+		if wait == 3 {
+			landed = 1
+		}
+		return false
+	})
+	d := stickyBaselineDeps(r, &sleeps,
 		func(string, string) (int, bool, error) {
 			return 0, false, errors.New("transcript read failed")
 		},
 		func(string, string, time.Time) (int, bool, error) {
 			return landed, true, nil
-		},
-		func() {
-			waits++
-			if waits == 2 {
-				landed = 1
-			}
 		},
 	)
 
@@ -2401,7 +1805,7 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmi
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true: the boundary does land after submission")
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up] once a boundary lands", prompts)
 	}
 	if sleeps == 0 {
@@ -2417,17 +1821,16 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmi
 // into ten minutes of waiting and a gated give-up.
 func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfirmed(t *testing.T) {
 	t.Parallel()
-	var prompts []string
-	var sleeps, waits int
-	d := stickyBaselineDeps(&prompts, &sleeps,
+	var sleeps int
+	r := breachRunner(nil)
+	d := stickyBaselineDeps(r, &sleeps,
 		func(string, string) (int, bool, error) {
-			if len(prompts) == 0 {
+			if len(r.Prompts("iter-19")) == 0 {
 				return 0, false, errors.New("transcript read failed")
 			}
 			return 6, true, nil // already includes the boundary this recovery caused
 		},
 		func(string, string, time.Time) (int, bool, error) { return 1, true, nil },
-		func() { waits++ },
 	)
 
 	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
@@ -2437,11 +1840,11 @@ func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfir
 	if !recovered {
 		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true: the compaction genuinely completed")
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
 	}
-	if waits != 0 || sleeps != 0 {
-		t.Errorf("AgentWait calls = %d, gated sleeps = %d; want 0 and 0: an already-landed boundary confirms before any polling", waits, sleeps)
+	if r.waits != 1 || sleeps != 0 {
+		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an already-landed boundary confirms on the first poll tick", r.waits, sleeps)
 	}
 }
 
@@ -2454,9 +1857,9 @@ func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfir
 // recovery must give up on the extended bound — never on that stale comparison.
 func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *testing.T) {
 	t.Parallel()
-	var prompts []string
 	var sleeps, reads int
-	d := stickyBaselineDeps(&prompts, &sleeps,
+	r := breachRunner(nil)
+	d := stickyBaselineDeps(r, &sleeps,
 		func(string, string) (int, bool, error) {
 			reads++
 			if reads == 1 { // the submission-time read
@@ -2465,7 +1868,6 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *
 			return 5, true, nil
 		},
 		noBoundarySinceSubmission,
-		nil,
 	)
 
 	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
@@ -2475,7 +1877,7 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *
 	if recovered {
 		t.Error("recoverSmartZoneBreach returned recovered=true, want false: a late baseline is stale and can only deadlock the gate")
 	}
-	if len(prompts) != 1 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only: no finish-up prompt on a never-confirmed compaction", prompts)
 	}
 }
@@ -2488,9 +1890,9 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *
 // bound.
 func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.T) {
 	t.Parallel()
-	var prompts []string
 	var sleeps, reads int
-	d := stickyBaselineDeps(&prompts, &sleeps,
+	r := breachRunner(nil)
+	d := stickyBaselineDeps(r, &sleeps,
 		func(string, string) (int, bool, error) {
 			reads++
 			if reads == 1 {
@@ -2502,7 +1904,6 @@ func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.
 			return 0, false, nil // exists-but-unreadable and not-yet-existing both hold
 		},
 		noBoundarySinceSubmission,
-		nil,
 	)
 
 	recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
@@ -2512,10 +1913,10 @@ func TestRecoverSmartZoneBreach_UnavailableReadsInLoopHoldGateClosed(t *testing.
 	if recovered {
 		t.Error("recoverSmartZoneBreach returned recovered=true, want false: an unreadable transcript confirms nothing")
 	}
-	if len(prompts) != 1 || prompts[0] != "/compact" {
+	if prompts := r.Prompts("iter-19"); len(prompts) != 1 || prompts[0] != "/compact" {
 		t.Errorf("prompts = %v, want [/compact] only", prompts)
 	}
-	wantSleeps := smartZoneCompactExtendedTimeoutMs/smartZonePollMs - 1
+	wantSleeps := smartZoneCompactExtendedTimeoutMs / smartZonePollMs
 	if sleeps != wantSleeps {
 		t.Errorf("gated sleeps = %d, want %d: failed reads must consume the extended bound, not short-circuit it", sleeps, wantSleeps)
 	}
@@ -2532,34 +1933,34 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 
 	t.Run("Claude transcript not written yet holds the gate closed", func(t *testing.T) {
 		t.Parallel()
-		var prompts []string
 		var sleeps int
-		d := stickyBaselineDeps(&prompts, &sleeps, missing, noBoundarySinceSubmission, nil)
+		r := breachRunner(nil)
+		d := stickyBaselineDeps(r, &sleeps, missing, noBoundarySinceSubmission)
 		recovered, err := recoverSmartZoneBreach(d, gatedBreachParams(t.TempDir()), "sess-19", "smart-zone breach", 100)
 		if !errors.Is(err, errCompactNeverConfirmed) {
 			t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
 		}
-		if recovered || len(prompts) != 1 {
+		if prompts := r.Prompts("iter-19"); recovered || len(prompts) != 1 {
 			t.Errorf("recovered = %v, prompts = %v; want no finish-up prompt for an unavailable transcript", recovered, prompts)
 		}
 	})
 
 	t.Run("Codex has no boundary signal and fails open", func(t *testing.T) {
 		t.Parallel()
-		var prompts []string
-		var sleeps, waits int
-		d := stickyBaselineDeps(&prompts, &sleeps, missing, noBoundarySinceSubmission, func() { waits++ })
+		var sleeps int
+		r := breachRunner(nil)
+		d := stickyBaselineDeps(r, &sleeps, missing, noBoundarySinceSubmission)
 		p := gatedBreachParams(t.TempDir())
 		p.Agent = AgentCodex
 		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
 		if err != nil {
 			t.Fatalf("recoverSmartZoneBreach: %v", err)
 		}
-		if !recovered || len(prompts) != 2 {
+		if prompts := r.Prompts("iter-19"); !recovered || len(prompts) != 2 {
 			t.Errorf("recovered = %v, prompts = %v; want the pre-gate behavior for an agent with no boundary signal", recovered, prompts)
 		}
-		if waits != 0 {
-			t.Errorf("AgentWait calls = %d, want 0: an unsupported agent never enters the gated wait", waits)
+		if r.waits != 1 || sleeps != 0 {
+			t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an unsupported agent trusts the first idle tick", r.waits, sleeps)
 		}
 	})
 }
@@ -2600,6 +2001,14 @@ func paneRunner(label, pane, sessionID string) *runnerfake.Runner {
 	if _, err := r.Start(agentrunner.StartOptions{Label: label}); err != nil {
 		panic(err)
 	}
+	return r
+}
+
+// idlePromptRunner is paneRunner on pane-1 whose agent reports idle the moment
+// it is prompted, so a wait after "/compact" never blocks in real time.
+func idlePromptRunner(label, sessionID string) *runnerfake.Runner {
+	r := paneRunner(label, "pane-1", sessionID)
+	r.PromptState = agentrunner.StateIdle
 	return r
 }
 

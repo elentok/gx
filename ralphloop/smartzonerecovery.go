@@ -86,7 +86,7 @@ func (r *smartZoneRecovery) checkAndRecover(d Deps, p launchAndPromptParams, ses
 		return false, nil
 	}
 
-	if err := d.AgentSendKeys(p.Pane, "ctrl+c"); err != nil {
+	if err := d.Runner.Interrupt(p.session()); err != nil {
 		return false, fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
 	}
 	reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, r.zone)

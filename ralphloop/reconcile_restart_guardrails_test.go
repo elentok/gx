@@ -35,26 +35,17 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 		return 0, false, nil
 	}
 	hostLiveAgent(t, d, "epic-iter-01")
-	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutOn: 1}
-	var sentKeys [][]string
-	d.AgentSendKeys = func(target string, keys ...string) error {
-		sentKeys = append(sentKeys, keys)
-		return nil
-	}
-	var prompts []string
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		prompts = append(prompts, opts.Text)
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
+	r := &blipRunner{Runner: fakeRunner(d), timeoutOn: 1}
+	d.Runner = r
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(sentKeys) != 1 || len(sentKeys[0]) == 0 || sentKeys[0][0] != "ctrl+c" {
-		t.Errorf("AgentSendKeys calls = %v, want a single ctrl+c interrupt for the smart-zone breach", sentKeys)
+	if r.interrupts != 1 {
+		t.Errorf("interrupts = %d, want a single interrupt for the smart-zone breach", r.interrupts)
 	}
-	if len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "context window") {
+	if prompts := r.Prompts("epic-iter-01"); len(prompts) != 2 || prompts[0] != "/compact" || !strings.Contains(prompts[1], "context window") {
 		t.Fatalf("prompts = %v, want [/compact, finish-up prompt]", prompts)
 	}
 	if len(*removed) != 1 {

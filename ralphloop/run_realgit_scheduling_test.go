@@ -658,8 +658,10 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
 		case "compact-blocked":
 			assertClaimed("compact start confirmation")
-			if !slices.Equal(until, []string{"working"}) {
-				t.Errorf("compact start Until = %v, want [working]", until)
+			// The runner waits out Codex's compact confirmation for any state
+			// that shows the compaction is running or already over.
+			if want := []string{"working", "idle", "done"}; !slices.Equal(until, want) {
+				t.Errorf("compact start Until = %v, want %v", until, want)
 			}
 			phase = "compacting"
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "working", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil

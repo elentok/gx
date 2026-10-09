@@ -29,10 +29,23 @@ type gatedRunner struct {
 	// timeOut, when set, is asked first on every finish wait; true times that
 	// wait out ungated, as an agent still at work.
 	timeOut func(label string) bool
-	started chan string
+	// finishPollsOnly gates and times out only waitForFinish's own polls (the
+	// ones that also stop on blocked), so smart-zone recovery's compact wait
+	// passes straight through.
+	finishPollsOnly bool
+	// onInterrupt, when set, runs before every Interrupt.
+	onInterrupt func(s agentrunner.Session)
+	started     chan string
 
 	mu    sync.Mutex
 	gates map[string]chan struct{}
+}
+
+func (r *gatedRunner) Interrupt(s agentrunner.Session) error {
+	if r.onInterrupt != nil {
+		r.onInterrupt(s)
+	}
+	return r.Runner.Interrupt(s)
 }
 
 func newGatedRunner(next agentrunner.Runner) *gatedRunner {
@@ -40,7 +53,8 @@ func newGatedRunner(next agentrunner.Runner) *gatedRunner {
 }
 
 func (r *gatedRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
-	if !slices.Contains(states, agentrunner.StateDone) {
+	if !slices.Contains(states, agentrunner.StateDone) ||
+		(r.finishPollsOnly && !slices.Contains(states, agentrunner.StateBlocked)) {
 		return r.Runner.Wait(s, states, timeout)
 	}
 	if r.timeOut != nil && r.timeOut(s.Label) {

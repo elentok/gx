@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -30,7 +31,14 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
+	promptCh := make(chan string, 8)
+	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
+		promptCh <- text
+		return nil
+	})
+
 	g := newGatedRunner(d.Runner)
+	g.finishPollsOnly = true
 	var breachOnce sync.Once
 	g.timeOut = func(label string) bool {
 		breached := false
@@ -39,6 +47,8 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		}
 		return breached
 	}
+	interruptCh := make(chan string, 1)
+	g.onInterrupt = func(s agentrunner.Session) { interruptCh <- s.Label }
 	d.Runner = g
 
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
@@ -46,18 +56,6 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 			return 999999, true, nil
 		}
 		return 0, false, nil
-	}
-
-	sendKeysCh := make(chan []string, 1)
-	d.AgentSendKeys = func(target string, keys ...string) error {
-		sendKeysCh <- keys
-		return nil
-	}
-
-	promptCh := make(chan string, 8)
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		promptCh <- opts.Text
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
 
 	d.Sleep = func(time.Duration) {}
@@ -71,9 +69,8 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		}, d, sink)
 	}()
 
-	keys := <-sendKeysCh
-	if len(keys) == 0 || keys[0] != "ctrl+c" {
-		t.Fatalf("AgentSendKeys keys = %v, want [ctrl+c]", keys)
+	if label := <-interruptCh; !strings.Contains(label, "iter-01") {
+		t.Fatalf("interrupted %s, want iter-01", label)
 	}
 
 	// Drain the two iterations' initial launch prompts (order not
@@ -154,7 +151,16 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
+	promptCh := make(chan string, 8)
+	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
+		promptCh <- text
+		return nil
+	})
+
 	g := newGatedRunner(d.Runner)
+	g.finishPollsOnly = true
+	interruptCh := make(chan string, 8)
+	g.onInterrupt = func(s agentrunner.Session) { interruptCh <- s.Label }
 	var breaches int
 	var breachMu sync.Mutex
 	g.timeOut = func(label string) bool {
@@ -175,18 +181,6 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		return 999999, true, nil
 	}
 
-	sendKeysCh := make(chan []string, 8)
-	d.AgentSendKeys = func(target string, keys ...string) error {
-		sendKeysCh <- keys
-		return nil
-	}
-
-	promptCh := make(chan string, 8)
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		promptCh <- opts.Text
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
-
 	gate := NewGate()
 	d.Sleep = func(time.Duration) {}
 
@@ -199,9 +193,8 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	}()
 
 	for i := range 2 {
-		keys := <-sendKeysCh
-		if len(keys) == 0 || keys[0] != "ctrl+c" {
-			t.Fatalf("breach %d: AgentSendKeys keys = %v, want [ctrl+c]", i, keys)
+		if label := <-interruptCh; !strings.Contains(label, "iter-01") {
+			t.Fatalf("breach %d: interrupted %s, want iter-01", i, label)
 		}
 		// Drain the iteration's own initial launch prompt (only present
 		// ahead of the very first breach) before the recovery's /compact.

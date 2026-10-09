@@ -14,25 +14,21 @@ import (
 // occupancy still over the smart zone, and every "/compact" the recovery
 // submits is claimed complete by the pane but never corroborated by a
 // transcript boundary — the gated give-up waitForFinish bounds and escalates
-// on. onBreach runs when the breach's interrupting Ctrl-C is sent, so a caller
-// can fail the iteration there instead to model an ordinary, non-compaction
-// error at the same point in the loop.
-func stuckCompactionDeps(onBreach func() error) Deps {
+// on. A non-nil interruptErr fails the breach's interrupt instead, to model an
+// ordinary, non-compaction error at the same point in the loop.
+func stuckCompactionDeps(interruptErr error) Deps {
 	d, _, _ := fakeDeps()
 	// A native session id is what makes occupancy readable at all, so without
 	// one the poll loop would never classify a breach.
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "session-01"}, nil
 	}
-	// The main poll's every Runner wait times out, which is what keeps
-	// re-driving the breach; the compaction wait still goes through
-	// fakeDeps' AgentWait, whose premature idle ReadCompactions never
-	// corroborates.
-	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutIf: func(int) bool { return true }}
-	d.AgentSendKeys = func(string, ...string) error { return onBreach() }
+	// The main poll's every wait times out, which is what keeps re-driving the
+	// breach; the compaction wait sees fakeDeps' agent done right after
+	// "/compact", a premature idle ReadCompactions never corroborates.
+	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutIf: alwaysTimeout, finishPollsOnly: true, interruptErr: interruptErr}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 200, true, nil }
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 0, true, nil }
-	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }
 	return d
 }
 
@@ -59,7 +55,7 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
-	d := stuckCompactionDeps(func() error { return nil })
+	d := stuckCompactionDeps(nil)
 
 	// The escalated iteration leaves the epic's only ticket needs-repair, so
 	// the run parks on it rather than returning.
@@ -93,7 +89,7 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	scratchDir := writeEpic(t, epicName, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
-	d := stuckCompactionDeps(func() error { return errors.New("herdr pane vanished") })
+	d := stuckCompactionDeps(errors.New("herdr pane vanished"))
 
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,

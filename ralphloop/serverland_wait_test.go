@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -63,14 +64,38 @@ type blipRunner struct {
 	timeoutIf func(wait int) bool
 	// timeoutLabel, when set, also times out every Wait on a label it matches.
 	timeoutLabel func(label string) bool
+	// finishPollsOnly scripts only waitForFinish's own polls, told apart by
+	// also stopping on blocked: timeoutOn and timeoutIf index those alone, and
+	// every other Wait, such as recovery's compact polls, sees the fake's state.
+	finishPollsOnly bool
+	// interruptErr, when set, fails every Interrupt.
+	interruptErr error
 	waits        int
+	finishPolls  int
+	interrupts   int
+}
+
+func (r *blipRunner) Interrupt(s agentrunner.Session) error {
+	r.interrupts++
+	if r.interruptErr != nil {
+		return r.interruptErr
+	}
+	return r.Runner.Interrupt(s)
 }
 
 func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
 	r.waits++
-	timedOut := r.waits == r.timeoutOn
+	n := r.waits
+	if r.finishPollsOnly {
+		if !slices.Contains(states, agentrunner.StateBlocked) {
+			return r.Runner.Wait(s, states, timeout)
+		}
+		r.finishPolls++
+		n = r.finishPolls
+	}
+	timedOut := n == r.timeoutOn
 	if r.timeoutIf != nil {
-		timedOut = r.timeoutIf(r.waits)
+		timedOut = r.timeoutIf(n)
 	}
 	if r.timeoutLabel != nil && r.timeoutLabel(s.Label) {
 		timedOut = true
