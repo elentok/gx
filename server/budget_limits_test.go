@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
@@ -148,5 +149,45 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 	}
 	if len(closed) == 0 {
 		t.Error("pane was not closed")
+	}
+}
+
+func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Runner = fake
+		c.BudgetHardLimit = 5
+		c.BudgetKillGrace = time.Millisecond
+		c.BudgetPollInterval = time.Hour
+	})
+	cost := 0.0
+	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { cost += 3; return cost, true })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	for len(h.Server.Runs()) == 0 && ctx.Err() == nil {
+		time.Sleep(20 * time.Millisecond)
+	}
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	for ctx.Err() == nil {
+		h.Server.PollBudget()
+		data, _ := os.ReadFile(path)
+		if strings.Contains(string(data), "budget-killed") {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "budget-killed") {
+		t.Fatalf("ticket not parked budget-killed:\n%s", data)
+	}
+	if live, _ := fake.List("epic-a"); len(live) != 0 {
+		t.Errorf("sessions still live after budget kill: %v", live)
 	}
 }

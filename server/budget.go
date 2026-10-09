@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -401,6 +401,26 @@ func iterationCost(it IterationInfo) (float64, bool) {
 	return cost, ok && err == nil
 }
 
+// budgetIteration is the live iteration of address as its runner sees it, so a
+// headless run is metered like a herdr pane.
+func (s *Server) budgetIteration(address string) (IterationInfo, bool) {
+	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return IterationInfo{}, false
+	}
+	r := s.runnerFor(a.Project)
+	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
+	sess, found, err := r.Find(label)
+	if err != nil || !found {
+		return IterationInfo{}, false
+	}
+	st, err := r.Status(sess)
+	if err != nil {
+		return IterationInfo{}, false
+	}
+	return IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: st.SessionID}, true
+}
+
 // pollBudget adds every live iteration's cost delta to the ledger. All ticket
 // kinds count.
 func (s *Server) pollBudget(now time.Time) {
@@ -408,7 +428,7 @@ func (s *Server) pollBudget(now time.Time) {
 		if t.Status != "claimed" {
 			continue
 		}
-		it, ok := s.liveIteration(t.Address)
+		it, ok := s.budgetIteration(t.Address)
 		if !ok {
 			continue
 		}
@@ -447,7 +467,7 @@ func (s *Server) killForBudget(now time.Time) {
 	before := map[string]float64{}
 	for _, t := range runs {
 		before[t.Address] = s.liveCost(t.Address)
-		if err := herdr.AgentSendKeys(t.Session.ID, "ctrl+c"); err != nil {
+		if err := s.runnerOf(t).Interrupt(t.Session); err != nil {
 			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
 		}
 	}
@@ -463,7 +483,7 @@ func (s *Server) killForBudget(now time.Time) {
 }
 
 func (s *Server) liveCost(address string) float64 {
-	it, ok := s.liveIteration(address)
+	it, ok := s.budgetIteration(address)
 	if !ok {
 		return 0
 	}
@@ -471,7 +491,17 @@ func (s *Server) liveCost(address string) float64 {
 	return cost
 }
 
-// parkBudgetKilled closes the pane, then parks the ticket needs-repair.
+// runnerOf is the runner hosting the run's session.
+func (s *Server) runnerOf(t trackedRun) agentrunner.Runner {
+	project := ""
+	if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
+		project = addr.Project
+	}
+	return s.runnerFor(project)
+}
+
+// parkBudgetKilled stops the session through its runner, then parks the ticket
+// needs-repair.
 func (s *Server) parkBudgetKilled(t trackedRun) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
@@ -481,7 +511,7 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 	if err != nil {
 		return err
 	}
-	closeErr := herdr.TabClose(t.Tab)
+	closeErr := s.runnerOf(t).Stop(t.Session)
 	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
 	return errors.Join(closeErr, parkErr)
 }
