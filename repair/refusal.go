@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -97,24 +96,18 @@ func IsGuardedBranch(branch string) bool {
 	return strings.HasPrefix(branch, "ralph-loop/")
 }
 
-// DefaultVerifyRun wires the real git/herdr dependencies. Herdr is optional:
-// without a workspace the tab leftovers are reported as unknown.
+// DefaultVerifyRun wires the real git and runner dependencies. A runner that
+// can't list sessions leaves the session leftovers unknown.
 func DefaultVerifyRun(epicPath, cwd string) (VerifyRun, error) {
 	repo, err := git.FindRepo(cwd)
 	if err != nil {
 		return VerifyRun{}, fmt.Errorf("not inside a git repo: %w", err)
 	}
 	epicPath = filepath.Clean(epicPath)
-	run := VerifyRun{
+	return VerifyRun{
 		EpicPath:        epicPath,
 		FeatureWorktree: filepath.Join(repo.WorktreeDir, filepath.Base(epicPath)),
 		WorktreeDir:     repo.WorktreeDir,
 		Deps:            ralphloop.DefaultVerifyDeps(),
-	}
-	if ws, err := herdr.FindWorkspace(filepath.Base(epicPath)); err == nil {
-		run.WorkspaceID = ws
-	} else {
-		run.Deps.ListSessions = nil
-	}
-	return run, nil
+	}, nil
 }

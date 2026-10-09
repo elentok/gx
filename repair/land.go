@@ -59,8 +59,8 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	}
 
 	epic := filepath.Base(filepath.Clean(in.EpicPath))
-	if !in.IgnoreLiveTab && ralphloop.IterationTabLive(d, epic, t.Identifier) {
-		return LandResult{}, "", &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("the herdr tab for ticket %s exists; close it or pass --ignore-live-tab", in.ID)}
+	if _, live := ralphloop.FindIterationSession(d, epic, t.Identifier); live && !in.IgnoreLiveTab {
+		return LandResult{}, "", &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("the agent session for ticket %s exists; stop it or pass --ignore-live-tab", in.ID)}
 	}
 
 	wtDir, err := d.WorktreeDir(in.Cwd)

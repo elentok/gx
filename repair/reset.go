@@ -71,8 +71,8 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 		return ResetResult{}, err
 	}
 	epicName := filepath.Base(filepath.Clean(in.EpicPath))
-	if ralphloop.IterationAgentAlive(d, epicName, t.Identifier) {
-		return ResetResult{}, &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("an agent is still alive on the herdr tab for ticket %s; stop it first", in.ID)}
+	if _, alive := ralphloop.FindIterationSession(d, epicName, t.Identifier); alive {
+		return ResetResult{}, &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("an agent is still alive for ticket %s; stop it first", in.ID)}
 	}
 
 	wtDir, err := d.WorktreeDir(in.Cwd)
@@ -105,10 +105,10 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 	return res, nil
 }
 
-// clearIteration removes the iteration worktree and stale tab, then sets the
-// branch aside (or deletes it with --delete-branch). The worktree goes first:
-// git refuses to rename a branch that is checked out. A missing worktree, tab
-// or branch is a normal outcome.
+// clearIteration removes the iteration worktree, then sets the branch aside
+// (or deletes it with --delete-branch). The worktree goes first: git refuses
+// to rename a branch that is checked out. A missing worktree or branch is a
+// normal outcome.
 func clearIteration(in ResetInput, d ralphloop.Deps, wtDir, epic, id, branch string, attic atticInfo) error {
 	path := ralphloop.IterationWorktreePath(wtDir, epic, id)
 	if exists, err := d.WorktreeExists(path); err != nil {
@@ -116,11 +116,6 @@ func clearIteration(in ResetInput, d ralphloop.Deps, wtDir, epic, id, branch str
 	} else if exists {
 		if err := d.RemoveWorktree(in.Cwd, path, true); err != nil {
 			return fmt.Errorf("removing iteration worktree: %w", err)
-		}
-	}
-	if tabID := ralphloop.IterationTabID(d, epic, id); tabID != "" {
-		if err := d.TabClose(tabID); err != nil {
-			return fmt.Errorf("closing iteration tab: %w", err)
 		}
 	}
 	if attic.Tip == "" {
