@@ -8,6 +8,7 @@ import (
 
 // Agent describes a herdr agent pane, as returned by AgentPrompt.
 type Agent struct {
+	Name         string // empty for an agent herdr detected rather than started by name
 	PaneID       string
 	WorkspaceID  string
 	TabID        string
@@ -105,36 +106,60 @@ func AgentWait(opts AgentWaitOptions) (Agent, error) {
 	return runAgentJSON(args)
 }
 
+// AgentList returns every agent herdr knows, across all workspaces.
+func AgentList() ([]Agent, error) {
+	var result struct {
+		Agents []agentInfo `json:"agents"`
+	}
+	if err := runJSON([]string{"agent", "list"}, &result); err != nil {
+		return nil, err
+	}
+	agents := make([]Agent, len(result.Agents))
+	for i, info := range result.Agents {
+		agents[i] = info.agent()
+	}
+	return agents, nil
+}
+
+// agentInfo is herdr's AgentInfo JSON shape.
+type agentInfo struct {
+	Name         string `json:"name"`
+	PaneID       string `json:"pane_id"`
+	WorkspaceID  string `json:"workspace_id"`
+	TabID        string `json:"tab_id"`
+	AgentStatus  string `json:"agent_status"`
+	AgentSession *struct {
+		Value string `json:"value"`
+	} `json:"agent_session"`
+	StateChangeSeq int `json:"state_change_seq"`
+}
+
+func (info agentInfo) agent() Agent {
+	agent := Agent{
+		Name:           info.Name,
+		PaneID:         info.PaneID,
+		WorkspaceID:    info.WorkspaceID,
+		TabID:          info.TabID,
+		AgentStatus:    info.AgentStatus,
+		StateChangeSeq: info.StateChangeSeq,
+	}
+	if info.AgentSession != nil {
+		agent.AgentSession = info.AgentSession.Value
+	}
+	return agent
+}
+
 // runAgentJSON runs a herdr command whose JSON result has a top-level
 // `agent` field of the AgentInfo shape (agent prompt/start/wait all do), and
 // parses it into an Agent.
 func runAgentJSON(args []string) (Agent, error) {
 	var result struct {
-		Agent struct {
-			PaneID       string `json:"pane_id"`
-			WorkspaceID  string `json:"workspace_id"`
-			TabID        string `json:"tab_id"`
-			AgentStatus  string `json:"agent_status"`
-			AgentSession *struct {
-				Value string `json:"value"`
-			} `json:"agent_session"`
-			StateChangeSeq int `json:"state_change_seq"`
-		} `json:"agent"`
+		Agent agentInfo `json:"agent"`
 	}
 	if err := runJSON(args, &result); err != nil {
 		return Agent{}, err
 	}
-	agent := Agent{
-		PaneID:         result.Agent.PaneID,
-		WorkspaceID:    result.Agent.WorkspaceID,
-		TabID:          result.Agent.TabID,
-		AgentStatus:    result.Agent.AgentStatus,
-		StateChangeSeq: result.Agent.StateChangeSeq,
-	}
-	if result.Agent.AgentSession != nil {
-		agent.AgentSession = result.Agent.AgentSession.Value
-	}
-	return agent, nil
+	return result.Agent.agent(), nil
 }
 
 // AgentExplainResult is herdr's own diagnosis of a pane's current state:

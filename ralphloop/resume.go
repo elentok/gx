@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
@@ -26,24 +27,12 @@ func resumeReattachable(d Deps, workspaceID, epicName string, agentKind AgentKin
 // just whether it's live, doesn't have to re-derive the lookup).
 func liveAgent(d Deps, workspaceID, epicName string, agentKind AgentKind, worktreeDir string, t tickets.Ticket) (agent herdr.Agent, live bool) {
 	label := iterLabel(epicName, t.Identifier)
-	tabs, err := d.TabList(workspaceID)
+	tab, found, err := herdrrunner.FindTab(d.TabList, workspaceID, label)
+	if err != nil || !found {
+		return herdr.Agent{}, false
+	}
+	agent, err = herdrrunner.OwnedAgent(d.AgentGet, label, workspaceID, tab.TabID)
 	if err != nil {
-		return herdr.Agent{}, false
-	}
-	var tab herdr.Tab
-	found := false
-	for _, candidate := range tabs {
-		if candidate.Label == label {
-			tab = candidate
-			found = true
-			break
-		}
-	}
-	if !found {
-		return herdr.Agent{}, false
-	}
-	agent, err = d.AgentGet(label)
-	if err != nil || agent.PaneID == "" || agent.TabID != tab.TabID || agent.WorkspaceID != workspaceID {
 		return herdr.Agent{}, false
 	}
 	if agentKind == AgentCodex {

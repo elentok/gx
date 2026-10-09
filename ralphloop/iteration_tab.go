@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -18,15 +19,6 @@ func FindIterationTab(
 	if err != nil || workspaceID == "" {
 		return herdr.Tab{}, false
 	}
-	tabs, err := tabList(workspaceID)
-	if err != nil {
-		return herdr.Tab{}, false
-	}
-	label := iterLabel(epicName, identifier)
-	for _, tab := range tabs {
-		if tab.Label == label {
-			return tab, true
-		}
-	}
-	return herdr.Tab{}, false
+	tab, found, err := herdrrunner.FindTab(tabList, workspaceID, iterLabel(epicName, identifier))
+	return tab, found && err == nil
 }

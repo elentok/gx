@@ -85,6 +85,13 @@ func RegisterAgentHost(s *State) {
 		s.Agents[a.ID] = a
 		return s.agentJSON(a), Identities{PaneID: paneID, AgentID: a.ID}, nil
 	})
+	s.Register("agent", "list", func(s *State, _ []string) (any, Identities, error) {
+		agents := []map[string]any{}
+		for _, a := range sortedValues(s.Agents) {
+			agents = append(agents, s.agentInfo(a))
+		}
+		return map[string]any{"agents": agents}, Identities{}, nil
+	})
 	s.Register("agent", "get", func(s *State, argv []string) (any, Identities, error) {
 		a, err := s.targetAgent(argv)
 		if err != nil {
@@ -203,19 +210,24 @@ func (s *State) targetAgent(argv []string) (*Agent, error) {
 	if a := s.findAgent(argv[2]); a != nil {
 		return a, nil
 	}
-	return nil, fmt.Errorf("agent not found: %s", argv[2])
+	return nil, errorEnvelope("agent_not_found", fmt.Sprintf("agent target %s not found", argv[2]))
 }
 
 func (s *State) agentJSON(a *Agent) map[string]any {
+	return map[string]any{"agent": s.agentInfo(a)}
+}
+
+func (s *State) agentInfo(a *Agent) map[string]any {
 	p := s.Panes[a.PaneID]
 	tab := s.Tabs[p.TabID]
-	return map[string]any{"agent": map[string]any{
+	return map[string]any{
+		"name":             a.Name,
 		"pane_id":          a.PaneID,
 		"workspace_id":     tab.WorkspaceID,
 		"tab_id":           tab.ID,
 		"agent_status":     a.Status,
 		"state_change_seq": a.Seq,
-	}}
+	}
 }
 
 func tabJSON(t *Tab) map[string]any {

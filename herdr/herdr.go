@@ -100,6 +100,16 @@ type AgentNotReadyError struct {
 func (e *AgentNotReadyError) Error() string { return e.wrapped.Error() }
 func (e *AgentNotReadyError) Unwrap() error { return e.wrapped }
 
+// AgentNotFoundError is herdr's agent_not_found failure: no agent matches the
+// target name or pane id.
+type AgentNotFoundError struct {
+	Message string
+	wrapped error
+}
+
+func (e *AgentNotFoundError) Error() string { return e.wrapped.Error() }
+func (e *AgentNotFoundError) Unwrap() error { return e.wrapped }
+
 // candidateCwdPattern extracts the first candidate's cwd out of an
 // agent_name_taken error's Message, e.g. "...candidates: terminal_id=...
 // pane_id=... cwd=/path/to/worktree status=Working".
@@ -108,9 +118,8 @@ var candidateCwdPattern = regexp.MustCompile(`\bcwd=(\S+)`)
 // run shells out to herdr with args and returns its combined output,
 // wrapping a non-zero exit with the command line and output for context. If
 // the failure is herdr's JSON error envelope with code "agent_name_taken",
-// "agent_blocked", "agent_name_lost", or "agent_not_ready", the returned
-// error is an *AgentNameTakenError, *AgentBlockedError, *AgentNameLostError,
-// or *AgentNotReadyError instead.
+// "agent_blocked", "agent_name_lost", "agent_not_ready" or "agent_not_found",
+// the returned error is the matching typed error instead.
 func run(args ...string) ([]byte, error) {
 	out, err := runCommand(args...)
 	if err != nil {
@@ -135,6 +144,8 @@ func run(args ...string) ([]byte, error) {
 				return nil, &AgentNameLostError{Message: resp.Error.Message, wrapped: wrapped}
 			case "agent_not_ready":
 				return nil, &AgentNotReadyError{Message: resp.Error.Message, wrapped: wrapped}
+			case "agent_not_found":
+				return nil, &AgentNotFoundError{Message: resp.Error.Message, wrapped: wrapped}
 			}
 		}
 		return nil, wrapped

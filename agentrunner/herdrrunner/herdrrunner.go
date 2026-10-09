@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -50,31 +49,21 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 		return agentrunner.Session{}, err
 	}
 	agent, err := herdr.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
-	var taken *herdr.AgentNameTakenError
-	var notReady *herdr.AgentNotReadyError
-	switch {
-	case errors.As(err, &taken):
-		_ = herdr.TabClose(tab.TabID)
-		// Our own earlier launch is still running: adopt it.
-		if taken.CandidateCwd != opts.Cwd {
-			return agentrunner.Session{}, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, taken.Message)
+	if err != nil {
+		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, herdr.AgentExplain, herdr.AgentSendKeys)
+		if recovery != StartResume {
+			_ = herdr.TabClose(tab.TabID)
 		}
-		agent, err = herdr.AgentGet(opts.Label)
-		if err != nil {
+		switch {
+		case err != nil:
 			return agentrunner.Session{}, err
+		case recovery == StartAdopt:
+			if agent, err = herdr.AgentGet(opts.Label); err != nil {
+				return agentrunner.Session{}, err
+			}
+		default:
+			agent.PaneID = tab.RootPaneID
 		}
-	case errors.As(err, &notReady):
-		// Only the trust_directory dialog is answered: gx raised it by
-		// launching in a new directory. Any other dialog is not ours to answer.
-		if rule := MatchedRuleID(herdr.AgentExplain, tab.RootPaneID); rule != "trust_directory" {
-			return agentrunner.Session{}, fmt.Errorf("%w: %s blocked on dialog %q", agentrunner.ErrNotReady, opts.Label, rule)
-		}
-		if err := herdr.AgentSendKeys(tab.RootPaneID, "enter"); err != nil {
-			return agentrunner.Session{}, err
-		}
-		agent.PaneID = tab.RootPaneID
-	case err != nil:
-		return agentrunner.Session{}, err
 	}
 	s := agentrunner.Session{Label: opts.Label, ID: agent.PaneID, SessionID: agent.AgentSession}
 	// Drop a stopped predecessor's count; the wait's status read starts anew.
@@ -183,25 +172,21 @@ func (r *Runner) Find(label string) (agentrunner.Session, bool, error) {
 	return agentrunner.Session{Label: label, ID: agent.PaneID, SessionID: agent.AgentSession}, true, nil
 }
 
-// List returns the epic workspace's sessions, taking tab labels as agent
-// names the way Start creates them.
+// List returns the epic workspace's named agents. Tab labels are not agent
+// names: ralph-loop's server launch labels a tab after its ticket.
 func (r *Runner) List(epic string) ([]agentrunner.Session, error) {
 	wsID, err := herdr.FindWorkspace(epic)
 	if err != nil || wsID == "" {
 		return nil, err
 	}
-	tabs, err := herdr.TabList(wsID)
+	agents, err := herdr.AgentList()
 	if err != nil {
 		return nil, err
 	}
 	var out []agentrunner.Session
-	for _, tab := range tabs {
-		s, ok, err := r.Find(tab.Label)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			out = append(out, s)
+	for _, agent := range agents {
+		if agent.WorkspaceID == wsID && agent.Name != "" {
+			out = append(out, agentrunner.Session{Label: agent.Name, ID: agent.PaneID, SessionID: agent.AgentSession})
 		}
 	}
 	return out, nil
@@ -265,7 +250,8 @@ func (r *Runner) turnLocked(label string, seq int) *turn {
 }
 
 func isNotFound(err error) bool {
-	return err != nil && strings.Contains(strings.ToLower(err.Error()), "not found")
+	var notFound *herdr.AgentNotFoundError
+	return errors.As(err, &notFound)
 }
 
 func mapNotFound(err error) error {

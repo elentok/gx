@@ -177,27 +177,17 @@ func reattachIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("clearing iteration_status for reattached ticket %s: %w", p.Ticket.Identifier, err)
 	}
 
-	tabs, err := d.TabList(p.WorkspaceID)
+	tab, found, err := herdrrunner.FindTab(d.TabList, p.WorkspaceID, label)
 	if err != nil {
 		return fmt.Errorf("finding live tab for reattached iteration %s: %w", label, err)
 	}
-	var tab herdr.Tab
-	for _, t := range tabs {
-		if t.Label == label {
-			tab = t
-			break
-		}
-	}
-	if tab.TabID == "" {
+	if !found {
 		return fmt.Errorf("no live tab found for reattached iteration %s", label)
 	}
 	tabID := tab.TabID
-	agent, err := d.AgentGet(label)
+	agent, err := herdrrunner.OwnedAgent(d.AgentGet, label, p.WorkspaceID, tabID)
 	if err != nil {
-		return fmt.Errorf("reading live agent state for reattached iteration %s: %w", label, err)
-	}
-	if agent.PaneID == "" || agent.TabID != tabID || agent.WorkspaceID != p.WorkspaceID {
-		return fmt.Errorf("live agent state for reattached iteration %s does not match workspace %s and tab %s", label, p.WorkspaceID, tabID)
+		return fmt.Errorf("reattached iteration %s: %w", label, err)
 	}
 	if p.Agent == AgentCodex {
 		if agent.AgentSession == "" {
@@ -943,12 +933,9 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, liveTab herdr.Tab) 
 		return "", err
 	}
 
-	agent, err := d.AgentGet(label)
+	agent, err := herdrrunner.OwnedAgent(d.AgentGet, label, p.WorkspaceID, liveTab.TabID)
 	if err != nil {
-		return "", fmt.Errorf("reading live agent state for conflict-resolution tab %s: %w", label, err)
-	}
-	if agent.PaneID == "" || agent.TabID != liveTab.TabID || agent.WorkspaceID != p.WorkspaceID {
-		return "", fmt.Errorf("live agent state for conflict-resolution tab %s does not match workspace %s and tab %s", label, p.WorkspaceID, liveTab.TabID)
+		return "", fmt.Errorf("conflict-resolution tab %s: %w", label, err)
 	}
 	sessionID = agent.AgentSession
 
