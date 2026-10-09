@@ -55,6 +55,8 @@ type Agent struct {
 	// matched_rule (see RegisterAgentHost).
 	Seq  int
 	Rule string
+	// Stalled agents never pick up a prompt (see StallAgent).
+	Stalled bool
 }
 
 type Session struct {

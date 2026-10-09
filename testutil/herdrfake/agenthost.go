@@ -121,6 +121,9 @@ func RegisterAgentHost(s *State) {
 		if a.Status == "blocked" {
 			return nil, Identities{AgentID: a.ID}, AgentBlockedError(argv[2])
 		}
+		if a.Stalled {
+			return nil, Identities{AgentID: a.ID}, errorEnvelope("agent_prompt_stalled", "no observed state change after prompt")
+		}
 		a.setStatus("working", "")
 		return s.agentJSON(a), Identities{AgentID: a.ID}, nil
 	})
@@ -140,11 +143,12 @@ func RegisterAgentHost(s *State) {
 	})
 }
 
-// explainHandler wraps h so "agent explain", whose JSON is a bare object
-// rather than herdr's {"result": ...} envelope, answers from s directly.
-func (s *State) explainHandler(h Handler) Handler {
+// rawHandler wraps h so "agent explain" (a bare JSON object) and "agent read"
+// (raw pane text), which skip herdr's {"result": ...} envelope, answer from s
+// directly.
+func (s *State) rawHandler(h Handler) Handler {
 	return func(argv []string) ([]byte, int) {
-		if len(argv) < 3 || argv[0] != "agent" || argv[1] != "explain" {
+		if len(argv) < 3 || argv[0] != "agent" || (argv[1] != "explain" && argv[1] != "read") {
 			return h(argv)
 		}
 		s.mu.Lock()
@@ -152,6 +156,10 @@ func (s *State) explainHandler(h Handler) Handler {
 		a, err := s.targetAgent(argv)
 		if err != nil {
 			return CommandError(err.Error())
+		}
+		if argv[1] == "read" {
+			// The pane never changes: prompts are not typed into it.
+			return []byte("> "), 0
 		}
 		resp := map[string]any{"state": a.Status}
 		if a.Rule != "" {
@@ -170,7 +178,7 @@ func StartAgentHost(t *testing.T, s *State) *Coordinator {
 	stop := make(chan struct{})
 	t.Cleanup(func() { close(stop) })
 	go s.runWatchdog(stop)
-	return Start(t, s.explainHandler(s.Handler()))
+	return Start(t, s.rawHandler(s.Handler()))
 }
 
 // SetAgentStatus sets the status of the agent named name, as the agent
@@ -184,6 +192,20 @@ func (s *State) SetAgentStatus(name, status, rule string) error {
 		return fmt.Errorf("agent not found: %s", name)
 	}
 	a.setStatus(status, rule)
+	return nil
+}
+
+// StallAgent makes every later prompt to the agent named name fail with
+// herdr's agent_prompt_stalled error, as for a submission that never reaches
+// the pane.
+func (s *State) StallAgent(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.findAgent(name)
+	if a == nil {
+		return fmt.Errorf("agent not found: %s", name)
+	}
+	a.Stalled = true
 	return nil
 }
 

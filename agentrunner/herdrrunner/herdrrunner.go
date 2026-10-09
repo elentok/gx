@@ -19,6 +19,11 @@ import (
 const pollInterval = 20 * time.Millisecond
 
 type Runner struct {
+	// BackgroundTasks reports whether the agent behind s still has a
+	// background task running. herdr shows such an agent idle, but the task
+	// will wake it, so the runner reports it working. Nil means no gating.
+	BackgroundTasks func(s agentrunner.Session) bool
+
 	mu sync.Mutex
 	// turns counts prompts the agent picked up, keyed by label. herdr's
 	// StateChangeSeq also advances when a turn ends, so it can't be Turn as is.
@@ -124,8 +129,11 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 			return agentrunner.Status{}, mapNotFound(err)
 		}
 		if err == nil {
+			// herdr's state can still be overridden by a background task.
 			st, err := r.status(s)
-			return st.Status, err
+			if err != nil || slices.Contains(states, st.State) {
+				return st.Status, err
+			}
 		}
 		if time.Now().After(deadline) {
 			st, err := r.status(s)
@@ -226,7 +234,13 @@ func (r *Runner) status(s agentrunner.Session) (status, error) {
 		return status{}, mapNotFound(err)
 	}
 	st := status{Status: agentrunner.Status{State: agentrunner.State(agent.AgentStatus), SessionID: agent.AgentSession}, seq: agent.StateChangeSeq}
-	if !slices.Contains([]agentrunner.State{agentrunner.StateWorking, agentrunner.StateIdle, agentrunner.StateDone, agentrunner.StateBlocked}, st.State) {
+	switch st.State {
+	case agentrunner.StateWorking, agentrunner.StateBlocked:
+	case agentrunner.StateIdle, agentrunner.StateDone:
+		if r.BackgroundTasks != nil && r.BackgroundTasks(s) {
+			st.State = agentrunner.StateWorking
+		}
+	default:
 		st.State = agentrunner.StateWorking
 	}
 	if st.State == agentrunner.StateBlocked {

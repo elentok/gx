@@ -3,6 +3,7 @@ package herdrrunner_test
 import (
 	"os"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,8 +28,19 @@ func TestConformance(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		var tasksMu sync.Mutex
+		tasks := map[string]bool{}
+		newRunner := func() agentrunner.Runner {
+			r := herdrrunner.New()
+			r.BackgroundTasks = func(s agentrunner.Session) bool {
+				tasksMu.Lock()
+				defer tasksMu.Unlock()
+				return tasks[s.Label]
+			}
+			return r
+		}
 		return runnertest.Harness{
-			Runner: herdrrunner.New(),
+			Runner: newRunner(),
 			FinishTurn: func(t *testing.T, s agentrunner.Session) {
 				setStatus(t, s, "idle", "")
 			},
@@ -39,16 +51,16 @@ func TestConformance(t *testing.T) {
 				t.Skip("herdr RateLimit lands in a sibling ticket")
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
-				t.Skip("herdrfake stall support lands in a follow-up ticket")
+				if err := state.StallAgent(s.Label); err != nil {
+					t.Fatal(err)
+				}
 			},
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
-				t.Skip("herdr background-task gating lands in a follow-up ticket")
+				tasksMu.Lock()
+				defer tasksMu.Unlock()
+				tasks[s.Label] = running
 			},
-			Restart: func(t *testing.T) agentrunner.Runner { return herdrrunner.New() },
-			Skip: map[string]string{
-				"PromptNotDelivered":           "herdrfake has no stalled agent yet",
-				"FinishWaitsForBackgroundTask": "herdrfake has no background tasks yet",
-			},
+			Restart: func(t *testing.T) agentrunner.Runner { return newRunner() },
 		}
 	})
 }
