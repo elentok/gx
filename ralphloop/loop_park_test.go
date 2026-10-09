@@ -171,8 +171,10 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 
-	if len(*prompts) != 2 {
-		t.Errorf("prompts = %v, want 2 (the stalled iteration, then a relaunch once the registry entry cleared)", *prompts)
+	// The relaunch adopts the parked iteration's still-live session, which has
+	// already had its turn, so it is not prompted again.
+	if len(*prompts) != 1 {
+		t.Errorf("prompts = %v, want 1 (the stalled iteration's only, adopted by the relaunch once the registry entry cleared)", *prompts)
 	}
 	got := mustParse(t, path)
 	if got.Status != schema.StatusDone {

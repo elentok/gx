@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"log"
@@ -281,7 +282,12 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 // agent_prompt_stalled. Any other prompt error (e.g. ErrNotReady on a blocked
 // agent) returns with the session still live, for the blocked-pane park.
 // onFail is called for every failed attempt, to log launch-failed.
-func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error)) (agentrunner.Session, error) {
+//
+// A label already live before Start means Start adopted our own earlier
+// session (e.g. a second gx process racing the same ticket): that one is
+// returned unprompted with Adopted set, since it may be mid-turn.
+func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error)) (launched, error) {
+	_, adopted, _ := r.Find(opts.Label)
 	for attempt := 1; ; attempt++ {
 		s, err := r.Start(opts)
 		if err != nil {
@@ -291,11 +297,18 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 			}
 			err = fmt.Errorf("starting %s: %w", opts.Label, err)
 			onFail(attempt, kind, err)
-			return agentrunner.Session{}, &launchFailure{Kind: kind, Err: err}
+			return launched{}, &launchFailure{Kind: kind, Err: err}
+		}
+		if adopted {
+			return launched{Session: s, Adopted: true}, nil
+		}
+		status, err := r.Status(s)
+		if err != nil {
+			log.Printf("reading %s status before initial prompt: %v", opts.Label, err)
 		}
 		err = r.Prompt(s, prompt)
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
-			return s, err
+			return launched{Session: s, Baseline: status.Turn}, err
 		}
 		err = fmt.Errorf("sending initial prompt: %w", err)
 		onFail(attempt, events.AgentPromptStalled, err)
@@ -303,9 +316,19 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 			log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
 		}
 		if attempt == 2 {
-			return agentrunner.Session{}, &launchFailure{Kind: events.AgentPromptStalled, Err: err}
+			return launched{}, &launchFailure{Kind: events.AgentPromptStalled, Err: err}
 		}
 	}
+}
+
+// launched is a session startAndPrompt started and prompted, or adopted.
+type launched struct {
+	agentrunner.Session
+	Adopted bool
+	// Baseline is the session's Turn before its initial prompt: the
+	// stalled-since-launch baseline (see noActivitySinceLaunch). Zero when
+	// adopted or unknown.
+	Baseline int
 }
 
 // launchAndPrompt runs the shared agent lifecycle protocol: launch the agent in
@@ -383,8 +406,8 @@ func continueLaunch(d Deps, p launchAndPromptParams, startedAgent herdr.Agent) (
 }
 
 // promptedLaunch is continueLaunch's post-prompt half for a session started
-// and prompted through Deps.Runner.
-func promptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
+// and prompted through Deps.Runner, with baseline its pre-prompt Turn.
+func promptedLaunch(d Deps, p launchAndPromptParams, baseline int) (string, error) {
 	status, err := d.Runner.Status(p.Session)
 	if err != nil {
 		log.Printf("reading %s status after initial prompt: %v", p.Label, err)
@@ -394,16 +417,46 @@ func promptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
 	if sessionID == "" {
 		sessionID = p.Session.SessionID
 	}
-	return startedLaunch(d, p, sessionID, status.Turn)
+	return startedLaunch(d, p, sessionID, baseline)
 }
 
 // startedLaunch logs and reports a freshly prompted agent's start, with seq as
 // its stalled-since-launch baseline, then waits for it to finish.
 func startedLaunch(d Deps, p launchAndPromptParams, sessionID string, seq int) (string, error) {
+	p.reportStarted(d, sessionID, seq)
+	return waitLaunched(d, p, sessionID)
+}
+
+func (p launchAndPromptParams) reportStarted(d Deps, sessionID string, seq int) {
 	p.logAgentStartEvent(p.StartEvent, sessionID, seq)
 	if p.StartEvent != "" {
 		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane, p.Tab)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
+	}
+}
+
+// adoptedLaunch takes over p.Session, a live session startAndPrompt adopted
+// unprompted. An idle one whose turn hasn't moved past its logged launch
+// baseline (see noActivitySinceLaunch) never got its prompt, so it gets it
+// now; an idle one that has moved is already finished; anything else is
+// waited out.
+func adoptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
+	status, err := d.Runner.Status(p.Session)
+	if err != nil {
+		return "", fmt.Errorf("reading adopted %s status: %w", p.Label, err)
+	}
+	sessionID := cmp.Or(status.SessionID, p.Session.SessionID)
+	// Seq 0 keeps the original launch's baseline the one noActivitySinceLaunch
+	// finds.
+	p.reportStarted(d, sessionID, 0)
+	if alreadyFinished(string(status.State)) {
+		if !noActivitySinceLaunch(p.ScratchDir, p.EpicName, sessionID, status.Turn) {
+			p.logLifecycleEvent(p.FinishEvent, sessionID)
+			return sessionID, nil
+		}
+		if err := d.Runner.Prompt(p.Session, p.Prompt); err != nil {
+			return "", fmt.Errorf("sending initial prompt to stalled adopted session: %w", err)
+		}
 	}
 	return waitLaunched(d, p, sessionID)
 }
@@ -456,7 +509,7 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		return sessionID, nil
 	}
 	if alreadyFinished(live.AgentStatus) {
-		promptedAgent, err := resendPrompt(d, p, p.Prompt)
+		promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{Target: p.Pane, Text: p.Prompt, Wait: true, Until: []string{"working"}})
 		if err != nil {
 			return "", fmt.Errorf("sending initial prompt to stalled reattached pane: %w", err)
 		}
@@ -465,20 +518,6 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 		}
 	}
 	return waitLaunched(d, p, sessionID)
-}
-
-// resendPrompt sends text to p.Pane and waits for the pane to reach
-// "working" — the shared send used by attachToLiveAgent's
-// stalled-since-launch branch and finishIteration's unexecuted-tool-call
-// corrective retry, so future changes to resend semantics land once, not
-// twice.
-func resendPrompt(d Deps, p launchAndPromptParams, text string) (herdr.Agent, error) {
-	return d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: p.Pane,
-		Text:   text,
-		Wait:   true,
-		Until:  []string{"working"},
-	})
 }
 
 // stalledSinceLaunch reports whether live's pane never advanced past the
@@ -495,8 +534,8 @@ func stalledSinceLaunch(p launchAndPromptParams, live herdr.Agent) bool {
 // still matches the baseline stamped on its own iteration-started event (see
 // logAgentStartEvent), found in the epic's run log by matching agentSession.
 // Shared by stalledSinceLaunch (attachToLiveAgent's collided-reattach guard)
-// and parkOnBlockedPane's resend-before-park guard — both need the same
-// "has this pane done anything since this iteration launched it" check. A
+// and adoptedLaunch, the herdr and Runner forms of the same "has this pane
+// done anything since this iteration launched it" check. A
 // missing log, an untracked session, or no matching event all fall through
 // to false — the safe default of trusting the caller's existing behavior.
 func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq int) bool {

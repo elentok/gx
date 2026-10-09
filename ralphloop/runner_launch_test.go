@@ -18,10 +18,10 @@ type launchFail struct {
 func startAndPromptFake(t *testing.T, r *runnerfake.Runner) (agentrunner.Session, error, []launchFail) {
 	t.Helper()
 	var fails []launchFail
-	s, err := startAndPrompt(r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
+	l, err := startAndPrompt(r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
 		fails = append(fails, launchFail{attempt, kind})
 	})
-	return s, err, fails
+	return l.Session, err, fails
 }
 
 func TestStartAndPrompt_DeliversPrompt(t *testing.T) {

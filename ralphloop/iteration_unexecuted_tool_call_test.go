@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 )
 
 // TestRun_UnexecutedToolCallDetected_RetryLandsCommits pins ticket 02's
@@ -27,9 +27,7 @@ func TestRun_UnexecutedToolCallDetected_RetryLandsCommits(t *testing.T) {
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle", AgentSession: "session-" + target}, nil
-	}
+	fakeRunner(d).PromptState = agentrunner.StateIdle
 	var calls int32
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		n := atomic.AddInt32(&calls, 1)
@@ -115,9 +113,7 @@ func TestRun_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToNeedsAnswer
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle", AgentSession: "session-" + target}, nil
-	}
+	fakeRunner(d).PromptState = agentrunner.StateIdle
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
@@ -153,9 +149,7 @@ func TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *test
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
-	}
+	fakeRunner(d).PromptState = agentrunner.StateBlocked
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}

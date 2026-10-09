@@ -7,29 +7,27 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// retryTurnSelfReport wraps a Deps.AgentPrompt so the ticket picks up a
-// self-report exactly when the corrective retry's own prompt (see
-// retryUnexecutedToolCallOnce, unexecutedToolCallCorrection) is sent — never
-// on the original turn's launch prompt, which carries different text. That
-// pins these tests to ticket 04's ordering claim: the self-report belongs to
-// the retry's own turn, not the original unexecuted-tool-call glitch that
-// triggered the retry. It delegates to the given base (fakeDeps' own
-// AgentPrompt) so prompt recording keeps working unchanged.
-func retryTurnSelfReport(t *testing.T, path string, base func(herdr.AgentPromptOptions) (herdr.Agent, error), mutate func(*schema.Ticket)) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+// retryTurnSelfReport makes the ticket pick up a self-report exactly when the
+// corrective retry's own prompt (see retryUnexecutedToolCallOnce,
+// unexecutedToolCallCorrection) is sent — never on the original turn's launch
+// prompt, which carries different text. That pins these tests to ticket 04's
+// ordering claim: the self-report belongs to the retry's own turn, not the
+// original unexecuted-tool-call glitch that triggered the retry.
+func retryTurnSelfReport(t *testing.T, d Deps, path string, mutate func(*schema.Ticket)) {
 	t.Helper()
-	return func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if strings.Contains(opts.Text, unexecutedToolCallCorrection) {
+	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
+		if strings.Contains(text, unexecutedToolCallCorrection) {
 			if err := updateTicket(path, mutate); err != nil {
 				t.Errorf("seeding retry-turn self-report on %s: %v", path, err)
 			}
 		}
-		return base(opts)
-	}
+		return nil
+	})
 }
 
 // TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported pins
@@ -49,13 +47,11 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *te
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle", AgentSession: "session-" + target}, nil
-	}
+	fakeRunner(d).PromptState = agentrunner.StateIdle
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
-	d.AgentPrompt = retryTurnSelfReport(t, path, d.AgentPrompt, func(tk *schema.Ticket) {
+	retryTurnSelfReport(t, d, path, func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusNeedsAnswer
 	})
 
@@ -106,9 +102,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle", AgentSession: "session-" + target}, nil
-	}
+	fakeRunner(d).PromptState = agentrunner.StateIdle
 	var calls int32
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		n := atomic.AddInt32(&calls, 1)
@@ -122,7 +116,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 		cherryPickCalled = true
 		return nil
 	}
-	d.AgentPrompt = retryTurnSelfReport(t, path, d.AgentPrompt, func(tk *schema.Ticket) {
+	retryTurnSelfReport(t, d, path, func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusNeedsAnswer
 	})
 
@@ -167,13 +161,11 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
 		return true, nil
 	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle", AgentSession: "session-" + target}, nil
-	}
+	fakeRunner(d).PromptState = agentrunner.StateIdle
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
-	d.AgentPrompt = retryTurnSelfReport(t, path, d.AgentPrompt, func(tk *schema.Ticket) {
+	retryTurnSelfReport(t, d, path, func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
 		tk.Commitless = true
 	})

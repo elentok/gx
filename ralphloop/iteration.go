@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"log"
@@ -83,7 +84,7 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 	prompt := skillPrompt(p.Agent, skill, ticketAddress(p.Ticket))
 
-	s, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
+	l, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  p.FeatureBranch,
 		Cwd:   path,
@@ -96,19 +97,19 @@ func runIteration(d Deps, p iterationParams) error {
 	if errors.As(err, &launchFail) {
 		return err
 	}
-	launchParams := p.launchAndPromptParams(label, s.ID, iterationTabID(d, label), prompt, path, string(events.IterationStarted), string(events.IterationFinished))
-	launchParams.Session = s
+	launchParams := p.launchAndPromptParams(label, l.ID, iterationTabID(d, label), prompt, path, string(events.IterationStarted), string(events.IterationFinished))
+	launchParams.Session = l.Session
 	var sessionID string
 	if errors.Is(err, agentrunner.ErrNotReady) {
 		// The agent is live but blocked on a dialog gx did not raise: same
 		// park as a mid-turn block. One that cleared before the re-check is a
 		// plain launch failure.
-		parked, parkErr := parkOnBlockedPane(d, launchParams, s.SessionID)
+		parked, parkErr := parkOnBlockedPane(d, launchParams, l.SessionID)
 		if parkErr != nil {
 			return parkErr
 		}
 		if parked {
-			sessionID, err = s.SessionID, errBlockedPaneParked
+			sessionID, err = l.SessionID, errBlockedPaneParked
 		}
 	}
 	switch {
@@ -117,8 +118,10 @@ func runIteration(d Deps, p iterationParams) error {
 		err = fmt.Errorf("sending initial prompt: %w", err)
 		p.logLaunchFailed(label, 1, events.IterationError, err)
 		return &launchFailure{Kind: events.IterationError, Err: err}
+	case l.Adopted:
+		sessionID, err = adoptedLaunch(d, launchParams)
 	default:
-		sessionID, err = promptedLaunch(d, launchParams)
+		sessionID, err = promptedLaunch(d, launchParams, l.Baseline)
 	}
 	parked := errors.Is(err, errBlockedPaneParked)
 	if err != nil && !parked {
@@ -475,23 +478,26 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, tab, bas
 	}
 
 	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
-	agent, err := d.AgentGet(label)
+	s, found, err := d.Runner.Find(label)
+	if err == nil && !found {
+		err = agentrunner.ErrNotFound
+	}
+	var status agentrunner.Status
+	if err == nil {
+		status, err = d.Runner.Status(s)
+	}
 	if err != nil {
 		return false, 0, "", fmt.Errorf("reading live agent state for %s before corrective retry: %w", label, err)
 	}
-	if !alreadyFinished(agent.AgentStatus) {
+	if !alreadyFinished(string(status.State)) {
 		return false, 0, "", nil
 	}
 
-	launchParams := p.launchAndPromptParams(label, pane, tab, "", path, "", "")
-	promptedAgent, err := resendPrompt(d, launchParams, unexecutedToolCallCorrection)
-	if err != nil {
+	if err := d.Runner.Prompt(s, unexecutedToolCallCorrection); err != nil {
 		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
 	}
-	retrySessionID := sessionID
-	if promptedAgent.AgentSession != "" {
-		retrySessionID = promptedAgent.AgentSession
-	}
+	retrySessionID := cmp.Or(status.SessionID, sessionID)
+	launchParams := p.launchAndPromptParams(label, pane, tab, "", path, "", "")
 
 	if err := waitForFinish(d, launchParams, retrySessionID); err != nil {
 		if errors.Is(err, errBlockedPaneParked) {
