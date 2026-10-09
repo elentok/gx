@@ -6,28 +6,26 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// reportIterationStatus returns a Deps.AgentWait that first writes
-// iteration_status: value onto the ticket at path (simulating the agent's own
-// `gx tickets set --iteration-status` call during the iteration) and then
-// falls through to the idle report every fakeDeps agent produces. It only
-// fires for the target iteration's own pane so other tickets in a multi-item
-// run are unaffected.
-func reportIterationStatus(t *testing.T, path, target, value string) func(herdr.AgentWaitOptions) (herdr.Agent, error) {
+// reportIterationStatus writes iteration_status: value onto the ticket at
+// path on every Runner wait of fakeDeps' d for label, simulating the agent's
+// own `gx tickets set --iteration-status` call during the iteration. Other
+// tickets in a multi-item run are unaffected.
+func reportIterationStatus(t *testing.T, d Deps, path, label, value string) {
 	t.Helper()
-	return func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if opts.Target == "pane-"+target {
-			if err := updateTicket(path, func(tk *schema.Ticket) {
-				tk.IterationStatus = schema.IterationStatus(value)
-			}); err != nil {
-				t.Errorf("seeding iteration_status on %s: %v", path, err)
-			}
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if s.Label != label {
+			return
 		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+		if err := updateTicket(path, func(tk *schema.Ticket) {
+			tk.IterationStatus = schema.IterationStatus(value)
+		}); err != nil {
+			t.Errorf("seeding iteration_status on %s: %v", path, err)
+		}
+	})
 }
 
 // TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits pins ticket
@@ -60,9 +58,9 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 	// The default fakeDeps CommitsAhead returns 1: commits are present, which
 	// is exactly the case that must not be landed once needs-answer has been
 	// reported.
-	d.AgentWait = reportIterationStatus(t, path, "epic-iter-01", "needs-answer")
+	reportIterationStatus(t, d, path, "epic-iter-01", "needs-answer")
 
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), &recordingSink{})
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 
 	if cherryPickCalled {
 		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted needs-answer report")
@@ -108,7 +106,7 @@ func TestRun_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
-	d.AgentWait = reportIterationStatus(t, path, "epic-iter-01", "finished")
+	reportIterationStatus(t, d, path, "epic-iter-01", "finished")
 
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 

@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
@@ -16,57 +16,57 @@ import (
 	"github.com/elentok/gx/herdr"
 )
 
-// gatedAgentWait wraps a fakeDeps' AgentWait so that only the "wait for the
-// agent to finish" call (the one whose Until includes "done") blocks until
-// released, letting a test control exactly when each iteration completes and
-// observe how many run concurrently in between. waitForFinish's
-// confirmFinished re-polls the same pane once more (with the same Until list)
-// before treating it as genuinely finished, so a pane's gate — once created —
-// is reused (and returns immediately once released) rather than re-armed on
-// every call: only the first call per pane blocks and reports on started.
-func gatedAgentWait(next func(herdr.AgentWaitOptions) (herdr.Agent, error)) (
-	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
-	started <-chan string,
-	release func(pane string),
-) {
-	var mu sync.Mutex
-	gates := map[string]chan struct{}{}
-	startedCh := make(chan string, 16)
+// gatedRunner blocks only the "wait for the agent to finish" Wait (the one
+// whose states include done) until released, letting a test control exactly
+// when each iteration completes and observe how many run concurrently in
+// between. waitForFinish's confirmFinished re-waits the same session once
+// more before treating it as genuinely finished, so a label's gate — once
+// created — is reused (and passes straight through once released) rather
+// than re-armed on every call: only the first call per label blocks and
+// reports on started.
+type gatedRunner struct {
+	agentrunner.Runner
+	// timeOut, when set, is asked first on every finish wait; true times that
+	// wait out ungated, as an agent still at work.
+	timeOut func(label string) bool
+	started chan string
 
-	wait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		isFinish := false
-		for _, u := range opts.Until {
-			if u == "done" {
-				isFinish = true
-			}
-		}
-		if !isFinish {
-			return next(opts)
-		}
+	mu    sync.Mutex
+	gates map[string]chan struct{}
+}
 
-		mu.Lock()
-		gate, exists := gates[opts.Target]
-		if !exists {
-			gate = make(chan struct{})
-			gates[opts.Target] = gate
-		}
-		mu.Unlock()
+func newGatedRunner(next agentrunner.Runner) *gatedRunner {
+	return &gatedRunner{Runner: next, started: make(chan string, 16), gates: map[string]chan struct{}{}}
+}
 
-		if !exists {
-			startedCh <- opts.Target
-		}
-		<-gate
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
+func (r *gatedRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
+	if !slices.Contains(states, agentrunner.StateDone) {
+		return r.Runner.Wait(s, states, timeout)
+	}
+	if r.timeOut != nil && r.timeOut(s.Label) {
+		return agentrunner.Status{State: agentrunner.StateWorking}, agentrunner.ErrTimeout
 	}
 
-	release = func(pane string) {
-		mu.Lock()
-		gate := gates[pane]
-		mu.Unlock()
-		close(gate)
+	r.mu.Lock()
+	gate, exists := r.gates[s.Label]
+	if !exists {
+		gate = make(chan struct{})
+		r.gates[s.Label] = gate
 	}
+	r.mu.Unlock()
 
-	return wait, startedCh, release
+	if !exists {
+		r.started <- s.Label
+	}
+	<-gate
+	return r.Runner.Wait(s, states, timeout)
+}
+
+func (r *gatedRunner) release(label string) {
+	r.mu.Lock()
+	gate := r.gates[label]
+	r.mu.Unlock()
+	close(gate)
 }
 
 func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testing.T) {
@@ -121,7 +121,7 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		return origRemoveWorktree(repoDir, path, force)
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -330,17 +330,12 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutA
 	d.CherryPickInProgress = func(dir string) (bool, error) {
 		return true, nil // conflict never resolves
 	}
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		isFinish := slices.Contains(opts.Until, "done")
-		isConflictPane := strings.HasPrefix(opts.Target, "pane-conflict-")
-		if isFinish && isConflictPane {
-			return herdr.Agent{}, errors.New("timeout waiting for agent")
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutLabel: func(label string) bool {
+		return strings.HasPrefix(label, "conflict-")
+	}}
 	// A stuck conflict resolution marks the ticket needs-repair rather than
 	// aborting the run, which leaves the epic parked on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{})
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 	if err != nil {
@@ -513,6 +508,7 @@ func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *test
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-conflict-01", Label: "conflict-01", WorkspaceID: workspaceID}}, nil
 	}
+	hostLiveAgent(t, d, "conflict-01")
 
 	// The sequencer already owns a conflict from before the crash — no
 	// CherryPickRange call for this ticket ever produces it. The first check
@@ -542,7 +538,7 @@ func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *test
 		return nil
 	})
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -696,25 +692,17 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	})
 	d, _, removed := fakeDeps()
 
-	var finishCalls int32
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if !slices.Contains(opts.Until, "done") {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		}
-		if atomic.AddInt32(&finishCalls, 1) == 2 {
-			// The debounce recheck: the agent went back to work in the
-			// meantime, so this "confirm" poll should see it still busy.
-			return herdr.Agent{}, errors.New("timed out waiting for agent")
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	// The second wait is the debounce recheck: the agent went back to work in
+	// the meantime, so this "confirm" wait should see it still busy.
+	r := &blipRunner{Runner: fakeRunner(d), timeoutOn: 2}
+	d.Runner = r
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if got := atomic.LoadInt32(&finishCalls); got < 3 {
-		t.Fatalf("AgentWait finish-poll calls = %d, want at least 3 (initial idle, failed confirm, real finish)", got)
+	if r.waits < 3 {
+		t.Fatalf("Runner.Wait calls = %d, want at least 3 (initial idle, failed confirm, real finish)", r.waits)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))

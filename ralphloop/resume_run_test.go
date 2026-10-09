@@ -1,10 +1,8 @@
 package ralphloop
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -32,18 +30,16 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
-	wait, started, release := gatedAgentWait(d.AgentWait)
+	g := newGatedRunner(d.Runner)
 	var breachOnce sync.Once
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if slices.Contains(opts.Until, "done") && strings.Contains(opts.Target, "iter-01") {
-			breached := false
+	g.timeOut = func(label string) bool {
+		breached := false
+		if strings.Contains(label, "iter-01") {
 			breachOnce.Do(func() { breached = true })
-			if breached {
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
 		}
-		return wait(opts)
+		return breached
 	}
+	d.Runner = g
 
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if strings.Contains(cwd, "epic-item-01") {
@@ -72,7 +68,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, withAgentWaitRunner(d), sink)
+		}, d, sink)
 	}()
 
 	keys := <-sendKeysCh
@@ -107,23 +103,23 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 	// between iter-02's ordinary registration and iter-01's post-recovery
 	// re-registration isn't guaranteed, since nothing blocks iter-01
 	// between the breach and re-entering the poll loop anymore.
-	var pane1, pane2 string
+	var iter1, iter2 string
 	for range 2 {
-		p := <-started
-		if strings.Contains(p, "iter-01") {
-			pane1 = p
+		l := <-g.started
+		if strings.Contains(l, "iter-01") {
+			iter1 = l
 		} else {
-			pane2 = p
+			iter2 = l
 		}
 	}
 
 	// iter-02 finishes and ticket 03 backfills immediately, even though
 	// iter-01 is still mid-recovery — proving the scheduler was never
 	// blocked by the smart-zone breach (no Gate.pause on this path).
-	release(pane2)
-	pane3 := <-started
-	release(pane1)
-	release(pane3)
+	g.release(iter2)
+	iter3 := <-g.started
+	g.release(iter1)
+	g.release(iter3)
 
 	if err := <-errCh; err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -158,23 +154,22 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
-	wait, started, release := gatedAgentWait(d.AgentWait)
+	g := newGatedRunner(d.Runner)
 	var breaches int
 	var breachMu sync.Mutex
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if slices.Contains(opts.Until, "done") && strings.Contains(opts.Target, "iter-01") {
-			breachMu.Lock()
-			fire := breaches < 2
-			if fire {
-				breaches++
-			}
-			breachMu.Unlock()
-			if fire {
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
+	g.timeOut = func(label string) bool {
+		if !strings.Contains(label, "iter-01") {
+			return false
 		}
-		return wait(opts)
+		breachMu.Lock()
+		defer breachMu.Unlock()
+		fire := breaches < 2
+		if fire {
+			breaches++
+		}
+		return fire
 	}
+	d.Runner = g
 
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 999999, true, nil
@@ -200,7 +195,7 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 1, Gate: gate,
-		}, withAgentWaitRunner(d), noopEventSink{})
+		}, d, noopEventSink{})
 	}()
 
 	for i := range 2 {
@@ -223,8 +218,7 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		}
 	}
 
-	pane1 := <-started
-	release(pane1)
+	g.release(<-g.started)
 
 	if err := <-errCh; err != nil {
 		t.Fatalf("Run() error = %v", err)

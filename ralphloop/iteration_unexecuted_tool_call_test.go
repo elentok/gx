@@ -146,15 +146,16 @@ func TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *test
 	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	d, prompts, _ := fakeDeps()
 
+	// The agent blocks after finishing its turn, by the time the check runs.
 	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) {
+		fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "approval")
 		return true, nil
 	}
-	fakeRunner(d).PromptState = agentrunner.StateBlocked
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
 
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), &recordingSink{})
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 
 	wantPrompts := 1
 	if len(*prompts) != wantPrompts {

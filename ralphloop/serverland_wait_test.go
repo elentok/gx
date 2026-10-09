@@ -61,7 +61,9 @@ type blipRunner struct {
 	// timeoutIf, when set, replaces timeoutOn: it is told each Wait's 1-based
 	// index and reports whether that Wait times out.
 	timeoutIf func(wait int) bool
-	waits     int
+	// timeoutLabel, when set, also times out every Wait on a label it matches.
+	timeoutLabel func(label string) bool
+	waits        int
 }
 
 func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
@@ -69,6 +71,9 @@ func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, tim
 	timedOut := r.waits == r.timeoutOn
 	if r.timeoutIf != nil {
 		timedOut = r.timeoutIf(r.waits)
+	}
+	if r.timeoutLabel != nil && r.timeoutLabel(s.Label) {
+		timedOut = true
 	}
 	if timedOut {
 		return agentrunner.Status{State: agentrunner.StateWorking}, agentrunner.ErrTimeout

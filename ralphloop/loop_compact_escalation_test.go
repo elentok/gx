@@ -24,38 +24,12 @@ func stuckCompactionDeps(onBreach func() error) Deps {
 	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "session-01"}, nil
 	}
-	// nestedCallsPerCycle is how many AgentWait calls waitForCompactionSignal
-	// makes per breach before giving up (ReadCompactions never advancing means
-	// it always runs to smartZoneCompactExtendedTimeoutMs), derived from the
-	// same constants waitForFinish paces by rather than a hardcoded guess.
-	nestedCallsPerCycle := (smartZoneCompactExtendedTimeoutMs - smartZonePollMs) / smartZonePollMs
-	// sinceBreach counts AgentWait calls since the last ctrl+c interrupt. Once
-	// "blocked" joined waitForFinish's main-poll completion states for every
-	// agent kind (ticket 14), the main poll's own bounded wait and the nested
-	// compaction-confirmation wait share the same Until/TimeoutMs shape, so
-	// nothing in opts distinguishes them anymore — call position does instead:
-	// the nestedCallsPerCycle calls right after each ctrl+c are the compaction
-	// wait (and must claim premature idle completion, since ReadCompactions
-	// never corroborates it), everything else is the main poll's own bounded
-	// tick (and must time out, which is what keeps re-driving the breach).
-	// sinceBreach starts outside that window so the very first call — before
-	// any breach has happened — times out too.
-	sinceBreach := nestedCallsPerCycle + 1
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if opts.TimeoutMs == 0 {
-			// The launch's own unbounded wait.
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		}
-		sinceBreach++
-		if sinceBreach <= nestedCallsPerCycle {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		}
-		return herdr.Agent{}, errors.New("timed out waiting for agent status")
-	}
-	d.AgentSendKeys = func(string, ...string) error {
-		sinceBreach = 0
-		return onBreach()
-	}
+	// The main poll's every Runner wait times out, which is what keeps
+	// re-driving the breach; the compaction wait still goes through
+	// fakeDeps' AgentWait, whose premature idle ReadCompactions never
+	// corroborates.
+	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutIf: func(int) bool { return true }}
+	d.AgentSendKeys = func(string, ...string) error { return onBreach() }
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 200, true, nil }
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 0, true, nil }
 	d.AgentRead = func(string, herdr.AgentReadOptions) (string, error) { return "compaction complete", nil }
@@ -92,7 +66,7 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
-	}, withAgentWaitRunner(d), noopEventSink{})
+	}, d, noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	if !strings.Contains(contents, "status: needs-repair") {
@@ -124,7 +98,7 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	runUntilParked(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
-	}, withAgentWaitRunner(d), noopEventSink{})
+	}, d, noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	if !strings.Contains(contents, "status: needs-repair") ||

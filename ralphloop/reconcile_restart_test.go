@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/agentrunner"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"

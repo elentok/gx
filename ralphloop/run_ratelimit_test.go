@@ -48,8 +48,8 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	// wait here resolves epic-iter-01's "done" wait to idle exactly like any
 	// other iteration's — release(pane) is what simulates that idle
 	// transition, whether it's a real finish or, as here, a rate limit.
-	wait, started, release := gatedAgentWait(d.AgentWait)
-	d.AgentWait = wait
+	g := newGatedRunner(d.Runner)
+	d.Runner = g
 
 	var rlMu sync.Mutex
 	rateLimitCleared := false
@@ -94,22 +94,22 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, withAgentWaitRunner(d), sink)
+		}, d, sink)
 	}()
 
 	// epic-iter-01 and epic-iter-02 both claimed and started (2 slots); either order.
-	var pane1, pane2 string
+	var iter1, iter2 string
 	for range 2 {
-		p := <-started
-		if strings.Contains(p, "epic-iter-01") {
-			pane1 = p
+		l := <-g.started
+		if l == "epic-iter-01" {
+			iter1 = l
 		} else {
-			pane2 = p
+			iter2 = l
 		}
 	}
 
 	// epic-iter-01's pane goes idle showing the rate-limit message.
-	release(pane1)
+	g.release(iter1)
 
 	select {
 	case keys := <-sendKeysCh:
@@ -126,7 +126,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	}
 
 	// epic-iter-02 finishes normally while epic-iter-01 stays paused.
-	release(pane2)
+	g.release(iter2)
 
 	// Give the scheduler a moment to (wrongly, if buggy) backfill a third
 	// ticket while still paused, then confirm it didn't.
@@ -143,10 +143,9 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	rlMu.Unlock()
 
 	// Ticket 03 is backfilled once epic-iter-01's pause clears (its own gate was
-	// already closed by the earlier release(pane1), so it re-observes idle
-	// and finishes without another release call).
-	pane3 := <-started
-	release(pane3)
+	// already closed by the earlier release, so it re-observes idle and
+	// finishes without another release call).
+	g.release(<-g.started)
 
 	if err := <-errCh; err != nil {
 		t.Fatalf("Run() error = %v", err)

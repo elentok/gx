@@ -498,31 +498,31 @@ func TestRun_MaxParallelTwo_RunsExactlyTwoConcurrentlyAndBackfills(t *testing.T)
 		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# C\n",
 	})
 	d, _, removed := fakeDeps()
-	wait, started, release := gatedAgentWait(d.AgentWait)
-	d.AgentWait = wait
+	g := newGatedRunner(d.Runner)
+	d.Runner = g
 
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 2,
-		}, withAgentWaitRunner(d), noopEventSink{})
+		}, d, noopEventSink{})
 	}()
 
-	pane1 := <-started
-	pane2 := <-started
+	iter1 := <-g.started
+	iter2 := <-g.started
 
 	select {
-	case pane3 := <-started:
-		t.Fatalf("a third iteration started with only 2 slots and both full: %s", pane3)
+	case iter3 := <-g.started:
+		t.Fatalf("a third iteration started with only 2 slots and both full: %s", iter3)
 	case <-time.After(100 * time.Millisecond):
 	}
 
-	release(pane1)
-	pane3 := <-started // backfilled without waiting for pane2
+	g.release(iter1)
+	iter3 := <-g.started // backfilled without waiting for iter2
 
-	release(pane2)
-	release(pane3)
+	g.release(iter2)
+	g.release(iter3)
 
 	if err := <-errCh; err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -539,8 +539,8 @@ func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
 	d, _, _ := fakeDeps()
-	wait, started, release := gatedAgentWait(d.AgentWait)
-	d.AgentWait = wait
+	g := newGatedRunner(d.Runner)
+	d.Runner = g
 	d.Sleep = func(time.Duration) { time.Sleep(time.Millisecond) }
 	gate := NewGate()
 
@@ -549,16 +549,16 @@ func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
 		errCh <- Run(RunOptions{
 			EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 			MaxParallel: 1, Gate: gate,
-		}, withAgentWaitRunner(d), noopEventSink{})
+		}, d, noopEventSink{})
 	}()
 
-	first := <-started
+	first := <-g.started
 	gate.Pause(QueuePauseLabel, "queue paused")
-	release(first)
+	g.release(first)
 
 	select {
-	case pane := <-started:
-		t.Fatalf("iteration %q started while the queue was paused", pane)
+	case label := <-g.started:
+		t.Fatalf("iteration %q started while the queue was paused", label)
 	case err := <-errCh:
 		t.Fatalf("Run() exited while paused: %v", err)
 	case <-time.After(100 * time.Millisecond):
@@ -567,8 +567,8 @@ func TestRun_PauseLetsInFlightFinishAndResumesScheduling(t *testing.T) {
 	if !gate.ForceResume(QueuePauseLabel) {
 		t.Fatal("expected queue pause to be active")
 	}
-	second := <-started
-	release(second)
+	second := <-g.started
+	g.release(second)
 
 	if err := <-errCh; err != nil {
 		t.Fatalf("Run() error = %v", err)

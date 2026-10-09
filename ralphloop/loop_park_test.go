@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
@@ -238,13 +239,16 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 			if err := SetStatus(path, "open"); err != nil {
 				t.Errorf("SetStatus: %v", err)
 			}
+			if _, err := fakeRunner(d).Start(agentrunner.StartOptions{Label: "my-epic-iter-01", Epic: "my-epic"}); err != nil {
+				t.Errorf("Start: %v", err)
+			}
 			cleared = true
 		}
 		return readyTimer(dur)
 	}
 	sink := &recordingSink{}
 
-	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), sink); err != nil {
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink); err != nil {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 

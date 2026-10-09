@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -354,34 +353,6 @@ func (r recordingRunner) Prompt(s agentrunner.Session, text string) error {
 	}
 	r.record(text)
 	return nil
-}
-
-// withAgentWaitRunner serves d.Runner's Wait from d's AgentWait stub, for
-// tests still scripted against AgentWait. Temporary: agent-runner-phase1-impl
-// ticket 03b11 moves them to runnerfake.
-func withAgentWaitRunner(d Deps) Deps {
-	d.Runner = agentWaitRunner{Runner: d.Runner, wait: d.AgentWait}
-	return d
-}
-
-type agentWaitRunner struct {
-	agentrunner.Runner
-	wait func(herdr.AgentWaitOptions) (herdr.Agent, error)
-}
-
-func (r agentWaitRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
-	until := make([]string, len(states))
-	for i, st := range states {
-		until[i] = string(st)
-	}
-	a, err := r.wait(herdr.AgentWaitOptions{Target: s.ID, Until: until, TimeoutMs: int(timeout.Milliseconds())})
-	if herdrrunner.IsPollTimeout(err) {
-		return agentrunner.Status{}, agentrunner.ErrTimeout
-	}
-	if err != nil {
-		return agentrunner.Status{}, err
-	}
-	return agentrunner.Status{State: agentrunner.State(a.AgentStatus), SessionID: a.AgentSession}, nil
 }
 
 // fakeRunner is the runnerfake behind fakeDeps' Runner.
@@ -1202,7 +1173,7 @@ func TestRun_Drain_WakesRunParkedInWaitForResume(t *testing.T) {
 // the TUI's 'a' key widening RunScope) was counted in Completed once it
 // landed but never grew Total to match, producing nonsensical stats like
 // Completed > Total. Ticket 01 is the only ticket originally in scope;
-// while its iteration is still running, its fake AgentWait call widens the
+// while its iteration is still running, its Runner wait hook widens the
 // live scope to also include ticket 02 (simulating the TUI action), so by
 // the time ticket 01's IterationFinished fires, Total must already reflect
 // both tickets even though only one has landed.
@@ -1216,12 +1187,11 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 
 	var scope RunScope
 	var widenOnce sync.Once
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if strings.Contains(opts.Target, iterLabel("my-epic", "01")) {
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if s.Label == iterLabel("my-epic", "01") {
 			widenOnce.Do(func() { scope.Add("02") })
 		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	})
 
 	sink := &recordingSink{}
 
@@ -1234,7 +1204,7 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 		OnScopeResolved: func(s RunScope) {
 			scope = s
 		},
-	}, withAgentWaitRunner(d), sink)
+	}, d, sink)
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
