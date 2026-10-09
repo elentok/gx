@@ -96,6 +96,13 @@ func fakeClaude() {
 		lifecycle := func(state string) string {
 			return fmt.Sprintf(`{"type":"command_lifecycle","command_uuid":%q,"state":%q}`, msg.UUID, state)
 		}
+		if content == "nocaps" {
+			// A claude without msg_lifecycle_v1 sends no command lifecycle.
+			emit(fmt.Sprintf(`{"type":"system","subtype":"init","session_id":%q,"capabilities":["interrupt_receipt_v1"]}`, sessionID),
+				`{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`,
+				`{"type":"result","subtype":"success"}`)
+			continue
+		}
 		if content != "/compact" {
 			emit(lifecycle("queued"), lifecycle("started"))
 		}
@@ -104,7 +111,7 @@ func fakeClaude() {
 			os.Exit(0)
 		}
 		if !initSent {
-			emit(fmt.Sprintf(`{"type":"system","subtype":"init","session_id":%q}`, sessionID))
+			emit(fmt.Sprintf(`{"type":"system","subtype":"init","session_id":%q,"capabilities":["msg_lifecycle_v1"]}`, sessionID))
 			initSent = true
 		}
 		switch content {
@@ -408,6 +415,18 @@ func TestHeadless_PromptNeverStartedIsNotDelivered(t *testing.T) {
 
 	if err := h.runner.Prompt(s, "stall"); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("Prompt = %v, want ErrNotDelivered", err)
+	}
+}
+
+func TestHeadless_InitWithoutRequiredCapabilityFailsPrompt(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-07")
+
+	for range 2 {
+		err := h.runner.Prompt(s, "nocaps")
+		if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "msg_lifecycle_v1") {
+			t.Fatalf("Prompt = %v, want ErrMissingCapability naming msg_lifecycle_v1", err)
+		}
 	}
 }
 

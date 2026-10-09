@@ -91,6 +91,9 @@ var (
 	// costs the same pane read RateLimit already makes, which Status, polled
 	// far more often, should not.
 	ErrContextExhausted = errors.New("agentrunner: context window exhausted")
+	// ErrMissingCapability: the agent lacks a protocol capability the runner
+	// relies on. Retrying cannot help; the agent needs upgrading.
+	ErrMissingCapability = errors.New("agentrunner: agent missing capability")
 )
 
 type Runner interface {

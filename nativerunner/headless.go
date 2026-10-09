@@ -353,8 +353,11 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 		h.mu.Unlock()
 		return err
 	}
-	before := ss.track.status()
+	before, capErr := ss.track.status(), ss.track.capabilityErr()
 	h.mu.Unlock()
+	if capErr != nil {
+		return capErr
+	}
 	switch before.State {
 	case agentrunner.StateBlocked:
 		return agentrunner.ErrNotReady
@@ -379,7 +382,10 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 
 // awaitTurn waits for claude to start command uuid. A turn that began since
 // the prompt also counts: slash commands like /compact may run without a
-// command lifecycle.
+// command lifecycle. Headless Start returns before claude sends init, so the
+// first prompt is where a missing capability shows up; it wins over a started
+// turn, which without msg_lifecycle_v1 is only ever seen through assistant
+// output.
 func (h *Headless) awaitTurn(ss *headlessSession, uuid string, turn int) error {
 	timeout := h.PromptTimeout
 	if timeout <= 0 {
@@ -389,10 +395,13 @@ func (h *Headless) awaitTurn(ss *headlessSession, uuid string, turn int) error {
 	defer deadline.Stop()
 	for {
 		h.mu.Lock()
+		capErr := ss.track.capabilityErr()
 		started := ss.track.started(uuid) || ss.track.turn > turn
 		exited, changed := ss.track.exited, ss.changed
 		h.mu.Unlock()
 		switch {
+		case capErr != nil:
+			return capErr
 		case started:
 			return nil
 		case exited:

@@ -2,10 +2,18 @@ package nativerunner
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 )
+
+// requiredCapabilities are the init capabilities the headless runner relies
+// on: Prompt detects a started turn through command_lifecycle. Capabilities
+// are checked rather than claude versions, since a version says nothing about
+// which protocol features a build ships.
+var requiredCapabilities = []string{"msg_lifecycle_v1"}
 
 // event holds the few stream-json fields the headless runner reads. Claude
 // adds event types and fields between releases, so anything unknown is
@@ -23,6 +31,7 @@ type event struct {
 	CompactMetadata struct {
 		Trigger string `json:"trigger"`
 	} `json:"compact_metadata"`
+	Capabilities  []string   `json:"capabilities"`
 	Tasks         []struct{} `json:"tasks"`
 	RateLimitInfo struct {
 		Status   string `json:"status"`
@@ -55,6 +64,8 @@ type tracker struct {
 	bgTasks  int
 	resetAt  time.Time
 	exited   bool
+	// missingCap names the first required capability init did not list.
+	missingCap string
 	// finished is set by a result and cleared when a turn begins.
 	finished bool
 	// seen holds event uuids already applied, so replaying out.jsonl after a
@@ -104,6 +115,13 @@ func (t *tracker) apply(e event) {
 		switch e.Subtype {
 		case "init":
 			t.sessionID = e.SessionID
+			t.missingCap = ""
+			for _, c := range requiredCapabilities {
+				if !slices.Contains(e.Capabilities, c) {
+					t.missingCap = c
+					break
+				}
+			}
 		case "session_state_changed":
 			switch e.State {
 			case "running":
@@ -166,6 +184,13 @@ func (t *tracker) beginTurn() {
 		t.turn++
 		t.turnCmd = false
 	}
+}
+
+func (t *tracker) capabilityErr() error {
+	if t.missingCap == "" {
+		return nil
+	}
+	return fmt.Errorf("%w: %s", agentrunner.ErrMissingCapability, t.missingCap)
 }
 
 // started reports whether claude started the gx command uuid.

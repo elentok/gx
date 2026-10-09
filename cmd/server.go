@@ -141,6 +141,9 @@ func runServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if _, err := preflightAgentRunner(cfg.AgentRunner, liveProbe, server.LogPath(stateDir)); err != nil {
+		return err
+	}
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
