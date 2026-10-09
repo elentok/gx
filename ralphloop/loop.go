@@ -396,9 +396,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 	}
 
-	workspaceID, err := d.FindOrCreateWorkspace(opts.EpicName, opts.RepoDir)
-	if err != nil {
-		return fmt.Errorf("finding/creating herdr workspace %q: %w", opts.EpicName, err)
+	// Runner.Start ensures the workspace. Paths not yet moved off herdr still
+	// read this id, so look it up without creating (empty if none exists yet).
+	workspaceID := ""
+	if d.FindWorkspace != nil {
+		workspaceID, _ = d.FindWorkspace(opts.EpicName)
 	}
 
 	wtDir, err := d.WorktreeDir(opts.RepoDir)

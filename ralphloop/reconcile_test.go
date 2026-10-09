@@ -169,9 +169,7 @@ func TestReconcile_ClaimedWithLiveTab_ReturnsReattached(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
@@ -223,9 +221,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 4200, true, nil
 	}
@@ -243,7 +239,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 		t.Fatalf("reconcile() error = %v", err)
 	}
 
-	if reattached.identifier != "01" || reattached.label != "epic-iter-01" || reattached.cwd != "/fake/worktrees/epic-item-01" || reattached.sessionID != "session-epic-iter-01" {
+	if reattached.identifier != "01" || reattached.label != "epic-iter-01" || reattached.cwd != "/fake/worktrees/epic-item-01" || reattached.sessionID != "sess-pane-epic-iter-01" {
 		t.Errorf("TicketReattached args = %+v, want live Herdr cwd/session identity", reattached)
 	}
 	if len(sink.occupancySink.calls) != 1 || sink.occupancySink.calls[0].identifier != "01" || sink.occupancySink.calls[0].tokens != 4200 {
@@ -261,9 +257,7 @@ func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
 		t.Fatalf("tickets.Load: %v", err)
 	}
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
@@ -290,9 +284,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
 	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{})
 	// A scope that requested only ticket 99 — ticket 01 is outside it.
@@ -443,9 +435,7 @@ func TestReconcile_ConflictResolutionChildWithLiveParentTab_StaysClaimed(t *test
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-conflict-01", Label: "conflict-01", WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, "conflict-01")
 	// Neither the parent's iter-01 tab nor its own iteration branch survived
 	// (only the conflict-resolution resolver's pane is live), so the parent
 	// ticket's own claim reverts to open — irrelevant to what this test

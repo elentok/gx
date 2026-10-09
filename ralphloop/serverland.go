@@ -113,7 +113,7 @@ func ResumeIteration(d Deps, o OneIteration, base string) (IterationWorktree, er
 // DiscardIteration removes a prepared iteration's worktree and branch, for a
 // launch that failed before the agent produced anything.
 func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
-	return finishCleanup(d, &worktreeLock, o.RepoDir, w.featureWorktree, w.Path, w.Branch, "", true)
+	return finishCleanup(d, &worktreeLock, o.RepoDir, w.featureWorktree, w.Path, w.Branch, agentrunner.Session{}, true)
 }
 
 // FinishIteration runs a finished agent through the shared finish path: park

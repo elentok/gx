@@ -277,7 +277,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 		return outcome{ticket: job.ticket, err: fmt.Errorf("clearing iteration_status after landing: %w", err)}
 	}
 
-	if err := finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, job.path, job.branch, job.tab, true); err != nil {
+	if err := finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, job.path, job.branch, iterationSession(p, job.pane), true); err != nil {
 		return outcome{ticket: job.ticket, err: err}
 	}
 

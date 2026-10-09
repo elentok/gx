@@ -274,20 +274,13 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-03", Label: iterLabel("epic", "03"), WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, iterLabel("epic", "03"))
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }
 
 	var removedWorktree string
 	d.RemoveWorktree = func(repoDir, path string, force bool) error {
 		removedWorktree = path
-		return nil
-	}
-	var closedTab string
-	d.TabClose = func(tabID string) error {
-		closedTab = tabID
 		return nil
 	}
 
@@ -299,8 +292,8 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 	if !strings.Contains(removedWorktree, "item-03") {
 		t.Errorf("removedWorktree = %q, want the leftover item-03 worktree removed", removedWorktree)
 	}
-	if closedTab != "tab-iter-03" {
-		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
+	if _, found, _ := fakeRunner(d).Find(iterLabel("epic", "03")); found {
+		t.Error("leftover iter-03 session still live, want it stopped")
 	}
 }
 
@@ -324,9 +317,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-iter-03", Label: iterLabel("epic", "03"), WorkspaceID: workspaceID}}, nil
-	}
+	hostLiveAgent(t, d, iterLabel("epic", "03"))
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil } // commits landed
 	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }
 	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so the
@@ -335,11 +326,6 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 	var removedWorktree string
 	d.RemoveWorktree = func(repoDir, path string, force bool) error {
 		removedWorktree = path
-		return nil
-	}
-	var closedTab string
-	d.TabClose = func(tabID string) error {
-		closedTab = tabID
 		return nil
 	}
 	var deletedBranch string
@@ -357,8 +343,8 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 	if !strings.Contains(removedWorktree, "item-03") {
 		t.Errorf("removedWorktree = %q, want the leftover item-03 worktree removed", removedWorktree)
 	}
-	if closedTab != "tab-iter-03" {
-		t.Errorf("closedTab = %q, want the leftover iter-03 tab closed", closedTab)
+	if _, found, _ := fakeRunner(d).Find(iterLabel("epic", "03")); found {
+		t.Error("leftover iter-03 session still live, want it stopped")
 	}
 	if deletedBranch != "ralph-loop/epic-item-03" {
 		t.Errorf("deletedBranch = %q, want ralph-loop/epic-item-03 deleted", deletedBranch)

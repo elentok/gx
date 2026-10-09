@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -42,7 +43,7 @@ func TestCommitlessGitOneOff_RunsDetachedAndIsGoneAfterwards(t *testing.T) {
 	if got := gitIn(t, wt.Path, "branch", "--show-current"); got != "" {
 		t.Errorf("worktree is on branch %q, want detached", got)
 	}
-	if err := cleanupCommitless(d, one, wt, ""); err != nil {
+	if err := cleanupCommitless(d, one, wt, agentrunner.Session{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(wt.Path); !os.IsNotExist(err) {
@@ -65,7 +66,7 @@ func TestCommitlessScratchOneOff_KeepsItsSubdirAfterwards(t *testing.T) {
 	if wt.Path != dir {
 		t.Fatalf("path = %s, want %s", wt.Path, dir)
 	}
-	if err := cleanupCommitless(d, one, wt, ""); err != nil {
+	if err := cleanupCommitless(d, one, wt, agentrunner.Session{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); err != nil {

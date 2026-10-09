@@ -114,7 +114,7 @@ func DefaultVerifyRun(epicPath, cwd string) (VerifyRun, error) {
 	if ws, err := herdr.FindWorkspace(filepath.Base(epicPath)); err == nil {
 		run.WorkspaceID = ws
 	} else {
-		run.Deps.TabList = nil
+		run.Deps.ListSessions = nil
 	}
 	return run, nil
 }

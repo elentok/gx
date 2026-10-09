@@ -26,7 +26,13 @@ func IterationTabID(d Deps, epic, identifier string) string {
 	if err != nil {
 		return ""
 	}
-	return tabIDForLabel(tabs, iterLabel(epic, identifier))
+	label := iterLabel(epic, identifier)
+	for _, tab := range tabs {
+		if tab.Label == label {
+			return tab.TabID
+		}
+	}
+	return ""
 }
 
 // IterationTabLive reports whether the iteration's herdr tab exists.

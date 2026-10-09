@@ -142,6 +142,15 @@ func runIteration(d Deps, p iterationParams) error {
 	return finishIteration(d, p, path, launchParams.Pane, launchParams.Tab, base, branch, sessionID)
 }
 
+// iterationSession is the live session of p's ticket, for cleanup; the zero
+// Session when the iteration has no pane.
+func iterationSession(p iterationParams, pane string) agentrunner.Session {
+	if pane == "" {
+		return agentrunner.Session{}
+	}
+	return agentrunner.Session{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), ID: pane}
+}
+
 // iterationTabID is the tab hosting label's agent, for finishIteration's
 // cleanup. Runner sessions don't expose their tab, so herdr is asked by name;
 // on failure the tab is left open rather than failing a launched iteration.
@@ -325,7 +334,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// the answer boundary in one pick (see runIteration's branch-reuse
 		// base computation); only the worktree/tab/permit are redundant while
 		// the ticket waits on an answer.
-		return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, false)
+		return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), false)
 	}
 
 	ahead, err := d.CommitsAhead(path, base, branch)
@@ -363,7 +372,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			return err
 		}
 		if commitlessAdopted {
-			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
+			return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), true)
 		}
 
 		// A zero-commit finish whose last turn is shaped like ticket 01's
@@ -394,7 +403,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 				return err
 			}
 			if adopted {
-				return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, false)
+				return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), false)
 			}
 
 			if ahead == 0 {
@@ -403,7 +412,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 					return err
 				}
 				if commitlessAdopted {
-					return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, tab, true)
+					return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), true)
 				}
 			}
 		}
@@ -671,8 +680,8 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, ta
 // completion (worktree/tab/branch all just created and definitely present),
 // or a done ticket's leftover state found on startup after a crash (any
 // subset may have survived — see classifyDoneTicket's doneStaleCleanup).
-// tabID is "" if no live tab was found for this iteration.
-func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, path, branch, tabID string, removeBranch bool) error {
+// s is the zero Session if no live session was found for this iteration.
+func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, path, branch string, s agentrunner.Session, removeBranch bool) error {
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
 		return fmt.Errorf("checking iteration worktree: %w", err)
@@ -686,9 +695,9 @@ func finishCleanup(d Deps, worktreeLock *sync.Mutex, repoDir, featureWorktree, p
 		}
 	}
 
-	if tabID != "" {
-		if err := d.TabClose(tabID); err != nil {
-			return fmt.Errorf("closing iteration tab: %w", err)
+	if s != (agentrunner.Session{}) {
+		if err := d.Runner.Stop(s); err != nil {
+			return fmt.Errorf("stopping iteration session: %w", err)
 		}
 	}
 

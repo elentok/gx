@@ -24,14 +24,12 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 		herdrHelp      string
 		herdrHelpErr   error
 		wantErr        string
-		wantWorkspaces int
 	}{
 		{
-			name:           "available",
-			executables:    map[string]string{"codex": "/bin/codex", "herdr": "/bin/herdr"},
-			loginStatus:    "Logged in using ChatGPT",
-			herdrHelp:      "[possible values: claude, codex]",
-			wantWorkspaces: 1,
+			name:        "available",
+			executables: map[string]string{"codex": "/bin/codex", "herdr": "/bin/herdr"},
+			loginStatus: "Logged in using ChatGPT",
+			herdrHelp:   "[possible values: claude, codex]",
 		},
 		{
 			name:        "missing codex",
@@ -126,8 +124,8 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 			if preflightCalls != 1 {
 				t.Errorf("PreflightAgent() calls = %d, want 1", preflightCalls)
 			}
-			if workspaceCalls != tc.wantWorkspaces {
-				t.Errorf("FindOrCreateWorkspace() calls = %d, want %d", workspaceCalls, tc.wantWorkspaces)
+			if workspaceCalls != 0 {
+				t.Errorf("FindOrCreateWorkspace() calls = %d, want 0", workspaceCalls)
 			}
 
 			if tc.wantErr != "" {

@@ -171,6 +171,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		FindOrCreateWorkspace: func(label, cwd string) (string, error) {
 			return "ws1", nil
 		},
+		FindWorkspace: func(label string) (string, error) {
+			return "ws1", nil
+		},
 		WorktreeDir: func(repoDir string) (string, error) {
 			return "/fake/worktrees", nil
 		},
@@ -286,6 +289,25 @@ type runnerHooks struct {
 	starts  []func(opts agentrunner.StartOptions) error
 	prompts []func(s agentrunner.Session, text string) error
 	waits   []func(s agentrunner.Session)
+	stops   []func(s agentrunner.Session)
+}
+
+// onRunnerStop runs hook whenever a session is stopped.
+func onRunnerStop(d Deps, hook func(s agentrunner.Session)) {
+	h := d.Runner.(recordingRunner).hooks
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.stops = append(h.stops, hook)
+}
+
+func (r recordingRunner) Stop(s agentrunner.Session) error {
+	r.hooks.mu.Lock()
+	fns := slices.Clone(r.hooks.stops)
+	r.hooks.mu.Unlock()
+	for _, fn := range fns {
+		fn(s)
+	}
+	return r.Runner.Stop(s)
 }
 
 // onRunnerWait runs hook before every Runner wait of fakeDeps' d, e.g. to
@@ -1407,12 +1429,11 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 	})
 	tabClosed02 := make(chan struct{})
 	var tabClosed02Once sync.Once
-	d.TabClose = func(tabID string) error {
-		if tabID == "tab-"+iterLabel("epic", "02") {
+	onRunnerStop(d, func(s agentrunner.Session) {
+		if s.Label == iterLabel("epic", "02") {
 			tabClosed02Once.Do(func() { close(tabClosed02) })
 		}
-		return nil
-	}
+	})
 
 	runErr := make(chan error, 1)
 	go func() {

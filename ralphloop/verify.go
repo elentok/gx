@@ -3,7 +3,7 @@ package ralphloop
 import (
 	"fmt"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -65,21 +65,24 @@ type VerifyDeps struct {
 	PatchesApplied func(dir, upstream, base, branch string) (bool, error)
 	RevParse       func(dir, ref string) (string, error)
 	WorktreeExists func(path string) (bool, error)
-	// TabList may be nil (herdr unavailable): every Leftovers.Tab is then nil.
-	TabList func(workspaceID string) ([]herdr.Tab, error)
+	// ListSessions may be nil (no runner): every Leftovers.Tab is then nil.
+	ListSessions func(epic string) ([]agentrunner.Session, error)
 	// LandedTickets defaults to landedTickets (the trailer rung).
 	LandedTickets func(dir, featureBranch string) (map[string]bool, error)
 }
 
 func (d Deps) verifyDeps() VerifyDeps {
-	return VerifyDeps{
+	vd := VerifyDeps{
 		IsAncestor:     d.IsAncestor,
 		MergeBase:      d.MergeBase,
 		PatchesApplied: d.PatchesApplied,
 		RevParse:       d.RevParse,
 		WorktreeExists: d.WorktreeExists,
-		TabList:        d.TabList,
 	}
+	if d.Runner != nil {
+		vd.ListSessions = d.Runner.List
+	}
+	return vd
 }
 
 // DefaultVerifyDeps wires VerifyDeps to the real git and herdr packages, for
@@ -113,11 +116,11 @@ func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 	}
 
 	var live map[string]bool
-	if vd.TabList != nil {
-		if tabs, err := vd.TabList(p.WorkspaceID); err == nil {
-			live = make(map[string]bool, len(tabs))
-			for _, tab := range tabs {
-				live[iterationKey(p.Epic, tab.Label)] = true
+	if vd.ListSessions != nil {
+		if sessions, err := vd.ListSessions(p.Epic); err == nil {
+			live = make(map[string]bool, len(sessions))
+			for _, s := range sessions {
+				live[iterationKey(p.Epic, s.Label)] = true
 			}
 		}
 	}

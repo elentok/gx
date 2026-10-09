@@ -3,8 +3,8 @@ package ralphloop
 import (
 	"fmt"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -21,7 +21,7 @@ import (
 // on the feature branch. Only when there's nothing to lose — no iteration
 // branch, or one with zero commits ahead — does it fall back to the plain
 // revert-to-open.
-func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
+func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, live map[string]agentrunner.Session) error {
 	paths := rp.Paths
 	branch := iterBranch(featureBranch, t.Identifier)
 	label := iterLabel(featureBranch, t.Identifier)
@@ -58,8 +58,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 				return fmt.Errorf("marking recovered ticket %s done: %w", t.Identifier, err)
 			}
 
-			tabID := tabIDForLabel(tabs, label)
-			if err := finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID, true); err != nil {
+			if err := finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, live[iterationKey(featureBranch, label)], true); err != nil {
 				return fmt.Errorf("cleaning up orphaned claim %s: %w", t.Identifier, err)
 			}
 

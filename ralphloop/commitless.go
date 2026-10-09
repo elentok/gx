@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -53,7 +54,7 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 	if w.keep {
 		return nil
 	}
-	return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", "", false)
+	return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", agentrunner.Session{}, false)
 }
 
 // FinishCommitless settles a commitless one-off whose agent has gone idle: an
@@ -77,7 +78,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane, tab str
 		if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no result reported", pane, tab, sessionID, w.Path); err != nil {
 			return FinishOutcome{}, fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
-	} else if err := cleanupCommitless(d, o, w, tab); err != nil {
+	} else if err := cleanupCommitless(d, o, w, commitlessSession(w, pane)); err != nil {
 		return FinishOutcome{}, err
 	}
 	t, err := schema.ParseTicket(o.Ticket.Path)
@@ -90,15 +91,24 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane, tab str
 	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
 }
 
-func cleanupCommitless(d Deps, o OneIteration, w IterationWorktree, tab string) error {
-	if !w.keep {
-		return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", tab, false)
+// commitlessSession is the live session of w's one-off, the zero Session when
+// the iteration has no pane.
+func commitlessSession(w IterationWorktree, pane string) agentrunner.Session {
+	if pane == "" {
+		return agentrunner.Session{}
 	}
-	if tab == "" {
+	return agentrunner.Session{Label: w.Label, ID: pane}
+}
+
+func cleanupCommitless(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
+	if !w.keep {
+		return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", s, false)
+	}
+	if s == (agentrunner.Session{}) {
 		return nil
 	}
-	if err := d.TabClose(tab); err != nil {
-		return fmt.Errorf("closing iteration tab: %w", err)
+	if err := d.Runner.Stop(s); err != nil {
+		return fmt.Errorf("stopping iteration session: %w", err)
 	}
 	return nil
 }

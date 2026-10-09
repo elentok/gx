@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -220,8 +221,8 @@ func TestRun_Permit_AcquiredBeforeReattachLaunch(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{Label: iterLabel("my-epic", "01"), WorkspaceID: workspaceID, TabID: "tab-01"}}, nil
+	if _, err := fakeRunner(d).Start(agentrunner.StartOptions{Label: iterLabel("my-epic", "01"), Epic: "my-epic"}); err != nil {
+		t.Fatalf("Start: %v", err)
 	}
 
 	var mu sync.Mutex
@@ -234,19 +235,19 @@ func TestRun_Permit_AcquiredBeforeReattachLaunch(t *testing.T) {
 		},
 	}
 
-	origAgentWait := d.AgentWait
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
+	// Runner.Find is the reattach launch's first live-session lookup.
+	d.Runner = findHookRunner{Runner: d.Runner, onFind: func() {
 		mu.Lock()
 		ready := acquired
 		mu.Unlock()
 		if !ready {
-			t.Errorf("AgentWait (reattach launch) called before Permit.Acquire")
+			t.Errorf("Runner.Find (reattach launch) called before Permit.Acquire")
 		}
-		return origAgentWait(opts)
-	}
+	}}
 
-	// The reattached iteration ends stalled, so the run parks on it.
-	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Permit: permit}, d, &recordingSink{})
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Permit: permit}, d, &recordingSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
 
 	mu.Lock()
 	defer mu.Unlock()

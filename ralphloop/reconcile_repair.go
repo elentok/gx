@@ -2,9 +2,9 @@ package ralphloop
 
 import (
 	"fmt"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -21,7 +21,7 @@ import (
 // iteration would, reports what was restored, and finishes whatever cleanup
 // the crash left undone (leftover worktree/tab; branch deletion is a later
 // ticket's job).
-func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
+func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, live map[string]agentrunner.Session) error {
 	paths := rp.Paths
 	branch := iterBranch(featureBranch, t.Identifier)
 	label := iterLabel(featureBranch, t.Identifier)
@@ -70,7 +70,6 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 	// Branch deletion is left to finishStaleCleanup/finishCleanup elsewhere:
 	// this repair just re-landed the commits, so the branch that held them
 	// stays until a later ticket cleans it up.
-	tabID := tabIDForLabel(tabs, label)
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
 		return fmt.Errorf("checking leftover worktree during repair cleanup: %w", err)
@@ -83,9 +82,9 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 			return fmt.Errorf("removing repaired iteration worktree: %w", err)
 		}
 	}
-	if tabID != "" {
-		if err := d.TabClose(tabID); err != nil {
-			return fmt.Errorf("closing repaired iteration tab: %w", err)
+	if s, ok := live[iterationKey(featureBranch, label)]; ok {
+		if err := d.Runner.Stop(s); err != nil {
+			return fmt.Errorf("stopping repaired iteration session: %w", err)
 		}
 	}
 
@@ -97,25 +96,13 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 // worktree/tab/branch survived a crash that landed between marking done and
 // the cleanup step right after it — the same tail finishIteration runs on the
 // normal completion path.
-func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, tabs []herdr.Tab) error {
+func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, live map[string]agentrunner.Session) error {
 	paths := rp.Paths
 	label := iterLabel(featureBranch, t.Identifier)
 	branch := iterBranch(featureBranch, t.Identifier)
 	path := iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier)
-	tabID := tabIDForLabel(tabs, label)
 
-	return finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, tabID, true)
-}
-
-// tabIDForLabel finds the tab id of the live tab named label, or "" if none
-// is live.
-func tabIDForLabel(tabs []herdr.Tab, label string) string {
-	for _, tab := range tabs {
-		if tab.Label == label {
-			return tab.TabID
-		}
-	}
-	return ""
+	return finishCleanup(d, rp.WorktreeLock, paths.RepoDir, paths.FeatureWorktree, path, branch, live[iterationKey(featureBranch, label)], true)
 }
 
 // markDoneTicketUnrecoverable flags a doneUnrecoverable ticket for a human to

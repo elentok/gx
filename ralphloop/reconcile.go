@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -74,16 +74,16 @@ type reconcileParams struct {
 func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket, error) {
 	paths := rp.Paths
 	sink := rp.Sink
-	tabs, err := d.TabList(rp.WorkspaceID)
+	sessions, err := d.Runner.List(epic.Name)
 	if err != nil {
-		return nil, fmt.Errorf("listing tabs for crash/restart reconciliation: %w", err)
+		return nil, fmt.Errorf("listing sessions for crash/restart reconciliation: %w", err)
 	}
-	live := make(map[string]bool, len(tabs))
-	liveTabs := make(map[string]herdr.Tab, len(tabs))
-	for _, tab := range tabs {
-		key := iterationKey(epic.Name, tab.Label)
+	live := make(map[string]bool, len(sessions))
+	liveSessions := make(map[string]agentrunner.Session, len(sessions))
+	for _, s := range sessions {
+		key := iterationKey(epic.Name, s.Label)
 		live[key] = true
-		liveTabs[key] = tab
+		liveSessions[key] = s
 	}
 
 	// First, so a landing it records is in the run log read below and in
@@ -100,16 +100,11 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	reattach := func(t tickets.Ticket) {
 		label := iterLabel(epic.Name, t.Identifier)
 		cwd := iterationWorktreePath(paths.WorktreeDir, epic.Name, t.Identifier)
-		tab := liveTabs[iterationKey(epic.Name, label)]
-		agentState, agentErr := d.AgentGet(label)
-		sessionID := ""
-		if agentErr == nil && agentState.PaneID != "" && agentState.TabID == tab.TabID && agentState.WorkspaceID == rp.WorkspaceID {
-			sessionID = agentState.AgentSession
-			if rp.Agent == AgentCodex {
-				verified, verifyErr := d.VerifyCodexSession(cwd, sessionID)
-				if verifyErr != nil || !verified {
-					sessionID = ""
-				}
+		sessionID := liveSessions[iterationKey(epic.Name, label)].SessionID
+		if sessionID != "" && rp.Agent == AgentCodex {
+			verified, verifyErr := d.VerifyCodexSession(cwd, sessionID)
+			if verifyErr != nil || !verified {
+				sessionID = ""
 			}
 		}
 		sink.TicketReattached(t.Identifier, label, cwd, sessionID)
@@ -152,13 +147,13 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			if t.Parent != nil && live[iterationKey(epic.Name, conflictLabel(*t.Parent))] {
 				continue
 			}
-			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, tabs); err != nil {
+			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, liveSessions); err != nil {
 				return nil, fmt.Errorf("reconciling orphaned claim %s: %w", t.Identifier, err)
 			}
 			continue
 		}
 		if !live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
-			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, tabs); err != nil {
+			if err := reconcileOrphanedClaim(d, rp, epic.Name, t, liveSessions); err != nil {
 				return nil, fmt.Errorf("reconciling orphaned claim %s: %w", t.Identifier, err)
 			}
 			continue
@@ -181,7 +176,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		}
 	}
 	vd := d.verifyDeps()
-	vd.TabList = func(string) ([]herdr.Tab, error) { return tabs, nil }
+	vd.ListSessions = func(string) ([]agentrunner.Session, error) { return sessions, nil }
 	// A transient git failure on the trailer lookup degrades to "no trailer
 	// evidence" rather than parking the ticket as unknown: the SHA and
 	// patch-id rungs still resolve the common cases, and aborting reconcile
@@ -212,12 +207,12 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// Commits landed, nothing left behind: the common case, left
 			// untouched.
 		case doneStaleCleanup:
-			if err := finishStaleCleanup(d, rp, epic.Name, t, tabs); err != nil {
+			if err := finishStaleCleanup(d, rp, epic.Name, t, liveSessions); err != nil {
 				return nil, fmt.Errorf("finishing interrupted cleanup for done ticket %s: %w", t.Identifier, err)
 			}
 			sink.TicketCleanupFinished(t.Identifier)
 		case doneRecoverable:
-			if err := repairRecoverableTicket(d, rp, epic.Name, t, tabs); err != nil {
+			if err := repairRecoverableTicket(d, rp, epic.Name, t, liveSessions); err != nil {
 				return nil, fmt.Errorf("repairing done ticket %s: %w", t.Identifier, err)
 			}
 		case doneUnrecoverable:

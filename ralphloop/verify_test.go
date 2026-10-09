@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -18,7 +18,7 @@ func verifyFixture() VerifyDeps {
 		PatchesApplied: func(dir, upstream, base, branch string) (bool, error) { return false, nil },
 		RevParse:       func(dir, ref string) (string, error) { return "", errors.New("unknown revision") },
 		WorktreeExists: func(path string) (bool, error) { return false, nil },
-		TabList:        func(string) ([]herdr.Tab, error) { return nil, nil },
+		ListSessions:   func(string) ([]agentrunner.Session, error) { return nil, nil },
 		LandedTickets:  func(dir, branch string) (map[string]bool, error) { return map[string]bool{}, nil },
 	}
 }
@@ -125,7 +125,9 @@ func TestVerifyEpic_ClaimedTicketWithLeftoversByDesign(t *testing.T) {
 	vd := verifyFixture()
 	vd.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil }
 	vd.WorktreeExists = func(path string) (bool, error) { return true, nil }
-	vd.TabList = func(string) ([]herdr.Tab, error) { return []herdr.Tab{{Label: iterLabel("epic", "03")}}, nil }
+	vd.ListSessions = func(string) ([]agentrunner.Session, error) {
+		return []agentrunner.Session{{Label: iterLabel("epic", "03")}}, nil
+	}
 	tk := tickets.Ticket{Number: 3, Identifier: "03", Status: "claimed"}
 	v := verifyOne(t, vd, tk, nil)
 	l := v.Leftovers
@@ -153,7 +155,7 @@ func TestVerifyEpic_NotExpected(t *testing.T) {
 func TestVerifyEpic_NilTabListMeansTabUnanswered(t *testing.T) {
 	t.Parallel()
 	vd := verifyFixture()
-	vd.TabList = nil
+	vd.ListSessions = nil
 	v := verifyOne(t, vd, doneTicket(), nil)
 	if v.Leftovers.Tab != nil {
 		t.Errorf("Leftovers.Tab = %v, want nil when herdr did not answer", *v.Leftovers.Tab)
@@ -162,7 +164,7 @@ func TestVerifyEpic_NilTabListMeansTabUnanswered(t *testing.T) {
 		t.Errorf("Leftovers = %+v, git-side fields must still be answered", v.Leftovers)
 	}
 
-	vd.TabList = func(string) ([]herdr.Tab, error) { return nil, errors.New("herdr down") }
+	vd.ListSessions = func(string) ([]agentrunner.Session, error) { return nil, errors.New("herdr down") }
 	if v := verifyOne(t, vd, doneTicket(), nil); v.Leftovers.Tab != nil {
 		t.Errorf("Leftovers.Tab = %v, want nil when TabList errors", *v.Leftovers.Tab)
 	}
