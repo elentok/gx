@@ -7,8 +7,8 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -250,13 +250,13 @@ func TestQueueHeaderCostSuffixFormats(t *testing.T) {
 	root := t.TempDir()
 	budgetOff := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{}, keys.Manager{}))
 	budgetOff.serverBudget.Total = 42.3
-	if got, want := budgetOff.queueHeaderCostSuffix(), "$42.30"; got != want {
+	if got, want := budgetOff.queueHeaderCostSuffix(), "today $42.30"; got != want {
 		t.Fatalf("budget disabled: queueHeaderCostSuffix() = %q, want bare %q", got, want)
 	}
 
-	withBudget := loadQueueModel(t, NewQueueModel(root, ui.Settings{Budget: config.BudgetConfig{SoftLimit: 100}}, map[string]bool{}, keys.Manager{}))
-	withBudget.serverBudget.Total = 50
-	if got, want := withBudget.queueHeaderCostSuffix(), "$50.00 of $100.00"; got != want {
+	withBudget := budgetOff
+	withBudget.serverBudget = server.BudgetStatus{Total: 50, SoftLimit: 100}
+	if got, want := withBudget.queueHeaderCostSuffix(), "today $50.00 of $100.00"; got != want {
 		t.Fatalf("soft limit set: queueHeaderCostSuffix() = %q, want %q", got, want)
 	}
 }

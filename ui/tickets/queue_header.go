@@ -192,27 +192,11 @@ type queueRunStateKind int
 const (
 	queueRunIdle queueRunStateKind = iota
 	queueRunRunning
-	queueRunPaused
-	queueRunCompleted
 )
 
-// queueRunState classifies the queue's current run state. Paused only wins
-// over idle once a run has actually captured a ticket scope
-// (m.completedExecutionProgress total > 0) — m.paused alone can be set by the bare `p`
-// key with no run-state guard, so a queue that was never started must still
-// classify as idle even while globally paused.
+// queueRunState classifies the queue's current run state from the epics the
+// server reports running.
 func (m QueueModel) queueRunState() queueRunStateKind {
-	if !m.executionCompletedAt.IsZero() {
-		done, total := m.completedExecutionProgress()
-		if total > 0 && done == total {
-			return queueRunCompleted
-		}
-	}
-	if m.paused {
-		if _, total := m.completedExecutionProgress(); total > 0 {
-			return queueRunPaused
-		}
-	}
 	if len(m.runningEpics) > 0 {
 		return queueRunRunning
 	}
@@ -231,36 +215,38 @@ func (m QueueModel) queueHeaderTitle() string {
 // live-cost suffix is appended — split out so the suffix logic doesn't have
 // to be repeated in every switch case.
 func (m QueueModel) queueRunStateTitle() string {
-	switch m.queueRunState() {
-	case queueRunCompleted:
-		elapsed := int(m.executionCompletedAt.Sub(m.executionStartedAt).Seconds())
-		return fmt.Sprintf("Queue · done, took %s", formatElapsed(elapsed))
-	case queueRunPaused:
-		done, total := m.completedExecutionProgress()
-		return fmt.Sprintf("Queue · paused (%d of %d done)", done, total)
-	case queueRunRunning:
-		done, total := m.completedExecutionProgress()
-		glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-		return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
-	default:
+	if m.queueRunState() != queueRunRunning {
 		return "Queue"
 	}
+	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
+	done, total := m.runningProgress()
+	if total == 0 {
+		return fmt.Sprintf("Queue · %s implementing...", glyph)
+	}
+	return fmt.Sprintf("Queue · %d of %d done · %s implementing...", done, total, glyph)
 }
 
-// queueHeaderCostSuffix renders ticket 10's live-total segment appended to
-// the title line in every local run state: "$X of $Y" colored against the
-// configured soft limit when one is set (config.BudgetConfig.SoftLimit != 0),
-// bare unstyled "$X" when the budget is off. The total is the server
-// ledger's, from the snapshot.
-func (m QueueModel) queueHeaderCostSuffix() string {
-	total, soft, prefix := m.serverBudget.Total, m.settings.Budget.SoftLimit, ""
-	if m.serverAPI != nil {
-		soft, prefix = m.serverBudget.SoftLimit, "today "
+// runningProgress sums the done/total ticket counts of the epics the server
+// reports running.
+func (m QueueModel) runningProgress() (done, total int) {
+	for _, epic := range m.epics {
+		if m.runningEpics[epic.Name] {
+			done += epic.DoneCount()
+			total += epic.TotalCount()
+		}
 	}
-	text := prefix + tickets.FormatCost(total)
+	return done, total
+}
+
+// queueHeaderCostSuffix renders today's server spend appended to the title
+// line: "$X of $Y" colored against the server's soft limit when one is set,
+// bare unstyled "$X" when the budget is off.
+func (m QueueModel) queueHeaderCostSuffix() string {
+	total, soft := m.serverBudget.Total, m.serverBudget.SoftLimit
+	text := "today " + tickets.FormatCost(total)
 	style := lipgloss.NewStyle()
 	if soft > 0 {
-		text = fmt.Sprintf("%s%s of %s", prefix, tickets.FormatCost(total), tickets.FormatCost(soft))
+		text = fmt.Sprintf("today %s of %s", tickets.FormatCost(total), tickets.FormatCost(soft))
 		style = budgetTotalStyle(total, soft)
 	}
 	return style.Render(text)
@@ -301,23 +287,10 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 	if m.serverAPI != nil && m.herdrDown {
 		return []string{epicStatusProblemStyle.Render(queueHerdrDownBanner)}
 	}
-	switch m.queueRunState() {
-	case queueRunCompleted:
-		total, average, maximum := m.completedContextMetrics()
-		return []string{fmt.Sprintf(
-			"context windows: total %s, avg %s, max %s",
-			formatTokenCount(total), formatTokenCount(average), formatTokenCount(maximum),
-		)}
-	case queueRunPaused:
-		if len(m.runningEpics) > 0 {
-			return []string{"Queue paused — in-flight iterations will finish"}
-		}
+	if m.queueRunState() == queueRunRunning {
 		return []string{""}
-	case queueRunRunning:
-		return []string{""}
-	default: // queueRunIdle
-		return []string{m.queueIdleBodyLine()}
 	}
+	return []string{m.queueIdleBodyLine()}
 }
 
 // queueHerdrDownBanner is shown in server mode while the server cannot reach
@@ -337,22 +310,4 @@ func (m QueueModel) queueIdleBodyLine() string {
 		return epicStatusParkedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
 	}
 	return epicStatusParkedAnswerStyle.Render("Idle — runs start from the server")
-}
-
-func (m QueueModel) completedContextMetrics() (total, average, maximum int) {
-	count := 0
-	for _, epic := range m.epics {
-		for _, ticket := range epic.Tickets {
-			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
-				continue
-			}
-			count++
-			total += ticket.ActualContextWindow
-			maximum = max(maximum, ticket.ActualContextWindow)
-		}
-	}
-	if count > 0 {
-		average = total / count
-	}
-	return total, average, maximum
 }

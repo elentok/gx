@@ -1,8 +1,6 @@
 package tickets
 
 import (
-	"time"
-
 	tea "charm.land/bubbletea/v2"
 
 	gxtickets "github.com/elentok/gx/tickets"
@@ -12,8 +10,8 @@ import (
 // syncServerRunState derives the Queue tab's running state from the server's
 // ticket snapshot: no run happens in-process, so a claimed ticket is the
 // only sign that an epic runs.
-// It fills runningEpics and live so the header, row spinners and timers behave
-// as they do for an in-process run, and returns the spinner tick when the tab
+// It fills runningEpics and live for the header, row spinners and timers, and
+// returns the spinner tick when the tab
 // goes from idle to running. A ticket's timer counts from the server's claim
 // time; a claimed ticket the server has no run for is not counted as running.
 func (m *QueueModel) syncServerRunState() tea.Cmd {
@@ -44,14 +42,8 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	}
 	m.live = live
 	m.runningEpics = running
-	if len(running) > 0 {
-		if m.executionStartedAt.IsZero() {
-			m.executionStartedAt = time.Now()
-		}
-		m.executionCompletedAt = time.Time{}
-		if !wasRunning {
-			return m.implementSpinner.Tick
-		}
+	if len(running) > 0 && !wasRunning {
+		return m.implementSpinner.Tick
 	}
 	return nil
 }

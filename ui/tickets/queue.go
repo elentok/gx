@@ -25,25 +25,14 @@ import (
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
 type QueueModel struct {
-	executionStartedAt   time.Time
-	executionCompletedAt time.Time
-	// executionTickets is this run's captured ticket scope (epicName/identifier
-	// keys), fixed at kickoff so progress totals don't shift if the checked
-	// selection is edited while the run is active (ticket 20).
-	executionTickets map[string]bool
-	// runTicketIDs is each running epic's captured ticket-ID subset, fixed at
-	// kickoff alongside executionTickets — the lifecycle-status transitions
-	// (running/done/errored) below are driven from this rather than
-	// re-deriving from the live checked set.
-	runTicketIDs map[string][]string
 	now          func() time.Time
 	worktreeRoot string
 	settings     ui.Settings
 	checked      map[string]bool
 	checkOrder   map[string]uint64
-	// live mirrors Model.live (model_live.go): epicName -> ticket identifier
-	// -> in-memory orchestrator state, so the Queue tab's rows can render the same running/paused
-	// spinner+phase presentation as the Tickets tab (renderLiveTicketRow).
+	// live is epicName -> ticket identifier -> running state, derived from the
+	// server snapshot (syncServerRunState), so the Queue tab's rows render the
+	// running spinner+phase presentation (renderLiveTicketRow).
 	live map[string]map[string]liveTicketState
 	// serverClaimedAt and herdrDown come from the last server load: the claim
 	// time of each running ticket, and whether the server can launch agents.
@@ -149,8 +138,6 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		}
 	})
 	return QueueModel{
-		executionTickets: map[string]bool{},
-		runTicketIDs:     map[string][]string{},
 		now:              time.Now,
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
@@ -614,8 +601,6 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 type checkedEpicPlan struct {
 	epic tickets.Epic
-	// ticketIDs is the checked-set snapshot, used for this Model's own
-	// progress accounting (executionTickets, runTicketIDs).
 	ticketIDs []string
 	ordinal   uint64
 	ordered   bool

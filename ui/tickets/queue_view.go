@@ -71,42 +71,6 @@ func (m QueueModel) View() tea.View {
 	return ui.NewMainView(content)
 }
 
-func (m QueueModel) completedExecutionProgress() (done, total int) {
-	for _, epic := range m.epics {
-		for _, ticket := range epic.Tickets {
-			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
-				continue
-			}
-			total++
-			if epic.RenderedStatus(ticket).Terminal() {
-				done++
-			}
-		}
-	}
-	return done, total
-}
-
-// checkedProgress reports the active run's done/total ticket counts, scoped
-// to m.executionTickets — the run's captured selection at kickoff — rather
-// than the live m.checked set, so editing the checked selection while a run
-// is active doesn't rewrite that run's progress totals (ticket 20).
-func (m QueueModel) checkedProgress() (int, int) {
-	done := 0
-	total := 0
-	for _, epic := range m.epics {
-		for _, ticket := range epic.Tickets {
-			if !m.executionTickets[epic.Name+"/"+ticket.Identifier] {
-				continue
-			}
-			total++
-			if epic.RenderedStatus(ticket).Terminal() {
-				done++
-			}
-		}
-	}
-	return done, total
-}
-
 // queueBody renders the Queue tab's panel body: the run-state banner
 // (queueHeaderBodyLines, queue_header.go) as fixed lines, followed by
 // m.queueTree's own windowed rendering — mirroring the Tickets tab's

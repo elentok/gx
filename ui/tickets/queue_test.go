@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -506,36 +505,6 @@ func TestQueueModelSurfacesActionableErrorForDependencyCycle(t *testing.T) {
 	}
 }
 
-// TestQueueModelPollSyncsExecutionTicketsToWidenedRunScope covers ticket 06:
-// a ticket added mid-run via "a" (cmdAddToLiveQueue, ralphloop.RunScope.Add)
-// must show up in the Queue tab's list/count instead of staying frozen to
-// m.executionTickets' kickoff snapshot.
-func TestQueueModelBannerWhileRunningAggregatesCheckedEpics(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "alpha", "01-done.md", "Status: done\n\nBody.\n")
-	writeTicket(t, root, "alpha", "02-running.md", "Status: claimed\n\nBody.\n")
-	writeTicket(t, root, "beta", "01-running.md", "Status: claimed\n\nBody.\n")
-
-	checked := map[string]bool{
-		ticketPath(root, "alpha", "01-done.md"):    true,
-		ticketPath(root, "alpha", "02-running.md"): true,
-		ticketPath(root, "beta", "01-running.md"):  true,
-	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	now := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
-	m.executionStartedAt = now.Add(-time.Hour - 3*time.Minute)
-	m.now = func() time.Time { return now }
-	m.runningEpics = map[string]bool{"alpha": true, "beta": true}
-	m.executionTickets = map[string]bool{"alpha/01": true, "alpha/02": true, "beta/01": true}
-
-	content := m.View().Content
-	want := "1 of 3 done"
-	if !strings.Contains(content, want) || !strings.Contains(content, "implementing...") {
-		t.Fatalf("running title missing %q and/or \"implementing...\":\n%s", want, content)
-	}
-}
-
 // TestQueueHeaderStateMatchesPrototype covers ticket 05's Option B redesign
 // (.scratch/tickets-queue-batch3/issues/assets/08-header-prototype.md): the
 // title always encodes run state, and the body carries at most one
@@ -546,11 +515,10 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 	base := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
-	base.executionTickets = map[string]bool{"alpha/01": true}
 
 	t.Run("not started", func(t *testing.T) {
 		m := base
-		if got, want := m.queueHeaderTitle(), "Queue · $0.00"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · today $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		lines := m.queueHeaderBodyLines()
@@ -573,8 +541,8 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		m := base
 		m.runningEpics = map[string]bool{"alpha": true}
 		got := m.queueHeaderTitle()
-		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · $0.00") {
-			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · $0.00\"", got)
+		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · today $0.00") {
+			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · today $0.00\"", got)
 		}
 		want := []string{""}
 		if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
@@ -582,33 +550,10 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		}
 	})
 
-	t.Run("paused with in-flight iterations", func(t *testing.T) {
-		m := base
-		m.paused = true
-		m.runningEpics = map[string]bool{"alpha": true}
-		if got, want := m.queueHeaderTitle(), "Queue · paused (0 of 1 done) · $0.00"; got != want {
-			t.Fatalf("title = %q, want %q", got, want)
-		}
-		want := []string{"Queue paused — in-flight iterations will finish"}
-		if got := m.queueHeaderBodyLines(); !slices.Equal(got, want) {
-			t.Fatalf("body lines = %v, want %v", got, want)
-		}
-	})
-
-	t.Run("paused with nothing in flight", func(t *testing.T) {
-		m := base
-		m.paused = true
-		want := []string{""}
-		if lines := m.queueHeaderBodyLines(); !slices.Equal(lines, want) {
-			t.Fatalf("body lines = %v, want %v when runningEpics is empty", lines, want)
-		}
-	})
-
 	t.Run("idle but globally paused", func(t *testing.T) {
 		m := base
 		m.paused = true
-		m.executionTickets = map[string]bool{}
-		if got, want := m.queueHeaderTitle(), "Queue · $0.00"; got != want {
+		if got, want := m.queueHeaderTitle(), "Queue · today $0.00"; got != want {
 			t.Fatalf("title = %q, want %q", got, want)
 		}
 		lines := m.queueHeaderBodyLines()
@@ -639,26 +584,6 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		emptyLine := m.queueRenderOpts(80).EmptyLine
 		if emptyLine != "" {
 			t.Fatalf("tree EmptyLine = %q, want empty (header banner already covers no-selection case)", emptyLine)
-		}
-	})
-
-	t.Run("completed", func(t *testing.T) {
-		completedRoot := t.TempDir()
-		writeTicket(t, completedRoot, "alpha", "01-first.md", "Status: claimed\n\nBody.\n")
-		writeRawQueueTicket(t, completedRoot, "alpha", "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\nactual_context_window: 12000\n---\n\nBody.\n")
-		checked := map[string]bool{ticketPath(completedRoot, "alpha", "01-first.md"): true}
-		m := loadQueueModel(t, NewQueueModel(completedRoot, ui.Settings{}, checked, keys.Manager{}))
-		completedAt := time.Date(2026, time.August, 3, 12, 0, 0, 0, time.UTC)
-		m.executionStartedAt = completedAt.Add(-time.Hour - 3*time.Minute)
-		m.executionCompletedAt = completedAt
-		m.executionTickets = map[string]bool{"alpha/01": true}
-
-		if got, want := m.queueHeaderTitle(), "Queue · done, took 1h03m · $0.00"; got != want {
-			t.Fatalf("title = %q, want %q", got, want)
-		}
-		want := []string{"context windows: total 12.0k tok, avg 12.0k tok, max 12.0k tok"}
-		if got := m.queueHeaderBodyLines(); !slices.Equal(got, want) {
-			t.Fatalf("body lines = %v, want %v", got, want)
 		}
 	})
 }

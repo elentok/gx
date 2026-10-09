@@ -54,6 +54,36 @@ func TestQueueServerMode_ClaimedTicketShowsRunningState(t *testing.T) {
 	}
 }
 
+func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
+	api := fakeServerAPI{
+		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: "done"},
+			{Address: "gx:alpha/02", Title: "Second", Status: "claimed", ClaimedAt: time.Now()},
+			{Address: "gx:alpha/03", Title: "Third", Status: "open"},
+		}},
+		queue: []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}},
+	}
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
+	m = next.(QueueModel)
+
+	got := m.queueHeaderTitle()
+	if !strings.HasPrefix(got, "Queue · 1 of 3 done · ") || !strings.Contains(got, "implementing...") {
+		t.Errorf("queueHeaderTitle() = %q, want \"Queue · 1 of 3 done · <spinner> implementing...\"", got)
+	}
+}
+
+func TestQueueServerMode_RunningHeaderDropsCountWithoutTickets(t *testing.T) {
+	m, _ := loadedServerQueue(t, "open")
+	m.runningEpics = map[string]bool{"gx:missing": true}
+
+	got := m.queueHeaderTitle()
+	if strings.Contains(got, "of 0 done") || !strings.HasPrefix(got, "Queue · ") || !strings.Contains(got, "implementing...") {
+		t.Errorf("queueHeaderTitle() = %q, want a running title with no count", got)
+	}
+}
+
 func TestQueueServerMode_NoClaimedTicketStaysIdleWithServerCopy(t *testing.T) {
 	m, _ := loadedServerQueue(t, "open")
 
