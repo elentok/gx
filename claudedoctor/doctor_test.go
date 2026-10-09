@@ -29,6 +29,70 @@ func TestRun_DefaultTableAgainstFixtures(t *testing.T) {
 	}
 }
 
+func TestHeadlessChecks_FixtureChecksPassAndLiveChecksSkip(t *testing.T) {
+	t.Parallel()
+	src, err := FixtureSource()
+	if err != nil {
+		t.Fatalf("FixtureSource: %v", err)
+	}
+	modes := map[string]Mode{}
+	for _, c := range Table {
+		modes[c.Name] = c.Mode
+	}
+	for _, r := range Run(Table, "headless", src) {
+		want := Pass
+		if modes[r.Name] == Live {
+			want = Skip
+		}
+		if r.Status != want {
+			t.Errorf("%s (%s): status %s (%s), want %s", r.Name, modes[r.Name], r.Status, r.Detail, want)
+		}
+	}
+	for _, name := range []string{"transcript-written", "survives-launcher-exit", "survives-launchctl-kickstart", "print-mode-hooks-blocked"} {
+		if modes[name] != Live {
+			t.Errorf("%s should be a live check", name)
+		}
+	}
+}
+
+func TestCheckPermission_CountsRequiresAction(t *testing.T) {
+	t.Parallel()
+	src, _ := FixtureSource()
+	events, err := src.Session("permission")
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, ok := checkPermission(Input{Events: events})
+	if !ok || !strings.HasPrefix(detail, "1 requires_action") {
+		t.Errorf("checkPermission = %q, %v", detail, ok)
+	}
+	if _, ok := checkPermission(Input{Events: events[:2]}); ok {
+		t.Error("a session without a permission request must fail")
+	}
+}
+
+func TestCheckSessionID_FailsOnMismatch(t *testing.T) {
+	t.Parallel()
+	events := []json.RawMessage{
+		json.RawMessage(`{"type":"system","subtype":"init","session_id":"5beba6a5-403e-4eb4-82b7-063505e30940"}`),
+		json.RawMessage(`{"type":"result","session_id":"11111111-403e-4eb4-82b7-063505e30940"}`),
+	}
+	if _, ok := checkSessionID(Input{Events: events}); ok {
+		t.Error("a later event with a different session_id must fail")
+	}
+}
+
+func TestCheckCompact_FailsWhenSessionChanges(t *testing.T) {
+	t.Parallel()
+	events := []json.RawMessage{
+		json.RawMessage(`{"type":"system","subtype":"init","session_id":"a"}`),
+		json.RawMessage(`{"type":"system","subtype":"compact_boundary","session_id":"b"}`),
+	}
+	if _, ok := checkCompact(Input{Events: events}); ok {
+		t.Error("compact into a new session must fail")
+	}
+}
+
 func TestRun_SkipsDependentsOfFailedOrSkippedChecks(t *testing.T) {
 	t.Parallel()
 	table := []Check{

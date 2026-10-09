@@ -1,0 +1,8 @@
+{"claude_version":"2.1.293"}
+{"type":"system","subtype":"init","session_id":"5beba6a5-403e-4eb4-82b7-063505e30940","capabilities":["msg_lifecycle_v1"]}
+{"type":"command_lifecycle","command_uuid":"c1","state":"started"}
+{"type":"control_request","request_id":"perm-1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"}}}
+{"type":"system","subtype":"session_state_changed","state":"requires_action"}
+{"type":"system","subtype":"session_state_changed","state":"running"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"permission allow"}]}}
+{"type":"result","subtype":"success"}

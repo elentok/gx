@@ -6,6 +6,7 @@ package claudedoctor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ type Input struct {
 type Result struct {
 	Runner string `json:"runner"`
 	Name   string `json:"name"`
+	Mode   Mode   `json:"mode"`
 	Status Status `json:"status"`
 	Detail string `json:"detail"`
 }
@@ -61,10 +63,14 @@ type Source struct {
 	Session       func(name string) ([]json.RawMessage, error)
 }
 
+// ErrNoLiveSession is what a live Source returns for a canned session it
+// cannot drive against a real claude yet; the check is skipped, not failed.
+var ErrNoLiveSession = errors.New("no live driver for this session")
+
 // Table is the doctor's check list, in run order.
-var Table = []Check{
+var Table = append([]Check{
 	{Runner: "headless", Name: "claude-version", Mode: Fixture, Run: checkClaudeVersion},
-}
+}, headlessChecks...)
 
 // Run runs runner's checks from table in order. A check whose dependency did
 // not pass is skipped rather than run.
@@ -84,7 +90,7 @@ func Run(table []Check, runner string, src Source) []Result {
 }
 
 func runCheck(c Check, src Source, status map[string]Status, sessions map[string][]json.RawMessage) Result {
-	r := Result{Runner: c.Runner, Name: c.Name}
+	r := Result{Runner: c.Runner, Name: c.Name, Mode: c.Mode}
 	for _, dep := range c.DependsOn {
 		if status[dep] != Pass {
 			r.Status, r.Detail = Skip, "needs "+dep
@@ -105,6 +111,10 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 				err = fmt.Errorf("no session source")
 			} else {
 				events, err = src.Session(c.Session)
+			}
+			if errors.Is(err, ErrNoLiveSession) {
+				r.Status, r.Detail = Skip, err.Error()
+				return r
 			}
 			if err != nil {
 				r.Status, r.Detail = Fail, fmt.Sprintf("session %s: %v", c.Session, err)

@@ -62,14 +62,15 @@ func TestRunClaudeDoctor_JSON(t *testing.T) {
 	out := &strings.Builder{}
 	d := deps{stdout: out, stderr: &strings.Builder{}}
 
-	if err := runClaudeDoctor(d, claudeDoctorOptions{runner: "headless", json: true}, fixtureDoctorSource(t), ""); err != nil {
+	opts := claudeDoctorOptions{runner: "headless", json: true, table: claudedoctor.Table[:1]}
+	if err := runClaudeDoctor(d, opts, fixtureDoctorSource(t), ""); err != nil {
 		t.Fatalf("runClaudeDoctor: %v", err)
 	}
 	var got []map[string]string
 	if err := json.Unmarshal([]byte(out.String()), &got); err != nil {
 		t.Fatalf("output is not a JSON array: %v\n%s", err, out.String())
 	}
-	want := map[string]string{"runner": "headless", "name": "claude-version", "status": "PASS", "detail": "2.1.293 >= " + nativerunner.MinClaudeVersion}
+	want := map[string]string{"runner": "headless", "name": "claude-version", "mode": "fixture", "status": "PASS", "detail": "2.1.293 >= " + nativerunner.MinClaudeVersion}
 	if len(got) != 1 || len(got[0]) != len(want) {
 		t.Fatalf("got %v, want [%v]", got, want)
 	}
@@ -99,7 +100,8 @@ func TestRunClaudeDoctor_WarnsWhenLiveClaudeIsNewerThanFixtures(t *testing.T) {
 	d := deps{stdout: &strings.Builder{}, stderr: errOut}
 	src := claudedoctor.Source{Live: true, ClaudeVersion: "2.1.400"}
 
-	if err := runClaudeDoctor(d, claudeDoctorOptions{runner: "headless"}, src, "2.1.293"); err != nil {
+	opts := claudeDoctorOptions{runner: "headless", table: claudedoctor.Table[:1]}
+	if err := runClaudeDoctor(d, opts, src, "2.1.293"); err != nil {
 		t.Fatalf("runClaudeDoctor: %v", err)
 	}
 	if !strings.Contains(errOut.String(), "newer than the test fixtures (2.1.293)") {
