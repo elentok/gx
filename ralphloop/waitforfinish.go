@@ -762,14 +762,6 @@ func confirmFinished(d Deps, pane string, until []string) (bool, error) {
 	return false, err
 }
 
-// backgroundTaskAgedOutCap bounds how long waitForBackgroundTasks trusts an
-// outstanding backgrounded-shell-command marker as evidence the pane isn't
-// really finished. Past this, ReadBackgroundTasks itself reclassifies the
-// marker outstanding-aged-out, and the gate stops holding on it — the
-// background job is assumed abandoned or unresolvable rather than waited on
-// forever.
-const backgroundTaskAgedOutCap = 2 * time.Hour
-
 // waitForBackgroundTasks gates confirmFinished's conclusion on any
 // outstanding-fresh backgrounded-shell-command marker in the Claude
 // transcript: a pane that looks idle/done while a background task it started

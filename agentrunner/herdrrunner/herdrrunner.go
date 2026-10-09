@@ -6,6 +6,7 @@ package herdrrunner
 import (
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"sync"
 	"time"
@@ -38,8 +39,14 @@ type turn struct {
 var _ agentrunner.Runner = (*Runner)(nil)
 var _ agentrunner.HealthChecker = (*Runner)(nil)
 
+// New gates on Claude transcript background tasks, unless the home directory
+// can't be found.
 func New() *Runner {
-	return &Runner{turns: map[string]*turn{}}
+	r := &Runner{turns: map[string]*turn{}}
+	if home, err := os.UserHomeDir(); err == nil {
+		r.BackgroundTasks = ClaudeBackgroundTasks(home, time.Now)
+	}
+	return r
 }
 
 func (r *Runner) Healthy() error { return herdr.Ping() }
@@ -237,7 +244,12 @@ func (r *Runner) status(s agentrunner.Session) (status, error) {
 	switch st.State {
 	case agentrunner.StateWorking, agentrunner.StateBlocked:
 	case agentrunner.StateIdle, agentrunner.StateDone:
-		if r.BackgroundTasks != nil && r.BackgroundTasks(s) {
+		// s may predate herdr learning the agent's session id.
+		probed := s
+		if agent.AgentSession != "" {
+			probed.SessionID = agent.AgentSession
+		}
+		if r.BackgroundTasks != nil && r.BackgroundTasks(probed) {
 			st.State = agentrunner.StateWorking
 		}
 	default:

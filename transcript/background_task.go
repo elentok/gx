@@ -35,6 +35,12 @@ const (
 	BackgroundTaskUnsupported BackgroundTaskStatus = "unsupported"
 )
 
+// BackgroundTaskAgedOutCap is the cap gx's callers pass to
+// ReadBackgroundTasks: how long an outstanding marker is trusted as evidence
+// the agent isn't really finished. Past it, the background job is assumed
+// abandoned or unresolvable rather than waited on forever.
+const BackgroundTaskAgedOutCap = 2 * time.Hour
+
 // BackgroundTaskMarker is one non-sidechain backgrounded-shell-command start
 // marker found in a transcript, together with its resolution state.
 type BackgroundTaskMarker struct {

@@ -303,7 +303,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			if err != nil {
 				return transcript.BackgroundTaskReading{}, err
 			}
-			return transcript.ReadBackgroundTasks(path, backgroundTaskAgedOutCap, time.Now())
+			return transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Now())
 		},
 		ReadUnexecutedToolCall: func(cwd, sessionID string) (bool, error) {
 			path, err := transcriptPath(overrides.Home, cwd, sessionID)
