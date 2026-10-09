@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.31.0 - 2026-10-09
+
+- The `gx server` daemon is now the only scheduler. The in-process ralph-loop is removed:
+  - Removed the `orchestrator` config key. `gx ui` always connects to the server. Without a server, the TUI starts in "down" mode: the Tickets tab falls back to a file watch plus a slow poll, and server keys are disabled.
+  - Removed the TUI's own queue store and `queue-state.json`. Without a server, `r` tells you to start one, and `c`/`C` do nothing.
+  - Removed the run-start modal, drain-and-replace and the quit guard. `D` now only opens the server drain confirm. Quitting is never blocked.
+  - Removed the attach lock and the reattach flows. Server reclaim replaces them.
+  - Removed scratch folding, the TUI cost aggregator and the old `budget-log.jsonl`. Spend now comes from the server's budget ledger.
+  - The Queue header now follows server state. The running title counts the tickets of the epics the server reports as running.
+  - Removed the Tickets tab's live rows and the epic "running" marker. Live progress stays on the Queue tab.
+  - The Tickets tab's checked selection is now kept in memory. It is no longer saved across restarts.
+- Epics now always use `ticket.md`:
+  - The loader no longer reads `epic.yaml` or `map.md`. A map epic is detected from `kind: map` in `ticket.md`, and the edit key on an epic opens its `ticket.md`.
+  - `gx tickets add` and one-off creation write the epic's `ticket.md`. They also add a missing one to an existing epic directory, and never overwrite one.
+  - Project validation reports an epic directory that has no `ticket.md`. `gx tickets migrate --to-store` gives every epic a `ticket.md`.
+  - The migration now fails on an unreadable `epic.yaml` or `map.md`, instead of silently writing an empty `ticket.md`.
+  - The run-log no longer creates a missing epic directory. It drops the event instead.
+- `type: task` is now rejected, with a pointer to `implement` and `gx tickets migrate`.
+- Removed the hidden `gx tickets land|reset|unpark|verify` aliases. Use `gx server tickets <verb>`.
+- Updated docs and skills to remove the in-process mode. Added gx-investigate gotchas for land-conflict parks, multi-level fork queues, session-limit parks and ticket-done notifications.
+
 ## v0.30.0 - 2026-10-08
 
 - Added the `gx server` orchestrator daemon. It owns the queue, the ticket store and the chat sink:
