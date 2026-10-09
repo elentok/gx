@@ -13,6 +13,7 @@ import (
 type event struct {
 	Type      string `json:"type"`
 	Subtype   string `json:"subtype"`
+	UUID      string `json:"uuid"`
 	SessionID string `json:"session_id"`
 	// State is the session state on session_state_changed and the command
 	// state on command_lifecycle.
@@ -54,6 +55,11 @@ type tracker struct {
 	bgTasks  int
 	resetAt  time.Time
 	exited   bool
+	// finished is set by a result and cleared when a turn begins.
+	finished bool
+	// seen holds event uuids already applied, so replaying out.jsonl after a
+	// reattach never counts an event twice.
+	seen map[string]bool
 }
 
 func (t *tracker) status() agentrunner.Status {
@@ -84,6 +90,15 @@ func (t *tracker) queued() bool {
 
 // apply folds one event into t.
 func (t *tracker) apply(e event) {
+	if e.UUID != "" {
+		if t.seen[e.UUID] {
+			return
+		}
+		if t.seen == nil {
+			t.seen = map[string]bool{}
+		}
+		t.seen[e.UUID] = true
+	}
 	switch e.Type {
 	case "system":
 		switch e.Subtype {
@@ -134,10 +149,18 @@ func (t *tracker) apply(e event) {
 		t.beginTurn()
 	case "result":
 		t.working = false
+		t.finished = true
 	}
 }
 
+// ended reports a turn that ran to its result with no gx command left
+// waiting for the next one.
+func (t *tracker) ended() bool {
+	return t.finished && !t.working && !t.queued()
+}
+
 func (t *tracker) beginTurn() {
+	t.finished = false
 	if !t.working {
 		t.working = true
 		t.turn++

@@ -31,10 +31,14 @@ const (
 type Meta struct {
 	Runner    string `json:"runner"`
 	PID       int    `json:"pid"`
+	PIDStart  string `json:"pid_start"`
 	SessionID string `json:"session_id"`
 	Label     string `json:"label"`
 	Epic      string `json:"epic"`
 	Cwd       string `json:"cwd"`
+	// Offset is where this session's events begin in out.jsonl, always at a
+	// line boundary. Earlier lines belong to a previous run in the same dir.
+	Offset int64 `json:"offset"`
 }
 
 var errUnsupported = errors.New("headless runner: not supported yet")
@@ -55,6 +59,8 @@ type Headless struct {
 	InterruptGrace time.Duration
 	// PromptTimeout is how long Prompt waits for claude to start the turn.
 	PromptTimeout time.Duration
+	// Procs checks agent liveness on reattach; defaults to ps.
+	Procs ProcessTable
 
 	mu       sync.Mutex
 	sessions map[string]*headlessSession
@@ -65,7 +71,8 @@ var _ agentrunner.Runner = (*Headless)(nil)
 type headlessSession struct {
 	session agentrunner.Session
 	epic    string
-	cmd     *exec.Cmd
+	// pid leads claude's process group (setsid).
+	pid int
 	// stdin is the FIFO's write end. The server is its only writer;
 	// writeMu keeps a large prompt and an interrupt from interleaving.
 	stdin   *os.File
@@ -108,7 +115,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
-	out, err := os.OpenFile(filepath.Join(dir, OutFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	out, err := os.OpenFile(filepath.Join(dir, OutFile), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o644)
 	if err != nil {
 		stdin.Close()
 		return agentrunner.Session{}, err
@@ -121,7 +128,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 	}
 	defer stderr.Close()
 	// Only events claude writes from now on belong to this session.
-	offset, err := out.Seek(0, io.SeekEnd)
+	offset, err := lineBoundary(out)
 	if err != nil {
 		stdin.Close()
 		return agentrunner.Session{}, err
@@ -143,21 +150,21 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 		return agentrunner.Session{}, err
 	}
 
-	ss := &headlessSession{
-		session: agentrunner.Session{Label: opts.Label, ID: opts.Label, SessionID: sessionID},
-		epic:    opts.Epic,
-		cmd:     cmd,
-		stdin:   stdin,
-		exited:  make(chan struct{}),
-		tailed:  make(chan struct{}),
-		// Input waits in the FIFO until claude reads it, so the agent can
-		// take a prompt as soon as it is launched.
-		track:   tracker{sessionID: sessionID},
-		changed: make(chan struct{}),
+	pid := cmd.Process.Pid
+	// Input waits in the FIFO until claude reads it, so the agent can take a
+	// prompt as soon as it is launched.
+	ss := newSession(opts.Label, opts.Epic, sessionID, pid, stdin)
+	meta := Meta{Runner: "headless", PID: pid, SessionID: sessionID, Label: opts.Label, Epic: opts.Epic, Cwd: opts.Cwd, Offset: offset}
+	proc, ok, err := h.procs().Lookup(pid)
+	if err == nil && !ok {
+		err = fmt.Errorf("claude (pid %d) exited during launch", pid)
 	}
-	meta := Meta{Runner: "headless", PID: cmd.Process.Pid, SessionID: sessionID, Label: opts.Label, Epic: opts.Epic, Cwd: opts.Cwd}
-	if err := writeMeta(dir, meta); err != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	meta.PIDStart = proc.Start
+	if err == nil {
+		err = writeMeta(dir, meta)
+	}
+	if err != nil {
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		_ = cmd.Wait()
 		stdin.Close()
 		return agentrunner.Session{}, err
@@ -167,13 +174,56 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 		_ = cmd.Wait()
 		close(ss.exited)
 	}()
-	go h.tail(ss, filepath.Join(dir, OutFile), offset)
+	h.follow(ss, filepath.Join(dir, OutFile), offset)
+	return ss.session, nil
+}
 
+func newSession(label, epic, sessionID string, pid int, stdin *os.File) *headlessSession {
+	return &headlessSession{
+		session: agentrunner.Session{Label: label, ID: label, SessionID: sessionID},
+		epic:    epic,
+		pid:     pid,
+		stdin:   stdin,
+		exited:  make(chan struct{}),
+		tailed:  make(chan struct{}),
+		track:   tracker{sessionID: sessionID},
+		changed: make(chan struct{}),
+	}
+}
+
+// follow registers ss and starts folding out.jsonl from offset into it; the
+// caller holds h.mu.
+func (h *Headless) follow(ss *headlessSession, out string, offset int64) {
+	go h.tail(ss, out, offset)
 	if h.sessions == nil {
 		h.sessions = map[string]*headlessSession{}
 	}
-	h.sessions[opts.Label] = ss
-	return ss.session, nil
+	h.sessions[ss.session.Label] = ss
+}
+
+func (h *Headless) procs() ProcessTable {
+	if h.Procs == nil {
+		return psTable{}
+	}
+	return h.Procs
+}
+
+// lineBoundary returns the end of out, first ending a partial last line left
+// by an earlier run so it can't merge with this session's first event.
+func lineBoundary(out *os.File) (int64, error) {
+	end, err := out.Seek(0, io.SeekEnd)
+	if err != nil || end == 0 {
+		return end, err
+	}
+	last := make([]byte, 1)
+	if _, err := out.ReadAt(last, end-1); err != nil {
+		return 0, err
+	}
+	if last[0] == '\n' {
+		return end, nil
+	}
+	n, err := out.Write([]byte{'\n'})
+	return end + int64(n), err
 }
 
 func launchArgs(sessionID string, extra []string) []string {
@@ -233,11 +283,7 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 		return
 	}
 
-	interval := h.PollInterval
-	if interval <= 0 {
-		interval = 100 * time.Millisecond
-	}
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(h.pollInterval())
 	defer ticker.Stop()
 
 	var pending []byte
@@ -272,6 +318,13 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 			drain()
 		}
 	}
+}
+
+func (h *Headless) pollInterval() time.Duration {
+	if h.PollInterval <= 0 {
+		return 100 * time.Millisecond
+	}
+	return h.PollInterval
 }
 
 func (h *Headless) update(ss *headlessSession, fn func(*tracker)) {
@@ -422,7 +475,7 @@ func (h *Headless) Stop(s agentrunner.Session) error {
 		_, _ = h.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, grace)
 	}
 
-	pgid := -ss.cmd.Process.Pid
+	pgid := -ss.pid
 	_ = syscall.Kill(pgid, syscall.SIGTERM)
 	grace := h.StopGrace
 	if grace <= 0 {
@@ -440,7 +493,7 @@ func (h *Headless) Stop(s agentrunner.Session) error {
 	h.mu.Lock()
 	delete(h.sessions, s.Label)
 	h.mu.Unlock()
-	return nil
+	return h.Cleanup(s.Label)
 }
 
 func (h *Headless) Find(label string) (agentrunner.Session, bool, error) {
