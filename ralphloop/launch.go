@@ -329,6 +329,13 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 	}
 }
 
+// StartAndPrompt is startAndPrompt for callers outside the loop (the server's
+// launch): same retry on an undelivered prompt, no launch-failed events.
+func StartAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string) (agentrunner.Session, error) {
+	l, err := startAndPrompt(r, opts, prompt, func(int, events.Kind, error) {})
+	return l.Session, err
+}
+
 // launched is a session startAndPrompt started and prompted, or adopted.
 type launched struct {
 	agentrunner.Session

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ func TestStop_WaitsForALandInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
 		testutil.WriteFile(t, *cwd, "agent.txt", "work")
 		testutil.CommitAll(t, *cwd, "agent work")
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	// The land closes the iteration's tab; hold it there.
 	landing, release := make(chan struct{}), make(chan struct{})
@@ -87,12 +88,15 @@ func TestStop_LeavesALiveAgentRunningAndUnlanded(t *testing.T) {
 	block := make(chan struct{})
 	defer close(block)
 	waits := 0
-	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		waits++
+	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		// A wait for "working" is the launch prompt's, not the finish wait.
+		if !slices.Contains(argv, "working") {
+			waits++
+		}
 		if waits > 1 {
 			<-block
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

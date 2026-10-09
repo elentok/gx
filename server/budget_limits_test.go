@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,8 +86,28 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
 		"agent_session": map[string]any{"value": "sess"},
 	}}
-	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+	// The agent is idle until prompted (Start waits for idle), then working.
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle"}}
+	var started, prompted atomic.Bool
+	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		started.Store(true)
 		return live, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if !started.Load() {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		}
+		if !prompted.Load() {
+			return idle, herdrfake.Identities{}, nil
+		}
+		return live, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "prompt", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		prompted.Store(true)
+		return map[string]any{"agent": map[string]any{
+			"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1,
+			"agent_session": map[string]any{"value": "sess"},
+		}}, herdrfake.Identities{}, nil
 	})
 	var sent, closed []string
 	h.Herdr.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {

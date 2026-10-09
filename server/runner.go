@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -481,16 +480,11 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 func (s *Server) prepareAndLaunch(
 	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode iterationMode,
 ) (Run, ralphloop.IterationWorktree, error) {
-	ws, err := herdr.EnsureWorkspace(ticket.Epic, one.RepoDir)
-	if err != nil {
-		return Run{}, ralphloop.IterationWorktree{}, err
-	}
-	one.WorkspaceID = ws
 	wt, err := mode.prepare(deps, *one)
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	run, err := s.launch(ticket, launchSkill(one.Ticket), investigatePrompt(one.Ticket), ws, wt.Path, one.Agent)
+	run, err := s.launch(deps, ticket, launchSkill(one.Ticket), investigatePrompt(one.Ticket), wt.Path, one.Agent)
 	if err != nil {
 		if derr := mode.discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
@@ -654,35 +648,24 @@ func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string
 	return prompt
 }
 
-func (s *Server) launch(ticket tickets.Address, skill, note, ws, cwd string, agent ralphloop.AgentKind) (Run, error) {
-	prompt := launchPrompt(agent, skill, note, ticket.String())
-	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: ws, Cwd: cwd, Label: ticket.String(), Env: s.cfg.TabEnv})
+func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
+	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
+	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
+	session, err := ralphloop.StartAndPrompt(s.cfg.Runner, agentrunner.StartOptions{
+		Label: label,
+		Epic:  ticket.Epic,
+		Cwd:   cwd,
+		Kind:  agentrunner.Kind(agent),
+		Args:  ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", ""),
+		Env:   s.cfg.TabEnv,
+	}, launchPrompt(agent, skill, note, ticket.String()))
 	if err != nil {
 		return Run{}, err
 	}
-	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
-	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
-	if _, err := herdr.AgentStart(herdr.AgentStartOptions{
-		Name:      label,
-		Kind:      string(agent),
-		Pane:      tab.RootPaneID,
-		AgentArgs: ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", ""),
-	}); err != nil {
-		return Run{}, err
+	run := Run{Address: ticket.String(), Agent: string(agent), Runner: runnerHerdr, Session: session}
+	if deps.TabID != nil {
+		// Only herdr has tabs; a failed lookup just skips the tab cleanup later.
+		run.Tab, _ = deps.TabID(label)
 	}
-	if _, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: tab.RootPaneID, Until: []string{"idle"}}); err != nil {
-		return Run{}, err
-	}
-	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{
-		Target: tab.RootPaneID,
-		Text:   prompt,
-		Wait:   true,
-		Until:  []string{"working"},
-	}); err != nil {
-		return Run{}, err
-	}
-	return Run{
-		Address: ticket.String(), Agent: string(agent), Runner: runnerHerdr,
-		Session: agentrunner.Session{Label: label, ID: tab.RootPaneID}, Tab: tab.TabID,
-	}, nil
+	return run, nil
 }

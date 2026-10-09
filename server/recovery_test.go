@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -669,8 +670,14 @@ func runToZeroCommitPark(t *testing.T, h *servertest.Harness, last string) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	_, _, cwd := registerLaunch(h)
-	agent := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "agent_session": map[string]any{"value": "s1"}}}
+	var started atomic.Bool
+	var turns atomic.Int32
+	agentAt := func(turn int32) map[string]any {
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": turn, "agent_session": map[string]any{"value": "s1"}}}
+	}
+	agent := agentAt(0)
 	turn := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		agent := agentAt(turns.Add(1))
 		line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"content": []map[string]any{{"type": "text", "text": last}}}})
 		path := transcript.PathIn(home, *cwd, "s1")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -679,10 +686,18 @@ func runToZeroCommitPark(t *testing.T, h *servertest.Harness, last string) {
 		return agent, herdrfake.Identities{}, os.WriteFile(path, append(line, '\n'), 0o644)
 	}
 	reply := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return agent, herdrfake.Identities{}, nil
+		return agentAt(turns.Load()), herdrfake.Identities{}, nil
 	}
-	h.Herdr.Register("agent", "start", reply)
-	h.Herdr.Register("agent", "get", reply)
+	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		started.Store(true)
+		return agent, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if !started.Load() {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		}
+		return agentAt(turns.Load()), herdrfake.Identities{}, nil
+	})
 	h.Herdr.Register("agent", "wait", reply)
 	h.Herdr.Register("agent", "prompt", turn)
 

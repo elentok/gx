@@ -31,7 +31,21 @@ import (
 // agent start and prompt argv.
 func registerLaunch(h *servertest.Harness) (start, prompt *[]string, cwd *string) {
 	start, prompt, cwd = new([]string), new([]string), new(string)
-	agent := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}
+	var started atomic.Bool
+	var turns atomic.Int32
+	agentAt := func(turn int32) map[string]any {
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": turn}}
+	}
+	agent := agentAt(0)
+	h.Herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if !started.Load() {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		}
+		return agentAt(turns.Load()), herdrfake.Identities{}, nil
+	})
 	h.Herdr.Register("workspace", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{"workspace": map[string]any{"workspace_id": "w1"}}, herdrfake.Identities{}, nil
 	})
@@ -44,18 +58,26 @@ func registerLaunch(h *servertest.Harness) (start, prompt *[]string, cwd *string
 		return map[string]any{"tab": map[string]any{"tab_id": "t1"}, "root_pane": map[string]any{"pane_id": "p1"}}, herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		started.Store(false) // the agent ended with its tab
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "start", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		*start = argv
+		started.Store(true)
 		return agent, herdrfake.Identities{}, nil
 	})
-	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return agent, herdrfake.Identities{}, nil
+	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		turn := turns.Load()
+		// A wait for "working" follows a prompt, whose own handler may be a test
+		// override that doesn't count turns: the turn it started is the first.
+		if slices.Contains(argv, "working") {
+			turn = max(turn, 1)
+		}
+		return agentAt(turn), herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		*prompt = argv
-		return agent, herdrfake.Identities{}, nil
+		return agentAt(turns.Add(1)), herdrfake.Identities{}, nil
 	})
 	return start, prompt, cwd
 }
@@ -265,7 +287,7 @@ func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
 		testutil.WriteFile(t, *cwd, "agent.txt", "work")
 		testutil.CommitAll(t, *cwd, "agent work")
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -321,7 +343,7 @@ func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *tes
 		if err := os.RemoveAll(*cwd); err != nil {
 			t.Error(err)
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -395,7 +417,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 		// Root A lands on main first, so root B needs work of its own to commit.
 		testutil.WriteFile(t, *cwd, filepath.Base(*cwd)+".txt", "work")
 		testutil.CommitAll(t, *cwd, "agent work")
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -543,9 +565,9 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 	// until the test frees the slot.
 	release := make(chan struct{})
 	var waits atomic.Int32
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}
-	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		if waits.Add(1) == 2 {
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}
+	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if !slices.Contains(argv, "working") && waits.Add(1) == 2 {
 			<-release
 		}
 		return idle, herdrfake.Identities{}, nil
@@ -647,10 +669,11 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	var once sync.Once
 	free := func() { once.Do(func() { close(release) }) }
 	defer free()
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle"}}
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}
 	var waits atomic.Int32
-	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		if waits.Add(1) > 3 { // the three launches' waits come first
+	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		// The launches' waits come first; a wait for "working" is the prompt's, not an iteration's.
+		if !slices.Contains(argv, "working") && waits.Add(1) > 3 {
 			<-release
 		}
 		return idle, herdrfake.Identities{}, nil
@@ -720,7 +743,7 @@ func leaveIteration(t *testing.T, h *servertest.Harness, store, repo string) (st
 }
 
 func registerLiveAgent(h *servertest.Harness) {
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle"}}
+	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": 1}}
 	for _, verb := range []string{"get", "wait"} {
 		h.Herdr.Register("agent", verb, func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 			return idle, herdrfake.Identities{}, nil

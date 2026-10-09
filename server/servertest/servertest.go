@@ -100,12 +100,35 @@ type Prompt struct {
 // commit in p.Cwd). The agent is idle again when the prompt returns.
 func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
 	var mu sync.Mutex
-	cwds := map[string]string{} // pane -> cwd
+	cwds := map[string]string{}  // pane -> cwd
+	named := map[string]string{} // agent name -> pane
+	turns := map[string]int{}    // pane -> state_change_seq
 	tabs := 0
 	reply := func(pane string) map[string]any {
-		return map[string]any{"agent": map[string]any{"pane_id": pane, "agent_status": "idle"}}
+		mu.Lock()
+		defer mu.Unlock()
+		return map[string]any{"agent": map[string]any{
+			"pane_id": pane, "tab_id": "t" + strings.TrimPrefix(pane, "p"),
+			"agent_status": "idle", "state_change_seq": turns[pane],
+		}}
 	}
 	ok := func() (any, herdrfake.Identities, error) { return map[string]any{}, herdrfake.Identities{}, nil }
+	h.Herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		pane, byName := named[argv[2]]
+		_, byPane := cwds[argv[2]]
+		mu.Unlock()
+		switch {
+		case byName:
+			return reply(pane), herdrfake.Identities{}, nil
+		case byPane:
+			return reply(argv[2]), herdrfake.Identities{}, nil
+		}
+		return nil, herdrfake.Identities{}, AgentNotFound(argv[2])
+	})
 	h.Herdr.Register("workspace", "create", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{"workspace": map[string]any{"workspace_id": "w1"}}, herdrfake.Identities{}, nil
 	})
@@ -121,9 +144,25 @@ func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
 		}
 		return map[string]any{"tab": map[string]any{"tab_id": "t" + strconv.Itoa(tabs)}, "root_pane": map[string]any{"pane_id": pane}}, herdrfake.Identities{}, nil
 	})
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) { return ok() })
+	h.Herdr.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		// Closing the tab ends the agent in its pane, so a relaunch starts fresh.
+		pane := "p" + strings.TrimPrefix(argv[2], "t")
+		mu.Lock()
+		defer mu.Unlock()
+		delete(cwds, pane)
+		for name, p := range named {
+			if p == pane {
+				delete(named, name)
+			}
+		}
+		return ok()
+	})
 	h.Herdr.Register("agent", "start", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		return reply(flagValue(argv, "--pane")), herdrfake.Identities{}, nil
+		pane := flagValue(argv, "--pane")
+		mu.Lock()
+		named[argv[2]] = pane
+		mu.Unlock()
+		return reply(pane), herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		return reply(argv[2]), herdrfake.Identities{}, nil
@@ -132,12 +171,18 @@ func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
 		pane, text := argv[2], argv[3]
 		mu.Lock()
 		cwd := cwds[pane]
+		turns[pane]++ // the prompt starts a turn
 		mu.Unlock()
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
 		agent(Prompt{Address: addr, Cwd: cwd, Text: text})
 		return reply(pane), herdrfake.Identities{}, nil
 	})
+}
+
+// AgentNotFound is the error a fake `herdr agent get` returns for an unknown target.
+func AgentNotFound(target string) error {
+	return errors.New(`{"error":{"code":"agent_not_found","message":"agent target ` + target + ` not found"}}`)
 }
 
 func flagValue(argv []string, flag string) string {
