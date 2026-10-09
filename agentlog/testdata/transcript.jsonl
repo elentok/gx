@@ -1,0 +1,8 @@
+{"type":"summary","summary":"Watch renderer","leafUuid":"u0"}
+{"type":"user","isMeta":true,"message":{"role":"user","content":"<command-name>/clear</command-name>"},"uuid":"u1","cwd":"/repo","sessionId":"s1"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"/gx-implement gx:epic/12"}]},"uuid":"u2","cwd":"/repo","sessionId":"s1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Reading the ticket."},{"type":"tool_use","id":"t1","name":"Grep","input":{"pattern":"AgentLog","path":"."}}]},"uuid":"u3","sessionId":"s1"}
+{"type":"assistant","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"subagent chatter"}]},"uuid":"u4"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"agentlog/lookup.go:57:func (l Locator) AgentLog("}]},"uuid":"u5"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Custom","input":{"a":1,"b":[2,3]}}]},"uuid":"u6"}
+{"type":"system","subtype":"local_command","content":"ignored","uuid":"u7"}

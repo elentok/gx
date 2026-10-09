@@ -272,7 +272,8 @@ func TestHeadless_PruneKeepsRecentParkedAndLiveAgents(t *testing.T) {
 	}
 
 	r := &nativerunner.Headless{Root: root, Procs: agentProcs()}
-	pruned, err := r.Prune(nativerunner.DefaultLogRetention, now, func(label string) bool { return label == "parked" })
+	parked := func(label string) bool { return label == "parked" }
+	pruned, err := r.Prune(nativerunner.DefaultLogRetention, now, parked)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +285,26 @@ func TestHeadless_PruneKeepsRecentParkedAndLiveAgents(t *testing.T) {
 			t.Errorf("%s was pruned: %v", kept, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(root, "old")); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("old survived: %v", err)
+	if _, err := os.Stat(filepath.Join(root, "old", nativerunner.OutFile)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("old's log survived: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "old", nativerunner.MetaFile)); err != nil {
+		t.Errorf("old's meta was removed, watch can't name its transcript: %v", err)
+	}
+	if again, err := r.Prune(nativerunner.DefaultLogRetention, now, parked); err != nil || len(again) != 0 {
+		t.Errorf("second prune = %q, %v; want nothing (already pruned)", again, err)
+	}
+}
+
+func TestHeadless_InspectReportsMetaAndLiveness(t *testing.T) {
+	root := t.TempDir()
+	prepareAgent(t, root, "live", "", lines(evAssistant))
+	r := &nativerunner.Headless{Root: root, Procs: agentProcs()}
+	meta, live, err := r.Inspect("live")
+	if err != nil || !live || meta.SessionID != agentSID {
+		t.Errorf("Inspect(live) = %+v, %v, %v; want live with session %s", meta, live, err, agentSID)
+	}
+	if _, _, err := r.Inspect("missing"); !errors.Is(err, agentrunner.ErrNotFound) {
+		t.Errorf("Inspect(missing) err = %v, want ErrNotFound", err)
 	}
 }

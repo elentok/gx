@@ -160,8 +160,20 @@ func (h *Headless) Cleanup(label string) error {
 	return err
 }
 
-// Prune removes agent directories untouched for longer than maxAge and
-// returns their labels. It keeps any directory whose agent still runs and
+// Inspect reads label's meta.json and reports whether its claude still runs.
+// A missing directory is agentrunner.ErrNotFound.
+func (h *Headless) Inspect(label string) (Meta, bool, error) {
+	meta, err := readMeta(filepath.Join(h.Root, label))
+	if err != nil {
+		return Meta{}, false, err
+	}
+	live, err := h.alive(meta)
+	return meta, live, err
+}
+
+// Prune removes the logs of agent directories untouched for longer than
+// maxAge and returns their labels. meta.json stays, so watch can still name
+// the claude transcript. It keeps any directory whose agent still runs and
 // any label parked reports true for, so a parked ticket's logs stay.
 func (h *Headless) Prune(maxAge time.Duration, now time.Time, parked func(label string) bool) ([]string, error) {
 	entries, err := os.ReadDir(h.Root)
@@ -183,7 +195,7 @@ func (h *Headless) Prune(maxAge time.Duration, now time.Time, parked func(label 
 			// Not an agent directory, or one too broken to judge; leave it.
 			continue
 		}
-		if !lastTouched(dir).Before(now.Add(-maxAge)) {
+		if Pruned(dir) || !lastTouched(dir).Before(now.Add(-maxAge)) {
 			continue
 		}
 		h.mu.Lock()
@@ -195,12 +207,25 @@ func (h *Headless) Prune(maxAge time.Duration, now time.Time, parked func(label 
 		if live, err := h.alive(meta); err != nil || live {
 			continue
 		}
-		if err := os.RemoveAll(dir); err != nil {
-			return pruned, err
+		for _, name := range []string{OutFile, ErrFile, StdinFile} {
+			if err := os.Remove(filepath.Join(dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return pruned, err
+			}
 		}
 		pruned = append(pruned, label)
 	}
 	return pruned, nil
+}
+
+// Pruned reports whether Prune already removed dir's log.
+func Pruned(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, OutFile))
+	return errors.Is(err, os.ErrNotExist)
+}
+
+// AgentsRoot is where a project's native agent directories live.
+func AgentsRoot(stateDir, project string) string {
+	return filepath.Join(stateDir, "agents", project)
 }
 
 func lastTouched(dir string) time.Time {

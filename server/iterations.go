@@ -18,6 +18,7 @@ import (
 // module.
 type IterationInfo struct {
 	Address    string `json:"address"`
+	Agent      string `json:"agent,omitempty"`
 	Pane       string `json:"pane"`
 	Tab        string `json:"tab,omitempty"`
 	Worktree   string `json:"worktree"`
@@ -65,6 +66,9 @@ func (s *Server) liveIteration(address string) (IterationInfo, bool) {
 	it := IterationInfo{
 		Address: address, Pane: agent.PaneID, Tab: agent.TabID,
 		Worktree: worktree, Branch: branch, Session: agent.AgentSession,
+	}
+	if run, ok := s.registry.runOf(address); ok {
+		it.Agent = run.Agent
 	}
 	// Base and transcript are best effort: a missing git worktree or session
 	// leaves them empty rather than hiding a live pane.
