@@ -45,6 +45,10 @@ func TestConformance(t *testing.T) {
 				t.Skip("herdr background-task gating lands in a follow-up ticket")
 			},
 			Restart: func(t *testing.T) agentrunner.Runner { return herdrrunner.New() },
+			Skip: map[string]string{
+				"PromptNotDelivered":           "herdrfake has no stalled agent yet",
+				"FinishWaitsForBackgroundTask": "herdrfake has no background tasks yet",
+			},
 		}
 	})
 }

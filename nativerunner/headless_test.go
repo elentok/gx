@@ -16,6 +16,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil/agentfake"
 	"golang.org/x/sys/unix"
 )
 
@@ -30,6 +31,9 @@ func TestMain(m *testing.M) {
 	if os.Getenv(fakeClaudeEnv) == "1" {
 		fakeClaude()
 		return
+	}
+	if os.Getenv(agentfake.ClaudeEnv) == "1" {
+		agentfake.Claude()
 	}
 	os.Exit(m.Run())
 }

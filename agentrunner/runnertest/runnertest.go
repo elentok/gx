@@ -30,6 +30,8 @@ type Harness struct {
 	// Restart returns a fresh Runner over the same host, as after a gx
 	// restart.
 	Restart func(t *testing.T) agentrunner.Runner
+	// Skip maps a scenario this runner can't pass yet to the reason why.
+	Skip map[string]string
 }
 
 // waitTimeout bounds every Wait expected to succeed.
@@ -60,7 +62,13 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"RestartThenFind", restartThenFind},
 	}
 	for _, sc := range scenarios {
-		t.Run(sc.name, func(t *testing.T) { sc.fn(t, newHarness(t)) })
+		t.Run(sc.name, func(t *testing.T) {
+			h := newHarness(t)
+			if reason, ok := h.Skip[sc.name]; ok {
+				t.Skip(reason)
+			}
+			sc.fn(t, h)
+		})
 	}
 }
 
