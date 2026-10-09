@@ -19,7 +19,7 @@ import (
 func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t *testing.T) {
 	t.Parallel()
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var waits, paneReads, interruptions int
 	var prompts []string
 	d := Deps{
@@ -348,7 +348,7 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 // that as success (and finish up) instead of reporting a failure.
 func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var waits, prompts int
 	var compactionCount int
 	d := Deps{
@@ -433,7 +433,7 @@ func TestRecoverSmartZoneBreach_TranscriptConfirmsLateCompaction(t *testing.T) {
 // report a genuine failure, not poll forever.
 func TestRecoverSmartZoneBreach_GenuineStuckCompactFailsAfterExtendedWait(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var prompts int
 	d := Deps{
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -909,7 +909,7 @@ func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 // must log the gated event rather than borrowing the timeout one.
 func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var waits int
 	compactionCount := 0
 	d := Deps{
@@ -950,7 +950,7 @@ func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 // keeps the expired event and must not pick up the gated one.
 func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var waits int
 	compactionCount := 0
 	d := Deps{
@@ -995,7 +995,7 @@ func TestRecoverSmartZoneBreach_TimeoutCompletionKeepsTheExpiredEvent(t *testing
 // in the run log.
 func TestRecoverSmartZoneBreach_PaneConfirmedCompletionLogsNeitherEvent(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var reads int
 	d := Deps{
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
@@ -1614,7 +1614,7 @@ func TestRecoverSmartZoneBreach_FinishUpGatedOnCompactSubmitConfirmation(t *test
 // resubmitting, and no finish-up prompt is sent.
 func TestRecoverSmartZoneBreach_FinishUpGateGivesUpAfterTimeout(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var prompts []string
 	var sentKeys [][]string
 	d := Deps{
@@ -1873,7 +1873,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 		t.Run(string(agentKind), func(t *testing.T) {
 			t.Parallel()
 			ticketPath := writeFrontmatterTicket(t, "claimed")
-			scratchDir := t.TempDir()
+			scratchDir := epicScratchDir(t, "epic")
 			var slept []time.Duration
 			var prompted bool
 			d := Deps{
@@ -2687,7 +2687,7 @@ func backgroundTaskGateParams(scratchDir string) launchAndPromptParams {
 // until that task resolves.
 func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -2742,7 +2742,7 @@ func TestWaitForFinish_BackgroundTaskGateHoldsUntilResolved(t *testing.T) {
 // that never resolves stops holding once GateReleased reports true.
 func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -2785,7 +2785,7 @@ func TestWaitForFinish_RecoveryForceReleasesAHeldGate(t *testing.T) {
 // (never gate-released) for that marker.
 func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var sleeps, reads int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++
@@ -2834,7 +2834,7 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 // until a later idle genuinely holds up.
 func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	var sleeps, reads, waits int
 	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
 		reads++

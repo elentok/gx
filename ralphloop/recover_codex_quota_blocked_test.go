@@ -23,7 +23,7 @@ import (
 func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 
 	d := Deps{
 		Now:   func() time.Time { return time.Unix(0, 0) },

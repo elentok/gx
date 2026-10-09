@@ -18,7 +18,7 @@ import (
 
 func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 
 	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01", Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -45,7 +45,7 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 
 func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 
 	err := AppendEvent(dir, "epic", Event{
 		Type: string(eventsc.ManualLand), Ticket: "04", Outcome: "landed",
@@ -80,7 +80,7 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 
 func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 
 	// Multi-byte and escaped characters exercise the encoded-size accounting.
 	reason := strings.Repeat("é\"\n", 5000)
@@ -103,7 +103,7 @@ func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 
 func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	before := time.Now()
 	if err := logEvent(dir, "epic", Event{Type: string(eventsc.NeedsAnswer), Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -213,7 +213,7 @@ func TestLastIterationSession_NoMatch_OkFalse(t *testing.T) {
 
 func TestLogEvent_ConcurrentAppends_NeverInterleave(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	var wg sync.WaitGroup
 	for i := range 20 {
 		wg.Add(1)
@@ -259,7 +259,7 @@ func TestSanitizeSendError_LeavesNonURLErrorsUnchanged(t *testing.T) {
 
 func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	if err := LogNotificationsConfigured(dir, "epic", true, false); err != nil {
 		t.Fatalf("LogNotificationsConfigured: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestLogNotificationsConfigured_RecordsBooleansForBothChannels(t *testing.T)
 
 func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	logNotificationSent(dir, "epic", "telegram", notifyKindEpicComplete, "epic complete!")
 	logNotificationFailed(dir, "epic", "slack", notifyKindIterationPaused, "post failed: 500", "iteration paused")
 
@@ -301,7 +301,7 @@ func TestLogNotificationSentAndFailed_RecordChannelAndTriggeringKind(t *testing.
 
 func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	var attempts atomic.Int32
 	sendSync := func(ctx context.Context) (sendResult, error) {
 		if attempts.Add(1) == 1 {
@@ -335,7 +335,7 @@ func TestSendNotification_FailsOnceThenSucceeds_LogsOneSentAndNoFailed(t *testin
 
 func TestSendNotification_FailsEveryAttempt_LogsOneFailedAndCallsOnFailed(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	var attempts atomic.Int32
 	sendSync := func(ctx context.Context) (sendResult, error) {
 		attempts.Add(1)
@@ -550,7 +550,7 @@ func canonicalAddr(scratchDir, epic, id string) string {
 
 func TestLogEvent_EveryTicketEventCarriesCanonicalAddressInEpicLog(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 
 	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "05"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
@@ -566,7 +566,7 @@ func TestLogEvent_EveryTicketEventCarriesCanonicalAddressInEpicLog(t *testing.T)
 
 func TestLogEvent_FailureEventCarriesAddressAndTruncatedReason(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 
 	err := logEvent(dir, "epic", Event{
 		Type: string(eventsc.LaunchFailed), Kind: string(eventsc.AgentNameTaken), Ticket: "07",
@@ -588,4 +588,28 @@ func TestLogEvent_FailureEventCarriesAddressAndTruncatedReason(t *testing.T) {
 	if strings.Contains(line, `"iteration"`) {
 		t.Errorf("unknown iteration must be omitted, not a placeholder: %.200s", line)
 	}
+}
+
+// epicScratchDir returns a fresh scratch dir with epicName's directory
+// already created, since logEvent drops events for a missing epic dir.
+func TestAppendEvent_MissingEpicDirIsNotCreated(t *testing.T) {
+	t.Parallel()
+	scratchDir := t.TempDir()
+
+	if err := AppendEvent(scratchDir, "no-such-epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01"}); err != nil {
+		t.Fatalf("AppendEvent: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(scratchDir, "no-such-epic")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("epic dir stat err = %v, want not-exist", err)
+	}
+}
+
+func epicScratchDir(t *testing.T, epicName string) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, epicName), 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	return dir
 }

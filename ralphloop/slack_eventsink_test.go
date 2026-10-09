@@ -184,7 +184,7 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 
 func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, getRequests := fakeSlackServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newSlackEventSink(inner, server.URL, dir, "epic")
@@ -206,7 +206,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 
 func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Slack webhook looks like to the client.
@@ -310,7 +310,7 @@ func TestSendSlackMessage_ReturnsErrorOnFailingServer(t *testing.T) {
 
 func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, _ := fakeSlackServer(t, http.StatusOK)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 	defer sink.Close()
@@ -335,7 +335,7 @@ func TestSlackEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 
 func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	sink := newSlackEventSink(&recordingSink{}, server.URL, dir, "epic")
 	defer sink.Close()
@@ -362,7 +362,7 @@ func TestSlackEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 
 func TestSlackEventSink_LogsNotificationFailedToRunLog_RedactsWebhookSecret(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	const secretPath = "T00/B00/super-secret-webhook-token"
 	// A closed server's URL is unreachable but well-formed, so http.Client.Do
 	// returns a *url.Error whose Error() embeds the full request URL —

@@ -134,7 +134,7 @@ func TestTelegramEventSink_DrainComplete_PostsTelegramWireFormat(t *testing.T) {
 
 func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, getRequests := fakeTelegramServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
@@ -156,7 +156,7 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 
 func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	inner := &recordingSink{}
 	// A closed server's URL is unreachable but still well-formed, which is
 	// what a broken/unreachable Telegram API looks like to the client.
@@ -477,7 +477,7 @@ func TestTelegramTransport_SendSync_UnrelatedBadRequest_NoFallback(t *testing.T)
 // still reaches NotificationFailed for the TUI toast pipeline.
 func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, _ := fakeTelegramMarkdownRejectingServer(t)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
@@ -514,7 +514,7 @@ func TestTelegramEventSink_MarkdownParseRejection_LogsDegradedAndTogglesToast(t 
 
 func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, _ := fakeTelegramServer(t, http.StatusOK)
 	sink := newTelegramEventSink(&recordingSink{}, "tok", "chat-1", server.URL, dir, "epic")
 	defer sink.Close()
@@ -539,7 +539,7 @@ func TestTelegramEventSink_LogsNotificationSentToRunLog(t *testing.T) {
 
 func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	server, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 	inner := &recordingSink{}
 	sink := newTelegramEventSink(inner, "tok", "chat-1", server.URL, dir, "epic")
@@ -575,7 +575,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 
 func TestTelegramEventSink_LogsNotificationFailedToRunLog_RedactsBotToken(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	dir := epicScratchDir(t, "epic")
 	const secretToken = "super-secret-bot-token-123"
 	// A closed server's URL is unreachable but well-formed, so http.Client.Do
 	// returns a *url.Error whose Error() embeds the full request URL —

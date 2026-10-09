@@ -547,7 +547,7 @@ func TestChatEventSink_Close_FlushesQueuedMessageSynchronously(t *testing.T) {
 // exactly one notification-suppressed run-log line naming the queued kinds.
 func TestChatEventSink_Close_GloballyMuted_SuppressesFlushAndLogsRunLogLine(t *testing.T) {
 	t.Parallel()
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	epicName := "epic"
 	sink, transport := newFakeChatSink(t, &recordingSink{})
 	sink.scratchDir = scratchDir
@@ -722,7 +722,7 @@ func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testin
 // run-log line instead of silently dropped into a queue nobody will ever
 // flush again.
 func TestChatEventSink_Requeue_SkippedAfterClose_LogsSuppression(t *testing.T) {
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	epicName := "epic"
 	sink, _ := newFakeChatSink(t, &recordingSink{})
 	sink.scratchDir = scratchDir

@@ -25,7 +25,7 @@ func TestConsecutiveLaunchFailures(t *testing.T) {
 }
 
 func TestRetryStormKind_ParksAtLimit(t *testing.T) {
-	scratch := t.TempDir()
+	scratch := epicScratchDir(t, "epic")
 	old := retryStormLaunches
 	retryStormLaunches = func() int { return 3 }
 	t.Cleanup(func() { retryStormLaunches = old })

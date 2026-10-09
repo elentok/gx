@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -84,6 +85,22 @@ func TestRunTicketsAddBody_ExistingEpicKeepsTicketMD(t *testing.T) {
 
 	if raw, _ := os.ReadFile(filepath.Join(epicPath, "ticket.md")); string(raw) != want {
 		t.Errorf("epic ticket.md = %q, want unchanged %q", raw, want)
+	}
+}
+
+func TestRunTicketsAdd_ExistingEpicWithoutTicketMDIsRepaired(t *testing.T) {
+	t.Parallel()
+	projectDir := t.TempDir()
+	epicPath := filepath.Join(projectDir, "bare-epic")
+	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
+
+	var stdout bytes.Buffer
+	if err := runTicketsAdd(epicPath, "", "x", &stdout); err != nil {
+		t.Fatalf("runTicketsAdd: %v", err)
+	}
+
+	if err := tickets.ValidateProject(projectDir); err != nil {
+		t.Errorf("ValidateProject after add: %v", err)
 	}
 }
 

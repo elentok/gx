@@ -191,7 +191,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	// sleeping for them.
 	s.AdvanceVirtualTime(3 * time.Minute)
 
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -398,7 +398,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 
 	herdrfake.StartState(t, s)
 
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -569,7 +569,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 
 	herdrfake.StartState(t, s)
 
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -654,7 +654,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 
 	herdrfake.StartState(t, s)
 
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -867,7 +867,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	// sleeping for them.
 	s.AdvanceVirtualTime(8 * time.Minute)
 
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
@@ -973,7 +973,7 @@ func TestRecoverCodexRateLimit_ProductionBlockedAfterReset_ParksWithoutPrompting
 	herdrfake.StartState(t, s)
 
 	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
+	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }

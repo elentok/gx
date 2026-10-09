@@ -172,7 +172,7 @@ func TestRunIteration_LaunchFailures_LogOneEventPerAttempt(t *testing.T) {
 		return herdr.Agent{}, errStuckSubmission
 	})
 	p := testIterationParams()
-	p.ScratchDir = t.TempDir()
+	p.ScratchDir = epicScratchDir(t, p.FeatureBranch)
 
 	err := runIteration(d, p)
 	var lf *launchFailure

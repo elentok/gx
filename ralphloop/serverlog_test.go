@@ -7,7 +7,7 @@ import (
 )
 
 func TestAppendServerEvent_BudgetEventLandsInServerLogNotEpicLog(t *testing.T) {
-	store := t.TempDir()
+	store := epicScratchDir(t, "epic-a")
 
 	if err := AppendEvent(store, "epic-a", Event{Type: string(events.Resumed), Ticket: "01"}); err != nil {
 		t.Fatal(err)

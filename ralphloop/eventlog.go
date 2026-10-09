@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -178,12 +179,12 @@ func RunLogPath(scratchDir, epicName string) string {
 }
 
 // logEvent appends ev as one JSON line to epicName's run-log.jsonl under
-// scratchDir, creating the epic directory if it doesn't exist yet, and
-// filling Time in if it's zero. It's a no-op if scratchDir or epicName is
-// empty, so call sites that don't have logging wired up (e.g. the
+// scratchDir, filling Time in if it's zero. It's a no-op if scratchDir or
+// epicName is empty, so call sites that don't have logging wired up (e.g. the
 // conflict-resolution launch, which logs conflict-hit/resolved manually
 // instead of via the generic start/finish path) don't need to special-case
-// it.
+// it. It never creates a missing epic directory: one made that way has no
+// ticket.md, so it would be an invalid epic. The event is dropped instead.
 func logEvent(scratchDir, epicName string, ev Event) error {
 	if scratchDir == "" || epicName == "" {
 		return nil
@@ -195,7 +196,12 @@ func logEvent(scratchDir, epicName string, ev Event) error {
 	if err != nil {
 		return err
 	}
-	return appendLine(runLogPath(scratchDir, epicName), data)
+	err = appendLine(runLogPath(scratchDir, epicName), data)
+	if errors.Is(err, fs.ErrNotExist) {
+		logger.Debug("dropping %s event: epic %s has no directory\n", ev.Type, epicName)
+		return nil
+	}
+	return err
 }
 
 // logDeadlocked records an epic entering deadlock. Callers invoke it on the
@@ -286,19 +292,19 @@ func AppendServerEvent(storeDir string, ev Event) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(storeDir, 0755); err != nil {
+		return err
+	}
 	return appendLine(serverLogPath(storeDir), data)
 }
 
-// appendLine writes data plus a newline to path, creating its directory.
+// appendLine writes data plus a newline to path. Its directory must exist.
 func appendLine(path string, data []byte) error {
 	data = append(data, '\n')
 
 	eventLogMu.Lock()
 	defer eventLogMu.Unlock()
 
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err

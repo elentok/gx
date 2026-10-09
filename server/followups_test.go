@@ -75,6 +75,24 @@ func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraf
 	}
 }
 
+func TestEnsureDraftEpic_ExistingDirWithoutTicketMDBecomesValid(t *testing.T) {
+	projectDir := t.TempDir()
+	epicPath := filepath.Join(projectDir, "follow-ups")
+	testutil.Mkdir(t, epicPath)
+
+	if err := ensureDraftEpic(epicPath); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tickets.ValidateProject(projectDir); err != nil {
+		t.Errorf("ValidateProject: %v", err)
+	}
+	epics, err := tickets.Load(projectDir)
+	if err != nil || len(epics) != 1 || epics[0].Status != string(schema.StatusDraft) {
+		t.Errorf("Load = %+v, %v; want one draft epic", epics, err)
+	}
+}
+
 func followUpTickets(t *testing.T, store string) []tickets.Ticket {
 	t.Helper()
 	epics, err := tickets.Load(filepath.Join(store, "proj"))

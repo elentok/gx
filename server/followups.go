@@ -160,11 +160,9 @@ func noteOccurrence(epicPath, key string, from tickets.Address) (path string, fo
 }
 
 // ensureDraftEpic creates a missing epic with status draft, so nothing in it is
-// scheduled until a person promotes it.
+// scheduled until a person promotes it. An existing epic directory without a
+// ticket.md gets one too; one with a ticket.md keeps it.
 func ensureDraftEpic(epicPath string) error {
-	if _, err := os.Stat(epicPath); err == nil {
-		return nil
-	}
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
 		return err
 	}
