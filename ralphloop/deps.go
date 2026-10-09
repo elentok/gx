@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
@@ -60,12 +61,15 @@ type Deps struct {
 	// RenameBranch renames a local branch, for setting an iteration branch
 	// aside under an attic name.
 	RenameBranch func(repoDir, oldName, newName string) error
-	TabCreate    func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
-	TabClose     func(tabID string) error
-	TabList      func(workspaceID string) ([]herdr.Tab, error)
-	AgentStart   func(opts herdr.AgentStartOptions) (herdr.Agent, error)
-	AgentPrompt  func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
-	AgentGet     func(target string) (herdr.Agent, error)
+	// Runner hosts the iteration's agent. The herdr fields below are being
+	// retired path by path onto it.
+	Runner      agentrunner.Runner
+	TabCreate   func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
+	TabClose    func(tabID string) error
+	TabList     func(workspaceID string) ([]herdr.Tab, error)
+	AgentStart  func(opts herdr.AgentStartOptions) (herdr.Agent, error)
+	AgentPrompt func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
+	AgentGet    func(target string) (herdr.Agent, error)
 	// AgentExplain reports which detection rule herdr's pane monitor matched
 	// for a pane's current state, used by blocked-pane recovery paths to name
 	// the unanswered dialog (its matched_rule.id) in a park reason or to
@@ -235,6 +239,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RemoveWorktree:        removeWorktree,
 		DeleteBranch:          deleteBranch,
 		RenameBranch:          renameBranch,
+		Runner:                herdrrunner.New(),
 		TabCreate:             herdr.TabCreate,
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
