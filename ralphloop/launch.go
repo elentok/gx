@@ -3,10 +3,12 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
@@ -284,6 +286,39 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 		Attempt: attempt,
 		Reason:  err.Error(),
 	})
+}
+
+// startAndPrompt starts a session and sends its initial prompt. A prompt the
+// agent never picks up (ErrNotDelivered) points at a bad session rather than a
+// slow agent, so it gets exactly one fresh session before parking as
+// agent_prompt_stalled. Any other prompt error (e.g. ErrNotReady on a blocked
+// agent) returns with the session still live, for the blocked-pane park.
+// onFail is called for every failed attempt, to log launch-failed.
+func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error)) (agentrunner.Session, error) {
+	for attempt := 1; ; attempt++ {
+		s, err := r.Start(opts)
+		if err != nil {
+			kind := events.IterationError
+			if errors.Is(err, agentrunner.ErrLabelTaken) {
+				kind = events.AgentNameTaken
+			}
+			err = fmt.Errorf("starting %s: %w", opts.Label, err)
+			onFail(attempt, kind, err)
+			return agentrunner.Session{}, &launchFailure{Kind: kind, Err: err}
+		}
+		err = r.Prompt(s, prompt)
+		if !errors.Is(err, agentrunner.ErrNotDelivered) {
+			return s, err
+		}
+		err = fmt.Errorf("sending initial prompt: %w", err)
+		onFail(attempt, events.AgentPromptStalled, err)
+		if stopErr := r.Stop(s); stopErr != nil {
+			log.Printf("stopping undelivered session %s: %v", s.Label, stopErr)
+		}
+		if attempt == 2 {
+			return agentrunner.Session{}, &launchFailure{Kind: events.AgentPromptStalled, Err: err}
+		}
+	}
 }
 
 // launchAndPrompt runs the shared agent lifecycle protocol: launch the agent in

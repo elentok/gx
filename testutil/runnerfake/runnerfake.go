@@ -49,6 +49,12 @@ type Runner struct {
 	changed   chan struct{}
 	healthErr error
 	startErrs map[string]error
+	failNext  map[string]failPrompts
+}
+
+type failPrompts struct {
+	n   int
+	err error
 }
 
 func NewRunner() *Runner {
@@ -57,6 +63,7 @@ func NewRunner() *Runner {
 		history:     map[string]*session{},
 		changed:     make(chan struct{}),
 		startErrs:   map[string]error{},
+		failNext:    map[string]failPrompts{},
 	}
 }
 
@@ -124,6 +131,11 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 	}
 	if ss.promptErr != nil {
 		return ss.promptErr
+	}
+	if f := r.failNext[s.Label]; f.n > 0 {
+		f.n--
+		r.failNext[s.Label] = f
+		return f.err
 	}
 	ss.prompts = append(ss.prompts, text)
 	ss.status.Turn++
@@ -267,6 +279,14 @@ func (r *Runner) SetPromptErr(label string, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.byLabel(label).promptErr = err
+}
+
+// FailNextPrompts makes the next n Prompts to label fail with err, across
+// sessions, so a test can fail a prompt before its session exists.
+func (r *Runner) FailNextPrompts(label string, n int, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.failNext[label] = failPrompts{n: n, err: err}
 }
 
 // SetStartErr makes every Start of label fail with err (e.g. ErrLabelTaken)
