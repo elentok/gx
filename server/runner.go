@@ -497,6 +497,12 @@ func (s *Server) prepareAndLaunch(
 // finishRun waits for the agent to settle, then lands (or parks) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
+	s.settleRun(deps, root, mode, one, wt, run, ticketAddr, ralphloop.WaitIterationFinished(deps, one, wt, run.Session))
+}
+
+// settleRun lands (or parks) an iteration whose wait ended with waitErr. A run
+// found already finished at reattach skips the wait and comes straight here.
+func (s *Server) settleRun(deps ralphloop.Deps, root rootRef, mode iterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string, waitErr error) {
 	defer s.kickRunner()
 	keepRun := false
 	defer func() {
@@ -505,7 +511,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 		}
 	}()
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Session)
+	err := waitErr
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next
@@ -537,6 +543,13 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 			s.notifyPark(addr, one.Ticket.Path, out.Kind, reason)
 		}
 		return
+	}
+	// Stop already cleans an adopted session; a run found finished at reattach
+	// was never adopted, so its I/O files are removed here.
+	if c, ok := deps.Runner.(agentCleaner); ok {
+		if cerr := c.Cleanup(run.Session.Label); cerr != nil {
+			s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
+		}
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
 	s.notifyResult(addr, one.Ticket.Path)

@@ -96,6 +96,9 @@ type ServerConfig struct {
 	// AutoMergeEpic merges an epic's branch into its target once every ticket
 	// is done. Off by default: a person runs gx-merge.
 	AutoMergeEpic bool `json:"auto-merge-epic"`
+	// LogRetention is how long a headless agent's logs outlive its last
+	// activity. Zero means the runner's default.
+	LogRetention time.Duration `json:"-"`
 }
 
 // Default returns the default configuration.
@@ -197,6 +200,7 @@ func Load() (Config, error) {
 			TCPListen     *bool    `json:"tcp-listen"`
 			TabEnv        []string `json:"tab-env"`
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
+			LogRetention  *string  `json:"log-retention"`
 		} `json:"server"`
 		AgentRunner *string `json:"agent-runner"`
 		Recovery    *struct {
@@ -312,6 +316,11 @@ func Load() (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.AutoMergeEpic != nil {
 		cfg.Server.AutoMergeEpic = *raw.Server.AutoMergeEpic
+	}
+	if raw.Server != nil && raw.Server.LogRetention != nil {
+		if d, err := time.ParseDuration(*raw.Server.LogRetention); err == nil && d > 0 {
+			cfg.Server.LogRetention = d
+		}
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

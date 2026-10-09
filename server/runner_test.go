@@ -963,7 +963,8 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	for _, p := range projects {
-		if p != "proj" {
+		// scratch is asked by the log prune, which visits every project.
+		if p != "proj" && p != server.ScratchProject {
 			t.Errorf("RunnerFor asked for project %q", p)
 		}
 	}

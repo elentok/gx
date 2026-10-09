@@ -74,6 +74,10 @@ type Config struct {
 	// Runner still answers host health and any project RunnerFor returns nil for.
 	RunnerFor func(project string) agentrunner.Runner
 
+	// LogRetention is how long a headless agent's logs are kept after its last
+	// activity; zero means nativerunner.DefaultLogRetention.
+	LogRetention time.Duration
+
 	BudgetPollInterval time.Duration // zero means the default
 
 	// BudgetSoftLimit and BudgetHardLimit are config.Budget's daily limits in
@@ -442,6 +446,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 	s.recoverLands()
 	s.reclaimRuns()
+	s.pruneAgentLogs(time.Now())
 	s.scanParentDefects()
 	stopCommits := func() {}
 	if stop, err := s.startStoreCommits(); err != nil {
@@ -456,6 +461,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
+	pruneDone := make(chan struct{})
+	go func() { defer close(pruneDone); s.keepPruned(freshCtx) }()
 	budgetDone := make(chan struct{})
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
@@ -480,6 +487,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-freshDone
 	<-herdrDone
 	<-claimDone
+	<-pruneDone
 	<-budgetDone
 	<-gatesDone
 	timeout := s.cfg.LandStopTimeout

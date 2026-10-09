@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -287,7 +288,56 @@ func (s *Server) parkMismatch(t trackedRun, cause error) {
 	}
 }
 
+// reclaimHeadless takes over a headless iteration: a live agent keeps running
+// on the adopted session, a finished one lands as if it had just finished, and
+// one that died with the server down parks needs-repair with its dir kept.
+func (s *Server) reclaimHeadless(t trackedRun) error {
+	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	re, ok := s.runnerFor(addr.Project).(reattacher)
+	if !ok {
+		return fmt.Errorf("%w: runner %s cannot reattach", errHandleMismatch, t.Runner)
+	}
+	session, verdict, err := re.Reattach(iterationLabel(t.Address))
+	if err != nil {
+		return fmt.Errorf("%w: reattach %s: %v", errHandleMismatch, t.Address, err)
+	}
+	if verdict == nativerunner.VerdictDied {
+		dir, _, err := s.projectOf(addr.Project)
+		if err != nil {
+			return err
+		}
+		return s.parkTicket(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied)
+	}
+	one, wt, mode, err := s.resume(t)
+	if err != nil {
+		return err
+	}
+	root, err := parseRootRef(t.Root)
+	if err != nil {
+		return err
+	}
+	if verdict == nativerunner.VerdictLive {
+		t.Session = session
+	}
+	s.registry.put(t)
+	s.events.publish(EventReclaimed, t.Address)
+	deps := s.depsFor(addr.Project)
+	deps.GateReleased = s.registry.gateReleased(t.Address)
+	if verdict == nativerunner.VerdictFinished {
+		go s.settleRun(deps, root, mode, one, wt, t.Run, t.Address, nil)
+		return nil
+	}
+	go s.finishRun(deps, root, mode, one, wt, t.Run, t.Address)
+	return nil
+}
+
 func (s *Server) reclaim(t trackedRun) error {
+	if t.Runner != "" && t.Runner != runnerHerdr {
+		return s.reclaimHeadless(t)
+	}
 	label := iterationLabel(t.Address)
 	agent, err := herdr.AgentGet(label)
 	if err != nil {

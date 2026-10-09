@@ -52,6 +52,29 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadServerLogRetention(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"server":{"log-retention":"48h"}}`), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Server.LogRetention != 48*time.Hour {
+		t.Fatalf("LogRetention = %v, want 48h", cfg.Server.LogRetention)
+	}
+}
+
 func TestLoadAgentRunner(t *testing.T) {
 	tmp := t.TempDir()
 	prev := userConfigDirFn
