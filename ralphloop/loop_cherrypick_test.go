@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -74,9 +75,6 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, removed := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
 
 	var mu sync.Mutex
 	var picks int
@@ -101,27 +99,17 @@ func TestRun_CherryPickConflict_ResolvesInFeatureWorktreeThenCompletes(t *testin
 		return inProgress, nil
 	}
 
-	origTabCreate := d.TabCreate
-	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+	onRunnerPrompt(d, func(s agentrunner.Session, text string) error {
 		mu.Lock()
-		conflictPane = "pane-" + opts.Label
-		mu.Unlock()
-		return origTabCreate(opts)
-	}
-
-	origAgentPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Text == "/gx-resolving-merge-conflicts" {
-			mu.Lock()
+		defer mu.Unlock()
+		if text == "/gx-resolving-merge-conflicts" {
+			conflictPane = s.ID
 			inProgress = false // resolution "commits", ending the cherry-pick sequence
-			mu.Unlock()
 		} else {
-			mu.Lock()
-			iterPane = opts.Target
-			mu.Unlock()
+			iterPane = s.ID
 		}
-		return origAgentPrompt(opts)
-	}
+		return nil
+	})
 
 	origRemoveWorktree := d.RemoveWorktree
 	d.RemoveWorktree = func(repoDir, path string, force bool) error {
@@ -439,14 +427,25 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 	}
 }
 
-// TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab covers the
-// ordering half of the 2.1.228 fix directly: resolveCherryPickConflict must
-// check the git sequencer before trusting herdr's tab-closed signal, not
-// after. It scripts TabClose to fail the test if it fires before
-// CherryPickInProgress has already been consulted for the conflict pane's
-// resolution — the reverse of today's bug, where the tab closed (and the
-// child ticket was marked done) before any sequencer check ran at all.
-func TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab(t *testing.T) {
+// stopHookRunner calls onStop before every Stop.
+type stopHookRunner struct {
+	agentrunner.Runner
+	onStop func(s agentrunner.Session)
+}
+
+func (r stopHookRunner) Stop(s agentrunner.Session) error {
+	r.onStop(s)
+	return r.Runner.Stop(s)
+}
+
+// TestRun_ConflictResolution_CorroboratesSequencerBeforeStoppingSession covers
+// the ordering half of the 2.1.228 fix directly: resolveCherryPickConflict
+// must check the git sequencer before trusting the agent's finished signal,
+// not after. It fails the test if the conflict session is stopped before
+// CherryPickInProgress has been consulted — the reverse of the original bug,
+// where the tab closed (and the child ticket was marked done) before any
+// sequencer check ran at all.
+func TestRun_ConflictResolution_CorroboratesSequencerBeforeStoppingSession(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -460,47 +459,31 @@ func TestRun_ConflictResolution_CorroboratesSequencerBeforeClosingTab(t *testing
 	}
 
 	var mu sync.Mutex
-	var conflictPaneTab string
-	origTabCreate := d.TabCreate
-	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
-		created, err := origTabCreate(opts)
-		if strings.HasPrefix(opts.Label, "conflict-") {
-			mu.Lock()
-			conflictPaneTab = created.Tab.TabID
-			mu.Unlock()
-		}
-		return created, err
-	}
-
-	origAgentPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Text == "/gx-resolving-merge-conflicts" {
+	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
+		if text == "/gx-resolving-merge-conflicts" {
 			mu.Lock()
 			inProgress = false
 			mu.Unlock()
 		}
-		return origAgentPrompt(opts)
-	}
+		return nil
+	})
 
-	var sequencerCheckedBeforeClose bool
+	var sequencerCheckedBeforeStop bool
 	d.CherryPickInProgress = func(dir string) (bool, error) {
 		mu.Lock()
-		sequencerCheckedBeforeClose = true
+		sequencerCheckedBeforeStop = true
 		cur := inProgress
 		mu.Unlock()
 		return cur, nil
 	}
-	origTabClose := d.TabClose
-	d.TabClose = func(tabID string) error {
+	d.Runner = stopHookRunner{Runner: d.Runner, onStop: func(s agentrunner.Session) {
 		mu.Lock()
-		isConflictTab := conflictPaneTab != "" && tabID == conflictPaneTab
-		checked := sequencerCheckedBeforeClose
+		checked := sequencerCheckedBeforeStop
 		mu.Unlock()
-		if isConflictTab && !checked {
-			t.Errorf("conflict-resolution tab %s closed before the sequencer was corroborated", tabID)
+		if strings.HasPrefix(s.Label, "conflict-") && !checked {
+			t.Errorf("conflict-resolution session %s stopped before the sequencer was corroborated", s.Label)
 		}
-		return origTabClose(tabID)
-	}
+	}}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -551,17 +534,13 @@ func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *test
 		return nil
 	}
 
-	var mu sync.Mutex
-	var conflictTabCreates int
-	origTabCreate := d.TabCreate
-	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+	var conflictStarts atomic.Int32
+	onRunnerStart(d, func(opts agentrunner.StartOptions) error {
 		if strings.HasPrefix(opts.Label, "conflict-") {
-			mu.Lock()
-			conflictTabCreates++
-			mu.Unlock()
+			conflictStarts.Add(1)
 		}
-		return origTabCreate(opts)
-	}
+		return nil
+	})
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -570,8 +549,8 @@ func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *test
 	if atomic.LoadInt32(&aborts) != 0 {
 		t.Errorf("AbortCherryPick calls = %d, want 0 (must reattach the live resolver, not abort its sequencer state)", aborts)
 	}
-	if conflictTabCreates != 0 {
-		t.Errorf("conflict-labeled TabCreate calls = %d, want 0 (must reuse the live resolver's tab, not fork a second one)", conflictTabCreates)
+	if n := conflictStarts.Load(); n != 0 {
+		t.Errorf("conflict-labeled Runner starts = %d, want 0 (must reuse the live resolver, not fork a second one)", n)
 	}
 	if atomic.LoadInt32(&picks) != 0 {
 		t.Errorf("CherryPickRange calls = %d, want 0 for this ticket (the sequencer was already mid-conflict)", picks)

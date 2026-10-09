@@ -1,9 +1,8 @@
 package ralphloop
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,164 +12,90 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 )
 
 // conflictResolver is a fake stand-in for the real "/resolving-merge-
 // conflicts" agent production Ralph-loop launches on a cherry-pick conflict
-// (see resolveCherryPickConflict in iteration.go): it recognizes the same
-// skill prompt, then — instead of an LLM turn — does the deterministic
-// real-git equivalent of what that skill instructs an agent to do: verify
-// it's running in the feature worktree with a cherry-pick actually stopped on
-// a conflict, resolve every conflicted file with fixed content, stage it, and
-// run `git cherry-pick --continue`. Any of those preconditions failing (wrong
-// cwd, no cherry-pick in progress) or an unrecognized prompt fails the
-// command immediately rather than guessing.
+// (see resolveCherryPickConflict in iteration.go): hooked into fakeDeps'
+// Runner, it recognizes the same skill prompt, then — instead of an LLM turn
+// — does the deterministic real-git equivalent of what that skill instructs
+// an agent to do: verify it's running in the feature worktree with a
+// cherry-pick actually stopped on a conflict, resolve every conflicted file
+// with fixed content, stage it, and run `git cherry-pick --continue`. Any of
+// those preconditions failing (wrong cwd, no cherry-pick in progress) or an
+// unrecognized prompt fails the prompt immediately rather than guessing.
 type conflictResolver struct {
-	t            *testing.T
 	expectedCwd  string
-	sessionID    string
 	resolvedText string
 
-	mu      sync.Mutex
-	paneCwd map[string]string
-	status  string
+	mu  sync.Mutex
+	cwd map[string]string // by session label
 }
 
-func newConflictResolver(t *testing.T, expectedCwd, sessionID, resolvedText string) *conflictResolver {
+func newConflictResolver(expectedCwd, resolvedText string) *conflictResolver {
 	return &conflictResolver{
-		t:            t,
 		expectedCwd:  expectedCwd,
-		sessionID:    sessionID,
 		resolvedText: resolvedText,
-		paneCwd:      map[string]string{},
+		cwd:          map[string]string{},
 	}
 }
 
-func (r *conflictResolver) registerAll(s *herdrfake.State) {
-	s.Register("tab", "create", r.handleTabCreate)
-	s.Register("tab", "close", r.handleTabClose)
-	s.Register("agent", "start", r.handleAgentStart)
-	s.Register("agent", "wait", r.handleAgentWait)
-	s.Register("agent", "prompt", r.handlePrompt)
-	s.Register("agent", "read", r.handleAgentRead)
-}
-
-func (r *conflictResolver) handleTabClose(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-	return nil, herdrfake.Identities{}, nil
-}
-
-func (r *conflictResolver) handleTabCreate(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-	rest := argv[2:]
-	cwd := flagValue(rest, "--cwd")
-	label := flagValue(rest, "--label")
-	workspace := flagValue(rest, "--workspace")
-	tabID := "tab-" + label
-	paneID := "pane-" + label
-
+func (r *conflictResolver) onStart(opts agentrunner.StartOptions) error {
 	r.mu.Lock()
-	r.paneCwd[paneID] = cwd
-	r.mu.Unlock()
-
-	return map[string]any{
-		"tab":       map[string]any{"tab_id": tabID, "workspace_id": workspace, "label": label},
-		"root_pane": map[string]any{"pane_id": paneID},
-	}, herdrfake.Identities{WorkspaceID: workspace, TabID: tabID, PaneID: paneID}, nil
+	defer r.mu.Unlock()
+	r.cwd[opts.Label] = opts.Cwd
+	return nil
 }
 
-func (r *conflictResolver) handleAgentStart(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-	pane := flagValue(argv[2:], "--pane")
-	r.mu.Lock()
-	r.status = "idle"
-	r.mu.Unlock()
-	return conflictAgentResult(pane, "idle", "")
-}
-
-func (r *conflictResolver) handleAgentWait(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-	target := argv[2]
-	until := parseUntil(argv[3:])
-	r.mu.Lock()
-	cur := r.status
-	r.mu.Unlock()
-	if len(until) == 0 || slices.Contains(until, cur) {
-		return conflictAgentResult(target, cur, "")
-	}
-	return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
-}
-
-func (r *conflictResolver) handleAgentRead(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-	return "", herdrfake.Identities{}, nil
-}
-
-// handlePrompt is the resolver's core: on the production
+// onPrompt is the resolver's core: on the production
 // "/gx-resolving-merge-conflicts" prompt, it validates its own preconditions
-// then performs the real conflict resolution against argv[2]'s pane cwd.
-// Anything else fails immediately rather than producing a default response.
-func (r *conflictResolver) handlePrompt(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-	target, text := argv[2], argv[3]
+// then performs the real conflict resolution in s's cwd.
+func (r *conflictResolver) onPrompt(s agentrunner.Session, text string) error {
 	if text != "/gx-resolving-merge-conflicts" {
-		return nil, herdrfake.Identities{}, fmt.Errorf("conflict resolver received unexpected prompt %q", text)
+		return fmt.Errorf("conflict resolver received unexpected prompt %q", text)
 	}
 
 	r.mu.Lock()
-	cwd := r.paneCwd[target]
+	cwd := r.cwd[s.Label]
 	r.mu.Unlock()
 
 	if cwd == "" || cwd != r.expectedCwd {
-		return nil, herdrfake.Identities{}, fmt.Errorf("conflict resolver launched in wrong cwd %q, want %q", cwd, r.expectedCwd)
+		return fmt.Errorf("conflict resolver launched in wrong cwd %q, want %q", cwd, r.expectedCwd)
 	}
 
 	inProgress, err := git.CherryPickInProgress(cwd)
 	if err != nil {
-		return nil, herdrfake.Identities{}, fmt.Errorf("checking cherry-pick state in %s: %w", cwd, err)
+		return fmt.Errorf("checking cherry-pick state in %s: %w", cwd, err)
 	}
 	if !inProgress {
-		return nil, herdrfake.Identities{}, fmt.Errorf("conflict resolver launched with no cherry-pick in progress in %s", cwd)
+		return fmt.Errorf("conflict resolver launched with no cherry-pick in progress in %s", cwd)
 	}
 
 	conflicted, err := conflictedFiles(cwd)
 	if err != nil {
-		return nil, herdrfake.Identities{}, fmt.Errorf("listing conflicted files in %s: %w", cwd, err)
+		return fmt.Errorf("listing conflicted files in %s: %w", cwd, err)
 	}
 	if len(conflicted) == 0 {
-		return nil, herdrfake.Identities{}, fmt.Errorf("cherry-pick in progress but no conflicted files found in %s", cwd)
+		return fmt.Errorf("cherry-pick in progress but no conflicted files found in %s", cwd)
 	}
 
 	for _, f := range conflicted {
 		if err := os.WriteFile(filepath.Join(cwd, f), []byte(r.resolvedText), 0644); err != nil {
-			return nil, herdrfake.Identities{}, fmt.Errorf("writing resolved %s: %w", f, err)
+			return fmt.Errorf("writing resolved %s: %w", f, err)
 		}
 		if err := gitRun(cwd, "add", f); err != nil {
-			return nil, herdrfake.Identities{}, fmt.Errorf("staging resolved %s: %w", f, err)
+			return fmt.Errorf("staging resolved %s: %w", f, err)
 		}
 	}
 	if err := gitContinueCherryPick(cwd); err != nil {
-		return nil, herdrfake.Identities{}, fmt.Errorf("git cherry-pick --continue in %s: %w", cwd, err)
+		return fmt.Errorf("git cherry-pick --continue in %s: %w", cwd, err)
 	}
-
-	r.mu.Lock()
-	r.status = "done"
-	r.mu.Unlock()
-
-	return conflictAgentResult(target, "working", r.sessionID)
-}
-
-// conflictAgentResult builds the same {"agent": {...}} envelope agentResult
-// does, plus an optional agent_session so the resolver's own session id
-// (distinct from the iteration agent's) flows through to the caller.
-func conflictAgentResult(pane, status, sessionID string) (any, herdrfake.Identities, error) {
-	agent := map[string]any{"pane_id": pane, "agent_status": status}
-	ids := herdrfake.Identities{PaneID: pane}
-	if sessionID != "" {
-		agent["agent_session"] = map[string]any{"value": sessionID}
-		ids.SessionID = sessionID
-	}
-	return map[string]any{"agent": agent}, ids, nil
+	return nil
 }
 
 func flagValue(args []string, flag string) string {
@@ -228,17 +153,25 @@ func gitSubject(t *testing.T, dir, ref string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// TestCherryPickWithConflictResolution_ProductionRealConflict drives
-// cherryPickWithConflictResolution — the real production function, not a
-// stand-in — against a real git repo with a genuine cherry-pick conflict,
-// resolved through the same herdr tab-create/agent-start/agent-wait/
-// agent-prompt protocol production Ralph-loop uses, reaching a fake
-// "/gx-resolving-merge-conflicts" agent through a process-boundary fake herdr
-// executable (testutil/herdrfake) instead of a mocked Deps field.
-func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
-	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
-	// socket path and PATH.
-	dir := testutil.TempRepo(t)
+// realLandingDeps is realGitDeps plus the rest of landing's git operations,
+// for driving a genuine cherry-pick conflict.
+func realLandingDeps() Deps {
+	d := realGitDeps()
+	real := DefaultDeps()
+	d.CommitsAhead = real.CommitsAhead
+	d.CommitSubjects = real.CommitSubjects
+	d.CherryPickRange = real.CherryPickRange
+	d.CherryPickInProgress = real.CherryPickInProgress
+	d.AbortCherryPick = real.AbortCherryPick
+	return d
+}
+
+// conflictRepo builds a real repo whose ralph-loop/main/iter-03 branch
+// conflicts with main on shared.txt, returning the branch's base, its tip and
+// its commit subject.
+func conflictRepo(t *testing.T) (dir, base, iterTip, subject string) {
+	t.Helper()
+	dir = testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
 	if err != nil {
 		t.Fatalf("RevParse: %v", err)
@@ -247,32 +180,23 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	testutil.MustGitExported(t, dir, "checkout", "-b", "ralph-loop/main/iter-03", base)
 	testutil.WriteFile(t, dir, "shared.txt", "iteration content\n")
 	testutil.CommitAll(t, dir, "Add shared.txt from iteration")
-	iterTip, err := git.RevParse(dir, "HEAD")
+	iterTip, err = git.RevParse(dir, "HEAD")
 	if err != nil {
 		t.Fatalf("RevParse: %v", err)
 	}
-	wantSubject := gitSubject(t, dir, "HEAD")
+	subject = gitSubject(t, dir, "HEAD")
 
 	testutil.MustGitExported(t, dir, "checkout", "main")
 	testutil.WriteFile(t, dir, "shared.txt", "main content\n")
 	testutil.CommitAll(t, dir, "Add shared.txt from main")
+	return dir, base, iterTip, subject
+}
 
-	const resolutionSessionID = "resolver-session-1"
-	const iterationSessionID = "iteration-session-1"
-	const resolvedText = "resolved by fake conflict resolver\n"
-
-	resolver := newConflictResolver(t, dir, resolutionSessionID, resolvedText)
-	s := herdrfake.NewState(t)
-	resolver.registerAll(s)
-	herdrfake.StartState(t, s)
-
+func conflictParams(t *testing.T, dir string) iterationParams {
+	t.Helper()
 	scratchDir := t.TempDir()
 	testutil.EnsureEpicTicketMD(t, filepath.Join(scratchDir, "main"))
-	d := testDeps()
-	d.Sleep = func(time.Duration) {}
-	d.Now = func() time.Time { return time.Unix(0, 0) }
-
-	p := iterationParams{
+	return iterationParams{
 		WorkspaceID:     "ws-1",
 		FeatureWorktree: dir,
 		FeatureBranch:   "main",
@@ -283,6 +207,32 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		Gate:            NewGate(),
 		Sink:            noopEventSink{},
 	}
+}
+
+// TestCherryPickWithConflictResolution_ProductionRealConflict drives
+// cherryPickWithConflictResolution — the real production function, not a
+// stand-in — against a real git repo with a genuine cherry-pick conflict,
+// resolved by a fake "/gx-resolving-merge-conflicts" agent hosted on the
+// Runner.
+func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
+	t.Parallel()
+	dir, base, iterTip, wantSubject := conflictRepo(t)
+
+	const resolutionSessionID = "resolver-session-1"
+	const iterationSessionID = "iteration-session-1"
+	const resolvedText = "resolved by fake conflict resolver\n"
+
+	resolver := newConflictResolver(dir, resolvedText)
+	d := realLandingDeps()
+	d.Sleep = func(time.Duration) {}
+	d.Now = func() time.Time { return time.Unix(0, 0) }
+	onRunnerStart(d, resolver.onStart)
+	onRunnerPrompt(d, resolver.onPrompt)
+	runner := fakeRunner(d)
+	runner.IDs = func(label string) (string, string) { return "pane-" + label, resolutionSessionID }
+
+	p := conflictParams(t, dir)
+	label := conflictLabel(p.Ticket.Identifier)
 
 	res, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane", "iter-tab")
 	if err != nil {
@@ -315,7 +265,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("landed commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
 	}
 
-	evs, ok, err := ReadEvents(scratchDir, "main")
+	evs, ok, err := ReadEvents(p.ScratchDir, "main")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
@@ -332,145 +282,68 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 		t.Errorf("conflict-hit session = %q, want the iteration agent's session %q", conflictHit.AgentSession, iterationSessionID)
 	}
 
-	trace := s.Trace()
-	var verbs []string
-	for _, e := range trace {
-		if len(e.Argv) >= 2 {
-			verbs = append(verbs, e.Argv[0]+" "+e.Argv[1])
-		}
+	if got, want := runner.Prompts(label), []string{"/gx-resolving-merge-conflicts"}; !slices.Equal(got, want) {
+		t.Errorf("resolver prompts = %v, want %v", got, want)
 	}
-	// herdrrunner.PromptWithNudge now reads the pane once (a baseline snapshot for its
-	// unchanged-vs-changed diff) before submitting the initial prompt — see
-	// the fix-spinner/04 stuck-submission fix in deps.go.
-	wantPrefix := []string{"tab create", "agent start", "agent wait", "agent read", "agent prompt"}
-	if len(verbs) < len(wantPrefix) {
-		t.Fatalf("traced commands = %v, want at least %v", verbs, wantPrefix)
-	}
-	for i, want := range wantPrefix {
-		if verbs[i] != want {
-			t.Errorf("traced command #%d = %q, want %q (full order = %v)", i, verbs[i], want, verbs)
-		}
-	}
-
-	// The conflict-resolution tab must actually be closed once the resolution
-	// agent finishes — this is the coverage gap flagged by
-	// .scratch/tickets-queue-polish/issues/04-conflict-resolution-tab-not-closing.md:
-	// today's suite never asserted this call happened at all, so a regression
-	// that silently dropped it would have gone unnoticed.
-	wantTabID := "tab-" + conflictLabel(p.Ticket.Identifier)
-	var closeArgv []string
-	for _, e := range trace {
-		if len(e.Argv) >= 2 && e.Argv[0]+" "+e.Argv[1] == "tab close" {
-			closeArgv = e.Argv
-			break
-		}
-	}
-	if closeArgv == nil {
-		t.Fatalf("traced commands = %v, want a %q call for tab %q", verbs, "tab close", wantTabID)
-	}
-	if len(closeArgv) < 3 || closeArgv[2] != wantTabID {
-		t.Errorf("tab close argv = %v, want tab id %q", closeArgv, wantTabID)
-	}
-
-	// Nothing beyond tab-create/agent-start/agent-wait/agent-prompt/agent-read
-	// is registered, so any other command against this same coordinator fails
-	// immediately instead of silently no-op'ing.
-	if err := herdr.AgentSendKeys("pane-"+conflictLabel(p.Ticket.Identifier), "ctrl+c"); err == nil {
-		t.Error("AgentSendKeys against an unregistered command = nil error, want failure")
+	// The resolver's session must actually end once it finishes — the gap
+	// tickets-queue-polish/04 found when the tab was never closed.
+	if _, live, _ := runner.Find(label); live {
+		t.Errorf("conflict-resolution session %s still live after resolution", label)
 	}
 }
 
-func TestConflictResolverHandlePrompt_WrongCwd_FailsImmediately(t *testing.T) {
+func TestResolveCherryPickConflict_StopFailure_FailsTheResolution(t *testing.T) {
 	t.Parallel()
-	expected := t.TempDir()
-	wrong := t.TempDir()
-	resolver := newConflictResolver(t, expected, "sess", "resolved\n")
-	resolver.paneCwd["pane-x"] = wrong
+	d, _, _ := fakeDeps()
+	p := conflictParams(t, t.TempDir())
+	label := conflictLabel(p.Ticket.Identifier)
+	stopErr := errors.New("stop failed")
+	onRunnerPrompt(d, func(agentrunner.Session, string) error {
+		fakeRunner(d).SetStopErr(label, stopErr)
+		return nil
+	})
 
-	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/gx-resolving-merge-conflicts"})
+	if _, err := resolveCherryPickConflict(d, p); !errors.Is(err, stopErr) {
+		t.Fatalf("resolveCherryPickConflict() error = %v, want it to wrap %v", err, stopErr)
+	}
+}
+
+func TestConflictResolverOnPrompt_WrongCwd_FailsImmediately(t *testing.T) {
+	t.Parallel()
+	resolver := newConflictResolver(t.TempDir(), "resolved\n")
+	resolver.cwd["x"] = t.TempDir()
+
+	err := resolver.onPrompt(agentrunner.Session{Label: "x"}, "/gx-resolving-merge-conflicts")
 	if err == nil {
-		t.Fatal("handlePrompt() error = nil, want a wrong-cwd failure")
+		t.Fatal("onPrompt() error = nil, want a wrong-cwd failure")
 	}
 	if !strings.Contains(err.Error(), "wrong cwd") {
 		t.Errorf("error = %v, want it to mention the cwd mismatch", err)
 	}
 }
 
-func TestConflictResolverHandlePrompt_NoCherryPickInProgress_FailsImmediately(t *testing.T) {
+func TestConflictResolverOnPrompt_NoCherryPickInProgress_FailsImmediately(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t) // clean repo, nothing in progress
-	resolver := newConflictResolver(t, dir, "sess", "resolved\n")
-	resolver.paneCwd["pane-x"] = dir
+	resolver := newConflictResolver(dir, "resolved\n")
+	resolver.cwd["x"] = dir
 
-	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/gx-resolving-merge-conflicts"})
+	err := resolver.onPrompt(agentrunner.Session{Label: "x"}, "/gx-resolving-merge-conflicts")
 	if err == nil {
-		t.Fatal("handlePrompt() error = nil, want a missing-cherry-pick-state failure")
+		t.Fatal("onPrompt() error = nil, want a missing-cherry-pick-state failure")
 	}
 	if !strings.Contains(err.Error(), "cherry-pick") {
 		t.Errorf("error = %v, want it to mention missing cherry-pick state", err)
 	}
 }
 
-func TestConflictResolverHandlePrompt_UnexpectedPrompt_FailsImmediately(t *testing.T) {
+func TestConflictResolverOnPrompt_UnexpectedPrompt_FailsImmediately(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	resolver := newConflictResolver(t, dir, "sess", "resolved\n")
-	resolver.paneCwd["pane-x"] = dir
+	resolver := newConflictResolver(dir, "resolved\n")
+	resolver.cwd["x"] = dir
 
-	_, _, err := resolver.handlePrompt(nil, []string{"agent", "prompt", "pane-x", "/some-other-skill"})
-	if err == nil {
-		t.Fatal("handlePrompt() error = nil, want failure for an unrecognized prompt")
-	}
-}
-
-// TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError
-// covers the false-success case from
-// .scratch/tickets-queue-polish/issues/04-conflict-resolution-tab-not-closing.md:
-// herdr's tab-close call can report success without the tab actually
-// disappearing. The cleanup path in resolveCherryPickConflict must notice
-// (via a follow-up tab-list check) and log a warning, not fail the overall
-// operation.
-func TestResolveCherryPickConflict_TabStillPresentAfterClose_LogsWarningNotError(t *testing.T) {
-	// Not t.Parallel(): this test mutates the shared global "log" output
-	// (log.SetOutput) to capture the warning, which races against any other
-	// concurrently-running test's log calls.
-	d, _, _ := fakeDeps()
-	var closedTabID string
-	d.TabClose = func(tabID string) error {
-		closedTabID = tabID
-		return nil // reports success even though TabList below still lists it
-	}
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: closedTabID, WorkspaceID: workspaceID}}, nil
-	}
-
-	scratchDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(scratchDir, "main", "issues"), 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	testutil.EnsureEpicTicketMD(t, filepath.Join(scratchDir, "main"))
-
-	p := iterationParams{
-		WorkspaceID:     "ws-1",
-		FeatureWorktree: t.TempDir(),
-		FeatureBranch:   "main",
-		Agent:           AgentClaude,
-		Ticket:          tickets.Ticket{Identifier: "03"},
-		ScratchDir:      scratchDir,
-		SmartZone:       1_000_000,
-		Gate:            NewGate(),
-		Sink:            noopEventSink{},
-	}
-
-	var logBuf bytes.Buffer
-	log.SetOutput(&logBuf)
-	defer log.SetOutput(os.Stderr)
-
-	if _, err := resolveCherryPickConflict(d, p); err != nil {
-		t.Fatalf("resolveCherryPickConflict() error = %v, want nil (a false-success tab-close warns, it doesn't fail the operation)", err)
-	}
-
-	if !strings.Contains(logBuf.String(), closedTabID) {
-		t.Errorf("log output = %q, want a warning naming the still-present tab %q", logBuf.String(), closedTabID)
+	if err := resolver.onPrompt(agentrunner.Session{Label: "x"}, "/some-other-skill"); err == nil {
+		t.Fatal("onPrompt() error = nil, want failure for an unrecognized prompt")
 	}
 }

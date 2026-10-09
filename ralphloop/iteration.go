@@ -978,13 +978,13 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, liveTab herdr.Tab) 
 }
 
 // resolveCherryPickConflict forks p.Ticket into a claimed conflict-resolution
-// child ticket (see forkConflictResolutionTicket), then launches a fresh pane
-// in the feature worktree and drives a "/gx-resolving-merge-conflicts" agent
-// to completion in it, returning its agent session id. The iteration's own
-// worktree/tab are untouched while this runs. herdr's tab-closed/idle signal
-// is not trusted on its own — see the 2.1.228 incident, where herdr
-// misdetected the pane as idle while the agent was still working — so once
-// launchAndPrompt reports the agent done, the child is only marked done after
+// child ticket (see forkConflictResolutionTicket), then starts a fresh Runner
+// session in the feature worktree and drives a "/gx-resolving-merge-conflicts"
+// agent to completion in it, returning its agent session id. The iteration's
+// own worktree/session are untouched while this runs. The idle signal is not
+// trusted on its own — see the 2.1.228 incident, where herdr misdetected the
+// pane as idle while the agent was still working — so once the wait reports
+// the agent done, the child is only marked done after
 // corroborating against the git sequencer itself (the ground truth for
 // whether the resolution actually finished). A sequencer that's still
 // conflicted at that point means the "done" signal was premature; the child
@@ -998,45 +998,42 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	}
 
 	label := conflictLabel(p.Ticket.Identifier)
+	prompt := skillPrompt(p.Agent, "gx-resolving-merge-conflicts", "")
 
-	tab, err := d.TabCreate(herdr.TabCreateOptions{
-		WorkspaceID: p.WorkspaceID,
-		Cwd:         p.FeatureWorktree,
-		Label:       label,
+	l, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
+		Label: label,
+		Epic:  p.FeatureBranch,
+		Cwd:   p.FeatureWorktree,
+		Kind:  agentrunner.Kind(p.Agent),
+		Args:  agentArgs(p.Agent, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
+	}, prompt, func(attempt int, kind events.Kind, err error) {
+		p.logLaunchFailed(label, attempt, kind, err)
 	})
-	if err != nil {
-		return "", fmt.Errorf("creating conflict-resolution pane: %w", err)
+	var launchFail *launchFailure
+	if errors.As(err, &launchFail) {
+		return "", fmt.Errorf("starting conflict-resolution agent %s: %w", label, err)
 	}
 	defer func() {
-		closeErr := d.TabClose(tab.TabID)
-		if closeErr != nil {
+		if stopErr := d.Runner.Stop(l.Session); stopErr != nil {
 			if resultErr != nil {
-				resultErr = fmt.Errorf("%w (also failed closing conflict-resolution tab: %v)", resultErr, closeErr)
+				resultErr = fmt.Errorf("%w (also failed stopping conflict-resolution agent: %v)", resultErr, stopErr)
 			} else {
-				resultErr = fmt.Errorf("closing conflict-resolution tab: %w", closeErr)
-			}
-			return
-		}
-		// herdr's tab-close call can report success without the tab actually
-		// disappearing (upstream bug, see .scratch/tickets-queue-polish/issues/
-		// 04-conflict-resolution-tab-not-closing.md) — check for it so a false
-		// success doesn't silently leak a tab, without turning it into a hard
-		// failure that would take the whole ticket down over one leaked pane.
-		tabs, listErr := d.TabList(p.WorkspaceID)
-		if listErr != nil {
-			return
-		}
-		for _, t := range tabs {
-			if t.TabID == tab.TabID {
-				log.Printf("conflict-resolution tab %s reported closed but is still present in tab list", tab.TabID)
-				break
+				resultErr = fmt.Errorf("stopping conflict-resolution agent: %w", stopErr)
 			}
 		}
 	}()
 
-	launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, skillPrompt(p.Agent, "gx-resolving-merge-conflicts", ""), p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, l.ID, "", prompt, p.FeatureWorktree, "", "")
+	launchParams.Session = l.Session
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	sessionID, err = launchAndPrompt(d, launchParams)
+	switch {
+	case err != nil:
+		err = fmt.Errorf("sending initial prompt: %w", err)
+	case l.Adopted:
+		sessionID, err = adoptedLaunch(d, launchParams)
+	default:
+		sessionID, err = promptedLaunch(d, launchParams, l.Baseline)
+	}
 	if err != nil {
 		return "", fmt.Errorf("conflict-resolution agent %s did not finish (possibly stuck): %w", label, err)
 	}

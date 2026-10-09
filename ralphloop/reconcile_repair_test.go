@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -154,14 +155,13 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
 
 	var resolutionPrompted bool
-	origAgentPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Text == "/gx-resolving-merge-conflicts" {
+	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
+		if text == "/gx-resolving-merge-conflicts" {
 			resolutionPrompted = true
 			inProgress = false
 		}
-		return origAgentPrompt(opts)
-	}
+		return nil
+	})
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
