@@ -9,11 +9,12 @@ import (
 func newClaudeCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "claude",
-		Short: "Claude Code integration (statusline, history)",
+		Short: "Claude Code integration (statusline, history, doctor)",
 	}
 	cmd.AddCommand(newClaudeStatuslineCmd(d))
 	cmd.AddCommand(newClaudeHistoryCmd(d))
 	cmd.AddCommand(newClaudeSessionPathCmd(d))
+	cmd.AddCommand(newClaudeDoctorCmd(d))
 	return cmd
 }
 
