@@ -3,11 +3,13 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/events"
 	"log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/events"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -20,7 +22,7 @@ import (
 const conflictResolutionTimeoutMs = 30 * 60 * 1000
 
 // maxLaunchAttempts bounds how many fresh panes runIteration will try when a
-// launch keeps failing with errStuckSubmission (the initial prompt never
+// launch keeps failing with herdrrunner.ErrStuckSubmission (the initial prompt never
 // reaching the pane at all) — a genuinely bad pane rather than a slow agent,
 // so a clean retry against a new one often just works. Other launch failures
 // (agent_name_taken, agent_pane_busy, ...) are not retried this way; they
@@ -107,11 +109,11 @@ func runIteration(d Deps, p iterationParams) error {
 			p.logLaunchFailed(label, attempt, kind, err)
 			err = &launchFailure{Kind: kind, Err: err}
 		}
-		if !errors.Is(err, errStuckSubmission) || attempt >= maxLaunchAttempts {
+		if !errors.Is(err, herdrrunner.ErrStuckSubmission) || attempt >= maxLaunchAttempts {
 			break
 		}
 		// The pane never received its initial prompt at all (see
-		// errStuckSubmission's doc comment) — close it and retry against a
+		// herdrrunner.ErrStuckSubmission's doc comment) — close it and retry against a
 		// fresh one instead of leaving an orphaned, never-prompted pane
 		// behind for a problem a clean retry can often solve on its own.
 		if closeErr := d.TabClose(tab.TabID); closeErr != nil {
@@ -120,7 +122,7 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 	parked := errors.Is(err, errBlockedPaneParked)
 	if err != nil && !parked {
-		if errors.Is(err, errStuckSubmission) {
+		if errors.Is(err, herdrrunner.ErrStuckSubmission) {
 			// The retry budget is exhausted too — don't leave this last
 			// unprompted pane leaked behind a needs-repair ticket either.
 			if closeErr := d.TabClose(tab.TabID); closeErr != nil {

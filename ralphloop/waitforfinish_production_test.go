@@ -94,7 +94,7 @@ func writeOccupancyTranscript(t *testing.T, cwd, sessionID string, inputTokens i
 }
 
 // TestWaitForFinish_ProductionSlowCompactRegression reproduces the
-// production bug (promptWithNudge overriding a caller's /compact timeout
+// production bug (herdrrunner.PromptWithNudge overriding a caller's /compact timeout
 // with its short nudge grace, then canceling an in-progress compaction with
 // a stray Enter) through the real dependency wiring: DefaultDeps with only
 // Sleep/Now swapped for deterministic ones, every herdr call (prompt, wait,

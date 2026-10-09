@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -79,7 +80,7 @@ func testIterationParams() iterationParams {
 
 // TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh is a regression
 // test for the fix-spinner/04 incident: a launch whose initial prompt never
-// reaches the pane at all (errStuckSubmission) must not bounce the ticket to
+// reaches the pane at all (herdrrunner.ErrStuckSubmission) must not bounce the ticket to
 // needs-repair while leaking a live, never-prompted pane behind it. Instead
 // runIteration should close that pane and retry against a fresh one.
 func TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh(t *testing.T) {
@@ -87,7 +88,7 @@ func TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh(t *testing.T) {
 	boom := errors.New("boom: some unrelated failure once the prompt actually lands")
 	d, tabIDs, closedTabIDs := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
 		if attempt == 1 {
-			return herdr.Agent{}, errStuckSubmission
+			return herdr.Agent{}, herdrrunner.ErrStuckSubmission
 		}
 		// The retry's prompt lands fine; a distinct, non-retryable error
 		// further down the pipeline ends the test here so it doesn't have to
@@ -102,8 +103,8 @@ func TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh(t *testing.T) {
 	if !errors.Is(err, boom) {
 		t.Errorf("runIteration() error = %v, want it to wrap the second attempt's error %v", err, boom)
 	}
-	if errors.Is(err, errStuckSubmission) {
-		t.Errorf("runIteration() error = %v, want no trace of errStuckSubmission (only the first attempt hit it)", err)
+	if errors.Is(err, herdrrunner.ErrStuckSubmission) {
+		t.Errorf("runIteration() error = %v, want no trace of herdrrunner.ErrStuckSubmission (only the first attempt hit it)", err)
 	}
 
 	if len(*tabIDs) != 2 {
@@ -115,19 +116,19 @@ func TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh(t *testing.T) {
 }
 
 // TestRunIteration_StuckSubmission_ExhaustsRetries_ClosesBothPanes covers the
-// case where every launch attempt hits errStuckSubmission: runIteration
+// case where every launch attempt hits herdrrunner.ErrStuckSubmission: runIteration
 // should stop retrying once maxLaunchAttempts is spent (not loop forever)
 // and must not leak the final attempt's pane either, even though it's the
 // one the ticket ultimately fails against.
 func TestRunIteration_StuckSubmission_ExhaustsRetries_ClosesBothPanes(t *testing.T) {
 	t.Parallel()
 	d, tabIDs, closedTabIDs := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
-		return herdr.Agent{}, errStuckSubmission
+		return herdr.Agent{}, herdrrunner.ErrStuckSubmission
 	})
 
 	err := runIteration(d, testIterationParams())
-	if !errors.Is(err, errStuckSubmission) {
-		t.Fatalf("runIteration() error = %v, want it to wrap errStuckSubmission", err)
+	if !errors.Is(err, herdrrunner.ErrStuckSubmission) {
+		t.Fatalf("runIteration() error = %v, want it to wrap herdrrunner.ErrStuckSubmission", err)
 	}
 
 	if len(*tabIDs) != maxLaunchAttempts {
@@ -144,7 +145,7 @@ func TestRunIteration_StuckSubmission_ExhaustsRetries_ClosesBothPanes(t *testing
 }
 
 // TestRunIteration_SucceedsFirstAttempt_NeverRetriesOrClosesTab is the
-// sanity check that ordinary launch failures unrelated to errStuckSubmission
+// sanity check that ordinary launch failures unrelated to herdrrunner.ErrStuckSubmission
 // (or a clean first-attempt failure) don't get the new retry/cleanup
 // treatment at all.
 func TestRunIteration_UnrelatedFailure_NeverRetriesOrClosesTab(t *testing.T) {
@@ -159,7 +160,7 @@ func TestRunIteration_UnrelatedFailure_NeverRetriesOrClosesTab(t *testing.T) {
 		t.Fatalf("runIteration() error = %v, want it to wrap %v", err, plainErr)
 	}
 	if len(*tabIDs) != 1 {
-		t.Errorf("TabCreate called %d times, want 1 (no retry for a non-errStuckSubmission failure)", len(*tabIDs))
+		t.Errorf("TabCreate called %d times, want 1 (no retry for a non-herdrrunner.ErrStuckSubmission failure)", len(*tabIDs))
 	}
 	if len(*closedTabIDs) != 0 {
 		t.Errorf("TabClose called %d times, want 0 (this failure mode's pane is left for needs-repair inspection, as before)", len(*closedTabIDs))
@@ -169,7 +170,7 @@ func TestRunIteration_UnrelatedFailure_NeverRetriesOrClosesTab(t *testing.T) {
 func TestRunIteration_LaunchFailures_LogOneEventPerAttempt(t *testing.T) {
 	t.Parallel()
 	d, _, _ := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
-		return herdr.Agent{}, errStuckSubmission
+		return herdr.Agent{}, herdrrunner.ErrStuckSubmission
 	})
 	p := testIterationParams()
 	p.ScratchDir = epicScratchDir(t, p.FeatureBranch)

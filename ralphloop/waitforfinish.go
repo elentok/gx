@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
@@ -183,7 +184,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 			continue
 		}
-		if !isPollTimeout(err) {
+		if !herdrrunner.IsPollTimeout(err) {
 			return fmt.Errorf("waiting for agent to finish: %w", err)
 		}
 		elapsedMs += pollMs
@@ -431,7 +432,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 				Until:     plainFinishStates,
 				TimeoutMs: smartZonePollMs,
 			})
-			if err != nil && isPollTimeout(err) {
+			if err != nil && herdrrunner.IsPollTimeout(err) {
 				_, completion, err = waitForCompactionSignal(d, p, sessionID, plainFinishStates, smartZonePollMs, baseline, false)
 			}
 		}
@@ -647,7 +648,7 @@ const (
 // later can still name the route it came by.
 func compactSignalUnconfirmed(d Deps, p launchAndPromptParams, sessionID string, err error, baseline *stickyBaseline) (unconfirmed, gateHeld bool) {
 	if err != nil {
-		return isPollTimeout(err), false
+		return herdrrunner.IsPollTimeout(err), false
 	}
 	if !baseline.gates() {
 		return false, false
@@ -701,7 +702,7 @@ func waitForCompactionSignal(
 			Until:     until,
 			TimeoutMs: smartZonePollMs,
 		})
-		if err != nil && !isPollTimeout(err) {
+		if err != nil && !herdrrunner.IsPollTimeout(err) {
 			return agent, compactPaneConfirmed, err
 		}
 		if err == nil {
@@ -755,7 +756,7 @@ func confirmFinished(d Deps, pane string, until []string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if isPollTimeout(err) {
+	if herdrrunner.IsPollTimeout(err) {
 		return false, nil
 	}
 	return false, err
@@ -917,19 +918,6 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 	return parkBlockedAfterCodexQuotaReset(d, p, sessionID)
 }
 
-// matchedRuleID reads a pane's matched_rule.id via Deps.AgentExplain,
-// falling back to "unknown" when the explain call fails, is unset, or
-// returns no rule id.
-func matchedRuleID(d Deps, pane string) string {
-	if d.AgentExplain == nil {
-		return "unknown"
-	}
-	if explain, err := d.AgentExplain(pane); err == nil && explain.MatchedRuleID != "" {
-		return explain.MatchedRuleID
-	}
-	return "unknown"
-}
-
 // parkBlockedAfterCodexQuotaReset handles a Codex pane that comes back
 // blocked once its quota reset: unlike waitForClaudeRateLimitReset's plain
 // "continue" re-prompt, a blocked pane here is sitting on its own dialog, not
@@ -942,7 +930,7 @@ func matchedRuleID(d Deps, pane string) string {
 // via AgentExplain) — unlike parkOnBlockedPane, whose park reason names no
 // rule id at all.
 func parkBlockedAfterCodexQuotaReset(d Deps, p launchAndPromptParams, sessionID string) error {
-	ruleID := matchedRuleID(d, p.Pane)
+	ruleID := herdrrunner.MatchedRuleID(d.AgentExplain, p.Pane)
 	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, ruleID)
 	p.parkBlockedPane(sessionID, reason)
 	return errBlockedPaneParked
@@ -1187,19 +1175,4 @@ func recoverOrFailCodexContextExhaustion(d Deps, p launchAndPromptParams, sessio
 		return fmt.Errorf("Codex context exhaustion recovery failed for %s: %s", p.Label, evidence)
 	}
 	return nil
-}
-
-// isPollTimeout reports whether err looks like a transient herdr wait
-// failure worth nudging and retrying rather than aborting the loop: either
-// AgentWait's own timeout-elapsed failure ("timed out waiting for agent
-// status"), or herdr's agent_prompt_stalled error (the pane went idle with
-// no observed state change within herdr's own internal stall window).
-func isPollTimeout(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "timed out") ||
-		strings.Contains(msg, "agent_prompt_stalled") ||
-		strings.Contains(msg, "no observed state change")
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -265,7 +266,7 @@ func classifyLaunchError(err error) events.Kind {
 	switch {
 	case errors.As(err, &nameTaken):
 		return events.AgentNameTaken
-	case errors.Is(err, errStuckSubmission), strings.Contains(err.Error(), string(events.AgentPromptStalled)):
+	case errors.Is(err, herdrrunner.ErrStuckSubmission), strings.Contains(err.Error(), string(events.AgentPromptStalled)):
 		return events.AgentPromptStalled
 	case strings.Contains(err.Error(), string(events.AgentPaneBusy)):
 		return events.AgentPaneBusy
@@ -389,7 +390,7 @@ func continueLaunch(d Deps, p launchAndPromptParams, startedAgent herdr.Agent) (
 // it; that routes to needs-repair naming the rule id instead, sending no
 // keys to the pane.
 func recoverAgentNotReady(d Deps, p launchAndPromptParams) (string, error) {
-	ruleID := matchedRuleID(d, p.Pane)
+	ruleID := herdrrunner.MatchedRuleID(d.AgentExplain, p.Pane)
 	if ruleID != "trust_directory" {
 		return "", fmt.Errorf("launching %s: %s is not ready, blocked on dialog %q gx did not raise", p.Agent, p.Label, ruleID)
 	}

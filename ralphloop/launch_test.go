@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -224,10 +225,10 @@ func TestLaunchAndPrompt_AgentNameTakenByUnrelatedWorktree_StillFails(t *testing
 
 // TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission is a
 // regression test for the fix-spinner/04 incident: when the initial prompt
-// never reaches the pane at all (AgentPrompt's promptWithNudge wrapper
-// exhausts its retypes and returns errStuckSubmission), launchAndPrompt's
+// never reaches the pane at all (AgentPrompt's herdrrunner.PromptWithNudge wrapper
+// exhausts its retypes and returns herdrrunner.ErrStuckSubmission), launchAndPrompt's
 // "sending initial prompt" wrap must still be unwrappable back to
-// errStuckSubmission via errors.Is, so runIteration's caller-side retry
+// herdrrunner.ErrStuckSubmission via errors.Is, so runIteration's caller-side retry
 // logic can tell it apart from an ordinary launch failure.
 func TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission(t *testing.T) {
 	t.Parallel()
@@ -239,7 +240,7 @@ func TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission(t *testi
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			return herdr.Agent{}, errStuckSubmission
+			return herdr.Agent{}, herdrrunner.ErrStuckSubmission
 		},
 	}
 
@@ -251,8 +252,8 @@ func TestLaunchAndPrompt_StuckSubmission_PropagatesAsErrStuckSubmission(t *testi
 		SessionCwd: "/repo/iter-04",
 		Ticket:     "04",
 	})
-	if !errors.Is(err, errStuckSubmission) {
-		t.Fatalf("launchAndPrompt() error = %v, want it to wrap errStuckSubmission", err)
+	if !errors.Is(err, herdrrunner.ErrStuckSubmission) {
+		t.Fatalf("launchAndPrompt() error = %v, want it to wrap herdrrunner.ErrStuckSubmission", err)
 	}
 }
 
@@ -495,8 +496,8 @@ func TestLaunchAndPrompt_AgentNameLost_ReportsPaneAndFails(t *testing.T) {
 	if !strings.Contains(err.Error(), "pane-6") {
 		t.Errorf("error = %q, want it to name the lost pane %q", err.Error(), "pane-6")
 	}
-	if errors.Is(err, errStuckSubmission) || errors.Is(err, errBlockedPaneParked) {
-		t.Errorf("error = %v, want it to be neither errStuckSubmission nor errBlockedPaneParked", err)
+	if errors.Is(err, herdrrunner.ErrStuckSubmission) || errors.Is(err, errBlockedPaneParked) {
+		t.Errorf("error = %v, want it to be neither herdrrunner.ErrStuckSubmission nor errBlockedPaneParked", err)
 	}
 }
 

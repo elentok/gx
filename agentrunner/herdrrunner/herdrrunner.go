@@ -66,7 +66,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	case errors.As(err, &notReady):
 		// Only the trust_directory dialog is answered: gx raised it by
 		// launching in a new directory. Any other dialog is not ours to answer.
-		if rule := matchedRuleID(tab.RootPaneID); rule != "trust_directory" {
+		if rule := MatchedRuleID(herdr.AgentExplain, tab.RootPaneID); rule != "trust_directory" {
 			return agentrunner.Session{}, fmt.Errorf("%w: %s blocked on dialog %q", agentrunner.ErrNotReady, opts.Label, rule)
 		}
 		if err := herdr.AgentSendKeys(tab.RootPaneID, "enter"); err != nil {
@@ -95,12 +95,15 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 	if st.State == agentrunner.StateBlocked {
 		return agentrunner.ErrNotReady
 	}
-	agent, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: s.ID, Text: text})
+	prompt := PromptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now)
+	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: []string{"working"}})
 	var blocked *herdr.AgentBlockedError
-	if errors.As(err, &blocked) {
+	switch {
+	case errors.As(err, &blocked):
 		return fmt.Errorf("%w: %s", agentrunner.ErrNotReady, blocked.Message)
-	}
-	if err != nil {
+	case errors.Is(err, ErrStuckSubmission):
+		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
+	case err != nil:
 		return err
 	}
 	r.mu.Lock()
@@ -128,7 +131,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	for {
 		remaining := time.Until(deadline)
 		_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: until, TimeoutMs: max(1, int(remaining.Milliseconds()))})
-		if err != nil && !isPollTimeout(err) {
+		if err != nil && !IsPollTimeout(err) {
 			return agentrunner.Status{}, mapNotFound(err)
 		}
 		if err == nil {
@@ -242,10 +245,7 @@ func (r *Runner) status(s agentrunner.Session) (status, error) {
 		st.State = agentrunner.StateWorking
 	}
 	if st.State == agentrunner.StateBlocked {
-		st.BlockedReason = matchedRuleID(s.ID)
-		if st.BlockedReason == "" {
-			st.BlockedReason = "blocked"
-		}
+		st.BlockedReason = MatchedRuleID(herdr.AgentExplain, s.ID)
 	}
 	r.mu.Lock()
 	st.Turn = r.turnLocked(s.Label, agent.StateChangeSeq).count
@@ -262,23 +262,6 @@ func (r *Runner) turnLocked(label string, seq int) *turn {
 		r.turns[label] = t
 	}
 	return t
-}
-
-func matchedRuleID(pane string) string {
-	res, err := herdr.AgentExplain(pane)
-	if err != nil {
-		return ""
-	}
-	return res.MatchedRuleID
-}
-
-// isPollTimeout mirrors ralphloop's: herdr reports a wait or prompt that ran
-// out of time under several messages.
-func isPollTimeout(err error) bool {
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "timed out") ||
-		strings.Contains(msg, "agent_prompt_stalled") ||
-		strings.Contains(msg, "no observed state change")
 }
 
 func isNotFound(err error) bool {
