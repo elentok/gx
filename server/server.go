@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -61,6 +63,10 @@ type Config struct {
 	DisableWatch bool          // poll only
 
 	HerdrRetryInterval time.Duration // zero means the default
+
+	// Runner is the configured agent runner; nil means herdr. Herdr health
+	// is only probed when it reports health (agentrunner.HealthChecker).
+	Runner agentrunner.Runner
 
 	BudgetPollInterval time.Duration // zero means the default
 
@@ -152,6 +158,9 @@ type Server struct {
 // New prepares the state dir, takes the server lock and binds the socket.
 // It does not serve until Serve is called.
 func New(cfg Config) (*Server, error) {
+	if cfg.Runner == nil {
+		cfg.Runner = herdrrunner.New()
+	}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return nil, err
 	}

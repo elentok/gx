@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/nativerunner"
 )
 
 // liveProbe asks the real machine. herdr.Ping has no timeout of its own, so it
@@ -47,4 +49,13 @@ func preflightAgentRunner(setting string, p agentrunner.Probe, logPath string) (
 		return "", fmt.Errorf("gx server: %w", err)
 	}
 	return choice, nil
+}
+
+// serverRunner is the runner the server reports host health for. Launches
+// still go through herdr directly, so a native runner needs no setup yet.
+func serverRunner(c agentrunner.Choice) agentrunner.Runner {
+	if c == agentrunner.ChoiceHerdr {
+		return herdrrunner.New()
+	}
+	return &nativerunner.Headless{}
 }

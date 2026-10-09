@@ -447,7 +447,7 @@ func (s *Server) killForBudget(now time.Time) {
 	before := map[string]float64{}
 	for _, t := range runs {
 		before[t.Address] = s.liveCost(t.Address)
-		if err := herdr.AgentSendKeys(t.Pane, "ctrl+c"); err != nil {
+		if err := herdr.AgentSendKeys(t.Session.ID, "ctrl+c"); err != nil {
 			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
 		}
 	}

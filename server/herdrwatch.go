@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -31,9 +31,10 @@ func (w *herdrWatch) isUnavailable() bool {
 	return w.unavailable
 }
 
-// probe records the current herdr state and reports whether it changed.
-func (w *herdrWatch) probe() (changed bool) {
-	down := herdr.Ping() != nil
+// probe records r's host health and reports whether it changed. A runner
+// with no host never reports herdr down.
+func (w *herdrWatch) probe(r agentrunner.Runner) (changed bool) {
+	down := agentrunner.Healthy(r) != nil
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	changed = down != w.unavailable
@@ -43,7 +44,7 @@ func (w *herdrWatch) probe() (changed bool) {
 
 // checkHerdr probes once and, on a transition, logs and streams it.
 func (s *Server) checkHerdr() {
-	if !s.herdr.probe() {
+	if !s.herdr.probe(s.cfg.Runner) {
 		return
 	}
 	typ := EventHerdrAvailable
@@ -63,6 +64,9 @@ func (s *Server) checkHerdr() {
 // keepHerdrChecked retries herdr until ctx ends, so a herdr that starts late
 // (or dies later) is noticed without a server restart.
 func (s *Server) keepHerdrChecked(ctx context.Context) {
+	if _, ok := s.cfg.Runner.(agentrunner.HealthChecker); !ok {
+		return
+	}
 	interval := s.cfg.HerdrRetryInterval
 	if interval <= 0 {
 		interval = defaultHerdrRetryInterval

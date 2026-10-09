@@ -30,11 +30,11 @@ const (
 // its label and cwd match theirs; ID and SessionID mean whatever the adapter
 // needs them to mean.
 type Session struct {
-	Label string
+	Label string `json:"label"`
 	// ID is the adapter's handle (herdr pane, native process key).
-	ID string
+	ID string `json:"id"`
 	// SessionID is the agent's own conversation id, when known.
-	SessionID string
+	SessionID string `json:"session_id,omitempty"`
 }
 
 type StartOptions struct {

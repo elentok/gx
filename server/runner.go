@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -510,7 +511,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 		}
 	}()
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Pane)
+	err := ralphloop.WaitIterationFinished(deps, one, wt, run.Session.ID)
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next
@@ -520,7 +521,7 @@ func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 			return
 		}
 		defer s.lands.end()
-		out, err = mode.finish(deps, one, wt, run.Pane, run.Tab)
+		out, err = mode.finish(deps, one, wt, run.Session.ID, run.Tab)
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
@@ -680,5 +681,8 @@ func (s *Server) launch(ticket tickets.Address, skill, note, ws, cwd string, age
 	}); err != nil {
 		return Run{}, err
 	}
-	return Run{Address: ticket.String(), Agent: string(agent), Pane: tab.RootPaneID, Tab: tab.TabID}, nil
+	return Run{
+		Address: ticket.String(), Agent: string(agent), Runner: runnerHerdr,
+		Session: agentrunner.Session{Label: label, ID: tab.RootPaneID}, Tab: tab.TabID,
+	}, nil
 }

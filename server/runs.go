@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -27,8 +28,32 @@ const runsFileName = "runs.json"
 type Run struct {
 	Address string `json:"address"`
 	Agent   string `json:"agent"`
-	Pane    string `json:"pane"`
-	Tab     string `json:"tab"`
+	// Runner names the agentrunner hosting Session, e.g. "herdr".
+	Runner  string              `json:"runner"`
+	Session agentrunner.Session `json:"session"`
+	// Tab is the herdr tab herdr-only cleanup closes; empty for other runners.
+	Tab string `json:"tab,omitempty"`
+}
+
+// runnerHerdr is the Runner of every launch until the server launches
+// through agentrunner, and of any run an older server saved.
+const runnerHerdr = "herdr"
+
+// savedRun reads runs.json, including files written before Run held a
+// Session: those carried the herdr pane at the top level instead.
+type savedRun struct {
+	trackedRun
+	Pane string `json:"pane"`
+}
+
+// iterationLabel is the agent label of the iteration of the ticket at address.
+func iterationLabel(address string) string {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return address
+	}
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	return label
 }
 
 // trackedRun is a Run plus what a restarted server needs to finish it.
@@ -68,11 +93,20 @@ func openRuns(stateDir string, log *slog.Logger) (*runRegistry, []trackedRun, er
 	if err != nil {
 		return nil, nil, err
 	}
-	var saved []trackedRun
+	var saved []savedRun
 	if err := json.Unmarshal(data, &saved); err != nil {
 		return nil, nil, err
 	}
-	return r, saved, nil
+	out := make([]trackedRun, 0, len(saved))
+	for _, s := range saved {
+		t := s.trackedRun
+		if t.Session.ID == "" && s.Pane != "" {
+			t.Runner = runnerHerdr
+			t.Session = agentrunner.Session{Label: iterationLabel(t.Address), ID: s.Pane}
+		}
+		out = append(out, t)
+	}
+	return r, out, nil
 }
 
 // save writes through a rename so a crash never leaves a torn file. Callers hold mu.
@@ -254,10 +288,7 @@ func (s *Server) parkMismatch(t trackedRun, cause error) {
 }
 
 func (s *Server) reclaim(t trackedRun) error {
-	label := t.Address
-	if addr, perr := tickets.ParseAddress(t.Address, tickets.AddressContext{}); perr == nil {
-		label, _, _ = ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
-	}
+	label := iterationLabel(t.Address)
 	agent, err := herdr.AgentGet(label)
 	if err != nil {
 		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
@@ -273,7 +304,9 @@ func (s *Server) reclaim(t trackedRun) error {
 	if err != nil {
 		return err
 	}
-	t.Pane, t.Tab = agent.PaneID, agent.TabID
+	t.Runner = runnerHerdr
+	t.Session = agentrunner.Session{Label: label, ID: agent.PaneID, SessionID: t.Session.SessionID}
+	t.Tab = agent.TabID
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
 	deps := ralphloop.DefaultDeps()

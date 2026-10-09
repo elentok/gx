@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -104,7 +105,7 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 		closed.Add(1)
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Pane: "p1", Tab: "t1"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}, Tab: "t1"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -157,7 +158,7 @@ func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	launched := time.Now().Add(-90 * time.Second).Truncate(time.Second)
-	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Pane: "p1", Tab: "t1"}, launched)
+	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}, Tab: "t1"}, launched)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

@@ -141,14 +141,15 @@ func runServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := preflightAgentRunner(cfg.AgentRunner, liveProbe, server.LogPath(stateDir)); err != nil {
+	choice, err := preflightAgentRunner(cfg.AgentRunner, liveProbe, server.LogPath(stateDir))
+	if err != nil {
 		return err
 	}
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), Runner: serverRunner(choice), TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
 		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
 		Recovery:                  recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
 		RecoverySettings:          cfg.Recovery,

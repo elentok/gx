@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -10,9 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func TestMain(m *testing.M) {
@@ -323,6 +326,43 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 	}
 	if after.HerdrUnavailable || after.Seq != 2 {
 		t.Errorf("after recovery: %+v", after)
+	}
+}
+
+func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
+	// Embedding only the interface hides runnerfake's Healthy, like a native runner.
+	native := struct{ agentrunner.Runner }{runnerfake.NewRunner()}
+	h := servertest.StartHerdrDown(t, func(c *server.Config) {
+		c.HerdrRetryInterval = 20 * time.Millisecond
+		c.Runner = native
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	events, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case ev := <-events:
+		t.Fatalf("unexpected event %+v", ev)
+	case <-time.After(100 * time.Millisecond):
+	}
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.HerdrUnavailable {
+		t.Error("snapshot reports herdr unavailable for a runner without herdr")
+	}
+}
+
+func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
+	fake := runnerfake.NewRunner()
+	fake.SetHealthErr(errors.New("down"))
+	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.Runner = fake })
+	got, err := h.Client.Handshake(context.Background())
+	if err != nil || !got.HerdrUnavailable {
+		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable", got, err)
 	}
 }
 
