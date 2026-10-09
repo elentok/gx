@@ -184,7 +184,7 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 // forking a second one under the same conflict-labeled tab. Unlike the
 // genuine-new-conflict precedent above (no live resolver, TabList nil),
 // this exercises reattachLiveConflictResolver, which never calls
-// AgentPrompt, so the in-progress flag flips via an AgentWait hook instead.
+// AgentPrompt, so the in-progress flag flips via a Runner wait hook instead.
 func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutReforking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -205,19 +205,19 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 	}
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
 
-	// The sequencer already owns a conflict from before the crash. The
-	// AgentWait hook (fired once reattachLiveConflictResolver waits out the
-	// reattached resolver) flips it to resolved, mirroring what
-	// AgentPrompt does for a fresh fork in the genuine-conflict precedent.
+	hostLiveAgent(t, d, "conflict-03")
+
+	// The sequencer already owns a conflict from before the crash. The wait
+	// hook (fired once reattachLiveConflictResolver waits out the reattached
+	// resolver) flips it to resolved, mirroring what AgentPrompt does for a
+	// fresh fork in the genuine-conflict precedent.
 	inProgress := true
 	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
-	origAgentWait := d.AgentWait
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if opts.Target == "pane-conflict-03" {
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if s.Label == "conflict-03" {
 			inProgress = false
 		}
-		return origAgentWait(opts)
-	}
+	})
 
 	var aborted bool
 	d.AbortCherryPick = func(dir string) error {
@@ -233,7 +233,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 		return origTabCreate(opts)
 	}
 
-	_, err = reconcile(withAgentWaitRunner(d), testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
+	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
 		t.Fatalf("reconcile() error = %v", err)
 	}

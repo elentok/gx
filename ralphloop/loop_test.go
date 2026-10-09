@@ -389,6 +389,15 @@ func fakeRunner(d Deps) *runnerfake.Runner {
 	return d.Runner.(recordingRunner).Runner
 }
 
+// hostLiveAgent hosts label's agent in fakeDeps' Runner, idle, as a restart
+// finds it still running from before the crash.
+func hostLiveAgent(t *testing.T, d Deps, label string) {
+	t.Helper()
+	if _, err := fakeRunner(d).Start(agentrunner.StartOptions{Label: label, Epic: "epic"}); err != nil {
+		t.Fatalf("Start(%s): %v", label, err)
+	}
+}
+
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{

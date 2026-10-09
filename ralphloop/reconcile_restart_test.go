@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
@@ -77,6 +77,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
 	var worktreeCreateCalledForIter bool
 	origAddWorktree := d.AddWorktree
@@ -87,7 +88,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 		return origAddWorktree(repoDir, path, branch, base)
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -157,20 +158,21 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 		}, nil
 	}
 
+	hostLiveAgent(t, d, "epic-iter-01")
+	hostLiveAgent(t, d, "conflict-01")
+
 	// The sequencer already owns a conflict from before the crash — no
-	// CherryPickRange call for this ticket ever produces it. The AgentWait
-	// hook (fired once reattachLiveConflictResolver waits out the
-	// reattached resolver in its own "pane-conflict-01" pane) flips it to
-	// resolved.
-	inProgress := true
-	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress, nil }
-	origAgentWait := d.AgentWait
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if opts.Target == "pane-conflict-01" {
-			inProgress = false
+	// CherryPickRange call for this ticket ever produces it. The wait hook
+	// (fired once reattachLiveConflictResolver waits out the reattached
+	// resolver) flips it to resolved.
+	var inProgress atomic.Bool
+	inProgress.Store(true)
+	d.CherryPickInProgress = func(dir string) (bool, error) { return inProgress.Load(), nil }
+	onRunnerWait(d, func(s agentrunner.Session) {
+		if s.Label == "conflict-01" {
+			inProgress.Store(false)
 		}
-		return origAgentWait(opts)
-	}
+	})
 
 	var picks, aborts int32
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
@@ -194,7 +196,7 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 		return origTabCreate(opts)
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -254,8 +256,9 @@ func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
 		iterationStatusAtTabList = string(ticket.IterationStatus)
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -285,18 +288,17 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "idle", AgentSession: "session-epic-iter-01"}, nil
 	}
 
-	var agentWaitCalls int
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		agentWaitCalls++
-		return herdr.Agent{AgentStatus: "idle"}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	var waitCalls atomic.Int32
+	onRunnerWait(d, func(agentrunner.Session) { waitCalls.Add(1) })
+
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if agentWaitCalls != 1 {
-		t.Errorf("AgentWait calls = %d, want 1 (confirmFinished's debounce re-check) for a pane already idle at reattach, not waitForFinish's full poll loop", agentWaitCalls)
+	if got := waitCalls.Load(); got != 1 {
+		t.Errorf("Runner.Wait calls = %d, want 1 (confirmFinished's debounce re-check) for a pane already idle at reattach, not waitForFinish's full poll loop", got)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree removed on completion", *removed)
@@ -393,6 +395,7 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 	d.AgentGet = func(string) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "working", AgentSession: "sess-live"}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if cwd == "/fake/worktrees/epic-item-01" && sessionID == "sess-live" {
 			return 54321, true, nil
@@ -400,7 +403,7 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 		return 0, false, nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -431,6 +434,7 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 	d.AgentGet = func(string) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "idle", AgentSession: ""}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
@@ -440,7 +444,7 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 		return nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -487,8 +491,9 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -503,7 +508,7 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 
 // idleReattachDeps returns fakeDeps() wired for a reattach whose live pane
 // already reports idle at AgentGet time, the alreadyFinished short-circuit's
-// entry condition. AgentWait always answers idle too, so once the gate lets
+// entry condition. Its Runner session stays idle too, so once the gate lets
 // the short-circuit through, nothing loops back into waitForFinish's full
 // poll.
 func idleReattachDeps(t *testing.T, agentSession string) (Deps, *[]string) {
@@ -515,9 +520,7 @@ func idleReattachDeps(t *testing.T, agentSession string) (Deps, *[]string) {
 	d.AgentGet = func(string) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: "pane-epic-iter-01", WorkspaceID: "ws1", TabID: "tab-epic-iter-01", AgentStatus: "idle", AgentSession: agentSession}, nil
 	}
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
 	return d, removed
 }
 
@@ -545,7 +548,7 @@ func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *
 	}
 	d.Sleep = func(time.Duration) {}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -584,24 +587,18 @@ func TestRun_ReattachAlreadyIdle_NoBackgroundTask_DebouncesBeforeShortCircuit(t 
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, removed := idleReattachDeps(t, "session-epic-iter-01")
-	var waitCalls int
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		waitCalls++
-		if waitCalls == 1 {
-			// confirmFinished's debounce re-check: the agent is still working,
-			// so the just-observed idle at AgentGet time was a transient blip.
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	// confirmFinished's debounce re-check finds the agent still working, so
+	// the just-observed idle at AgentGet time was a transient blip.
+	r := &blipRunner{Runner: fakeRunner(d), timeoutOn: 1}
+	d.Runner = r
 	d.Sleep = func(time.Duration) {}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if waitCalls < 2 {
-		t.Errorf("AgentWait calls = %d, want at least 2: debounce re-check plus waitForFinish's own poll after the short-circuit is declined", waitCalls)
+	if r.waits < 2 {
+		t.Errorf("Runner.Wait calls = %d, want at least 2: debounce re-check plus waitForFinish's own poll after the short-circuit is declined", r.waits)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the reattached iteration's worktree cleaned up once it genuinely finishes", *removed)
@@ -631,7 +628,7 @@ func TestRun_ReattachAlreadyIdle_EmptySession_FallsBackToTicketSessionIDs(t *tes
 	}
 	d.Sleep = func(time.Duration) {}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -670,7 +667,7 @@ func TestRun_ReattachAlreadyIdle_EmptySessionAndNoSessionIDs_FallsBackToRunLog(t
 	}
 	d.Sleep = func(time.Duration) {}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 

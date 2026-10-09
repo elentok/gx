@@ -384,6 +384,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
 	var mu sync.Mutex
 	sawClaimed := false
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
@@ -396,7 +397,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 		return 1, nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if len(*prompts) != 1 || !strings.HasSuffix((*prompts)[0], "epic/02") {

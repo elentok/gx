@@ -1,13 +1,13 @@
 package ralphloop
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 )
@@ -34,14 +34,8 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 		}
 		return 0, false, nil
 	}
-	var waits int
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		waits++
-		if waits == 1 {
-			return herdr.Agent{}, errors.New("timed out waiting for agent status")
-		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
+	hostLiveAgent(t, d, "epic-iter-01")
+	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutOn: 1}
 	var sentKeys [][]string
 	d.AgentSendKeys = func(target string, keys ...string) error {
 		sentKeys = append(sentKeys, keys)
@@ -53,7 +47,7 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -101,6 +95,8 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	d.AgentGet = func(target string) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
+	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "usage limit")
 	var quotaChecks int
 	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		quotaChecks++
@@ -139,7 +135,7 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 		return readyTimer(dur)
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
@@ -177,6 +173,8 @@ func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T
 	d.AgentGet = func(target string) (herdr.Agent, error) {
 		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
 	}
+	hostLiveAgent(t, d, "epic-iter-01")
+	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "usage limit")
 	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		return codexsession.RateLimit{}, false, nil
 	}
@@ -209,7 +207,7 @@ func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T
 		return readyTimer(dur)
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, withAgentWaitRunner(d), noopEventSink{}); err != nil {
+	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
