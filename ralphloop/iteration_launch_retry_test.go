@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,6 +138,26 @@ func TestRunIteration_PromptNotReady_ParksBlockedPane(t *testing.T) {
 	}
 	if failed := launchFailedEvents(t, scratchDir); len(failed) != 0 {
 		t.Errorf("launch-failed events = %+v, want none for a park", failed)
+	}
+}
+
+func TestRunIteration_MissingCapability_ParksWithDoctorHint(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.FailNextPrompts(launchLabel, 1, fmt.Errorf("%w: msg_lifecycle_v1", agentrunner.ErrMissingCapability))
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketStatus(t, scratchDir, "needs-repair")
+	failed := launchFailedEvents(t, scratchDir)
+	if len(failed) != 1 {
+		t.Fatalf("launch-failed events = %+v, want one", failed)
+	}
+	for _, want := range []string{"msg_lifecycle_v1", "gx claude doctor"} {
+		if !strings.Contains(failed[0].Reason, want) {
+			t.Errorf("reason %q lacks %q", failed[0].Reason, want)
+		}
 	}
 }
 
