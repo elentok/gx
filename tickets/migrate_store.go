@@ -180,8 +180,14 @@ func convertEpics(oldRoot string) ([]storeFile, error) {
 		if _, err := os.Stat(filepath.Join(dir, "ticket.md")); err == nil {
 			continue
 		}
-		sidecar, _ := os.ReadFile(filepath.Join(dir, "epic.yaml"))
-		body, _ := os.ReadFile(filepath.Join(dir, "map.md"))
+		sidecar, err := readOptional(filepath.Join(dir, "epic.yaml"))
+		if err != nil {
+			return nil, err
+		}
+		body, err := readOptional(filepath.Join(dir, "map.md"))
+		if err != nil {
+			return nil, err
+		}
 		data, err := epicTicketMD(sidecar, body)
 		if err != nil {
 			return nil, fmt.Errorf("converting epic %s: %w", dir, err)
@@ -189,6 +195,16 @@ func convertEpics(oldRoot string) ([]storeFile, error) {
 		out = append(out, storeFile{src: dir, rel: filepath.Join(e.Name(), "ticket.md"), data: data})
 	}
 	return out, nil
+}
+
+// readOptional returns nil for a missing file, so a missing map.md stays
+// distinct from an empty one.
+func readOptional(path string) ([]byte, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return data, err
 }
 
 func epicTicketMD(sidecar, body []byte) ([]byte, error) {

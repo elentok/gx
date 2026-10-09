@@ -174,6 +174,32 @@ func TestExecute_TicketsMigrateToStore_ConvertsEpicShapeAndTypes(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsMigrateToStore_UnreadableEpicSidecarFails(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can read a mode-000 file")
+	}
+	for _, sidecar := range []string{"epic.yaml", "map.md"} {
+		t.Run(sidecar, func(t *testing.T) {
+			store := isolateTicketStore(t)
+			repo := testutil.TempRepo(t)
+			old := writeOldTree(t, "open")
+			path := filepath.Join(old, "widget", sidecar)
+			testutil.WriteFile(t, filepath.Dir(path), sidecar, "")
+			if err := os.Chmod(path, 0); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err := runIn(t, repo, "tickets", "migrate", "--to-store", "--project", "mine", old)
+			if err == nil || !strings.Contains(err.Error(), path) {
+				t.Fatalf("err = %v, want it to name %s", err, path)
+			}
+			if _, statErr := os.Stat(filepath.Join(store, "mine")); !os.IsNotExist(statErr) {
+				t.Errorf("store written despite unreadable %s: %v", sidecar, statErr)
+			}
+		})
+	}
+}
+
 func TestExecute_TicketsMigrateToStore_NameDefaultsToRepoDir(t *testing.T) {
 	store := isolateTicketStore(t)
 	repo := testutil.TempRepo(t)
