@@ -28,6 +28,10 @@ type Runner struct {
 	BackgroundTasks func(s agentrunner.Session) bool
 	// CodexQuota is checked before the pane for Codex sessions. Nil skips it.
 	CodexQuota CodexQuotaReader
+	// Now and Sleep pace Wait's polling. Nil means the wall clock; tests on
+	// herdrfake swap in its virtual one (Coordinator.Clock).
+	Now   func() time.Time
+	Sleep func(time.Duration)
 
 	mu sync.Mutex
 	// started remembers what RateLimit needs from Start, keyed by label.
@@ -169,9 +173,16 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	for i, st := range states {
 		until[i] = string(st)
 	}
-	deadline := time.Now().Add(timeout)
+	now, sleep := time.Now, time.Sleep
+	if r.Now != nil {
+		now = r.Now
+	}
+	if r.Sleep != nil {
+		sleep = r.Sleep
+	}
+	deadline := now().Add(timeout)
 	for {
-		remaining := time.Until(deadline)
+		remaining := deadline.Sub(now())
 		_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: until, TimeoutMs: max(1, int(remaining.Milliseconds()))})
 		if err != nil && !IsPollTimeout(err) {
 			return agentrunner.Status{}, mapNotFound(err)
@@ -183,14 +194,14 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 				return st, err
 			}
 		}
-		if time.Now().After(deadline) {
+		if !now().Before(deadline) {
 			st, err := r.status(s)
 			if err != nil {
 				return agentrunner.Status{}, err
 			}
 			return st, agentrunner.ErrTimeout
 		}
-		time.Sleep(min(pollInterval, remaining))
+		sleep(min(pollInterval, remaining))
 	}
 }
 

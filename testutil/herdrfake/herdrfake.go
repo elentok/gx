@@ -15,7 +15,11 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // helperSocketEnv names the environment variable a helper invocation reads to
@@ -65,6 +69,29 @@ type response struct {
 // lifecycle, so most tests never touch it directly.
 type Coordinator struct {
 	ln net.Listener
+	// elapsed is the virtual time Clock reports, in nanoseconds.
+	elapsed atomic.Int64
+}
+
+// Clock reads and advances a virtual clock as wall time, for code that paces
+// itself on a clock it is handed (herdrrunner.Runner's Now and Sleep). A
+// timed-out "agent wait" moves it on by its --timeout: real herdr blocks that
+// long before reporting one, while a fake answers at once.
+func (c *Coordinator) Clock() (now func() time.Time, sleep func(time.Duration)) {
+	return func() time.Time { return time.Unix(0, c.elapsed.Load()) },
+		func(d time.Duration) { c.elapsed.Add(int64(d)) }
+}
+
+func (c *Coordinator) elapseTimedOutWaits(h Handler) Handler {
+	return func(argv []string) ([]byte, int) {
+		out, code := h(argv)
+		if code != 0 && len(argv) >= 2 && argv[0] == "agent" && argv[1] == "wait" && strings.Contains(string(out), "timed out") {
+			if ms, err := strconv.Atoi(flag(argv, "--timeout")); err == nil {
+				c.elapsed.Add(int64(time.Duration(ms) * time.Millisecond))
+			}
+		}
+		return out, code
+	}
 }
 
 // Start puts a fake `herdr` executable first in PATH for the duration of the
@@ -92,7 +119,7 @@ func Start(t *testing.T, handler Handler) *Coordinator {
 	t.Cleanup(func() { ln.Close() })
 
 	c := &Coordinator{ln: ln}
-	go c.serve(trackAgents(handler))
+	go c.serve(c.elapseTimedOutWaits(trackAgents(handler)))
 
 	binDir := t.TempDir()
 	fakeExe := filepath.Join(binDir, "herdr")

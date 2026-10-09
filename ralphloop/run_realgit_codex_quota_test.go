@@ -30,7 +30,6 @@ import (
 // tickets driven by the Codex agent so quota detection is exercised for
 // real via Deps.ReadCodexRateLimit.
 func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
 	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
@@ -186,11 +185,12 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		}
 	}
 
-	herdrfake.Start(t, handler)
+	hf := herdrfake.Start(t, handler)
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
 	deps := testDepsWithOverrides(DepsOverrides{Home: home})
+	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }
@@ -352,7 +352,6 @@ func waitForPausedRateLimitEvent(t *testing.T, scratchDir, epicName, ticketID st
 // goes through the actual codexsession reader; 02 and 03 reuse the quota
 // test's generic pane bookkeeping.
 func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
 	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
@@ -569,11 +568,12 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		}
 	}
 
-	herdrfake.Start(t, handler)
+	hf := herdrfake.Start(t, handler)
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
 	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
+	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }

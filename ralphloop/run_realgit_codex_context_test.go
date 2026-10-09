@@ -33,7 +33,6 @@ import (
 // AddWorktree, so the commit is guaranteed to exist before any wait/finish
 // polling begins.
 func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: setProcessEnv mutates the process-wide $HOME/$CODEX_HOME
 	// env vars, and herdrfake.StartState calls t.Setenv for the helper socket
 	// path and PATH.
@@ -103,9 +102,10 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		// fires here.
 		RejectPromptWhenBlocked: true,
 	})
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	deps := testDeps()
+	useFakeClock(deps, hf)
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -314,7 +314,6 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 // /compact, finish-up) fires off the native-exhaustion banner, the agent
 // finishes and commits, and the ticket lands normally.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
 	// socket path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
@@ -413,9 +412,10 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 		}
 		return "", herdrfake.Identities{}, nil
 	})
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
+	useFakeClock(deps, hf)
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
@@ -493,7 +493,6 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 // exhaustion reason — and it must leave the iteration's worktree/branch/tab
 // in place for a human to inspect.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
 	// socket path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
@@ -580,9 +579,10 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		}
 		return "", herdrfake.Identities{}, nil
 	})
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
+	useFakeClock(deps, hf)
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}

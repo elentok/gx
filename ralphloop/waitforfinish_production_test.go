@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
@@ -56,6 +57,14 @@ func agentResult(pane, status string) (any, herdrfake.Identities, error) {
 			"agent_status": status,
 		},
 	}, herdrfake.Identities{PaneID: pane}, nil
+}
+
+// useFakeClock paces d's herdrrunner on hf's virtual clock, so a Runner.Wait
+// whose fake herdr wait times out ends instead of polling out a wall-clock
+// deadline.
+func useFakeClock(d Deps, hf *herdrfake.Coordinator) {
+	r := d.Runner.(*herdrrunner.Runner)
+	r.Now, r.Sleep = hf.Clock()
 }
 
 // parseUntil extracts every "--until VALUE" pair from a herdr agent
@@ -107,7 +116,6 @@ func writeOccupancyTranscript(t *testing.T, cwd, sessionID string, inputTokens i
 // minutes already advanced before waitForFinish is called — since an idle
 // report the transcript never backs up is now held by the completion gate.
 func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
 	const pane = "pane-1"
@@ -183,7 +191,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 		return "", herdrfake.Identities{}, nil
 	})
 
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	setHomeEnv(t, t.TempDir())
 	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
@@ -194,6 +202,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 
 	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
+	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
@@ -282,7 +291,6 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 // and would instead exercise the gated give-up path, so the virtual-time
 // assertion below is load-bearing, not decorative.
 func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
 	const pane = "pane-1"
@@ -398,10 +406,11 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		return "", herdrfake.Identities{}, nil
 	})
 
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
+	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
@@ -476,7 +485,6 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 // The run must instead end at errCompactRecoveryExhausted, which loop.go
 // persists as needs-repair for an operator.
 func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
 	const pane = "pane-1"
@@ -570,10 +578,11 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 		return "", herdrfake.Identities{}, nil
 	})
 
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
+	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 
@@ -770,7 +779,6 @@ func appendCompactBoundaryLine(t *testing.T, cwd, sessionID string) {
 // would time out at the 5-minute mark and this scenario would be reported as
 // a failed recovery; against the fix, it's confirmed successful instead.
 func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T) {
-	t.Skip("agent-runner-phase1-impl/03b11: herdrfake can't drive herdrrunner.Wait yet")
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
 	const pane = "pane-1"
@@ -862,7 +870,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 		return "", herdrfake.Identities{}, nil
 	})
 
-	herdrfake.StartState(t, s)
+	hf := herdrfake.StartState(t, s)
 
 	setHomeEnv(t, t.TempDir())
 	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
@@ -873,6 +881,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 
 	scratchDir := epicScratchDir(t, "epic")
 	deps := testDeps()
+	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }
 

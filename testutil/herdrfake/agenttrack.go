@@ -2,6 +2,7 @@ package herdrfake
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -17,7 +18,7 @@ type trackedAgent struct {
 // trackAgents wraps h so a hand-rolled handler answers the way real herdr
 // does for an agentrunner adapter: agent responses missing state_change_seq
 // or tab_id get them filled in, and "agent get" is answered from the last
-// response seen when h doesn't implement it. The seq advances on every
+// response seen (or a timed-out wait) when h doesn't implement it. The seq advances on every
 // status change and every prompt, like herdr's.
 func trackAgents(h Handler) Handler {
 	var mu sync.Mutex
@@ -65,6 +66,13 @@ func trackAgents(h Handler) Handler {
 				return CommandError(errorEnvelope("agent_not_found", "agent target "+argv[2]+" not found").Error())
 			}
 			return Result(map[string]any{"agent": a.info(pane)})
+		case argv[1] == "wait" && code != 0 && strings.Contains(string(out), "timed out"):
+			// A wait for anything but "working" timing out is the first sign
+			// of an agent already mid-turn.
+			if _, a := find(argv[2]); a == nil && !slices.Contains(flags(argv, "--until"), "working") {
+				agents[argv[2]] = &trackedAgent{tab: tabs[argv[2]], status: "working", seq: 1}
+			}
+			return out, code
 		case code != 0:
 			return out, code
 		}
