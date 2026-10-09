@@ -8,7 +8,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -106,106 +105,6 @@ func TestRenderTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
 	}
 	if strings.Contains(lines[0], "tok") {
 		t.Fatalf("row line = %q, want no metrics suffix", lines[0])
-	}
-}
-
-func TestRenderTicketRow_LiveHasSuffixAndMetricsLine(t *testing.T) {
-	t.Parallel()
-	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
-	m := newModelForTicketRowTests(epic)
-	m.implementingEpics = map[string]bool{epic.Name: true}
-	m.live[epic.Name] = map[string]liveTicketState{
-		"01": {
-			running:   true,
-			label:     "iter-01",
-			startedAt: time.Now().Add(-754 * time.Second),
-			tokens:    45_200,
-		},
-	}
-
-	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	if len(lines) != 1 {
-		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
-	}
-	for _, want := range []string{"iter-01", "implementing", "12m34s", "45.2k tok"} {
-		if !strings.Contains(lines[0], want) {
-			t.Errorf("row line = %q, want %q", lines[0], want)
-		}
-	}
-}
-
-// TestRenderTicketRow_LiveRowIndentNotDoubled covers ticket 10 (and ticket
-// 02's checkbox-prefix mirroring): renderTicketRow must pass its own
-// checkbox prefix into renderLiveTicketRow rather than adding one on top of
-// a hardcoded prefix, so a live row's indent matches its non-live siblings'
-// checkbox column exactly.
-func TestRenderTicketRow_LiveRowIndentNotDoubled(t *testing.T) {
-	t.Parallel()
-	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Running ticket", Status: "claimed"}}}
-	m := newModelForTicketRowTests(epic)
-	m.implementingEpics = map[string]bool{epic.Name: true}
-	live := liveTicketState{running: true, label: "iter-01"}
-	m.live[epic.Name] = map[string]liveTicketState{"01": live}
-
-	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)
-
-	wantPrefix := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " " + m.checkboxGlyph(m.isChecked(epic.Tickets[0].Path)) + " "
-	wantBase, _, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, epic.Tickets[0], live, wantPrefix)
-	if !ok {
-		t.Fatalf("renderLiveTicketRow() ok = false, want true")
-	}
-	if !strings.HasPrefix(lines[0], wantBase) {
-		t.Fatalf("live row line = %q, want it to start with renderLiveTicketRow's own output %q (no extra caller prefix)", lines[0], wantBase)
-	}
-}
-
-// TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling covers ticket 02:
-// the Tickets tab's checkbox column (4 spaces + checkbox + space) must be
-// mirrored into the live-row path, so a running ticket's row indent matches
-// its non-running siblings' instead of falling back to a bare 2-space prefix.
-func TestRenderTicketRow_LiveRowIndentMatchesNonLiveSibling(t *testing.T) {
-	t.Parallel()
-	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-		{Identifier: "01", Title: "Normal ticket", Status: "open"},
-		{Identifier: "02", Title: "Running ticket", Status: "claimed"},
-	}}
-	m := newModelForTicketRowTests(epic)
-	m.implementingEpics = map[string]bool{epic.Name: true}
-	m.live[epic.Name] = map[string]liveTicketState{"02": {running: true, label: "iter-01"}}
-
-	normalLine := m.renderTicketRow(epic, row{ticketIdx: 0}, 0)[0]
-	liveLine := m.renderTicketRow(epic, row{ticketIdx: 1}, 1)[0]
-
-	normalIndent := leadingWhitespace(ansi.Strip(normalLine))
-	liveIndent := leadingWhitespace(ansi.Strip(liveLine))
-	if liveIndent != normalIndent {
-		t.Fatalf("live row indent = %q, want %q (matching non-live sibling): live=%q normal=%q", liveIndent, normalIndent, liveLine, normalLine)
-	}
-}
-
-func TestRenderTicketRow_PausedHasReasonAndMetricsLine(t *testing.T) {
-	t.Parallel()
-	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{{Identifier: "01", Title: "Paused ticket", Status: "claimed"}}}
-	m := newModelForTicketRowTests(epic)
-	m.implementingEpics = map[string]bool{epic.Name: true}
-	m.live[epic.Name] = map[string]liveTicketState{
-		"01": {
-			paused:    true,
-			pauseKind: ralphloop.PauseRateLimit,
-			reason:    "context budget exceeded",
-			startedAt: time.Now().Add(-3900 * time.Second),
-			tokens:    1_200_000,
-		},
-	}
-
-	lines := m.renderTicketRow(epic, row{ticketIdx: 0}, 1)
-	if len(lines) != 1 {
-		t.Fatalf("renderTicketRow() returned %d lines, want 1: %#v", len(lines), lines)
-	}
-	for _, want := range []string{"context budget exceeded", "1h05m", "1.2M tok"} {
-		if !strings.Contains(lines[0], want) {
-			t.Errorf("row line = %q, want %q", lines[0], want)
-		}
 	}
 }
 

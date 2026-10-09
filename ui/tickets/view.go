@@ -147,9 +147,6 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 		}
 		line = appendRowMetrics(line, text, metricsLineStyle)
 	}
-	if m.implementingEpics[epic.Name] {
-		line += " " + statusClaimedStyle.Render(strings.TrimRight(m.implementSpinner.View(), " ")+" running")
-	}
 	return line
 }
 
@@ -160,10 +157,9 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // has children (a childless row shows a blank in its place), so every row
 // at a given depth — siblings, and a row's own children one level in —
 // lines its checkbox up in the same column; only the triangle itself,
-// sitting left of the checkbox, reflects r.expanded. A live or done
-// ticket's line ends with the same elapsed/token metrics as the former
-// standalone ralph-loop view, appended dim italic; live rows also append
-// their phase or pause reason there. Returns a single-element slice today
+// sitting left of the checkbox, reflects r.expanded. A done ticket's line
+// ends with the same elapsed/token metrics as the former standalone
+// ralph-loop view, appended dim italic. Returns a single-element slice today
 // (every branch renders exactly one physical line); the []string return
 // keeps the multi-line-row seam open for a future ticket without another
 // signature change at every call site.
@@ -178,23 +174,6 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 			glyph = m.icons().TriangleCollapsed
 		}
 		triangle = glyph + " "
-	}
-
-	// m.live is nested by epic name (ticket 05) precisely because bare
-	// ticket identifiers repeat across epics (each restarts numbering from
-	// 01) — gating on m.implementingEpics[epic.Name] and looking the ticket
-	// up within that epic's own inner map keeps a concurrently-running
-	// epic's same-numbered ticket (e.g. two epics' own "02") from
-	// cross-rendering as running here.
-	// While the server is down the live state is stale, so it is blanked
-	// rather than shown.
-	if m.implementingEpics[epic.Name] && m.serverLink != ServerLinkDown {
-		if live, ok := m.live[epic.Name][t.Identifier]; ok {
-			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, triangle+m.checkboxGlyph(m.isChecked(t.Path))+" "); ok {
-				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0)
-				return []string{appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)}
-			}
-		}
 	}
 
 	icon, style := statusIconAndStyle(m.icons(), status)

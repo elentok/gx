@@ -3,7 +3,6 @@ package tickets
 import (
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/ui"
@@ -46,21 +45,9 @@ func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 	}
 }
 
-func TestServerLink_DownBlanksLiveColumnsKeepsMarkdownRow(t *testing.T) {
+func TestServerLink_DownKeepsMarkdownRow(t *testing.T) {
 	m := loadedModelWithTicket(t)
-	identifier := m.epics[0].Tickets[0].Identifier
-	m.implementingEpics = map[string]bool{"my-epic": true}
-	m.live = map[string]map[string]liveTicketState{"my-epic": {
-		identifier: {running: true, label: "iter-01", phase: livePhaseImplementing, startedAt: time.Now()},
-	}}
-	if !strings.Contains(m.View().Content, "iter-01") {
-		t.Fatalf("precondition: live suffix should render while the link is up")
-	}
-
 	content := m.WithServerLink(ServerLinkDown).View().Content
-	if strings.Contains(content, "iter-01") || strings.Contains(content, "implementing...") {
-		t.Fatalf("live columns should be blank while down, got:\n%s", content)
-	}
 	if !strings.Contains(content, "First ticket") {
 		t.Fatalf("markdown row should stay, got:\n%s", content)
 	}

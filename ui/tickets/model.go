@@ -36,8 +36,8 @@ const (
 	focusPreview
 )
 
-// TicketProgressSpinner is the circle-slice pie-fill spinner shared by the
-// Tickets tab and Queue tab to indicate an in-progress ticket. Frames
+// TicketProgressSpinner is the circle-slice pie-fill spinner the Queue tab
+// uses to indicate an in-progress ticket. Frames
 // fill 1/8 to full then drain back down (rather than cutting straight from
 // full back to 1/8) so the loop point has no visible jump.
 var TicketProgressSpinner = spinner.Spinner{
@@ -119,11 +119,7 @@ type Model struct {
 	// keep reading/writing its fields as m.focus, m.previewVP, etc.
 	previewFocus
 
-	// implementingEpics is the set of epics rendered as live, more than one
-	// at a time.
-	confirm           confirm.Model
-	implementingEpics map[string]bool
-	implementSpinner  spinner.Model
+	confirm confirm.Model
 
 	// statusMenuOpen/statusMenu back the "s"-triggered change-status menu (see
 	// status_menu.go): built fresh from the selected row each time "s" opens it.
@@ -134,10 +130,6 @@ type Model struct {
 	// actions_menu.go/suggested_actions.go): built fresh from the selected
 	// row's rendered status each time "m" opens it.
 	actionsMenu actionsMenuModel
-
-	// Live state is scoped by epic before ticket identity so concurrent epics
-	// cannot collide.
-	live map[string]map[string]liveTicketState
 
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab on the down
 	// fallback for good.
@@ -166,8 +158,6 @@ type Model struct {
 // `.scratch/`. extraKeys (the app-wide global bindings) feeds the "?" help
 // modal alongside the tab's own bindings, mirroring ui/prs's NewModelWithScope.
 func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) Model {
-	sp := spinner.New()
-	sp.Spinner = TicketProgressSpinner
 	km := newTicketsManager()
 	sidebarTree := tree.NewModel[sidebarNode]()
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
@@ -186,9 +176,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		search:            search.NewModel(),
 		previewFocus:      newPreviewFocus(),
 		confirm:           confirm.New(),
-		implementingEpics: map[string]bool{},
-		implementSpinner:  sp,
-		live:              map[string]map[string]liveTicketState{},
 		checked:           map[string]bool{},
 		checkOrder:        map[string]uint64{},
 		explicitCollapsed: map[string]bool{},
@@ -323,8 +310,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleMouseWheel(msg)
 
-	case spinner.TickMsg:
-		return m.handleImplementSpinnerTick(msg)
 	case statusChangedMsg:
 		return m.handleStatusChanged()
 	}
