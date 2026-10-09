@@ -31,6 +31,7 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 	}
 
 	d := Deps{
+		Runner: paneRunner("iter-01", "pane-1", "sess-1"),
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-1"}, nil
 		},
@@ -46,7 +47,7 @@ func TestLaunchAndPrompt_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccu
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentClaude,
 		Pane:       "pane-1",
@@ -87,6 +88,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 	}
 
 	d := Deps{
+		Runner: paneRunner("iter-09", "pane-9", "codex-session-1"),
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 		},
@@ -103,7 +105,7 @@ func TestLaunchAndPrompt_CodexAdoptsSessionIDFromInitialPrompt(t *testing.T) {
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
 		Label:      "iter-09",
 		Agent:      AgentCodex,
 		Pane:       "pane-9",
@@ -142,6 +144,7 @@ func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t 
 	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
 
 	d := Deps{
+		Runner: paneRunner("iter-01", "live-pane", "sess-live"),
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{}, &herdr.AgentNameTakenError{
 				Message:      "agent name iter-01 is already used; candidates: cwd=/repo/iter-01 status=Working",
@@ -165,7 +168,7 @@ func TestLaunchAndPrompt_AgentNameTakenByOwnWorktree_AttachesInsteadOfFailing(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentClaude,
 		Pane:       "fresh-pane",
@@ -280,6 +283,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt(t *test
 	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
 
 	d := Deps{
+		Runner: paneRunner("iter-01", "live-pane", "sess-live"),
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{}, &herdr.AgentNameTakenError{
 				Message:      "agent name iter-01 is already used; candidates: cwd=/repo/iter-01 status=Idle",
@@ -299,7 +303,7 @@ func TestLaunchAndPrompt_AttachToLiveAgent_StalledSinceLaunchSendsPrompt(t *test
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentClaude,
 		Pane:       "fresh-pane",
@@ -513,6 +517,7 @@ func TestLaunchAndPrompt_AgentNotReady_TrustDirectory_DismissesAndProceeds(t *te
 	sink := &recordingSinkWithArgs{occupancySink: &occupancySink{}}
 
 	d := Deps{
+		Runner: paneRunner("iter-06", "pane-6", "sess-06"),
 		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
 			return herdr.Agent{}, &herdr.AgentNotReadyError{
 				Message: "agent iter-06 is blocked during startup and is not ready for prompts",
@@ -535,7 +540,7 @@ func TestLaunchAndPrompt_AgentNotReady_TrustDirectory_DismissesAndProceeds(t *te
 		Sleep: func(time.Duration) {},
 	}
 
-	sessionID, err := launchAndPrompt(withAgentWaitRunner(d), launchAndPromptParams{
+	sessionID, err := launchAndPrompt(d, launchAndPromptParams{
 		Label:      "iter-06",
 		Agent:      AgentClaude,
 		Pane:       "pane-6",

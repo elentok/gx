@@ -2679,8 +2679,14 @@ func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (tra
 // idleRunner hosts one idle session under label, with ID "pane-1" and
 // SessionID "sess-1".
 func idleRunner(label string) *runnerfake.Runner {
+	return paneRunner(label, "pane-1", "sess-1")
+}
+
+// paneRunner hosts one idle session of label on pane, so a Wait aimed at any
+// other pane fails with ErrNotFound.
+func paneRunner(label, pane, sessionID string) *runnerfake.Runner {
 	r := runnerfake.NewRunner()
-	r.IDs = func(string) (string, string) { return "pane-1", "sess-1" }
+	r.IDs = func(string) (string, string) { return pane, sessionID }
 	if _, err := r.Start(agentrunner.StartOptions{Label: label}); err != nil {
 		panic(err)
 	}
