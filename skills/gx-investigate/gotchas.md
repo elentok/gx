@@ -92,12 +92,13 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `reattachIteration`, which deliberately sets `StartEvent=""` (`ralphloop/iteration.go:189-191`);
   that gates off both the run-log event and `sink().IterationStarted`
   (`launch.go:260-262,291-293`). The UI spinner (`ui/tickets/live_row.go`) and the epic-parked
-  count (`ui/tickets/loop_registry.go:322-379,413-415`) both only update on
+  count (in the since-deleted `ui/tickets/loop_registry.go`) both only updated on
   `IterationStarted`/`TicketReattached`/`IterationPaused` events, never recomputing from ticket
   status directly — so a ticket can sit `claimed` with `gx` genuinely still polling it (confirmed
   live via the `herdr agent wait` process) while the UI shows no spinner and the epic title stays
   stuck at a stale parked count. Found live: `model-config/04a`, same stalled pane as the entry
-  below, retried 3x. Not fixed. See
+  below, retried 3x. The parked-count half went away when the cutover deleted the loop registry;
+  re-check the spinner half against the server before relying on it. See
   `follow-ups/issues/04-reattach-reclaim-skips-sink-events.md`.
 - **`attachToLiveAgent` treats a permanently-stalled idle pane as "already finished," parking a
   second ticket zero-commit with no real work attempted.** A ticket that already leaked a pane/tab
@@ -244,31 +245,6 @@ kept as history of what the code did at the time, not as a description of today'
   just its status field. Regression test:
   `TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder` in
   `tickets/status_test.go`. See `tickets-tree/issues/13-epic-run-stalled-two-finished-iterations-undetected.md`.
-- **A checked/queued epic silently drops out of cross-epic auto-promotion across a `gx` process
-  restart.** `MaxConcurrentEpics` (default 2, `ui/settings.go:31-35`) is meant to auto-start the
-  next queued epic the instant a running one finishes (`QueueModel.startAvailableEpics`,
-  `queue.go:824-850`, re-invoked from `implementPollMsg` on completion, `queue.go:252`), but
-  `m.pendingEpics` is process-local, in-memory-only state, populated exclusively by
-  `startCheckedEpic` (Enter key) or `handleDetachedLiveConfirmed`. If the `gx` TUI process
-  restarts (crash, reattach) after an epic was checked/queued but before its turn came up, the
-  new process's `pendingEpics` starts empty — the TUI's (since-deleted) queue state file still marked
-  the epic's tickets `"pending"`, but nothing reconstructs `pendingEpics` from that on load.
-  `cmdCheckDetachedLive` (`queue_reattach.go`) only covers the *other* stranded case (a ticket
-  left `claimed`/`needs-repair` with a live herdr tab) — an epic that never got claimed at all
-  falls through both paths and sits forever, looking "queued" in the UI but never starting. Found
-  live: `tickets-tree` epic, ticket `03b1` (unclaimed and unblocked) never claimed after
-  `fork-term` finished and freed a slot, because the attached `gx` process had restarted in
-  between. Note: the durable `items` state can't distinguish "checked, Enter never pressed" from
-  "checked, was queued, restarted before its turn" — both look identical on disk — so silently
-  auto-requeuing on that signal alone is wrong (an earlier attempt at this fix did exactly that
-  and broke `TestQueueModelSchedulesCheckedEpicsInCheckOrderAndBackfillsAtCap` by auto-starting
-  epics the test hadn't pressed Enter for yet). Fixed instead by mirroring
-  `cmdCheckDetachedLive`'s own pattern: a new `cmdCheckStrandedPending`
-  (`ui/tickets/queue_reattach.go`), run once on the Queue tab's first load per process, surfaces
-  checked-but-unclaimed-and-not-running epics via the same kind of confirm dialog ("Resume?")
-  rather than resuming them silently; accepting re-derives the plan from the checked selection and
-  appends it to `pendingEpics`. See `tickets-tree/issues/12-epic-runner-not-active-research.md`.
-
 - **`gx tickets add --parent <id>` allocates the correct lettered ID but never writes `parent` into
   the new ticket's own frontmatter.** `cmd/tickets_add.go`'s `runTicketsAdd` only used `parent` to
   compute the new ID via `tickets.NextTicketID`; the stub `schema.Ticket{}` literal never set

@@ -1,5 +1,8 @@
 # No silent stalls
 
+> **Historical.** Written before the orchestrator-daemon cutover. The loop registry
+> (`ui/tickets/loop_registry.go`) is gone — `gx server` is the only scheduler.
+
 > Follow-on epic to `lifecycle-refactor`. Written from the wayfinder map at
 > `.scratch/no-silent-stalls-map/map.md`, whose 15 decision tickets are all closed. Almost every
 > decision below is recorded in one of those tickets or in ADRs 0018–0023; this spec states the

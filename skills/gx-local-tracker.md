@@ -82,7 +82,7 @@ Fields:
   ticket it forked off, and a fix ticket opened by a `type: code-review` ticket names that review
   ticket. This is the only fork edge — it lives on the descendant, and nothing is recorded on the
   original. Omit entirely on a normally-authored ticket.
-- **`type`** (enum) — one of `implement` (`task` is accepted as an alias until cutover), `research`, `prototype`, `grilling`, `code-review`, `conflict-resolution`. See
+- **`type`** (enum) — one of `implement` (the retired `task` fails validation; `gx tickets migrate` rewrites it), `research`, `prototype`, `grilling`, `code-review`, `conflict-resolution`. See
   `code-review` below.
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
   occupy.

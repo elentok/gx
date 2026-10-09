@@ -211,7 +211,7 @@ the row can't go stale between a park and a restart.
 
 **Agent runner** — the thing that hosts one agent session for an iteration: it starts the agent,
 takes its prompts, and reports whether it is working, idle or blocked. herdr is one agent runner.
-_Avoid_: "runner" alone, "backend"; never "run", which is an epic run.
+_Avoid_: "runner" alone, "backend", "run".
 
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
 multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
@@ -242,8 +242,8 @@ implementation work goes into a separate epic. _Avoid_: "map" alone for the epic
 body).
 
 **Ticket type** (`type` frontmatter) — what kind of work a ticket is. `implement` is the default
-code-writing type. _Avoid_: `task` (retired name; the loader accepts it as an alias until cutover,
-`gx tickets migrate` rewrites it).
+code-writing type. _Avoid_: `task` (retired name; validation rejects it, `gx tickets migrate` rewrites it to
+`implement`).
 
 **Ticket store** — the one global git-backed directory holding every project's tickets and event
 logs, laid out as `<store>/<project>/<epic>/…`. Markdown is the truth and any server state is an
@@ -551,9 +551,8 @@ when it is deactivated.
 
 ## Queue Lifecycle (Queue Tab)
 
-**Queue** — the single, per-repo collection of checked/queued tickets across all epics
-(held only by the orchestrator server; with no server the Queue tab is empty). One Queue per repo,
-not per epic.
+**Queue** — the Queue tab's view of the **Server queue**: one server-wide collection of queued
+tickets across every project and epic. With no server the Queue tab is empty.
 
 **Hand-driven epic** / **Loop-driven epic** — the two kinds of epic `.scratch/` holds, distinguished
 by who writes `status`, not by file format or by anything on disk. In a hand-driven epic (a

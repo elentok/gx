@@ -181,8 +181,9 @@ looking at when you found it:
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
   for — publish in `<root>/follow-ups/issues/` instead, even though you found it investigating a
   specific epic. Don't clutter that epic's own issue list with a finding about gx itself.
-  - If `<root>/follow-ups/` doesn't exist yet, create the directory (no `epic.yaml` needed until a
-    loop actually runs against it).
+  - If `<root>/follow-ups/` doesn't exist yet, create the directory with a `ticket.md` holding
+    `status: draft` frontmatter and a `# follow-ups` heading. An epic without `ticket.md` is
+    invalid.
   - File it as `type: research, status: draft` — `draft` because it's a diagnosis handed off for a
     person to plan, not schedulable work; `research` matches `gx-implement`'s commitless-by-type
     handling for a diagnosis-only ticket.

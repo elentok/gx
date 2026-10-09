@@ -121,7 +121,7 @@ instead of one, blocked in sequence:
 This keeps each ticket within budget and avoids one session paying for both wide exploration and
 implementation.
 
-An explore ticket stays `type: task`. **Never publish a `type: research` ticket into an epic this
+An explore ticket stays `type: implement`. **Never publish a `type: research` ticket into an epic this
 skill produces.** A loop-driven epic contains work ralph-loop claims and closes; `research` is a
 diagnosis or a decision handed to a *person* to plan, which is why `gx-investigate` files one as
 `draft` — deliberately not schedulable. Publishing one `open` inside an epic makes a hand-driven

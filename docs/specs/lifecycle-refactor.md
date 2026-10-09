@@ -1,5 +1,9 @@
 # lifecycle-refactor
 
+> **Historical.** Written before the orchestrator-daemon cutover. The loop registry
+> (`ui/tickets/loop_registry.go` and its tests) is gone — `gx server` is the only scheduler — and an
+> epic's metadata lives in its `ticket.md`, not `epic.yaml`.
+
 ## Problem Statement
 
 Running an epic through ralph-loop is unreliable in ways that keep recurring, and every fix opens a

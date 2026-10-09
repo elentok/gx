@@ -104,8 +104,8 @@ existing `follow-ups` backlog epic instead of the epic under investigation.
     global-mute rules below, and returns a decision (allow / per-source-muted / globally-muted) —
     plus, as a side effect of a trip, persists the resulting mute state (ticket frontmatter and/or
     the global state file) and returns whether this call is the edge-triggered one that should also
-    send the "muting this" / "globally muted" notification. The loop registry supplies `parkTicket`
-    (it owns the ticket path and repair state); a bare `gx notify` process has none, so a trip there
+    send the "muting this" / "globally muted" notification. The scheduler supplies `parkTicket`
+    (`gx server` since the cutover deleted the loop registry; it owns the ticket path and repair state); a bare `gx notify` process has none, so a trip there
     still writes the ticket's `mutes` field but skips the `needs-repair` park (see "Clearing a mute"
     below for how an unparked mute stays reachable).
   - **Batch queue**: wraps only the async chat-event path (`chatEventSink`) — the internal
@@ -239,8 +239,8 @@ existing `follow-ups` backlog epic instead of the epic under investigation.
   (`status: draft`, `type: research` — matching gx-investigate's current type choice, which is
   commitless-by-type and therefore correct for a diagnosis-only ticket, unlike `type: task` — plus a
   `## Context` section naming the originating epic/investigation). If `follow-ups` doesn't exist yet
-  under the current tracker root, gx-investigate creates the epic directory (no `epic.yaml` needed
-  until a loop actually runs against it). Scoped specifically to gx-investigate — other "file into
+  under the current tracker root, gx-investigate creates the epic directory with a draft
+  `ticket.md` (`epic.yaml` is gone since the orchestrator-daemon cutover). Scoped specifically to gx-investigate — other "file into
   whatever epic is active" call sites (code-review fix tickets, spec-review follow-ups) are
   untouched. The skill doc also gains a step in its diagnosis inventory to read
   `~/.config/gx/notifications-state.json` and scan for ticket-level `Mutes`, so an investigation can

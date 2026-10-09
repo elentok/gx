@@ -20,7 +20,7 @@ Ticket Forking sections) this doc expands on.
 |---|---|
 | **Epic** | A named unit of work: a directory `.scratch/<epic>/issues/*.md` of tickets, plus one shared **feature worktree/branch** checked out for the epic's lifetime. |
 | **Ticket** | One markdown file with frontmatter (`status`, `blocked_by`, `parent`, `type`, ...) describing one unit of agent work. |
-| **Epic run** | One call to `ralphloop.Run(...)`, started by the Queue tab (`loopRegistry.tryStart`) when the user starts a queued epic. Drives every unblocked ticket in that epic (or a narrower `RunScope`) to completion, up to `MaxParallel` concurrently (default 2). |
+| **Epic run** | One call to `ralphloop.Run(...)`. The Queue tab no longer starts one: `gx server` schedules queued tickets itself, one iteration at a time (`server/runs.go`), using the same claim/build/land mechanics described below. Drives every unblocked ticket in that epic (or a narrower `RunScope`) to completion, up to `MaxParallel` concurrently (default 2). |
 | **Iteration** | The lifecycle of one ticket being worked: its own worktree, branch, herdr tab, and agent session, from claim through landing (or a stall). |
 | **Iteration worktree/branch** | Per-ticket git worktree (`{worktreeDir}/{epic}-item-{identifier}`) on branch `ralph-loop/{epic}-item-{identifier}`, created fresh off the feature branch's current tip. |
 | **Claim** | Atomically writes `status: claimed` on a ticket, taking it off the frontier so no other scan can pick it up. |
@@ -39,7 +39,7 @@ Ticket Forking sections) this doc expands on.
 ```mermaid
 sequenceDiagram
     participant User
-    participant Queue as Queue tab (loopRegistry)
+    participant Queue as gx server queue
     participant Run as ralphloop.Run
     participant Reconcile
     participant Scheduler as claimNext
@@ -49,7 +49,7 @@ sequenceDiagram
     participant Feature as feature worktree/branch
 
     User->>Queue: check tickets, add to queue, start
-    Queue->>Run: tryStart -> ralphloop.Run(epic, scope)
+    Queue->>Run: schedule queued tickets (epic, scope)
     Run->>Reconcile: reconcile(scope) [once, before scheduling]
     Reconcile-->>Run: reattach list, repaired tickets
     Run->>LandQ: start (single goroutine, one per Run call)
@@ -104,7 +104,7 @@ sequenceDiagram
    human needs to clear). Once nothing in scope is runnable, a parked ticket keeps the epic waiting
    on a person (`EpicParked`, no timeout) instead of exiting; nothing runnable *and* nothing parked
    is a deadlock error. If the *whole* epic (not just this run's scope) is done, `EpicComplete`
-   fires and `epic.yaml` gets a `completed_at` stamp.
+   fires and the epic's `ticket.md` gets a `completed_at` stamp.
 
 One epic → one feature worktree/branch, and one land-queue worker serializing every landing onto
 it. One ticket-iteration → its own worktree, branch, herdr tab, and agent session. Up to
