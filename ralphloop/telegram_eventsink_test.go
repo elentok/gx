@@ -566,8 +566,7 @@ func TestTelegramEventSink_LogsNotificationFailedToRunLog(t *testing.T) {
 
 	// The failed send must also reach the embedded EventSink as a
 	// NotificationFailed call, not just run-log.jsonl — that's what lets a
-	// live TUI turn a Telegram 400 into an in-app toast (see
-	// ui/tickets/loop_registry.go's LiveEventNotificationFailed case).
+	// live TUI turn a Telegram 400 into an in-app toast.
 	if calls := inner.snapshot(); len(calls) != 2 || calls[0] != "EpicComplete" || calls[1] != "NotificationFailed" {
 		t.Errorf("inner events = %v, want [EpicComplete NotificationFailed]", calls)
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 // ServerLink is how the Tickets tab currently reaches the server. The zero
-// value is "no restriction" (up, or the old in-process mode).
+// value is "no restriction" (up).
 type ServerLink int
 
 const (
