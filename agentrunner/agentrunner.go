@@ -53,8 +53,11 @@ type StartOptions struct {
 
 type Status struct {
 	State State
-	// Turn increases every time the agent starts a new turn, so a caller can
-	// tell a prompt was picked up even if the turn already finished.
+	// Turn never decreases and advances every time the agent starts a new
+	// turn, so a caller can tell a prompt was picked up even if the turn
+	// already finished. It may advance on other changes too: only equality
+	// means anything ("no turn started since"), and it holds across a runner
+	// restart, so a caller can compare it with a value it logged earlier.
 	Turn          int
 	SessionID     string
 	BlockedReason string
@@ -89,7 +92,8 @@ var (
 	// ErrContextExhausted: RateLimit found the agent out of context window
 	// (Codex only). It's an error, not a Status field, because detecting it
 	// costs the same pane read RateLimit already makes, which Status, polled
-	// far more often, should not.
+	// far more often, should not. The wrapping error's message carries the
+	// evidence the adapter found, for a park reason.
 	ErrContextExhausted = errors.New("agentrunner: context window exhausted")
 	// ErrMissingCapability: the agent lacks a protocol capability the runner
 	// relies on. Retrying cannot help; the agent needs upgrading.
@@ -98,9 +102,12 @@ var (
 
 type Runner interface {
 	// Start launches the agent and returns once it is idle and ready for a
-	// prompt.
+	// prompt. An adapter whose sessions outlive gx may instead adopt a live
+	// session with the same label and cwd, returning it in whatever state it
+	// is in; a live session on another cwd is ErrLabelTaken.
 	Start(opts StartOptions) (Session, error)
-	// Prompt returns once a new turn started, or ErrNotDelivered.
+	// Prompt returns once a new turn started, or ErrNotDelivered. For
+	// "/compact" that includes any confirmation the agent asks for itself.
 	Prompt(s Session, text string) error
 	Status(s Session) (Status, error)
 	// Wait blocks until the session is in one of states, or returns

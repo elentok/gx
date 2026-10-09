@@ -2,6 +2,7 @@ package runnerfake
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -40,6 +41,29 @@ func TestStart_IdleAndLabelTaken(t *testing.T) {
 	_, err := r.Start(agentrunner.StartOptions{Label: "a", Epic: "epic"})
 	if !errors.Is(err, agentrunner.ErrLabelTaken) {
 		t.Fatalf("second Start err = %v, want ErrLabelTaken", err)
+	}
+}
+
+func TestStartAndStopErrs(t *testing.T) {
+	r := NewRunner()
+	r.SetStartErr("a", agentrunner.ErrLabelTaken)
+	if _, err := r.Start(agentrunner.StartOptions{Label: "a"}); !errors.Is(err, agentrunner.ErrLabelTaken) {
+		t.Fatalf("Start err = %v, want ErrLabelTaken", err)
+	}
+	r.SetStartErr("a", nil)
+	s := start(t, r, "a")
+
+	failed := errors.New("tab close failed")
+	r.SetStopErr("a", failed)
+	if err := r.Stop(s); !errors.Is(err, failed) {
+		t.Fatalf("Stop err = %v, want %v", err, failed)
+	}
+	if _, ok, _ := r.Find("a"); !ok {
+		t.Fatal("a failed Stop left no session, want it still live")
+	}
+	r.SetStopErr("a", nil)
+	if err := r.Stop(s); err != nil {
+		t.Fatalf("Stop after clear = %v", err)
 	}
 }
 
@@ -178,6 +202,19 @@ func TestRateLimitAndHealth(t *testing.T) {
 	r.SetRateLimit("a", reset)
 	if at, limited, err := r.RateLimit(s); err != nil || !limited || !at.Equal(reset) {
 		t.Fatalf("RateLimit = %v, %v, %v; want %v", at, limited, err, reset)
+	}
+	r.SetLimitedUnknownReset("a")
+	if at, limited, err := r.RateLimit(s); err != nil || !limited || !at.IsZero() {
+		t.Fatalf("RateLimit = %v, %v, %v; want limited, unknown reset", at, limited, err)
+	}
+	r.SetRateLimit("a", time.Time{})
+	if _, limited, err := r.RateLimit(s); err != nil || limited {
+		t.Fatalf("RateLimit after clear = %v, %v; want not limited", limited, err)
+	}
+	exhausted := fmt.Errorf("%w: ran out of room", agentrunner.ErrContextExhausted)
+	r.SetRateLimitErr("a", exhausted)
+	if _, _, err := r.RateLimit(s); !errors.Is(err, agentrunner.ErrContextExhausted) {
+		t.Fatalf("RateLimit err = %v, want ErrContextExhausted", err)
 	}
 
 	if err := agentrunner.Healthy(r); err != nil {

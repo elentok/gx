@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -96,18 +97,106 @@ func TestList_TabLabelDiffersFromAgentName(t *testing.T) {
 	}
 }
 
-func startCodex(t *testing.T, quota herdrrunner.CodexQuotaReader) (*herdrrunner.Runner, *herdrfake.State, agentrunner.Session) {
+func startAgent(t *testing.T, kind agentrunner.Kind, quota herdrrunner.CodexQuotaReader) (*herdrrunner.Runner, *herdrfake.State, agentrunner.Session) {
 	t.Helper()
 	state := herdrfake.NewState(t)
 	herdrfake.StartAgentHost(t, state)
 	r := herdrrunner.New()
 	r.BackgroundTasks = nil
 	r.CodexQuota = quota
-	s, err := r.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "codex"})
+	s, err := r.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: kind})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return r, state, s
+}
+
+func startCodex(t *testing.T, quota herdrrunner.CodexQuotaReader) (*herdrrunner.Runner, *herdrfake.State, agentrunner.Session) {
+	t.Helper()
+	return startAgent(t, "codex", quota)
+}
+
+// A gx restarted mid-turn starts the same label in the same cwd again; it
+// gets the live agent back as is, not a fresh one or an idle wait.
+func TestStart_AdoptsLiveAgentOnSameCwd(t *testing.T) {
+	state := herdrfake.NewState(t)
+	herdrfake.StartAgentHost(t, state)
+	opts := agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"}
+	s, err := herdrrunner.New().Start(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := herdrrunner.New()
+	if err := r.Prompt(s, "do it"); err != nil {
+		t.Fatal(err)
+	}
+	before, err := r.Status(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := herdrrunner.New().Start(opts)
+	if err != nil || got.ID != s.ID {
+		t.Fatalf("second Start = %+v, %v; want %+v adopted", got, err, s)
+	}
+	if st, err := r.Status(got); err != nil || st != before {
+		t.Fatalf("status after adopt = %+v, %v; want %+v", st, err, before)
+	}
+}
+
+func TestPrompt_CompactWaitsOutCodexConfirmation(t *testing.T) {
+	herdrrunner.ShortenCompactTimings(t)
+	r, state, s := startCodex(t, nil)
+	if err := state.ConfirmCompact(s.Label); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = state.SetAgentStatus(s.Label, "working", "")
+	}()
+	if err := r.Prompt(s, "/compact"); err != nil {
+		t.Fatalf("Prompt(/compact) = %v, want nil", err)
+	}
+	if st, err := r.Status(s); err != nil || st.State != agentrunner.StateWorking {
+		t.Fatalf("status after /compact = %+v, %v; want working", st, err)
+	}
+}
+
+func TestPrompt_CompactConfirmationNeverAnsweredIsNotDelivered(t *testing.T) {
+	herdrrunner.ShortenCompactTimings(t)
+	r, state, s := startCodex(t, nil)
+	if err := state.ConfirmCompact(s.Label); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Prompt(s, "/compact"); !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt(/compact) = %v, want ErrNotDelivered", err)
+	}
+}
+
+func TestPrompt_CompactWaitsForPaneToShowItSubmitted(t *testing.T) {
+	herdrrunner.ShortenCompactTimings(t)
+	r, state, s := startAgent(t, "claude", nil)
+	if err := state.SetPaneText(s.Label, "earlier output\n/compact\n"); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = state.SetPaneText(s.Label, "/compact\n✻ Compacting conversation…")
+	}()
+	if err := r.Prompt(s, "/compact"); err != nil {
+		t.Fatalf("Prompt(/compact) = %v, want nil", err)
+	}
+}
+
+func TestPrompt_CompactNeverSubmittedIsNotDelivered(t *testing.T) {
+	herdrrunner.ShortenCompactTimings(t)
+	r, state, s := startAgent(t, "claude", nil)
+	if err := state.SetPaneText(s.Label, "/compact"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Prompt(s, "/compact"); !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt(/compact) = %v, want ErrNotDelivered", err)
+	}
 }
 
 func TestRateLimit_CodexQuotaRecordWinsOverPane(t *testing.T) {
@@ -144,6 +233,10 @@ func TestRateLimit_CodexContextExhausted(t *testing.T) {
 	_, limited, err := r.RateLimit(s)
 	if !errors.Is(err, agentrunner.ErrContextExhausted) || limited {
 		t.Fatalf("RateLimit = %v, %v; want ErrContextExhausted, not limited", limited, err)
+	}
+	// ralph-loop puts the evidence in the park reason.
+	if !strings.Contains(err.Error(), "ran out of room") {
+		t.Fatalf("RateLimit err = %q, want the pane evidence", err)
 	}
 }
 

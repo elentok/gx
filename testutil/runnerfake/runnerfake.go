@@ -17,7 +17,10 @@ type session struct {
 	epic      string
 	status    agentrunner.Status
 	promptErr error
+	stopErr   error
+	limited   bool
 	resetAt   time.Time
+	limitErr  error
 	bgTask    bool
 	prompts   []string
 	answers   []agentrunner.Answer
@@ -45,6 +48,7 @@ type Runner struct {
 	history   map[string]*session
 	changed   chan struct{}
 	healthErr error
+	startErrs map[string]error
 }
 
 func NewRunner() *Runner {
@@ -52,6 +56,7 @@ func NewRunner() *Runner {
 		PromptState: agentrunner.StateWorking,
 		history:     map[string]*session{},
 		changed:     make(chan struct{}),
+		startErrs:   map[string]error{},
 	}
 }
 
@@ -83,6 +88,9 @@ func (r *Runner) byLabel(label string) *session {
 func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := r.startErrs[opts.Label]; err != nil {
+		return agentrunner.Session{}, err
+	}
 	for _, ss := range r.sessions {
 		if ss.Label == opts.Label {
 			return agentrunner.Session{}, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, opts.Label)
@@ -172,6 +180,9 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 func (r *Runner) Stop(s agentrunner.Session) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if ss, err := r.live(s); err == nil && ss.stopErr != nil {
+		return ss.stopErr
+	}
 	r.sessions = slices.DeleteFunc(r.sessions, func(ss *session) bool { return ss.ID == s.ID })
 	r.notify()
 	return nil
@@ -207,7 +218,10 @@ func (r *Runner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	if err != nil {
 		return time.Time{}, false, err
 	}
-	return ss.resetAt, !ss.resetAt.IsZero(), nil
+	if ss.limitErr != nil {
+		return time.Time{}, false, ss.limitErr
+	}
+	return ss.resetAt, ss.limited, nil
 }
 
 func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
@@ -255,12 +269,46 @@ func (r *Runner) SetPromptErr(label string, err error) {
 	r.byLabel(label).promptErr = err
 }
 
+// SetStartErr makes every Start of label fail with err (e.g. ErrLabelTaken)
+// until cleared with nil.
+func (r *Runner) SetStartErr(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.startErrs[label] = err
+}
+
+// SetStopErr makes every Stop of the live session label fail with err, and
+// leave it running, until cleared with nil.
+func (r *Runner) SetStopErr(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).stopErr = err
+}
+
 // SetRateLimit marks label as rate limited until resetAt; a zero time clears
 // it.
 func (r *Runner) SetRateLimit(label string, resetAt time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byLabel(label).resetAt = resetAt
+	ss := r.byLabel(label)
+	ss.resetAt, ss.limited = resetAt, !resetAt.IsZero()
+}
+
+// SetLimitedUnknownReset marks label as rate limited with no known reset
+// time, as when the agent's message gave none.
+func (r *Runner) SetLimitedUnknownReset(label string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ss := r.byLabel(label)
+	ss.resetAt, ss.limited = time.Time{}, true
+}
+
+// SetRateLimitErr makes RateLimit on label fail with err (e.g. a wrapped
+// ErrContextExhausted) until cleared with nil.
+func (r *Runner) SetRateLimitErr(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).limitErr = err
 }
 
 // SetBackgroundTask starts or ends a background task of label.

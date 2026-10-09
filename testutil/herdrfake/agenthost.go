@@ -124,7 +124,11 @@ func RegisterAgentHost(s *State) {
 		if a.Stalled {
 			return nil, Identities{AgentID: a.ID}, errorEnvelope("agent_prompt_stalled", "no observed state change after prompt")
 		}
-		a.setStatus("working", "")
+		if a.ConfirmsCompact && argv[3] == "/compact" {
+			a.setStatus("blocked", "compact_confirm")
+		} else {
+			a.setStatus("working", "")
+		}
 		return s.agentJSON(a), Identities{AgentID: a.ID}, nil
 	})
 	s.Register("agent", "send-keys", func(s *State, argv []string) (any, Identities, error) {
@@ -209,6 +213,19 @@ func (s *State) StallAgent(name string) error {
 		return fmt.Errorf("agent not found: %s", name)
 	}
 	a.Stalled = true
+	return nil
+}
+
+// ConfirmCompact makes the agent named name block on a "/compact" prompt, as
+// Codex does while it asks to confirm. SetAgentStatus moves it on.
+func (s *State) ConfirmCompact(name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.findAgent(name)
+	if a == nil {
+		return fmt.Errorf("agent not found: %s", name)
+	}
+	a.ConfirmsCompact = true
 	return nil
 }
 

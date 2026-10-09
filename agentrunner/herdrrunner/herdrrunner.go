@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,16 +30,8 @@ type Runner struct {
 	CodexQuota CodexQuotaReader
 
 	mu sync.Mutex
-	// turns counts prompts the agent picked up, keyed by label. herdr's
-	// StateChangeSeq also advances when a turn ends, so it can't be Turn as is.
-	turns map[string]*turn
 	// started remembers what RateLimit needs from Start, keyed by label.
 	started map[string]agentrunner.StartOptions
-}
-
-type turn struct {
-	count   int
-	lastSeq int
 }
 
 var _ agentrunner.Runner = (*Runner)(nil)
@@ -47,7 +40,7 @@ var _ agentrunner.HealthChecker = (*Runner)(nil)
 // New gates on Claude transcript background tasks, unless the home directory
 // can't be found.
 func New() *Runner {
-	r := &Runner{turns: map[string]*turn{}, started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
+	r := &Runner{started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
 	if home, err := os.UserHomeDir(); err == nil {
 		r.BackgroundTasks = ClaudeBackgroundTasks(home, time.Now)
 	}
@@ -66,6 +59,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 		return agentrunner.Session{}, err
 	}
 	agent, err := herdr.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
+	adopted := false
 	if err != nil {
 		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, herdr.AgentExplain, herdr.AgentSendKeys)
 		if recovery != StartResume {
@@ -78,16 +72,18 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 			if agent, err = herdr.AgentGet(opts.Label); err != nil {
 				return agentrunner.Session{}, err
 			}
+			adopted = true
 		default:
 			agent.PaneID = tab.RootPaneID
 		}
 	}
 	s := agentrunner.Session{Label: opts.Label, ID: agent.PaneID, SessionID: agent.AgentSession}
-	// Drop a stopped predecessor's count; the wait's status read starts anew.
 	r.mu.Lock()
-	delete(r.turns, opts.Label)
 	r.started[opts.Label] = opts
 	r.mu.Unlock()
+	if adopted {
+		return s, nil
+	}
 	if _, err := r.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, 30*time.Second); err != nil {
 		return agentrunner.Session{}, err
 	}
@@ -102,8 +98,14 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 	if st.State == agentrunner.StateBlocked {
 		return agentrunner.ErrNotReady
 	}
+	compact := text == "/compact"
+	until := []string{"working"}
+	if compact {
+		// Codex asks to confirm a compact before it starts.
+		until = append(until, "blocked")
+	}
 	prompt := PromptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now)
-	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: []string{"working"}})
+	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {
 	case errors.As(err, &blocked):
@@ -113,20 +115,53 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 	case err != nil:
 		return err
 	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	t := r.turnLocked(s.Label, st.seq)
-	if agent.StateChangeSeq <= t.lastSeq {
+	if agent.StateChangeSeq <= st.Turn {
 		return agentrunner.ErrNotDelivered
 	}
-	t.count++
-	t.lastSeq = agent.StateChangeSeq
+	if compact {
+		return r.confirmCompact(s, agent.AgentStatus)
+	}
 	return nil
 }
 
+// Compact timings are vars so tests can shorten them.
+var (
+	compactConfirmTimeout = 5 * time.Minute
+	compactSubmitPoll     = 5 * time.Second
+	compactSubmitTimeout  = 30 * time.Second
+)
+
+// confirmCompact passively waits out Codex's compact confirmation (it moves
+// on by itself), then waits for the pane's last line to stop reading
+// "/compact": herdr can see the state change before Enter's effect renders,
+// and a prompt sent then lands appended to the unsubmitted "/compact". It
+// never presses Enter itself, which could cancel a running compaction.
+func (r *Runner) confirmCompact(s agentrunner.Session, state string) error {
+	if state == string(agentrunner.StateBlocked) {
+		running := []agentrunner.State{agentrunner.StateWorking, agentrunner.StateIdle, agentrunner.StateDone}
+		if _, err := r.Wait(s, running, compactConfirmTimeout); err != nil {
+			return fmt.Errorf("%w: waiting out the compact confirmation: %w", agentrunner.ErrNotDelivered, err)
+		}
+	}
+	deadline := time.Now().Add(compactSubmitTimeout)
+	for {
+		text, err := ReadPaneRecent(s.ID)
+		if err != nil {
+			return mapNotFound(err)
+		}
+		lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+		if strings.TrimSpace(lines[len(lines)-1]) != "/compact" {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%w: /compact still unsubmitted in the pane", agentrunner.ErrNotDelivered)
+		}
+		time.Sleep(compactSubmitPoll)
+	}
+}
+
 func (r *Runner) Status(s agentrunner.Session) (agentrunner.Status, error) {
-	st, err := r.status(s)
-	return st.Status, err
+	return r.status(s)
 }
 
 func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
@@ -145,7 +180,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 			// herdr's state can still be overridden by a background task.
 			st, err := r.status(s)
 			if err != nil || slices.Contains(states, st.State) {
-				return st.Status, err
+				return st, err
 			}
 		}
 		if time.Now().After(deadline) {
@@ -153,7 +188,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 			if err != nil {
 				return agentrunner.Status{}, err
 			}
-			return st.Status, agentrunner.ErrTimeout
+			return st, agentrunner.ErrTimeout
 		}
 		time.Sleep(min(pollInterval, remaining))
 	}
@@ -175,7 +210,6 @@ func (r *Runner) Stop(s agentrunner.Session) error {
 		return err
 	}
 	r.mu.Lock()
-	delete(r.turns, s.Label)
 	delete(r.started, s.Label)
 	r.mu.Unlock()
 	return nil
@@ -276,17 +310,14 @@ func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	return herdr.AgentSendKeys(s.ID, keys...)
 }
 
-type status struct {
-	agentrunner.Status
-	seq int
-}
-
-func (r *Runner) status(s agentrunner.Session) (status, error) {
+// status reports herdr's StateChangeSeq as Turn: herdr keeps it, so it holds
+// across a gx restart, and it advances on every turn start (and end).
+func (r *Runner) status(s agentrunner.Session) (agentrunner.Status, error) {
 	agent, err := herdr.AgentGet(s.ID)
 	if err != nil {
-		return status{}, mapNotFound(err)
+		return agentrunner.Status{}, mapNotFound(err)
 	}
-	st := status{Status: agentrunner.Status{State: agentrunner.State(agent.AgentStatus), SessionID: agent.AgentSession}, seq: agent.StateChangeSeq}
+	st := agentrunner.Status{State: agentrunner.State(agent.AgentStatus), Turn: agent.StateChangeSeq, SessionID: agent.AgentSession}
 	switch st.State {
 	case agentrunner.StateWorking, agentrunner.StateBlocked:
 	case agentrunner.StateIdle, agentrunner.StateDone:
@@ -304,21 +335,7 @@ func (r *Runner) status(s agentrunner.Session) (status, error) {
 	if st.State == agentrunner.StateBlocked {
 		st.BlockedReason = MatchedRuleID(herdr.AgentExplain, s.ID)
 	}
-	r.mu.Lock()
-	st.Turn = r.turnLocked(s.Label, agent.StateChangeSeq).count
-	r.mu.Unlock()
 	return st, nil
-}
-
-// turnLocked returns label's turn counter, starting one at seq for a session
-// this runner did not start (e.g. found after a gx restart).
-func (r *Runner) turnLocked(label string, seq int) *turn {
-	t, ok := r.turns[label]
-	if !ok {
-		t = &turn{lastSeq: seq}
-		r.turns[label] = t
-	}
-	return t
 }
 
 func isNotFound(err error) bool {

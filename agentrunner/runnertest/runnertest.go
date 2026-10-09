@@ -60,6 +60,7 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"AnswerNotBlocked", answerNotBlocked},
 		{"RateLimit", rateLimit},
 		{"RestartThenFind", restartThenFind},
+		{"TurnSurvivesRestart", turnSurvivesRestart},
 	}
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
@@ -102,9 +103,22 @@ func startIsIdle(t *testing.T, h Harness) {
 	if s.Label != "e-01" || s.ID == "" {
 		t.Fatalf("session = %+v, want label e-01 and an ID", s)
 	}
-	if st := status(t, h.Runner, s); !slices.Contains(idleOrDone, st.State) || st.Turn != 0 {
-		t.Fatalf("status after Start = %+v, want idle at turn 0", st)
+	if st := status(t, h.Runner, s); !slices.Contains(idleOrDone, st.State) {
+		t.Fatalf("status after Start = %+v, want idle", st)
 	}
+}
+
+// promptAdvancesTurn prompts s and returns its Turn, failing unless the
+// prompt advanced it.
+func promptAdvancesTurn(t *testing.T, r agentrunner.Runner, s agentrunner.Session, text string) int {
+	t.Helper()
+	before := status(t, r, s).Turn
+	prompt(t, r, s, text)
+	after := status(t, r, s).Turn
+	if after <= before {
+		t.Fatalf("Turn after Prompt(%q) = %d, want > %d", text, after, before)
+	}
+	return after
 }
 
 func startLabelTaken(t *testing.T, h Harness) {
@@ -117,18 +131,33 @@ func startLabelTaken(t *testing.T, h Harness) {
 
 func promptStartsTurn(t *testing.T, h Harness) {
 	s := start(t, h.Runner, "e-01", "e")
-	prompt(t, h.Runner, s, "do it")
-	if st := status(t, h.Runner, s); st.Turn != 1 {
-		t.Fatalf("Turn after Prompt = %d, want 1", st.Turn)
-	}
+	promptAdvancesTurn(t, h.Runner, s, "do it")
 	h.FinishTurn(t, s)
 	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
 		t.Fatalf("Wait idle after FinishTurn: %v", err)
 	}
-	prompt(t, h.Runner, s, "again")
-	if st := status(t, h.Runner, s); st.Turn != 2 {
-		t.Fatalf("Turn after second Prompt = %d, want 2", st.Turn)
+	promptAdvancesTurn(t, h.Runner, s, "again")
+}
+
+// turnSurvivesRestart: a caller compares Turn with a value logged before a gx
+// restart to tell whether the agent did anything since.
+func turnSurvivesRestart(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	promptAdvancesTurn(t, h.Runner, s, "do it")
+	h.FinishTurn(t, s)
+	st, err := h.Runner.Wait(s, idleOrDone, waitTimeout)
+	if err != nil {
+		t.Fatalf("Wait idle after FinishTurn: %v", err)
 	}
+	r := h.Restart(t)
+	got, ok, err := r.Find("e-01")
+	if err != nil || !ok {
+		t.Fatalf("Find after restart = %v, %v; want found", ok, err)
+	}
+	if after := status(t, r, got).Turn; after != st.Turn {
+		t.Fatalf("Turn after restart = %d, want %d", after, st.Turn)
+	}
+	promptAdvancesTurn(t, r, got, "again")
 }
 
 func waitTimesOut(t *testing.T, h Harness) {
@@ -176,10 +205,7 @@ func compactAfterInterrupt(t *testing.T, h Harness) {
 	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
 		t.Fatalf("Wait idle after Interrupt: %v", err)
 	}
-	prompt(t, h.Runner, s, "/compact")
-	if st := status(t, h.Runner, s); st.Turn != 2 {
-		t.Fatalf("Turn after /compact = %d, want 2", st.Turn)
-	}
+	promptAdvancesTurn(t, h.Runner, s, "/compact")
 	h.FinishTurn(t, s)
 	st, err := h.Runner.Wait(s, idleOrDone, waitTimeout)
 	if err != nil {
