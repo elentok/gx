@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
@@ -135,9 +134,12 @@ type launchAndPromptParams struct {
 	// process starts under; empty omits that one flag from the launch argv.
 	Model  string
 	Effort string
-	Pane   string // pane id to launch the agent in and send the prompt to
-	Tab    string // tab id owning Pane, recorded on logged events
-	Prompt string // initial skill prompt text
+	// Session is the Runner session hosting the agent, for a fresh launch
+	// started through Deps.Runner; zero on the herdr-only paths.
+	Session agentrunner.Session
+	Pane    string // pane id to launch the agent in and send the prompt to
+	Tab     string // tab id owning Pane, recorded on logged events
+	Prompt  string // initial skill prompt text
 
 	// FinishTimeoutMs bounds the final "wait for the agent to finish" step, so
 	// a stuck agent surfaces as a distinct error instead of blocking forever.
@@ -261,21 +263,6 @@ type launchFailure struct {
 func (e *launchFailure) Error() string { return e.Err.Error() }
 func (e *launchFailure) Unwrap() error { return e.Err }
 
-// classifyLaunchError names a launch error's herdr code. Most herdr errors
-// reach us as plain text, so only agent_name_taken has a typed error.
-func classifyLaunchError(err error) events.Kind {
-	var nameTaken *herdr.AgentNameTakenError
-	switch {
-	case errors.As(err, &nameTaken):
-		return events.AgentNameTaken
-	case errors.Is(err, herdrrunner.ErrStuckSubmission), strings.Contains(err.Error(), string(events.AgentPromptStalled)):
-		return events.AgentPromptStalled
-	case strings.Contains(err.Error(), string(events.AgentPaneBusy)):
-		return events.AgentPaneBusy
-	}
-	return events.IterationError
-}
-
 // logLaunchFailed appends one launch-failed event for a failed attempt.
 func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.Kind, err error) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
@@ -392,12 +379,38 @@ func continueLaunch(d Deps, p launchAndPromptParams, startedAgent herdr.Agent) (
 	if promptedAgent.AgentSession != "" {
 		sessionID = promptedAgent.AgentSession
 	}
-	p.logAgentStartEvent(p.StartEvent, sessionID, startedAgent.StateChangeSeq)
+	return startedLaunch(d, p, sessionID, startedAgent.StateChangeSeq)
+}
+
+// promptedLaunch is continueLaunch's post-prompt half for a session started
+// and prompted through Deps.Runner.
+func promptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
+	status, err := d.Runner.Status(p.Session)
+	if err != nil {
+		log.Printf("reading %s status after initial prompt: %v", p.Label, err)
+	}
+	// Codex only knows its session id once the first prompt begins.
+	sessionID := status.SessionID
+	if sessionID == "" {
+		sessionID = p.Session.SessionID
+	}
+	return startedLaunch(d, p, sessionID, status.Turn)
+}
+
+// startedLaunch logs and reports a freshly prompted agent's start, with seq as
+// its stalled-since-launch baseline, then waits for it to finish.
+func startedLaunch(d Deps, p launchAndPromptParams, sessionID string, seq int) (string, error) {
+	p.logAgentStartEvent(p.StartEvent, sessionID, seq)
 	if p.StartEvent != "" {
 		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane, p.Tab)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
+	return waitLaunched(d, p, sessionID)
+}
 
+// waitLaunched is waitForFinish keeping sessionID on a blocked-pane park,
+// whose caller still records the live session.
+func waitLaunched(d Deps, p launchAndPromptParams, sessionID string) (string, error) {
 	if err := waitForFinish(d, p, sessionID); err != nil {
 		if errors.Is(err, errBlockedPaneParked) {
 			return sessionID, err
@@ -451,13 +464,7 @@ func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
 			sessionID = promptedAgent.AgentSession
 		}
 	}
-	if err := waitForFinish(d, p, sessionID); err != nil {
-		if errors.Is(err, errBlockedPaneParked) {
-			return sessionID, err
-		}
-		return "", err
-	}
-	return sessionID, nil
+	return waitLaunched(d, p, sessionID)
 }
 
 // resendPrompt sends text to p.Pane and waits for the pane to reach

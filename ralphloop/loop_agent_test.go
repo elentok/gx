@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -217,9 +217,9 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 	})
 	d, _, _ := fakeDeps()
 	d.PreflightAgent = func(AgentKind) error { return nil }
-	d.AgentStart = func(herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{}, errors.New("Herdr rejected Codex integration")
-	}
+	onRunnerStart(d, func(agentrunner.StartOptions) error {
+		return errors.New("Herdr rejected Codex integration")
+	})
 	sink := newRecordingEventSink()
 	// The failed launch leaves the epic's only ticket needs-repair, so the
 	// run parks on it rather than returning.
@@ -239,7 +239,7 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 		}
 	}
 	if !strings.Contains(string(contents), "status: needs-repair") ||
-		!strings.Contains(string(contents), "launching codex: Herdr rejected Codex integration") {
+		!strings.Contains(string(contents), "starting "+iterLabel("my-epic", "01")+": Herdr rejected Codex integration") {
 		t.Errorf("ticket after launch failure =\n%s\nwant durable needs-repair status and launch reason", contents)
 	}
 
@@ -317,35 +317,35 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 			})
 			d, prompts, _ := fakeDeps()
-			var start herdr.AgentStartOptions
-			d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			var start agentrunner.StartOptions
+			onRunnerStart(d, func(opts agentrunner.StartOptions) error {
 				start = opts
-				return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
-			}
+				return nil
+			})
 
 			err := Run(RunOptions{EpicName: "my-epic", Agent: tc.agent, Agents: tc.agents, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 			if err != nil {
 				t.Fatalf("Run() error = %v", err)
 			}
-			if start.Kind != tc.wantKind {
-				t.Errorf("AgentStart Kind = %q, want %q", start.Kind, tc.wantKind)
+			if string(start.Kind) != tc.wantKind {
+				t.Errorf("Start Kind = %q, want %q", start.Kind, tc.wantKind)
 			}
-			if len(start.AgentArgs) < len(tc.wantArgs) || !slices.Equal(start.AgentArgs[:len(tc.wantArgs)], tc.wantArgs) {
-				t.Errorf("AgentStart AgentArgs = %v, want prefix %v", start.AgentArgs, tc.wantArgs)
+			if len(start.Args) < len(tc.wantArgs) || !slices.Equal(start.Args[:len(tc.wantArgs)], tc.wantArgs) {
+				t.Errorf("Start Args = %v, want prefix %v", start.Args, tc.wantArgs)
 			}
 			if tc.agent == AgentCodex {
 				wantScratch := filepath.Join(scratchDir, "my-epic")
-				if !slices.Contains(start.AgentArgs, wantScratch) {
-					t.Errorf("AgentStart AgentArgs = %v, want epic scratch directory %q", start.AgentArgs, wantScratch)
+				if !slices.Contains(start.Args, wantScratch) {
+					t.Errorf("Start Args = %v, want epic scratch directory %q", start.Args, wantScratch)
 				}
 				codexCfg := tc.agents.Codex
-				if codexCfg.Model != "" && !slices.Contains(start.AgentArgs, "--model") {
-					t.Errorf("AgentStart AgentArgs = %v, want --model flag", start.AgentArgs)
+				if codexCfg.Model != "" && !slices.Contains(start.Args, "--model") {
+					t.Errorf("Start Args = %v, want --model flag", start.Args)
 				}
 				if codexCfg.Effort != "" {
 					want := `model_reasoning_effort="` + codexCfg.Effort + `"`
-					if !slices.Contains(start.AgentArgs, want) {
-						t.Errorf("AgentStart AgentArgs = %v, want %q", start.AgentArgs, want)
+					if !slices.Contains(start.Args, want) {
+						t.Errorf("Start Args = %v, want %q", start.Args, want)
 					}
 				}
 			}

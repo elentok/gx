@@ -6,16 +6,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -146,7 +149,17 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	removedSlice := []string{}
 	branchByPath := map[string]string{}
 
+	record := func(text string) {
+		mu.Lock()
+		promptsSlice = append(promptsSlice, text)
+		mu.Unlock()
+	}
+	runner := runnerfake.NewRunner()
+	// Panes are named like TabCreate's below.
+	runner.IDs = func(label string) (string, string) { return "pane-" + label, "sess-pane-" + label }
+	runner.Adopt = true
 	d = Deps{
+		Runner: recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
 		AgentGet: func(target string) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "working", AgentSession: "session-" + target}, nil
 		},
@@ -181,6 +194,10 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			}, nil
 		},
 		TabClose: func(tabID string) error {
+			// Closing a tab ends its agent, as on herdr.
+			if s, ok, _ := runner.Find(strings.TrimPrefix(tabID, "tab-")); ok {
+				return runner.Stop(s)
+			}
 			return nil
 		},
 		TabList: func(workspaceID string) ([]herdr.Tab, error) {
@@ -190,9 +207,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
 		},
 		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			mu.Lock()
-			promptsSlice = append(promptsSlice, opts.Text)
-			mu.Unlock()
+			record(opts.Text)
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
 		},
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
@@ -253,6 +268,70 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		ParkTimer: readyTimer,
 	}
 	return d, &promptsSlice, &removedSlice
+}
+
+// recordingRunner adds Runner prompts to fakeDeps' prompts slice, so tests
+// asserting the prompt sequence see initial prompts and herdr-sent ones alike.
+type recordingRunner struct {
+	*runnerfake.Runner
+	record func(text string)
+	hooks  *runnerHooks
+}
+
+type runnerHooks struct {
+	mu      sync.Mutex
+	starts  []func(opts agentrunner.StartOptions) error
+	prompts []func(s agentrunner.Session, text string) error
+}
+
+// onRunnerStart runs hook before every Runner start of fakeDeps' d, after
+// any hooks added earlier; a hook's error fails the start.
+func onRunnerStart(d Deps, hook func(opts agentrunner.StartOptions) error) {
+	h := d.Runner.(recordingRunner).hooks
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.starts = append(h.starts, hook)
+}
+
+// onRunnerPrompt is onRunnerStart for prompts.
+func onRunnerPrompt(d Deps, hook func(s agentrunner.Session, text string) error) {
+	h := d.Runner.(recordingRunner).hooks
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.prompts = append(h.prompts, hook)
+}
+
+func (r recordingRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
+	r.hooks.mu.Lock()
+	fns := slices.Clone(r.hooks.starts)
+	r.hooks.mu.Unlock()
+	for _, fn := range fns {
+		if err := fn(opts); err != nil {
+			return agentrunner.Session{}, err
+		}
+	}
+	return r.Runner.Start(opts)
+}
+
+func (r recordingRunner) Prompt(s agentrunner.Session, text string) error {
+	r.hooks.mu.Lock()
+	fns := slices.Clone(r.hooks.prompts)
+	r.hooks.mu.Unlock()
+	for _, fn := range fns {
+		if err := fn(s, text); err != nil {
+			return err
+		}
+	}
+	if err := r.Runner.Prompt(s, text); err != nil {
+		return err
+	}
+	r.record(text)
+	return nil
+}
+
+// fakeRunner is the runnerfake behind fakeDeps' Runner.
+func fakeRunner(d Deps) *runnerfake.Runner {
+	return d.Runner.(recordingRunner).Runner
 }
 
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
@@ -327,9 +406,6 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
 
 	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -640,18 +716,15 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
 	}
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+	onRunnerPrompt(d, func(agentrunner.Session, string) error {
 		// Simulate the agent calling `gx tickets set --iteration-status
 		// finished --commitless true` on itself before going idle with no
 		// commit.
-		if err := updateTicket(ticketPath, func(tk *schema.Ticket) {
+		return updateTicket(ticketPath, func(tk *schema.Ticket) {
 			tk.IterationStatus = schema.IterationStatusFinished
 			tk.Commitless = true
-		}); err != nil {
-			t.Fatalf("simulating agent self-report: %v", err)
-		}
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
+		})
+	})
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -1261,33 +1334,33 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 
 	d, _, _ := fakeDeps()
 
-	label01 := "pane-" + iterLabel("epic", "01")
-	label02 := "pane-" + iterLabel("epic", "02")
+	label01 := iterLabel("epic", "01")
+	label02 := iterLabel("epic", "02")
 
 	var mu sync.Mutex
 	agentStartCalls := map[string]int{}
 	unblock01 := make(chan struct{})
 	var clobberOnce sync.Once
 
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+	onRunnerStart(d, func(opts agentrunner.StartOptions) error {
 		mu.Lock()
-		agentStartCalls[opts.Pane]++
+		agentStartCalls[opts.Label]++
 		mu.Unlock()
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
-	}
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Target == label02 {
+		return nil
+	})
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		if s.Label == label02 {
 			clobberOnce.Do(func() {
 				if err := os.WriteFile(ticket01Path, []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n"), 0644); err != nil {
 					t.Errorf("simulating external clobber of ticket 01: %v", err)
 				}
 			})
 		}
-		if opts.Target == label01 {
+		if s.Label == label01 {
 			<-unblock01
 		}
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
+		return nil
+	})
 	tabClosed02 := make(chan struct{})
 	var tabClosed02Once sync.Once
 	d.TabClose = func(tabID string) error {
@@ -1319,7 +1392,7 @@ func TestRun_ClaimNext_IgnoresExternalRevertOfAlreadyLaunchedTicket(t *testing.T
 	mu.Lock()
 	defer mu.Unlock()
 	if agentStartCalls[label01] != 1 {
-		t.Errorf("AgentStart calls for ticket 01's pane = %d, want exactly 1 (claimNext must not re-claim a ticket it already launched, even after an external write reverted its on-disk status)", agentStartCalls[label01])
+		t.Errorf("Start calls for ticket 01 = %d, want exactly 1 (claimNext must not re-claim a ticket it already launched, even after an external write reverted its on-disk status)", agentStartCalls[label01])
 	}
 }
 

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -67,12 +67,11 @@ func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
 
-	label01 := "pane-" + iterLabel("epic", "01")
-	label01a := "pane-" + iterLabel("epic", "01a")
+	label01 := iterLabel("epic", "01")
+	label01a := iterLabel("epic", "01a")
 	var once01, once01a sync.Once
-	origPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		switch opts.Target {
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		switch s.Label {
 		case label01:
 			once01.Do(func() {
 				if err := writeChildTicket(issuesDir, "01a", "01"); err != nil {
@@ -86,8 +85,8 @@ func TestRun_ForkChain_ClaimsInDependencyOrder(t *testing.T) {
 				}
 			})
 		}
-		return origPrompt(opts)
-	}
+		return nil
+	})
 
 	sink := &claimOrderSink{EventSink: noopEventSink{}}
 
@@ -114,11 +113,9 @@ func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
 
-	label01 := "pane-" + iterLabel("epic", "01")
 	var once sync.Once
-	origPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Target == label01 {
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		if s.Label == iterLabel("epic", "01") {
 			once.Do(func() {
 				for _, id := range []string{"01a", "01b"} {
 					if err := writeChildTicket(issuesDir, id, "01"); err != nil {
@@ -127,8 +124,8 @@ func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 				}
 			})
 		}
-		return origPrompt(opts)
-	}
+		return nil
+	})
 
 	sink := &claimOrderSink{EventSink: noopEventSink{}}
 
@@ -160,19 +157,17 @@ func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
 
-	label01 := "pane-" + iterLabel("epic", "01")
 	var once sync.Once
-	origPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Target == label01 {
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		if s.Label == iterLabel("epic", "01") {
 			once.Do(func() {
 				if err := writeChildTicket(issuesDir, "01a", "01"); err != nil {
 					t.Errorf("writeChildTicket(01a): %v", err)
 				}
 			})
 		}
-		return origPrompt(opts)
-	}
+		return nil
+	})
 
 	sink := &claimOrderSink{EventSink: noopEventSink{}}
 
@@ -206,11 +201,9 @@ func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.
 	issuesDir := filepath.Join(scratchDir, "epic", "issues")
 	d, _, _ := fakeDeps()
 
-	label01 := "pane-" + iterLabel("epic", "01")
 	var forkOnce sync.Once
-	origPromptForFork := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Target == label01 {
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		if s.Label == iterLabel("epic", "01") {
 			forkOnce.Do(func() {
 				for _, id := range []string{"01a", "01b"} {
 					if err := writeChildTicket(issuesDir, id, "01"); err != nil {
@@ -219,10 +212,9 @@ func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.
 				}
 			})
 		}
-		return origPromptForFork(opts)
-	}
+		return nil
+	})
 
-	label01b := "pane-" + iterLabel("epic", "01b")
 	unblock01b := make(chan struct{})
 	var unblockOnce sync.Once
 	ticket01bPath := filepath.Join(scratchDir, "epic", "issues", "01b-child.md")
@@ -234,13 +226,12 @@ func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.
 	// "status: claimed", proving 02 didn't wait for 01b to land.
 	var stillClaimedAt01bRelease string
 
-	origPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.Target == label01b {
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		if s.Label == iterLabel("epic", "01b") {
 			<-unblock01b
 		}
-		return origPrompt(opts)
-	}
+		return nil
+	})
 
 	sink := &claimOrderSink{EventSink: noopEventSink{}}
 	sink.EventSink = &unblockingSink{

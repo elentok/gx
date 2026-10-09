@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 )
 
 // TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket is the
@@ -35,14 +35,13 @@ func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing
 	}
 
 	ticket02Started := make(chan struct{})
-	origTabCreate := d.TabCreate
-	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+	onRunnerStart(d, func(opts agentrunner.StartOptions) error {
 		if opts.Label == "epic-iter-02" {
 			var once2 sync.Once
 			once2.Do(func() { close(ticket02Started) })
 		}
-		return origTabCreate(opts)
-	}
+		return nil
+	})
 
 	done := make(chan error, 1)
 	go func() {

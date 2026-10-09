@@ -39,13 +39,6 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 		}
 		return "deadbeef", nil
 	}
-	origAgentPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		agent, err := origAgentPrompt(opts)
-		agent.AgentSession = "session-fresh-01"
-		return agent, err
-	}
-
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -66,7 +59,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 	if err != nil {
 		t.Fatalf("schema.ParseTicket: %v", err)
 	}
-	if want := []string{"session-fresh-01"}; len(ticket.SessionIDs) != 1 || ticket.SessionIDs[0] != want[0] {
+	if want := []string{"sess-pane-" + iterLabel("epic", "01")}; len(ticket.SessionIDs) != 1 || ticket.SessionIDs[0] != want[0] {
 		t.Errorf("SessionIDs = %v, want %v", ticket.SessionIDs, want)
 	}
 }

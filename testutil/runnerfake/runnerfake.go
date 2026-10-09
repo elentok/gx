@@ -15,6 +15,7 @@ import (
 type session struct {
 	agentrunner.Session
 	epic      string
+	cwd       string
 	status    agentrunner.Status
 	promptErr error
 	stopErr   error
@@ -41,6 +42,12 @@ type Runner struct {
 	// Defaults to working; set it to done for tests that don't care about the
 	// turn in between.
 	PromptState agentrunner.State
+	// IDs names a new session of label. Nil numbers them fake-N and
+	// session-N.
+	IDs func(label string) (id, sessionID string)
+	// Adopt makes Start return a live session of the same label and cwd, as
+	// an adapter whose sessions outlive gx may, instead of ErrLabelTaken.
+	Adopt bool
 
 	mu        sync.Mutex
 	nextID    int
@@ -100,17 +107,21 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	}
 	for _, ss := range r.sessions {
 		if ss.Label == opts.Label {
+			if r.Adopt && ss.cwd == opts.Cwd {
+				return ss.Session, nil
+			}
 			return agentrunner.Session{}, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, opts.Label)
 		}
 	}
 	r.nextID++
+	id, sessionID := fmt.Sprintf("fake-%d", r.nextID), fmt.Sprintf("session-%d", r.nextID)
+	if r.IDs != nil {
+		id, sessionID = r.IDs(opts.Label)
+	}
 	ss := &session{
-		Session: agentrunner.Session{
-			Label:     opts.Label,
-			ID:        fmt.Sprintf("fake-%d", r.nextID),
-			SessionID: fmt.Sprintf("session-%d", r.nextID),
-		},
-		epic: opts.Epic,
+		Session: agentrunner.Session{Label: opts.Label, ID: id, SessionID: sessionID},
+		epic:    opts.Epic,
+		cwd:     opts.Cwd,
 	}
 	ss.status = agentrunner.Status{State: agentrunner.StateIdle, SessionID: ss.SessionID}
 	r.sessions = append(r.sessions, ss)

@@ -72,6 +72,9 @@ type Coordinator struct {
 // mutate PATH, which panics if the test has already called t.Parallel —
 // process-wide environment changes and parallel subtests don't mix, so tests
 // using Start must stay non-parallel.
+//
+// handler's agent responses are completed the way real herdr's are (see
+// trackAgents), so a handler only has to model the states it cares about.
 func Start(t *testing.T, handler Handler) *Coordinator {
 	t.Helper()
 
@@ -89,7 +92,7 @@ func Start(t *testing.T, handler Handler) *Coordinator {
 	t.Cleanup(func() { ln.Close() })
 
 	c := &Coordinator{ln: ln}
-	go c.serve(handler)
+	go c.serve(trackAgents(handler))
 
 	binDir := t.TempDir()
 	fakeExe := filepath.Join(binDir, "herdr")

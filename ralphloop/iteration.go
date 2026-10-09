@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
 
@@ -20,14 +21,6 @@ import (
 // run before it's treated as stuck, so a hung resolution surfaces as a
 // distinct, actionable error instead of hanging the whole loop forever.
 const conflictResolutionTimeoutMs = 30 * 60 * 1000
-
-// maxLaunchAttempts bounds how many fresh panes runIteration will try when a
-// launch keeps failing with herdrrunner.ErrStuckSubmission (the initial prompt never
-// reaching the pane at all) — a genuinely bad pane rather than a slow agent,
-// so a clean retry against a new one often just works. Other launch failures
-// (agent_name_taken, agent_pane_busy, ...) are not retried this way; they
-// fall straight through to the existing needs-repair path.
-const maxLaunchAttempts = 2
 
 // runIteration drives one ticket through the full iteration lifecycle:
 // create its worktree, launch and prompt the agent, wait for it to finish,
@@ -90,45 +83,45 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 	prompt := skillPrompt(p.Agent, skill, ticketAddress(p.Ticket))
 
-	var tab herdr.CreatedTab
+	s, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
+		Label: label,
+		Epic:  p.FeatureBranch,
+		Cwd:   path,
+		Kind:  agentrunner.Kind(p.Agent),
+		Args:  agentArgs(p.Agent, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
+	}, prompt, func(attempt int, kind events.Kind, err error) {
+		p.logLaunchFailed(label, attempt, kind, err)
+	})
+	var launchFail *launchFailure
+	if errors.As(err, &launchFail) {
+		return err
+	}
+	launchParams := p.launchAndPromptParams(label, s.ID, iterationTabID(d, label), prompt, path, string(events.IterationStarted), string(events.IterationFinished))
+	launchParams.Session = s
 	var sessionID string
-	for attempt := 1; ; attempt++ {
-		tab, err = d.TabCreate(herdr.TabCreateOptions{
-			WorkspaceID: p.WorkspaceID,
-			Cwd:         path,
-			Label:       label,
-		})
-		if err != nil {
-			return fmt.Errorf("opening iteration tab: %w", err)
+	if errors.Is(err, agentrunner.ErrNotReady) {
+		// The agent is live but blocked on a dialog gx did not raise: same
+		// park as a mid-turn block. One that cleared before the re-check is a
+		// plain launch failure.
+		parked, parkErr := parkOnBlockedPane(d, launchParams, s.SessionID)
+		if parkErr != nil {
+			return parkErr
 		}
-
-		launchParams := p.launchAndPromptParams(label, tab.RootPaneID, tab.TabID, prompt, path, string(events.IterationStarted), string(events.IterationFinished))
-		sessionID, err = launchAndPrompt(d, launchParams)
-		if err != nil && !errors.Is(err, errBlockedPaneParked) {
-			kind := classifyLaunchError(err)
-			p.logLaunchFailed(label, attempt, kind, err)
-			err = &launchFailure{Kind: kind, Err: err}
+		if parked {
+			sessionID, err = s.SessionID, errBlockedPaneParked
 		}
-		if !errors.Is(err, herdrrunner.ErrStuckSubmission) || attempt >= maxLaunchAttempts {
-			break
-		}
-		// The pane never received its initial prompt at all (see
-		// herdrrunner.ErrStuckSubmission's doc comment) — close it and retry against a
-		// fresh one instead of leaving an orphaned, never-prompted pane
-		// behind for a problem a clean retry can often solve on its own.
-		if closeErr := d.TabClose(tab.TabID); closeErr != nil {
-			log.Printf("closing stuck-submission tab %s for retry: %v", tab.TabID, closeErr)
-		}
+	}
+	switch {
+	case errors.Is(err, errBlockedPaneParked):
+	case err != nil:
+		err = fmt.Errorf("sending initial prompt: %w", err)
+		p.logLaunchFailed(label, 1, events.IterationError, err)
+		return &launchFailure{Kind: events.IterationError, Err: err}
+	default:
+		sessionID, err = promptedLaunch(d, launchParams)
 	}
 	parked := errors.Is(err, errBlockedPaneParked)
 	if err != nil && !parked {
-		if errors.Is(err, herdrrunner.ErrStuckSubmission) {
-			// The retry budget is exhausted too — don't leave this last
-			// unprompted pane leaked behind a needs-repair ticket either.
-			if closeErr := d.TabClose(tab.TabID); closeErr != nil {
-				log.Printf("closing stuck-submission tab %s: %v", tab.TabID, closeErr)
-			}
-		}
 		return err
 	}
 	if sessionID != "" {
@@ -145,7 +138,19 @@ func runIteration(d Deps, p iterationParams) error {
 		return nil
 	}
 
-	return finishIteration(d, p, path, tab.RootPaneID, tab.TabID, base, branch, sessionID)
+	return finishIteration(d, p, path, launchParams.Pane, launchParams.Tab, base, branch, sessionID)
+}
+
+// iterationTabID is the tab hosting label's agent, for finishIteration's
+// cleanup. Runner sessions don't expose their tab, so herdr is asked by name;
+// on failure the tab is left open rather than failing a launched iteration.
+func iterationTabID(d Deps, label string) string {
+	agent, err := d.AgentGet(label)
+	if err != nil {
+		log.Printf("resolving %s's tab: %v", label, err)
+		return ""
+	}
+	return agent.TabID
 }
 
 // reattachIteration resumes a claimed ticket whose worktree, tab, and agent

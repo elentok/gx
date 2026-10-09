@@ -2,66 +2,17 @@ package ralphloop
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
-	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
-
-// stuckSubmissionRetryDeps builds a Deps whose git/worktree/deps-install
-// calls are all no-ops (this test only cares about runIteration's
-// TabCreate/TabClose/launch retry orchestration, not real git state), and
-// whose herdr calls are driven by the given per-attempt AgentPrompt/AgentWait
-// stubs. tabIDs records the TabID handed out by each TabCreate call in
-// order; closedTabIDs records every TabID passed to TabClose in order.
-func stuckSubmissionRetryDeps(t *testing.T, agentPrompt func(attempt int) (herdr.Agent, error)) (d Deps, tabIDs *[]string, closedTabIDs *[]string) {
-	t.Helper()
-	tabIDs = &[]string{}
-	closedTabIDs = &[]string{}
-	tabAttempt := 0
-
-	d = Deps{
-		RevParse: func(dir, ref string) (string, error) {
-			if ref == "feature" {
-				return "feature-tip", nil
-			}
-			// The iteration branch doesn't exist yet (branchExists' check).
-			return "", errors.New("no such ref")
-		},
-		AddWorktree: func(repoDir, path, branch, base string) error { return nil },
-		InstallDeps: func(path string) (string, error) { return "", nil },
-		TabCreate: func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
-			tabAttempt++
-			tab := herdr.CreatedTab{
-				Tab:        herdr.Tab{TabID: "tab-" + string(rune('0'+tabAttempt))},
-				RootPaneID: "pane-" + string(rune('0'+tabAttempt)),
-			}
-			*tabIDs = append(*tabIDs, tab.TabID)
-			return tab, nil
-		},
-		TabClose: func(tabID string) error {
-			*closedTabIDs = append(*closedTabIDs, tabID)
-			return nil
-		},
-		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			// Only used here for "wait for idle after launch" (launch.go)
-			// before the initial prompt; waitForFinish's own polling isn't
-			// reached in this test since every attempt fails at the prompt
-			// step itself.
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			return agentPrompt(tabAttempt)
-		},
-	}
-	return d, tabIDs, closedTabIDs
-}
 
 func testIterationParams() iterationParams {
 	return iterationParams{
@@ -78,111 +29,42 @@ func testIterationParams() iterationParams {
 	}
 }
 
-// TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh is a regression
-// test for the fix-spinner/04 incident: a launch whose initial prompt never
-// reaches the pane at all (herdrrunner.ErrStuckSubmission) must not bounce the ticket to
-// needs-repair while leaking a live, never-prompted pane behind it. Instead
-// runIteration should close that pane and retry against a fresh one.
-func TestRunIteration_StuckSubmission_ClosesPaneAndRetriesFresh(t *testing.T) {
-	t.Parallel()
-	boom := errors.New("boom: some unrelated failure once the prompt actually lands")
-	d, tabIDs, closedTabIDs := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
-		if attempt == 1 {
-			return herdr.Agent{}, herdrrunner.ErrStuckSubmission
-		}
-		// The retry's prompt lands fine; a distinct, non-retryable error
-		// further down the pipeline ends the test here so it doesn't have to
-		// stub waitForFinish's full polling machinery too.
-		return herdr.Agent{}, boom
+const launchEpic = "my-epic"
+
+var launchLabel = iterLabel(launchEpic, "01")
+
+// runLaunchEpic runs a one-ticket epic on d, until it parks if parks is set,
+// and returns its scratch dir.
+func runLaunchEpic(t *testing.T, d Deps, parks bool) string {
+	t.Helper()
+	scratchDir := writeEpic(t, launchEpic, map[string]string{
+		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
+	opts := RunOptions{EpicName: launchEpic, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}
+	if parks {
+		runUntilParked(t, opts, d, noopEventSink{})
+	} else if err := Run(opts, d, noopEventSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	return scratchDir
+}
 
-	err := runIteration(d, testIterationParams())
-	if err == nil {
-		t.Fatal("runIteration() error = nil, want the second attempt's error")
+func assertTicketStatus(t *testing.T, scratchDir, status string) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(scratchDir, launchEpic, "issues", "01-first.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
 	}
-	if !errors.Is(err, boom) {
-		t.Errorf("runIteration() error = %v, want it to wrap the second attempt's error %v", err, boom)
-	}
-	if errors.Is(err, herdrrunner.ErrStuckSubmission) {
-		t.Errorf("runIteration() error = %v, want no trace of herdrrunner.ErrStuckSubmission (only the first attempt hit it)", err)
-	}
-
-	if len(*tabIDs) != 2 {
-		t.Fatalf("TabCreate called %d times, want 2 (initial + one retry)", len(*tabIDs))
-	}
-	if len(*closedTabIDs) != 1 || (*closedTabIDs)[0] != (*tabIDs)[0] {
-		t.Errorf("TabClose calls = %v, want exactly [%s] (only the first, stuck-submission pane)", *closedTabIDs, (*tabIDs)[0])
+	if !strings.Contains(string(raw), "status: "+status) {
+		t.Errorf("ticket not %s:\n%s", status, raw)
 	}
 }
 
-// TestRunIteration_StuckSubmission_ExhaustsRetries_ClosesBothPanes covers the
-// case where every launch attempt hits herdrrunner.ErrStuckSubmission: runIteration
-// should stop retrying once maxLaunchAttempts is spent (not loop forever)
-// and must not leak the final attempt's pane either, even though it's the
-// one the ticket ultimately fails against.
-func TestRunIteration_StuckSubmission_ExhaustsRetries_ClosesBothPanes(t *testing.T) {
-	t.Parallel()
-	d, tabIDs, closedTabIDs := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
-		return herdr.Agent{}, herdrrunner.ErrStuckSubmission
-	})
-
-	err := runIteration(d, testIterationParams())
-	if !errors.Is(err, herdrrunner.ErrStuckSubmission) {
-		t.Fatalf("runIteration() error = %v, want it to wrap herdrrunner.ErrStuckSubmission", err)
-	}
-
-	if len(*tabIDs) != maxLaunchAttempts {
-		t.Fatalf("TabCreate called %d times, want maxLaunchAttempts (%d)", len(*tabIDs), maxLaunchAttempts)
-	}
-	if len(*closedTabIDs) != maxLaunchAttempts {
-		t.Fatalf("TabClose called %d times, want maxLaunchAttempts (%d): every stuck pane, including the last, should be closed", len(*closedTabIDs), maxLaunchAttempts)
-	}
-	for i, tabID := range *tabIDs {
-		if (*closedTabIDs)[i] != tabID {
-			t.Errorf("closedTabIDs[%d] = %q, want %q (closed in the same order they were created)", i, (*closedTabIDs)[i], tabID)
-		}
-	}
-}
-
-// TestRunIteration_SucceedsFirstAttempt_NeverRetriesOrClosesTab is the
-// sanity check that ordinary launch failures unrelated to herdrrunner.ErrStuckSubmission
-// (or a clean first-attempt failure) don't get the new retry/cleanup
-// treatment at all.
-func TestRunIteration_UnrelatedFailure_NeverRetriesOrClosesTab(t *testing.T) {
-	t.Parallel()
-	plainErr := errors.New("agent_pane_busy")
-	d, tabIDs, closedTabIDs := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
-		return herdr.Agent{}, plainErr
-	})
-
-	err := runIteration(d, testIterationParams())
-	if !errors.Is(err, plainErr) {
-		t.Fatalf("runIteration() error = %v, want it to wrap %v", err, plainErr)
-	}
-	if len(*tabIDs) != 1 {
-		t.Errorf("TabCreate called %d times, want 1 (no retry for a non-herdrrunner.ErrStuckSubmission failure)", len(*tabIDs))
-	}
-	if len(*closedTabIDs) != 0 {
-		t.Errorf("TabClose called %d times, want 0 (this failure mode's pane is left for needs-repair inspection, as before)", len(*closedTabIDs))
-	}
-}
-
-func TestRunIteration_LaunchFailures_LogOneEventPerAttempt(t *testing.T) {
-	t.Parallel()
-	d, _, _ := stuckSubmissionRetryDeps(t, func(attempt int) (herdr.Agent, error) {
-		return herdr.Agent{}, herdrrunner.ErrStuckSubmission
-	})
-	p := testIterationParams()
-	p.ScratchDir = epicScratchDir(t, p.FeatureBranch)
-
-	err := runIteration(d, p)
-	var lf *launchFailure
-	if !errors.As(err, &lf) || lf.Kind != events.AgentPromptStalled {
-		t.Fatalf("runIteration() error = %v, want launchFailure of kind %q", err, events.AgentPromptStalled)
-	}
-	evs, ok, rerr := ReadEvents(p.ScratchDir, p.FeatureBranch)
-	if !ok || rerr != nil {
-		t.Fatalf("ReadEvents() ok=%v err=%v", ok, rerr)
+func launchFailedEvents(t *testing.T, scratchDir string) []Event {
+	t.Helper()
+	evs, ok, err := ReadEvents(scratchDir, launchEpic)
+	if !ok || err != nil {
+		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
 	var failed []Event
 	for _, ev := range evs {
@@ -190,12 +72,87 @@ func TestRunIteration_LaunchFailures_LogOneEventPerAttempt(t *testing.T) {
 			failed = append(failed, ev)
 		}
 	}
-	if len(failed) != maxLaunchAttempts {
-		t.Fatalf("launch-failed events = %d, want %d", len(failed), maxLaunchAttempts)
+	return failed
+}
+
+func TestRunIteration_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.FailNextPrompts(launchLabel, 1, agentrunner.ErrNotDelivered)
+
+	scratchDir := runLaunchEpic(t, d, false)
+
+	assertTicketStatus(t, scratchDir, "done")
+	if got := r.Prompts(launchLabel); len(got) != 1 {
+		t.Errorf("delivered prompts = %v, want one on the fresh session", got)
+	}
+	failed := launchFailedEvents(t, scratchDir)
+	if len(failed) != 1 || failed[0].Kind != string(events.AgentPromptStalled) || failed[0].Attempt != 1 {
+		t.Errorf("launch-failed events = %+v, want one agent_prompt_stalled for attempt 1", failed)
+	}
+}
+
+func TestRunIteration_PromptNotDeliveredTwice_ParksPromptStalled(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.FailNextPrompts(launchLabel, 2, agentrunner.ErrNotDelivered)
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketStatus(t, scratchDir, "needs-repair")
+	if _, found, _ := r.Find(launchLabel); found {
+		t.Error("an undelivered session is still live, want both stopped")
+	}
+	failed := launchFailedEvents(t, scratchDir)
+	if len(failed) != 2 {
+		t.Fatalf("launch-failed events = %d, want 2", len(failed))
 	}
 	for i, ev := range failed {
-		if ev.Kind != string(events.AgentPromptStalled) || ev.Attempt != i+1 || ev.Label == "" {
+		if ev.Kind != string(events.AgentPromptStalled) || ev.Attempt != i+1 || ev.Label != launchLabel {
 			t.Errorf("event %d = kind %q attempt %d label %q", i, ev.Kind, ev.Attempt, ev.Label)
 		}
+	}
+}
+
+func TestRunIteration_PromptNotReady_ParksBlockedPane(t *testing.T) {
+	t.Parallel()
+	d, _, removed := fakeDeps()
+	d.AgentGet = func(target string) (herdr.Agent, error) {
+		return herdr.Agent{PaneID: target, TabID: "tab-1", AgentStatus: "blocked"}, nil
+	}
+	r := fakeRunner(d)
+	r.FailNextPrompts(launchLabel, 1, agentrunner.ErrNotReady)
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketStatus(t, scratchDir, "needs-answer")
+	if _, found, _ := r.Find(launchLabel); !found {
+		t.Error("blocked session was stopped, want it live for a person to answer")
+	}
+	if len(*removed) != 0 {
+		t.Errorf("removed worktrees = %v, want the parked worktree kept", *removed)
+	}
+	if failed := launchFailedEvents(t, scratchDir); len(failed) != 0 {
+		t.Errorf("launch-failed events = %+v, want none for a park", failed)
+	}
+}
+
+func TestRunIteration_OtherPromptError_ParksWithoutRetry(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.FailNextPrompts(launchLabel, 1, errors.New("boom"))
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketStatus(t, scratchDir, "needs-repair")
+	if _, found, _ := r.Find(launchLabel); !found {
+		t.Error("session was stopped, want it left for needs-repair inspection")
+	}
+	failed := launchFailedEvents(t, scratchDir)
+	if len(failed) != 1 || failed[0].Kind != string(events.IterationError) {
+		t.Errorf("launch-failed events = %+v, want one iteration_error", failed)
 	}
 }

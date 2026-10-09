@@ -287,9 +287,6 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	})
 
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
 	release01 := make(chan struct{})
 	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 		if strings.Contains(opts.Target, iterLabel("epic", "01")) {
