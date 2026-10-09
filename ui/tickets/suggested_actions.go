@@ -65,12 +65,18 @@ const actionAnswer = "answer"
 // default. handleSuggestedActionsKey/handleQueueSuggestedActionsKey toast
 // "no suggested actions" rather than opening an empty menu.
 //
-// herdrDown (ui.Settings.HerdrUnavailable) drops the herdr-only items:
-// Investigate, whose launch opens a herdr tab, and Answer in pane.
-func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, herdrDown bool) []components.MenuItem {
+// native (the ticket's agent runs on a native runner) swaps Answer in pane
+// for Watch agent. herdrDown (ui.Settings.HerdrUnavailable) drops the
+// herdr-only items: Investigate, whose launch opens a herdr tab, and Answer
+// in pane.
+func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, native, herdrDown bool) []components.MenuItem {
 	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
-		if paneLive && !herdrDown {
+		if native {
+			items = append(items,
+				components.MenuItem{Label: "Watch agent", Value: actionWatchAgent},
+				components.MenuItem{Label: "Answer…", Value: actionAnswer})
+		} else if paneLive && !herdrDown {
 			items = append(items, components.MenuItem{Label: "Answer in pane", Value: actionAnswerInPane})
 		} else {
 			items = append(items, components.MenuItem{Label: "Answer…", Value: actionAnswer})
@@ -89,7 +95,7 @@ func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, 
 // ticketHasSuggestedActions reports whether ticket's row should carry the
 // "m" suggested-actions badge (ui.IconSet.SuggestedAction).
 func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) bool {
-	return len(suggestedActionItems(status, ticket, false, herdrDown)) > 0
+	return len(suggestedActionItems(status, ticket, false, false, herdrDown)) > 0
 }
 
 // applySuggestedAction performs action's write against the ticket at path.

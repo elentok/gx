@@ -18,7 +18,7 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
 	status := r.epic.RenderedStatus(r.ticket)
-	items := suggestedActionItems(status, r.ticket, ticketPaneLive(status, r.epic.Name, r.ticket.DisplayNumber()), m.settings.HerdrUnavailable)
+	items := suggestedActionItems(status, r.ticket, ticketPaneLive(status, r.epic.Name, r.ticket.DisplayNumber()), false, m.settings.HerdrUnavailable)
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
 	}

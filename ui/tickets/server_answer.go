@@ -68,6 +68,8 @@ func (m Model) serverAnswerActionCmd(result actionsMenuResult) (tea.Cmd, bool) {
 			return notify.Error("answer: " + err.Error()), true
 		}
 		return cmdAnswerThen(m.worktreeRoot, m.settings, path, m.cmdServerResumeAnswered(address)), true
+	case actionWatchAgent:
+		return cmdWatchAgent(address), true
 	case actionAnswerInPane:
 		return m.cmdServerFocusPane(address), true
 	}

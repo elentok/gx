@@ -129,6 +129,9 @@ type Model struct {
 	// row's rendered status each time "m" opens it.
 	actionsMenu actionsMenuModel
 
+	// watch backs the Watch agent modal (watch_agent.go).
+	watch watchModal
+
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab on the down
 	// fallback for good.
 	serverAPI ServerAPI
@@ -197,7 +200,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen
+	return m.help.IsOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen || m.watch.open
 }
 
 func (m Model) Init() tea.Cmd {
@@ -271,10 +274,19 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case checkAddConfirmedMsg:
 		return m.handleCheckAddConfirmed(msg)
 
+	case watchLoadedMsg:
+		m.watch = m.watch.Open(msg.title, msg.lines, m.width, m.height)
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd
 			m.help, cmd = m.help.Update(msg)
+			return m, cmd
+		}
+		if m.watch.open {
+			var cmd tea.Cmd
+			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
 		if m.statusMenuOpen {
@@ -289,7 +301,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.statusMenuOpen || m.actionsMenu.IsOpen {
+		if m.statusMenuOpen || m.actionsMenu.IsOpen || m.watch.open {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -463,6 +475,9 @@ func (m Model) View() tea.View {
 		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
+	}
+	if m.watch.open {
+		content = ui.OverlayCenter(content, m.watch.View(), m.width, m.height)
 	}
 	if m.help.IsOpen {
 		content = ui.OverlayCenter(content, m.help.View(), m.width, m.height)
