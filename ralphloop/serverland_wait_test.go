@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -70,9 +71,20 @@ type blipRunner struct {
 	finishPollsOnly bool
 	// interruptErr, when set, fails every Interrupt.
 	interruptErr error
-	waits        int
-	finishPolls  int
-	interrupts   int
+	// contextExhausted, when set, is the evidence of the next RateLimit call
+	// alone failing with ErrContextExhausted; later calls see the fake's state.
+	contextExhausted string
+	waits            int
+	finishPolls      int
+	interrupts       int
+}
+
+func (r *blipRunner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
+	if evidence := r.contextExhausted; evidence != "" {
+		r.contextExhausted = ""
+		return time.Time{}, false, fmt.Errorf("%w: %s", agentrunner.ErrContextExhausted, evidence)
+	}
+	return r.Runner.RateLimit(s)
 }
 
 func (r *blipRunner) Interrupt(s agentrunner.Session) error {

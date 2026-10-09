@@ -240,6 +240,34 @@ func TestRateLimit_CodexContextExhausted(t *testing.T) {
 	}
 }
 
+func TestRateLimit_CodexIncidentalPaneTextIsNeither(t *testing.T) {
+	for _, text := range []string{
+		"Error: request failed with status 500",
+		`I am adding detection for "Your input exceeds the context window of this model."`,
+		"The response included context_length_exceeded, which we should classify.",
+		"blocked: approve this command",
+	} {
+		r, state, s := startCodex(t, nil)
+		if err := state.SetPaneText(s.Label, text); err != nil {
+			t.Fatal(err)
+		}
+		if _, limited, err := r.RateLimit(s); err != nil || limited {
+			t.Errorf("RateLimit(%q) = limited %v, err %v; want neither", text, limited, err)
+		}
+	}
+}
+
+func TestRateLimit_CodexQuotaReadErrorIsReturned(t *testing.T) {
+	boom := errors.New("rollout unreadable")
+	r, _, s := startCodex(t, func(string, string) (codexsession.RateLimit, bool, error) {
+		return codexsession.RateLimit{}, false, boom
+	})
+	s.SessionID = "session-1"
+	if _, _, err := r.RateLimit(s); !errors.Is(err, boom) {
+		t.Fatalf("RateLimit err = %v, want %v", err, boom)
+	}
+}
+
 func TestFind_UnknownLabel(t *testing.T) {
 	herdrfake.StartAgentHost(t, herdrfake.NewState(t))
 	_, ok, err := herdrrunner.New().Find("nobody")

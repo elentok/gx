@@ -3,13 +3,11 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -75,12 +73,12 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					continue
 				}
 				if p.Agent == AgentCodex {
-					limit, exhausted, limitErr := codexRateLimit(d, p.SessionCwd, sessionID, p.Pane)
+					resetAt, limited, _, limitErr := runnerRateLimit(d, p)
 					if limitErr != nil {
 						return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
 					}
-					if exhausted {
-						if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
+					if limited {
+						if err := recoverCodexRateLimit(d, p, sessionID, resetAt); err != nil {
 							return err
 						}
 						elapsedMs = 0
@@ -105,27 +103,27 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			// while it's still working, which is what caused false alarms
 			// from stale "approaching the limit" mentions still visible in
 			// scrollback mid-turn.
-			if p.Agent == AgentCodex {
-				recovered, recoveryErr := recoverCodexContextExhaustion(d, p, sessionID, smartZone)
-				if recoveryErr != nil {
-					return recoveryErr
+			// A read failure here is not worth failing a finish over: the
+			// ordinary finish checks below run regardless. Codex quota is
+			// deliberately not acted on here, only its context exhaustion.
+			resetAt, limited, evidence, _ := runnerRateLimit(d, p)
+			if p.Agent == AgentCodex && evidence != "" {
+				if err := d.Runner.Interrupt(p.session()); err != nil {
+					return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
 				}
-				if recovered {
-					elapsedMs = 0
-					continue
+				if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
+					return err
 				}
+				elapsedMs = 0
+				continue
 			}
 
-			if p.Agent == AgentClaude && d.ReadPaneRecent != nil {
-				if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
-					if token, matched := herdrrunner.DetectRateLimit(text); matched {
-						if err := recoverClaudeRateLimit(d, p, sessionID, token); err != nil {
-							return err
-						}
-						elapsedMs = 0
-						continue
-					}
+			if p.Agent == AgentClaude && limited {
+				if err := recoverClaudeRateLimit(d, p, sessionID, resetAt); err != nil {
+					return err
 				}
+				elapsedMs = 0
+				continue
 			}
 
 			confirmed, err := confirmFinished(d, p.session(), waitForFinishStates)
@@ -189,12 +187,12 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		elapsedMs += pollMs
 
 		if p.Agent == AgentCodex {
-			limit, exhausted, evidence, checkErr := codexQuotaOrContextExhaustion(d, p.SessionCwd, sessionID, p.Pane)
+			resetAt, limited, evidence, checkErr := runnerRateLimit(d, p)
 			if checkErr != nil {
 				return fmt.Errorf("detecting %s Codex quota: %w", p.Label, checkErr)
 			}
-			if exhausted {
-				if err := recoverCodexRateLimit(d, p, sessionID, limit); err != nil {
+			if limited {
+				if err := recoverCodexRateLimit(d, p, sessionID, resetAt); err != nil {
 					return err
 				}
 				elapsedMs = 0
@@ -707,55 +705,47 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 // via waitForClaudeRateLimitReset (racing the reset deadline against a
 // resume request rather than blocking through it), then resumes and
 // re-prompts the agent to continue.
-func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID, token string) error {
+func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID string, resetAt time.Time) error {
 	reason := "rate limit detected"
-	if token != "" {
-		reason = fmt.Sprintf("rate limit detected, resets %s", token)
+	if !resetAt.IsZero() {
+		reason = fmt.Sprintf("rate limit detected, resets %s", resetAt.UTC().Format(time.RFC3339))
 	}
 	p.Gate.pause(p.Label, reason)
 	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
-	waitForClaudeRateLimitReset(d, p.Gate, p.Label, p.Pane, token)
+	waitForClaudeRateLimitReset(d, p.Gate, p.session(), resetAt)
 	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
 	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	p.Gate.ForceResume(p.Label)
 
-	if _, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: p.Pane,
-		Text:   "continue",
-		Wait:   true,
-		Until:  []string{"working"},
-	}); err != nil {
+	if err := d.Runner.Prompt(p.session(), "continue"); err != nil {
 		return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
 	}
 	return nil
 }
 
-func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, limit codexsession.RateLimit) error {
-	reason := fmt.Sprintf("Codex %s quota exhausted", limit.Quota)
-	if !limit.ResetAt.IsZero() {
-		reason += fmt.Sprintf(", resets %s", limit.ResetAt.UTC().Format(time.RFC3339))
+func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, resetAt time.Time) error {
+	reason := "Codex quota exhausted"
+	if !resetAt.IsZero() {
+		reason += fmt.Sprintf(", resets %s", resetAt.UTC().Format(time.RFC3339))
 	}
 	p.Gate.pause(p.Label, reason)
 	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
 	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
-	waitForCodexRateLimitReset(d, p.SessionCwd, sessionID, limit)
+	waitForCodexRateLimitReset(d, p.session(), resetAt)
 	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
 	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	p.Gate.ForceResume(p.Label)
 
-	agent, err := d.AgentWait(herdr.AgentWaitOptions{
-		Target: p.Pane,
-		Until:  []string{"idle", "done", "working", "blocked"},
-	})
+	st, err := d.Runner.Status(p.session())
 	if err != nil {
 		return fmt.Errorf("re-observing %s after Codex quota reset: %w", p.Label, err)
 	}
-	if agent.AgentStatus != "blocked" {
+	if st.State != agentrunner.StateBlocked {
 		return nil
 	}
 
-	return parkBlockedAfterCodexQuotaReset(d, p, sessionID)
+	return parkBlockedAfterCodexQuotaReset(p, sessionID, st.BlockedReason)
 }
 
 // parkBlockedAfterCodexQuotaReset handles a Codex pane that comes back
@@ -766,12 +756,11 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, li
 // be sent. There is also no trust_directory branch to try: the directory was
 // already trusted at launch and gx was asleep for the reset, so the only
 // answerable-dialog case (see ticket 01) can't occur here. This parks for a
-// human instead, naming the unanswered dialog by its matched_rule.id (read
-// via AgentExplain) — unlike parkOnBlockedPane, whose park reason names no
-// rule id at all.
-func parkBlockedAfterCodexQuotaReset(d Deps, p launchAndPromptParams, sessionID string) error {
-	ruleID := herdrrunner.MatchedRuleID(d.AgentExplain, p.Pane)
-	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, ruleID)
+// human instead, naming the unanswered dialog by the runner's
+// Status.BlockedReason — unlike parkOnBlockedPane, whose park reason names no
+// dialog at all.
+func parkBlockedAfterCodexQuotaReset(p launchAndPromptParams, sessionID, blockedReason string) error {
+	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, blockedReason)
 	p.parkBlockedPane(sessionID, reason)
 	return errBlockedPaneParked
 }
@@ -794,8 +783,8 @@ const blockedDwellMs = 15_000
 // yet.
 var errBlockedPaneParked = errors.New("iteration parked: pane blocked on an unanswered prompt")
 
-// parkOnBlockedPane waits out blockedDwellMs, then re-reads the pane once via
-// AgentGet (a peek, not another AgentWait) and, only if it is still blocked
+// parkOnBlockedPane waits out blockedDwellMs, then re-reads the session once via
+// Runner.Status (a peek, not another Wait) and, only if it is still blocked
 // at that instant, writes the pane-answered park (needs-answer, a reason, and
 // a "## Needs Answer" stub, both naming p.Label — the pane is named by its
 // iteration label, never a raw pane id, since a label still resolves after a
@@ -813,11 +802,11 @@ var errBlockedPaneParked = errors.New("iteration parked: pane blocked on an unan
 func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parked bool, err error) {
 	d.Sleep(blockedDwellMs * time.Millisecond)
 
-	agent, err := d.AgentGet(p.Pane)
+	st, err := d.Runner.Status(p.session())
 	if err != nil {
 		return false, fmt.Errorf("rechecking %s for park: %w", p.Label, err)
 	}
-	if agent.AgentStatus != "blocked" {
+	if st.State != agentrunner.StateBlocked {
 		return false, nil
 	}
 
@@ -904,38 +893,15 @@ func sessionCompactions(d Deps, agent AgentKind, cwd, sessionID string) (int, bo
 	return d.ReadCompactions(cwd, sessionID)
 }
 
-func codexRateLimit(d Deps, cwd, sessionID, pane string) (codexsession.RateLimit, bool, error) {
-	limit, exhausted, _, err := codexQuotaOrContextExhaustion(d, cwd, sessionID, pane)
-	return limit, exhausted, err
-}
-
-func codexQuotaOrContextExhaustion(d Deps, cwd, sessionID, pane string) (codexsession.RateLimit, bool, string, error) {
-	now := time.Now()
-	if d.Now != nil {
-		now = d.Now()
+// runnerRateLimit asks the runner whether p's agent is rate limited.
+// ErrContextExhausted is not a failure: it is returned as the evidence the
+// adapter found, with limited false and a nil err.
+func runnerRateLimit(d Deps, p launchAndPromptParams) (resetAt time.Time, limited bool, evidence string, err error) {
+	resetAt, limited, err = d.Runner.RateLimit(p.session())
+	if errors.Is(err, agentrunner.ErrContextExhausted) {
+		return time.Time{}, false, strings.TrimPrefix(err.Error(), agentrunner.ErrContextExhausted.Error()+": "), nil
 	}
-	return herdrrunner.CodexQuotaOrContextExhaustion(d.ReadCodexRateLimit, d.ReadPaneRecent, now, cwd, sessionID, pane)
-}
-
-func recoverCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID string, smartZone int) (bool, error) {
-	if d.ReadPaneRecent == nil {
-		return false, nil
-	}
-	text, err := d.ReadPaneRecent(p.Pane)
-	if err != nil {
-		return false, nil
-	}
-	evidence, exhausted := herdrrunner.DetectCodexContextExhaustion(text)
-	if !exhausted {
-		return false, nil
-	}
-	if err := d.Runner.Interrupt(p.session()); err != nil {
-		return false, fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
-	}
-	if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
-		return false, err
-	}
-	return true, nil
+	return resetAt, limited, "", err
 }
 
 // recoverOrFailCodexContextExhaustion runs the compact/finish-up contract for

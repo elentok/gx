@@ -48,22 +48,9 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	// wait here resolves epic-iter-01's "done" wait to idle exactly like any
 	// other iteration's — release(pane) is what simulates that idle
 	// transition, whether it's a real finish or, as here, a rate limit.
+	runner := fakeRunner(d)
 	g := newGatedRunner(d.Runner)
 	d.Runner = g
-
-	var rlMu sync.Mutex
-	rateLimitCleared := false
-	d.ReadPaneRecent = func(pane string) (string, error) {
-		if !strings.Contains(pane, "epic-iter-01") {
-			return "working on it", nil
-		}
-		rlMu.Lock()
-		defer rlMu.Unlock()
-		if rateLimitCleared {
-			return "back to normal", nil
-		}
-		return "Claude usage limit reached", nil
-	}
 
 	sendKeysCh := make(chan []string, 1)
 	d.AgentSendKeys = func(target string, keys ...string) error {
@@ -71,8 +58,8 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		return nil
 	}
 
-	// No parseable reset time in "Claude usage limit reached", so the wait
-	// falls back to re-checking ReadPaneRecent every rateLimitPollInterval.
+	// The limit has no known reset time, so the wait falls back to asking the
+	// runner again every rateLimitPollInterval.
 	// Advance a fake clock on every Sleep so that cadence is actually
 	// reached without a real 5-minute wait.
 	var clockMu sync.Mutex
@@ -108,7 +95,8 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		}
 	}
 
-	// epic-iter-01's pane goes idle showing the rate-limit message.
+	// epic-iter-01's pane goes idle with the runner reporting it rate limited.
+	runner.SetLimitedUnknownReset(iter1)
 	g.release(iter1)
 
 	select {
@@ -138,9 +126,7 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		t.Fatalf("worktrees created while paused = %v, want exactly [epic, epic-iter-01, epic-iter-02] (no backfill until resumed)", createdSoFar)
 	}
 
-	rlMu.Lock()
-	rateLimitCleared = true
-	rlMu.Unlock()
+	runner.SetRateLimit(iter1, time.Time{})
 
 	// Ticket 03 is backfilled once epic-iter-01's pause clears (its own gate was
 	// already closed by the earlier release, so it re-observes idle and

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -195,7 +196,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
-	deps.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+	deps.Runner.(*herdrrunner.Runner).CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		rateLimitMu.Lock()
 		rateLimitCalls++
 		call := rateLimitCalls
@@ -233,7 +234,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	}
 
 	if rateLimitCalls < 4 {
-		t.Errorf("ReadCodexRateLimit calls = %d, want at least 4 (converging within codexRateLimitMaxRepolls)", rateLimitCalls)
+		t.Errorf("CodexQuota calls = %d, want at least 4 (converging within codexRateLimitMaxRepolls)", rateLimitCalls)
 	}
 
 	featurePath := filepath.Join(wtDir, epicName)
@@ -578,7 +579,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
-	deps.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+	deps.Runner.(*herdrrunner.Runner).CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		if sessionID == contextSessionID {
 			// Ticket 01's own quota reads go through the real reader against
 			// its synthetic rollout file, which never reports an exhausted

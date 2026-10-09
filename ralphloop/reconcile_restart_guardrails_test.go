@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -88,14 +87,8 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	}
 	hostLiveAgent(t, d, "epic-iter-01")
 	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "usage limit")
-	var quotaChecks int
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		quotaChecks++
-		if quotaChecks > 1 {
-			return codexsession.RateLimit{}, false, nil
-		}
-		return codexsession.RateLimit{Quota: "primary", ResetAt: time.Now().Add(-time.Second)}, true, nil
-	}
+	fakeRunner(d).SetRateLimit("epic-iter-01", time.Now().Add(-time.Second))
+	d.Sleep = func(time.Duration) { fakeRunner(d).SetRateLimit("epic-iter-01", time.Time{}) }
 	var prompts []string
 	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		prompts = append(prompts, opts.Text)
@@ -108,78 +101,6 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	// parked ticket to prove it landed on needs-answer with the reset's
 	// pane never prompted, then marks it done directly, the same way a person
 	// resolving the dialog by hand would let the run settle.
-	path := ticketPath(scratchDir, "epic", "01-a.md")
-	var parkPolls int
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		parkPolls++
-		if parkPolls == 1 {
-			raw, err := os.ReadFile(path)
-			if err != nil {
-				t.Errorf("ReadFile %s: %v", path, err)
-			} else if !strings.Contains(string(raw), "needs-answer") {
-				t.Errorf("ticket at first park poll = %s, want needs-answer", raw)
-			}
-			if err := SetStatus(path, "done"); err != nil {
-				t.Errorf("SetStatus %s: %v", path, err)
-			}
-		}
-		return readyTimer(dur)
-	}
-
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	if len(prompts) != 0 {
-		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", prompts)
-	}
-	if len(*removed) != 0 {
-		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary landing path", *removed)
-	}
-	if parkPolls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the blocked-after-reset ticket")
-	}
-}
-
-// TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands covers the
-// other half of ticket 23's second requirement: when structured session data
-// can't identify the block, a reattached Codex iteration's wait still falls
-// back to reading the pane's recent output to detect the quota message. Per
-// ticket 04, a pane still blocked once that reset completes must park for a
-// human instead of being re-prompted.
-func TestRun_ReattachedCodexQuota_PaneTextFallbackRecoversThenLands(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
-	})
-	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
-	}
-	var waits int
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		waits++
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
-	}
-	hostLiveAgent(t, d, "epic-iter-01")
-	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "usage limit")
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		return codexsession.RateLimit{}, false, nil
-	}
-	d.ReadPaneRecent = func(pane string) (string, error) {
-		return "You've hit your usage limit. Try again in 2 hours 33 minutes 12 seconds.", nil
-	}
-	var prompts []string
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		prompts = append(prompts, opts.Text)
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
-	// Same rationale as the structured-recovery test above: the pane stays
-	// blocked forever here, so the park poll doubles as the "human" that
-	// notices the park and resolves it, after proving it landed correctly.
 	path := ticketPath(scratchDir, "epic", "01-a.md")
 	var parkPolls int
 	d.ParkTimer = func(dur time.Duration) <-chan time.Time {

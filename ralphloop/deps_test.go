@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -321,12 +322,12 @@ func TestDefaultDepsWithOverrides_CodexHomeOverridesContextAndRateLimitReads(t *
 		t.Errorf("ReadCodexContext() = (%d, %t), want (151000, true)", tokens, ok)
 	}
 
-	limit, ok, err := deps.ReadCodexRateLimit("/repo/iter-01", "session-1")
+	limit, ok, err := deps.Runner.(*herdrrunner.Runner).CodexQuota("/repo/iter-01", "session-1")
 	if err != nil {
-		t.Fatalf("ReadCodexRateLimit() error = %v", err)
+		t.Fatalf("CodexQuota() error = %v", err)
 	}
 	if !ok || limit.Quota != "primary" {
-		t.Errorf("ReadCodexRateLimit() = (%+v, %t), want exhausted primary, ok=true", limit, ok)
+		t.Errorf("CodexQuota() = (%+v, %t), want exhausted primary, ok=true", limit, ok)
 	}
 }
 

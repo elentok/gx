@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -25,28 +24,18 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	scratchDir := epicScratchDir(t, "epic")
 
+	runner := blockedRunner("iter-01")
+	runner.SetState("iter-01", agentrunner.StateBlocked, "trust_directory")
 	d := Deps{
-		Now:   func() time.Time { return time.Unix(0, 0) },
-		Sleep: func(time.Duration) {},
-		ReadCodexRateLimit: func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-			return codexsession.RateLimit{}, false, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-		},
-		AgentExplain: func(target string) (herdr.AgentExplainResult, error) {
-			return herdr.AgentExplainResult{State: "blocked", MatchedRuleID: "trust_directory"}, nil
-		},
-		AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
-			t.Fatal("AgentPrompt was called on a pane herdr reports blocked; must never prompt it")
-			return herdr.Agent{}, nil
-		},
+		Now:    func() time.Time { return time.Unix(0, 0) },
+		Sleep:  func(time.Duration) {},
+		Runner: runner,
 	}
 
 	err := recoverCodexRateLimit(d, launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
-	}, "sess-1", codexsession.RateLimit{Quota: "usage"})
+	}, "sess-1", time.Time{})
 	if !errors.Is(err, errBlockedPaneParked) {
 		t.Fatalf("recoverCodexRateLimit() err = %v, want errBlockedPaneParked", err)
 	}
@@ -91,35 +80,24 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 // all.
 func TestRecoverCodexRateLimit_NonBlockedAfterReset_ReturnsWithoutSendingAnything(t *testing.T) {
 	t.Parallel()
-	for _, status := range []string{"idle", "done", "working"} {
-		t.Run(status, func(t *testing.T) {
+	for _, state := range []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone, agentrunner.StateWorking} {
+		t.Run(string(state), func(t *testing.T) {
 			t.Parallel()
 			ticketPath := writeFrontmatterTicket(t, "claimed")
 			scratchDir := t.TempDir()
 
+			runner := idleRunner("iter-01")
+			runner.SetState("iter-01", state, "")
 			d := Deps{
-				Now:   func() time.Time { return time.Unix(0, 0) },
-				Sleep: func(time.Duration) {},
-				ReadCodexRateLimit: func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-					return codexsession.RateLimit{}, false, nil
-				},
-				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-					return herdr.Agent{PaneID: opts.Target, AgentStatus: status}, nil
-				},
-				AgentExplain: func(target string) (herdr.AgentExplainResult, error) {
-					t.Fatal("AgentExplain was called for a non-blocked pane")
-					return herdr.AgentExplainResult{}, nil
-				},
-				AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
-					t.Fatal("AgentPrompt was called on the unaffected non-blocked branch")
-					return herdr.Agent{}, nil
-				},
+				Now:    func() time.Time { return time.Unix(0, 0) },
+				Sleep:  func(time.Duration) {},
+				Runner: runner,
 			}
 
 			err := recoverCodexRateLimit(d, launchAndPromptParams{
 				Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 				ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
-			}, "sess-1", codexsession.RateLimit{Quota: "usage"})
+			}, "sess-1", time.Time{})
 			if err != nil {
 				t.Fatalf("recoverCodexRateLimit() err = %v, want nil", err)
 			}

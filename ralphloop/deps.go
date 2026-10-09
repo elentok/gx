@@ -162,13 +162,6 @@ type Deps struct {
 	ReadCodexContext func(cwd, sessionID string) (tokens int, ok bool, err error)
 	// VerifyCodexSession confirms that sessionID's rollout metadata belongs to cwd.
 	VerifyCodexSession func(cwd, sessionID string) (ok bool, err error)
-	// ReadCodexRateLimit returns an exhausted Codex quota for the session
-	// launched in cwd, or ok=false when its session data is incomplete or no
-	// quota is exhausted.
-	ReadCodexRateLimit func(cwd, sessionID string) (limit codexsession.RateLimit, ok bool, err error)
-	// ReadPaneRecent returns pane's recent terminal output, used to detect a
-	// Claude usage/session rate-limit message.
-	ReadPaneRecent func(pane string) (string, error)
 	// Sleep is how a paused loop waits between poll checks.
 	Sleep func(time.Duration)
 	// Now returns the current time, injectable so a rate-limit reset
@@ -212,6 +205,13 @@ type DepsOverrides struct {
 // DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
 // in-process env reads described on DepsOverrides.
 func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
+	runner := herdrrunner.New()
+	runner.CodexQuota = codexHomeFn(overrides.CodexHome,
+		codexsession.LastRateLimit,
+		func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+			return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
+		},
+	)
 	return Deps{
 		PreflightAgent: func(agent AgentKind) error {
 			return preflightAgentWith(agent, lookPathFor(overrides.Path), commandOutput)
@@ -235,7 +235,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RemoveWorktree:        removeWorktree,
 		DeleteBranch:          deleteBranch,
 		RenameBranch:          renameBranch,
-		Runner:                herdrrunner.New(),
+		Runner:                runner,
 		TabCreate:             herdr.TabCreate,
 		TabClose:              herdr.TabClose,
 		TabList:               herdr.TabList,
@@ -318,16 +318,9 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
 			},
 		),
-		ReadCodexRateLimit: codexHomeFn(overrides.CodexHome,
-			codexsession.LastRateLimit,
-			func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-				return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
-			},
-		),
-		ReadPaneRecent: herdrrunner.ReadPaneRecent,
-		Sleep:          time.Sleep,
-		Now:            time.Now,
-		ParkTimer:      time.After,
+		Sleep:     time.Sleep,
+		Now:       time.Now,
+		ParkTimer: time.After,
 	}
 }
 

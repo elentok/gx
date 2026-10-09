@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/codexsession"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -22,17 +21,9 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	t.Parallel()
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
 	scratchDir := epicScratchDir(t, "epic")
-	var paneReads int
-	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20"), timeoutOn: 1}
+	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20"), timeoutOn: 1, contextExhausted: failure}
 	d := Deps{
 		Runner: r,
-		ReadPaneRecent: func(string) (string, error) {
-			paneReads++
-			if paneReads == 1 {
-				return failure, nil
-			}
-			return "", nil
-		},
 		ReadCodexContext: func(string, string) (int, bool, error) {
 			return 1_000, true, nil
 		},
@@ -64,19 +55,11 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 
 func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T) {
 	t.Parallel()
-	var paneReads int
-	r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20")}
-	d := Deps{
-		Runner: r,
-		ReadPaneRecent: func(string) (string, error) {
-			paneReads++
-			if paneReads == 1 {
-				return `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`, nil
-			}
-			return "", nil
-		},
-		Sleep: func(time.Duration) {},
+	r := &blipRunner{
+		Runner:           idlePromptRunner("iter-20", "codex-session-20"),
+		contextExhausted: `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`,
 	}
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
@@ -93,20 +76,9 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *testing.T) {
 	t.Parallel()
 	const failure = "■ Codex ran out of room in the model's context window."
-	var paneReads int
-	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21")}
+	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21"), contextExhausted: failure}
 	r.FailNextPrompts("iter-21", 1, errors.New("compact never landed"))
-	d := Deps{
-		Runner: r,
-		ReadPaneRecent: func(string) (string, error) {
-			paneReads++
-			if paneReads == 1 {
-				return failure, nil
-			}
-			return "", nil
-		},
-		Sleep: func(time.Duration) {},
-	}
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
@@ -129,20 +101,9 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	// recovery-failure path must not depend on a fresh high-token record
 	// existing to fire — the native exhaustion text is itself the evidence.
 	const failure = `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`
-	var paneReads int
-	r := idlePromptRunner("iter-21", "codex-session-21")
+	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21"), contextExhausted: failure}
 	r.FailNextPrompts("iter-21", 1, errors.New("compact never landed"))
-	d := Deps{
-		Runner: r,
-		ReadPaneRecent: func(string) (string, error) {
-			paneReads++
-			if paneReads == 1 {
-				return failure, nil
-			}
-			return "", nil
-		},
-		Sleep: func(time.Duration) {},
-	}
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
@@ -150,43 +111,6 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	}, "codex-session-21")
 	if err == nil || !strings.Contains(err.Error(), "recovery failed") {
 		t.Fatalf("waitForFinish() = %v, want a durable recovery-failed error without any ReadCodexContext dependency", err)
-	}
-}
-
-func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T) {
-	t.Parallel()
-	for _, text := range []string{
-		"Error: request failed with status 500",
-		`I am adding detection for "Your input exceeds the context window of this model."`,
-		"The response included context_length_exceeded, which we should classify.",
-	} {
-		t.Run(text, func(t *testing.T) {
-			t.Parallel()
-			var paneReads int
-			r := &blipRunner{Runner: idlePromptRunner("iter-20", "codex-session-20")}
-			d := Deps{
-				Runner: r,
-				ReadPaneRecent: func(string) (string, error) {
-					paneReads++
-					if paneReads == 1 {
-						return text, nil
-					}
-					return "", nil
-				},
-				Sleep: func(time.Duration) {},
-			}
-
-			err := waitForFinish(d, launchAndPromptParams{
-				Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
-				SmartZone: 150_000, Gate: NewGate(),
-			}, "codex-session-20")
-			if err != nil {
-				t.Fatalf("waitForFinish: %v", err)
-			}
-			if r.interrupts != 0 || len(r.Prompts("iter-20")) != 0 {
-				t.Errorf("pane interruptions = %d, prompts = %v, want no recovery for discussion/error text", r.interrupts, r.Prompts("iter-20"))
-			}
-		})
 	}
 }
 
@@ -1209,11 +1133,11 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 // TestWaitForFinish_BlockedPaneDwellsThenParks verifies ticket 14's core
 // gate: a pane found blocked joins the wait's completion list (so the wait
 // returns immediately instead of re-looping to a timeout), a single 15s
-// dwell precedes a re-check via AgentGet (a peek, not another AgentWait), and
+// dwell precedes a re-check via Runner.Status (a peek, not another Wait), and
 // — the pane still being blocked at the end of that window — the iteration
 // ends in a pane-answered park: needs-answer, a reason, and a "## Needs
 // Answer" stub, both naming the iteration label rather than the raw pane id.
-// It also covers the destructive-interrupt regression: no AgentPrompt call
+// It also covers the destructive-interrupt regression: no Prompt call
 // is ever made while the pane is blocked, since typing into a pane sitting
 // on an operator's own pending dialog would be exactly that.
 func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
@@ -1224,17 +1148,10 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			ticketPath := writeFrontmatterTicket(t, "claimed")
 			scratchDir := epicScratchDir(t, "epic")
 			var slept []time.Duration
-			var prompted bool
+			r := blockedRunner("iter-01")
 			d := Deps{
-				Runner: blockedRunner("iter-01"),
-				AgentGet: func(target string) (herdr.Agent, error) {
-					return herdr.Agent{PaneID: target, AgentStatus: "blocked"}, nil
-				},
-				AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
-					prompted = true
-					return herdr.Agent{}, nil
-				},
-				Sleep: func(d time.Duration) { slept = append(slept, d) },
+				Runner: r,
+				Sleep:  func(d time.Duration) { slept = append(slept, d) },
 			}
 
 			err := waitForFinish(d, launchAndPromptParams{
@@ -1247,8 +1164,8 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			if len(slept) != 1 || slept[0] != blockedDwellMs*time.Millisecond {
 				t.Errorf("Sleep calls = %v, want exactly one %v dwell", slept, blockedDwellMs*time.Millisecond)
 			}
-			if prompted {
-				t.Error("AgentPrompt was called while the pane was blocked; must never interrupt a pending operator prompt")
+			if prompts := r.Prompts("iter-01"); len(prompts) != 0 {
+				t.Errorf("prompts = %v, want none; must never interrupt a pending operator prompt", prompts)
 			}
 
 			raw, err := os.ReadFile(ticketPath)
@@ -1305,12 +1222,8 @@ func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testin
 	r := blockedRunner("iter-01")
 	d := Deps{
 		Runner: r,
-		AgentGet: func(target string) (herdr.Agent, error) {
-			// The pane cleared during the dwell; it then finishes.
-			r.SetState("iter-01", agentrunner.StateIdle, "")
-			return herdr.Agent{PaneID: target, AgentStatus: "working"}, nil
-		},
-		Sleep: func(time.Duration) {},
+		// The pane clears during the dwell; it then finishes.
+		Sleep: func(time.Duration) { r.SetState("iter-01", agentrunner.StateIdle, "") },
 	}
 
 	err := waitForFinish(d, launchAndPromptParams{
@@ -1342,10 +1255,7 @@ func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.
 	r := &blipRunner{Runner: blockedRunner("iter-01")}
 	d := Deps{
 		Runner: r,
-		AgentGet: func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: target, AgentStatus: "blocked"}, nil
-		},
-		Sleep: func(time.Duration) {},
+		Sleep:  func(time.Duration) {},
 	}
 
 	err := waitForFinish(d, launchAndPromptParams{
@@ -1389,10 +1299,6 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 2_000_000, true, nil
 		},
-		AgentGet: func(target string) (herdr.Agent, error) {
-			t.Fatal("AgentGet (the dwell recheck) was called; the inverse guard should have skipped parking without dwelling")
-			return herdr.Agent{}, nil
-		},
 		// The first two reads are the pre-"/compact" baselines (waitForFinish's
 		// own, then recoverSmartZoneBreach's own newStickyBaseline); the third
 		// is the advancement check on recovery's first poll tick, so the
@@ -1431,18 +1337,8 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 
-	var prompted bool
-	d := Deps{
-		Runner: blockedRunner("iter-01"),
-		AgentGet: func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: target, AgentStatus: "blocked", StateChangeSeq: 0}, nil
-		},
-		AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompted = true
-			return herdr.Agent{}, nil
-		},
-		Sleep: func(time.Duration) {},
-	}
+	r := blockedRunner("iter-01")
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
@@ -1451,8 +1347,8 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 	if !errors.Is(err, errBlockedPaneParked) {
 		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
 	}
-	if prompted {
-		t.Error("AgentPrompt was called; a blocked pane must never be prompted")
+	if prompts := r.Prompts("iter-01"); len(prompts) != 0 {
+		t.Errorf("prompts = %v, want none; a blocked pane must never be prompted", prompts)
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -1469,181 +1365,73 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 // TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair covers a Codex pane
 // still blocked once its quota resets: per ticket 04, that must park for a
 // human (needs-answer), never a hard failure that stalled-agent detection
-// would flag needs-repair, and never a "continue" re-prompt into a pane
-// herdr reports blocked.
+// would flag needs-repair, and never a "continue" re-prompt into a pane the
+// runner reports blocked.
 func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	t.Parallel()
-	for _, quota := range []string{"primary", "secondary"} {
-		t.Run(quota, func(t *testing.T) {
-			t.Parallel()
-			ticketPath := writeFrontmatterTicket(t, "claimed")
-			scratchDir := t.TempDir()
-			gate := NewGate()
-			sink := &quotaEventSink{}
-			var prompts, quotaChecks, interruptions int
-			var sawPausedGate bool
-			d := Deps{
-				Runner: blockedRunner("iter-01"),
-				// The quota reset's own re-observation still finds the pane blocked.
-				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-					return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-				},
-				AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
-					prompts++
-					return herdr.Agent{}, nil
-				},
-				AgentSendKeys: func(string, ...string) error {
-					interruptions++
-					return nil
-				},
-				ReadCodexRateLimit: func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-					quotaChecks++
-					if quotaChecks > 1 {
-						sawPausedGate = gate.isPaused()
-						return codexsession.RateLimit{}, false, nil
-					}
-					return codexsession.RateLimit{Quota: quota, ResetAt: time.Now().Add(-time.Second)}, true, nil
-				},
-				Sleep: func(time.Duration) {},
-				Now:   time.Now,
-			}
-
-			err := waitForFinish(d, launchAndPromptParams{
-				Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-				ScratchDir: scratchDir, EpicName: "epic", Gate: gate, Sink: sink,
-			}, "codex-session-1")
-			if !errors.Is(err, errBlockedPaneParked) {
-				t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
-			}
-			if prompts != 0 {
-				t.Errorf("continue prompts = %d, want 0 — a pane herdr reports blocked must never be prompted", prompts)
-			}
-			if interruptions != 0 {
-				t.Errorf("pane interruptions = %d, want 0", interruptions)
-			}
-			if !sawPausedGate {
-				t.Error("shared gate was not paused while waiting for the Codex quota reset")
-			}
-			if gate.isPaused() {
-				t.Error("gate remains paused after the Codex quota reset")
-			}
-			wantPaused := quotaPauseEvent{
-				identifier: "iter-01",
-				kind:       PauseRateLimit,
-			}
-			if len(sink.paused) != 1 || sink.paused[0].identifier != wantPaused.identifier ||
-				sink.paused[0].kind != wantPaused.kind || !strings.Contains(sink.paused[0].reason, "Codex "+quota+" quota exhausted") {
-				t.Errorf("paused events = %+v, want one typed %s rate-limit pause", sink.paused, quota)
-			}
-			if len(sink.resumed) != 1 || sink.resumed[0] != (quotaResumeEvent{identifier: "iter-01", kind: PauseRateLimit}) {
-				t.Errorf("resumed events = %+v, want one typed rate-limit resume", sink.resumed)
-			}
-			raw, err := os.ReadFile(ticketPath)
-			if err != nil {
-				t.Fatalf("ReadFile: %v", err)
-			}
-			if !strings.Contains(string(raw), "needs-answer") || strings.Contains(string(raw), "needs-repair") {
-				t.Errorf("ticket status = %s, want needs-answer without needs-repair", raw)
-			}
-		})
-	}
-}
-
-func TestCodexRateLimit_UsesPaneOnlyWhenStructuredQuotaCannotIdentifyBlock(t *testing.T) {
-	t.Parallel()
-	structuredErr := errors.New("rollout unreadable")
-	paneErr := errors.New("pane unreadable")
-	cases := []struct {
-		name          string
-		structured    func(string, string) (codexsession.RateLimit, bool, error)
-		pane          func(string) (string, error)
-		wantQuota     string
-		wantExhausted bool
-		wantErr       error
-		wantPaneReads int
-	}{
-		{
-			name: "structured quota wins",
-			structured: func(string, string) (codexsession.RateLimit, bool, error) {
-				return codexsession.RateLimit{Quota: "primary"}, true, nil
-			},
-			pane:          func(string) (string, error) { return "You've hit your usage limit.", nil },
-			wantQuota:     "primary",
-			wantExhausted: true,
+	ticketPath := writeFrontmatterTicket(t, "claimed")
+	scratchDir := t.TempDir()
+	gate := NewGate()
+	sink := &quotaEventSink{}
+	var sawPausedGate bool
+	r := &blipRunner{Runner: blockedRunner("iter-01")}
+	r.SetState("iter-01", agentrunner.StateBlocked, "approval_prompt")
+	r.SetRateLimit("iter-01", time.Now().Add(-time.Second))
+	d := Deps{
+		Runner: r,
+		// The reset's own recheck is the first Sleep: the quota clears there
+		// while the pane stays blocked.
+		Sleep: func(time.Duration) {
+			sawPausedGate = gate.isPaused()
+			r.SetRateLimit("iter-01", time.Time{})
 		},
-		{
-			name: "null rollout falls back to pane",
-			structured: func(string, string) (codexsession.RateLimit, bool, error) {
-				return codexsession.RateLimit{}, false, nil
-			},
-			pane:          func(string) (string, error) { return "You've hit your usage limit.", nil },
-			wantQuota:     "usage",
-			wantExhausted: true,
-			wantPaneReads: 1,
-		},
-		{
-			name: "incidental pane text is not quota",
-			structured: func(string, string) (codexsession.RateLimit, bool, error) {
-				return codexsession.RateLimit{}, false, nil
-			},
-			pane:          func(string) (string, error) { return "blocked: approve this command", nil },
-			wantPaneReads: 1,
-		},
-		{
-			name: "structured error stops classification",
-			structured: func(string, string) (codexsession.RateLimit, bool, error) {
-				return codexsession.RateLimit{}, false, structuredErr
-			},
-			pane:    func(string) (string, error) { return "You've hit your usage limit.", nil },
-			wantErr: structuredErr,
-		},
-		{
-			name: "pane error is returned",
-			structured: func(string, string) (codexsession.RateLimit, bool, error) {
-				return codexsession.RateLimit{}, false, nil
-			},
-			pane:          func(string) (string, error) { return "", paneErr },
-			wantErr:       paneErr,
-			wantPaneReads: 1,
-		},
+		Now: time.Now,
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			paneReads := 0
-			d := Deps{
-				ReadCodexRateLimit: tc.structured,
-				ReadPaneRecent: func(pane string) (string, error) {
-					paneReads++
-					return tc.pane(pane)
-				},
-				Now: func() time.Time { return time.Date(2026, 8, 4, 9, 0, 0, 0, time.UTC) },
-			}
-
-			limit, exhausted, err := codexRateLimit(d, "/repo/iter-01", "session-1", "pane-1")
-			if !errors.Is(err, tc.wantErr) {
-				t.Fatalf("error = %v, want %v", err, tc.wantErr)
-			}
-			if exhausted != tc.wantExhausted || limit.Quota != tc.wantQuota {
-				t.Errorf("limit = %+v, exhausted = %v; want quota %q, exhausted %v", limit, exhausted, tc.wantQuota, tc.wantExhausted)
-			}
-			if paneReads != tc.wantPaneReads {
-				t.Errorf("pane reads = %d, want %d", paneReads, tc.wantPaneReads)
-			}
-		})
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
+		ScratchDir: scratchDir, EpicName: "epic", Gate: gate, Sink: sink,
+	}, "codex-session-1")
+	if !errors.Is(err, errBlockedPaneParked) {
+		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+	}
+	if prompts := r.Prompts("iter-01"); len(prompts) != 0 {
+		t.Errorf("prompts = %v, want none — a blocked pane must never be prompted", prompts)
+	}
+	if r.interrupts != 0 {
+		t.Errorf("pane interruptions = %d, want 0", r.interrupts)
+	}
+	if !sawPausedGate {
+		t.Error("shared gate was not paused while waiting for the Codex quota reset")
+	}
+	if gate.isPaused() {
+		t.Error("gate remains paused after the Codex quota reset")
+	}
+	if len(sink.paused) != 1 || sink.paused[0].identifier != "iter-01" ||
+		sink.paused[0].kind != PauseRateLimit || !strings.Contains(sink.paused[0].reason, "Codex quota exhausted") {
+		t.Errorf("paused events = %+v, want one typed rate-limit pause", sink.paused)
+	}
+	if len(sink.resumed) != 1 || sink.resumed[0] != (quotaResumeEvent{identifier: "iter-01", kind: PauseRateLimit}) {
+		t.Errorf("resumed events = %+v, want one typed rate-limit resume", sink.resumed)
+	}
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "needs-answer") || strings.Contains(string(raw), "needs-repair") {
+		t.Errorf("ticket status = %s, want needs-answer without needs-repair", raw)
+	}
+	if !strings.Contains(string(raw), "approval_prompt") {
+		t.Errorf("ticket = %s, want the park reason to name the runner's blocked reason", raw)
 	}
 }
 
 func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
-	d := Deps{
-		Runner: blockedRunner("iter-01"),
-		ReadCodexRateLimit: func(string, string) (codexsession.RateLimit, bool, error) {
-			return codexsession.RateLimit{}, false, errors.New("rollout unreadable")
-		},
-	}
+	r := blockedRunner("iter-01")
+	r.SetRateLimitErr("iter-01", errors.New("rollout unreadable"))
+	d := Deps{Runner: r}
 
 	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
@@ -1660,37 +1448,26 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	}
 }
 
-func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
+func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepairWhenPaneIdlesAfterReset(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
 	sink := &quotaEventSink{}
-	structuredReads := 0
 	r := blockedRunner("iter-01")
+	r.SetLimitedUnknownReset("iter-01")
 	d := Deps{
 		Runner: r,
 		// The pane comes back idle once the quota resets.
-		AgentWait: func(herdr.AgentWaitOptions) (herdr.Agent, error) {
+		Sleep: func(time.Duration) {
+			r.SetRateLimit("iter-01", time.Time{})
 			r.SetState("iter-01", agentrunner.StateIdle, "")
-			return herdr.Agent{AgentStatus: "idle"}, nil
 		},
-		ReadCodexRateLimit: func(string, string) (codexsession.RateLimit, bool, error) {
-			structuredReads++
-			return codexsession.RateLimit{}, false, nil
-		},
-		ReadPaneRecent: func(string) (string, error) {
-			return "■ You've hit your usage limit.", nil
-		},
-		Sleep: func(time.Duration) {},
 	}
 
 	if err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: gate, Sink: sink,
 	}, "session-1"); err != nil {
 		t.Fatalf("waitForFinish: %v", err)
-	}
-	if structuredReads != 2 {
-		t.Errorf("structured quota reads = %d, want classification and reset recheck", structuredReads)
 	}
 	if len(sink.paused) != 1 || sink.paused[0].kind != PauseRateLimit || len(sink.resumed) != 1 {
 		t.Errorf("quota events = paused %+v, resumed %+v; want one of each", sink.paused, sink.resumed)
@@ -1701,55 +1478,6 @@ func TestWaitForFinish_CodexPaneQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
 		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
-	}
-}
-
-func TestWaitForFinish_CodexPaneReadErrorPreservesClaimedTicket(t *testing.T) {
-	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
-	d := Deps{
-		Runner: blockedRunner("iter-01"),
-		ReadCodexRateLimit: func(string, string) (codexsession.RateLimit, bool, error) {
-			return codexsession.RateLimit{}, false, nil
-		},
-		ReadPaneRecent: func(string) (string, error) { return "", errors.New("pane unreadable") },
-	}
-
-	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: NewGate(),
-	}, "session-1")
-	if err == nil || !strings.Contains(err.Error(), "pane unreadable") {
-		t.Fatalf("waitForFinish error = %v, want pane read failure", err)
-	}
-	raw, readErr := os.ReadFile(ticketPath)
-	if readErr != nil {
-		t.Fatalf("ReadFile: %v", readErr)
-	}
-	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
-		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
-	}
-}
-
-func TestWaitForFinish_CodexIgnoresClaudeTerminalRateLimitText(t *testing.T) {
-	t.Parallel()
-	var prompts int
-	d := Deps{
-		Runner: &blipRunner{Runner: idleRunner("iter-01"), timeoutOn: 1},
-		AgentPrompt: func(herdr.AgentPromptOptions) (herdr.Agent, error) {
-			prompts++
-			return herdr.Agent{}, nil
-		},
-		ReadPaneRecent: func(string) (string, error) { return "Claude usage limit reached", nil },
-		Sleep:          func(time.Duration) {},
-	}
-
-	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Gate: NewGate(),
-	}, "codex-session-1"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
-	}
-	if prompts != 0 {
-		t.Errorf("continue prompts = %d, want 0 from Claude terminal text", prompts)
 	}
 }
 

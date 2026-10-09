@@ -4,18 +4,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/agentrunner"
 )
 
-func TestWaitForClaudeRateLimitReset_ParseableToken_ReturnsOnceDeadlinePasses(t *testing.T) {
+func TestWaitForClaudeRateLimitReset_KnownReset_ReturnsOnceDeadlinePasses(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
-	g.pause("t1", "rate limit detected, resets 3pm")
+	g.pause("t1", "rate limit detected")
 
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
 	current := base
 	slept := 0
 	d := Deps{
+		Runner: idleRunner("t1"),
 		Sleep: func(time.Duration) {
 			slept++
 			current = current.Add(rateLimitPollInterval)
@@ -23,39 +24,41 @@ func TestWaitForClaudeRateLimitReset_ParseableToken_ReturnsOnceDeadlinePasses(t 
 		Now: func() time.Time { return current },
 	}
 
-	waitForClaudeRateLimitReset(d, g, "t1", "pane-1", "9:05am")
+	waitForClaudeRateLimitReset(d, g, agentrunner.Session{Label: "t1", ID: "pane-1"}, base.Add(5*time.Minute))
 
 	if slept == 0 {
 		t.Errorf("Sleep never called, want at least one poll before the deadline check")
 	}
 }
 
-func TestWaitForClaudeRateLimitReset_UnparseableToken_PollsUntilMessageClears(t *testing.T) {
+func TestWaitForClaudeRateLimitReset_UnknownReset_PollsUntilRunnerReportsCleared(t *testing.T) {
 	t.Parallel()
 	g := NewGate()
 	g.pause("t1", "rate limit detected")
 
+	runner := idleRunner("t1")
+	runner.SetLimitedUnknownReset("t1")
 	current := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
-	calls := 0
+	polls := 0
 	d := Deps{
+		Runner: runner,
 		// Advance wall-clock time on each Sleep so the coarse
-		// rateLimitPollInterval text-recheck cadence is actually reached
-		// without a real sleep.
-		Sleep: func(time.Duration) { current = current.Add(rateLimitPollInterval) },
-		Now:   func() time.Time { return current },
-		ReadPaneRecent: func(pane string) (string, error) {
-			calls++
-			if calls < 3 {
-				return "Claude usage limit reached", nil
+		// rateLimitPollInterval recheck cadence is actually reached without a
+		// real sleep.
+		Sleep: func(time.Duration) {
+			current = current.Add(rateLimitPollInterval)
+			polls++
+			if polls == 3 {
+				runner.SetRateLimit("t1", time.Time{})
 			}
-			return "working on the task now", nil
 		},
+		Now: func() time.Time { return current },
 	}
 
-	waitForClaudeRateLimitReset(d, g, "t1", "pane-1", "")
+	waitForClaudeRateLimitReset(d, g, agentrunner.Session{Label: "t1", ID: "pane-1"}, time.Time{})
 
-	if calls != 3 {
-		t.Errorf("ReadPaneRecent called %d times, want 3 (poll until message clears)", calls)
+	if polls != 3 {
+		t.Errorf("Sleep called %d times, want 3 (poll until the runner reports it cleared)", polls)
 	}
 }
 
@@ -70,21 +73,23 @@ func TestWaitForClaudeRateLimitReset_ForceResumed_ReturnsImmediately(t *testing.
 		Now:   time.Now,
 	}
 
-	waitForClaudeRateLimitReset(d, g, "t1", "pane-1", "3pm")
+	waitForClaudeRateLimitReset(d, g, agentrunner.Session{Label: "t1", ID: "pane-1"}, time.Now().Add(time.Hour))
 }
 
 func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing.T) {
 	t.Parallel()
-	d := Deps{}
+	runner := idleRunner("iter-01")
+	runner.SetLimitedUnknownReset("iter-01")
+	d := Deps{Runner: runner}
 	var sleeps []time.Duration
-	checks := 0
-	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		checks++
-		return codexsession.RateLimit{}, checks == 1, nil
+	d.Sleep = func(duration time.Duration) {
+		sleeps = append(sleeps, duration)
+		if len(sleeps) == 2 {
+			runner.SetRateLimit("iter-01", time.Time{})
+		}
 	}
 
-	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{Quota: "primary"})
+	waitForCodexRateLimitReset(d, agentrunner.Session{Label: "iter-01", ID: "pane-1"}, time.Time{})
 
 	if len(sleeps) != 2 || sleeps[0] != rateLimitPollInterval || sleeps[1] != rateLimitPollInterval {
 		t.Errorf("sleeps = %v, want two %v polls", sleeps, rateLimitPollInterval)
@@ -93,17 +98,14 @@ func TestWaitForCodexRateLimitReset_MissingResetPollsUntilQuotaClears(t *testing
 
 func TestWaitForCodexRateLimitReset_MissingResetAt_NeverClears_BoundedThenReturns(t *testing.T) {
 	t.Parallel()
-	d := Deps{}
-	checks := 0
-	d.Sleep = func(time.Duration) {}
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		checks++
-		return codexsession.RateLimit{}, true, nil
-	}
+	runner := idleRunner("iter-01")
+	runner.SetLimitedUnknownReset("iter-01")
+	sleeps := 0
+	d := Deps{Runner: runner, Sleep: func(time.Duration) { sleeps++ }}
 
 	done := make(chan struct{})
 	go func() {
-		waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{Quota: "primary"})
+		waitForCodexRateLimitReset(d, agentrunner.Session{Label: "iter-01", ID: "pane-1"}, time.Time{})
 		close(done)
 	}()
 
@@ -113,83 +115,59 @@ func TestWaitForCodexRateLimitReset_MissingResetAt_NeverClears_BoundedThenReturn
 		t.Fatal("waitForCodexRateLimitReset never returned: an unchanging exhausted snapshot polled indefinitely")
 	}
 
-	if checks != codexRateLimitMaxRepolls {
-		t.Errorf("quota rechecks = %d, want %d (bounded)", checks, codexRateLimitMaxRepolls)
+	if sleeps != codexRateLimitMaxRepolls {
+		t.Errorf("quota rechecks = %d, want %d (bounded)", sleeps, codexRateLimitMaxRepolls)
 	}
 }
 
 func TestWaitForCodexRateLimitReset_SleepsPastResetThenReobserves(t *testing.T) {
 	t.Parallel()
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
-	d := Deps{Now: func() time.Time { return base }}
+	runner := idleRunner("iter-01")
+	runner.SetRateLimit("iter-01", base.Add(2*time.Second))
+	d := Deps{Runner: runner, Now: func() time.Time { return base }}
 	var sleeps []time.Duration
-	checks := 0
-	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		checks++
-		return codexsession.RateLimit{}, false, nil
+	d.Sleep = func(duration time.Duration) {
+		sleeps = append(sleeps, duration)
+		runner.SetRateLimit("iter-01", time.Time{})
 	}
 
-	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
-		Quota: "secondary", ResetAt: base.Add(2 * time.Second),
-	})
+	waitForCodexRateLimitReset(d, agentrunner.Session{Label: "iter-01", ID: "pane-1"}, base.Add(2*time.Second))
 
 	if len(sleeps) != 1 || sleeps[0] < rateLimitResetBuffer {
-		t.Errorf("sleeps = %v, want a sleep through the reset plus buffer", sleeps)
-	}
-	if checks != 1 {
-		t.Errorf("quota rechecks = %d, want 1 after reset", checks)
+		t.Errorf("sleeps = %v, want a single sleep through the reset plus buffer", sleeps)
 	}
 }
 
 func TestWaitForCodexRateLimitReset_StaleResetAt_NoWaitAndBoundedRepolls(t *testing.T) {
 	t.Parallel()
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
-	d := Deps{Now: func() time.Time { return base }}
+	stale := base.Add(-time.Hour)
+	runner := idleRunner("iter-01")
+	runner.SetRateLimit("iter-01", stale)
+	d := Deps{Runner: runner, Now: func() time.Time { return base }}
 	var sleeps []time.Duration
-	checks := 0
 	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		checks++
-		return codexsession.RateLimit{}, true, nil
-	}
 
-	// ResetAt is already in the past relative to the deterministic clock —
+	// The reset is already in the past relative to the deterministic clock —
 	// an immutable pre-reset record from a deadline that already passed.
-	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
-		Quota: "secondary", ResetAt: base.Add(-time.Hour),
-	})
+	waitForCodexRateLimitReset(d, agentrunner.Session{Label: "iter-01", ID: "pane-1"}, stale)
 
 	if len(sleeps) != codexRateLimitMaxRepolls {
 		t.Errorf("sleeps = %v, want %d bounded repoll sleeps and no deadline wait", sleeps, codexRateLimitMaxRepolls)
-	}
-	// One check right after the (already-past) deadline, plus the bounded
-	// repoll loop.
-	if checks != codexRateLimitMaxRepolls+1 {
-		t.Errorf("quota rechecks = %d, want %d", checks, codexRateLimitMaxRepolls+1)
 	}
 }
 
 func TestWaitForCodexRateLimitReset_ClearedRightAfterDeadline_ReturnsWithoutRepolling(t *testing.T) {
 	t.Parallel()
 	base := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
-	d := Deps{Now: func() time.Time { return base }}
-	var sleeps []time.Duration
-	checks := 0
-	d.Sleep = func(duration time.Duration) { sleeps = append(sleeps, duration) }
-	d.ReadCodexRateLimit = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-		checks++
-		return codexsession.RateLimit{}, false, nil
+	d := Deps{
+		Runner: idleRunner("iter-01"),
+		Now:    func() time.Time { return base },
+		Sleep: func(duration time.Duration) {
+			t.Errorf("slept %v: reset already passed and quota cleared on first recheck", duration)
+		},
 	}
 
-	waitForCodexRateLimitReset(d, "/repo/iter-01", "session-1", codexsession.RateLimit{
-		Quota: "secondary", ResetAt: base.Add(-time.Hour),
-	})
-
-	if len(sleeps) != 0 {
-		t.Errorf("sleeps = %v, want none: reset already passed and quota cleared on first recheck", sleeps)
-	}
-	if checks != 1 {
-		t.Errorf("quota rechecks = %d, want 1", checks)
-	}
+	waitForCodexRateLimitReset(d, agentrunner.Session{Label: "iter-01", ID: "pane-1"}, base.Add(-time.Hour))
 }

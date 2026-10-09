@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -119,11 +118,13 @@ func TestRunIteration_PromptNotDeliveredTwice_ParksPromptStalled(t *testing.T) {
 func TestRunIteration_PromptNotReady_ParksBlockedPane(t *testing.T) {
 	t.Parallel()
 	d, _, removed := fakeDeps()
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: target, TabID: "tab-1", AgentStatus: "blocked"}, nil
-	}
 	r := fakeRunner(d)
-	r.FailNextPrompts(launchLabel, 1, agentrunner.ErrNotReady)
+	// The agent is blocked on a dialog by the time the initial prompt arrives,
+	// so the runner reports ErrNotReady and then stays blocked.
+	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
+		r.SetState(s.Label, agentrunner.StateBlocked, "trust_directory")
+		return nil
+	})
 
 	scratchDir := runLaunchEpic(t, d, true)
 
