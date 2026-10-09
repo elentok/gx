@@ -41,6 +41,7 @@ type Tab struct {
 type Pane struct {
 	ID    string
 	TabID string
+	Cwd   string
 }
 
 type Agent struct {
@@ -50,6 +51,10 @@ type Agent struct {
 	Kind      string
 	Status    string
 	SessionID string
+	// Seq and Rule back herdr's state_change_seq and agent explain's
+	// matched_rule (see RegisterAgentHost).
+	Seq  int
+	Rule string
 }
 
 type Session struct {
