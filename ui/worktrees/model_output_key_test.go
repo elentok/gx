@@ -190,6 +190,26 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 	_ = updated
 }
 
+func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalHerdr, HerdrUnavailable: true})
+	m.ready = true
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	resizeTable(&m.table, 100, 10)
+	m.table.SetRows(m.buildRows())
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if got := updated.(Model).mode; got == modeTerminalMenu {
+		t.Fatalf("o entered the terminal menu with herdr unavailable")
+	}
+}
+
 func TestOEntersTerminalMenuMode(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -310,8 +311,18 @@ func serverDeps() *app.ServerDeps {
 	return &app.ServerDeps{Client: c, Build: getVersion(), Start: serverStarter(c)}
 }
 
+// herdrUnavailable reports herdr missing from PATH or not answering. It is
+// independent of agent_runner: the herdr-only TUI features need herdr itself.
+var herdrUnavailable = func() bool {
+	if _, err := liveProbe.LookPath("herdr"); err != nil {
+		return true
+	}
+	return liveProbe.PingHerdr(agentrunner.HerdrPingTimeout) != nil
+}
+
 func settingsFromConfig(cfg config.Config) ui.Settings {
 	return ui.Settings{
+		HerdrUnavailable: herdrUnavailable(),
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
 		ImageDiffs:       cfg.ImageDiffs,
 		InputModalBottom: cfg.InputModalBottom,

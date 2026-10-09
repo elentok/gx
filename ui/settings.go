@@ -11,6 +11,11 @@ type Settings struct {
 	ImageDiffs       bool // used by the status diff view
 	InputModalBottom config.InputModalBottom
 	Terminal         Terminal
+	// HerdrUnavailable is true when herdr is missing or unreachable, whatever
+	// agent_runner says. It hides the herdr-only features (the terminal menu's
+	// herdr splits, Investigate, Answer in pane). Negative so the zero value
+	// keeps today's behaviour.
+	HerdrUnavailable bool
 	EnableNavigation bool
 	// RenderHeartbeat keeps ui/status's 1s renderTickCmd loop running. It
 	// exists solely so teatest's WaitFor (which polls rendered output) keeps

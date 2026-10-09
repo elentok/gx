@@ -21,6 +21,12 @@ func terminalMenuItems() []components.MenuItem {
 	}
 }
 
+// herdrTerminalDown reports a herdr terminal whose herdr is missing or
+// unreachable: its splits and tabs would fail, so the menu stays hidden.
+func (m Model) herdrTerminalDown() bool {
+	return m.settings.Terminal == ui.TerminalHerdr && m.settings.HerdrUnavailable
+}
+
 func (m Model) enterTerminalMenuFor(name, path string) Model {
 	m.mode = modeTerminalMenu
 	m.openTargetName = name

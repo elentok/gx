@@ -116,7 +116,7 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
 	_, paneLive := m.serverIteration(ticket.Path)
 	paneLive = paneLive && status == tickets.StatusNeedsAnswer
-	items := suggestedActionItems(status, ticket, paneLive)
+	items := suggestedActionItems(status, ticket, paneLive, m.settings.HerdrUnavailable)
 	if len(items) == 0 {
 		return m, notify.Info("no suggested actions for this ticket")
 	}

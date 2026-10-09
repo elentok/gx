@@ -249,7 +249,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	}
 
 	line := indent + triangle + style.Render(icon)
-	if ticketHasSuggestedActions(status, t) {
+	if ticketHasSuggestedActions(status, t, m.settings.HerdrUnavailable) {
 		badgeStyle := suggestedActionBadgeStyle
 		if dimmed {
 			badgeStyle = dimStyle
@@ -292,7 +292,7 @@ func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	triangleWidth := triangleColumnWidth(m.icons()) + 1
 	icon, _ := statusIconAndStyle(m.icons(), status)
 	badgeWidth := 0
-	if ticketHasSuggestedActions(status, t) {
+	if ticketHasSuggestedActions(status, t, m.settings.HerdrUnavailable) {
 		badgeWidth = lipgloss.Width(m.icons().SuggestedAction) + 1
 	}
 

@@ -64,17 +64,20 @@ const actionAnswer = "answer"
 // any status added to the enum later, instead of showing the badge by
 // default. handleSuggestedActionsKey/handleQueueSuggestedActionsKey toast
 // "no suggested actions" rather than opening an empty menu.
-func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive bool) []components.MenuItem {
+//
+// herdrDown (ui.Settings.HerdrUnavailable) drops the herdr-only items:
+// Investigate, whose launch opens a herdr tab, and Answer in pane.
+func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, herdrDown bool) []components.MenuItem {
 	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
-		if paneLive {
+		if paneLive && !herdrDown {
 			items = append(items, components.MenuItem{Label: "Answer in pane", Value: actionAnswerInPane})
 		} else {
 			items = append(items, components.MenuItem{Label: "Answer…", Value: actionAnswer})
 		}
 		items = append(items, components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
 	}
-	if status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError {
+	if !herdrDown && (status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError) {
 		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
 	}
 	if len(ticket.Mutes) > 0 {
@@ -85,8 +88,8 @@ func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, 
 
 // ticketHasSuggestedActions reports whether ticket's row should carry the
 // "m" suggested-actions badge (ui.IconSet.SuggestedAction).
-func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket) bool {
-	return len(suggestedActionItems(status, ticket, false)) > 0
+func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) bool {
+	return len(suggestedActionItems(status, ticket, false, herdrDown)) > 0
 }
 
 // applySuggestedAction performs action's write against the ticket at path.

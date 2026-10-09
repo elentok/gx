@@ -144,7 +144,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		m = m.enterTerminalMenuFor(msg.name, msg.path)
+		if !m.herdrTerminalDown() {
+			m = m.enterTerminalMenuFor(msg.name, msg.path)
+		}
 		return m, cmdLoadWorktrees(m.repo)
 
 	case terminalResultMsg:
