@@ -119,7 +119,7 @@ func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) 
 		return "", fmt.Errorf("%w %s: %v", errNoFollowUpProject, project, err)
 	}
 	epicPath := filepath.Join(dir, epic)
-	if err := ensureDraftEpic(epicPath, epic); err != nil {
+	if err := ensureDraftEpic(epicPath); err != nil {
 		return "", err
 	}
 	if path, found, err := noteOccurrence(epicPath, key, from); found || err != nil {
@@ -161,13 +161,12 @@ func noteOccurrence(epicPath, key string, from tickets.Address) (path string, fo
 
 // ensureDraftEpic creates a missing epic with status draft, so nothing in it is
 // scheduled until a person promotes it.
-func ensureDraftEpic(epicPath, name string) error {
+func ensureDraftEpic(epicPath string) error {
 	if _, err := os.Stat(epicPath); err == nil {
 		return nil
 	}
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
 		return err
 	}
-	body := fmt.Sprintf("---\nstatus: draft\n---\n\n# %s\n", name)
-	return os.WriteFile(filepath.Join(epicPath, "ticket.md"), []byte(body), 0o644)
+	return tickets.WriteEpicTicketMD(epicPath, schema.StatusDraft)
 }

@@ -49,6 +49,44 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	}
 }
 
+func TestRunTicketsAddBody_NewEpicWritesTicketMD(t *testing.T) {
+	t.Parallel()
+	epicPath := filepath.Join(t.TempDir(), "new-epic")
+
+	var stdout bytes.Buffer
+	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", false, &stdout, nil); err != nil {
+		t.Fatalf("runTicketsAddBody: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(epicPath, "ticket.md"))
+	if err != nil {
+		t.Fatalf("epic ticket.md: %v", err)
+	}
+	if want := "---\nstatus: open\n---\n\n# new-epic\n"; string(raw) != want {
+		t.Errorf("epic ticket.md = %q, want %q", raw, want)
+	}
+	if _, err := schema.ParseTicket(addedPath(t, epicPath, stdout.String())); err != nil {
+		t.Errorf("added ticket: %v", err)
+	}
+}
+
+func TestRunTicketsAddBody_ExistingEpicKeepsTicketMD(t *testing.T) {
+	t.Parallel()
+	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
+	want := "---\nstatus: draft\nbase: main\n---\n\n# Widgets\n\nKeep me.\n"
+	testutil.WriteFile(t, epicPath, "ticket.md", want)
+
+	var stdout bytes.Buffer
+	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", false, &stdout, nil); err != nil {
+		t.Fatalf("runTicketsAddBody: %v", err)
+	}
+
+	if raw, _ := os.ReadFile(filepath.Join(epicPath, "ticket.md")); string(raw) != want {
+		t.Errorf("epic ticket.md = %q, want unchanged %q", raw, want)
+	}
+}
+
 func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()

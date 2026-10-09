@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -149,6 +150,24 @@ type ticketMDYAML struct {
 	Base        string     `yaml:"base"`
 	StartedAt   *time.Time `yaml:"started_at"`
 	CompletedAt *time.Time `yaml:"completed_at"`
+}
+
+// WriteEpicTicketMD writes a minimal ticket.md for the epic at epicPath, with
+// the given status and the directory name as its heading. An existing
+// ticket.md is left alone: it carries the epic's own fields and body.
+func WriteEpicTicketMD(epicPath string, status schema.Status) error {
+	f, err := os.OpenFile(filepath.Join(epicPath, "ticket.md"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if errors.Is(err, os.ErrExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(f, "---\nstatus: %s\n---\n\n# %s\n", status, filepath.Base(epicPath))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }
 
 // loadEpicTicketMD fills epic from its ticket.md frontmatter and reports

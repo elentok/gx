@@ -459,6 +459,9 @@ func writeOneOffTicket(projectDir, epic string, tk schema.Ticket, prompt string)
 	if err := os.Mkdir(issues, 0o755); err != nil {
 		return err
 	}
+	if err := tickets.WriteEpicTicketMD(epicDir, schema.StatusOpen); err != nil {
+		return err
+	}
 	out, err := schema.MarshalTicket(tk, "\n"+prompt+"\n")
 	if err != nil {
 		return err

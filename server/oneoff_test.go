@@ -61,6 +61,9 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	if !strings.Contains(string(raw), "type: prompt") || !strings.Contains(string(raw), "fix the flaky test please") {
 		t.Fatalf("ticket = %s", raw)
 	}
+	if epicMD, err := os.ReadFile(filepath.Join(epicDir, "ticket.md")); err != nil || !strings.Contains(string(epicMD), "status: open") {
+		t.Fatalf("epic ticket.md = %q, %v; want status: open", epicMD, err)
+	}
 	log, _ := os.ReadFile(ralphloop.RunLogPath(filepath.Join(h.TicketStore, a.Project), a.Epic))
 	if !strings.Contains(string(log), `"type":"submitted"`) || !strings.Contains(string(log), res.Address) {
 		t.Fatalf("run log = %s", log)

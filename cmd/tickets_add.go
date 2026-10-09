@@ -122,6 +122,14 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 	}
 
 	epicPath = filepath.Clean(epicPath)
+	if _, err := os.Stat(epicPath); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
+			return "", err
+		}
+		if err := tickets.WriteEpicTicketMD(epicPath, schema.StatusOpen); err != nil {
+			return "", err
+		}
+	}
 
 	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
 	if err != nil {
