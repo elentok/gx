@@ -22,14 +22,11 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 	t.Parallel()
 	const failure = "■ stream disconnected before completion: Your input exceeds the context window of this model. Please adjust your input and try again."
 	scratchDir := epicScratchDir(t, "epic")
-	var waits, paneReads, interruptions int
+	var paneReads, interruptions int
 	var prompts []string
 	d := Deps{
+		Runner: &blipRunner{Runner: paneRunner("iter-20", "pane-1", "codex-session-20"), timeoutOn: 1},
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			waits++
-			if waits == 1 {
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			}
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		AgentSendKeys: func(string, ...string) error {
@@ -59,7 +56,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoversDespiteStaleOccupancy(t 
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
+	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
 		SessionCwd: "/repo/iter-20", SmartZone: 150_000, ScratchDir: scratchDir,
 		EpicName: "epic", Gate: NewGate(),
@@ -86,6 +83,7 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 	t.Parallel()
 	var paneReads, interruptions int
 	d := Deps{
+		Runner: paneRunner("iter-20", "pane-1", "codex-session-20"),
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
@@ -112,7 +110,7 @@ func TestWaitForFinish_CodexNativeContextFailureDetectedWhenSettled(t *testing.T
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
+	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-20")
@@ -129,6 +127,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 	const failure = "■ Codex ran out of room in the model's context window."
 	var paneReads, interruptions int
 	d := Deps{
+		Runner: paneRunner("iter-21", "pane-1", "codex-session-21"),
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
@@ -152,7 +151,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
+	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-21")
@@ -175,6 +174,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	const failure = `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`
 	var paneReads int
 	d := Deps{
+		Runner: paneRunner("iter-21", "pane-1", "codex-session-21"),
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
@@ -195,11 +195,11 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
+	err := waitForFinish(d, launchAndPromptParams{
 		Label: "iter-21", Agent: AgentCodex, Pane: "pane-1", Ticket: "21",
 		SmartZone: 150_000, Gate: NewGate(),
 	}, "codex-session-21")
-	if err == nil || !strings.Contains(err.Error(), "recovery failed") {
+	if err == nil ||!strings.Contains(err.Error(), "recovery failed") {
 		t.Fatalf("waitForFinish() = %v, want a durable recovery-failed error without any ReadCodexContext dependency", err)
 	}
 }
@@ -215,6 +215,7 @@ func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T
 			t.Parallel()
 			var paneReads, interruptions int
 			d := Deps{
+				Runner: paneRunner("iter-20", "pane-1", "codex-session-20"),
 				AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 					return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 				},
@@ -238,7 +239,7 @@ func TestWaitForFinish_CodexContextDiscussionDoesNotTriggerRecovery(t *testing.T
 				Sleep: func(time.Duration) {},
 			}
 
-			err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
+			err := waitForFinish(d, launchAndPromptParams{
 				Label: "iter-20", Agent: AgentCodex, Pane: "pane-1", Ticket: "20",
 				SmartZone: 150_000, Gate: NewGate(),
 			}, "codex-session-20")
@@ -263,15 +264,15 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 	var promptUntils [][]string
 	var recoveryWaitUntils [][]string
 	d := Deps{
+		Runner: &blipRunner{Runner: paneRunner("iter-01", "pane-1", "codex-session-1"), timeoutOn: 1},
+		// Recovery's own waits, which still go through herdr.
 		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
 			waits++
 			switch waits {
 			case 1:
-				return herdr.Agent{}, errors.New("timed out waiting for agent status")
-			case 2:
 				recoveryWaitUntils = append(recoveryWaitUntils, opts.Until)
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-			case 3:
+			case 2:
 				recoveryWaitUntils = append(recoveryWaitUntils, opts.Until)
 				return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 			}
@@ -299,7 +300,7 @@ func TestWaitForFinish_CodexContextBreachRecoversThroughBlockedCompactConfirmati
 		Sleep: func(time.Duration) {},
 	}
 
-	err := waitForFinish(withAgentWaitRunner(d), launchAndPromptParams{
+	err := waitForFinish(d, launchAndPromptParams{
 		Label:      "iter-01",
 		Agent:      AgentCodex,
 		Pane:       "pane-1",
