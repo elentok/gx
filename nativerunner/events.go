@@ -31,6 +31,14 @@ type event struct {
 	CompactMetadata struct {
 		Trigger string `json:"trigger"`
 	} `json:"compact_metadata"`
+	// RequestID and Request describe a control_request claude sends; only
+	// can_use_tool (a permission prompt) is read.
+	RequestID string `json:"request_id"`
+	Request   struct {
+		Subtype  string          `json:"subtype"`
+		ToolName string          `json:"tool_name"`
+		Input    json.RawMessage `json:"input"`
+	} `json:"request"`
 	Capabilities  []string   `json:"capabilities"`
 	Tasks         []struct{} `json:"tasks"`
 	RateLimitInfo struct {
@@ -56,6 +64,10 @@ type tracker struct {
 	turn      int
 	working   bool
 	blocked   bool
+	// permission is the open can_use_tool request. Claude writes it to
+	// out.jsonl and nothing records our answer there, so replaying the file
+	// after a restart rebuilds it until claude moves on.
+	permission *permission
 	// turnCmd is set once a gx command has claimed the current turn, so a
 	// second queued command starting inside it counts as a new turn.
 	turnCmd bool
@@ -80,12 +92,29 @@ func (t *tracker) status() agentrunner.Status {
 		st.State = agentrunner.StateDone
 	case t.blocked:
 		st.State = agentrunner.StateBlocked
+		st.BlockedReason = t.permission.reason()
 	case t.working || t.bgTasks > 0 || t.queued():
 		st.State = agentrunner.StateWorking
 	default:
 		st.State = agentrunner.StateIdle
 	}
 	return st
+}
+
+// permission is a tool-use request waiting for an allow or deny.
+type permission struct {
+	requestID string
+	tool      string
+	input     json.RawMessage
+}
+
+// reason names the tool and its input, so a person can judge the request
+// without opening the log. A nil permission is a block claude gave no detail on.
+func (p *permission) reason() string {
+	if p == nil {
+		return "waiting on a prompt"
+	}
+	return fmt.Sprintf("permission to use %s: %s", p.tool, p.input)
 }
 
 // queued reports a gx command claude accepted but has not started; claude
@@ -125,10 +154,10 @@ func (t *tracker) apply(e event) {
 		case "session_state_changed":
 			switch e.State {
 			case "running":
-				t.blocked = false
+				t.blocked, t.permission = false, nil
 				t.beginTurn()
 			case "idle":
-				t.blocked = false
+				t.blocked, t.permission = false, nil
 				t.working = false
 			case "requires_action":
 				t.blocked = true
@@ -157,6 +186,15 @@ func (t *tracker) apply(e event) {
 			}
 			t.beginTurn()
 			t.turnCmd = true
+		}
+	case "control_request":
+		if e.Request.Subtype == "can_use_tool" {
+			t.permission = &permission{requestID: e.RequestID, tool: e.Request.ToolName, input: e.Request.Input}
+			t.blocked = true
+		}
+	case "control_cancel_request":
+		if t.permission != nil && t.permission.requestID == e.RequestID {
+			t.permission, t.blocked = nil, false
 		}
 	case "rate_limit_event":
 		t.resetAt = time.Time{}

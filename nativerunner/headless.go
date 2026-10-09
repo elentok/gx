@@ -41,8 +41,6 @@ type Meta struct {
 	Offset int64 `json:"offset"`
 }
 
-var errUnsupported = errors.New("headless runner: not supported yet")
-
 // Headless runs claude as `claude -p` speaking stream-json, detached in its
 // own session so it outlives the server.
 type Headless struct {
@@ -562,4 +560,54 @@ func (h *Headless) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	return ss.track.resetAt, !ss.track.resetAt.IsZero(), nil
 }
 
-func (h *Headless) Answer(agentrunner.Session, agentrunner.Answer) error { return errUnsupported }
+// Answer replies to the open permission request. Text is the reason shown to
+// claude when denying; an allow ignores it. gx never answers on its own.
+func (h *Headless) Answer(s agentrunner.Session, a agentrunner.Answer) error {
+	var behavior map[string]any
+	switch a.Decision {
+	case agentrunner.DecisionAllow:
+	case agentrunner.DecisionDeny:
+		msg := a.Text
+		if msg == "" {
+			msg = "denied by the user"
+		}
+		behavior = map[string]any{"behavior": "deny", "message": msg}
+	default:
+		return fmt.Errorf("headless runner: unknown decision %q", a.Decision)
+	}
+
+	h.mu.Lock()
+	ss, err := h.live(s)
+	if err != nil {
+		h.mu.Unlock()
+		return err
+	}
+	p := ss.track.permission
+	if p == nil {
+		h.mu.Unlock()
+		return fmt.Errorf("%w: no permission request is open", agentrunner.ErrNotReady)
+	}
+	// Claimed under the lock so two answers can't both go out.
+	ss.track.permission = nil
+	h.mu.Unlock()
+
+	if behavior == nil {
+		behavior = map[string]any{"behavior": "allow", "updatedInput": p.input}
+	}
+	err = ss.send(map[string]any{
+		"type": "control_response",
+		"response": map[string]any{
+			"subtype":    "success",
+			"request_id": p.requestID,
+			"response":   behavior,
+		},
+	})
+	h.update(ss, func(t *tracker) {
+		if err != nil {
+			t.permission = p
+			return
+		}
+		t.blocked = false
+	})
+	return err
+}

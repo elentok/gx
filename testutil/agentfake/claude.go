@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/elentok/gx/claudedoctor"
 )
@@ -100,6 +101,14 @@ type message struct {
 	Message   struct {
 		Content string `json:"content"`
 	} `json:"message"`
+	// Response is gx's answer to a permission request.
+	Response struct {
+		RequestID string `json:"request_id"`
+		Response  struct {
+			Behavior string `json:"behavior"`
+			Message  string `json:"message"`
+		} `json:"response"`
+	} `json:"response"`
 	Control
 }
 
@@ -154,6 +163,14 @@ func runClaude(in io.Reader, out io.Writer, init string) error {
 		case "control_request":
 			emit(fmt.Sprintf(`{"type":"control_response","response":{"subtype":"success","request_id":%q}}`, msg.RequestID))
 			endTurn("error_during_execution")
+		case "control_response":
+			// The fake echoes the decision so a test can read what claude was told.
+			answer := msg.Response.Response
+			emit(
+				`{"type":"system","subtype":"session_state_changed","state":"running"}`,
+				fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"text","text":%q}]}}`,
+					strings.TrimSpace("permission "+answer.Behavior+" "+answer.Message)),
+			)
 		case controlType:
 			switch msg.Action {
 			case ActionFinish:
@@ -163,7 +180,10 @@ func runClaude(in io.Reader, out io.Writer, init string) error {
 				}
 				endTurn("success")
 			case ActionBlock:
-				emit(`{"type":"system","subtype":"session_state_changed","state":"requires_action"}`)
+				emit(
+					`{"type":"control_request","request_id":"perm-1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"}}}`,
+					`{"type":"system","subtype":"session_state_changed","state":"requires_action"}`,
+				)
 			case ActionRateLimit:
 				emit(fmt.Sprintf(`{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":%d}}`, msg.ResetsAt))
 			case ActionStall:

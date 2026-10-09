@@ -811,6 +811,9 @@ func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parke
 	}
 
 	reason := fmt.Sprintf("%s is blocked on a prompt gx did not send; answer it in the pane", p.Label)
+	if st.BlockedReason != "" {
+		reason = fmt.Sprintf("%s is blocked on a prompt gx did not send (%s); answer it with `gx server agents answer`, or in the pane", p.Label, st.BlockedReason)
+	}
 	p.parkBlockedPane(sessionID, reason)
 	return true, nil
 }

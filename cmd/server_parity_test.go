@@ -45,6 +45,9 @@ var routeVerbs = map[string]string{
 	"POST /v1/tickets/approve":   "server tickets approve",
 	"POST /v1/tickets/relaunch":  "server tickets relaunch",
 	"POST /v1/tickets/nudge":     "server tickets nudge",
+	"POST /v1/agents/prompt":     "server agents prompt",
+	"POST /v1/agents/interrupt":  "server agents interrupt",
+	"POST /v1/agents/answer":     "server agents answer",
 }
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {

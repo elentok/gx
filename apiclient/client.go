@@ -267,6 +267,21 @@ func (c *Client) TicketNudge(ctx context.Context, address, text string) (server.
 	return c.queueWriteTo(ctx, "/v1/tickets/nudge", server.QueueRequest{Address: address, Text: text})
 }
 
+// AgentPrompt sends text to the live agent of a ticket's iteration.
+func (c *Client) AgentPrompt(ctx context.Context, address, text string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/agents/prompt", server.QueueRequest{Address: address, Text: text})
+}
+
+// AgentInterrupt stops the current turn of a ticket's live agent.
+func (c *Client) AgentInterrupt(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/agents/interrupt", server.QueueRequest{Address: address})
+}
+
+// AgentAnswer allows or denies the permission request a ticket's agent waits on.
+func (c *Client) AgentAnswer(ctx context.Context, address, decision, text string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/agents/answer", server.QueueRequest{Address: address, Decision: decision, Text: text})
+}
+
 // TicketChanged pings the server that a direct write changed address's file.
 func (c *Client) TicketChanged(ctx context.Context, address string) error {
 	if err := c.CheckWrite(); err != nil {

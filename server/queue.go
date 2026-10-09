@@ -75,6 +75,8 @@ type QueueRequest struct {
 	Front bool `json:"front,omitempty"`
 	// Text is what a nudge types into the live pane.
 	Text string `json:"text,omitempty"`
+	// Decision is allow or deny, for answering a blocked permission request.
+	Decision string `json:"decision,omitempty"`
 
 	// actor is set only by the server's own recovery calls, never decoded from a
 	// client: a park made by recovery must not trigger recovery again.

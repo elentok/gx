@@ -41,7 +41,6 @@ func TestHeadless_Conformance(t *testing.T) {
 				t.Fatalf("control %s: %v", c.Action, err)
 			}
 		}
-		const noAnswer = "headless Answer and blocked reasons land in ticket 09"
 		runner := newRunner()
 		return runnertest.Harness{
 			Runner: runner,
@@ -84,10 +83,6 @@ func TestHeadless_Conformance(t *testing.T) {
 					}
 				}
 				return r
-			},
-			Skip: map[string]string{
-				"BlockedThenAnswer": noAnswer,
-				"AnswerNotBlocked":  noAnswer,
 			},
 		}
 	})

@@ -14,7 +14,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/agentlog"
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server"
 )
 
 type agentsWatchOpts struct {
@@ -61,7 +63,40 @@ func newServerAgentsCmd() *cobra.Command {
 	watch.Flags().IntVar(&opts.Tail, "tail", 0, "show only the last N lines (N events with --json)")
 	watch.Flags().BoolVar(&opts.JSON, "json", false, "print raw JSONL events instead of rendered lines")
 	cmd.AddCommand(watch)
+	cmd.AddCommand(agentsWriteCmd("prompt <project:epic/NN> <text>", "send a prompt to a ticket's live agent", cobra.ExactArgs(2),
+		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
+			return cl.AgentPrompt(ctx, args[0], args[1])
+		}))
+	cmd.AddCommand(agentsWriteCmd("interrupt <project:epic/NN>", "stop the current turn of a ticket's live agent", cobra.ExactArgs(1),
+		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
+			return cl.AgentInterrupt(ctx, args[0])
+		}))
+	cmd.AddCommand(agentsWriteCmd("answer <project:epic/NN> <allow|deny> [reason]", "answer the permission request a ticket's agent waits on", cobra.RangeArgs(2, 3),
+		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
+			var text string
+			if len(args) == 3 {
+				text = args[2]
+			}
+			return cl.AgentAnswer(ctx, args[0], args[1], text)
+		}))
 	return cmd
+}
+
+// agentsWriteCmd is one `gx server agents` verb that writes through the server.
+func agentsWriteCmd(use, short string, args cobra.PositionalArgs, do func(context.Context, *apiclient.Client, []string) (server.QueueResult, error)) *cobra.Command {
+	var jsonOut bool
+	c := &cobra.Command{
+		Use:   use,
+		Short: short,
+		Args:  args,
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return do(ctx, cl, args)
+			})
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return c
 }
 
 // herdrIteration looks address up among the server's live iterations.
