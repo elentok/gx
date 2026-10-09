@@ -1,6 +1,7 @@
 package herdrrunner_test
 
 import (
+	"errors"
 	"os"
 	"slices"
 	"sync"
@@ -10,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/agentrunner/runnertest"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -48,7 +50,9 @@ func TestConformance(t *testing.T) {
 				setStatus(t, s, "blocked", reason)
 			},
 			RateLimit: func(t *testing.T, s agentrunner.Session, resetAt time.Time) {
-				t.Skip("herdr RateLimit lands in a sibling ticket")
+				if err := state.SetPaneText(s.Label, "You've hit your session limit · resets "+resetAt.Format("3:04pm")); err != nil {
+					t.Fatal(err)
+				}
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				if err := state.StallAgent(s.Label); err != nil {
@@ -89,6 +93,57 @@ func TestList_TabLabelDiffersFromAgentName(t *testing.T) {
 	want := []agentrunner.Session{{Label: "epic-iter-03", ID: agent.PaneID}}
 	if !slices.Equal(got, want) {
 		t.Fatalf("List = %+v, want %+v", got, want)
+	}
+}
+
+func startCodex(t *testing.T, quota herdrrunner.CodexQuotaReader) (*herdrrunner.Runner, *herdrfake.State, agentrunner.Session) {
+	t.Helper()
+	state := herdrfake.NewState(t)
+	herdrfake.StartAgentHost(t, state)
+	r := herdrrunner.New()
+	r.BackgroundTasks = nil
+	r.CodexQuota = quota
+	s, err := r.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "codex"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r, state, s
+}
+
+func TestRateLimit_CodexQuotaRecordWinsOverPane(t *testing.T) {
+	resetAt := time.Date(2026, 8, 5, 15, 6, 0, 0, time.UTC)
+	r, _, s := startCodex(t, func(string, string) (codexsession.RateLimit, bool, error) {
+		return codexsession.RateLimit{Quota: "usage", ResetAt: resetAt}, true, nil
+	})
+	s.SessionID = "session-1"
+	got, limited, err := r.RateLimit(s)
+	if err != nil || !limited || !got.Equal(resetAt) {
+		t.Fatalf("RateLimit = %v, %v, %v; want %v, limited", got, limited, err, resetAt)
+	}
+}
+
+func TestRateLimit_CodexPaneQuota(t *testing.T) {
+	r, state, s := startCodex(t, nil)
+	if err := state.SetPaneText(s.Label, "■ You've hit your usage limit. Try again in 2 hours."); err != nil {
+		t.Fatal(err)
+	}
+	got, limited, err := r.RateLimit(s)
+	if err != nil || !limited {
+		t.Fatalf("RateLimit = %v, %v; want limited", limited, err)
+	}
+	if d := time.Until(got) - 2*time.Hour; d.Abs() > time.Minute {
+		t.Fatalf("RateLimit resetAt = %v, want ~2h from now", got)
+	}
+}
+
+func TestRateLimit_CodexContextExhausted(t *testing.T) {
+	r, state, s := startCodex(t, nil)
+	if err := state.SetPaneText(s.Label, "■ Codex ran out of room in the model's context window."); err != nil {
+		t.Fatal(err)
+	}
+	_, limited, err := r.RateLimit(s)
+	if !errors.Is(err, agentrunner.ErrContextExhausted) || limited {
+		t.Fatalf("RateLimit = %v, %v; want ErrContextExhausted, not limited", limited, err)
 	}
 }
 

@@ -57,6 +57,8 @@ type Agent struct {
 	Rule string
 	// Stalled agents never pick up a prompt (see StallAgent).
 	Stalled bool
+	// PaneText is what "agent read" returns (see SetPaneText).
+	PaneText string
 }
 
 type Session struct {

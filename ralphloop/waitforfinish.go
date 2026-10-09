@@ -119,7 +119,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 
 			if p.Agent == AgentClaude && d.ReadPaneRecent != nil {
 				if text, rlErr := d.ReadPaneRecent(p.Pane); rlErr == nil {
-					if token, matched := detectRateLimit(text); matched {
+					if token, matched := herdrrunner.DetectRateLimit(text); matched {
 						if err := recoverClaudeRateLimit(d, p, sessionID, token); err != nil {
 							return err
 						}
@@ -1057,70 +1057,16 @@ func sessionCompactions(d Deps, agent AgentKind, cwd, sessionID string) (int, bo
 }
 
 func codexRateLimit(d Deps, cwd, sessionID, pane string) (codexsession.RateLimit, bool, error) {
-	if sessionID != "" && d.ReadCodexRateLimit != nil {
-		limit, exhausted, err := d.ReadCodexRateLimit(cwd, sessionID)
-		if err != nil || exhausted {
-			return limit, exhausted, err
-		}
-	}
-	if d.ReadPaneRecent == nil {
-		return codexsession.RateLimit{}, false, nil
-	}
-	text, err := d.ReadPaneRecent(pane)
-	if err != nil {
-		return codexsession.RateLimit{}, false, err
-	}
+	limit, exhausted, _, err := codexQuotaOrContextExhaustion(d, cwd, sessionID, pane)
+	return limit, exhausted, err
+}
+
+func codexQuotaOrContextExhaustion(d Deps, cwd, sessionID, pane string) (codexsession.RateLimit, bool, string, error) {
 	now := time.Now()
 	if d.Now != nil {
 		now = d.Now()
 	}
-	limit, matched := detectCodexRateLimit(text, now)
-	return limit, matched, nil
-}
-
-// codexQuotaOrContextExhaustion classifies a single ReadPaneRecent snapshot
-// as a quota exhaustion or a context-window exhaustion, reading the pane at
-// most once — unlike calling codexRateLimit and detectCodexContextExhaustion
-// separately, which would each read the pane independently and risk missing
-// a transient banner that clears between the two reads.
-func codexQuotaOrContextExhaustion(d Deps, cwd, sessionID, pane string) (limit codexsession.RateLimit, exhausted bool, evidence string, err error) {
-	if sessionID != "" && d.ReadCodexRateLimit != nil {
-		limit, exhausted, err = d.ReadCodexRateLimit(cwd, sessionID)
-		if err != nil || exhausted {
-			return limit, exhausted, "", err
-		}
-	}
-	if d.ReadPaneRecent == nil {
-		return codexsession.RateLimit{}, false, "", nil
-	}
-	text, err := d.ReadPaneRecent(pane)
-	if err != nil {
-		return codexsession.RateLimit{}, false, "", err
-	}
-	now := time.Now()
-	if d.Now != nil {
-		now = d.Now()
-	}
-	if quotaLimit, matched := detectCodexRateLimit(text, now); matched {
-		return quotaLimit, true, "", nil
-	}
-	evidence, _ = detectCodexContextExhaustion(text)
-	return codexsession.RateLimit{}, false, evidence, nil
-}
-
-func detectCodexContextExhaustion(text string) (string, bool) {
-	for _, line := range strings.Split(text, "\n") {
-		evidence := strings.TrimSpace(line)
-		lower := strings.ToLower(evidence)
-		structuredCode := strings.Contains(lower, `"code"`) && strings.Contains(lower, "context_length_exceeded")
-		streamFailure := strings.Contains(lower, "stream disconnected before completion") &&
-			strings.Contains(lower, "your input exceeds the context window of this model")
-		terminalFailure := strings.HasPrefix(strings.TrimLeft(lower, "■⚠️ \t"), "codex ran out of room in the model's context window")
-		if structuredCode || streamFailure || terminalFailure {
-			return evidence, true
-		}
-	}
-	return "", false
+	return herdrrunner.CodexQuotaOrContextExhaustion(d.ReadCodexRateLimit, d.ReadPaneRecent, now, cwd, sessionID, pane)
 }
 
 func recoverCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID string, smartZone int) (bool, error) {
@@ -1131,7 +1077,7 @@ func recoverCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID st
 	if err != nil {
 		return false, nil
 	}
-	evidence, exhausted := detectCodexContextExhaustion(text)
+	evidence, exhausted := herdrrunner.DetectCodexContextExhaustion(text)
 	if !exhausted {
 		return false, nil
 	}

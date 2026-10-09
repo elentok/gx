@@ -158,8 +158,11 @@ func (s *State) rawHandler(h Handler) Handler {
 			return CommandError(err.Error())
 		}
 		if argv[1] == "read" {
-			// The pane never changes: prompts are not typed into it.
-			return []byte("> "), 0
+			// Prompts are not typed into the pane; only SetPaneText changes it.
+			if a.PaneText == "" {
+				return []byte("> "), 0
+			}
+			return []byte(a.PaneText), 0
 		}
 		resp := map[string]any{"state": a.Status}
 		if a.Rule != "" {
@@ -206,6 +209,19 @@ func (s *State) StallAgent(name string) error {
 		return fmt.Errorf("agent not found: %s", name)
 	}
 	a.Stalled = true
+	return nil
+}
+
+// SetPaneText sets what "agent read" returns for the agent named name, e.g.
+// a rate-limit message.
+func (s *State) SetPaneText(name, text string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.findAgent(name)
+	if a == nil {
+		return fmt.Errorf("agent not found: %s", name)
+	}
+	a.PaneText = text
 	return nil
 }
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -24,11 +25,15 @@ type Runner struct {
 	// background task running. herdr shows such an agent idle, but the task
 	// will wake it, so the runner reports it working. Nil means no gating.
 	BackgroundTasks func(s agentrunner.Session) bool
+	// CodexQuota is checked before the pane for Codex sessions. Nil skips it.
+	CodexQuota CodexQuotaReader
 
 	mu sync.Mutex
 	// turns counts prompts the agent picked up, keyed by label. herdr's
 	// StateChangeSeq also advances when a turn ends, so it can't be Turn as is.
 	turns map[string]*turn
+	// started remembers what RateLimit needs from Start, keyed by label.
+	started map[string]agentrunner.StartOptions
 }
 
 type turn struct {
@@ -42,7 +47,7 @@ var _ agentrunner.HealthChecker = (*Runner)(nil)
 // New gates on Claude transcript background tasks, unless the home directory
 // can't be found.
 func New() *Runner {
-	r := &Runner{turns: map[string]*turn{}}
+	r := &Runner{turns: map[string]*turn{}, started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
 	if home, err := os.UserHomeDir(); err == nil {
 		r.BackgroundTasks = ClaudeBackgroundTasks(home, time.Now)
 	}
@@ -81,6 +86,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	// Drop a stopped predecessor's count; the wait's status read starts anew.
 	r.mu.Lock()
 	delete(r.turns, opts.Label)
+	r.started[opts.Label] = opts
 	r.mu.Unlock()
 	if _, err := r.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, 30*time.Second); err != nil {
 		return agentrunner.Session{}, err
@@ -170,6 +176,7 @@ func (r *Runner) Stop(s agentrunner.Session) error {
 	}
 	r.mu.Lock()
 	delete(r.turns, s.Label)
+	delete(r.started, s.Label)
 	r.mu.Unlock()
 	return nil
 }
@@ -207,8 +214,47 @@ func (r *Runner) List(epic string) ([]agentrunner.Session, error) {
 	return out, nil
 }
 
-// RateLimit is not wired to herdr yet; see the sibling rate-limit ticket.
-func (r *Runner) RateLimit(agentrunner.Session) (time.Time, bool, error) {
+// RateLimit scrapes the pane for the agent's limit message. A session this
+// runner did not start is read as Claude; Claude's pattern also matches
+// Codex's quota line, just without its reset time.
+func (r *Runner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
+	r.mu.Lock()
+	opts := r.started[s.Label]
+	r.mu.Unlock()
+	now := time.Now()
+	if opts.Kind == "codex" {
+		return r.codexRateLimit(s, opts.Cwd, now)
+	}
+	text, err := ReadPaneRecent(s.ID)
+	if err != nil {
+		return time.Time{}, false, mapNotFound(err)
+	}
+	token, limited := DetectRateLimit(text)
+	if !limited {
+		return time.Time{}, false, nil
+	}
+	if d, ok := SecondsUntilReset(token, now); ok {
+		return now.Add(d), true, nil
+	}
+	return time.Time{}, true, nil
+}
+
+func (r *Runner) codexRateLimit(s agentrunner.Session, cwd string, now time.Time) (time.Time, bool, error) {
+	// s may predate herdr learning the agent's session id.
+	if s.SessionID == "" {
+		if agent, err := herdr.AgentGet(s.ID); err == nil {
+			s.SessionID = agent.AgentSession
+		}
+	}
+	limit, exhausted, evidence, err := CodexQuotaOrContextExhaustion(r.CodexQuota, ReadPaneRecent, now, cwd, s.SessionID, s.ID)
+	switch {
+	case err != nil:
+		return time.Time{}, false, mapNotFound(err)
+	case exhausted:
+		return limit.ResetAt, true, nil
+	case evidence != "":
+		return time.Time{}, false, fmt.Errorf("%w: %s", agentrunner.ErrContextExhausted, evidence)
+	}
 	return time.Time{}, false, nil
 }
 

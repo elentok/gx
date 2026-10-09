@@ -86,6 +86,11 @@ var (
 	ErrTimeout = errors.New("agentrunner: wait timed out")
 	// ErrNotFound: the session is unknown or already stopped.
 	ErrNotFound = errors.New("agentrunner: session not found")
+	// ErrContextExhausted: RateLimit found the agent out of context window
+	// (Codex only). It's an error, not a Status field, because detecting it
+	// costs the same pane read RateLimit already makes, which Status, polled
+	// far more often, should not.
+	ErrContextExhausted = errors.New("agentrunner: context window exhausted")
 )
 
 type Runner interface {
@@ -106,6 +111,8 @@ type Runner interface {
 	Find(label string) (Session, bool, error)
 	List(epic string) ([]Session, error)
 	// RateLimit reports when the agent's rate limit resets, if it is limited.
+	// A zero resetAt means limited with an unknown reset. It returns
+	// ErrContextExhausted when the agent ran out of context instead.
 	RateLimit(s Session) (resetAt time.Time, limited bool, err error)
 	Answer(s Session, a Answer) error
 }

@@ -324,7 +324,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
 			},
 		),
-		ReadPaneRecent: defaultReadPaneRecent,
+		ReadPaneRecent: herdrrunner.ReadPaneRecent,
 		Sleep:          time.Sleep,
 		Now:            time.Now,
 		ParkTimer:      time.After,
