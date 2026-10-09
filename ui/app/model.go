@@ -116,7 +116,7 @@ func cwdProjectName(root string) string {
 }
 
 func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
-	qm := ticketsui.NewQueueModel(root, s, nil, keys.New(Bindings()))
+	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
 	}

@@ -117,14 +117,7 @@ type QueueModel struct {
 	projectFilter string
 }
 
-func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string]bool, extraKeys keys.Manager, orders ...map[string]uint64) QueueModel {
-	if checked == nil {
-		checked = map[string]bool{}
-	}
-	checkOrder := map[string]uint64{}
-	if len(orders) > 0 && orders[0] != nil {
-		checkOrder = orders[0]
-	}
+func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) QueueModel {
 	sp := spinner.New()
 	sp.Spinner = TicketProgressSpinner
 	km := newQueueKeysManager()
@@ -141,8 +134,8 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, checked map[string
 		now:              time.Now,
 		worktreeRoot:     worktreeRoot,
 		settings:         settings,
-		checked:          checked,
-		checkOrder:       checkOrder,
+		checked:          map[string]bool{},
+		checkOrder:       map[string]uint64{},
 		live:             map[string]map[string]liveTicketState{},
 		implementSpinner: sp,
 		runningEpics:     map[string]bool{},

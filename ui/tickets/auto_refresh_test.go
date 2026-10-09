@@ -32,7 +32,7 @@ func TestQueueModel_AutoRefreshesDataFromDiskWithoutManualReload(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	// A ticket's status changes on disk (e.g. ralph-loop claims it) with no
 	// manual reload action from this tab.

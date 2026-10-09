@@ -113,7 +113,7 @@ func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 	writeTicket(t, root, "epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "epic", "01-only-ticket.md"): true}
 
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	shortContent := m.View().Content
 	if strings.Contains(shortContent, "┃") {
 		t.Fatalf("expected no queue scrollbar thumb when list fits, got:\n%s", shortContent)
@@ -125,7 +125,7 @@ func TestQueueModel_ScrollbarAppearsOnlyWhenListOverflows(t *testing.T) {
 		writeTicket(t, root, "epic2", name, "Status: open\n\nBody.\n")
 		checked2[ticketPath(root, "epic2", name)] = true
 	}
-	m2 := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked2, keys.Manager{}))
+	m2 := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked2))
 	longContent := m2.View().Content
 	if !strings.Contains(longContent, "┃") {
 		t.Fatalf("expected a queue scrollbar thumb when the list overflows, got:\n%s", longContent)

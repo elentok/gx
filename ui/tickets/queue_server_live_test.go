@@ -30,7 +30,7 @@ func loadedServerQueueWith(t *testing.T, status string, claimedAt time.Time, her
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}},
 	}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, cmd := next.(QueueModel).Update(m.cmdLoadQueue()())
 	return next.(QueueModel), cmd
@@ -63,7 +63,7 @@ func TestQueueServerMode_RunningHeaderCountsFromSnapshot(t *testing.T) {
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/03"}},
 	}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
 	m = next.(QueueModel)
@@ -138,7 +138,7 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/01"}},
 	}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
 	m = next.(QueueModel)

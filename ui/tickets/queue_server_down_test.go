@@ -17,7 +17,7 @@ import (
 
 func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueModel {
 	t.Helper()
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
 		WithServerLink(fakeServerAPI{}, start)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
@@ -90,7 +90,7 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 		}},
 		queue: []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}},
 	}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 
@@ -115,7 +115,7 @@ func TestQueueServerMode_PrefixesRowsAndFiltersByProject(t *testing.T) {
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "blog:beta/01", Title: "Second", Status: "open"},
 	}}, queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}}}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).WithServerLink(api, nil)
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	next, _ = next.(QueueModel).Update(next.(QueueModel).cmdLoadQueue()())
 	m = next.(QueueModel)

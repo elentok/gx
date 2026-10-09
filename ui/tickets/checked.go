@@ -30,34 +30,15 @@ func (m Model) isChecked(path string) bool {
 // "checked" concept, so the selection deliberately does not survive a restart.
 func (m *Model) setPathsChecked(paths []string, checked bool) {
 	if m.checked == nil {
-		m.checked, m.checkOrder = map[string]bool{}, map[string]uint64{}
+		m.checked = map[string]bool{}
 	}
 	for _, path := range paths {
-		if !checked {
-			markUnchecked(m.checked, m.checkOrder, path)
-			continue
-		}
-		if m.checked[path] {
-			continue
-		}
-		m.checked[path] = true
-		m.checkOrder[path] = nextCheckOrdinal(m.checkOrder)
-	}
-}
-
-func nextCheckOrdinal(checkOrder map[string]uint64) uint64 {
-	var next uint64 = 1
-	for _, ordinal := range checkOrder {
-		if ordinal >= next {
-			next = ordinal + 1
+		if checked {
+			m.checked[path] = true
+		} else {
+			delete(m.checked, path)
 		}
 	}
-	return next
-}
-
-func markUnchecked(checked map[string]bool, checkOrder map[string]uint64, path string) {
-	delete(checked, path)
-	delete(checkOrder, path)
 }
 
 // handleToggleCheck answers "space" on the selected row: toggling an epic
@@ -90,16 +71,17 @@ func eligibleEpicTickets(epic tickets.Epic) []tickets.Ticket {
 	return out
 }
 
-// epicFullyMember reports whether every one of epic's eligible (non-done)
-// tickets is a member of the set isMember tests. A zero-eligible epic (no tickets, or all done) is never "fully member": it
-// has nothing to be fully checked/queued about.
-func epicFullyMember(epic tickets.Epic, isMember func(string) bool) bool {
+// epicChecked reports whether every one of epic's eligible (non-done) tickets
+// is checked (also used to render the epic row's own checkbox glyph). A
+// zero-eligible epic (no tickets, or all done) renders unchecked: it has
+// nothing to be fully checked about.
+func (m Model) epicChecked(epic tickets.Epic) bool {
 	eligible := eligibleEpicTickets(epic)
 	if len(eligible) == 0 {
 		return false
 	}
 	for _, t := range eligible {
-		if !isMember(t.Path) {
+		if !m.isChecked(t.Path) {
 			return false
 		}
 	}
@@ -118,7 +100,7 @@ func (m *Model) toggleEpicChecked(r row) {
 	for i, t := range eligible {
 		paths[i] = t.Path
 	}
-	m.setPathsChecked(paths, !epicFullyMember(epic, m.isChecked))
+	m.setPathsChecked(paths, !m.epicChecked(epic))
 }
 
 // toggleTicketChecked toggles r's ticket. Unchecking is always immediate.
@@ -194,10 +176,7 @@ func (m Model) handleCheckAddConfirmed(msg checkAddConfirmedMsg) (tea.Model, tea
 // fork of an unchecked ticket is a no-op: only a fork of already-checked work
 // needs its continuation auto-added.
 func (m *Model) autoCheckForkedChildren(newEpics []tickets.Epic) {
-	_ = applyForkedChildren(m.epics, newEpics, m.isChecked, func(paths []string, checked bool) error {
-		m.setPathsChecked(paths, checked)
-		return nil
-	})
+	m.setPathsChecked(m.forkedChildren(newEpics), true)
 }
 
 // epicNewTickets pairs a newly-loaded epic with the tickets in it that
@@ -241,8 +220,8 @@ func diffNewTickets(oldEpics, newEpics []tickets.Epic) []epicNewTickets {
 	return out
 }
 
-// applyForkedChildren is autoCheckForkedChildren's traversal over the
-// membership set isMember/setMember expose.
+// forkedChildren returns the paths of newEpics' freshly-appeared tickets
+// whose parent is checked.
 //
 // The fork is detected from the new ticket's own `parent` rather than from
 // any list kept on the parent, so a fork still gets picked up when the tool
@@ -252,9 +231,9 @@ func diffNewTickets(oldEpics, newEpics []tickets.Epic) []epicNewTickets {
 // what keeps the first reload of a session — where every ticket looks new —
 // from mass-adding every fork in the tracker to a membership set the user
 // only ever added the parents to.
-func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string) bool, setMember func([]string, bool) error) error {
+func (m Model) forkedChildren(newEpics []tickets.Epic) []string {
 	var childPaths []string
-	for _, group := range diffNewTickets(oldEpics, newEpics) {
+	for _, group := range diffNewTickets(m.epics, newEpics) {
 		if !group.oldEpicOK {
 			continue
 		}
@@ -265,19 +244,11 @@ func applyForkedChildren(oldEpics, newEpics []tickets.Epic, isMember func(string
 		parents := group.epic.ForkParents()
 		for _, nt := range group.newTickets {
 			parent, ok := parents.Of(nt)
-			if !ok || !oldTicketPaths[parent.Path] || !isMember(parent.Path) {
+			if !ok || !oldTicketPaths[parent.Path] || !m.isChecked(parent.Path) {
 				continue
 			}
 			childPaths = append(childPaths, nt.Path)
 		}
 	}
-	return setMember(childPaths, true)
-}
-
-// epicChecked reports whether every non-done ticket in epic is currently
-// checked (used to render the epic row's own checkbox glyph) — a StatusDone
-// ticket can never be checked, so it's excluded from the check. A
-// zero-ticket or all-done epic renders unchecked.
-func (m Model) epicChecked(epic tickets.Epic) bool {
-	return epicFullyMember(epic, m.isChecked)
+	return childPaths
 }

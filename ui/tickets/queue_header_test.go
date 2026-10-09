@@ -192,7 +192,7 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 		ticketPath(root, "alpha", "01-first.md"):  true,
 		ticketPath(root, "alpha", "02-second.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := ansi.Strip(m.View().Content)
 
 	if !strings.Contains(content, "took 14m14s") {
@@ -213,7 +213,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	var headerLine, rowLine string
 	for _, line := range m.queueBody(80) {
@@ -248,7 +248,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 // queue_server_budget_test.go.
 func TestQueueHeaderCostSuffixFormats(t *testing.T) {
 	root := t.TempDir()
-	budgetOff := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, map[string]bool{}, keys.Manager{}))
+	budgetOff := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), map[string]bool{}))
 	budgetOff.serverBudget.Total = 42.3
 	if got, want := budgetOff.queueHeaderCostSuffix(), "today $42.30"; got != want {
 		t.Fatalf("budget disabled: queueHeaderCostSuffix() = %q, want bare %q", got, want)
@@ -267,7 +267,7 @@ func TestQueueEpicHeaderOmitsCostForNonRunningEpic(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	headerLine := epicHeaderLine(t, m, "alpha")
 	if strings.Contains(headerLine, "$") {
@@ -289,7 +289,7 @@ func TestQueueEpicHeaderAppendsSummedCostForCompletedEpic(t *testing.T) {
 		ticketPath(root, "alpha", "01-first.md"):  true,
 		ticketPath(root, "alpha", "02-second.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	headerLine := epicHeaderLine(t, m, "alpha")
 	if !strings.Contains(headerLine, "$43.00") {

@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -517,19 +518,15 @@ func TestModel_CheckedRowsRenderDistinctMarker(t *testing.T) {
 	}
 }
 
-func TestModel_CheckOrderFollowsCheckSequence(t *testing.T) {
+func TestModel_SetPathsChecked(t *testing.T) {
 	t.Parallel()
 	var m Model
 	m.setPathsChecked([]string{"b"}, true)
 	m.setPathsChecked([]string{"a"}, true)
 	m.setPathsChecked([]string{"b"}, true)
-
-	if m.checkOrder["b"] >= m.checkOrder["a"] {
-		t.Fatalf("check order = %v, want b before a and a re-check of b not to move it", m.checkOrder)
-	}
-
 	m.setPathsChecked([]string{"b"}, false)
-	if m.isChecked("b") || m.checkOrder["b"] != 0 {
-		t.Fatalf("unchecked b still tracked: checked=%v order=%v", m.checked, m.checkOrder)
+
+	if want := map[string]bool{"a": true}; !maps.Equal(m.checked, want) {
+		t.Fatalf("checked = %v, want %v", m.checked, want)
 	}
 }

@@ -109,8 +109,6 @@ type Model struct {
 	// Ticket.Path so it survives a reload's re-sorting/index-shuffling. Held
 	// in memory only (see setPathsChecked).
 	checked map[string]bool
-	// checkOrder records when each path joined checked.
-	checkOrder map[string]uint64
 
 	search search.Model
 
@@ -177,7 +175,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		previewFocus:      newPreviewFocus(),
 		confirm:           confirm.New(),
 		checked:           map[string]bool{},
-		checkOrder:        map[string]uint64{},
 		explicitCollapsed: map[string]bool{},
 		archivedLazy:      archivedLazy,
 	}

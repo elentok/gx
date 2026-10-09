@@ -52,7 +52,7 @@ func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
 	writeTicket(t, root, "alpha", "01-first.md",
 		"Status: draft\n\n## Needs Answer\n\nLeftover text that must not surface.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	lines := m.queueBody(80)
 	rowText := ansi.Strip(strings.Join(lines, "\n"))
@@ -106,7 +106,7 @@ func TestQueueModel_ParkedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 		ticketPath(root, "alpha", "01-a.md"): true,
 		ticketPath(root, "alpha", "02-b.md"): true,
 	}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	entries := m.queueTree.Entries()
 	var parent tree.Entry[queueNode]
@@ -142,7 +142,7 @@ func TestQueueModel_ParkedLeafTicket_HasChildrenStaysFalse(t *testing.T) {
 	root := t.TempDir()
 	writeParkedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "needs-answer", "", "Leaf needs a decision.")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-a.md"): true}
-	m := loadQueueModel(t, NewQueueModel(root, ui.Settings{}, checked, keys.Manager{}))
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	entries := queueTicketEntries(m)
 	if len(entries) != 1 {

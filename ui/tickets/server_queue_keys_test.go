@@ -17,7 +17,7 @@ import (
 
 func newMaintenanceQueue(t *testing.T, api fakeServerAPI) QueueModel {
 	t.Helper()
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, nil, keys.New(nil)).
+	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).
 		WithServerLink(api, nil)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
