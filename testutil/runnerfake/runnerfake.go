@@ -247,6 +247,8 @@ func (r *Runner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	return ss.resetAt, ss.limited, nil
 }
 
+func (r *Runner) Name() string { return "fake" }
+
 func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

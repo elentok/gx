@@ -927,7 +927,6 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	var projects []string
 	var mu sync.Mutex
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerName = "fake"
 		c.RunnerFor = func(project string) agentrunner.Runner {
 			mu.Lock()
 			defer mu.Unlock()

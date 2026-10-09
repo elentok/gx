@@ -80,6 +80,22 @@ func TestServerRunner_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing
 	}
 }
 
+func TestServerRunner_HeadlessDefaultRunnerHasARoot(t *testing.T) {
+	r, _ := serverRunner(agentrunner.ChoiceHeadless, t.TempDir())
+	if h, ok := r.(*nativerunner.Headless); !ok || h.Root == "" {
+		t.Errorf("default runner = %#v, want a *Headless with a Root", r)
+	}
+}
+
+func TestServerRunner_NamesComeFromTheRunners(t *testing.T) {
+	if r, _ := serverRunner(agentrunner.ChoiceHerdr, t.TempDir()); r.Name() != "herdr" {
+		t.Errorf("herdr Name = %q", r.Name())
+	}
+	if r, _ := serverRunner(agentrunner.ChoiceHeadless, t.TempDir()); r.Name() != "headless" {
+		t.Errorf("headless Name = %q", r.Name())
+	}
+}
+
 func TestServerRunner_HerdrNeedsNoPerProjectRunner(t *testing.T) {
 	if _, runnerFor := serverRunner(agentrunner.ChoiceHerdr, t.TempDir()); runnerFor != nil {
 		t.Error("herdr has no per-project state")

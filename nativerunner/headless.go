@@ -635,6 +635,8 @@ func (h *Headless) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	return ss.track.resetAt, !ss.track.resetAt.IsZero(), nil
 }
 
+func (h *Headless) Name() string { return string(agentrunner.ChoiceHeadless) }
+
 // Answer replies to the open permission request. Text is the reason shown to
 // claude when denying; an allow ignores it. gx never answers on its own.
 func (h *Headless) Answer(s agentrunner.Session, a agentrunner.Answer) error {

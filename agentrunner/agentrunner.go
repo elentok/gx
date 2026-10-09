@@ -98,6 +98,8 @@ var (
 )
 
 type Runner interface {
+	// Name identifies the runner kind; it is recorded on every run it hosts.
+	Name() string
 	// Start launches the agent and returns once it is idle and ready for a
 	// prompt. An adapter whose sessions outlive gx may instead adopt a live
 	// session with the same label and cwd, returning it in whatever state it

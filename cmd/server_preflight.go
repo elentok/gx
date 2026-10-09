@@ -52,9 +52,13 @@ func preflightAgentRunner(setting string, p agentrunner.Probe, logPath string) (
 	return choice, nil
 }
 
+const fallbackProject = "_default"
+
 // serverRunner is the runner the server launches through. A headless runner
 // keeps its agent dirs per project, so runnerFor hands out one Headless per
 // project (kept, because its live sessions are in memory); it is nil for herdr.
+// The returned runner answers host health and projects runnerFor never sees, so
+// it is a Headless with its own root too.
 func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, runnerFor func(project string) agentrunner.Runner) {
 	if c == agentrunner.ChoiceHerdr {
 		return herdrrunner.New(), nil
@@ -71,5 +75,5 @@ func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, 
 		}
 		return h
 	}
-	return &nativerunner.Headless{}, runnerFor
+	return runnerFor(fallbackProject), runnerFor
 }

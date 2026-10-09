@@ -307,6 +307,8 @@ func (r *Runner) codexRateLimit(s agentrunner.Session, cwd string, now time.Time
 	return time.Time{}, false, nil
 }
 
+func (r *Runner) Name() string { return string(agentrunner.ChoiceHerdr) }
+
 func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	st, err := r.status(s)
 	if err != nil {

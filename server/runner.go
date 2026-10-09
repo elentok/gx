@@ -671,13 +671,6 @@ func (s *Server) runnerFor(project string) agentrunner.Runner {
 	return s.cfg.Runner
 }
 
-func (s *Server) runnerName() string {
-	if s.cfg.RunnerName == "" {
-		return runnerHerdr
-	}
-	return s.cfg.RunnerName
-}
-
 // depsFor is the default deps with the project's runner, so launch, wait and
 // finish all talk to the runner that hosts the agent.
 func (s *Server) depsFor(project string) ralphloop.Deps {
@@ -689,7 +682,7 @@ func (s *Server) depsFor(project string) ralphloop.Deps {
 func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
-	session, err := ralphloop.StartAndPrompt(s.runnerFor(ticket.Project), agentrunner.StartOptions{
+	session, err := ralphloop.StartAndPrompt(deps.Runner,agentrunner.StartOptions{
 		Label: label,
 		Epic:  ticket.Epic,
 		Cwd:   cwd,
@@ -700,7 +693,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note
 	if err != nil {
 		return Run{}, err
 	}
-	run := Run{Address: ticket.String(), Agent: string(agent), Runner: s.runnerName(), Session: session}
+	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(),Session: session}
 	if deps.TabID != nil {
 		// Only herdr has tabs; a failed lookup just skips the tab cleanup later.
 		run.Tab, _ = deps.TabID(label)

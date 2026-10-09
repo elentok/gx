@@ -150,7 +150,7 @@ func runServer(ctx context.Context) error {
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerName: string(choice), RunnerFor: runnerFor, TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
+	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
 		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
 		LogRetention:              cfg.Server.LogRetention,
 		Recovery:                  recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),

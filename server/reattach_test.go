@@ -90,7 +90,6 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerName = "fake"
 		c.RunnerFor = func(string) agentrunner.Runner { return fake }
 		c.LogRetention = retention
 	})
