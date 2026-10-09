@@ -34,6 +34,7 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 		return 0, false, nil
 	}
 	hostLiveAgent(t, d, "epic-iter-01")
+	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateWorking, "")
 	r := &blipRunner{Runner: fakeRunner(d), timeoutOn: 1}
 	d.Runner = r
 

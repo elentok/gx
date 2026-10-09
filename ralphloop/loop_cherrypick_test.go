@@ -660,7 +660,9 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
-		if strings.Contains(dir, "epic-item-01") {
+		// The zero-commit park's clearable check asks about the iteration
+		// branch from the feature worktree.
+		if strings.Contains(dir, "epic-item-01") || strings.HasSuffix(toRef, "epic-item-01") {
 			return 0, nil
 		}
 		return 1, nil

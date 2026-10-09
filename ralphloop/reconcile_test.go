@@ -384,7 +384,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
 		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
 	}
-	hostLiveAgent(t, d, "epic-iter-01")
+	hostLiveAgentWithSession(t, d, "epic-iter-01", "session-epic-iter-01")
 	var mu sync.Mutex
 	sawClaimed := false
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -22,27 +21,16 @@ import (
 func TestClearableParkedTicket(t *testing.T) {
 	t.Parallel()
 
-	live := func(d *Deps) {
-		d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-			return []herdr.Tab{{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID}}, nil
-		}
-		d.AgentGet = func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle"}, nil
-		}
+	live := func(t *testing.T, d *Deps) { hostLiveAgent(t, *d, "my-epic-iter-01") }
+	blocked := func(t *testing.T, d *Deps) {
+		live(t, d)
+		fakeRunner(*d).SetState("my-epic-iter-01", agentrunner.StateBlocked, "")
 	}
-	blocked := func(d *Deps) {
-		live(d)
-		d.AgentGet = func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked"}, nil
-		}
-	}
-	dead := func(d *Deps) {
-		d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
-	}
-	noCommits := func(d *Deps) {
+	dead := func(t *testing.T, d *Deps) {}
+	noCommits := func(t *testing.T, d *Deps) {
 		d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
 	}
-	commitsErr := func(d *Deps) {
+	commitsErr := func(t *testing.T, d *Deps) {
 		d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, errors.New("fake CommitsAhead failure") }
 	}
 
@@ -50,7 +38,7 @@ func TestClearableParkedTicket(t *testing.T) {
 		name      string
 		status    string
 		parkKind  string
-		setupDeps func(*Deps)
+		setupDeps func(*testing.T, *Deps)
 		want      bool
 	}{
 		{"blocked-pane live unblocked clearable", "needs-answer", "blocked-pane", live, true},
@@ -59,11 +47,11 @@ func TestClearableParkedTicket(t *testing.T) {
 		{"self-reported live unblocked clearable", "needs-answer", "self-reported", live, true},
 		{"self-reported dead pane not clearable", "needs-answer", "self-reported", dead, false},
 		{"zero-commit live with new commits clearable", "needs-answer", "zero-commit", live, true},
-		{"zero-commit live with no new commits not clearable", "needs-answer", "zero-commit", func(d *Deps) { live(d); noCommits(d) }, false},
+		{"zero-commit live with no new commits not clearable", "needs-answer", "zero-commit", func(t *testing.T, d *Deps) { live(t, d); noCommits(t, d) }, false},
 		{"zero-commit dead pane not clearable", "needs-answer", "zero-commit", dead, false},
-		{"zero-commit CommitsAhead failure degrades to not clearable", "needs-answer", "zero-commit", func(d *Deps) { live(d); commitsErr(d) }, false},
+		{"zero-commit CommitsAhead failure degrades to not clearable", "needs-answer", "zero-commit", func(t *testing.T, d *Deps) { live(t, d); commitsErr(t, d) }, false},
 		{"missing park_kind defaults to zero-commit, live with commits clearable", "needs-answer", "", live, true},
-		{"missing park_kind defaults to zero-commit, live with no commits not clearable", "needs-answer", "", func(d *Deps) { live(d); noCommits(d) }, false},
+		{"missing park_kind defaults to zero-commit, live with no commits not clearable", "needs-answer", "", func(t *testing.T, d *Deps) { live(t, d); noCommits(t, d) }, false},
 		{"needs-repair ignores park_kind, live is enough", "needs-repair", "", live, true},
 		{"needs-repair ignores park_kind, dead pane not clearable", "needs-repair", "", dead, false},
 		{"draft ignores park_kind, live is enough", "draft", "", live, true},
@@ -81,7 +69,7 @@ func TestClearableParkedTicket(t *testing.T) {
 				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: implement\n" + parkKindLine + "---\n# A\n",
 			})
 			d, _, _ := fakeDeps()
-			tt.setupDeps(&d)
+			tt.setupDeps(t, &d)
 
 			epic, err := loadNamedEpic(scratchDir, "my-epic")
 			if err != nil {
@@ -89,7 +77,7 @@ func TestClearableParkedTicket(t *testing.T) {
 			}
 			ticket := epic.Tickets[0]
 
-			got := clearableParkedTicket(d, "ws1", "my-epic", "/fake/worktrees", AgentClaude, *epic, ticket)
+			got := clearableParkedTicket(d, "my-epic", "/fake/worktrees", AgentClaude, *epic, ticket)
 			if got != tt.want {
 				t.Errorf("clearableParkedTicket() = %v, want %v", got, tt.want)
 			}
@@ -120,12 +108,7 @@ func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "idle"}, nil
-	}
+	hostLiveAgent(t, d, "my-epic-iter-01")
 
 	epic, err := loadNamedEpic(scratchDir, "my-epic")
 	if err != nil {
@@ -133,7 +116,7 @@ func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	}
 	scope := wholeScope(t, *epic)
 
-	if err := unparkAnswered(d, "ws1", "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
+	if err := unparkAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
 		t.Fatalf("unparkAnswered: %v", err)
 	}
 
@@ -171,7 +154,7 @@ func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
 	}
 	scope := wholeScope(t, *epic)
 
-	if err := unparkAnswered(d, "ws1", "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
+	if err := unparkAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
 		t.Fatalf("unparkAnswered: %v", err)
 	}
 
@@ -197,12 +180,8 @@ func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked"}, nil
-	}
+	hostLiveAgent(t, d, "my-epic-iter-01")
+	fakeRunner(d).SetState("my-epic-iter-01", agentrunner.StateBlocked, "")
 
 	epic, err := loadNamedEpic(scratchDir, "my-epic")
 	if err != nil {
@@ -210,7 +189,7 @@ func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 	}
 	scope := wholeScope(t, *epic)
 
-	if err := unparkAnswered(d, "ws1", "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
+	if err := unparkAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
 		t.Fatalf("unparkAnswered: %v", err)
 	}
 
@@ -250,38 +229,6 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	unblocked01 := false
 	ticket02Gate := make(chan struct{})
 
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{
-			{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID},
-			{TabID: "tab-my-epic-iter-02", Label: "my-epic-iter-02", WorkspaceID: workspaceID},
-		}, nil
-	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		status := "idle"
-		if strings.Contains(target, "iter-01") {
-			mu.Lock()
-			if !unblocked01 {
-				status = "blocked"
-			}
-			mu.Unlock()
-		}
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: status}, nil
-	}
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		if strings.Contains(opts.Target, "iter-01") {
-			mu.Lock()
-			done := unblocked01
-			mu.Unlock()
-			if !done {
-				return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-			}
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		}
-		// ticket 02 stays "running" until the test releases it — proving the
-		// scheduler didn't just happen to wait it out.
-		<-ticket02Gate
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-	}
 	onRunnerWait(d, func(s agentrunner.Session) {
 		if !strings.Contains(s.Label, "iter-01") {
 			<-ticket02Gate
@@ -312,6 +259,7 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	mu.Lock()
 	unblocked01 = true
 	mu.Unlock()
+	fakeRunner(d).SetState("my-epic-iter-01", agentrunner.StateIdle, "")
 
 	// If the fix didn't work, this blocks until the test times out, since the
 	// old code wouldn't notice ticket 01's answer until ticket 02's result

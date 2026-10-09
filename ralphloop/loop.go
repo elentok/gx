@@ -513,7 +513,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// status alone can't tell that apart from a ticket that never ran.
 			// Iteration ownership decides, not the status.
 			if everLaunched[ticket.Identifier] {
-				reattach = resumeReattachable(d, workspaceID, opts.EpicName, agent, wtDir, ticket)
+				reattach = resumeReattachable(d, opts.EpicName, agent, wtDir, ticket)
 			}
 			if err := Claim(ticket.Path); err != nil {
 				return fmt.Errorf("claiming ticket %s: %w", ticket.Identifier, err)
@@ -682,7 +682,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// epic load just above rather than scanning again on its own. See
 		// unparkAnswered's doc for why a live, unblocked pane is what makes
 		// this safe with no ownership check.
-		if err := unparkAnswered(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic, d.Now()); err != nil {
+		if err := unparkAnswered(d, opts.EpicName, wtDir, agent, scope, *epic, d.Now()); err != nil {
 			return err
 		}
 		if scope.AllDone(*epic) && active == 0 && landing == 0 {
@@ -791,7 +791,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				for i, t := range stalled {
 					stalledForSink[i] = StalledTicket{
 						Identifier:   t.Identifier,
-						Reattachable: everLaunched[t.Identifier] && clearableParkedTicket(d, workspaceID, opts.EpicName, wtDir, agent, *epic, t),
+						Reattachable: everLaunched[t.Identifier] && clearableParkedTicket(d, opts.EpicName, wtDir, agent, *epic, t),
 					}
 				}
 				sink.EpicParked(opts.EpicName, stalledForSink)
@@ -829,7 +829,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		// sibling build's own results send.
 		var r outcome
 		var fromLand bool
-		if active > 0 && hasLiveParkedTicket(d, workspaceID, opts.EpicName, wtDir, agent, scope, *epic) {
+		if active > 0 && hasLiveParkedTicket(d, opts.EpicName, wtDir, agent, scope, *epic) {
 			select {
 			case r = <-results:
 			case r = <-landResults:

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -28,7 +28,7 @@ import (
 // person. Nothing records which kind a park was; this predicate answers it
 // fresh every pass, including for a gate park whose pane a person killed —
 // that degrades into a file-answered park rather than getting stuck.
-func unparkAnswered(d Deps, workspaceID, epicName, worktreeDir string, agentKind AgentKind, scope RunScope, epic tickets.Epic, now time.Time) error {
+func unparkAnswered(d Deps, epicName, worktreeDir string, agentKind AgentKind, scope RunScope, epic tickets.Epic, now time.Time) error {
 	for _, t := range epic.Tickets {
 		if !scope.Contains(t, epic) {
 			continue
@@ -36,7 +36,7 @@ func unparkAnswered(d Deps, workspaceID, epicName, worktreeDir string, agentKind
 		if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
 			continue
 		}
-		if !clearableParkedTicket(d, workspaceID, epicName, worktreeDir, agentKind, epic, t) {
+		if !clearableParkedTicket(d, epicName, worktreeDir, agentKind, epic, t) {
 			continue
 		}
 		if err := UnparkTicket(t.Path, now); err != nil {
@@ -55,7 +55,7 @@ func unparkAnswered(d Deps, workspaceID, epicName, worktreeDir string, agentKind
 // per-iteration epic reload already picks up — polling for it while a
 // sibling runs would just race an always-ready park-timer fake against that
 // sibling's results send and starve it out.
-func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agentKind AgentKind, scope RunScope, epic tickets.Epic) bool {
+func hasLiveParkedTicket(d Deps, epicName, worktreeDir string, agentKind AgentKind, scope RunScope, epic tickets.Epic) bool {
 	for _, t := range epic.Tickets {
 		if !scope.Contains(t, epic) {
 			continue
@@ -63,7 +63,7 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 		if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
 			continue
 		}
-		agent, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
+		status, live := liveAgent(d, epicName, agentKind, worktreeDir, t)
 		if !live {
 			continue
 		}
@@ -80,7 +80,7 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 		// agent/live were just looked up above for this same ticket — reused
 		// here via clearableNeedsAnswer rather than re-derived through
 		// clearableParkedTicket, which would look the pane up a second time.
-		if agent.AgentStatus == "blocked" || clearableNeedsAnswer(d, worktreeDir, epicName, t, agent, live) {
+		if status.State == agentrunner.StateBlocked || clearableNeedsAnswer(d, worktreeDir, epicName, t, status, live) {
 			return true
 		}
 	}
@@ -94,16 +94,16 @@ func hasLiveParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agen
 // three call sites reach status two different ways today, and a raw-Status
 // predicate would route a ticket down the wrong branch whenever they
 // diverge.
-func clearableParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, agentKind AgentKind, epic tickets.Epic, t tickets.Ticket) bool {
+func clearableParkedTicket(d Deps, epicName, worktreeDir string, agentKind AgentKind, epic tickets.Epic, t tickets.Ticket) bool {
 	switch epic.RenderedStatus(t) {
 	case tickets.StatusNeedsAnswer:
-		agent, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
-		return clearableNeedsAnswer(d, worktreeDir, epicName, t, agent, live)
+		status, live := liveAgent(d, epicName, agentKind, worktreeDir, t)
+		return clearableNeedsAnswer(d, worktreeDir, epicName, t, status, live)
 	case tickets.StatusNeedsRepair, tickets.StatusDraft:
 		// These statuses never carry park_kind (only a needs-answer park
 		// does) and stay on the same liveness-only rule ralph-loop has
 		// always applied to them.
-		_, live := liveAgent(d, workspaceID, epicName, agentKind, worktreeDir, t)
+		_, live := liveAgent(d, epicName, agentKind, worktreeDir, t)
 		return live
 	default:
 		return false
@@ -132,8 +132,8 @@ func clearableParkedTicket(d Deps, workspaceID, epicName, worktreeDir string, ag
 // self-reported) never pays for it, and a CommitsAhead failure degrades to
 // "not clearable" rather than propagating as an error — a git hiccup here
 // must not kill the whole run.
-func clearableNeedsAnswer(d Deps, worktreeDir, epicName string, t tickets.Ticket, agent herdr.Agent, live bool) bool {
-	if !live || agent.AgentStatus == "blocked" {
+func clearableNeedsAnswer(d Deps, worktreeDir, epicName string, t tickets.Ticket, status agentrunner.Status, live bool) bool {
+	if !live || status.State == agentrunner.StateBlocked {
 		return false
 	}
 	kind := t.ParkKind

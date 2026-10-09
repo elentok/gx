@@ -268,7 +268,7 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
 	}
-	want := [4]string{"01", "my-epic-iter-01", "/fake/worktrees/my-epic-item-01", "session-my-epic-iter-01"}
+	want := [4]string{"01", "my-epic-iter-01", "/fake/worktrees/my-epic-item-01", "sess-pane-my-epic-iter-01"}
 	if len(sink.reattachedCalls) != 1 || sink.reattachedCalls[0] != want {
 		t.Errorf("TicketReattached calls = %v, want exactly one %v", sink.reattachedCalls, want)
 	}

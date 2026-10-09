@@ -10,10 +10,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
 
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -185,33 +183,33 @@ func reattachIteration(d Deps, p iterationParams) error {
 		return fmt.Errorf("clearing iteration_status for reattached ticket %s: %w", p.Ticket.Identifier, err)
 	}
 
-	tab, found, err := herdrrunner.FindTab(d.TabList, p.WorkspaceID, label)
+	session, found, err := d.Runner.Find(label)
 	if err != nil {
-		return fmt.Errorf("finding live tab for reattached iteration %s: %w", label, err)
+		return fmt.Errorf("finding live session for reattached iteration %s: %w", label, err)
 	}
 	if !found {
-		return fmt.Errorf("no live tab found for reattached iteration %s", label)
+		return fmt.Errorf("no live session found for reattached iteration %s", label)
 	}
-	tabID := tab.TabID
-	agent, err := herdrrunner.OwnedAgent(d.AgentGet, label, p.WorkspaceID, tabID)
+	agent, err := d.Runner.Status(session)
 	if err != nil {
 		return fmt.Errorf("reattached iteration %s: %w", label, err)
 	}
+	tabID := iterationTabID(d, label)
 	if p.Agent == AgentCodex {
-		if agent.AgentSession == "" {
+		if agent.SessionID == "" {
 			return fmt.Errorf("missing live Codex session for reattached iteration %s; keep the tab open and retry after Herdr reports its session", label)
 		}
-		verified, verifyErr := d.VerifyCodexSession(path, agent.AgentSession)
+		verified, verifyErr := d.VerifyCodexSession(path, agent.SessionID)
 		if verifyErr != nil {
-			return fmt.Errorf("verifying live Codex session %s for reattached iteration %s: %w", agent.AgentSession, label, verifyErr)
+			return fmt.Errorf("verifying live Codex session %s for reattached iteration %s: %w", agent.SessionID, label, verifyErr)
 		}
 		if !verified {
-			return fmt.Errorf("live Codex session %s for reattached iteration %s does not match rollout metadata for cwd %s", agent.AgentSession, label, path)
+			return fmt.Errorf("live Codex session %s for reattached iteration %s does not match rollout metadata for cwd %s", agent.SessionID, label, path)
 		}
 	}
-	p.Sink.TicketReattached(p.Ticket.Identifier, label, path, agent.AgentSession)
-	if agent.AgentSession != "" {
-		if err := AppendSessionID(p.Ticket.Path, agent.AgentSession); err != nil {
+	p.Sink.TicketReattached(p.Ticket.Identifier, label, path, agent.SessionID)
+	if agent.SessionID != "" {
+		if err := AppendSessionID(p.Ticket.Path, agent.SessionID); err != nil {
 			return fmt.Errorf("appending session id for reattached ticket %s: %w", p.Ticket.Identifier, err)
 		}
 	}
@@ -223,9 +221,9 @@ func reattachIteration(d Deps, p iterationParams) error {
 
 	// StartEvent remains empty because reattachment must not imply a fresh
 	// launch; all later events use the recovered native session identity.
-	launchParams := p.launchAndPromptParams(label, agent.PaneID, tabID, "", path, "", string(events.IterationFinished))
+	launchParams := p.launchAndPromptParams(label, session.ID, tabID, "", path, "", string(events.IterationFinished))
 	finished := false
-	if alreadyFinished(agent.AgentStatus) {
+	if alreadyFinished(string(agent.State)) {
 		// An idle pane at reattach gets the same debounce and background-task
 		// gate a live finish gets in waitForFinish (confirmFinished /
 		// waitForBackgroundTasks): without them, a genuine mid-turn pause or a
@@ -239,7 +237,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("confirming %s already finished at reattach: %w", label, err)
 		}
 		if confirmed {
-			sessionID := resolveReattachSessionID(p, agent.AgentSession, preClear.SessionIDs)
+			sessionID := resolveReattachSessionID(p, agent.SessionID, preClear.SessionIDs)
 			elapsedMs := 0
 			finishedAfterGate, err := waitForBackgroundTasks(d, launchParams, sessionID, runnerFinishStates, &elapsedMs)
 			if err != nil {
@@ -261,8 +259,8 @@ func reattachIteration(d Deps, p iterationParams) error {
 				return fmt.Errorf("restoring iteration_status for already-finished reattached ticket %s: %w", p.Ticket.Identifier, err)
 			}
 		}
-		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.AgentSession)
-	} else if err := waitForFinish(d, launchParams, agent.AgentSession); err != nil {
+		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.SessionID)
+	} else if err := waitForFinish(d, launchParams, agent.SessionID); err != nil {
 		if errors.Is(err, errBlockedPaneParked) {
 			// Same as runIteration's park: the iteration ends here, the pane/
 			// tab/worktree survive, and finishIteration must not run.
@@ -278,11 +276,11 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
-		launchParams.logLifecycleEvent(string(events.Resumed), agent.AgentSession)
+		launchParams.logLifecycleEvent(string(events.Resumed), agent.SessionID)
 		p.Gate.ForceResume(label)
 	}
 
-	return finishIteration(d, p, path, agent.PaneID, tabID, base, branch, agent.AgentSession)
+	return finishIteration(d, p, path, session.ID, tabID, base, branch, agent.SessionID)
 }
 
 // resolveReattachSessionID recovers a session id for
@@ -742,12 +740,12 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		return LandResult{}, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
-		liveTab, found, err := findLiveConflictResolutionTab(d, p)
+		liveSession, found, err := findLiveConflictResolutionTab(d, p)
 		if err != nil {
 			return LandResult{}, "", err
 		}
 		if found {
-			resolutionSessionID, err := reattachLiveConflictResolver(d, p, liveTab)
+			resolutionSessionID, err := reattachLiveConflictResolver(d, p, liveSession)
 			if err != nil {
 				return LandResult{}, "", err
 			}
@@ -886,18 +884,12 @@ var errConflictResolutionUnresolved = errors.New("conflict-resolution child tick
 // evidence that a conflict-resolution agent forked for this exact cherry-pick
 // survived a crash/restart and still owns the sequencer state
 // cherryPickWithConflictResolution is about to inspect.
-func findLiveConflictResolutionTab(d Deps, p iterationParams) (tab herdr.Tab, found bool, err error) {
-	label := conflictLabel(p.Ticket.Identifier)
-	tabs, err := d.TabList(p.WorkspaceID)
+func findLiveConflictResolutionTab(d Deps, p iterationParams) (session agentrunner.Session, found bool, err error) {
+	session, found, err = d.Runner.Find(conflictLabel(p.Ticket.Identifier))
 	if err != nil {
-		return herdr.Tab{}, false, fmt.Errorf("listing tabs to check for a live conflict-resolution resolver for %s: %w", p.Ticket.Identifier, err)
+		return agentrunner.Session{}, false, fmt.Errorf("looking for a live conflict-resolution resolver for %s: %w", p.Ticket.Identifier, err)
 	}
-	for _, t := range tabs {
-		if t.Label == label {
-			return t, true, nil
-		}
-	}
-	return herdr.Tab{}, false, nil
+	return session, found, nil
 }
 
 // findConflictResolutionChildTicket locates the still-claimed
@@ -936,7 +928,7 @@ func findConflictResolutionChildTicket(p iterationParams) (string, error) {
 // wait for its agent, mark it done, close its tab — but never creates a tab
 // or child ticket of its own, since both already exist from before the
 // crash.
-func reattachLiveConflictResolver(d Deps, p iterationParams, liveTab herdr.Tab) (sessionID string, resultErr error) {
+func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Session) (sessionID string, resultErr error) {
 	label := conflictLabel(p.Ticket.Identifier)
 
 	childPath, err := findConflictResolutionChildTicket(p)
@@ -944,15 +936,15 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, liveTab herdr.Tab) 
 		return "", err
 	}
 
-	agent, err := herdrrunner.OwnedAgent(d.AgentGet, label, p.WorkspaceID, liveTab.TabID)
+	agent, err := d.Runner.Status(live)
 	if err != nil {
-		return "", fmt.Errorf("conflict-resolution tab %s: %w", label, err)
+		return "", fmt.Errorf("conflict-resolution session %s: %w", label, err)
 	}
-	sessionID = agent.AgentSession
+	sessionID = agent.SessionID
 
-	launchParams := p.launchAndPromptParams(label, agent.PaneID, liveTab.TabID, "", p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, live.ID, iterationTabID(d, label), "", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	if !alreadyFinished(agent.AgentStatus) {
+	if !alreadyFinished(string(agent.State)) {
 		if err := waitForFinish(d, launchParams, sessionID); err != nil {
 			return "", fmt.Errorf("waiting for reattached conflict-resolution agent %s to finish: %w", label, err)
 		}
@@ -966,8 +958,8 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, liveTab herdr.Tab) 
 		return "", fmt.Errorf("cherry-pick onto %s still in progress after reattached conflict-resolution agent %s finished", p.FeatureBranch, label)
 	}
 
-	if err := d.TabClose(liveTab.TabID); err != nil {
-		return "", fmt.Errorf("closing reattached conflict-resolution tab: %w", err)
+	if err := d.Runner.Stop(live); err != nil {
+		return "", fmt.Errorf("closing reattached conflict-resolution session: %w", err)
 	}
 
 	if err := MarkDone(childPath); err != nil {

@@ -366,6 +366,20 @@ func hostLiveAgent(t *testing.T, d Deps, label string) {
 	}
 }
 
+// hostLiveAgentWithSession is hostLiveAgent for an agent whose native session
+// id is sessionID ("" for one that has not reported any yet).
+func hostLiveAgentWithSession(t *testing.T, d Deps, label, sessionID string) {
+	t.Helper()
+	r := fakeRunner(d)
+	ids := r.IDs
+	r.IDs = func(l string) (string, string) {
+		id, _ := ids(l)
+		return id, sessionID
+	}
+	defer func() { r.IDs = ids }()
+	hostLiveAgent(t, d, label)
+}
+
 func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{

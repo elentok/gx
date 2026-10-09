@@ -206,6 +206,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
 
 	hostLiveAgent(t, d, "conflict-03")
+	fakeRunner(d).SetState("conflict-03", agentrunner.StateWorking, "")
 
 	// The sequencer already owns a conflict from before the crash. The wait
 	// hook (fired once reattachLiveConflictResolver waits out the reattached
@@ -216,6 +217,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 	onRunnerWait(d, func(s agentrunner.Session) {
 		if s.Label == "conflict-03" {
 			inProgress = false
+			fakeRunner(d).SetState("conflict-03", agentrunner.StateIdle, "")
 		}
 	})
 
