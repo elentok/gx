@@ -155,12 +155,15 @@ func iterationSession(p iterationParams, pane string) agentrunner.Session {
 // cleanup. Runner sessions don't expose their tab, so herdr is asked by name;
 // on failure the tab is left open rather than failing a launched iteration.
 func iterationTabID(d Deps, label string) string {
-	agent, err := d.AgentGet(label)
+	if d.TabID == nil {
+		return ""
+	}
+	tabID, err := d.TabID(label)
 	if err != nil {
 		log.Printf("resolving %s's tab: %v", label, err)
 		return ""
 	}
-	return agent.TabID
+	return tabID
 }
 
 // reattachIteration resumes a claimed ticket whose worktree, tab, and agent

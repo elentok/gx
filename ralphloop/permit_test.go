@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/herdr"
 )
 
 // fakePermit is a minimal test Permit: Acquire/Release just call the
@@ -138,16 +137,15 @@ func TestRun_Permit_BlocksClaimUntilAcquireReturns(t *testing.T) {
 		},
 	}
 
-	origAgentPrompt := d.AgentPrompt
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+	onRunnerPrompt(d, func(agentrunner.Session, string) error {
 		mu.Lock()
 		ready := acquireReturned
 		mu.Unlock()
 		if !ready {
-			t.Errorf("AgentPrompt called before Permit.Acquire returned")
+			t.Errorf("Runner.Prompt called before Permit.Acquire returned")
 		}
-		return origAgentPrompt(opts)
-	}
+		return nil
+	})
 
 	runErr := make(chan error, 1)
 	go func() {

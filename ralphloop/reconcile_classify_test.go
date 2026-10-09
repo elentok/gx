@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -204,7 +203,6 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 

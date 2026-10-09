@@ -25,6 +25,10 @@ import (
 // happen to share a long prefix truncate to different labels).
 const maxIterLabelLen = 32
 
+// IterationLabel is iterLabel for callers outside the package that look up an
+// iteration's live session by name.
+func IterationLabel(epicName, identifier string) string { return iterLabel(epicName, identifier) }
+
 func iterLabel(epicName, identifier string) string {
 	suffix := "-iter-" + identifier
 	budget := maxIterLabelLen - len(suffix)

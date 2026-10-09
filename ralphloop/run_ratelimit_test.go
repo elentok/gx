@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/agentrunner"
 )
 
 // TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt drives a full
@@ -38,10 +38,6 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 		return origAddWorktree(repoDir, path, branch, base)
 	}
 
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
-
 	// A Claude rate-limit hit has no status of its own (see waitForFinish):
 	// the pane just goes idle, same as an ordinary finish, with the
 	// rate-limit message still sitting in its recent output. So the gated
@@ -52,11 +48,8 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	g := newGatedRunner(d.Runner)
 	d.Runner = g
 
-	sendKeysCh := make(chan []string, 1)
-	d.AgentSendKeys = func(target string, keys ...string) error {
-		sendKeysCh <- keys
-		return nil
-	}
+	interruptCh := make(chan string, 1)
+	g.onInterrupt = func(s agentrunner.Session) { interruptCh <- s.Label }
 
 	// The limit has no known reset time, so the wait falls back to asking the
 	// runner again every rateLimitPollInterval.
@@ -100,8 +93,8 @@ func TestRun_RateLimitDetected_AutoPausesAndResumesWithReprompt(t *testing.T) {
 	g.release(iter1)
 
 	select {
-	case keys := <-sendKeysCh:
-		t.Fatalf("AgentSendKeys called with %v, want no interrupt on a rate-limit pause (unlike smart-zone)", keys)
+	case label := <-interruptCh:
+		t.Fatalf("Runner.Interrupt(%s) called, want no interrupt on a rate-limit pause (unlike smart-zone)", label)
 	case <-time.After(50 * time.Millisecond):
 	}
 

@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 )
 
 // gatedRunner blocks only the "wait for the agent to finish" Wait (the one
@@ -519,9 +518,6 @@ func TestRun_RestartMidResolution_ReattachesLiveResolverWithoutReforking(t *test
 	})
 	d, _, _ := fakeDeps()
 
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-conflict-01", Label: "conflict-01", WorkspaceID: workspaceID}}, nil
-	}
 	hostLiveAgent(t, d, "conflict-01")
 
 	// The sequencer already owns a conflict from before the crash — no

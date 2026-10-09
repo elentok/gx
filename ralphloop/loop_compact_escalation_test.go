@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/elentok/gx/herdr"
 )
 
 // stuckCompactionDeps returns fakeDeps wired so every poll tick times out with
@@ -20,9 +18,6 @@ func stuckCompactionDeps(interruptErr error) Deps {
 	d, _, _ := fakeDeps()
 	// A native session id is what makes occupancy readable at all, so without
 	// one the poll loop would never classify a breach.
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "session-01"}, nil
-	}
 	// The main poll's every wait times out, which is what keeps re-driving the
 	// breach; the compaction wait sees fakeDeps' agent done right after
 	// "/compact", a premature idle ReadCompactions never corroborates.

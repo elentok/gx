@@ -9,7 +9,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -32,7 +31,6 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
 	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so
 	// the iteration branch is treated as still existing.
@@ -95,7 +93,6 @@ func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *te
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error { return nil }
 
@@ -142,7 +139,6 @@ func TestReconcile_DoneTicketRecoverable_ConflictGoesThroughResolutionPath(t *te
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	// The stale pick is gx's own debris: its commit is on an iteration branch.
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
 		return strings.HasPrefix(descendant, "ralph-loop/"), nil
@@ -200,9 +196,6 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-conflict-03", Label: "conflict-03", WorkspaceID: workspaceID}}, nil
-	}
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
 
 	hostLiveAgent(t, d, "conflict-03")
@@ -227,13 +220,12 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 		return nil
 	}
 	var conflictTabCreates int
-	origTabCreate := d.TabCreate
-	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+	onRunnerStart(d, func(opts agentrunner.StartOptions) error {
 		if strings.HasPrefix(opts.Label, "conflict-") {
 			conflictTabCreates++
 		}
-		return origTabCreate(opts)
-	}
+		return nil
+	})
 
 	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {
@@ -244,7 +236,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 		t.Error("AbortCherryPick called, want the live conflict-resolution resolver reattached instead")
 	}
 	if conflictTabCreates != 0 {
-		t.Errorf("conflict-labeled TabCreate calls = %d, want 0 (must reuse the live resolver's tab, not fork a second one)", conflictTabCreates)
+		t.Errorf("conflict-labeled Runner.Start calls = %d, want 0 (must reuse the live resolver, not fork a second one)", conflictTabCreates)
 	}
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "03-c.md"))
@@ -380,7 +372,6 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") } // branch gone
@@ -390,10 +381,7 @@ func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 		cleanupCalled = true
 		return nil
 	}
-	d.TabClose = func(tabID string) error {
-		cleanupCalled = true
-		return nil
-	}
+	onRunnerStop(d, func(agentrunner.Session) { cleanupCalled = true })
 	d.DeleteBranch = func(repoDir, branch string) error {
 		cleanupCalled = true
 		return nil

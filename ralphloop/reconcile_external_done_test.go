@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -78,7 +77,6 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
@@ -125,7 +123,6 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
@@ -166,7 +163,6 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
@@ -205,7 +201,6 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
@@ -246,7 +241,6 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 
@@ -311,7 +305,6 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 	})
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
 		return ancestor == "confirmed-landed-sha-02", nil
 	}

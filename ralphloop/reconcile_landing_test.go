@@ -11,7 +11,6 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -38,7 +37,6 @@ func writeDeadLandLock(t *testing.T, dir string, owner LandLockOwner) {
 // iteration branch whose commits have featureSubjects' subjects.
 func interruptedLandingDeps(featureSubjects []string) (Deps, *[]string, *[]git.Trailer) {
 	d, _, _ := fakeDeps()
-	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
 	d.RevParse = func(dir, ref string) (string, error) {
 		if ref == "HEAD" || ref == "epic" {
 			return "landed", nil
@@ -169,7 +167,6 @@ func TestReconcile_OrphanedClaimLandingHoldsLandLock(t *testing.T) {
 		t.Fatalf("tickets.Load: %v", err)
 	}
 	d, _, _ := fakeDeps()
-	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
 	var owner *LandLockOwner
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
 		owner, _ = ReadLandLock(lockDir)

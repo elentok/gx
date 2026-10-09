@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -49,9 +48,6 @@ func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
-	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 12345, true, nil
 	}
@@ -83,9 +79,6 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
-	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 12345, true, nil
 	}
@@ -124,9 +117,6 @@ func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testin
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
-	}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)

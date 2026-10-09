@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -40,9 +39,6 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return nil, nil // no live tabs at all
-	}
 	// No iteration branch was ever created for this claim (it never got as
 	// far as running), so there's nothing to recover — only the plain revert
 	// applies.
@@ -88,9 +84,6 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 	}
 
 	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return nil, nil // no live tabs at all
-	}
 	// Default fakeDeps RevParse/CommitsAhead already report the iteration
 	// branch as existing with commits ahead of base — simulating the
 	// finished-but-uncherry-picked branch left behind.
@@ -132,7 +125,6 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBefor
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) { return nil, nil }
 
 	sink := &recordingSink{}
 	_, err = reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, sink), epics[0])
@@ -319,9 +311,6 @@ func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 		t.Fatalf("tickets.Load: %v", err)
 	}
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
 
 	rp := testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{})
 	rp.Scope = RunScope{data: &scopeData{ticketIDs: map[string]struct{}{"99": {}}}}
@@ -346,7 +335,6 @@ func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
-	d.TabList = func(string) ([]herdr.Tab, error) { return nil, nil }
 
 	sink := &recordingSink{}
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
@@ -373,9 +361,6 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
 	hostLiveAgentWithSession(t, d, "epic-iter-01", "session-epic-iter-01")
 	var mu sync.Mutex
 	sawClaimed := false
@@ -477,9 +462,6 @@ func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *t
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return nil, nil // no live tabs at all
-	}
 	// A conflict-resolution child never has its own iteration branch (see
 	// conflictLabel's doc), so its orphaned-claim check must fall straight to
 	// the plain revert-to-open rather than the recover-unlanded-commits path.
@@ -516,9 +498,6 @@ func TestReconcile_OpenAndDoneTicketsIgnored(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return nil, nil
-	}
 
 	reattached, err := reconcile(d, testReconcileParams("ws1", reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, noopEventSink{}), epics[0])
 	if err != nil {

@@ -32,12 +32,7 @@ type Deps struct {
 	// skill is otherwise only discovered mid-iteration, after the ticket is
 	// already claimed and the agent has been prompted with a skill invocation
 	// it can't resolve.
-	VerifySkill           func(agent AgentKind, skill string) error
-	FindOrCreateWorkspace func(label, cwd string) (string, error)
-	// FindWorkspace looks up an epic's herdr workspace without creating one,
-	// for callers that must never bring a workspace into existence just to
-	// discover it doesn't have one.
-	FindWorkspace func(label string) (string, error)
+	VerifySkill func(agent AgentKind, skill string) error
 	// WorktreeDir returns the directory linked worktrees for repoDir's repo
 	// are created in (see git.Repo.LinkedWorktreeDir).
 	WorktreeDir func(repoDir string) (string, error)
@@ -61,25 +56,14 @@ type Deps struct {
 	// RenameBranch renames a local branch, for setting an iteration branch
 	// aside under an attic name.
 	RenameBranch func(repoDir, oldName, newName string) error
-	// Runner hosts the iteration's agent. The herdr fields below are being
-	// retired path by path onto it.
-	Runner      agentrunner.Runner
-	TabCreate   func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error)
-	TabClose    func(tabID string) error
-	TabList     func(workspaceID string) ([]herdr.Tab, error)
-	AgentStart  func(opts herdr.AgentStartOptions) (herdr.Agent, error)
-	AgentPrompt func(opts herdr.AgentPromptOptions) (herdr.Agent, error)
-	AgentGet    func(target string) (herdr.Agent, error)
-	// AgentExplain reports which detection rule herdr's pane monitor matched
-	// for a pane's current state, used by blocked-pane recovery paths to name
-	// the unanswered dialog (its matched_rule.id) in a park reason or to
-	// decide whether it is answerable.
-	AgentExplain  func(target string) (herdr.AgentExplainResult, error)
-	AgentWait     func(opts herdr.AgentWaitOptions) (herdr.Agent, error)
-	AgentSendKeys func(target string, keys ...string) error
-	RevParse      func(dir, ref string) (string, error)
-	MergeBase     func(dir, refA, refB string) (string, error)
-	CommitsAhead  func(dir, fromExclusive, toRef string) (int, error)
+	// Runner hosts the iteration's agent.
+	Runner agentrunner.Runner
+	// TabID returns the id of the tab hosting label's agent, for logging on
+	// events and closing it at cleanup. Runner sessions don't expose their tab.
+	TabID        func(label string) (string, error)
+	RevParse     func(dir, ref string) (string, error)
+	MergeBase    func(dir, refA, refB string) (string, error)
+	CommitsAhead func(dir, fromExclusive, toRef string) (int, error)
 	// CommitSubjects lists fromExclusive..toRef's subjects, oldest first, so
 	// startup reconciliation can tell an interrupted landing's commits from
 	// anything else that reached the feature branch.
@@ -219,42 +203,35 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		VerifySkill: func(agent AgentKind, skill string) error {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
-		AgentGet:     herdr.AgentGet,
-		AgentExplain: herdr.AgentExplain,
+		TabID: func(label string) (string, error) {
+			agent, err := herdr.AgentGet(label)
+			return agent.TabID, err
+		},
 		VerifyCodexSession: codexHomeFn(overrides.CodexHome,
 			codexsession.VerifyIdentity,
 			func(cwd, sessionID string) (bool, error) {
 				return codexsession.VerifyIdentityIn(overrides.CodexHome, cwd, sessionID)
 			},
 		),
-		FindOrCreateWorkspace: herdr.EnsureWorkspace,
-		FindWorkspace:         herdr.FindWorkspace,
-		WorktreeDir:           worktreeDir,
-		AddWorktree:           addWorktree,
-		AddDetachedWorktree:   addDetachedWorktree,
-		RemoveWorktree:        removeWorktree,
-		DeleteBranch:          deleteBranch,
-		RenameBranch:          renameBranch,
-		Runner:                runner,
-		TabCreate:             herdr.TabCreate,
-		TabClose:              herdr.TabClose,
-		TabList:               herdr.TabList,
-		AgentStart:            herdr.AgentStart,
-		AgentPrompt:           herdrrunner.PromptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now),
-		AgentWait:             herdr.AgentWait,
-		AgentSendKeys:         herdr.AgentSendKeys,
-		RevParse:              git.RevParse,
-		MergeBase:             git.MergeBase,
-		CommitsAhead:          git.CommitsAhead,
-		CommitSubjects:        git.CommitSubjects,
-		CherryPickRange:       git.CherryPickRange,
-		CherryPickInProgress:  git.CherryPickInProgress,
-		AbortCherryPick:       git.AbortCherryPick,
-		IsAncestor:            git.IsAncestor,
-		PatchesApplied:        git.PatchesApplied,
-		AppendTrailers:        git.AppendTrailers,
-		TrailerMap:            git.TrailerMap,
-		WorktreeExists:        worktreeExists,
+		WorktreeDir:          worktreeDir,
+		AddWorktree:          addWorktree,
+		AddDetachedWorktree:  addDetachedWorktree,
+		RemoveWorktree:       removeWorktree,
+		DeleteBranch:         deleteBranch,
+		RenameBranch:         renameBranch,
+		Runner:               runner,
+		RevParse:             git.RevParse,
+		MergeBase:            git.MergeBase,
+		CommitsAhead:         git.CommitsAhead,
+		CommitSubjects:       git.CommitSubjects,
+		CherryPickRange:      git.CherryPickRange,
+		CherryPickInProgress: git.CherryPickInProgress,
+		AbortCherryPick:      git.AbortCherryPick,
+		IsAncestor:           git.IsAncestor,
+		PatchesApplied:       git.PatchesApplied,
+		AppendTrailers:       git.AppendTrailers,
+		TrailerMap:           git.TrailerMap,
+		WorktreeExists:       worktreeExists,
 		InstallDeps: func(path string) (string, error) {
 			return installDependenciesWith(path, overrides.Path)
 		},

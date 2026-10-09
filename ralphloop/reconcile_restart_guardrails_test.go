@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/herdr"
 )
 
 // TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands covers ticket 23's
@@ -24,9 +23,6 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
-	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if strings.Contains(cwd, "epic-item-01") {
 			return 999999, true, nil
@@ -74,27 +70,11 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "working"}}, nil
-	}
-	var waits int
-	d.AgentWait = func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		waits++
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "blocked"}, nil
-	}
-	d.AgentGet = func(target string) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "blocked", AgentSession: "session-" + target}, nil
-	}
+	d, promptsPtr, removed := fakeDeps()
 	hostLiveAgent(t, d, "epic-iter-01")
 	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "usage limit")
 	fakeRunner(d).SetRateLimit("epic-iter-01", time.Now().Add(-time.Second))
 	d.Sleep = func(time.Duration) { fakeRunner(d).SetRateLimit("epic-iter-01", time.Time{}) }
-	var prompts []string
-	d.AgentPrompt = func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		prompts = append(prompts, opts.Text)
-		return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-	}
 	// The pane stays blocked forever in this fake — there is no dialog for a
 	// human to answer here, only a scripted proof that the park happened. The
 	// park poll is the run's only path to noticing an external status change,
@@ -124,8 +104,8 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if len(prompts) != 0 {
-		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", prompts)
+	if len(*promptsPtr) != 0 {
+		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", *promptsPtr)
 	}
 	if len(*removed) != 0 {
 		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary landing path", *removed)

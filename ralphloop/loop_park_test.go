@@ -13,7 +13,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -219,16 +218,6 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 		return origAddWorktree(repoDir, wtPath, branch, base)
 	}
 
-	cleared := false
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		if !cleared {
-			return nil, nil
-		}
-		return []herdr.Tab{{TabID: "tab-my-epic-iter-01", Label: "my-epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
-
 	polls := 0
 	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
 		assertParkInterval(t, dur)
@@ -242,7 +231,6 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 			if _, err := fakeRunner(d).Start(agentrunner.StartOptions{Label: "my-epic-iter-01", Epic: "my-epic"}); err != nil {
 				t.Errorf("Start: %v", err)
 			}
-			cleared = true
 		}
 		return readyTimer(dur)
 	}

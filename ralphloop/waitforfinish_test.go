@@ -11,7 +11,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
@@ -1699,9 +1698,6 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 // waitForFinish's conclusion open.
 func idleBackgroundTaskDeps(readBackgroundTasks func(cwd, sessionID string) (transcript.BackgroundTaskReading, error), sleeps *int) Deps {
 	return Deps{
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
-		},
 		Runner:              idleRunner("iter-30"),
 		ReadBackgroundTasks: readBackgroundTasks,
 		Sleep:               func(time.Duration) { *sleeps++ },

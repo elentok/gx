@@ -12,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
@@ -28,9 +27,6 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return nil, nil
-	}
 	// No iteration branch was ever created for this claim, so reconcile has
 	// nothing to recover — only the plain revert-then-rerun applies.
 	d.RevParse = func(dir, ref string) (string, error) {
@@ -74,9 +70,6 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
 	hostLiveAgentWithSession(t, d, "epic-iter-01", "session-epic-iter-01")
 
 	var worktreeCreateCalledForIter bool
@@ -151,12 +144,6 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{
-			{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID},
-			{TabID: "tab-conflict-01", Label: "conflict-01", WorkspaceID: workspaceID},
-		}, nil
-	}
 
 	hostLiveAgent(t, d, "epic-iter-01")
 	hostLiveAgent(t, d, "conflict-01")
@@ -188,15 +175,14 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 
 	var mu sync.Mutex
 	var conflictTabCreates int
-	origTabCreate := d.TabCreate
-	d.TabCreate = func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
+	onRunnerStart(d, func(opts agentrunner.StartOptions) error {
 		if strings.HasPrefix(opts.Label, "conflict-") {
 			mu.Lock()
 			conflictTabCreates++
 			mu.Unlock()
 		}
-		return origTabCreate(opts)
-	}
+		return nil
+	})
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -206,7 +192,7 @@ func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutRefork
 		t.Errorf("AbortCherryPick calls = %d, want 0 (must reattach the live resolver, not abort its sequencer state)", aborts)
 	}
 	if conflictTabCreates != 0 {
-		t.Errorf("conflict-labeled TabCreate calls = %d, want 0 (must reuse the live resolver's tab, not fork a second one)", conflictTabCreates)
+		t.Errorf("conflict-labeled Runner.Start calls = %d, want 0 (must reuse the live resolver, not fork a second one)", conflictTabCreates)
 	}
 	if atomic.LoadInt32(&picks) != 0 {
 		t.Errorf("CherryPickRange calls = %d, want 0 (the sequencer was already mid-conflict)", picks)
@@ -270,9 +256,6 @@ func TestRun_ReattachClearsStaleIterationStatusBeforeFinish(t *testing.T) {
 		}
 		iterationStatusAtFind = string(ticket.IterationStatus)
 	}}
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
 
 	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
@@ -297,9 +280,6 @@ func TestRun_RestartWithClaimedTicketAlreadyIdle_SkipsWaitAndCherryPicks(t *test
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
-	}
 
 	hostLiveAgentWithSession(t, d, "epic-iter-01", "session-epic-iter-01")
 
@@ -357,16 +337,13 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			d, prompts, removed := fakeDeps()
-			d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-				return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-			}
 			hostLiveAgentWithSession(t, d, "epic-iter-01", tc.session)
 			d.VerifyCodexSession = func(cwd, sessionID string) (bool, error) { return tc.verified, nil }
 			var starts int
-			d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
+			onRunnerStart(d, func(agentrunner.StartOptions) error {
 				starts++
-				return herdr.Agent{}, nil
-			}
+				return nil
+			})
 
 			// The failed reattach leaves the epic's only ticket
 			// needs-repair, so the run parks on it.
@@ -402,9 +379,6 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 	}
 
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
 	hostLiveAgentWithSession(t, d, "epic-iter-01", "sess-live")
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		if cwd == "/fake/worktrees/epic-item-01" && sessionID == "sess-live" {
@@ -438,9 +412,6 @@ func TestRun_ReattachedCommitlessCloseWithNoLiveSession(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\ncommitless: true\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
-	}
 	hostLiveAgentWithSession(t, d, "epic-iter-01", "")
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
@@ -495,9 +466,6 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID}}, nil
-	}
 	hostLiveAgent(t, d, "epic-iter-01")
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
@@ -521,9 +489,6 @@ func TestRun_ReattachedClose_NoPriorSessionInLog_OmitsMetadata(t *testing.T) {
 func idleReattachDeps(t *testing.T, agentSession string) (Deps, *[]string) {
 	t.Helper()
 	d, _, removed := fakeDeps()
-	d.TabList = func(workspaceID string) ([]herdr.Tab, error) {
-		return []herdr.Tab{{TabID: "tab-epic-iter-01", Label: "epic-iter-01", WorkspaceID: workspaceID, AgentStatus: "idle"}}, nil
-	}
 	hostLiveAgentWithSession(t, d, "epic-iter-01", agentSession)
 	return d, removed
 }

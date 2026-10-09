@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
@@ -155,24 +154,15 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		mu.Unlock()
 	}
 	runner := runnerfake.NewRunner()
-	// Panes are named like TabCreate's below.
 	runner.IDs = func(label string) (string, string) { return "pane-" + label, "sess-pane-" + label }
 	runner.Adopt = true
-	// Agents finish their turn right away, as fakeDeps' AgentWait reports.
+	// Agents finish their turn right away.
 	runner.PromptState = agentrunner.StateDone
 	d = Deps{
 		Runner: recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
-		AgentGet: func(target string) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: "pane-" + target, WorkspaceID: "ws1", TabID: "tab-" + target, AgentStatus: "working", AgentSession: "session-" + target}, nil
-		},
+		TabID:  func(label string) (string, error) { return "tab-" + label, nil },
 		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
 			return true, nil
-		},
-		FindOrCreateWorkspace: func(label, cwd string) (string, error) {
-			return "ws1", nil
-		},
-		FindWorkspace: func(label string) (string, error) {
-			return "ws1", nil
 		},
 		WorktreeDir: func(repoDir string) (string, error) {
 			return "/fake/worktrees", nil
@@ -191,36 +181,6 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		DeleteBranch: func(repoDir, branch string) error {
 			return nil
-		},
-		TabCreate: func(opts herdr.TabCreateOptions) (herdr.CreatedTab, error) {
-			return herdr.CreatedTab{
-				Tab:        herdr.Tab{TabID: "tab-" + opts.Label, Label: opts.Label, WorkspaceID: opts.WorkspaceID},
-				RootPaneID: "pane-" + opts.Label,
-			}, nil
-		},
-		TabClose: func(tabID string) error {
-			// Closing a tab ends its agent, as on herdr.
-			if s, ok, _ := runner.Find(strings.TrimPrefix(tabID, "tab-")); ok {
-				return runner.Stop(s)
-			}
-			return nil
-		},
-		TabList: func(workspaceID string) ([]herdr.Tab, error) {
-			return nil, nil
-		},
-		AgentStart: func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-			// Herdr-only launches (the conflict resolver) still wait through
-			// the Runner, so host their pane there too. A label the Runner
-			// already hosts is ErrLabelTaken, which is fine.
-			_, _ = runner.Start(agentrunner.StartOptions{Label: strings.TrimPrefix(opts.Pane, "pane-")})
-			return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle"}, nil
-		},
-		AgentPrompt: func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-			record(opts.Text)
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "working"}, nil
-		},
-		AgentWait: func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-			return herdr.Agent{PaneID: opts.Target, AgentStatus: "idle"}, nil
 		},
 		RevParse: func(dir, ref string) (string, error) {
 			return "deadbeef", nil
@@ -257,9 +217,6 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		InstallDeps: func(path string) (string, error) {
 			return "", nil
-		},
-		AgentSendKeys: func(target string, keys ...string) error {
-			return nil
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, nil
@@ -652,9 +609,6 @@ func TestRun_FreshIteration_StampsCompactionsOnDone(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
-	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 12345, true, nil
 	}
@@ -685,9 +639,6 @@ func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-fresh-01"}, nil
-	}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
 		return 12345, true, nil
 	}
@@ -713,9 +664,6 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
-	}
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
 	// The needs-answer ticket is the epic's only one, so the run parks on it.
@@ -750,9 +698,6 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 	d, _, _ := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
 		return 0, nil
-	}
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
 	}
 
 	sink := &recordingSink{}

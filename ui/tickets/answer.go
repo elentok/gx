@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -15,9 +16,16 @@ import (
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
-// findIterationTab is a package-level seam so tests can fake herdr.
+// findIterationTab is a package-level seam so tests can fake herdr. Any lookup
+// failure reads as "no live tab": a transient herdr hiccup must only demote the
+// menu to its pane-gone variant, never block it.
 var findIterationTab = func(epicName, identifier string) (herdr.Tab, bool) {
-	return ralphloop.FindIterationTab(herdr.FindWorkspace, herdr.TabList, epicName, identifier)
+	workspaceID, err := herdr.FindWorkspace(epicName)
+	if err != nil || workspaceID == "" {
+		return herdr.Tab{}, false
+	}
+	tab, found, err := herdrrunner.FindTab(herdr.TabList, workspaceID, ralphloop.IterationLabel(epicName, identifier))
+	return tab, found && err == nil
 }
 
 // ticketPaneLive reports whether a parked ticket's iteration pane still

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/herdr"
 )
 
 // TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler drives a full
@@ -26,10 +25,6 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		"03-c.md": "---\nid: \"03\"\nstatus: open\ntype: implement\n---\n# C\n",
 	})
 	d, _, removed := fakeDeps()
-
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
 
 	promptCh := make(chan string, 8)
 	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {
@@ -146,10 +141,6 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, removed := fakeDeps()
-
-	d.AgentStart = func(opts herdr.AgentStartOptions) (herdr.Agent, error) {
-		return herdr.Agent{PaneID: opts.Pane, AgentStatus: "idle", AgentSession: "sess-" + opts.Pane}, nil
-	}
 
 	promptCh := make(chan string, 8)
 	onRunnerPrompt(d, func(_ agentrunner.Session, text string) error {

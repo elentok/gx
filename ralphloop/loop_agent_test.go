@@ -103,12 +103,11 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 					},
 				)
 			}
-			findOrCreateWorkspace := d.FindOrCreateWorkspace
 			workspaceCalls := 0
-			d.FindOrCreateWorkspace = func(label, cwd string) (string, error) {
+			onRunnerStart(d, func(agentrunner.StartOptions) error {
 				workspaceCalls++
-				return findOrCreateWorkspace(label, cwd)
-			}
+				return nil
+			})
 
 			err := Run(RunOptions{
 				EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",
@@ -124,8 +123,8 @@ func TestRun_CodexLaunchPreflight(t *testing.T) {
 			if preflightCalls != 1 {
 				t.Errorf("PreflightAgent() calls = %d, want 1", preflightCalls)
 			}
-			if workspaceCalls != 0 {
-				t.Errorf("FindOrCreateWorkspace() calls = %d, want 0", workspaceCalls)
+			if tc.wantErr != "" && workspaceCalls != 0 {
+				t.Errorf("Runner.Start() calls = %d, want 0 after a failed preflight", workspaceCalls)
 			}
 
 			if tc.wantErr != "" {
@@ -156,12 +155,11 @@ func TestRun_MissingSkill_FailsBeforeClaimingAnyTicket(t *testing.T) {
 		}
 		return errors.New(`skill "implement" not found at /home/x/.claude/skills/implement/SKILL.md; install it or pass a different --skill`)
 	}
-	findOrCreateWorkspace := d.FindOrCreateWorkspace
 	workspaceCalls := 0
-	d.FindOrCreateWorkspace = func(label, cwd string) (string, error) {
+	onRunnerStart(d, func(agentrunner.StartOptions) error {
 		workspaceCalls++
-		return findOrCreateWorkspace(label, cwd)
-	}
+		return nil
+	})
 
 	err := Run(RunOptions{
 		EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
@@ -173,7 +171,7 @@ func TestRun_MissingSkill_FailsBeforeClaimingAnyTicket(t *testing.T) {
 		t.Errorf("VerifySkill() calls = %d, want 1", verifySkillCalls)
 	}
 	if workspaceCalls != 0 {
-		t.Errorf("FindOrCreateWorkspace() calls = %d, want 0", workspaceCalls)
+		t.Errorf("Runner.Start() calls = %d, want 0", workspaceCalls)
 	}
 
 	ticketPath := filepath.Join(scratchDir, "my-epic", "issues", "01-first.md")
