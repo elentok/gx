@@ -69,7 +69,7 @@ func renderViewportWithScrollbar(vp viewport.Model) []string {
 // an empty `.scratch/`) falls back to the tab's empty-preview placeholder. A
 // ticket row is rendered by renderTicketPreview, shared with the Queue tab's
 // own preview pane (see queue_preview.go). An epic row gets its own header
-// (name + optional [map] badge + open/total count) followed by its map.md
+// (name + optional [map] badge + open/total count) followed by its ticket.md
 // body for a wayfinder-map epic, or nothing for a plain one. The second and
 // third return values are the park-section scroll target line index and
 // whether one exists — always false for an epic row.
@@ -177,8 +177,8 @@ func highlightParkSection(rendered string, status tickets.RenderedStatus) (out s
 }
 
 // previewEpicContent renders an epic row's preview: a header line, plus -
-// for a wayfinder-map epic only - a rule and its map.md body rendered
-// through the same glamour path as a ticket body. A plain epic (no map.md)
+// for a wayfinder-map epic only - a rule and its ticket.md body rendered
+// through the same glamour path as a ticket body. A plain epic (not kind: map)
 // has no single representative file to preview, so it's header-only.
 func previewEpicContent(epic tickets.Epic, width int) string {
 	header := previewEpicHeaderLine(epic)

@@ -1,9 +1,11 @@
 package tickets
 
 import (
+	"path/filepath"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -59,7 +61,7 @@ func TestModel_EditChordSplitVariants(t *testing.T) {
 	}
 }
 
-func TestModel_EditChordOnEpicWithMapOpensMapFile(t *testing.T) {
+func TestModel_EditChordOnEpicOpensTicketMD(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
@@ -70,28 +72,41 @@ func TestModel_EditChordOnEpicWithMapOpensMapFile(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Selection starts on the epic row itself.
+	// Row 0 is the section header; move down once to select the epic itself.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	path, ok, warning := m.selectedEditTarget()
+	want := filepath.Join(root, ".scratch", "my-epic", "ticket.md")
+	if !ok || path != want {
+		t.Fatalf("selectedEditTarget = %q, %v (%q), want %q", path, ok, warning, want)
+	}
+
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(Model)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(Model)
 	if cmd == nil {
-		t.Fatalf("expected ee on a map epic to launch an editor command for map.md")
+		t.Fatalf("expected ee on an epic to launch an editor command for ticket.md")
 	}
 }
 
-func TestModel_EditChordOnPlainEpicIsNoOpWithWarning(t *testing.T) {
+func TestModel_EditChordOnEpicWithoutTicketMDIsNoOpWithWarning(t *testing.T) {
 	// not parallel-safe: t.Setenv (EDITOR) is process-wide
 	t.Setenv("EDITOR", "true")
 	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	testutil.Mkdir(t, filepath.Join(root, ".scratch", "my-epic"))
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Selection starts on the epic row, which has no map.md (plain epic).
+	// Row 0 is the section header; move down once to select the epic itself.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	m = updated.(Model)
+	if _, ok, warning := m.selectedEditTarget(); ok || warning != "epic has no ticket.md to edit" {
+		t.Fatalf("selectedEditTarget ok=%v warning=%q, want the no-ticket.md warning", ok, warning)
+	}
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	m = updated.(Model)
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})

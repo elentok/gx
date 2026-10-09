@@ -65,7 +65,7 @@ func TestLoad_DiscoversEpicsAndTickets(t *testing.T) {
 		t.Errorf("Name = %q, want %q", epic.Name, "my-epic")
 	}
 	if epic.IsMap {
-		t.Error("epic without map.md should not be IsMap")
+		t.Error("epic without ticket.md should not be IsMap")
 	}
 	if epic.TotalCount() != 2 {
 		t.Fatalf("expected 2 tickets, got %d", epic.TotalCount())
@@ -105,19 +105,20 @@ func TestLoad_MirrorsMutes(t *testing.T) {
 	}
 }
 
-func TestLoad_EpicWithMapMdIsFlagged(t *testing.T) {
+func TestLoad_StrayMapMdIsNotAMapEpic(t *testing.T) {
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "wayfinder-epic", "map.md"), "# Map\n")
+	epicPath := filepath.Join(dir, "old-shape-epic")
+	writeFile(t, filepath.Join(epicPath, "map.md"), "# Map\n")
 
 	epics, err := Load(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(epics) != 1 || !epics[0].IsMap {
-		t.Fatalf("expected 1 IsMap epic, got %+v", epics)
+	if len(epics) != 1 || epics[0].IsMap || epics[0].HasTicketMD {
+		t.Fatalf("expected 1 non-map epic without ticket.md, got %+v", epics)
 	}
-	if epics[0].TotalCount() != 0 {
-		t.Errorf("expected 0 tickets for map-only epic, got %d", epics[0].TotalCount())
+	if IsMapEpic(epicPath) {
+		t.Error("IsMapEpic should ignore a stray map.md")
 	}
 }
 

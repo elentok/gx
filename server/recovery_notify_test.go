@@ -280,7 +280,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 		{"person entry", person, nil, "TEST"},
 		{"failed investigation", unmatched, func(t *testing.T, h *servertest.Harness) {
 			// A map epic refuses the investigate ticket's queueing.
-			testutil.WriteFile(t, filepath.Join(h.TicketStore, "proj", "epic-a"), "map.md", "# map\n")
+			testutil.WriteFile(t, filepath.Join(h.TicketStore, "proj", "epic-a"), "ticket.md", "---\nkind: map\nstatus: open\n---\n# map\n")
 		}, "no match"},
 		{"failed held remedy", rule(func(recovery.Failure, recovery.Verbs) error { return errors.New("remedy refused") }), nil, "TEST"},
 	} {

@@ -20,9 +20,9 @@ type editFileFinishedMsg struct {
 }
 
 // cmdEditSelectedFile opens the selected row's underlying file for editing:
-// a ticket's own file, or an epic's map.md if it has one. A plain epic (no
-// map.md) has nothing to edit, so it's a no-op with an inline message rather
-// than a crash.
+// a ticket's own file, or an epic's ticket.md. An epic without a ticket.md
+// has nothing to edit, so it's a no-op with an inline message rather than a
+// crash.
 func (m Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	target, ok, warning := m.selectedEditTarget()
 	if !ok {
@@ -52,7 +52,7 @@ func editTicketFile(worktreeRoot string, settings ui.Settings, path string, spli
 
 // selectedEditTarget resolves the file path to edit for the current
 // selection. A ticket row always has one; an epic row only has one when it
-// has a map.md. On failure it also returns a warning message describing why.
+// has a ticket.md. On failure it also returns a warning message describing why.
 func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 	r, ok := m.selectedRow()
 	if !ok {
@@ -60,10 +60,10 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 	}
 	epic := m.epicAt(r)
 	if r.isEpic() {
-		if !epic.IsMap {
-			return "", false, "epic has no map.md to edit"
+		if !epic.HasTicketMD {
+			return "", false, "epic has no ticket.md to edit"
 		}
-		return filepath.Join(epic.Path, "map.md"), true, ""
+		return filepath.Join(epic.Path, "ticket.md"), true, ""
 	}
 	return epic.Tickets[r.ticketIdx].FilePath(), true, ""
 }

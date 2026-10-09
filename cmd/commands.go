@@ -301,7 +301,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 			return runTicketsEpics(cwd, c.OutOrStdout(), mapsOnly)
 		},
 	}
-	epicsCmd.Flags().BoolVar(&mapsOnly, "maps", false, "only print epics with a wayfinder map.md")
+	epicsCmd.Flags().BoolVar(&mapsOnly, "maps", false, "only print epics with ticket.md kind: map")
 	cmd.AddCommand(epicsCmd)
 	cmd.AddCommand(newEpicScopedCmd(d, "ensure-code-review <epic>",
 		"no-op if the epic has a code-review ticket, else stamp out a stub",

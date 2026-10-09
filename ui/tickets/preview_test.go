@@ -154,7 +154,7 @@ func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
 		t.Fatalf("expected epic name + [map] badge + open/total count in preview header, got:\n%s", content)
 	}
 	if !strings.Contains(content, "Distinctive map prose.") {
-		t.Fatalf("expected map.md body rendered in preview, got:\n%s", content)
+		t.Fatalf("expected map body rendered in preview, got:\n%s", content)
 	}
 }
 

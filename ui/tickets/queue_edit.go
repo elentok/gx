@@ -21,7 +21,7 @@ const (
 
 // cmdEditSelectedFile opens the selected row's ticket file for editing,
 // mirroring the Tickets tab's Model.cmdEditSelectedFile — the Queue tab only
-// ever selects tickets (no epic rows), so there's no map.md case to handle.
+// ever selects tickets (no epic rows), so there's no epic ticket.md case to handle.
 func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	row, ok := m.selectedQueueRow()
 	if !ok {

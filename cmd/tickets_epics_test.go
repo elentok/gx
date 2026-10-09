@@ -38,7 +38,7 @@ func TestExecute_TicketsEpics_MapsFlagFiltersToWayfinderMapEpics(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", name, err)
 		}
 	}
-	testutil.WriteFile(t, project, "alpha-epic/map.md", "# alpha map")
+	testutil.WriteFile(t, project, "alpha-epic/ticket.md", "---\nkind: map\nstatus: open\n---\n# alpha map")
 
 	out, err := runIn(t, repo, "tickets", "epics", "--maps")
 	if err != nil {

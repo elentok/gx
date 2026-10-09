@@ -1097,13 +1097,9 @@ func LegacyTicketToFrontmatter(filename, content string) string {
 
 func writeMap(t *testing.T, root, epic, content string) {
 	t.Helper()
-	path := filepath.Join(root, ".scratch", epic, "map.md")
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
+	epicDir := filepath.Join(root, ".scratch", epic)
+	testutil.Mkdir(t, epicDir)
+	testutil.WriteFile(t, epicDir, "ticket.md", "---\nkind: map\nstatus: open\n---\n"+content)
 }
 
 // writeArchivedTicket mirrors writeTicket but writes under `.scratch/
