@@ -12,8 +12,11 @@ const (
 	ChoiceAuto     Choice = "auto"
 	ChoiceHerdr    Choice = "herdr"
 	ChoiceHeadless Choice = "headless"
-	ChoicePTY      Choice = "pty"
 )
+
+// choicePTY is recognised only to be rejected: no runner honors it, and the
+// server would otherwise run it headless.
+const choicePTY Choice = "pty"
 
 // HerdrPingTimeout bounds how long auto waits for herdr before it falls back
 // to headless.
@@ -26,9 +29,8 @@ type Probe struct {
 	PingHerdr func(timeout time.Duration) error
 }
 
-// Select resolves setting to the runner to use. auto never picks pty: a
-// blocked `claude -p` is too hard to detect, so pty is only ever chosen by
-// hand. An explicit herdr with herdr down is an error, not a fallback.
+// Select resolves setting to the runner to use. pty is rejected. An explicit
+// herdr with herdr down is an error, not a fallback.
 func Select(setting string, p Probe) (Choice, error) {
 	c := Choice(setting)
 	switch c {
@@ -42,9 +44,11 @@ func Select(setting string, p Probe) (Choice, error) {
 			return "", fmt.Errorf("agent-runner is herdr but herdr is unavailable: %w", err)
 		}
 		return ChoiceHerdr, nil
-	case ChoiceHeadless, ChoicePTY:
+	case ChoiceHeadless:
+	case choicePTY:
+		return "", fmt.Errorf("agent-runner pty is not supported: want auto, herdr or headless")
 	default:
-		return "", fmt.Errorf("invalid agent-runner %q: want auto, herdr, headless or pty", setting)
+		return "", fmt.Errorf("invalid agent-runner %q: want auto, herdr or headless", setting)
 	}
 	if _, err := p.LookPath("claude"); err != nil {
 		return "", fmt.Errorf("agent-runner %s needs claude on PATH: %w", c, err)

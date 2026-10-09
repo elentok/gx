@@ -64,7 +64,7 @@ type Config struct {
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
 	Server                ServerConfig         `json:"server"`
 	Recovery              RecoveryConfig       `json:"recovery"`
-	// AgentRunner is auto, herdr, headless or pty. It is validated when the
+	// AgentRunner is auto, herdr or headless. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
 	AgentRunner string `json:"agent-runner"`
 }

@@ -46,9 +46,6 @@ type StartOptions struct {
 	Kind Kind
 	Args []string
 	Env  []string
-	// Interactive asks for a session a person can type into. Only herdr
-	// supports it; native runners ignore it.
-	Interactive bool
 }
 
 type Status struct {

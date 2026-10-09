@@ -50,8 +50,8 @@ func TestSelect(t *testing.T) {
 		{name: "herdr down does not fall back", setting: "herdr", onPath: both, wantErr: "herdr is unavailable"},
 		{name: "headless", setting: "headless", onPath: both, herdrUp: true, want: agentrunner.ChoiceHeadless},
 		{name: "headless without claude", setting: "headless", onPath: []string{"herdr"}, wantErr: "needs claude on PATH"},
-		{name: "pty by hand", setting: "pty", onPath: both, want: agentrunner.ChoicePTY},
-		{name: "pty without claude", setting: "pty", wantErr: "needs claude on PATH"},
+		{name: "pty is rejected", setting: "pty", onPath: both, wantErr: "pty is not supported"},
+		{name: "pty is rejected without claude", setting: "pty", wantErr: "pty is not supported"},
 		{name: "bad value", setting: "tmux", onPath: both, herdrUp: true, wantErr: `invalid agent-runner "tmux"`},
 	}
 	for _, tt := range tests {
@@ -67,15 +67,5 @@ func TestSelect(t *testing.T) {
 				t.Fatalf("Select() = %q, %v; want %q", got, err, tt.want)
 			}
 		})
-	}
-}
-
-func TestSelectAutoNeverPicksPTY(t *testing.T) {
-	for _, onPath := range [][]string{nil, {"claude"}, {"herdr"}, {"herdr", "claude"}} {
-		for _, up := range []bool{false, true} {
-			if got, _ := agentrunner.Select("auto", probe(onPath, up)); got == agentrunner.ChoicePTY {
-				t.Fatalf("auto picked pty with path %v, herdr up %v", onPath, up)
-			}
-		}
 	}
 }
