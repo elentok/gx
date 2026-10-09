@@ -573,3 +573,64 @@ func (h *harness) pid(t *testing.T) int {
 	}
 	return meta.PID
 }
+
+// blockingProcs holds Start inside its post-launch process lookup.
+type blockingProcs struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (b blockingProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
+	close(b.entered)
+	<-b.release
+	return nativerunner.Process{Start: "x"}, true, nil
+}
+
+func TestHeadless_StatusDoesNotBlockOnAStartInProgress(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-01")
+	b := blockingProcs{entered: make(chan struct{}), release: make(chan struct{})}
+	h.runner.Procs = b
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := h.runner.Start(agentrunner.StartOptions{
+			Label: "epic-02", Epic: "epic", Cwd: h.cwd,
+			Env: []string{fakeClaudeEnv + "=1", fakeClaudeRecord + "=" + h.record},
+		})
+		done <- err
+	}()
+	<-b.entered
+
+	status := make(chan error, 1)
+	go func() { _, err := h.runner.Status(s); status <- err }()
+	select {
+	case err := <-status:
+		if err != nil {
+			t.Errorf("Status = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Error("Status blocked while Start was in progress")
+	}
+	if _, err := h.runner.Start(agentrunner.StartOptions{Label: "epic-02", Cwd: h.cwd}); !errors.Is(err, agentrunner.ErrLabelTaken) {
+		t.Errorf("Start of a label mid-start = %v, want ErrLabelTaken", err)
+	}
+	close(b.release)
+	if err := <-done; err != nil {
+		t.Errorf("Start = %v", err)
+	}
+}
+
+func TestHeadless_FailedLaunchReleasesItsLabel(t *testing.T) {
+	h := newHarness(t)
+	h.runner.Claude = filepath.Join(h.cwd, "no-such-claude")
+	if _, err := h.runner.Start(agentrunner.StartOptions{Label: "epic-03", Cwd: h.cwd}); err == nil {
+		t.Fatal("Start succeeded with a missing claude")
+	}
+	if _, ok, _ := h.runner.Find("epic-03"); ok {
+		t.Error("failed Start left a session")
+	}
+	if _, err := h.runner.Start(agentrunner.StartOptions{Label: "epic-03", Cwd: h.cwd}); errors.Is(err, agentrunner.ErrLabelTaken) {
+		t.Error("failed Start left its label reserved")
+	}
+}

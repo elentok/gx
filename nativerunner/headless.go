@@ -19,6 +19,9 @@ import (
 	"github.com/elentok/gx/agentrunner"
 )
 
+// runnerName is the Runner value recorded in meta.json.
+const runnerName = "headless"
+
 // Agent directory layout, shared with reattach.
 const (
 	MetaFile  = "meta.json"
@@ -62,6 +65,8 @@ type Headless struct {
 
 	mu       sync.Mutex
 	sessions map[string]*headlessSession
+	// starting holds labels whose Start is still launching.
+	starting map[string]struct{}
 }
 
 var _ agentrunner.Runner = (*Headless)(nil)
@@ -85,53 +90,137 @@ type headlessSession struct {
 }
 
 func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if _, ok := h.sessions[opts.Label]; ok {
-		return agentrunner.Session{}, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, opts.Label)
-	}
-
-	dir := filepath.Join(h.Root, opts.Label)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := h.reserve(opts.Label); err != nil {
 		return agentrunner.Session{}, err
 	}
+	// The label stays reserved until the session is in h.sessions or the
+	// launch failed, so the slow steps below run without holding h.mu.
+	defer h.release(opts.Label)
+
+	dir := filepath.Join(h.Root, opts.Label)
 	sessionID, err := newUUID()
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
+	files, err := openAgentFiles(dir)
+	if err != nil {
+		return agentrunner.Session{}, err
+	}
+	defer files.closeOutputs()
+	launched := false
+	defer func() {
+		if !launched {
+			files.stdin.Close()
+		}
+	}()
 
+	// Only events claude writes from now on belong to this session.
+	offset, err := lineBoundary(files.out)
+	if err != nil {
+		return agentrunner.Session{}, err
+	}
+	cmd, err := h.spawn(opts, sessionID, files)
+	if err != nil {
+		return agentrunner.Session{}, err
+	}
+	pid := cmd.Process.Pid
+	meta := Meta{Runner: runnerName, PID: pid, SessionID: sessionID, Label: opts.Label, Epic: opts.Epic, Cwd: opts.Cwd, Offset: offset}
+	if err := h.recordLaunch(dir, &meta); err != nil {
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
+		_ = cmd.Wait()
+		return agentrunner.Session{}, err
+	}
+	launched = true
+
+	// Input waits in the FIFO until claude reads it, so the agent can take a
+	// prompt as soon as it is launched.
+	ss := newSession(opts.Label, opts.Epic, sessionID, pid, files.stdin)
+	go func() {
+		_ = cmd.Wait()
+		close(ss.exited)
+	}()
+	h.mu.Lock()
+	h.follow(ss, filepath.Join(dir, OutFile), offset)
+	h.mu.Unlock()
+	return ss.session, nil
+}
+
+// reserve claims label for a Start in progress.
+func (h *Headless) reserve(label string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, live := h.sessions[label]
+	if _, starting := h.starting[label]; live || starting {
+		return fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, label)
+	}
+	if h.starting == nil {
+		h.starting = map[string]struct{}{}
+	}
+	h.starting[label] = struct{}{}
+	return nil
+}
+
+func (h *Headless) release(label string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.starting, label)
+}
+
+// agentFiles are the open files of one agent directory.
+type agentFiles struct {
+	stdin, out, stderr *os.File
+}
+
+// closeOutputs closes the files claude inherited; the parent keeps only stdin.
+func (f agentFiles) closeOutputs() {
+	f.out.Close()
+	f.stderr.Close()
+}
+
+// openAgentFiles prepares dir and opens the FIFO and log files. On error
+// nothing is left open.
+func openAgentFiles(dir string) (agentFiles, error) {
+	var f agentFiles
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return f, err
+	}
 	fifo := filepath.Join(dir, StdinFile)
 	if err := os.Remove(fifo); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return agentrunner.Session{}, err
+		return f, err
 	}
 	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
-		return agentrunner.Session{}, fmt.Errorf("mkfifo: %w", err)
+		return f, fmt.Errorf("mkfifo: %w", err)
 	}
+	ok := false
+	defer func() {
+		if ok {
+			return
+		}
+		for _, c := range []*os.File{f.stdin, f.out, f.stderr} {
+			if c != nil {
+				c.Close()
+			}
+		}
+		_ = os.Remove(fifo)
+	}()
+	var err error
 	// Read-write so neither side blocks on open and claude never sees EOF
 	// when the server exits.
-	stdin, err := os.OpenFile(fifo, os.O_RDWR, 0)
-	if err != nil {
-		return agentrunner.Session{}, err
+	if f.stdin, err = os.OpenFile(fifo, os.O_RDWR, 0); err != nil {
+		return f, err
 	}
-	out, err := os.OpenFile(filepath.Join(dir, OutFile), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o644)
-	if err != nil {
-		stdin.Close()
-		return agentrunner.Session{}, err
+	if f.out, err = os.OpenFile(filepath.Join(dir, OutFile), os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o644); err != nil {
+		return f, err
 	}
-	defer out.Close()
-	stderr, err := os.OpenFile(filepath.Join(dir, ErrFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
-	if err != nil {
-		stdin.Close()
-		return agentrunner.Session{}, err
+	if f.stderr, err = os.OpenFile(filepath.Join(dir, ErrFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644); err != nil {
+		return f, err
 	}
-	defer stderr.Close()
-	// Only events claude writes from now on belong to this session.
-	offset, err := lineBoundary(out)
-	if err != nil {
-		stdin.Close()
-		return agentrunner.Session{}, err
-	}
+	ok = true
+	return f, nil
+}
 
+// spawn starts claude detached in its own session.
+func (h *Headless) spawn(opts agentrunner.StartOptions, sessionID string, f agentFiles) (*exec.Cmd, error) {
 	claude := h.Claude
 	if claude == "" {
 		claude = "claude"
@@ -139,41 +228,27 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 	cmd := exec.Command(claude, launchArgs(sessionID, opts.Args)...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = launchEnv(os.Environ(), opts.Env)
-	cmd.Stdin = stdin
-	cmd.Stdout = out
-	cmd.Stderr = stderr
+	cmd.Stdin = f.stdin
+	cmd.Stdout = f.out
+	cmd.Stderr = f.stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
-		stdin.Close()
-		return agentrunner.Session{}, err
+		return nil, err
 	}
+	return cmd, nil
+}
 
-	pid := cmd.Process.Pid
-	// Input waits in the FIFO until claude reads it, so the agent can take a
-	// prompt as soon as it is launched.
-	ss := newSession(opts.Label, opts.Epic, sessionID, pid, stdin)
-	meta := Meta{Runner: "headless", PID: pid, SessionID: sessionID, Label: opts.Label, Epic: opts.Epic, Cwd: opts.Cwd, Offset: offset}
-	proc, ok, err := h.procs().Lookup(pid)
-	if err == nil && !ok {
-		err = fmt.Errorf("claude (pid %d) exited during launch", pid)
+// recordLaunch confirms claude is still alive and writes meta.json.
+func (h *Headless) recordLaunch(dir string, meta *Meta) error {
+	proc, ok, err := h.procs().Lookup(meta.PID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("claude (pid %d) exited during launch", meta.PID)
 	}
 	meta.PIDStart = proc.Start
-	if err == nil {
-		err = writeMeta(dir, meta)
-	}
-	if err != nil {
-		_ = syscall.Kill(-pid, syscall.SIGKILL)
-		_ = cmd.Wait()
-		stdin.Close()
-		return agentrunner.Session{}, err
-	}
-
-	go func() {
-		_ = cmd.Wait()
-		close(ss.exited)
-	}()
-	h.follow(ss, filepath.Join(dir, OutFile), offset)
-	return ss.session, nil
+	return writeMeta(dir, *meta)
 }
 
 func newSession(label, epic, sessionID string, pid int, stdin *os.File) *headlessSession {
