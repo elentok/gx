@@ -467,7 +467,7 @@ func (s *Server) killForBudget(now time.Time) {
 	before := map[string]float64{}
 	for _, t := range runs {
 		before[t.Address] = s.liveCost(t.Address)
-		if err := s.runnerOf(t).Interrupt(t.Session); err != nil {
+		if err := s.runnerOf(t.Run).Interrupt(t.Session); err != nil {
 			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
 		}
 	}
@@ -492,7 +492,7 @@ func (s *Server) liveCost(address string) float64 {
 }
 
 // runnerOf is the runner hosting the run's session.
-func (s *Server) runnerOf(t trackedRun) agentrunner.Runner {
+func (s *Server) runnerOf(t Run) agentrunner.Runner {
 	project := ""
 	if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
 		project = addr.Project
@@ -511,7 +511,7 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 	if err != nil {
 		return err
 	}
-	closeErr := s.runnerOf(t).Stop(t.Session)
+	closeErr := s.runnerOf(t.Run).Stop(t.Session)
 	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
 	return errors.Join(closeErr, parkErr)
 }

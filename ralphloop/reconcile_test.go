@@ -391,7 +391,7 @@ func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
 	}
 	foundResumed := false
 	for _, event := range events {
-		if event.Type == string(eventsc.Resumed) && event.Ticket == "01" && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
+		if event.Type == string(eventsc.Resumed) && event.Ticket == "01" && (event.Pane != "pane-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
 			t.Errorf("resumed attribution = %+v, want original pane/tab/cwd/session", event)
 		}
 		foundResumed = foundResumed || event.Type == string(eventsc.Resumed) && event.Ticket == "01"

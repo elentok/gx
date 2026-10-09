@@ -69,14 +69,13 @@ type iterationParams struct {
 // the agent starts/finishes (see eventlog.go); pass "" for either to skip
 // logging that transition (the conflict-resolution pane logs conflict-hit/
 // conflict-resolved itself instead, around the generic start/finish here).
-func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, sessionCwd, startEvent, finishEvent string) launchAndPromptParams {
+func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd, startEvent, finishEvent string) launchAndPromptParams {
 	return launchAndPromptParams{
 		Label:       label,
 		Agent:       p.Agent,
 		Model:       p.Model,
 		Effort:      p.Effort,
 		Pane:        pane,
-		Tab:         tab,
 		Prompt:      prompt,
 		SessionCwd:  sessionCwd,
 		SmartZone:   p.SmartZone,
@@ -97,27 +96,26 @@ func (p iterationParams) launchAndPromptParams(label, pane, tab, prompt, session
 // this package logs outside launchAndPrompt's own generic start/finish pair
 // (needs-answer, cherry-picked, conflict-hit, conflict-resolved,
 // deps-installed).
-func (p iterationParams) logTicketEvent(eventType, pane, tab, agentSession, cwd string) {
-	p.logTicketEventReason(eventType, pane, tab, agentSession, cwd, "")
+func (p iterationParams) logTicketEvent(eventType, pane, agentSession, cwd string) {
+	p.logTicketEventReason(eventType, pane, agentSession, cwd, "")
 }
 
 // logTicketEventReason is logTicketEvent plus a Reason, for events that
 // carry one (currently only deps-installed, whose Reason is the install
 // command run).
-func (p iterationParams) logTicketEventReason(eventType, pane, tab, agentSession, cwd, reason string) {
-	p.logTicketEventSHA(eventType, pane, tab, agentSession, cwd, reason, "")
+func (p iterationParams) logTicketEventReason(eventType, pane, agentSession, cwd, reason string) {
+	p.logTicketEventSHA(eventType, pane, agentSession, cwd, reason, "")
 }
 
 // logTicketEventSHA is logTicketEventReason plus a SHA, for the
 // cherry-picked event — the feature branch's landed tip, recorded so startup
 // reconciliation can later confirm it's still reachable (see Event.SHA).
-func (p iterationParams) logTicketEventSHA(eventType, pane, tab, agentSession, cwd, reason, sha string) {
+func (p iterationParams) logTicketEventSHA(eventType, pane, agentSession, cwd, reason, sha string) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
 		Type:         eventType,
 		Ticket:       p.Ticket.Identifier,
 		Agent:        p.Agent,
 		Pane:         pane,
-		Tab:          tab,
 		AgentSession: agentSession,
 		SHA:          sha,
 		Cwd:          cwd,
@@ -147,7 +145,6 @@ type launchAndPromptParams struct {
 	// started through Deps.Runner; zero on the herdr-only paths.
 	Session agentrunner.Session
 	Pane    string // pane id to launch the agent in and send the prompt to
-	Tab     string // tab id owning Pane, recorded on logged events
 	Prompt  string // initial skill prompt text
 
 	// FinishTimeoutMs bounds the final "wait for the agent to finish" step, so
@@ -211,7 +208,6 @@ func (p launchAndPromptParams) agentEvent(eventType, agentSession, reason string
 		Ticket:       p.Ticket,
 		Agent:        p.Agent,
 		Pane:         p.Pane,
-		Tab:          p.Tab,
 		AgentSession: agentSession,
 		Cwd:          p.SessionCwd,
 		Reason:       reason,
@@ -238,7 +234,6 @@ func (p launchAndPromptParams) logAgentStartEvent(eventType, agentSession string
 		Ticket:         p.Ticket,
 		Agent:          p.Agent,
 		Pane:           p.Pane,
-		Tab:            p.Tab,
 		AgentSession:   agentSession,
 		Cwd:            p.SessionCwd,
 		StateChangeSeq: seq,
@@ -371,7 +366,7 @@ func startedLaunch(d Deps, p launchAndPromptParams, sessionID string, seq int) (
 func (p launchAndPromptParams) reportStarted(d Deps, sessionID string, seq int) {
 	p.logAgentStartEvent(p.StartEvent, sessionID, seq)
 	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane, p.Tab)
+		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane)
 		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
 	}
 }

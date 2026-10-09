@@ -120,7 +120,7 @@ func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
 // on a needs-answer or zero-commit finish, otherwise land the commits onto the
 // feature branch, mark the ticket done and clean up. A deferred land (lock
 // held) is an error, like any failed finish; the caller parks it.
-func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab string) (FinishOutcome, error) {
+func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		WorkspaceID:     o.WorkspaceID,
 		RepoDir:         o.RepoDir,
@@ -137,7 +137,7 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane, tab stri
 		Sink:            noopEventSink{},
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-	err := finishIteration(d, p, w.Path, pane, tab, w.base, w.Branch, sessionID)
+	err := finishIteration(d, p, w.Path, pane, w.base, w.Branch, sessionID)
 	var built *builtAwaitingLandError
 	if err != nil && !errors.As(err, &built) {
 		return FinishOutcome{}, err

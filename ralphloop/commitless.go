@@ -61,21 +61,21 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 // agent that reported finished is marked done, a needs-answer report parks, and
 // anything else parks as a zero-commit finish. Every outcome but the last
 // takes the worktree away; the tab always closes once the ticket is done.
-func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane, tab string) (FinishOutcome, error) {
+func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Ticket: o.Ticket,
 		ScratchDir: o.ScratchDir, Sink: noopEventSink{},
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-	adopted, err := adoptNeedsAnswerReport(p, w.Path, pane, tab, sessionID)
+	adopted, err := adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
 	if err == nil && !adopted {
-		adopted, err = adoptCommitlessFinish(p, w.Path, pane, tab, sessionID)
+		adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID)
 	}
 	if err != nil {
 		return FinishOutcome{}, err
 	}
 	if !adopted {
-		if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no result reported", pane, tab, sessionID, w.Path); err != nil {
+		if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
 			return FinishOutcome{}, fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
 	} else if err := cleanupCommitless(d, o, w, commitlessSession(w, pane)); err != nil {

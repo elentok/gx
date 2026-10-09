@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -74,7 +73,7 @@ func runIteration(d Deps, p iterationParams) error {
 	if err != nil {
 		return fmt.Errorf("installing dependencies in %s: %w", path, err)
 	}
-	p.logTicketEventReason(string(events.DepsInstalled), "", "", "", path, command)
+	p.logTicketEventReason(string(events.DepsInstalled), "", "", path, command)
 
 	skill := p.Skill
 	if p.Ticket.IsCodeReview() {
@@ -95,7 +94,7 @@ func runIteration(d Deps, p iterationParams) error {
 	if errors.As(err, &launchFail) {
 		return err
 	}
-	launchParams := p.launchAndPromptParams(label, l.ID, iterationTabID(d, label), prompt, path, string(events.IterationStarted), string(events.IterationFinished))
+	launchParams := p.launchAndPromptParams(label, l.ID, prompt, path, string(events.IterationStarted), string(events.IterationFinished))
 	launchParams.Session = l.Session
 	var sessionID string
 	if errors.Is(err, agentrunner.ErrNotReady) {
@@ -137,12 +136,12 @@ func runIteration(d Deps, p iterationParams) error {
 		// The park already ended the iteration: the agent is still live in its
 		// pane, so finishIteration's commit-check/cherry-pick/cleanup — which
 		// assumes the agent actually finished — must not run. Only gx's
-		// watcher goes away; the pane, tab, and worktree survive for a person
+		// watcher goes away; the pane, and worktree survive for a person
 		// to answer in the pane.
 		return nil
 	}
 
-	return finishIteration(d, p, path, launchParams.Pane, launchParams.Tab, base, branch, sessionID)
+	return finishIteration(d, p, path, launchParams.Pane, base, branch, sessionID)
 }
 
 // iterationSession is the live session of p's ticket, for cleanup; the zero
@@ -154,22 +153,7 @@ func iterationSession(p iterationParams, pane string) agentrunner.Session {
 	return agentrunner.Session{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), ID: pane}
 }
 
-// iterationTabID is the tab hosting label's agent, for finishIteration's
-// cleanup. Runner sessions don't expose their tab, so herdr is asked by name;
-// on failure the tab is left open rather than failing a launched iteration.
-func iterationTabID(d Deps, label string) string {
-	if d.TabID == nil {
-		return ""
-	}
-	tabID, err := d.TabID(label)
-	if err != nil {
-		log.Printf("resolving %s's tab: %v", label, err)
-		return ""
-	}
-	return tabID
-}
-
-// reattachIteration resumes a claimed ticket whose worktree, tab, and agent
+// reattachIteration resumes a claimed ticket whose worktree, and agent
 // survived a prior invocation. The stable iteration label locates the live
 // agent, while its recovered pane and native session identity drive the
 // remaining wait, lifecycle logging, and completion work. Codex sessions are
@@ -209,7 +193,6 @@ func reattachIteration(d Deps, p iterationParams) error {
 	if err != nil {
 		return fmt.Errorf("reattached iteration %s: %w", label, err)
 	}
-	tabID := iterationTabID(d, label)
 	if p.Agent == AgentCodex {
 		if agent.SessionID == "" {
 			return fmt.Errorf("missing live Codex session for reattached iteration %s; keep the tab open and retry after Herdr reports its session", label)
@@ -236,7 +219,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 
 	// StartEvent remains empty because reattachment must not imply a fresh
 	// launch; all later events use the recovered native session identity.
-	launchParams := p.launchAndPromptParams(label, session.ID, tabID, "", path, "", string(events.IterationFinished))
+	launchParams := p.launchAndPromptParams(label, session.ID, "", path, "", string(events.IterationFinished))
 	finished := false
 	if alreadyFinished(string(agent.State)) {
 		// An idle pane at reattach gets the same debounce and background-task
@@ -295,7 +278,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		p.Gate.ForceResume(label)
 	}
 
-	return finishIteration(d, p, path, session.ID, tabID, base, branch, agent.SessionID)
+	return finishIteration(d, p, path, session.ID, base, branch, agent.SessionID)
 }
 
 // resolveReattachSessionID recovers a session id for
@@ -330,8 +313,8 @@ func resolveReattachSessionID(p iterationParams, agentSession string, priorSessi
 // Fresh and reattached iterations both carry their native session and pane
 // identity through this shared completion path. A needs-answer report is
 // adopted before any of that: see adoptNeedsAnswerReport.
-func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) error {
-	adopted, err := adoptNeedsAnswerReport(p, path, pane, tab, sessionID)
+func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessionID string) error {
+	adopted, err := adoptNeedsAnswerReport(p, path, pane, sessionID)
 	if err != nil {
 		return err
 	}
@@ -373,7 +356,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// the one place gx writes status: done with no cherry-pick, so it does
 		// so itself here rather than trusting the ticket file to already say
 		// done.
-		commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, tab, sessionID)
+		commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, sessionID)
 		if err != nil {
 			return err
 		}
@@ -387,7 +370,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		// retryUnexecutedToolCallOnce. A non-match, a pane that isn't in a
 		// plain finish state any more, or a retry that itself parked on a
 		// blocked pane all skip straight past this unchanged.
-		retried, newAhead, newSessionID, err := retryUnexecutedToolCallOnce(d, p, path, pane, tab, base, branch, sessionID)
+		retried, newAhead, newSessionID, err := retryUnexecutedToolCallOnce(d, p, path, pane, base, branch, sessionID)
 		if err != nil {
 			if errors.Is(err, errBlockedPaneParked) {
 				return nil
@@ -404,7 +387,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			// adoption checks that already ran pre-retry so that report isn't
 			// silently dropped into the ordinary zero-commit/land handling
 			// below.
-			adopted, err := adoptNeedsAnswerReport(p, path, pane, tab, sessionID)
+			adopted, err := adoptNeedsAnswerReport(p, path, pane, sessionID)
 			if err != nil {
 				return err
 			}
@@ -413,7 +396,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			}
 
 			if ahead == 0 {
-				commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, tab, sessionID)
+				commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, sessionID)
 				if err != nil {
 					return err
 				}
@@ -427,7 +410,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 			// The agent finished without landing any commits: leave the worktree/
 			// tab in place for inspection instead of silently marking done or
 			// retrying, and let the scheduler move on to other unblocked tickets.
-			if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no commits landed", pane, tab, sessionID, path); err != nil {
+			if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no commits landed", pane, sessionID, path); err != nil {
 				return fmt.Errorf("marking ticket needs-answer: %w", err)
 			}
 			return nil
@@ -453,7 +436,6 @@ func finishIteration(d Deps, p iterationParams, path, pane, tab, base, branch, s
 		branch:    branch,
 		sessionID: sessionID,
 		pane:      pane,
-		tab:       tab,
 		path:      path,
 	}}
 }
@@ -481,7 +463,7 @@ const unexecutedToolCallCorrection = "Your last turn ended with a tool call writ
 // at all, honoring the rule that gx never types into a pane sitting on a
 // dialog it did not raise (see parkOnBlockedPane); an err wrapping
 // errBlockedPaneParked reports the retry's own re-wait parking the same way.
-func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, tab, base, branch, sessionID string) (retried bool, ahead int, newSessionID string, err error) {
+func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, branch, sessionID string) (retried bool, ahead int, newSessionID string, err error) {
 	matched, err := d.ReadUnexecutedToolCall(path, sessionID)
 	if err != nil {
 		return false, 0, "", fmt.Errorf("reading transcript for unexecuted-tool-call detection: %w", err)
@@ -510,7 +492,7 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, tab, bas
 		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
 	}
 	retrySessionID := cmp.Or(status.SessionID, sessionID)
-	launchParams := p.launchAndPromptParams(label, pane, tab, "", path, "", "")
+	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
 
 	if err := waitForFinish(d, launchParams, retrySessionID); err != nil {
 		if errors.Is(err, errBlockedPaneParked) {
@@ -534,7 +516,7 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, tab, bas
 // (populated once at claim time) because the report is written by the agent
 // during the iteration this call is completing. Callers are responsible for
 // only invoking this when ahead == 0 — it does not check commit count itself.
-func adoptCommitlessFinish(p iterationParams, path, pane, tab, sessionID string) (adopted bool, err error) {
+func adoptCommitlessFinish(p iterationParams, path, pane, sessionID string) (adopted bool, err error) {
 	current, err := schema.ParseTicket(p.Ticket.Path)
 	if err != nil {
 		return false, fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
@@ -546,7 +528,7 @@ func adoptCommitlessFinish(p iterationParams, path, pane, tab, sessionID string)
 	if err := MarkDone(p.Ticket.Path); err != nil {
 		return false, fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
 	}
-	p.logTicketEvent(string(events.Commitless), pane, tab, sessionID, path)
+	p.logTicketEvent(string(events.Commitless), pane, sessionID, path)
 	return true, nil
 }
 
@@ -561,7 +543,7 @@ func adoptCommitlessFinish(p iterationParams, path, pane, tab, sessionID string)
 // commits at this point is legal. It reads the ticket fresh rather than
 // trusting p.Ticket (populated once at claim time) because the report is
 // written by the agent during the iteration this call is completing.
-func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string) (adopted bool, err error) {
+func adoptNeedsAnswerReport(p iterationParams, path, pane, sessionID string) (adopted bool, err error) {
 	current, err := schema.ParseTicket(p.Ticket.Path)
 	if err != nil {
 		return false, fmt.Errorf("reading ticket %s for iteration-status adoption: %w", p.Ticket.Path, err)
@@ -570,7 +552,7 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string
 		return false, nil
 	}
 
-	if _, err := p.parkNeedsAnswer(events.SelfReported, "agent reported needs-answer via iteration_status", pane, tab, sessionID, path); err != nil {
+	if _, err := p.parkNeedsAnswer(events.SelfReported, "agent reported needs-answer via iteration_status", pane, sessionID, path); err != nil {
 		return false, fmt.Errorf("adopting needs-answer report: %w", err)
 	}
 	return true, nil
@@ -578,11 +560,11 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, tab, sessionID string
 
 // parkNeedsAnswer routes a finish-time needs-answer park through the single
 // park path, carrying the iteration's pane/tab/session on the event.
-func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, tab, sessionID, cwd string) (string, error) {
+func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, sessionID, cwd string) (string, error) {
 	return park(p.Sink, parkRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 		Type: events.NeedsAnswer, Kind: kind, Reason: reason,
-		Event: Event{Agent: p.Agent, Pane: pane, Tab: tab, AgentSession: sessionID, Cwd: cwd},
+		Event: Event{Agent: p.Agent, Pane: pane, AgentSession: sessionID, Cwd: cwd},
 	})
 }
 
@@ -666,13 +648,13 @@ func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 // when those metrics were available — the same values onto
 // tokensTrailerKey/elapsedTrailerKey, all in a single amend
 // (Deps.AppendTrailers) rather than one amend per trailer.
-func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (string, error) {
-	res, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane, tab)
+func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane string) (string, error) {
+	res, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane)
 	if err != nil {
 		return "", err
 	}
 	if resolutionSessionID != "" {
-		p.logTicketEventSHA(string(events.ConflictResolved), "", "", resolutionSessionID, p.FeatureWorktree, "", res.SHA)
+		p.logTicketEventSHA(string(events.ConflictResolved), "", resolutionSessionID, p.FeatureWorktree, "", res.SHA)
 	}
 	return res.SHA, nil
 }
@@ -734,7 +716,7 @@ func branchExists(d Deps, dir, branch string) bool {
 // returns that agent's distinct session so landCherryPick can emit
 // conflict-resolved with the final post-trailer SHA. The returned result is
 // Landed (stamped) or AlreadyApplied, never Conflicted.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane, tab string) (res LandResult, resolutionSessionID string, resultErr error) {
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane string) (res LandResult, resolutionSessionID string, resultErr error) {
 	ld, lp := landDepsFor(d), landParamsFor(p, base, branch, sessionID)
 	p.Sink.CherryPickStarted(p.Ticket.Identifier)
 
@@ -819,7 +801,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 			resultErr = fmt.Errorf("%w (also failed aborting owned cherry-pick: %v)", resultErr, abortErr)
 		}
 	}()
-	p.logTicketEvent(string(events.ConflictHit), pane, tab, sessionID, p.FeatureWorktree)
+	p.logTicketEvent(string(events.ConflictHit), pane, sessionID, p.FeatureWorktree)
 	p.Sink.ConflictResolutionStarted(p.Ticket.Identifier)
 
 	// resolveCherryPickConflict itself corroborates against the sequencer
@@ -957,7 +939,7 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Se
 	}
 	sessionID = agent.SessionID
 
-	launchParams := p.launchAndPromptParams(label, live.ID, iterationTabID(d, label), "", p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	if !alreadyFinished(string(agent.State)) {
 		if err := waitForFinish(d, launchParams, sessionID); err != nil {
@@ -1030,7 +1012,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		}
 	}()
 
-	launchParams := p.launchAndPromptParams(label, l.ID, "", prompt, p.FeatureWorktree, "", "")
+	launchParams := p.launchAndPromptParams(label, l.ID, prompt, p.FeatureWorktree, "", "")
 	launchParams.Session = l.Session
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
 	switch {

@@ -275,3 +275,33 @@ func TestFind_UnknownLabel(t *testing.T) {
 		t.Fatalf("Find = ok %v, err %v; want not found, nil", ok, err)
 	}
 }
+
+// The adapter owns the tab: callers never see it, so Stop closes it.
+func TestStop_ClosesTheAgentsTab(t *testing.T) {
+	r, state, s := startAgent(t, "claude", nil)
+	var closed []string
+	state.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		closed = append(closed, argv[len(argv)-1])
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	agent, err := herdr.AgentGet(s.ID)
+	if err != nil || agent.TabID == "" {
+		t.Fatalf("AgentGet = %+v, %v; want a tab", agent, err)
+	}
+	if err := r.Stop(s); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(closed, []string{agent.TabID}) {
+		t.Errorf("closed tabs = %v, want [%s]", closed, agent.TabID)
+	}
+}
+
+func TestStop_ReportsAFailedTabLookup(t *testing.T) {
+	r, state, s := startAgent(t, "claude", nil)
+	state.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return nil, herdrfake.Identities{}, errors.New("herdr unreachable")
+	})
+	if err := r.Stop(s); err == nil {
+		t.Fatal("Stop = nil, want the lookup error")
+	}
+}

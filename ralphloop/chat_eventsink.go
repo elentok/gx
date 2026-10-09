@@ -549,8 +549,8 @@ func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
 	s.send(s.style.epicStartedText(epicName, loadEpicCounts(s.scratchDir, epicName)), notifyKindEpicStarted, epicSource(epicName), "")
 }
 
-func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID, tabID string) {
-	s.EventSink.IterationStarted(ticket, label, cwd, sessionID, agent, paneID, tabID)
+func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID string) {
+	s.EventSink.IterationStarted(ticket, label, cwd, sessionID, agent, paneID)
 	s.send(s.style.iterationStartedText(ticket, s.epicName), notifyKindIterationStarted, ticket.Path, ticket.Identifier)
 }
 

@@ -117,7 +117,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 	foundFinish := false
 	for _, event := range events {
-		if event.Type == string(eventsc.IterationFinished) && (event.Pane != "pane-epic-iter-01" || event.Tab != "tab-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
+		if event.Type == string(eventsc.IterationFinished) && (event.Pane != "pane-epic-iter-01" || event.Cwd != "/fake/worktrees/epic-item-01" || event.AgentSession != "session-epic-iter-01") {
 			t.Errorf("iteration-finished attribution = %+v, want original pane/tab/cwd/session", event)
 		}
 		foundFinish = foundFinish || event.Type == string(eventsc.IterationFinished)

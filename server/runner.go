@@ -378,7 +378,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: time.Now(),
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
-	go s.finishRun(deps, root, mode, one, wt, run, ticketAddr)
+	go s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr})
 	return true, nil
 }
 
@@ -496,13 +496,25 @@ func (s *Server) prepareAndLaunch(
 
 // finishRun waits for the agent to settle, then lands (or parks) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
-func (s *Server) finishRun(deps ralphloop.Deps, root rootRef, mode iterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string) {
-	s.settleRun(deps, root, mode, one, wt, run, ticketAddr, ralphloop.WaitIterationFinished(deps, one, wt, run.Session))
+func (s *Server) finishRun(rc runContext) {
+	s.settleRun(rc, ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session))
+}
+
+// runContext is everything settling one claimed iteration needs.
+type runContext struct {
+	deps       ralphloop.Deps
+	root       rootRef
+	mode       iterationMode
+	one        ralphloop.OneIteration
+	wt         ralphloop.IterationWorktree
+	run        Run
+	ticketAddr string
 }
 
 // settleRun lands (or parks) an iteration whose wait ended with waitErr. A run
 // found already finished at reattach skips the wait and comes straight here.
-func (s *Server) settleRun(deps ralphloop.Deps, root rootRef, mode iterationMode, one ralphloop.OneIteration, wt ralphloop.IterationWorktree, run Run, ticketAddr string, waitErr error) {
+func (s *Server) settleRun(rc runContext, err error) {
+	deps, root, mode, one, wt, run, ticketAddr := rc.deps, rc.root, rc.mode, rc.one, rc.wt, rc.run, rc.ticketAddr
 	defer s.kickRunner()
 	keepRun := false
 	defer func() {
@@ -511,7 +523,6 @@ func (s *Server) settleRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 		}
 	}()
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	err := waitErr
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next
@@ -521,7 +532,7 @@ func (s *Server) settleRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 			return
 		}
 		defer s.lands.end()
-		out, err = mode.finish(deps, one, wt, run.Session.ID, run.Tab)
+		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
@@ -546,10 +557,8 @@ func (s *Server) settleRun(deps ralphloop.Deps, root rootRef, mode iterationMode
 	}
 	// Stop already cleans an adopted session; a run found finished at reattach
 	// was never adopted, so its I/O files are removed here.
-	if c, ok := deps.Runner.(agentCleaner); ok {
-		if cerr := c.Cleanup(run.Session.Label); cerr != nil {
-			s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
-		}
+	if cerr := agentrunner.Cleanup(deps.Runner, run.Session.Label); cerr != nil {
+		s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
 	s.notifyResult(addr, one.Ticket.Path)
@@ -682,7 +691,7 @@ func (s *Server) depsFor(project string) ralphloop.Deps {
 func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
-	session, err := ralphloop.StartAndPrompt(deps.Runner,agentrunner.StartOptions{
+	session, err := ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
 		Label: label,
 		Epic:  ticket.Epic,
 		Cwd:   cwd,
@@ -693,10 +702,6 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note
 	if err != nil {
 		return Run{}, err
 	}
-	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(),Session: session}
-	if deps.TabID != nil {
-		// Only herdr has tabs; a failed lookup just skips the tab cleanup later.
-		run.Tab, _ = deps.TabID(label)
-	}
+	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session}
 	return run, nil
 }

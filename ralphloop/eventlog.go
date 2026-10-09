@@ -86,7 +86,6 @@ type Event struct {
 	Ticket       string    `json:"ticket"`
 	Agent        AgentKind `json:"agent,omitempty"`
 	Pane         string    `json:"pane,omitempty"`
-	Tab          string    `json:"tab,omitempty"`
 	AgentSession string    `json:"agent_session,omitempty"`
 	// Cwd is the directory the agent session was launched in and is the local
 	// session-data lookup key alongside AgentSession.

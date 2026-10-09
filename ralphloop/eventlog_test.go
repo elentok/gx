@@ -20,7 +20,7 @@ func TestLogEvent_AppendsOneJSONLinePerCall(t *testing.T) {
 	t.Parallel()
 	dir := epicScratchDir(t, "epic")
 
-	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01", Pane: "pane-1", Tab: "tab-1", AgentSession: "sess-1"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationStarted), Ticket: "01", Pane: "pane-1", AgentSession: "sess-1"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	if err := logEvent(dir, "epic", Event{Type: string(eventsc.IterationFinished), Ticket: "01"}); err != nil {

@@ -19,11 +19,6 @@ type logPruner interface {
 	Prune(maxAge time.Duration, now time.Time, parked func(label string) bool) ([]string, error)
 }
 
-// agentCleaner drops an agent's I/O files once its iteration landed.
-type agentCleaner interface {
-	Cleanup(label string) error
-}
-
 // reattacher adopts the agent a previous server launched.
 type reattacher interface {
 	Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error)

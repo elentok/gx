@@ -56,11 +56,11 @@ func (m iterationMode) discard(d ralphloop.Deps, o ralphloop.OneIteration, w ral
 	return ralphloop.DiscardIteration(d, o, w)
 }
 
-func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane, tab string) (ralphloop.FinishOutcome, error) {
+func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
 	if m.commitless {
-		return ralphloop.FinishCommitless(d, o, w, pane, tab)
+		return ralphloop.FinishCommitless(d, o, w, pane)
 	}
-	return ralphloop.FinishIteration(d, o, w, pane, tab)
+	return ralphloop.FinishIteration(d, o, w, pane)
 }
 
 // resume rebuilds the worktree; base is the persisted base of a feature-branch run.

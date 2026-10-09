@@ -101,11 +101,14 @@ func TestRelaunch_StartsAFreshIterationOfAParkedTicket(t *testing.T) {
 func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	h, path := startTicketWrites(t)
 	var closed atomic.Int32
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1"}}, herdrfake.Identities{}, nil
+	})
 	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		closed.Add(1)
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}, Tab: "t1"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -158,7 +161,7 @@ func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	launched := time.Now().Add(-90 * time.Second).Truncate(time.Second)
-	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}, Tab: "t1"}, launched)
+	h.Server.PutRunAt("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}}, launched)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

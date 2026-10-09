@@ -58,13 +58,13 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 
 	var landedSHA string
 	if err := withLandLock(d, p, func() (err error) {
-		landedSHA, err = landCherryPick(d, p, base, branch, "", "", "")
+		landedSHA, err = landCherryPick(d, p, base, branch, "", "")
 		return err
 	}); err != nil {
 		return fmt.Errorf("re-cherry-picking ticket %s during startup repair: %w", t.Identifier, err)
 	}
 
-	p.logTicketEventSHA(string(events.CherryPicked), "", "", "", path, "", landedSHA)
+	p.logTicketEventSHA(string(events.CherryPicked), "", "", path, "", landedSHA)
 	rp.Sink.TicketRecovered(t.Identifier, featureBranch, branch, landedSHA)
 
 	// Branch deletion is left to finishStaleCleanup/finishCleanup elsewhere:

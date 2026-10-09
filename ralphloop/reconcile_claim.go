@@ -47,12 +47,12 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 
 			var landedSHA string
 			if err := withLandLock(d, p, func() (err error) {
-				landedSHA, err = landCherryPick(d, p, base, branch, "", "", "")
+				landedSHA, err = landCherryPick(d, p, base, branch, "", "")
 				return err
 			}); err != nil {
 				return fmt.Errorf("re-cherry-picking orphaned claim %s: %w", t.Identifier, err)
 			}
-			p.logTicketEventSHA(string(events.CherryPicked), "", "", "", path, "", landedSHA)
+			p.logTicketEventSHA(string(events.CherryPicked), "", "", path, "", landedSHA)
 
 			if err := markDoneStampingCloseMetadata(d, p, path, ""); err != nil {
 				return fmt.Errorf("marking recovered ticket %s done: %w", t.Identifier, err)

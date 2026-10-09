@@ -110,7 +110,7 @@ func recordInterruptedLanding(d Deps, rp reconcileParams, epic tickets.Epic, own
 	if err != nil {
 		return fmt.Errorf("stamping interrupted landing of %s: %w", t.Identifier, err)
 	}
-	p.logTicketEventSHA(string(events.CherryPicked), "", "", "", fw, interruptedLandingReason, res.SHA)
+	p.logTicketEventSHA(string(events.CherryPicked), "", "", fw, interruptedLandingReason, res.SHA)
 	return nil
 }
 

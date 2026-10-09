@@ -234,7 +234,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	p := conflictParams(t, dir)
 	label := conflictLabel(p.Ticket.Identifier)
 
-	res, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane", "iter-tab")
+	res, gotResolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, iterTip, iterationSessionID, "iter-pane")
 	if err != nil {
 		t.Fatalf("cherryPickWithConflictResolution: %v", err)
 	}

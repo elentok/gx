@@ -131,6 +131,20 @@ type HealthChecker interface {
 	Healthy() error
 }
 
+// Cleaner is implemented by runners that keep per-agent files on disk
+// (nativerunner.Headless), dropped once the iteration landed.
+type Cleaner interface {
+	Cleanup(label string) error
+}
+
+// Cleanup drops label's leftovers when r keeps any; otherwise it is a no-op.
+func Cleanup(r Runner, label string) error {
+	if c, ok := r.(Cleaner); ok {
+		return c.Cleanup(label)
+	}
+	return nil
+}
+
 // Healthy reports r's host health; runners without a separate host are
 // always healthy.
 func Healthy(r Runner) error {

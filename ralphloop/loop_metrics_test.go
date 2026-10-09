@@ -166,7 +166,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 		Sink:            noopEventSink{},
 	}
 
-	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane", "tab"); err != nil {
+	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
 		t.Fatalf("landCherryPick() error = %v", err)
 	}
 
@@ -225,7 +225,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 		Sink:            noopEventSink{},
 	}
 
-	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane", "tab"); err != nil {
+	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
 		t.Fatalf("landCherryPick() error = %v", err)
 	}
 

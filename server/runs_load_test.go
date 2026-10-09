@@ -21,7 +21,7 @@ func TestOpenRuns_OldFileLoadsAsHerdrSession(t *testing.T) {
 	}
 	want := Run{
 		Address: "proj:epic-a/01", Agent: "claude", Runner: runnerHerdr,
-		Session: agentrunner.Session{Label: iterationLabel("proj:epic-a/01"), ID: "p1"}, Tab: "t1",
+		Session: agentrunner.Session{Label: iterationLabel("proj:epic-a/01"), ID: "p1"},
 	}
 	if len(saved) != 1 || !reflect.DeepEqual(saved[0].Run, want) || saved[0].Root != "proj:epic-a" {
 		t.Fatalf("saved = %+v, want run %+v", saved, want)

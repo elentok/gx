@@ -32,8 +32,6 @@ type Run struct {
 	// Runner names the agentrunner hosting Session, e.g. "herdr".
 	Runner  string              `json:"runner"`
 	Session agentrunner.Session `json:"session"`
-	// Tab is the herdr tab herdr-only cleanup closes; empty for other runners.
-	Tab string `json:"tab,omitempty"`
 }
 
 // runnerHerdr is the Runner of every launch until the server launches
@@ -327,10 +325,10 @@ func (s *Server) reclaimHeadless(t trackedRun) error {
 	deps := s.depsFor(addr.Project)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished {
-		go s.settleRun(deps, root, mode, one, wt, t.Run, t.Address, nil)
+		go s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil)
 		return nil
 	}
-	go s.finishRun(deps, root, mode, one, wt, t.Run, t.Address)
+	go s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address})
 	return nil
 }
 
@@ -356,7 +354,6 @@ func (s *Server) reclaim(t trackedRun) error {
 	}
 	t.Runner = runnerHerdr
 	t.Session = agentrunner.Session{Label: label, ID: agent.PaneID, SessionID: t.Session.SessionID}
-	t.Tab = agent.TabID
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
@@ -365,7 +362,7 @@ func (s *Server) reclaim(t trackedRun) error {
 	}
 	deps := s.depsFor(addr.Project)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
-	go s.finishRun(deps, root, mode, one, wt, t.Run, t.Address)
+	go s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address})
 	return nil
 }
 

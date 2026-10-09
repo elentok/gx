@@ -19,7 +19,7 @@ type parkRequest struct {
 	Reason     string
 	// Repair is rendered into the ticket's "## Needs Repair" section.
 	Repair schema.NeedsRepairState
-	// Event carries optional agent context (pane, tab, session, cwd) merged
+	// Event carries optional agent context (pane, session, cwd) merged
 	// into the appended event; park overwrites its type, ticket, kind and reason.
 	Event Event
 	// AlreadyDone skips the ticket write of a manual-land whose ticket was

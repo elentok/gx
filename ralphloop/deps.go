@@ -13,7 +13,6 @@ import (
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -57,10 +56,7 @@ type Deps struct {
 	// aside under an attic name.
 	RenameBranch func(repoDir, oldName, newName string) error
 	// Runner hosts the iteration's agent.
-	Runner agentrunner.Runner
-	// TabID returns the id of the tab hosting label's agent, for logging on
-	// events and closing it at cleanup. Runner sessions don't expose their tab.
-	TabID        func(label string) (string, error)
+	Runner       agentrunner.Runner
 	RevParse     func(dir, ref string) (string, error)
 	MergeBase    func(dir, refA, refB string) (string, error)
 	CommitsAhead func(dir, fromExclusive, toRef string) (int, error)
@@ -202,10 +198,6 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		},
 		VerifySkill: func(agent AgentKind, skill string) error {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
-		},
-		TabID: func(label string) (string, error) {
-			agent, err := herdr.AgentGet(label)
-			return agent.TabID, err
 		},
 		VerifyCodexSession: codexHomeFn(overrides.CodexHome,
 			codexsession.VerifyIdentity,

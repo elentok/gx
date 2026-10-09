@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -155,7 +154,7 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonTicketLive, live[0].Address+" has a live pane; use --stop"), nil
 		}
 		for _, run := range live {
-			if err := herdr.TabClose(run.Tab); err != nil {
+			if err := s.runnerOf(run).Stop(run.Session); err != nil {
 				return QueueResult{}, fmt.Errorf("stop %s: %w", run.Address, err)
 			}
 		}

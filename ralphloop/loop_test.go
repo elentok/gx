@@ -160,7 +160,6 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	runner.PromptState = agentrunner.StateDone
 	d = Deps{
 		Runner: recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
-		TabID:  func(label string) (string, error) { return "tab-" + label, nil },
 		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
 			return true, nil
 		},
@@ -473,7 +472,7 @@ func TestRun_LogsLifecycleEvents_LinearChain(t *testing.T) {
 	if events[3].AgentSession != wantSession || events[3].Cwd == "" {
 		t.Errorf("cherry-picked event = %+v, want AgentSession=%q and a non-empty Cwd", events[3], wantSession)
 	}
-	if events[1].Pane == "" || events[1].Tab == "" {
+	if events[1].Pane == "" {
 		t.Errorf("iteration-started event = %+v, want non-empty Pane/Tab", events[1])
 	}
 	if events[0].Cwd == "" {

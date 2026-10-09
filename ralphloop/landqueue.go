@@ -35,7 +35,6 @@ type landJob struct {
 	branch    string
 	sessionID string
 	pane      string
-	tab       string
 	path      string // iteration worktree path, for the string(events.CherryPicked) log call
 }
 
@@ -168,7 +167,7 @@ func logLandDeferred(p iterationParams) {
 			reason = "land lock held by " + owner.Describe()
 		}
 	}
-	p.logTicketEventReason(string(events.LandDeferred), "", "", "", "", reason)
+	p.logTicketEventReason(string(events.LandDeferred), "", "", "", reason)
 }
 
 // claimEligibleLandJob picks the lowest-numbered job in landJobs (see
@@ -245,7 +244,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 	}
 	defer ReleaseLandLock(lockDir)
 
-	landedSHA, err := landCherryPick(d, p, job.base, job.branch, job.sessionID, job.pane, job.tab)
+	landedSHA, err := landCherryPick(d, p, job.base, job.branch, job.sessionID, job.pane)
 	if err != nil {
 		if errors.Is(err, errLandDeferred) {
 			return outcome{ticket: job.ticket, landDeferred: true}
@@ -260,7 +259,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 		}
 		return outcome{ticket: job.ticket, err: err}
 	}
-	p.logTicketEventSHA(string(events.CherryPicked), job.pane, job.tab, job.sessionID, job.path, "", landedSHA)
+	p.logTicketEventSHA(string(events.CherryPicked), job.pane, job.sessionID, job.path, "", landedSHA)
 
 	if err := markDoneStampingCloseMetadata(d, p, job.path, job.sessionID); err != nil {
 		return outcome{ticket: job.ticket, err: fmt.Errorf("marking ticket done: %w", err)}
