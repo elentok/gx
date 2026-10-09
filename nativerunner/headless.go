@@ -50,6 +50,11 @@ type Headless struct {
 	PollInterval time.Duration
 	// StopGrace is how long Stop waits after SIGTERM before SIGKILL.
 	StopGrace time.Duration
+	// InterruptGrace is how long Stop lets a working agent wind down after an
+	// interrupt before it sends SIGTERM.
+	InterruptGrace time.Duration
+	// PromptTimeout is how long Prompt waits for claude to start the turn.
+	PromptTimeout time.Duration
 
 	mu       sync.Mutex
 	sessions map[string]*headlessSession
@@ -61,13 +66,15 @@ type headlessSession struct {
 	session agentrunner.Session
 	epic    string
 	cmd     *exec.Cmd
-	// stdin is the FIFO's write end. The server is its only writer.
-	stdin  *os.File
-	exited chan struct{}
-	tailed chan struct{}
+	// stdin is the FIFO's write end. The server is its only writer;
+	// writeMu keeps a large prompt and an interrupt from interleaving.
+	stdin   *os.File
+	writeMu sync.Mutex
+	exited  chan struct{}
+	tailed  chan struct{}
 	// Guarded by Headless.mu. changed is closed and replaced on every
-	// status update so Wait can block on it.
-	status  agentrunner.Status
+	// update so Wait and Prompt can block on it.
+	track   tracker
 	changed chan struct{}
 	stopped bool
 }
@@ -83,7 +90,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return agentrunner.Session{}, err
 	}
-	sessionID, err := newSessionID()
+	sessionID, err := newUUID()
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
@@ -145,7 +152,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 		tailed:  make(chan struct{}),
 		// Input waits in the FIFO until claude reads it, so the agent can
 		// take a prompt as soon as it is launched.
-		status:  agentrunner.Status{State: agentrunner.StateIdle, SessionID: sessionID},
+		track:   tracker{sessionID: sessionID},
 		changed: make(chan struct{}),
 	}
 	meta := Meta{Runner: "headless", PID: cmd.Process.Pid, SessionID: sessionID, Label: opts.Label, Epic: opts.Epic, Cwd: opts.Cwd}
@@ -200,7 +207,7 @@ func writeMeta(dir string, m Meta) error {
 	return os.WriteFile(filepath.Join(dir, MetaFile), append(data, '\n'), 0o644)
 }
 
-func newSessionID() (string, error) {
+func newUUID() (string, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
@@ -217,12 +224,12 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 	defer close(ss.tailed)
 	f, err := os.Open(path)
 	if err != nil {
-		h.update(ss, func(st *agentrunner.Status) { st.State = agentrunner.StateDone })
+		h.update(ss, func(t *tracker) { t.exited = true })
 		return
 	}
 	defer f.Close()
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
-		h.update(ss, func(st *agentrunner.Status) { st.State = agentrunner.StateDone })
+		h.update(ss, func(t *tracker) { t.exited = true })
 		return
 	}
 
@@ -251,7 +258,7 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 			line := pending[:i]
 			pending = pending[i+1:]
 			if e, ok := parseEvent(line); ok {
-				h.update(ss, func(st *agentrunner.Status) { apply(st, e) })
+				h.update(ss, func(t *tracker) { t.apply(e) })
 			}
 		}
 	}
@@ -259,7 +266,7 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 		select {
 		case <-ss.exited:
 			drain()
-			h.update(ss, func(st *agentrunner.Status) { st.State = agentrunner.StateDone })
+			h.update(ss, func(t *tracker) { t.exited = true })
 			return
 		case <-ticker.C:
 			drain()
@@ -267,15 +274,12 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 	}
 }
 
-func (h *Headless) update(ss *headlessSession, fn func(*agentrunner.Status)) {
+func (h *Headless) update(ss *headlessSession, fn func(*tracker)) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	before := ss.status
-	fn(&ss.status)
-	if ss.status != before {
-		close(ss.changed)
-		ss.changed = make(chan struct{})
-	}
+	fn(&ss.track)
+	close(ss.changed)
+	ss.changed = make(chan struct{})
 }
 
 // live returns the session s names; the caller holds h.mu.
@@ -287,7 +291,8 @@ func (h *Headless) live(s agentrunner.Session) (*headlessSession, error) {
 	return ss, nil
 }
 
-// Prompt writes one user message to claude's stdin.
+// Prompt writes one user message to claude's stdin and returns once claude
+// started a turn for it.
 func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 	h.mu.Lock()
 	ss, err := h.live(s)
@@ -295,27 +300,71 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 		h.mu.Unlock()
 		return err
 	}
-	state := ss.status.State
+	before := ss.track.status()
 	h.mu.Unlock()
-	switch state {
+	switch before.State {
 	case agentrunner.StateBlocked:
 		return agentrunner.ErrNotReady
 	case agentrunner.StateDone:
 		return agentrunner.ErrNotDelivered
 	}
-	// Written outside the lock: a full FIFO blocks until claude reads, and
-	// the tailer must keep updating status meanwhile.
-	msg, err := json.Marshal(map[string]any{
-		"type":    "user",
-		"message": map[string]any{"role": "user", "content": text},
-	})
+	uuid, err := newUUID()
 	if err != nil {
 		return err
 	}
-	if _, err := ss.stdin.Write(append(msg, '\n')); err != nil {
+	// Claude echoes uuid as command_uuid in its command_lifecycle events.
+	err = ss.send(map[string]any{
+		"type":    "user",
+		"uuid":    uuid,
+		"message": map[string]any{"role": "user", "content": text},
+	})
+	if err != nil {
 		return fmt.Errorf("%w: %v", agentrunner.ErrNotDelivered, err)
 	}
-	return nil
+	return h.awaitTurn(ss, uuid, before.Turn)
+}
+
+// awaitTurn waits for claude to start command uuid. A turn that began since
+// the prompt also counts: slash commands like /compact may run without a
+// command lifecycle.
+func (h *Headless) awaitTurn(ss *headlessSession, uuid string, turn int) error {
+	timeout := h.PromptTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	for {
+		h.mu.Lock()
+		started := ss.track.started(uuid) || ss.track.turn > turn
+		exited, changed := ss.track.exited, ss.changed
+		h.mu.Unlock()
+		switch {
+		case started:
+			return nil
+		case exited:
+			return fmt.Errorf("%w: claude exited", agentrunner.ErrNotDelivered)
+		}
+		select {
+		case <-changed:
+		case <-deadline.C:
+			return fmt.Errorf("%w: no turn started within %v", agentrunner.ErrNotDelivered, timeout)
+		}
+	}
+}
+
+// send writes one stream-json message to claude's stdin. It runs outside
+// Headless.mu: a full FIFO blocks until claude reads, and the tailer must
+// keep updating status meanwhile.
+func (ss *headlessSession) send(msg any) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	ss.writeMu.Lock()
+	defer ss.writeMu.Unlock()
+	_, err = ss.stdin.Write(append(data, '\n'))
+	return err
 }
 
 func (h *Headless) Status(s agentrunner.Session) (agentrunner.Status, error) {
@@ -325,7 +374,7 @@ func (h *Headless) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	if err != nil {
 		return agentrunner.Status{}, err
 	}
-	return ss.status, nil
+	return ss.track.status(), nil
 }
 
 func (h *Headless) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
@@ -338,7 +387,7 @@ func (h *Headless) Wait(s agentrunner.Session, states []agentrunner.State, timeo
 			h.mu.Unlock()
 			return agentrunner.Status{}, err
 		}
-		st, changed := ss.status, ss.changed
+		st, changed := ss.track.status(), ss.changed
 		h.mu.Unlock()
 		if slices.Contains(states, st.State) {
 			return st, nil
@@ -351,8 +400,9 @@ func (h *Headless) Wait(s agentrunner.Session, states []agentrunner.State, timeo
 	}
 }
 
-// Stop terminates claude's whole process group, giving it StopGrace to exit
-// cleanly first.
+// Stop terminates claude's whole process group. A working agent is
+// interrupted first and gets InterruptGrace to end its turn, then SIGTERM
+// and StopGrace to exit cleanly.
 func (h *Headless) Stop(s agentrunner.Session) error {
 	h.mu.Lock()
 	ss, ok := h.sessions[s.Label]
@@ -361,7 +411,16 @@ func (h *Headless) Stop(s agentrunner.Session) error {
 		return nil
 	}
 	ss.stopped = true
+	working := ss.track.status().State == agentrunner.StateWorking
 	h.mu.Unlock()
+
+	if working && ss.interrupt() == nil {
+		grace := h.InterruptGrace
+		if grace <= 0 {
+			grace = 10 * time.Second
+		}
+		_, _ = h.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, grace)
+	}
 
 	pgid := -ss.cmd.Process.Pid
 	_ = syscall.Kill(pgid, syscall.SIGTERM)
@@ -407,10 +466,38 @@ func (h *Headless) List(epic string) ([]agentrunner.Session, error) {
 	return out, nil
 }
 
-func (h *Headless) Interrupt(agentrunner.Session) error { return errUnsupported }
+// Interrupt ends claude's current turn through the control protocol; a
+// signal would end the whole process, not just the turn.
+func (h *Headless) Interrupt(s agentrunner.Session) error {
+	h.mu.Lock()
+	ss, err := h.live(s)
+	h.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	return ss.interrupt()
+}
 
-func (h *Headless) RateLimit(agentrunner.Session) (time.Time, bool, error) {
-	return time.Time{}, false, errUnsupported
+func (ss *headlessSession) interrupt() error {
+	id, err := newUUID()
+	if err != nil {
+		return err
+	}
+	return ss.send(map[string]any{
+		"type":       "control_request",
+		"request_id": id,
+		"request":    map[string]any{"subtype": "interrupt"},
+	})
+}
+
+func (h *Headless) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	ss, err := h.live(s)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	return ss.track.resetAt, !ss.track.resetAt.IsZero(), nil
 }
 
 func (h *Headless) Answer(agentrunner.Session, agentrunner.Answer) error { return errUnsupported }

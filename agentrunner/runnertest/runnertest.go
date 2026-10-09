@@ -22,6 +22,11 @@ type Harness struct {
 	Block func(t *testing.T, s agentrunner.Session, reason string)
 	// RateLimit makes the agent behind s report a limit that resets at resetAt.
 	RateLimit func(t *testing.T, s agentrunner.Session, resetAt time.Time)
+	// Stall makes the agent behind s never start a turn for later prompts.
+	Stall func(t *testing.T, s agentrunner.Session)
+	// BackgroundTask starts (running) or ends a background task of the agent
+	// behind s.
+	BackgroundTask func(t *testing.T, s agentrunner.Session, running bool)
 	// Restart returns a fresh Runner over the same host, as after a gx
 	// restart.
 	Restart func(t *testing.T) agentrunner.Runner
@@ -41,8 +46,11 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"StartIsIdle", startIsIdle},
 		{"StartLabelTaken", startLabelTaken},
 		{"PromptStartsTurn", promptStartsTurn},
+		{"PromptNotDelivered", promptNotDelivered},
 		{"WaitTimeout", waitTimesOut},
 		{"InterruptKeepsSession", interruptKeepsSession},
+		{"CompactAfterInterrupt", compactAfterInterrupt},
+		{"FinishWaitsForBackgroundTask", finishWaitsForBackgroundTask},
 		{"StopIsIdempotent", stopIsIdempotent},
 		{"FindAndList", findAndList},
 		{"StoppedSessionNotFound", stoppedSessionNotFound},
@@ -138,6 +146,59 @@ func interruptKeepsSession(t *testing.T, h Harness) {
 	}
 	if _, ok, err := h.Runner.Find("e-01"); err != nil || !ok {
 		t.Fatalf("Find after Interrupt = %v, %v; want found", ok, err)
+	}
+}
+
+func promptNotDelivered(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	h.Stall(t, s)
+	if err := h.Runner.Prompt(s, "do it"); !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt to a stalled agent err = %v, want ErrNotDelivered", err)
+	}
+}
+
+// compactAfterInterrupt is smart-zone recovery: interrupt, then /compact in
+// the same session.
+func compactAfterInterrupt(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	prompt(t, h.Runner, s, "do it")
+	if err := h.Runner.Interrupt(s); err != nil {
+		t.Fatalf("Interrupt: %v", err)
+	}
+	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
+		t.Fatalf("Wait idle after Interrupt: %v", err)
+	}
+	prompt(t, h.Runner, s, "/compact")
+	if st := status(t, h.Runner, s); st.Turn != 2 {
+		t.Fatalf("Turn after /compact = %d, want 2", st.Turn)
+	}
+	h.FinishTurn(t, s)
+	st, err := h.Runner.Wait(s, idleOrDone, waitTimeout)
+	if err != nil {
+		t.Fatalf("Wait idle after /compact: %v", err)
+	}
+	if st.SessionID != s.SessionID {
+		t.Fatalf("SessionID after /compact = %q, want %q", st.SessionID, s.SessionID)
+	}
+	if got, ok, err := h.Runner.Find("e-01"); err != nil || !ok || got.ID != s.ID {
+		t.Fatalf("Find after /compact = %+v, %v, %v; want %+v", got, ok, err, s)
+	}
+}
+
+// finishWaitsForBackgroundTask: a turn that ends with a background task
+// still running is not finished, since the task wakes the agent again.
+func finishWaitsForBackgroundTask(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	prompt(t, h.Runner, s, "do it")
+	h.BackgroundTask(t, s, true)
+	h.FinishTurn(t, s)
+	st, err := h.Runner.Wait(s, idleOrDone, 50*time.Millisecond)
+	if !errors.Is(err, agentrunner.ErrTimeout) || st.State != agentrunner.StateWorking {
+		t.Fatalf("Wait with a background task = %+v, %v; want working, ErrTimeout", st, err)
+	}
+	h.BackgroundTask(t, s, false)
+	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
+		t.Fatalf("Wait idle after the background task ended: %v", err)
 	}
 }
 

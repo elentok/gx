@@ -18,8 +18,19 @@ type session struct {
 	status    agentrunner.Status
 	promptErr error
 	resetAt   time.Time
+	bgTask    bool
 	prompts   []string
 	answers   []agentrunner.Answer
+}
+
+// view is the status callers see: a running background task keeps an idle
+// session working, as on a real runner.
+func (ss *session) view() agentrunner.Status {
+	st := ss.status
+	if ss.bgTask && st.State == agentrunner.StateIdle {
+		st.State = agentrunner.StateWorking
+	}
+	return st
 }
 
 type Runner struct {
@@ -120,7 +131,7 @@ func (r *Runner) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	if err != nil {
 		return agentrunner.Status{}, err
 	}
-	return ss.status, nil
+	return ss.view(), nil
 }
 
 func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
@@ -132,7 +143,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 			r.mu.Unlock()
 			return agentrunner.Status{}, err
 		}
-		st, changed := ss.status, r.changed
+		st, changed := ss.view(), r.changed
 		r.mu.Unlock()
 		if slices.Contains(states, st.State) {
 			return st, nil
@@ -250,6 +261,14 @@ func (r *Runner) SetRateLimit(label string, resetAt time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.byLabel(label).resetAt = resetAt
+}
+
+// SetBackgroundTask starts or ends a background task of label.
+func (r *Runner) SetBackgroundTask(label string, running bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).bgTask = running
+	r.notify()
 }
 
 func (r *Runner) SetHealthErr(err error) {

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -39,42 +40,104 @@ type launchRecord struct {
 	Cwd  string   `json:"cwd"`
 }
 
+// fakeRateLimitReset is the reset time the fake reports for "ratelimit".
+const fakeRateLimitReset = 1791403200
+
+// bgDoneFile, once created in the agent's cwd, ends the fake's background
+// task.
+const bgDoneFile = "bg-done"
+
 // fakeClaude answers each stdin message with one turn. "hang" starts a turn
-// that never finishes, "block" waits on a permission prompt, "exit" quits.
+// that never finishes, "block" waits on a permission prompt, "stall" is
+// never started, "background" leaves a background task running until
+// bgDoneFile appears, "ratelimit"/"allowed" set the rate limit, "/compact"
+// compacts without a command lifecycle, and "exit" quits.
 func fakeClaude() {
 	cwd, _ := os.Getwd()
 	rec, _ := json.Marshal(launchRecord{Args: os.Args[1:], Env: os.Environ(), Cwd: cwd})
 	_ = os.WriteFile(os.Getenv(fakeClaudeRecord), rec, 0o644)
 
+	var mu sync.Mutex
+	emit := func(lines ...string) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, l := range lines {
+			fmt.Println(l)
+		}
+	}
+
 	sessionID := os.Args[slices.Index(os.Args, "--session-id")+1]
-	fmt.Println("claude: some stray log line")
+	emit("claude: some stray log line")
 	initSent := false
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		var msg struct {
-			Message struct {
+			Type      string `json:"type"`
+			UUID      string `json:"uuid"`
+			RequestID string `json:"request_id"`
+			Message   struct {
 				Content string `json:"content"`
 			} `json:"message"`
 		}
 		_ = json.Unmarshal(scanner.Bytes(), &msg)
-		if msg.Message.Content == "exit" {
-			fmt.Println(`{"type":"result","subtype":"success"}`)
+		if msg.Type == "control_request" {
+			emit(fmt.Sprintf(`{"type":"control_response","response":{"subtype":"success","request_id":%q}}`, msg.RequestID),
+				`{"type":"result","subtype":"error_during_execution"}`)
+			continue
+		}
+		content := msg.Message.Content
+		if content == "stall" {
+			continue
+		}
+		lifecycle := func(state string) string {
+			return fmt.Sprintf(`{"type":"command_lifecycle","command_uuid":%q,"state":%q}`, msg.UUID, state)
+		}
+		if content != "/compact" {
+			emit(lifecycle("queued"), lifecycle("started"))
+		}
+		if content == "exit" {
+			emit(`{"type":"result","subtype":"success"}`)
 			os.Exit(0)
 		}
 		if !initSent {
-			fmt.Printf(`{"type":"system","subtype":"init","session_id":%q}`+"\n", sessionID)
+			emit(fmt.Sprintf(`{"type":"system","subtype":"init","session_id":%q}`, sessionID))
 			initSent = true
 		}
-		if msg.Message.Content == "block" {
-			fmt.Println(`{"type":"system","subtype":"session_state_changed","state":"running"}`)
-			fmt.Println(`{"type":"system","subtype":"session_state_changed","state":"requires_action"}`)
+		switch content {
+		case "block":
+			emit(`{"type":"system","subtype":"session_state_changed","state":"running"}`,
+				`{"type":"system","subtype":"session_state_changed","state":"requires_action"}`)
 			continue
+		case "hang":
+			emit(`{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`,
+				`{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"auto"}}`)
+			continue
+		case "/compact":
+			emit(`{"type":"system","subtype":"status","status":"compacting"}`,
+				`{"type":"system","subtype":"status","status":null,"compact_result":"success"}`,
+				`{"type":"system","subtype":"compact_boundary","compact_metadata":{"trigger":"manual"}}`,
+				`{"type":"user","message":{"content":"summary"},"isCompactSummary":true}`,
+				`{"type":"result","subtype":"success","num_turns":0}`)
+			continue
+		case "ratelimit", "allowed":
+			status := map[string]string{"ratelimit": "rejected", "allowed": "allowed"}[content]
+			emit(fmt.Sprintf(`{"type":"rate_limit_event","rate_limit_info":{"status":%q,"resetsAt":%d}}`, status, fakeRateLimitReset))
+		case "background":
+			emit(`{"type":"system","subtype":"background_tasks_changed","tasks":[{"task_id":"b1"}]}`)
+			go func() {
+				for {
+					if _, err := os.Stat(bgDoneFile); err == nil {
+						emit(`{"type":"system","subtype":"background_tasks_changed","tasks":[]}`)
+						return
+					}
+					time.Sleep(5 * time.Millisecond)
+				}
+			}()
 		}
-		fmt.Println(`{"type":"brand_new_event","x":1}`)
-		fmt.Println(`{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`)
-		if msg.Message.Content != "hang" {
-			fmt.Println(`{"type":"result","subtype":"success"}`)
-		}
+		emit(`{"type":"brand_new_event","x":1}`,
+			`{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`,
+			`{"type":"result","subtype":"success"}`,
+			lifecycle("completed"))
 	}
 }
 
@@ -97,10 +160,12 @@ func newHarness(t *testing.T) *harness {
 		record: filepath.Join(t.TempDir(), "launch.json"),
 	}
 	h.runner = &nativerunner.Headless{
-		Root:         h.root,
-		Claude:       exe,
-		PollInterval: 5 * time.Millisecond,
-		StopGrace:    2 * time.Second,
+		Root:           h.root,
+		Claude:         exe,
+		PollInterval:   5 * time.Millisecond,
+		StopGrace:      2 * time.Second,
+		InterruptGrace: 2 * time.Second,
+		PromptTimeout:  5 * time.Second,
 	}
 	t.Setenv("CLAUDECODE", "1")
 	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
@@ -330,6 +395,124 @@ func TestHeadless_LabelsFindListAndStop(t *testing.T) {
 	if _, ok, _ := h.runner.Find("epic-07"); ok {
 		t.Error("Find still sees a stopped session")
 	}
+}
+
+func TestHeadless_PromptNeverStartedIsNotDelivered(t *testing.T) {
+	h := newHarness(t)
+	h.runner.PromptTimeout = 100 * time.Millisecond
+	s := h.start(t, "epic-07")
+
+	if err := h.runner.Prompt(s, "stall"); !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt = %v, want ErrNotDelivered", err)
+	}
+}
+
+func TestHeadless_InterruptEndsTurnAndKeepsSession(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-07")
+
+	if err := h.runner.Prompt(s, "hang"); err != nil {
+		t.Fatal(err)
+	}
+	// The hanging turn includes an auto compaction, which must not end it.
+	if _, err := h.runner.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 100*time.Millisecond); !errors.Is(err, agentrunner.ErrTimeout) {
+		t.Fatalf("Wait idle mid-turn = %v, want ErrTimeout", err)
+	}
+	if err := h.runner.Interrupt(s); err != nil {
+		t.Fatal(err)
+	}
+	h.waitTurn(t, s, 1)
+	if err := h.runner.Prompt(s, "hello"); err != nil {
+		t.Fatalf("Prompt after Interrupt: %v", err)
+	}
+	h.waitTurn(t, s, 2)
+	if !strings.Contains(h.out(t), `"control_response"`) {
+		t.Error("claude never answered the interrupt control request")
+	}
+}
+
+func TestHeadless_CompactRunsInSameSession(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-07")
+
+	if err := h.runner.Prompt(s, "hang"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.runner.Interrupt(s); err != nil {
+		t.Fatal(err)
+	}
+	h.waitTurn(t, s, 1)
+	if err := h.runner.Prompt(s, "/compact"); err != nil {
+		t.Fatalf("Prompt /compact: %v", err)
+	}
+	if st := h.waitTurn(t, s, 2); st.SessionID != s.SessionID {
+		t.Errorf("session after /compact = %q, want %q", st.SessionID, s.SessionID)
+	}
+}
+
+func TestHeadless_RateLimitFromEvent(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-07")
+
+	if _, limited, err := h.runner.RateLimit(s); err != nil || limited {
+		t.Fatalf("RateLimit on fresh agent = %v, %v", limited, err)
+	}
+	if err := h.runner.Prompt(s, "ratelimit"); err != nil {
+		t.Fatal(err)
+	}
+	h.waitTurn(t, s, 1)
+	resetAt, limited, err := h.runner.RateLimit(s)
+	if err != nil || !limited || !resetAt.Equal(time.Unix(fakeRateLimitReset, 0)) {
+		t.Fatalf("RateLimit = %v, %v, %v; want limited until %v", resetAt, limited, err, time.Unix(fakeRateLimitReset, 0))
+	}
+	if err := h.runner.Prompt(s, "allowed"); err != nil {
+		t.Fatal(err)
+	}
+	h.waitTurn(t, s, 2)
+	if _, limited, _ := h.runner.RateLimit(s); limited {
+		t.Error("still limited after an allowed rate_limit_event")
+	}
+}
+
+func TestHeadless_FinishWaitsForBackgroundTasks(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-07")
+
+	if err := h.runner.Prompt(s, "background"); err != nil {
+		t.Fatal(err)
+	}
+	st, err := h.runner.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 200*time.Millisecond)
+	if !errors.Is(err, agentrunner.ErrTimeout) || st.State != agentrunner.StateWorking {
+		t.Fatalf("Wait idle with a background task = %+v, %v; want working, ErrTimeout", st, err)
+	}
+	if err := os.WriteFile(filepath.Join(h.cwd, bgDoneFile), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.waitTurn(t, s, 1)
+}
+
+func TestHeadless_StopInterruptsAWorkingAgentFirst(t *testing.T) {
+	h := newHarness(t)
+	s := h.start(t, "epic-07")
+
+	if err := h.runner.Prompt(s, "hang"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.runner.Stop(s); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(h.out(t), `"control_response"`) {
+		t.Error("Stop sent SIGTERM without interrupting the turn first")
+	}
+}
+
+func (h *harness) out(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(h.root, "epic-07", nativerunner.OutFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
 }
 
 // waitTurn waits for turn to have finished. Waiting on idle alone isn't

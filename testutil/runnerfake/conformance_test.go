@@ -23,6 +23,12 @@ func TestConformance(t *testing.T) {
 			RateLimit: func(t *testing.T, s agentrunner.Session, resetAt time.Time) {
 				r.SetRateLimit(s.Label, resetAt)
 			},
+			Stall: func(t *testing.T, s agentrunner.Session) {
+				r.SetPromptErr(s.Label, agentrunner.ErrNotDelivered)
+			},
+			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
+				r.SetBackgroundTask(s.Label, running)
+			},
 			// The fake's sessions live in memory, so a restarted gx sees the
 			// same runner.
 			Restart: func(t *testing.T) agentrunner.Runner { return r },
