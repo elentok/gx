@@ -144,11 +144,11 @@ type Event struct {
 	Body string `json:"body,omitempty"`
 	// StateChangeSeq (iteration-started only, and only when the agent was
 	// actually launched here rather than attached to) is herdr's
-	// state_change_seq at the moment AgentStart returned — the launch-time
-	// baseline a later collided reattach (attachToLiveAgent) compares its own
+	// turn count at the moment the session started — the launch-time
+	// baseline a later adopted launch (adoptedLaunch) compares its own
 	// live reading against to tell "idle because it genuinely finished a
 	// turn" from "idle because it never left this launch state" (see
-	// stalledSinceLaunch).
+	// noActivitySinceLaunch).
 	StateChangeSeq int `json:"state_change_seq,omitempty"`
 	// Outcome (manual-land/ticket-reset, recovery-applied) is what the
 	// recovery command or remedy concluded: "ok" or the remedy's error.

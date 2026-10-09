@@ -9,9 +9,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -230,7 +228,7 @@ func (p launchAndPromptParams) logGateEvent(eventType events.Type, agentSession,
 // logAgentStartEvent is logLifecycleEvent for the launch-time start event
 // only, additionally recording seq (see Event.StateChangeSeq) so a later
 // collided reattach can look up this launch's baseline by AgentSession — see
-// stalledSinceLaunch.
+// noActivitySinceLaunch.
 func (p launchAndPromptParams) logAgentStartEvent(eventType, agentSession string, seq int) {
 	if eventType == "" {
 		return
@@ -341,81 +339,7 @@ type launched struct {
 	Baseline int
 }
 
-// launchAndPrompt runs the shared agent lifecycle protocol: launch the agent in
-// Pane, wait for it to reach idle, send Prompt and wait for it to start
-// working, then wait for it to finish (idle or done) — pausing the whole
-// loop via Gate if this agent's context occupancy breaches SmartZone before
-// it finishes.
-func launchAndPrompt(d Deps, p launchAndPromptParams) (string, error) {
-	startedAgent, err := d.AgentStart(herdr.AgentStartOptions{
-		Name:      p.Label,
-		Kind:      string(p.Agent),
-		Pane:      p.Pane,
-		AgentArgs: agentArgs(p.Agent, p.ScratchDir, p.EpicName, p.Model, p.Effort),
-	})
-	if err != nil {
-		recovery, err := herdrrunner.RecoverStart(err, p.Label, p.SessionCwd, p.Pane, d.AgentExplain, d.AgentSendKeys)
-		var nameLost *herdr.AgentNameLostError
-		switch {
-		case errors.As(err, &nameLost):
-			return "", fmt.Errorf("launching %s: pane %s lost its identity before %s became ready: %w", p.Agent, p.Pane, p.Label, err)
-		case err != nil:
-			return "", fmt.Errorf("launching %s: %w", p.Agent, err)
-		case recovery == herdrrunner.StartAdopt:
-			// claimNext's launched-set de-dup should prevent this within one
-			// Run; this covers e.g. a second `gx ralph-loop` process racing the
-			// same ticket. Attach instead of parking the ticket.
-			return attachToLiveAgent(d, p)
-		}
-		return continueLaunch(d, p, herdr.Agent{})
-	}
-
-	return continueLaunch(d, p, startedAgent)
-}
-
-// continueLaunch runs the shared post-AgentStart launch protocol: wait for
-// Pane to reach idle, send Prompt and wait for it to start working, then wait
-// for it to finish. startedAgent is AgentStart's result when it succeeded
-// outright, or the zero value when resuming a launch whose AgentStart call
-// itself failed (agent_not_ready, see herdrrunner.RecoverStart) — in that case the
-// idle wait's own Agent result stands in for it.
-func continueLaunch(d Deps, p launchAndPromptParams, startedAgent herdr.Agent) (string, error) {
-	idleAgent, err := d.AgentWait(herdr.AgentWaitOptions{
-		Target: p.Pane,
-		Until:  []string{"idle"},
-	})
-	if err != nil {
-		return "", fmt.Errorf("waiting for %s to reach idle after launch: %w", p.Agent, err)
-	}
-	if startedAgent.AgentSession == "" {
-		startedAgent.AgentSession = idleAgent.AgentSession
-	}
-	if startedAgent.StateChangeSeq == 0 {
-		startedAgent.StateChangeSeq = idleAgent.StateChangeSeq
-	}
-
-	promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{
-		Target: p.Pane,
-		Text:   p.Prompt,
-		Wait:   true,
-		Until:  []string{"working"},
-	})
-	if err != nil {
-		return "", fmt.Errorf("sending initial prompt: %w", err)
-	}
-
-	// Claude normally exposes its native session ID at process startup, while
-	// Codex creates/discovers its rollout only after the first prompt begins.
-	// Prefer the post-prompt value when present, retaining the startup value as
-	// a fallback for agents whose prompt response omits agent_session.
-	sessionID := startedAgent.AgentSession
-	if promptedAgent.AgentSession != "" {
-		sessionID = promptedAgent.AgentSession
-	}
-	return startedLaunch(d, p, sessionID, startedAgent.StateChangeSeq)
-}
-
-// promptedLaunch is continueLaunch's post-prompt half for a session started
+// promptedLaunch is the post-prompt half of a launch for a session started
 // and prompted through Deps.Runner, with baseline its pre-prompt Turn.
 func promptedLaunch(d Deps, p launchAndPromptParams, baseline int) (string, error) {
 	status, err := d.Runner.Status(p.Session)
@@ -483,71 +407,13 @@ func waitLaunched(d Deps, p launchAndPromptParams, sessionID string) (string, er
 	return sessionID, nil
 }
 
-// attachToLiveAgent is launchAndPrompt's fallback once AgentStart reports
-// agent_name_taken for what's judged to be our own already-running pane
-// (see the CandidateCwd check at its call site): rather than send a second,
-// redundant initial prompt into a pane that may already be mid-turn, it
-// reads the live agent's current state via AgentGet and waits it out from
-// there — mirroring reattachIteration's own already-running handling, but
-// staying inside launchAndPrompt so its caller doesn't need to special-case
-// this path.
-//
-// An idle-looking pane isn't always a finished one: if the collision
-// happened because this pane's very first prompt-send stalled right after
-// launch, its status reads idle without ever having done any work. Before
-// trusting alreadyFinished, stalledSinceLaunch checks the pane's
-// state_change_seq against the baseline recorded when it was originally
-// started (see logAgentStartEvent) — if it hasn't moved, this is that
-// stalled-since-launch case, and the fix is to send the prompt now instead
-// of parking the ticket as already finished.
-func attachToLiveAgent(d Deps, p launchAndPromptParams) (string, error) {
-	live, err := d.AgentGet(p.Label)
-	if err != nil {
-		return "", fmt.Errorf("launching %s: agent name %q already used by our own worktree %s, and reading its live state failed: %w", p.Agent, p.Label, p.SessionCwd, err)
-	}
-	p.Pane = live.PaneID
-	sessionID := live.AgentSession
-
-	p.logLifecycleEvent(p.StartEvent, sessionID)
-	if p.StartEvent != "" {
-		p.sink().IterationStarted(p.TicketData, p.Label, p.SessionCwd, sessionID, p.Agent, p.Pane, p.Tab)
-		emitContextOccupancy(d, p.sink(), p.Agent, p.Ticket, p.SessionCwd, sessionID)
-	}
-
-	if alreadyFinished(live.AgentStatus) && !stalledSinceLaunch(p, live) {
-		p.logLifecycleEvent(p.FinishEvent, sessionID)
-		return sessionID, nil
-	}
-	if alreadyFinished(live.AgentStatus) {
-		promptedAgent, err := d.AgentPrompt(herdr.AgentPromptOptions{Target: p.Pane, Text: p.Prompt, Wait: true, Until: []string{"working"}})
-		if err != nil {
-			return "", fmt.Errorf("sending initial prompt to stalled reattached pane: %w", err)
-		}
-		if promptedAgent.AgentSession != "" {
-			sessionID = promptedAgent.AgentSession
-		}
-	}
-	return waitLaunched(d, p, sessionID)
-}
-
-// stalledSinceLaunch reports whether live's pane never advanced past the
-// state_change_seq baseline recorded when it was originally started (see
-// logAgentStartEvent), by looking that launch's iteration-started event up
-// in the epic's run log by AgentSession. A missing log, an untracked
-// session, or no matching event all fall through to false — the safe,
-// backward-compatible default of trusting alreadyFinished as before.
-func stalledSinceLaunch(p launchAndPromptParams, live herdr.Agent) bool {
-	return noActivitySinceLaunch(p.ScratchDir, p.EpicName, live.AgentSession, live.StateChangeSeq)
-}
-
 // noActivitySinceLaunch reports whether a pane's current state_change_seq
 // still matches the baseline stamped on its own iteration-started event (see
 // logAgentStartEvent), found in the epic's run log by matching agentSession.
-// Shared by stalledSinceLaunch (attachToLiveAgent's collided-reattach guard)
-// and adoptedLaunch, the herdr and Runner forms of the same "has this pane
-// done anything since this iteration launched it" check. A
-// missing log, an untracked session, or no matching event all fall through
-// to false — the safe default of trusting the caller's existing behavior.
+// adoptedLaunch uses it as its "has this session done anything since this
+// iteration launched it" check. A missing log, an untracked session, or no
+// matching event all fall through to false — the safe default of trusting the
+// caller's existing behavior.
 func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq int) bool {
 	if agentSession == "" {
 		return false
@@ -564,10 +430,9 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 	return false
 }
 
-// plainFinishStates are the herdr agent_status values that mean "the agent's
-// turn is over" for every agent kind. waitForFinish appends "blocked" to
-// these for every agent kind, which needs its own quota/park handling rather
-// than being treated as finished.
+// plainFinishStates are the agent state values that mean "the agent's turn is
+// over" for every agent kind. "blocked" needs its own quota/park handling
+// rather than being treated as finished.
 var plainFinishStates = []string{"idle", "done"}
 
 // runnerFinishStates is plainFinishStates for Runner.Wait.
