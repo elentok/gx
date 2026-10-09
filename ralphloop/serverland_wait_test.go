@@ -58,12 +58,19 @@ func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 type blipRunner struct {
 	*runnerfake.Runner
 	timeoutOn int
+	// timeoutIf, when set, replaces timeoutOn: it is told each Wait's 1-based
+	// index and reports whether that Wait times out.
+	timeoutIf func(wait int) bool
 	waits     int
 }
 
 func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
 	r.waits++
-	if r.waits == r.timeoutOn {
+	timedOut := r.waits == r.timeoutOn
+	if r.timeoutIf != nil {
+		timedOut = r.timeoutIf(r.waits)
+	}
+	if timedOut {
 		return agentrunner.Status{State: agentrunner.StateWorking}, agentrunner.ErrTimeout
 	}
 	return r.Runner.Wait(s, states, timeout)
