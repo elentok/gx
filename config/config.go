@@ -64,6 +64,9 @@ type Config struct {
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
 	Server                ServerConfig         `json:"server"`
 	Recovery              RecoveryConfig       `json:"recovery"`
+	// AgentRunner is auto, herdr, headless or pty. It is validated when the
+	// server starts, not here, so a bad value never breaks the TUI.
+	AgentRunner string `json:"agent-runner"`
 }
 
 // RecoveryConfig controls the recovery catalog.
@@ -111,6 +114,7 @@ func Default() Config {
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
+		AgentRunner:           "auto",
 	}
 }
 
@@ -194,7 +198,8 @@ func Load() (Config, error) {
 			TabEnv        []string `json:"tab-env"`
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
 		} `json:"server"`
-		Recovery *struct {
+		AgentRunner *string `json:"agent-runner"`
+		Recovery    *struct {
 			Enabled    *bool    `json:"enabled"`
 			Disabled   []string `json:"disabled"`
 			FollowUps  *string  `json:"follow-ups"`
@@ -310,6 +315,9 @@ func Load() (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv
+	}
+	if raw.AgentRunner != nil {
+		cfg.AgentRunner = *raw.AgentRunner
 	}
 	if raw.Recovery != nil {
 		if raw.Recovery.Enabled != nil {
