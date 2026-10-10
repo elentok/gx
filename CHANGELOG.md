@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.32.0 - 2026-10-10
+
+- Added a headless Claude runner, so gx can run agents without herdr:
+  - Added the `agent-runner` config key (`auto`, `herdr` or `headless`, default `auto`). `auto` uses herdr when it answers within 2s, else headless. `pty` and unknown values are rejected.
+  - `gx server` checks the runner before it starts. It refuses to start (stderr, a server log line and a non-zero exit) on a bad value, on an explicit `herdr` while herdr is down, or on a headless runner with no `claude` on `PATH`.
+  - The headless runner runs `claude -p` with stream-json under its own session. It writes `out.jsonl` and `meta.json` to the agent dir. It supports prompt, interrupt, `/compact`, rate-limit detection and permission answers, and it waits for background tasks before it reports idle.
+  - If `claude` lacks a needed capability, the ticket parks with a hint to run `gx claude doctor`.
+  - On start, the server reattaches saved headless runs. Live runs keep running, finished runs land, and dead runs park as needs-repair. Landing cleans up the agent's I/O files.
+  - Agent logs are pruned at start and daily. Set the retention with `server.log-retention`. Parked tickets keep their logs.
+- Added `gx claude doctor`. It runs named checks (fixture or live, including headless checks) and prints PASS, FAIL or SKIP with a version header. It supports `--runner`, `--json` and `--record`, exits 1 on FAIL, and warns when `claude` is newer than the recorded fixtures.
+- Added `gx server agents watch`, which renders a ticket's agent log, and `gx server agents prompt|interrupt|answer`. A blocked park reason now names the tool and its input.
+- TUI: on native runners, a Watch agent modal replaces "Answer in pane". Features that need herdr are hidden when herdr is missing or unreachable.
+- The ralph-loop and the server now drive every agent through one runner interface: launch, adopt, finish wait, smart-zone `/compact`, rate-limit waits, conflict resolution, reattach, land, repair and the budget kill. Each server run records the runner it launched with and waits on that runner. Old `runs.json` files load as herdr sessions.
+- Herdr runner fixes:
+  - A stuck prompt is now nudged and retyped, and gets one fresh session before it parks as `agent_prompt_stalled`.
+  - `/compact` now waits through Codex's confirmation.
+  - Sessions with running Claude background tasks no longer read as idle.
+  - The turn counter survives a gx restart.
+  - The runner now closes its own tab on stop.
+
 ## v0.31.0 - 2026-10-09
 
 - The `gx server` daemon is now the only scheduler. The in-process ralph-loop is removed:
