@@ -7,7 +7,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
@@ -36,26 +35,27 @@ type ServerDeps struct {
 	Start func(context.Context) error
 }
 
-// serverConnMsg is one probe's outcome.
+// serverConnMsg is one handshake's outcome, to be applied to the shell. A
+// manual probe (a page's "R", a finished start) sends it as is.
 type serverConnMsg struct {
 	conn ServerConn
 	// slow: the handshake failed for a reason other than "nothing listens", so
 	// the last known state stands.
 	slow bool
-	// manual: asked for by a page ("R", a finished start), not by the probe
-	// loop, so the result must not arm another tick.
-	manual bool
 }
 
-func (m Model) cmdServerProbe() tea.Cmd { return m.cmdProbe(false) }
+// serverProbeResultMsg is the probe loop's outcome: applied like a serverConnMsg,
+// and it arms the next tick, which a manual probe must not.
+type serverProbeResultMsg struct{ serverConnMsg }
 
-func (m Model) cmdProbe(manual bool) tea.Cmd {
+func (m Model) cmdServerProbe() tea.Cmd {
 	d := m.settings.Server
-	return func() tea.Msg {
-		msg := handshake(d)
-		msg.manual = manual
-		return msg
-	}
+	return func() tea.Msg { return serverProbeResultMsg{handshake(d)} }
+}
+
+func (m Model) cmdManualProbe() tea.Cmd {
+	d := m.settings.Server
+	return func() tea.Msg { return handshake(d) }
 }
 
 func handshake(d *ServerDeps) serverConnMsg {
@@ -86,86 +86,29 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case serverProbeTickMsg:
 		return m, m.cmdServerProbe(), true
+	case serverProbeResultMsg:
+		m, cmd := m.applyServerConn(msg.serverConnMsg)
+		return m, tea.Batch(m.cmdServerProbeLater(), cmd), true
+
 	case serverConnMsg:
-		if msg.slow {
-			if msg.manual {
-				return m, nil, true
-			}
-			return m, m.cmdServerProbeLater(), true
-		}
-		prev := m.serverConn
-		m.serverConn = msg.conn
-		var cmds []tea.Cmd
-		if !msg.manual {
-			cmds = append(cmds, m.cmdServerProbeLater())
-		}
-		// Pages start "up", so only a crossing of the down line is announced.
-		wasDown := prev.State == ServerDown
-		isDown := msg.conn.State == ServerDown
-		var announce tea.Msg
-		switch {
-		case isDown && !wasDown:
-			announce = ticketsui.ServerDownMsg{}
-		case wasDown && !isDown:
-			announce = ticketsui.ServerUpMsg{}
-		}
-		if announce != nil {
-			cmds = append(cmds, m.broadcastToLivePages(announce))
-		}
-		// The shell, not a page, watches the store while the server is down, so
-		// the watch runs whichever tab is on screen.
-		switch {
-		case isDown:
-			var watchCmd tea.Cmd
-			m, watchCmd = m.startStoreWatch()
-			cmds = append(cmds, watchCmd)
-		default:
-			m = m.stopStoreWatch()
-		}
-		if msg.conn.State == ServerReadOnly && prev.State != ServerReadOnly {
-			m.markTicketsReadOnly()
-		}
-		// Startup goes unknown → up without crossing the down line, so the
-		// stream is started from "no stream yet", not from a transition.
-		m, streamCmd := m.onLinkChange()
-		cmds = append(cmds, streamCmd)
-		return m, tea.Batch(cmds...), true
+		m, cmd := m.applyServerConn(msg)
+		return m, cmd, true
 
 	case ticketsui.ProbeRequestedMsg:
 		if m.settings.Server == nil {
 			return m, nil, true // permanently down: nothing to ask
 		}
-		return m, m.cmdProbe(true), true
+		return m, m.cmdManualProbe(), true
 	}
 	return m, nil, false
 }
 
-// markTicketsReadOnly covers the one link change that has no message: a
-// version mismatch found after the Tickets tab was built.
-func (m Model) markTicketsReadOnly() {
-	p, ok := m.livePageByTab[nav.TabTickets]
-	if !ok {
-		return
+// applyServerConn takes a handshake outcome; a slow one leaves the last state.
+func (m Model) applyServerConn(msg serverConnMsg) (Model, tea.Cmd) {
+	if msg.slow {
+		return m, nil
 	}
-	if tm, ok := p.model.(ticketsui.Model); ok {
-		p.model = tm.WithServerLink(ticketsui.ServerLinkReadOnly)
-		m.livePageByTab[nav.TabTickets] = p
-	}
-}
-
-// broadcastToLivePages delivers msg to every live tab, not just the active
-// one: the Tickets and Queue tabs both track the connection. Tabs never opened
-// are empty placeholders (see ensureLivePages) and have no model to deliver to.
-func (m Model) broadcastToLivePages(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
-	for tab, p := range m.livePageByTab {
-		if p.model == nil {
-			continue
-		}
-		next, cmd := p.model.Update(msg)
-		p.model = next
-		m.livePageByTab[tab] = p
-		cmds = append(cmds, cmd)
-	}
-	return tea.Batch(cmds...)
+	prev := m.serverConn.link()
+	m.serverConn = msg.conn
+	return m.onLinkChange(prev)
 }

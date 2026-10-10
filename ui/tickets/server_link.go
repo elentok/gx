@@ -19,13 +19,6 @@ const (
 	ServerLinkReadOnly
 )
 
-// WithServerLink sets the connection state that gates live columns and
-// server-backed keys.
-func (m Model) WithServerLink(l ServerLink) Model {
-	m.serverLink = l
-	return m
-}
-
 // disabledReason is why server keys are off; empty when they are usable.
 func (l ServerLink) disabledReason() string {
 	switch l {
@@ -50,7 +43,7 @@ var serverBlockedBindings = map[keys.BindingID]bool{
 // serverKeyGuard is the shared no-op check for server-backed keys: blocked
 // reports whether the caller should return cmd (a toast with the reason).
 func (m Model) serverKeyGuard(id keys.BindingID) (cmd tea.Cmd, blocked bool) {
-	reason := m.serverLink.disabledReason()
+	reason := m.link.disabledReason()
 	if reason == "" || !serverBlockedBindings[id] {
 		return nil, false
 	}

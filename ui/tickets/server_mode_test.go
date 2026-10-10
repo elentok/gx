@@ -129,7 +129,7 @@ func newServerModel(t *testing.T) Model {
 // withState hands the tab the state the app shell would deliver for snap.
 func withState(m Model, snap server.Snapshot) Model {
 	st := viewmodel.State{}.ApplySnapshot(snap)
-	next, _ := m.WithServerState(&st)
+	next, _ := m.WithServerState(&st, ServerLinkUp)
 	return next.(Model)
 }
 
@@ -149,7 +149,7 @@ func TestServerMode_NoStateKeepsLoading(t *testing.T) {
 	if cmd := m.Init(); cmd != nil {
 		t.Fatal("Init fetched; the shell's stream delivers the state")
 	}
-	pending, _ := m.WithServerState(nil)
+	pending, _ := m.WithServerState(nil, ServerLinkUp)
 	next, _ := pending.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if m := next.(Model); m.loaded || !strings.Contains(m.View().Content, "loading…") {
 		t.Fatalf("loaded=%v, want the loading… state", m.loaded)
@@ -203,8 +203,9 @@ func TestServerMode_OutsideProjectShowsAllWithoutToasting(t *testing.T) {
 
 func TestServerMode_StaleStateIsIgnoredWhileOnFallback(t *testing.T) {
 	m := newServerModel(t)
-	next, _ := m.Update(ServerDownMsg{})
-	m = withState(next.(Model), scopeSnap)
+	st := viewmodel.State{}.ApplySnapshot(scopeSnap)
+	next, _ := m.WithServerState(&st, ServerLinkDown)
+	m = next.(Model)
 	if m.loaded || len(m.epics) != 0 {
 		t.Fatalf("fallback tab took the shell's stale state: loaded=%v epics=%d", m.loaded, len(m.epics))
 	}

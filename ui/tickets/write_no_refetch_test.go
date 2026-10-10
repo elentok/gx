@@ -41,7 +41,7 @@ func TestStatusChanged_UpModeMakesNoRefetch(t *testing.T) {
 }
 
 func TestStatusChanged_DownModeReloadsDisk(t *testing.T) {
-	down, _, _ := newServerModel(t).updateServerLink(ServerDownMsg{})
+	down, _ := withLink(newServerModel(t), ServerLinkDown)
 	_, cmd := down.Update(statusChangedMsg{})
 	if cmd == nil {
 		t.Fatal("down mode did not reload")

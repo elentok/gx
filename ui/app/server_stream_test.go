@@ -95,14 +95,15 @@ func (f *streamFake) stream(i int) *fakeStream {
 type stubPage struct {
 	calls int
 	last  *viewmodel.State
+	link  ticketsui.ServerLink
 }
 
 func (p *stubPage) Init() tea.Cmd                       { return nil }
 func (p *stubPage) Update(tea.Msg) (tea.Model, tea.Cmd) { return p, nil }
 func (p *stubPage) View() tea.View                      { return tea.NewView("stub") }
-func (p *stubPage) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
+func (p *stubPage) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (tea.Model, tea.Cmd) {
 	p.calls++
-	p.last = st
+	p.last, p.link = st, link
 	return p, nil
 }
 

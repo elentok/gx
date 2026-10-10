@@ -101,7 +101,7 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
-	tm := ticketsui.NewModel(root, s, keys.New(Bindings())).WithServerLink(m.serverConn.link())
+	tm := ticketsui.NewModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
 		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(root))
 	}
@@ -122,11 +122,6 @@ func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
 	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
-	}
-	// A tab built while down gets no ServerDownMsg crossing; with no client the
-	// shell is down for good (its serverConn starts there).
-	if m.serverConn.State == ServerDown {
-		qm = qm.WithServerDown()
 	}
 	return qm
 }

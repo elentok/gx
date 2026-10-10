@@ -25,30 +25,18 @@ const storeWatchDebounce = 50 * time.Millisecond
 // readsDisk reports whether the tab reads the store itself: the server is down
 // or there is no client at all.
 func (m Model) readsDisk() bool {
-	return m.serverAPI == nil || m.serverLink == ServerLinkDown
+	return m.serverAPI == nil || m.link == ServerLinkDown
 }
 
-// updateServerLink handles the connection events; ok is false for any other msg.
-func (m Model) updateServerLink(msg tea.Msg) (Model, tea.Cmd, bool) {
-	switch msg.(type) {
-	case ServerDownMsg:
-		m.serverLink = ServerLinkDown
-		return m, m.cmdLoadDisk(), true
-
-	case ServerUpMsg:
-		if m.serverLink == ServerLinkDown {
-			m.serverLink = ServerLinkUp
-		}
-		// The shell re-snapshots on the same probe and delivers the result.
-		return m, nil, true
-
-	case StoreChangedMsg:
-		if !m.readsDisk() {
-			return m, nil, true
-		}
-		return m, m.cmdLoadDisk(), true
+// updateStoreChanged handles StoreChangedMsg; ok is false for any other msg.
+func (m Model) updateStoreChanged(msg tea.Msg) (Model, tea.Cmd, bool) {
+	if _, isChange := msg.(StoreChangedMsg); !isChange {
+		return m, nil, false
 	}
-	return m, nil, false
+	if !m.readsDisk() {
+		return m, nil, true
+	}
+	return m, m.cmdLoadDisk(), true
 }
 
 // OnPageActivated catches the tab up with the store: hidden tabs are not told

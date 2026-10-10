@@ -31,7 +31,7 @@ func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueM
 
 func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil })
-	next, cmd := m.Update(ServerDownMsg{})
+	next, cmd := m.WithServerState(nil, ServerLinkDown)
 	m = next.(QueueModel)
 	if cmd != nil {
 		t.Fatal("the tab must not run a reconnect loop of its own")
@@ -44,38 +44,34 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 		t.Fatalf("view = %s", view)
 	}
 
-	// Coming back clears the banner; rows return with the shell's delivery.
-	next, _ = m.Update(ServerUpMsg{})
-	m = next.(QueueModel)
-	if m.serverDown {
-		t.Fatal("still down after ServerUpMsg")
-	}
+	// Coming back clears the banner and brings the rows, in one delivery.
 	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
-	next, _ = m.WithServerState(&st)
+	next, _ = m.WithServerState(&st, ServerLinkUp)
+	if next.(QueueModel).serverDown() {
+		t.Fatal("still down after an up delivery")
+	}
 	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "First") {
 		t.Fatalf("delivered rows not shown after reconnect:\n%s", view)
 	}
 }
 
-// A delivery that lands while the tab still counts the server as down is
-// applied when the tab learns it is back.
-func TestQueueServerDown_DeliveryWhileDownShowsOnReconnect(t *testing.T) {
+// A state delivered with a down link is not shown; the same state delivered
+// with an up link is.
+func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil })
-	next, _ := m.Update(ServerDownMsg{})
-	m = next.(QueueModel)
 
 	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/09", Title: "Ninth", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/09"}})
-	next, _ = m.WithServerState(&st)
+	next, _ := m.WithServerState(&st, ServerLinkDown)
 	m = next.(QueueModel)
 	if len(m.epics) != 0 {
 		t.Fatalf("rows shown while down: %+v", m.epics)
 	}
 
-	next, _ = m.Update(ServerUpMsg{})
+	next, _ = m.WithServerState(&st, ServerLinkUp)
 	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "Ninth") {
 		t.Fatalf("delivered rows not shown after reconnect:\n%s", view)
 	}
@@ -91,7 +87,7 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 		t.Fatal("confirm opened while server is up")
 	}
 
-	next, _ = m.Update(ServerDownMsg{})
+	next, _ = m.WithServerState(nil, ServerLinkDown)
 	next, _ = next.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = next.(QueueModel)
 	if !m.confirm.IsOpen || !strings.Contains(m.confirm.View(80), "server is down — start it now?") {

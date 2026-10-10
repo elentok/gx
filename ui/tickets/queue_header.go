@@ -281,7 +281,7 @@ func budgetTotalStyle(total, softLimit float64) lipgloss.Style {
 // contextual copy, since that's the state a person is actually looking at
 // the Queue tab wondering what to do next.
 func (m QueueModel) queueHeaderBodyLines() []string {
-	if m.serverDown {
+	if m.serverDown() {
 		return []string{epicStatusParkedAnswerStyle.Render(queueServerDownBanner)}
 	}
 	if m.serverAPI != nil && m.herdrDown {

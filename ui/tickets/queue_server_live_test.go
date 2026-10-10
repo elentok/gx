@@ -34,7 +34,7 @@ func deliverQueue(t *testing.T, snap server.Snapshot, queue []server.QueueItem) 
 func deliverQueueTo(m QueueModel, snap server.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
 	st := viewmodel.State{}.ApplySnapshot(snap)
 	st = st.SetQueue(queue)
-	next, cmd := m.WithServerState(&st)
+	next, cmd := m.WithServerState(&st, ServerLinkUp)
 	return next.(QueueModel), cmd
 }
 
@@ -204,7 +204,7 @@ func TestQueueServerMode_PausedFollowsDeliveredMode(t *testing.T) {
 	}
 
 	st := viewmodel.State{Mode: server.ModePaused}
-	next, _ := m.WithServerState(&st)
+	next, _ := m.WithServerState(&st, ServerLinkUp)
 
 	if !next.(QueueModel).paused {
 		t.Error("paused = false after a delivered paused mode")

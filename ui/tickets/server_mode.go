@@ -184,11 +184,20 @@ func (m Model) WithServer(api ServerAPI) Model {
 	return m
 }
 
-// WithServerState hands the tab the app shell's shared state; nil means no
-// snapshot has arrived yet, so the tab keeps showing "loading…". While the tab
-// reads the store itself (server down) the shell's state is stale and ignored.
-func (m Model) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
-	if st == nil || m.readsDisk() {
+// WithServerState hands the tab the app shell's shared state and the link it
+// was read over; nil st means no snapshot has arrived yet, so the tab keeps
+// showing "loading…". While the tab reads the store itself (server down) the
+// shell's state is stale and ignored; the crossing into down loads from disk.
+func (m Model) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model, tea.Cmd) {
+	wasDown := m.link == ServerLinkDown
+	m.link = link
+	if m.readsDisk() {
+		if link == ServerLinkDown && !wasDown {
+			return m, m.cmdLoadDisk()
+		}
+		return m, nil
+	}
+	if st == nil {
 		return m, nil
 	}
 	m.vm = *st

@@ -20,7 +20,6 @@ import (
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/terminalrun"
 	"github.com/elentok/gx/ui/tree"
-	"github.com/elentok/gx/viewmodel"
 )
 
 // QueueModel renders a checked selection as dependency-aware epic waves.
@@ -48,9 +47,6 @@ type QueueModel struct {
 	loaded        bool
 	epics         []tickets.Epic
 	candidates    map[string]bool
-	// shared is the last state the app shell delivered, kept while the server
-	// is down so reconnecting can show it before the next delivery.
-	shared *viewmodel.State
 
 	// queueTree owns the Queue tab's selection/scroll/collapse state
 	// (tree.Model[queueNode], see queue_rows.go's buildQueueEntries).
@@ -106,12 +102,12 @@ type QueueModel struct {
 	// mirroring the Tickets tab's own focus-toggle.
 	previewFocus
 
-	// serverAPI/serverStart/serverDown back the server-down banner (see
-	// queue_server_down.go); serverDown is also how a tab with no client at all
-	// shows the banner (WithServerDown).
+	// serverAPI/serverStart/link back the server-down banner (see
+	// queue_server_down.go). link is only ever set by WithServerState; a tab
+	// with no client is delivered ServerLinkDown, so it shows the banner too.
 	serverAPI   ServerAPI
 	serverStart func(context.Context) error
-	serverDown  bool
+	link        ServerLink
 	// projectFilter narrows the server-mode rows to one project; "" shows all.
 	projectFilter string
 }
@@ -458,7 +454,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueueReload:
 			// The shell owns the connection and the snapshot; it hands the result
 			// back as state.
-			if m.serverDown {
+			if m.serverDown() {
 				return m, cmdProbeRequested
 			}
 			return m, func() tea.Msg { return ResnapshotRequestedMsg{} }

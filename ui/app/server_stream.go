@@ -12,10 +12,11 @@ import (
 )
 
 // serverStatePage is a page that renders the shell's shared server state.
-// st is nil until the first snapshot has arrived ("no snapshot yet"). The
-// command runs while the page is on screen (the Queue tab's spinner loop).
+// st is nil until the first snapshot has arrived ("no snapshot yet"); link is
+// how the shell currently reaches the server (a shell with no client is down).
+// The command runs while the page is on screen (the Queue tab's spinner loop).
 type serverStatePage interface {
-	WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd)
+	WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (tea.Model, tea.Cmd)
 }
 
 // serverStream is the shell's one subscription to the server: the shared state
@@ -104,18 +105,35 @@ func (m Model) cancelStream() Model {
 	return m
 }
 
-// onLinkChange starts or stops the stream after a probe result.
-func (m Model) onLinkChange() (Model, tea.Cmd) {
+// onLinkChange reacts to a probe result: the store watch runs while down (the
+// shell, not a page, watches it, so it runs whichever tab is on screen), the
+// stream only while not. prev is the link before the result; the active page is
+// told only when it changed, and hidden pages catch up when switched to.
+func (m Model) onLinkChange(prev ticketsui.ServerLink) (Model, tea.Cmd) {
+	var cmds []tea.Cmd
 	if m.serverConn.State == ServerDown {
+		var watch tea.Cmd
+		m, watch = m.startStoreWatch()
+		cmds = append(cmds, watch)
 		m = m.cancelStream()
 		m.stream.snapshotting = false
 		m.stream.gen++ // outdate an in-flight snapshot
-		return m, nil
+	} else {
+		m = m.stopStoreWatch()
+		// Startup goes unknown → up without crossing the down line, so the
+		// stream is started from "no stream yet", not from a transition.
+		if m.streamWanted() {
+			var snapshot tea.Cmd
+			m, snapshot = m.startSnapshot()
+			cmds = append(cmds, snapshot)
+		}
 	}
-	if m.streamWanted() {
-		return m.startSnapshot()
+	if m.serverConn.link() != prev {
+		var deliver tea.Cmd
+		m, deliver = m.deliverServerState()
+		cmds = append(cmds, deliver)
 	}
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 // subscribe replaces the current stream with one from since; the older one is
@@ -304,7 +322,7 @@ func (m Model) serverState() *viewmodel.State {
 // withServerState gives model the current state if it uses server state.
 func (m Model) withServerState(model tea.Model) (tea.Model, tea.Cmd) {
 	if p, ok := model.(serverStatePage); ok {
-		return p.WithServerState(m.serverState())
+		return p.WithServerState(m.serverState(), m.serverConn.link())
 	}
 	return model, nil
 }

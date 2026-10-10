@@ -30,7 +30,7 @@ func newDownHarness(t *testing.T) *harness {
 			h.m.store.stop()
 		}
 	})
-	if h.m.store.stop == nil {
+	if !h.m.store.running {
 		t.Fatal("going down must start the shell's store watch")
 	}
 	return h
@@ -60,8 +60,8 @@ func TestDownMode_StaleStoreSignalsAreDropped(t *testing.T) {
 	h := newDownHarness(t)
 	staleGen := h.m.store.gen
 
-	h.send(serverConnMsg{conn: ServerConn{State: ServerUp, PID: 1}, manual: true})
-	if h.m.store.stop != nil {
+	h.send(serverConnMsg{conn: ServerConn{State: ServerUp, PID: 1}})
+	if h.m.store.running {
 		t.Fatal("the watch kept running after the server came back")
 	}
 	for _, msg := range []tea.Msg{storeChangedMsg{gen: staleGen}, storePollMsg{gen: staleGen}} {
@@ -125,8 +125,8 @@ func TestDownMode_ProbeRequestIsOneShot(t *testing.T) {
 		t.Fatalf("probe request not handled (ok=%v)", ok)
 	}
 	res, isConn := cmd().(serverConnMsg)
-	if !isConn || !res.manual {
-		t.Fatalf("probe request produced %#v, want a manual handshake result", cmd())
+	if !isConn {
+		t.Fatalf("probe request produced %#v, want a plain handshake result", cmd())
 	}
 	_, cmd, _ = next.updateServerConn(res)
 	if cmd != nil {

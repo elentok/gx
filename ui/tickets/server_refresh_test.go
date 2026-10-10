@@ -17,18 +17,19 @@ func TestRefresh_FollowsConnection(t *testing.T) {
 		t.Fatal("connected tab reads the store")
 	}
 
-	next, cmd := m.Update(ServerDownMsg{})
-	m = next.(Model)
+	m, cmd := withLink(m, ServerLinkDown)
 	if !m.readsDisk() {
 		t.Fatal("down tab does not read the store")
 	}
 	if cmd == nil {
 		t.Fatal("going down must load from disk")
 	}
+	if _, cmd = withLink(m, ServerLinkDown); cmd != nil {
+		t.Fatal("a repeated down delivery must not reload")
+	}
 
 	// The shell re-snapshots on reconnect and delivers; the tab fetches nothing.
-	next, cmd = m.Update(ServerUpMsg{})
-	m = next.(Model)
+	m, cmd = withLink(m, ServerLinkUp)
 	if m.readsDisk() {
 		t.Fatal("reconnected tab reads the store")
 	}
@@ -39,8 +40,8 @@ func TestRefresh_FollowsConnection(t *testing.T) {
 
 // Seam B: with no client the tab starts, and stays, reading the store.
 func TestRefresh_NoClientStartsDown(t *testing.T) {
-	// The shell builds the tab down when it has no client (ServerConn.link).
-	m := NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}).WithServerLink(ServerLinkDown)
+	// The shell delivers the down link when it has no client (ServerConn.link).
+	m, _ := withLink(NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}), ServerLinkDown)
 	if m.Init() == nil {
 		t.Fatal("a tab with no client must load from disk on Init")
 	}
@@ -68,8 +69,8 @@ func TestRefresh_StoreChangedReloadsOnlyWhenDown(t *testing.T) {
 		t.Fatal("a connected tab reloaded on a store change")
 	}
 
-	next, _ := m.Update(ServerDownMsg{})
-	_, cmd := next.Update(StoreChangedMsg{})
+	down, _ := withLink(m, ServerLinkDown)
+	_, cmd := down.Update(StoreChangedMsg{})
 	if cmd == nil {
 		t.Fatal("a down tab must reload on a store change")
 	}
@@ -83,8 +84,8 @@ func TestRefresh_ActivationReloadsOnlyWhenDown(t *testing.T) {
 	if m.OnPageActivated() != nil {
 		t.Fatal("a connected tab reloaded on activation")
 	}
-	next, _ := m.Update(ServerDownMsg{})
-	if next.(Model).OnPageActivated() == nil {
+	down, _ := withLink(m, ServerLinkDown)
+	if down.OnPageActivated() == nil {
 		t.Fatal("a down tab must reload on activation")
 	}
 }

@@ -20,6 +20,13 @@ func loadedModelWithTicket(t *testing.T) Model {
 	return updated.(Model)
 }
 
+// withLink delivers link with no state, as the shell does on a link change
+// before any snapshot.
+func withLink(m Model, link ServerLink) (Model, tea.Cmd) {
+	next, cmd := m.WithServerState(nil, link)
+	return next.(Model), cmd
+}
+
 func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -30,7 +37,7 @@ func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 		{ServerLinkReadOnly, "read-only"},
 	}
 	for _, tc := range cases {
-		m := loadedModelWithTicket(t).WithServerLink(tc.link)
+		m, _ := withLink(loadedModelWithTicket(t), tc.link)
 		for _, key := range []string{"s", "r", "a", "D", "m"} {
 			updated, cmd := m.Update(tea.KeyPressMsg{Code: rune(key[0]), Text: key})
 			m = updated.(Model)
@@ -46,8 +53,8 @@ func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 }
 
 func TestServerLink_DownKeepsMarkdownRow(t *testing.T) {
-	m := loadedModelWithTicket(t)
-	content := m.WithServerLink(ServerLinkDown).View().Content
+	m, _ := withLink(loadedModelWithTicket(t), ServerLinkDown)
+	content := m.View().Content
 	if !strings.Contains(content, "First ticket") {
 		t.Fatalf("markdown row should stay, got:\n%s", content)
 	}

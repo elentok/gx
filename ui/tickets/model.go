@@ -132,9 +132,10 @@ type Model struct {
 	serverAPI ServerAPI
 	// ticketStore locates the ticket files "Answer…" edits directly in server mode.
 	ticketStore string
-	// serverLink is how the TUI currently reaches the server (server_link.go).
-	serverLink ServerLink
-	vm         viewmodel.State
+	// link is the link half of the last WithServerState delivery; nothing else
+	// writes it (server_link.go).
+	link ServerLink
+	vm   viewmodel.State
 	// scope is which projects the tab shows; owned by the tab, so no snapshot
 	// or event can reset it.
 	scope viewmodel.Scope
@@ -210,7 +211,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, cmd, ok := m.updateServer(msg); ok {
 		return next, cmd
 	}
-	if next, cmd, ok := m.updateServerLink(msg); ok {
+	if next, cmd, ok := m.updateStoreChanged(msg); ok {
 		return next, cmd
 	}
 	switch msg := msg.(type) {

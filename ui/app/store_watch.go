@@ -16,7 +16,10 @@ const storePollInterval = 30 * time.Second
 // plus a slow poll, running only while the server is down. gen orphans the
 // ticks of a watch that has since stopped.
 type storeWatch struct {
-	stop   func() // non-nil while running
+	running bool
+	// stop and events are nil when the file watcher failed to start; the poll
+	// alone then keeps running.
+	stop   func()
 	events <-chan struct{}
 	gen    int
 }
@@ -30,16 +33,16 @@ type (
 )
 
 func (m Model) startStoreWatch() (Model, tea.Cmd) {
-	if m.store.stop != nil {
+	if m.store.running {
 		return m, nil
 	}
 	events, stop, err := ticketsui.WatchStore(ticketsui.ScratchDir(m.settings.ActiveWorktreePath))
 	if err != nil {
 		// The poll alone still keeps the rows fresh.
-		events, stop = nil, func() {}
+		events, stop = nil, nil
 	}
 	m.store.gen++
-	m.store.stop, m.store.events = stop, events
+	m.store.running, m.store.stop, m.store.events = true, stop, events
 	cmds := []tea.Cmd{cmdStorePoll(m.store.gen)}
 	if events != nil {
 		cmds = append(cmds, cmdStoreWait(m.store.gen, events))
@@ -48,11 +51,13 @@ func (m Model) startStoreWatch() (Model, tea.Cmd) {
 }
 
 func (m Model) stopStoreWatch() Model {
-	if m.store.stop == nil {
+	if !m.store.running {
 		return m
 	}
-	m.store.stop()
-	m.store.stop, m.store.events = nil, nil
+	if m.store.stop != nil {
+		m.store.stop()
+	}
+	m.store.running, m.store.stop, m.store.events = false, nil, nil
 	m.store.gen++ // orphans any tick still in flight
 	return m
 }
@@ -65,14 +70,14 @@ func (m Model) updateStoreWatch(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, cmd, true
 
 	case storePollMsg:
-		if msg.gen != m.store.gen || m.store.stop == nil {
+		if msg.gen != m.store.gen || !m.store.running {
 			return m, nil, true
 		}
 		m, notify := m.notifyStoreChanged()
 		return m, tea.Batch(notify, cmdStorePoll(msg.gen)), true
 
 	case storeChangedMsg:
-		if msg.gen != m.store.gen || m.store.stop == nil {
+		if msg.gen != m.store.gen || !m.store.running {
 			return m, nil, true
 		}
 		m, notify := m.notifyStoreChanged()

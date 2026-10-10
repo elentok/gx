@@ -11,24 +11,26 @@ import (
 	"github.com/elentok/gx/viewmodel"
 )
 
-// WithServerState hands the tab the app shell's shared state; nil means no
-// snapshot has arrived yet. The returned command starts the running spinner
-// when the tab goes from idle to running.
-func (m QueueModel) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
-	if st == nil || m.serverAPI == nil {
+// WithServerState hands the tab the app shell's shared state and the link it
+// was read over; nil st means no snapshot has arrived yet. The returned command
+// starts the running spinner when the tab goes from idle to running.
+func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model, tea.Cmd) {
+	m.link = link
+	if m.serverDown() {
+		// Whatever the queue showed is stale; it refills on reconnect.
+		m.epics = nil
+		m.clampSelected()
 		return m, nil
 	}
-	m.shared = st
-	if m.serverDown {
+	if st == nil {
 		return m, nil
 	}
-	return m.applyServerState()
+	return m.applyServerState(st)
 }
 
 // applyServerState rebuilds rows, queue order, claim times, budget, herdr state
-// and queue mode from the shared state.
-func (m QueueModel) applyServerState() (QueueModel, tea.Cmd) {
-	st := m.shared
+// and queue mode from st.
+func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) {
 	m.serverClaimedAt = map[string]time.Time{}
 	for _, t := range st.Tickets {
 		if !t.ClaimedAt.IsZero() {
@@ -70,9 +72,9 @@ func (m QueueModel) OnPageActivated() tea.Cmd {
 // ticket snapshot: no run happens in-process, so a claimed ticket is the
 // only sign that an epic runs.
 // It fills runningEpics and live for the header, row spinners and timers, and
-// returns the spinner tick when the tab
-// goes from idle to running. A ticket's timer counts from the server's claim
-// time; a claimed ticket the server has no run for is not counted as running.
+// returns the spinner tick when the tab goes from idle to running. A ticket's
+// timer counts from the server's claim time; a claimed ticket the server has no
+// run for is not counted as running.
 func (m *QueueModel) syncServerRunState() tea.Cmd {
 	wasRunning := len(m.runningEpics) > 0
 	if m.runningEpics == nil {
