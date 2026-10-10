@@ -72,5 +72,5 @@ func RenderChordOverlay(prefix string, bindings []keys.Binding) string {
 		BorderForeground(ColorBorder).
 		Padding(0, 1).
 		Render(body)
-	return injectBorderTitle(box, prefix, "", ColorBlue, ColorBorder, ColorBorder)
+	return injectBorderTitle(box, prefix, "", "", ColorBlue, ColorBorder, ColorBorder)
 }

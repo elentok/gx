@@ -36,6 +36,62 @@ func TestRenderModalFrameIncludesTitleBodyAndHint(t *testing.T) {
 	}
 }
 
+func TestRenderModalFrameBottomRightTitle(t *testing.T) {
+	cases := []struct {
+		name       string
+		opts       ModalFrameOptions
+		wantBottom string
+		wantTopHas string
+	}{
+		{
+			name:       "label in bottom border",
+			opts:       ModalFrameOptions{Title: "Help", Body: "x", Width: 24, TitleInBorder: true, BottomRightTitle: "v0.28.16"},
+			wantBottom: "╰" + strings.Repeat("─", 12) + " v0.28.16 ╯",
+		},
+		{
+			name:       "empty label keeps plain bottom",
+			opts:       ModalFrameOptions{Title: "Help", Body: "x", Width: 24, TitleInBorder: true},
+			wantBottom: "╰" + strings.Repeat("─", 22) + "╯",
+		},
+		{
+			name:       "label without title",
+			opts:       ModalFrameOptions{Body: "x", Width: 24, TitleInBorder: true, BottomRightTitle: "v1"},
+			wantBottom: "╰" + strings.Repeat("─", 18) + " v1 ╯",
+		},
+		{
+			name:       "narrow frame truncates bottom label",
+			opts:       ModalFrameOptions{Body: "x", Width: 10, TitleInBorder: true, BottomRightTitle: "v0.28.16-long"},
+			wantBottom: "╰ v0.28.1╯",
+		},
+		{
+			name:       "narrow frame truncates top titles",
+			opts:       ModalFrameOptions{Title: "Keybindings", RightTitle: "2/5", Body: "x", Width: 12, TitleInBorder: true},
+			wantBottom: "╰" + strings.Repeat("─", 10) + "╯",
+			wantTopHas: " 2/5 ",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			lines := strings.Split(RenderModalFrame(tc.opts), "\n")
+			for i, line := range lines {
+				if got := ansi.StringWidth(line); got != tc.opts.Width {
+					t.Fatalf("line %d width = %d, want %d: %q", i, got, tc.opts.Width, line)
+				}
+			}
+			top, bottom := ansi.Strip(lines[0]), ansi.Strip(lines[len(lines)-1])
+			if bottom != tc.wantBottom {
+				t.Fatalf("bottom = %q, want %q", bottom, tc.wantBottom)
+			}
+			if !strings.HasPrefix(top, "╭") || !strings.HasSuffix(top, "╮") {
+				t.Fatalf("top corners broken: %q", top)
+			}
+			if !strings.Contains(top, tc.wantTopHas) {
+				t.Fatalf("top = %q, want it to contain %q", top, tc.wantTopHas)
+			}
+		})
+	}
+}
+
 func TestRenderPanelFrameReturnsEmptyForTooSmallDimensions(t *testing.T) {
 	if got := RenderPanelFrame(PanelFrameOptions{Width: 1, Height: 3}); got != "" {
 		t.Fatalf("expected empty frame for narrow dimensions, got %q", got)

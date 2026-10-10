@@ -11,17 +11,20 @@ import (
 const ansiReset = "\x1b[0m"
 
 type ModalFrameOptions struct {
-	Title           string
-	RightTitle      string
-	Body            string
-	Hint            string
-	Width           int
-	BorderColor     color.Color
-	TitleColor      color.Color
-	RightTitleColor color.Color
-	HintColor       color.Color
-	PaddingX        int
-	TitleInBorder   bool
+	Title      string
+	RightTitle string
+	// BottomRightTitle is embedded right-aligned in the bottom border when
+	// TitleInBorder is set.
+	BottomRightTitle string
+	Body             string
+	Hint             string
+	Width            int
+	BorderColor      color.Color
+	TitleColor       color.Color
+	RightTitleColor  color.Color
+	HintColor        color.Color
+	PaddingX         int
+	TitleInBorder    bool
 }
 
 func RenderModalFrame(opts ModalFrameOptions) string {
@@ -55,24 +58,25 @@ func RenderModalFrame(opts ModalFrameOptions) string {
 	}
 	rendered := borderStyle.Render(strings.Join(parts, "\n"))
 
-	if opts.TitleInBorder && (strings.TrimSpace(opts.Title) != "" || strings.TrimSpace(opts.RightTitle) != "") {
+	if opts.TitleInBorder && (strings.TrimSpace(opts.Title) != "" || strings.TrimSpace(opts.RightTitle) != "" || strings.TrimSpace(opts.BottomRightTitle) != "") {
 		rightColor := opts.RightTitleColor
 		if rightColor == nil {
 			rightColor = opts.TitleColor
 		}
-		rendered = injectBorderTitle(rendered, opts.Title, opts.RightTitle, opts.TitleColor, rightColor, opts.BorderColor)
+		rendered = injectBorderTitle(rendered, opts.Title, opts.RightTitle, opts.BottomRightTitle, opts.TitleColor, rightColor, opts.BorderColor)
 	}
 	return rendered
 }
 
 // injectBorderTitle replaces the top border line of a rendered frame with one
-// that embeds titles, e.g.  ╭─ Title ───── 2/5 ─╮.
-func injectBorderTitle(frame, title, rightTitle string, titleColor, rightTitleColor, borderColor color.Color) string {
+// that embeds titles, e.g.  ╭─ Title ───── 2/5 ─╮. A non-empty bottomRight is
+// embedded the same way in the bottom border line, e.g.  ╰────── v1.0 ─╯.
+func injectBorderTitle(frame, title, rightTitle, bottomRight string, titleColor, rightTitleColor, borderColor color.Color) string {
 	lines := strings.Split(frame, "\n")
 	if len(lines) == 0 {
 		return frame
 	}
-	frameW := ansi.StringWidth(lines[0])
+	innerW := maxInt(0, ansi.StringWidth(lines[0])-2) // -2 for the corners
 	borderS := lipgloss.NewStyle().Foreground(borderColor)
 	titleS := lipgloss.NewStyle().Foreground(titleColor).Bold(true)
 	rightS := lipgloss.NewStyle().Foreground(rightTitleColor)
@@ -85,12 +89,24 @@ func injectBorderTitle(frame, title, rightTitle string, titleColor, rightTitleCo
 	if strings.TrimSpace(rightTitle) != "" {
 		rightStr = rightS.Render(" " + rightTitle + " ")
 	}
+	lines[0] = borderLine("╭", "╮", leftStr, rightStr, innerW, borderS)
 
-	leftW := ansi.StringWidth(leftStr)
-	rightW := ansi.StringWidth(rightStr)
-	dashes := maxInt(0, frameW-2-leftW-rightW) // -2 for ╭ and ╮
-	lines[0] = borderS.Render("╭") + leftStr + borderS.Render(strings.Repeat("─", dashes)) + rightStr + borderS.Render("╮")
+	if strings.TrimSpace(bottomRight) != "" && len(lines) > 1 {
+		bottomS := lipgloss.NewStyle().Foreground(ColorGray)
+		lines[len(lines)-1] = borderLine("╰", "╯", "", bottomS.Render(" "+bottomRight+" "), innerW, borderS)
+	}
 	return strings.Join(lines, "\n")
+}
+
+// borderLine joins corners, a left label, dash fill and a right label into a
+// border row of exactly innerW+2 cells. The right label wins when space is
+// short, and each label is truncated rather than overrunning a corner.
+func borderLine(leftCorner, rightCorner, leftStr, rightStr string, innerW int, borderS lipgloss.Style) string {
+	rightStr = ansi.Truncate(rightStr, innerW, "")
+	rightW := ansi.StringWidth(rightStr)
+	leftStr = ansi.Truncate(leftStr, innerW-rightW, "")
+	dashes := innerW - rightW - ansi.StringWidth(leftStr)
+	return borderS.Render(leftCorner) + leftStr + borderS.Render(strings.Repeat("─", dashes)) + rightStr + borderS.Render(rightCorner)
 }
 
 type PanelFrameOptions struct {
