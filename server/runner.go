@@ -628,6 +628,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 				return
 			}
 		}
+		s.submitRetro(root, dir, e, one.Ticket.Path)
 		if removed, err := s.queued.removeRoot(root); err != nil {
 			s.log.Warn("dequeue completed root", "root", root, "err", err)
 		} else if removed {
@@ -640,6 +641,39 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			counts.Recovered = recoveredCount(dir, one.Epic)
 			s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, counts, elapsed, cost)
 		}
+	}
+}
+
+// submitRetro files the evolve one-off for a completed loop epic. It runs once
+// the epic is done (auto-merge off) or landed (auto-merge on); a parked or
+// failed land returns before it. A refused submit is logged, never an error:
+// the dedupe key refuses a second live retro of the same epic.
+func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ticketPath string) {
+	if e.IsMap || isOneOffTicket(ticketPath) || !e.EvolvedAt.IsZero() {
+		return
+	}
+	pf, err := config.ReadProjectFile(projectDir)
+	if err != nil {
+		s.log.Warn("retro hook: read project file", "root", root, "err", err)
+		return
+	}
+	mode := config.Config{Evolve: s.cfg.Evolve}.EvolveMode(pf)
+	if mode == config.EvolveOff || mode == "" {
+		return
+	}
+	// A maintainer's retro writes to the gx project; without one it has nowhere to go.
+	if mode == config.EvolveMaintainer {
+		if _, err := s.projectDir("gx"); err != nil {
+			s.log.Warn("retro hook: maintainer mode needs a gx project, not submitting", "root", root, "err", err)
+			return
+		}
+	}
+	res, err := s.oneOff(RetroSubmit(root.Project, filepath.Base(e.Path), time.Now()))
+	switch {
+	case err != nil:
+		s.log.Warn("retro hook: submit", "root", root, "err", err)
+	case res.Refused:
+		s.log.Info("retro hook: submit refused", "root", root, "reason", res.Reason, "message", res.Message)
 	}
 }
 

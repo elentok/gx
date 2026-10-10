@@ -58,6 +58,8 @@ type Config struct {
 	// AutoMergeEpic merges a finished epic's branch into its target; off leaves
 	// the merge to gx-merge.
 	AutoMergeEpic bool
+	// Evolve is the global evolve mode (config.Evolve*); empty means off.
+	Evolve string
 
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only
