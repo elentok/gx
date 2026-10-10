@@ -59,7 +59,11 @@ func evolveGuard(env evolveEnv, projectDir string) error {
 	if err != nil {
 		return err
 	}
-	if env.cfg.EvolveMode(pf) != config.EvolveMaintainer {
+	mode := env.cfg.EvolveMode(pf)
+	if err := server.EnsureOutboxProject(env.storePath, mode); err != nil {
+		return err
+	}
+	if mode != config.EvolveMaintainer {
 		return nil
 	}
 	if _, err := tickets.ProjectDirByName(env.storePath, evolveGxProject); err != nil {

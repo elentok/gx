@@ -100,6 +100,20 @@ func TestRetroHook_MaintainerWithoutAGxProjectSubmitsNothing(t *testing.T) {
 	}
 }
 
+func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
+	f := retroFixture(t, withEvolve(config.EvolveContributor))
+	if got := f.completeEpic(t); len(got) != 1 {
+		t.Fatalf("retros = %v, want one", got)
+	}
+	pf, err := config.ReadProjectFile(filepath.Join(f.store, "gx"))
+	if err != nil {
+		t.Fatalf("outbox project not created: %v", err)
+	}
+	if pf.VCS == nil || *pf.VCS != config.VCSNone {
+		t.Errorf("outbox vcs = %v, want none", pf.VCS)
+	}
+}
+
 func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 	f := retroFixture(t, withEvolve(config.EvolveMaintainer))
 	if err := os.MkdirAll(filepath.Join(f.store, "gx"), 0o755); err != nil {

@@ -150,6 +150,41 @@ func TestEvolve_MaintainerWithoutGxProjectRefuses(t *testing.T) {
 	}
 }
 
+func TestEvolve_OutboxProjectOnlyInContributorMode(t *testing.T) {
+	t.Parallel()
+	var out, errOut bytes.Buffer
+	gxProject := func(f *evolveFixture) string { return filepath.Join(f.env.storePath, "gx", "project.json") }
+
+	contrib := newEvolveFixture(t, config.EvolveContributor, false, "")
+	if err := runEvolveRun(context.Background(), contrib.env, &out, &errOut, "proj:epic", false); err != nil {
+		t.Fatal(err)
+	}
+	pf, err := config.ReadProjectFile(filepath.Join(contrib.env.storePath, "gx"))
+	if err != nil {
+		t.Fatalf("outbox project not created: %v", err)
+	}
+	if pf.VCS == nil || *pf.VCS != config.VCSNone {
+		t.Errorf("outbox vcs = %v, want none", pf.VCS)
+	}
+
+	for _, mode := range []string{config.EvolveMaintainer, config.EvolveOff} {
+		f := newEvolveFixture(t, mode, false, "")
+		_ = runEvolveSkip(f.env, &out, "proj:epic")
+		if _, err := os.Stat(gxProject(f)); err == nil {
+			t.Errorf("%s mode created a gx project", mode)
+		}
+	}
+
+	existing := newEvolveFixture(t, config.EvolveContributor, true, "")
+	if err := runEvolveSkip(existing.env, &out, "proj:epic"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(gxProject(existing))
+	if err != nil || string(data) != "{}" {
+		t.Errorf("existing gx project changed: %q, %v", data, err)
+	}
+}
+
 // addEpic writes project/name with the given ticket.md frontmatter and ticket file.
 func addEpic(t *testing.T, store, project, name, epicFM, ticketFile string) {
 	t.Helper()

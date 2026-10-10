@@ -663,6 +663,10 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ti
 	if mode == config.EvolveOff || mode == "" {
 		return
 	}
+	if err := EnsureOutboxProject(s.cfg.TicketStore, mode); err != nil {
+		s.log.Warn("retro hook: create outbox project", "root", root, "err", err)
+		return
+	}
 	// A maintainer's retro writes to the gx project; without one it has nowhere to go.
 	if mode == config.EvolveMaintainer {
 		if _, err := s.projectDir("gx"); err != nil {
