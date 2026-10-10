@@ -564,6 +564,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		s.log.Warn("clean up agent", "ticket", ticketAddr, "err", cerr)
 	}
 	s.events.publish(EventTicketDone, ticketAddr)
+	s.stampRetro(addr, one.Ticket.Path, false)
 	s.notifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)
 	s.fileFollowUp(addr, one.Ticket.Path)

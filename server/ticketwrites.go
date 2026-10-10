@@ -162,6 +162,7 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
 				return QueueResult{}, fmt.Errorf("cancel %s: %w", ref.address(t), err)
 			}
+			s.stampRetro(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
 			s.events.publish(EventTicketCancelled, ref.address(t))
 		}
 		return QueueResult{}, nil

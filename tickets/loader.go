@@ -253,6 +253,16 @@ func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
 // every other key and the body are kept. Retro stamping and `gx evolve skip`
 // reuse it for their own keys.
 func StampEpicFields(epicPath string, fields map[string]any) error {
+	return stampEpicFields(epicPath, fields, false)
+}
+
+// OverwriteEpicFields is StampEpicFields for keys a later run legitimately
+// replaces (a forced re-run's evolve_ticket): an existing value is rewritten.
+func OverwriteEpicFields(epicPath string, fields map[string]any) error {
+	return stampEpicFields(epicPath, fields, true)
+}
+
+func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) error {
 	ticketPath := filepath.Join(epicPath, "ticket.md")
 	if _, err := os.Stat(ticketPath); err != nil {
 		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
@@ -280,14 +290,23 @@ func StampEpicFields(epicPath string, fields map[string]any) error {
 	mapping := doc.Content[0]
 	changed := false
 	for key, value := range fields {
-		if hasMappingKey(mapping, key) {
+		exists := hasMappingKey(mapping, key)
+		if exists && !overwrite {
 			continue
 		}
 		var val yaml.Node
 		if err := val.Encode(value); err != nil {
 			return fmt.Errorf("encoding %s: %w", key, err)
 		}
-		mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
+		if exists {
+			for i := 0; i+1 < len(mapping.Content); i += 2 {
+				if mapping.Content[i].Value == key {
+					mapping.Content[i+1] = &val
+				}
+			}
+		} else {
+			mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
+		}
 		changed = true
 	}
 	if !changed {
