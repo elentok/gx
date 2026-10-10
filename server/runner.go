@@ -487,7 +487,7 @@ func (s *Server) prepareAndLaunch(
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	run, err := s.launch(deps, ticket, launchSkill(one.Ticket), investigatePrompt(one.Ticket), wt.Path, one.Agent)
+	run, err := s.launch(deps, ticket, one.Ticket, launchSkill(one.Ticket), investigatePrompt(one.Ticket), wt.Path, one.Agent)
 	if err != nil {
 		if derr := mode.discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
@@ -696,7 +696,25 @@ func (s *Server) depsFor(project string) ralphloop.Deps {
 	return deps
 }
 
-func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
+// evolveDirs are the dirs a retro's `gx tickets` verbs write to outside the
+// ticket's own epic: the follow-ups epic and the gx project's ticket dir.
+// A dir that does not resolve is left out; the verb then fails with its own error.
+func (s *Server) evolveDirs(ticket tickets.Address) []string {
+	var dirs []string
+	if d, err := s.followUpsEpicPath(ticket.Project); err == nil {
+		dirs = append(dirs, d)
+	}
+	if d, err := s.projectDir("gx"); err == nil {
+		dirs = append(dirs, d)
+	}
+	return dirs
+}
+
+func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, t tickets.Ticket, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
+	var extraDirs []string
+	if t.Type == string(schema.TypeEvolve) {
+		extraDirs = s.evolveDirs(ticket)
+	}
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
 	session, err := ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
@@ -704,7 +722,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, skill, note
 		Epic:  ticket.Epic,
 		Cwd:   cwd,
 		Kind:  agentrunner.Kind(agent),
-		Args:  ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", ""),
+		Args:  ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", "", extraDirs...),
 		Env:   s.cfg.TabEnv,
 	}, launchPrompt(agent, skill, note, ticket.String()))
 	if err != nil {

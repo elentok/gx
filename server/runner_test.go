@@ -968,3 +968,48 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 		}
 	}
 }
+
+func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
+	for _, tc := range []struct {
+		name, typ, agent string
+		wantExtra        bool
+	}{
+		{"codex evolve", "evolve", "codex", true},
+		{"codex implement", "implement", "codex", false},
+		{"claude evolve", "evolve", "claude", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store, repo := t.TempDir(), testutil.TempRepo(t)
+			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
+			servertest.WriteTicket(t, store, "gx", "other", "01", "unrelated", "")
+			servertest.SetProjectRepo(t, store, "proj", repo)
+			h := servertest.StartWithStore(t, store)
+			start, _, _ := registerLaunch(h)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			snap, err := h.Client.Snapshot(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			evs, err := h.Client.Events(ctx, snap.Seq)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", tc.agent); err != nil || res.Refused {
+				t.Fatalf("add: %+v, %v", res, err)
+			}
+			for ev := range evs {
+				if ev.Type == server.EventIterationStarted {
+					break
+				}
+			}
+			got := strings.Join(*start, " ")
+			for _, dir := range []string{filepath.Join(store, "gx", "follow-ups"), filepath.Join(store, "gx")} {
+				if has := strings.Contains(got, "--add-dir "+dir); has != tc.wantExtra {
+					t.Errorf("--add-dir %s present = %v, want %v in %q", dir, has, tc.wantExtra, got)
+				}
+			}
+		})
+	}
+}

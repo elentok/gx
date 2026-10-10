@@ -139,8 +139,16 @@ func SkillPrompt(agent AgentKind, skill, ticketAddr string) string {
 	return skillPrompt(agent, skill, ticketAddr)
 }
 
-func AgentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []string {
-	return agentArgs(agent, scratchDir, epicName, model, effort)
+// extraDirs are further writable dirs for a Codex sandbox; Claude ignores them.
+func AgentArgs(agent AgentKind, scratchDir, epicName, model, effort string, extraDirs ...string) []string {
+	args := agentArgs(agent, scratchDir, epicName, model, effort)
+	if agent != AgentCodex {
+		return args
+	}
+	for _, d := range extraDirs {
+		args = append(args, "--add-dir", d)
+	}
+	return args
 }
 
 func skillPrompt(agent AgentKind, skill, ticketAddr string) string {

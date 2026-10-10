@@ -103,22 +103,31 @@ func dedupeKey(investigateRaw, class string) string {
 
 func dedupeLine(key string) string { return "Dedupe key: " + key }
 
-// writeFollowUp files the follow-up, or adds an occurrence line to the open
-// draft that already has the same key.
-func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) (string, error) {
+// followUpsEpicPath is the follow-ups epic dir that receives follow-ups from
+// fromProject's tickets.
+func (s *Server) followUpsEpicPath(fromProject string) (string, error) {
 	target := s.cfg.RecoverySettings.FollowUps
 	if target == "" {
 		target = DefaultFollowUps
 	}
 	project, epic, ok := strings.Cut(target, ":")
 	if !ok {
-		project, epic = from.Project, target
+		project, epic = fromProject, target
 	}
 	dir, err := s.projectDir(project)
 	if err != nil {
 		return "", fmt.Errorf("%w %s: %v", errNoFollowUpProject, project, err)
 	}
-	epicPath := filepath.Join(dir, epic)
+	return filepath.Join(dir, epic), nil
+}
+
+// writeFollowUp files the follow-up, or adds an occurrence line to the open
+// draft that already has the same key.
+func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) (string, error) {
+	epicPath, err := s.followUpsEpicPath(from.Project)
+	if err != nil {
+		return "", err
+	}
 	if err := ensureDraftEpic(epicPath); err != nil {
 		return "", err
 	}
