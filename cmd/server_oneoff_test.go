@@ -37,6 +37,35 @@ func dupServer(t *testing.T, status string) *apiclient.Client {
 	return apiclient.New(sock)
 }
 
+func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.OneOffRequest
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(server.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	if newServerOneOffCmd().Flag("type") == nil {
+		t.Fatal("no --type flag")
+	}
+	var out bytes.Buffer
+	req := server.OneOffRequest{Prompt: "retro", Type: "evolve"}
+	if err := runServerOneOff(context.Background(), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
+		t.Fatal(err)
+	}
+	if got.Type != "evolve" {
+		t.Errorf("server request type = %q, want evolve", got.Type)
+	}
+}
+
 func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
 	cl := dupServer(t, "needs-answer")
 	var out, errOut bytes.Buffer

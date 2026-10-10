@@ -61,6 +61,7 @@ func newServerOneOffCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.Name, "name", "", "epic name (default: the prompt's first words plus a short unique suffix)")
 	cmd.Flags().StringVar(&req.Agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default claude)`)
 	cmd.Flags().BoolVar(&req.Commits, "commits", false, "create an implement ticket that lands commits (default: a commitless prompt ticket)")
+	cmd.Flags().StringVar(&req.Type, "type", "", `ticket type: "prompt" (default) or "evolve"`)
 	cmd.Flags().StringVar(&req.Base, "base", "", "branch to base the work on (needs --commits)")
 	cmd.Flags().StringArrayVar(&req.BlockedBy, "blocked-by", nil, "address of a ticket in the same project that must land first (repeatable)")
 	cmd.Flags().IntVar(&req.ExpectedContextWindow, "expected-context-window", 0, "expected context window in tokens")

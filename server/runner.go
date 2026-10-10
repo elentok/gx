@@ -45,6 +45,7 @@ const (
 	implementSkill  = "gx-implement"
 	codeReviewSkill = "gx-code-review"
 	oneOffSkill     = "gx-one-off"
+	evolveSkill     = "gx-evolve"
 )
 
 // launchSkill is the skill an agent starts under: code-review tickets get their
@@ -56,6 +57,8 @@ func launchSkill(t tickets.Ticket) string {
 		return codeReviewSkill
 	case t.Type == string(schema.TypePrompt):
 		return oneOffSkill
+	case t.Type == string(schema.TypeEvolve):
+		return evolveSkill
 	}
 	return implementSkill
 }

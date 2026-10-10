@@ -21,7 +21,8 @@ type iterationMode struct {
 }
 
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
-	m := iterationMode{commitless: addr.Project == ScratchProject || schema.TicketType(t.Type) == schema.TypePrompt || schema.TicketType(t.Type) == schema.TypeInvestigate}
+	typ := schema.TicketType(t.Type)
+	m := iterationMode{commitless: addr.Project == ScratchProject || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve}
 	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}

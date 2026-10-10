@@ -249,6 +249,50 @@ func TestOneOff_InvalidAgentLeavesNoTicketAndRetryIsNotDuplicateLive(t *testing.
 	}
 }
 
+func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testing.T) {
+	h, _ := startOneOffHarness(t)
+	ctx := context.Background()
+	at := time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC)
+	req := server.RetroSubmit("proj", "epic-a", at)
+
+	first, err := h.Client.OneOff(ctx, req)
+	if err != nil || first.Refused {
+		t.Fatalf("retro: %+v, %v", first, err)
+	}
+	if first.Address != "proj:evolve-epic-a-20261010-1405/01" {
+		t.Errorf("address = %q, want the dated epic name", first.Address)
+	}
+	files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "evolve-epic-a-20261010-1405", "issues", "01-*.md"))
+	if len(files) != 1 {
+		t.Fatalf("ticket files = %v", files)
+	}
+	raw, _ := os.ReadFile(files[0])
+	for _, want := range []string{"type: evolve", "notify: true", "unique: evolve:proj/epic-a"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("ticket lacks %q:\n%s", want, raw)
+		}
+	}
+
+	again := server.RetroSubmit("proj", "epic-a", at.Add(time.Hour))
+	res, err := h.Client.OneOff(ctx, again)
+	if err != nil || !res.Refused || res.Reason != server.ReasonDuplicateLive || res.Address != first.Address {
+		t.Errorf("second retro: %+v, %v; want duplicate-live naming %s", res, err, first.Address)
+	}
+}
+
+func TestOneOff_RefusesBadTypes(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	for name, req := range map[string]server.OneOffRequest{
+		"unknown type":      {Prompt: "x", Cwd: repo, Type: "research"},
+		"evolve and commit": {Prompt: "x", Cwd: repo, Type: "evolve", Commits: true},
+	} {
+		res, err := h.Client.OneOff(context.Background(), req)
+		if err != nil || !res.Refused || res.Reason != server.ReasonBadType {
+			t.Errorf("%s: %+v, %v; want invalid-type", name, res, err)
+		}
+	}
+}
+
 func TestOneOff_DuplicateLiveRefusedByFileKey(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	ctx := context.Background()

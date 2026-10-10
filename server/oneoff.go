@@ -29,6 +29,7 @@ const (
 	ReasonBadWindow     = "invalid-context-window"
 	ReasonBadFile       = "invalid-file"
 	ReasonDuplicateLive = "duplicate-live"
+	ReasonBadType       = "invalid-type"
 )
 
 // OneOffStatusQueued is the status a successful submit reports: it is created
@@ -49,6 +50,9 @@ type OneOffRequest struct {
 	Cwd   string `json:"cwd,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Agent string `json:"agent,omitempty"`
+	// Type is the ticket type: "prompt" (default) or "evolve", which is commitless
+	// by design and so cannot be combined with Commits.
+	Type string `json:"type,omitempty"`
 	// Commits makes the ticket type implement (prompt otherwise); a project without a VCS refuses it.
 	Commits bool `json:"commits,omitempty"`
 	// Base overrides the derived base; only a commit-landing ticket has one.
@@ -68,6 +72,20 @@ type OneOffRequest struct {
 	// resolved path unless NoUnique is set. A plain prompt has none.
 	Unique   string `json:"unique,omitempty"`
 	NoUnique bool   `json:"no_unique,omitempty"`
+}
+
+// RetroSubmit is the one-off a retro of epic runs as: a commitless evolve ticket
+// in the epic's own project. The dedupe key refuses a second live retro of the
+// same epic; the timestamped name keeps a --force re-run from hitting a taken one.
+func RetroSubmit(project, epic string, now time.Time) OneOffRequest {
+	return OneOffRequest{
+		Prompt:  "Retro of epic " + project + ":" + epic,
+		Project: project,
+		Name:    "evolve-" + epic + "-" + now.Format("20060102-1504"),
+		Type:    string(schema.TypeEvolve),
+		Unique:  "evolve:" + project + "/" + epic,
+		Notify:  true,
+	}
 }
 
 // oneOffFileFrontmatter is the subset of a payload file's frontmatter a submit
@@ -183,8 +201,18 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 		return oneOffRefusal(ReasonEmptyPrompt, "a one-off needs a prompt"), nil
 	}
 	typ := schema.TypePrompt
-	if req.Commits {
-		typ = schema.TypeImplement
+	switch schema.TicketType(req.Type) {
+	case "", schema.TypePrompt:
+		if req.Commits {
+			typ = schema.TypeImplement
+		}
+	case schema.TypeEvolve:
+		if req.Commits {
+			return oneOffRefusal(ReasonBadType, "an evolve ticket is commitless: --commits does not apply"), nil
+		}
+		typ = schema.TypeEvolve
+	default:
+		return oneOffRefusal(ReasonBadType, "type "+req.Type+" is not supported by a one-off"), nil
 	}
 	project, dir, err := s.oneOffProject(req)
 	if err != nil {
