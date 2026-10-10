@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -61,6 +62,8 @@ type InputsRow struct {
 	FixTickets []string `json:"fix_tickets,omitempty"`
 	Flags      []string `json:"flags"`
 	Severity   int      `json:"severity"`
+	// Digests lists the session digests written into the table's DigestDir.
+	Digests []InputsDigest `json:"digests,omitempty"`
 }
 
 // InputsTable is what `gx evolve inputs` reports for one epic.
@@ -69,7 +72,9 @@ type InputsTable struct {
 	// MedianElapsedSeconds is the baseline the slow flag compares against.
 	MedianElapsedSeconds int `json:"median_elapsed_seconds"`
 	// Deadlocks counts epic-wide deadlock events, which carry no ticket.
-	Deadlocks int         `json:"deadlocks"`
+	Deadlocks int `json:"deadlocks"`
+	// DigestDir holds the text-only transcript digests the rows point at.
+	DigestDir string      `json:"digest_dir"`
 	Rows      []InputsRow `json:"rows"`
 }
 
@@ -252,10 +257,20 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	if err != nil {
 		return err
 	}
+	if table.DigestDir, err = os.MkdirTemp(env.tempDir, "gx-evolve-digests-"); err != nil {
+		return err
+	}
+	if err := writeDigests(env, t, table.DigestDir, &table); err != nil {
+		return err
+	}
 	if asJSON {
 		return writeJSON(w, table)
 	}
-	return printInputsTable(w, table)
+	if err := printInputsTable(w, table); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, "digests: %s\n", table.DigestDir)
+	return err
 }
 
 func printInputsTable(w io.Writer, table InputsTable) error {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/config"
@@ -120,4 +121,83 @@ func TestEvolveInputs_TableOutput(t *testing.T) {
 	if !bytes.Contains(out.Bytes(), []byte("context-overrun")) || !bytes.HasPrefix(out.Bytes(), []byte("ID")) {
 		t.Errorf("unexpected table:\n%s", out.String())
 	}
+}
+
+func TestEvolveInputs_WritesDigests(t *testing.T) {
+	t.Parallel()
+	fx := inputsFixture(t)
+	root := t.TempDir()
+	put := func(path, content string) {
+		t.Helper()
+		path = filepath.Join(root, path)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	turn := func(text string) string {
+		return `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"` + text + `"}]}}` + "\n"
+	}
+	put(".claude/projects/p/s1.jsonl", turn("main-s1"))
+	put(".claude/projects/p/s1/subagents/agent-a.jsonl", turn("sub-s1"))
+	put(".claude/projects/p/res-1.jsonl", turn("resolved"))
+	label, _, _ := ralphloop.IterationIdentity("epic", "02", "")
+	put("state/agents/proj/"+label+"/meta.json", `{"session_id":"s2","label":"`+label+`"}`)
+	put("state/agents/proj/"+label+"/out.jsonl", turn("native-s2"))
+	put("codex/sessions/2026/rollout-s3.jsonl",
+		`{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"codex-s3"}]}}`+"\n"+
+			`{"type":"response_item","payload":{"type":"function_call_output","output":"tool noise"}}`+"\n")
+
+	env := fx.env
+	env.homeDir = root
+	env.stateDir = filepath.Join(root, "state")
+	env.codexHome = filepath.Join(root, "codex")
+
+	var out bytes.Buffer
+	if err := runEvolveInputs(env, &out, "proj:epic", true); err != nil {
+		t.Fatal(err)
+	}
+	var table InputsTable
+	if err := json.Unmarshal(out.Bytes(), &table); err != nil {
+		t.Fatal(err)
+	}
+	if table.DigestDir == "" {
+		t.Fatal("no digest dir")
+	}
+	digests := map[string][]InputsDigest{}
+	for _, r := range table.Rows {
+		digests[r.ID] = r.Digests
+	}
+	check := func(id string, i int, session, kind, source, contains string) {
+		t.Helper()
+		if i >= len(digests[id]) {
+			t.Fatalf("ticket %s has %d digests, want index %d", id, len(digests[id]), i)
+		}
+		d := digests[id][i]
+		if d.Session != session || d.Kind != kind || d.Source != source {
+			t.Errorf("ticket %s digest %d = %+v", id, i, d)
+		}
+		if source == "missing" {
+			if d.File != "" {
+				t.Errorf("missing digest has file %q", d.File)
+			}
+			return
+		}
+		b, err := os.ReadFile(filepath.Join(table.DigestDir, d.File))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body := string(b); !strings.Contains(body, contains) || strings.Contains(body, "tool noise") {
+			t.Errorf("ticket %s digest %d body = %q", id, i, body)
+		}
+	}
+	check("01", 0, "s1", "main", "claude", "main-s1")
+	check("01", 1, "s1", "subagent", "claude", "sub-s1")
+	check("02", 0, "s2", "main", "native", "native-s2")
+	check("02", 1, "s2b", "main", "missing", "")
+	check("03", 0, "s3", "main", "codex", "codex-s3")
+	check("04", 0, "land-1", "conflict", "missing", "")
+	check("04", 1, "res-1", "conflict", "claude", "resolved")
 }

@@ -48,6 +48,7 @@ func newEvolveFixture(t *testing.T, mode string, withGx bool, epicFM string) *ev
 	f.env = evolveEnv{
 		storePath: store,
 		cfg:       config.Config{Evolve: mode},
+		tempDir:   t.TempDir(),
 		now:       func() time.Time { return time.Date(2026, 3, 4, 5, 6, 0, 0, time.UTC) },
 		submit: func(_ context.Context, req server.OneOffRequest) (server.OneOffResult, error) {
 			f.sent = append(f.sent, req)

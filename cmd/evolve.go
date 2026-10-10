@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,10 @@ type evolveEnv struct {
 	// landed reports the epic's tickets that carry a Ralph-Loop-Ticket trailer
 	// on its branch; nil when there is no way to ask.
 	landed func(project, epic string) (map[string]bool, error)
+	// homeDir (claude transcripts), stateDir (native agent logs) and codexHome
+	// (rollouts) are where `evolve inputs` finds sessions; "" skips that source.
+	// tempDir is where its digest dir goes ("" = the OS temp dir).
+	homeDir, stateDir, codexHome, tempDir string
 }
 
 // evolveTarget is an epic an evolve verb acts on.
@@ -322,6 +327,15 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 	}
 	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.confirmForce,
 		landed: defaultLanded(cfg.TicketStore.Path)}
+	// Missing dirs only cost digests, which then report "missing".
+	env.homeDir, _ = d.userHomeDir()
+	env.stateDir, _ = config.StateDir()
+	if home, err := os.UserHomeDir(); err == nil {
+		env.codexHome = filepath.Join(home, ".codex")
+	}
+	if v := os.Getenv("CODEX_HOME"); v != "" {
+		env.codexHome = v
+	}
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := ticketRoot(cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)
