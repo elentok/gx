@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.32.3 - 2026-10-10
+
+- Fixed a ticket that blocks on a ticket in another epic: an epic can now complete, because cross-epic blockers are resolved when gx checks whether the epic is done.
+- Fixed a fork that made a ticket commitless: setting it now clears the ticket's base.
+- Fixed a conflict-resolution child with an invalid status: gx now repairs it instead of parking the parent. A repaired child is validated before it is written as done.
+- Fixed the `gx-implement` skill: it loads `TaskStop` via `ToolSearch` before it stops a task.
+- Queue tab: a done or cancelled ticket keeps its address in the view-model queue, so its row stays visible. A queued epic now shows every one of its tickets.
+- Internal: there is now one canonical resolved-epic loader (`tickets.LoadResolved`). The index scan, project epics, runs, ticket writes, iterations queue and the runner all use it, so they see the same resolved epics. Added seam tests for the commitless fork and the conflict-resolution handoff.
+
 ## v0.32.2 - 2026-10-10
 
 - TUI: the help modal now shows the gx version in its bottom-right border. Long modal titles are truncated so they fit next to it.
