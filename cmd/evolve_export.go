@@ -136,11 +136,21 @@ func buildFollowUpBundle(drafts []followUpDraft, now time.Time) string {
 	fmt.Fprintf(&b, "# gx follow-ups — %s\n", now.Format("2006-01-02"))
 	for _, d := range drafts {
 		tk := d.ticket
-		source := strings.Join(strings.Fields(schema.Section(tk.Body, "Source")), " ")
 		fmt.Fprintf(&b, "\n## %s\n\n```\ncategory: %s\ntype: %s\nsource: %s\n```\n\n%s\n",
-			tk.Title, d.category, tk.Type, source, strings.TrimSpace(pushHeadingsDown(tk.Body)))
+			tk.Title, d.category, tk.Type, sourceProject(tk.Body), strings.TrimSpace(pushHeadingsDown(tk.Body)))
 	}
 	return b.String()
+}
+
+// sourceProject is the project of the address that opens a follow-up's Source
+// section. The full section stays in the body.
+func sourceProject(body string) string {
+	fields := strings.Fields(schema.Section(body, "Source"))
+	if len(fields) == 0 {
+		return ""
+	}
+	project, _, _ := strings.Cut(fields[0], ":")
+	return project
 }
 
 // pushHeadingsDown adds one `#` to every ATX heading outside a fenced block.

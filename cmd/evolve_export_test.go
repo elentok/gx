@@ -33,7 +33,7 @@ func addFollowUp(t *testing.T, f *evolveFixture, file, id, extraFM, body string)
 func twoFollowUps(t *testing.T) (*evolveFixture, string, string) {
 	f := newEvolveFixture(t, config.EvolveContributor, true, "")
 	a := addFollowUp(t, f, "01-first-problem.md", "01", "category: bug\n",
-		"## Source\n\nproj:epic/03\n\n## Problem\n\nIt breaks.\n\n```\n# not a heading\n```\n\n## Suggested fix\n\nFix it.\n\n## Evidence\n\nLog.\n")
+		"## Source\n\nproj:epic/03\nfound while reviewing\nthe export\n\n## Problem\n\nIt breaks.\n\n```\n# not a heading\n```\n\n## Suggested fix\n\nFix it.\n\n## Evidence\n\nLog.\n")
 	b := addFollowUp(t, f, "02-second-problem.md", "02", "category: idea\n",
 		"## Source\n\nother:epic/01\n\n## Problem\n\nCould be better.\n\n## Suggested fix\n\nImprove.\n")
 	return f, a, b
@@ -58,11 +58,11 @@ func TestEvolveExport_BundleShapeAndStamp(t *testing.T) {
 	got := out.String()
 	for _, want := range []string{
 		"# gx follow-ups — 2026-03-04\n",
-		"## First problem\n\n```\ncategory: bug\ntype: research\nsource: proj:epic/03\n```\n",
-		"### Source\n",
+		"## First problem\n\n```\ncategory: bug\ntype: research\nsource: proj\n```\n",
+		"### Source\n\nproj:epic/03\nfound while reviewing\nthe export\n",
 		"### Suggested fix\n",
 		"# not a heading\n", // inside a fence: left alone
-		"## Second problem\n\n```\ncategory: idea\ntype: research\nsource: other:epic/01\n```\n",
+		"## Second problem\n\n```\ncategory: idea\ntype: research\nsource: other\n```\n",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("bundle misses %q:\n%s", want, got)
