@@ -596,7 +596,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		s.log.Warn("complete root", "root", root, "err", err)
 		return
 	}
-	epics, err := tickets.Load(dir)
+	epics, err := loadResolved(project, dir)
 	if err != nil {
 		s.log.Warn("complete root", "root", root, "err", err)
 		return

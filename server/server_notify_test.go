@@ -261,3 +261,71 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 		}
 	}
 }
+
+// crossEpicFixture is project "p" with epic "epic" whose two done tickets are
+// blocked_by ref, a qualified ticket address in a second epic of the project
+// whose only ticket, other/01, is done.
+func crossEpicFixture(t *testing.T, s *Server, ref string) {
+	t.Helper()
+	proj := filepath.Join(s.cfg.TicketStore, "p")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "project.json"), []byte(`{"repo":"/x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	write := func(epic, name string, tk schema.Ticket) {
+		dir := filepath.Join(proj, epic, "issues")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.EnsureEpicTicketMD(t, filepath.Dir(dir))
+		out, err := schema.MarshalTicket(tk, "\nbody\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, name), out, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blocked := []schema.TicketID{schema.TicketID(ref)}
+	write("epic", "01-a.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement, BlockedBy: blocked})
+	write("epic", "02-b.md", schema.Ticket{ID: "02", Status: schema.StatusDone, Type: schema.TypeImplement, BlockedBy: blocked})
+	write("other", "01-c.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement})
+}
+
+func TestCompleteRootIfDone_ResolvedCrossEpicBlockersCompleteTheEpic(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	crossEpicFixture(t, s, "other/01")
+
+	s.completeRootIfDone(rootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
+	s.chat.Close()
+	got := wait(1)
+	if len(got) != 1 || !strings.Contains(got[0], "epic complete") || !strings.Contains(got[0], "2 done · 2 total") {
+		t.Fatalf("sends = %v, want one epic-complete message with 2 done · 2 total", got)
+	}
+}
+
+func TestNotifyDone_CrossEpicBlockersDoNotUndercountDoneTickets(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	crossEpicFixture(t, s, "other/01")
+
+	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "")
+	s.chat.Close()
+	got := wait(1)
+	if len(got) != 1 || !strings.Contains(got[0], "2 done · 2 total") {
+		t.Fatalf("sends = %v, want counts 2 done · 2 total", got)
+	}
+}
+
+// A ref that names no ticket stays an error, which is never terminal.
+func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	crossEpicFixture(t, s, "other/99")
+
+	s.completeRootIfDone(rootRef{Project: "p", Epic: "epic"}, ralphloop.OneIteration{Epic: "epic"})
+	s.chat.Close()
+	if got := wait(-1); len(got) != 0 {
+		t.Fatalf("sends = %v, want none", got)
+	}
+}

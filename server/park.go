@@ -48,13 +48,24 @@ func (s *Server) epicCounts(project, epic string) ralphloop.EpicCounts {
 	return ralphloop.CountsOf(e)
 }
 
+// loadResolved loads the project's epics with cross-epic blockers resolved. A
+// plain Load fails closed on them, so a done ticket would read as error and an
+// epic with one could never count as complete.
+func loadResolved(project, dir string) ([]tickets.Epic, error) {
+	epics, err := tickets.Load(dir)
+	if err != nil {
+		return nil, err
+	}
+	return tickets.ResolveCrossEpic(project, epics), nil
+}
+
 // freshEpic loads one epic straight from its project's directory.
 func (s *Server) freshEpic(project, epic string) (tickets.Epic, bool) {
 	dir, err := s.projectDir(project)
 	if err != nil {
 		return tickets.Epic{}, false
 	}
-	epics, err := tickets.Load(dir)
+	epics, err := loadResolved(project, dir)
 	if err != nil {
 		return tickets.Epic{}, false
 	}
