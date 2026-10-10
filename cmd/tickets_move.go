@@ -63,7 +63,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	}
 	defer unlock()
 
-	plan, err := planMove(root, a, src, dstEpic, slug)
+	plan, err := planMove(root, a, src, dstEpic, slug, moveOpts{})
 	if err != nil {
 		return err
 	}
@@ -110,9 +110,20 @@ type movePlan struct {
 	warnings  []string
 }
 
+// moveOpts is what `tickets close` changes about a move. The zero value is a
+// plain `tickets move`.
+type moveOpts struct {
+	// archive is the one exception to move's draft/open, never-run rule: a
+	// ticket on its way into the archive may be done or have run history.
+	archive bool
+	// resolution, when set, cancels the ticket and records it as its
+	// ## Resolution section.
+	resolution string
+}
+
 // planMove runs the refusals and computes the moved ticket, writing nothing.
 // Called with both epic locks held, so what it reads is what applyMove writes.
-func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug string) (movePlan, error) {
+func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug string, opts moveOpts) (movePlan, error) {
 	raw, err := os.ReadFile(src.Path)
 	if err != nil {
 		return movePlan{}, err
@@ -121,11 +132,16 @@ func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 	if err != nil {
 		return movePlan{}, err
 	}
-	if t.Status != schema.StatusDraft && t.Status != schema.StatusOpen {
-		return movePlan{}, moveRefusal(tickets.CodeMoveStatus, "ticket %s is %s; only draft or open tickets move", a.ID, t.Status)
+	if opts.resolution != "" && t.Status != schema.StatusDraft && t.Status != schema.StatusOpen {
+		return movePlan{}, moveRefusal(tickets.CodeCloseStatus, "ticket %s is %s; only draft or open follow-ups close", a.ID, t.Status)
 	}
-	if len(t.SessionIDs) > 0 || t.ResolvedBase != "" || t.IterationStatus != "" {
-		return movePlan{}, moveRefusal(tickets.CodeMoveRunHistory, "ticket %s has run history", a.ID)
+	if !opts.archive {
+		if t.Status != schema.StatusDraft && t.Status != schema.StatusOpen {
+			return movePlan{}, moveRefusal(tickets.CodeMoveStatus, "ticket %s is %s; only draft or open tickets move", a.ID, t.Status)
+		}
+		if len(t.SessionIDs) > 0 || t.ResolvedBase != "" || t.IterationStatus != "" {
+			return movePlan{}, moveRefusal(tickets.CodeMoveRunHistory, "ticket %s has run history", a.ID)
+		}
 	}
 
 	epics, err := tickets.Load(root)
@@ -189,6 +205,10 @@ func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 		p.rewritten = append(p.rewritten, "title: # "+a.ID+" -> # "+newID)
 	}
 
+	if opts.resolution != "" {
+		p.ticket.Status = schema.StatusCancelled
+	}
+
 	if err := schema.Validate(p.ticket); err != nil {
 		return movePlan{}, fmt.Errorf("moved ticket would be invalid: %w", err)
 	}
@@ -197,6 +217,11 @@ func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 	}
 	if err := p.planInbound(root, epics); err != nil {
 		return movePlan{}, err
+	}
+	if opts.resolution != "" {
+		// After planInbound: the resolution names the old address on purpose,
+		// which is no stale prose mention.
+		p.body = schema.SetSection(p.body, "Resolution", opts.resolution)
 	}
 	return p, nil
 }

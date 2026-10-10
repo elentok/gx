@@ -29,6 +29,12 @@ const (
 	CodeMoveSameEpic     = "move-same-epic"
 	CodeMoveCrossProject = "move-cross-project"
 	CodeMoveBrokenProj   = "move-broken-project"
+
+	// `tickets close` refusals (a ticket outside follow-ups is
+	// CodeNotFollowUpsEpic).
+	CodeCloseStatus     = "close-status"
+	CodeCloseReason     = "close-reason"
+	CodeCloseNoteNeeded = "close-note-required"
 )
 
 // AddressError is a refused address with a stable Code.

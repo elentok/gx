@@ -400,6 +400,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	moveCmd.Flags().BoolVar(&moveDryRun, "dry-run", false, "print the plan, write nothing")
 	moveCmd.Flags().BoolVar(&moveJSON, "json", false, "emit {from, to, path, rewritten} JSON")
 	cmd.AddCommand(moveCmd)
+	cmd.AddCommand(newTicketsCloseCmd(d))
 	var filterTicket string
 	var filterEvents []string
 	filterRunLogCmd := newEpicScopedCmd(d, "filter-run-log <epic>",
