@@ -16,6 +16,10 @@ const (
 	CodeUnknownEpic      = "unknown-epic"
 	CodeUnknownTicket    = "unknown-ticket"
 	CodeCategoryRequired = "category-required"
+	CodeNotFollowUpsEpic = "not-follow-ups-epic"
+	CodeSectionRequired  = "section-required"
+	CodeStatusOverride   = "status-override"
+	CodeTypeOverride     = "type-override"
 )
 
 // AddressError is a refused address with a stable Code.

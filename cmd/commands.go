@@ -340,6 +340,32 @@ func newTicketsCmd(d deps) *cobra.Command {
 	addCmd.Flags().StringVar(&addBody, "body", "", "ticket body, or - to read it from stdin; the ticket is written open and printed by address")
 	addCmd.Flags().BoolVar(&addJSON, "json", false, "with --body, emit {address, path} JSON")
 	cmd.AddCommand(addCmd)
+	followUpCmd := &cobra.Command{
+		Use:   "follow-up",
+		Short: "work with follow-ups, the contributor outbox",
+	}
+	var followUpBody string
+	var followUpJSON bool
+	followUpAddCmd := &cobra.Command{
+		Use:   "add <project:epic>",
+		Short: "file one follow-up (draft, research) into a follow-ups epic, enforcing the follow-up format",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			epicPath, _, err := resolveAddTarget(d, args[0], "")
+			if err != nil {
+				return err
+			}
+			body, err := readBodyArg(d, followUpBody)
+			if err != nil {
+				return err
+			}
+			return runTicketsFollowUpAdd(epicPath, body, followUpJSON, c.OutOrStdout())
+		},
+	}
+	followUpAddCmd.Flags().StringVar(&followUpBody, "body", "-", "follow-up body, or - to read it from stdin")
+	followUpAddCmd.Flags().BoolVar(&followUpJSON, "json", false, "emit {address, path} JSON")
+	followUpCmd.AddCommand(followUpAddCmd)
+	cmd.AddCommand(followUpCmd)
 	var sectionJSON bool
 	sectionCmd := &cobra.Command{
 		Use:   "section <addr|path> <heading> <content|->",
