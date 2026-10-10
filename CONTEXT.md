@@ -320,6 +320,19 @@ takes `target`, not `base`.
 **Fix ticket** — a ticket a code-review ticket opens to repair what the review found. Its `parent`
 is the code-review ticket, so it sits in that ticket's fork subtree.
 
+**Follow-up** — a ticket filed for later in a project's `follow-ups` epic, outside any planned epic.
+Unlike a fix ticket it has no parent, and it is not scheduled until it is triaged into a real epic.
+Each follow-up has a **category**: a **bug** (something that works wrongly) or an **idea** (something
+missing or painful). The category is not the ticket's type: the type still picks which skill works
+it. A follow-up leaves the epic in one of two ways: it is **resolved** into a real epic, or it is
+**closed** with a reason (fixed already, obsolete, duplicate, not worth it) and kept in the project's
+**follow-ups archive** so the same finding is not filed again. _Avoid_: process, triage (for the
+whole run).
+
+**Retro** — a look back at one finished loop epic's run, judging the tooling and process (not the
+project's code) and filing follow-ups for what went wrong. An epic gets at most one retro; once it
+has run, or was skipped, the epic counts as retro'd. _Avoid_: evolve run, scan.
+
 **Budget day** — one local calendar day, from midnight to midnight. The run budget is global to the
 server and resets at the start of each budget day.
 
