@@ -79,6 +79,13 @@ func resolveTicketRef(getwd func() (string, error), arg string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
+		root, err := projectRoot(cwd, project)
+		if err != nil {
+			return "", err
+		}
+		return tickets.EpicTicketMDPath(root, project, epic)
+	}
 	_, t, err := findTicket(cwd, arg)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
@@ -90,13 +97,24 @@ func resolveTicketRef(getwd func() (string, error), arg string) (string, error) 
 	return t.Path, nil
 }
 
+// isEpicTicketMD reports whether path is an epic's own ticket.md, the file a
+// project:epic address resolves to.
+func isEpicTicketMD(path string) bool {
+	return filepath.Base(path) == "ticket.md"
+}
+
 // ticketLabel is how output names the ticket at path: its canonical address
 // when path sits in the tracker's <project>/<epic>/issues/<file>.md layout,
-// the path itself for anything else (ad-hoc files have no address).
+// the path itself for anything else (ad-hoc files have no address). An epic's
+// ticket.md is labelled by the epic's own address, project:epic.
 func ticketLabel(path string) string {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return path
+	}
+	if isEpicTicketMD(abs) {
+		epicDir := filepath.Dir(abs)
+		return tickets.ProjectName(filepath.Dir(epicDir)) + ":" + filepath.Base(epicDir)
 	}
 	t, err := schema.ParseTicket(abs)
 	if err != nil {

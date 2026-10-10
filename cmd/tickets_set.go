@@ -65,6 +65,10 @@ Epic frontmatter fields:
 An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
 never scheduled by the server.
 
+` + "`tickets set project:epic`" + ` writes an epic's kind (map, loop), status (draft, open) and
+provisional_destination; completed_at, evolved_at, evolve_skipped and evolve_ticket are
+refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
+
 An epic's ticket.md also holds epic-level timing. Both fields are gx-managed, not
 settable via ` + "`tickets set`" + `, and unset until ralph-loop stamps them.
   started_at (RFC3339 timestamp) — when work on the epic began
@@ -112,9 +116,69 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().String("exported-at", "", "refused: exported_at is gx-managed")
 	_ = cmd.Flags().MarkHidden("exported-at")
 
+	// Epic address only (project:epic): the settable epic fields.
+	cmd.Flags().String("kind", "", "epic only: set kind (map or loop)")
+	cmd.Flags().String("provisional-destination", "", "epic only: set provisional_destination (true/false)")
+	for _, field := range tickets.EpicServerStamped {
+		flag := strings.ReplaceAll(field, "_", "-")
+		cmd.Flags().String(flag, "", "refused: "+field+" is server-stamped")
+		_ = cmd.Flags().MarkHidden(flag)
+	}
+
 	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
 
 	return cmd
+}
+
+// runEpicSet is runTicketsSet for an epic's ticket.md, validated against the
+// epic schema rather than the ticket one. A server-stamped field refuses with
+// tickets.CodeServerStamped before anything is written.
+func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string, error)) error {
+	for _, field := range tickets.EpicServerStamped {
+		if c.Flags().Changed(strings.ReplaceAll(field, "_", "-")) {
+			return &tickets.AddressError{Code: tickets.CodeServerStamped, Msg: fmt.Sprintf("%s: %s is server-stamped and not settable via `tickets set`", ticketLabel(path), field)}
+		}
+	}
+
+	var (
+		update  tickets.EpicUpdate
+		changed []string
+	)
+	if c.Flags().Changed("kind") {
+		v, _ := c.Flags().GetString("kind")
+		update.Kind = &v
+		changed = append(changed, "kind="+v)
+	}
+	if c.Flags().Changed("status") {
+		v, _ := c.Flags().GetString("status")
+		update.Status = &v
+		changed = append(changed, "status="+v)
+	}
+	if c.Flags().Changed("provisional-destination") {
+		v, _ := c.Flags().GetString("provisional-destination")
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("%s: --provisional-destination %q: want true or false", ticketLabel(path), v)
+		}
+		update.ProvisionalDestination = &b
+		changed = append(changed, "provisional_destination="+v)
+	}
+	if len(changed) == 0 {
+		return fmt.Errorf("%s: an epic takes --kind, --status and --provisional-destination", ticketLabel(path))
+	}
+	if err := tickets.UpdateEpicFields(path, update); err != nil {
+		return fmt.Errorf("%s: %w", ticketLabel(path), err)
+	}
+
+	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
+		return writeStamped(w, struct {
+			Address string   `json:"address"`
+			Path    string   `json:"path"`
+			Updated []string `json:"updated"`
+		}{ticketLabel(path), path, changed}, viaDirect, callerActor(getwd))
+	}
+	fmt.Fprintf(w, "%s: updated (%s)\n", ticketLabel(path), strings.Join(changed, ", "))
+	return nil
 }
 
 // ticketSetField is one entry in the ordered flag-to-field table
@@ -197,6 +261,9 @@ func inMapEpic(path string) bool {
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
 func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error)) error {
+	if isEpicTicketMD(path) {
+		return runEpicSet(c, path, w, getwd)
+	}
 	if c.Flags().Changed("exported-at") {
 		return fmt.Errorf("%s: exported_at is gx-managed and not settable via `tickets set`", path)
 	}
