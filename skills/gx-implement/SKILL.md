@@ -63,8 +63,9 @@ Then, while working:
 - **Never run a command that can read stdin**: give `rg`/`grep` an explicit path (`rg foo .`),
   never a bare `cat`. Stdin never closes here, so it hangs forever.
 - **Finish with zero background shells.** If a call was moved to the background, read its output,
-  then stop it (TaskStop) before reporting finished. ralph-loop will not land a ticket while one is
-  open.
+  then stop it (TaskStop) before reporting finished. `TaskStop` is a deferred tool: if it isn't
+  callable, load it first with `ToolSearch` query `select:TaskStop`. ralph-loop will not land a
+  ticket while one is open.
 
 ## Forking when the ticket outgrows budget
 

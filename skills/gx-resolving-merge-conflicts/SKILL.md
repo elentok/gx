@@ -21,4 +21,5 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    process until all commits are rebased.
 
 6. **Finish with zero background shells.** If a call was moved to the background, read its output,
-   then stop it (TaskStop). ralph-loop will not land a ticket while one is open.
+   then stop it (TaskStop). `TaskStop` is a deferred tool: if it isn't callable, load it first with
+   `ToolSearch` query `select:TaskStop`. ralph-loop will not land a ticket while one is open.
