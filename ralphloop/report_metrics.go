@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -106,7 +107,39 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 		}
 		stats.cost += turnCost(l.Usage)
 	}
+	subCost, err := subagentCost(path)
+	if err != nil {
+		return sessionStats{}, err
+	}
+	stats.cost += subCost
 	return stats, nil
+}
+
+// subagentCost sums the cost of the subagent transcripts stored in the
+// "<session>/subagents" directory next to the main transcript at path. They
+// feed cost only: a subagent's context is its own, so it never counts towards
+// the session's peak occupancy.
+func subagentCost(path string) (float64, error) {
+	files, err := filepath.Glob(filepath.Join(strings.TrimSuffix(path, ".jsonl"), "subagents", "*.jsonl"))
+	if err != nil {
+		return 0, err
+	}
+	var cost float64
+	for _, f := range files {
+		lines, ok, err := transcript.ReadAll(f)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			continue
+		}
+		for _, l := range lines {
+			if l.Type == "assistant" {
+				cost += turnCost(l.Usage)
+			}
+		}
+	}
+	return cost, nil
 }
 
 // SessionCost returns the estimated API-equivalent cost of the Claude Code
