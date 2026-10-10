@@ -44,13 +44,16 @@ type ProjectFile struct {
 
 	// The rest are the whitelisted overrides layered over config.json; see
 	// project_overrides.go.
-	Trunk          *string              `json:"trunk"`
-	Landing        *string              `json:"landing"`
-	AutoFFMerge    *bool                `json:"auto-ff-merge"`
-	MaxAgents      *int                 `json:"max-agents"`
-	Agents         *AgentsConfig        `json:"agents"`
-	Skills         *SkillsConfig        `json:"skills"`
-	Notifications  *NotificationsConfig `json:"notifications"`
+	Trunk         *string              `json:"trunk"`
+	Landing       *string              `json:"landing"`
+	AutoFFMerge   *bool                `json:"auto-ff-merge"`
+	MaxAgents     *int                 `json:"max-agents"`
+	Agents        *AgentsConfig        `json:"agents"`
+	Skills        *SkillsConfig        `json:"skills"`
+	Notifications *NotificationsConfig `json:"notifications"`
+	// Evolve false opts the project out of evolve; absent or true follows the
+	// global mode.
+	Evolve         *bool `json:"evolve"`
 	ExecutionQueue *struct {
 		MaxAgentsPerEpic *int `json:"max-agents-per-epic"`
 	} `json:"execution-queue"`

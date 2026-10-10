@@ -21,6 +21,7 @@ var projectKeys = map[string]map[string]bool{
 	"agents":          nil,
 	"skills":          nil,
 	"notifications":   nil,
+	"evolve":          nil,
 	"execution-queue": {"max-agents-per-epic": true},
 }
 

@@ -67,6 +67,12 @@ type Config struct {
 	// AgentRunner is auto, herdr or headless. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
 	AgentRunner string `json:"agent-runner"`
+	// Evolve is off, maintainer or contributor. Unlike agent-runner it is
+	// validated in Load: a guessed mode would file findings to the wrong place.
+	Evolve string `json:"evolve"`
+	// EvolveDeepReadCap bounds the deep-read subagents of one gx-evolve run.
+	// The key is a flat dotted name because "evolve" is already a string.
+	EvolveDeepReadCap int `json:"evolve.deep-read-cap"`
 }
 
 // RecoveryConfig controls the recovery catalog.
@@ -118,6 +124,8 @@ func Default() Config {
 		TicketStore:           DefaultTicketStoreConfig(),
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		AgentRunner:           "auto",
+		Evolve:                EvolveOff,
+		EvolveDeepReadCap:     DefaultEvolveDeepReadCap,
 	}
 }
 
@@ -202,8 +210,10 @@ func Load() (Config, error) {
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
 			LogRetention  *string  `json:"log-retention"`
 		} `json:"server"`
-		AgentRunner *string `json:"agent-runner"`
-		Recovery    *struct {
+		AgentRunner       *string `json:"agent-runner"`
+		Evolve            *string `json:"evolve"`
+		EvolveDeepReadCap *int    `json:"evolve.deep-read-cap"`
+		Recovery          *struct {
 			Enabled    *bool    `json:"enabled"`
 			Disabled   []string `json:"disabled"`
 			FollowUps  *string  `json:"follow-ups"`
@@ -327,6 +337,15 @@ func Load() (Config, error) {
 	}
 	if raw.AgentRunner != nil {
 		cfg.AgentRunner = *raw.AgentRunner
+	}
+	if raw.Evolve != nil {
+		if !validEvolveMode(*raw.Evolve) {
+			return cfg, fmt.Errorf("config %s: evolve must be off, maintainer or contributor, got %q", path, *raw.Evolve)
+		}
+		cfg.Evolve = *raw.Evolve
+	}
+	if raw.EvolveDeepReadCap != nil {
+		cfg.EvolveDeepReadCap = max(*raw.EvolveDeepReadCap, 1)
 	}
 	if raw.Recovery != nil {
 		if raw.Recovery.Enabled != nil {

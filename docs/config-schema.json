@@ -252,6 +252,18 @@
       "default": "auto",
       "description": "How the server runs agents. auto uses herdr when it answers within 2s, else headless. herdr requires herdr to be up; headless requires claude on PATH. Checked when the server starts. Default: auto."
     },
+    "evolve": {
+      "type": "string",
+      "enum": ["off", "maintainer", "contributor"],
+      "default": "off",
+      "description": "What the retro hook does when an epic completes. A project opts out with evolve: false in its project file."
+    },
+    "evolve.deep-read-cap": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 8,
+      "description": "Maximum deep-read subagents in one gx-evolve run."
+    },
     "recovery": {
       "type": "object",
       "description": "Recovery catalog: automatic investigation of parked tickets.",
