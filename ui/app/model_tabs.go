@@ -52,7 +52,8 @@ func (m Model) openNotifyHistory() (Model, tea.Cmd) {
 // hidden pages are not kept up to date, so every switch catches the page up.
 func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 	m, cmd := m.switchToTab(tabVS, prevVS)
-	return m.deliverServerState(), cmd
+	m, deliver := m.deliverServerState()
+	return m, tea.Batch(cmd, deliver)
 }
 
 func (m Model) switchToTab(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {

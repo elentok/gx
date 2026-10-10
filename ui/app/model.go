@@ -218,7 +218,8 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 // current state (or the "no snapshot yet" marker).
 func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
 	entry := m.buildHistoryEntry(viewState)
-	entry.model = m.withServerState(entry.model)
+	// Server-state tabs are never history pages, so the command is dropped.
+	entry.model, _ = m.withServerState(entry.model)
 	return entry
 }
 

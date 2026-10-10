@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/viewmodel"
 )
 
 func newServerQueueModel(t *testing.T, start func(context.Context) error) QueueModel {
@@ -43,11 +44,40 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 		t.Fatalf("view = %s", view)
 	}
 
-	// Coming back clears the banner and reloads.
-	next, cmd = m.Update(ServerUpMsg{})
+	// Coming back clears the banner; rows return with the shell's delivery.
+	next, _ = m.Update(ServerUpMsg{})
 	m = next.(QueueModel)
-	if m.serverDown || cmd == nil {
-		t.Fatalf("up: down=%v cmd=%v", m.serverDown, cmd)
+	if m.serverDown {
+		t.Fatal("still down after ServerUpMsg")
+	}
+	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
+	next, _ = m.WithServerState(&st)
+	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "First") {
+		t.Fatalf("delivered rows not shown after reconnect:\n%s", view)
+	}
+}
+
+// A delivery that lands while the tab still counts the server as down is
+// applied when the tab learns it is back.
+func TestQueueServerDown_DeliveryWhileDownShowsOnReconnect(t *testing.T) {
+	m := newServerQueueModel(t, func(context.Context) error { return nil })
+	next, _ := m.Update(ServerDownMsg{})
+	m = next.(QueueModel)
+
+	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/09", Title: "Ninth", Status: "open"},
+	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/09"}})
+	next, _ = m.WithServerState(&st)
+	m = next.(QueueModel)
+	if len(m.epics) != 0 {
+		t.Fatalf("rows shown while down: %+v", m.epics)
+	}
+
+	next, _ = m.Update(ServerUpMsg{})
+	if view := ansi.Strip(next.(QueueModel).View().Content); !strings.Contains(view, "Ninth") {
+		t.Fatalf("delivered rows not shown after reconnect:\n%s", view)
 	}
 }
 
@@ -83,19 +113,10 @@ func TestQueueServerDown_SOpensStartConfirm(t *testing.T) {
 
 // In server mode the Queue tab shows the server's queue.
 func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
-	api := fakeServerAPI{
-		snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
-			{Address: "gx:alpha/01", Title: "First", Status: "open"},
-			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
-		}},
-		queue: []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}},
-	}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
-	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	m = next.(QueueModel)
-
-	next, _ = m.Update(m.cmdLoadQueue()())
-	m = next.(QueueModel)
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+	}}, []server.QueueItem{{Address: "gx:alpha/02"}, {Address: "gx:alpha/01"}})
 
 	if want := map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}; !reflect.DeepEqual(m.checked, want) {
 		t.Errorf("checked = %v, want the server queue %v", m.checked, want)
@@ -111,14 +132,10 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 // Seam D: a snapshot with two projects renders project-prefixed rows, and "tp"
 // filters them by project.
 func TestQueueServerMode_PrefixesRowsAndFiltersByProject(t *testing.T) {
-	api := fakeServerAPI{snap: server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "blog:beta/01", Title: "Second", Status: "open"},
-	}}, queue: []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}}}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
-	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	next, _ = next.(QueueModel).Update(next.(QueueModel).cmdLoadQueue()())
-	m = next.(QueueModel)
+	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}})
 
 	view := ansi.Strip(m.View().Content)
 	for _, want := range []string{"gx: 01 First", "blog: 01 Second"} {

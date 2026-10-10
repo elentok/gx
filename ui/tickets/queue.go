@@ -31,10 +31,10 @@ type QueueModel struct {
 	checked      map[string]bool
 	checkOrder   map[string]uint64
 	// live is epicName -> ticket identifier -> running state, derived from the
-	// server snapshot (syncServerRunState), so the Queue tab's rows render the
+	// delivered state (syncServerRunState), so the Queue tab's rows render the
 	// running spinner+phase presentation (renderLiveTicketRow).
 	live map[string]map[string]liveTicketState
-	// serverClaimedAt and herdrDown come from the last server load: the claim
+	// serverClaimedAt and herdrDown come from the delivered state: the claim
 	// time of each running ticket, and whether the server can launch agents.
 	serverClaimedAt map[string]time.Time
 	herdrDown       bool
@@ -48,10 +48,9 @@ type QueueModel struct {
 	loaded        bool
 	epics         []tickets.Epic
 	candidates    map[string]bool
-	// autoRefreshStarted guards cmdAutoRefresh's self-perpetuating poll loop
-	// (auto_refresh.go) against being started more than once per QueueModel
-	// instance, mirroring Model.autoRefreshStarted.
-	autoRefreshStarted bool
+	// shared is the last state the app shell delivered, kept while the server
+	// is down so reconnecting can show it before the next delivery.
+	shared *viewmodel.State
 
 	// queueTree owns the Queue tab's selection/scroll/collapse state
 	// (tree.Model[queueNode], see queue_rows.go's buildQueueEntries).
@@ -65,9 +64,8 @@ type QueueModel struct {
 	// is read straight from the model by queueRenderOpts' Label callback at
 	// draw time, not baked into the cached entries — so reusing a cached
 	// tree when none of those four inputs changed is safe even mid-run.
-	// Cuts the CPU cost of cmdAutoRefresh's 2s poll (auto_refresh.go)
-	// rebuilding the full tree from scratch every render even when nothing
-	// on disk changed.
+	// Cuts the CPU cost of rebuilding the full tree from scratch every
+	// render even when nothing changed.
 	entriesCache *queueEntriesCache
 
 	// actionsMenu backs the "m"-triggered suggested-actions menu (see
@@ -158,38 +156,14 @@ type queueEpicsLoadedMsg struct {
 	err   error
 }
 
-// queueServerLoadedMsg is a server-mode load: the server's tickets and its
-// queue, in order.
-type queueServerLoadedMsg struct {
-	epics []tickets.Epic
-	items []server.QueueItem
-	// claimedAt is when the server launched each running ticket, by address.
-	claimedAt map[string]time.Time
-	// herdrDown is the server's own view: it cannot start agents.
-	herdrDown bool
-	budget    server.BudgetStatus
-	err       error
-}
+// queueSpinnerRestartMsg restarts the running spinner on page activation.
+type queueSpinnerRestartMsg struct{}
 
+// cmdLoadQueue reads the store; in server mode there is nothing to load, since
+// the app shell delivers the state (WithServerState).
 func (m QueueModel) cmdLoadQueue() tea.Cmd {
-	if api := m.serverAPI; api != nil {
-		return func() tea.Msg {
-			snap, err := api.Snapshot(context.Background())
-			if err != nil {
-				return queueServerLoadedMsg{err: err}
-			}
-			items, err := api.QueueItems(context.Background())
-			claimedAt := map[string]time.Time{}
-			for _, t := range snap.Tickets {
-				if !t.ClaimedAt.IsZero() {
-					claimedAt[t.Address] = t.ClaimedAt
-				}
-			}
-			return queueServerLoadedMsg{
-				epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap), viewmodel.Scope{}), items: items,
-				claimedAt: claimedAt, herdrDown: snap.HerdrUnavailable, budget: snap.Budget, err: err,
-			}
-		}
+	if m.serverAPI != nil {
+		return nil
 	}
 	scratchDir := scratchDirFor(m.worktreeRoot)
 	return func() tea.Msg {
@@ -224,46 +198,19 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.help, _ = m.help.Update(msg)
 		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		return m, nil
-	case queueServerLoadedMsg:
-		// A failed load leaves the rows as they are: the server-down probe
-		// owns clearing them and showing the banner.
-		if msg.err != nil || m.serverDown {
-			return m, nil
-		}
-		m.serverClaimedAt, m.herdrDown, m.serverBudget = msg.claimedAt, msg.herdrDown, msg.budget
-		m.checked = make(map[string]bool, len(msg.items))
-		m.checkOrder = make(map[string]uint64, len(msg.items))
-		for i, item := range msg.items {
-			m.checked[item.Address] = true
-			m.checkOrder[item.Address] = uint64(i + 1)
-		}
-		return m.updateInner(queueEpicsLoadedMsg{epics: msg.epics})
 	case queueEpicsLoadedMsg:
 		if m.serverDown {
 			return m, nil
 		}
-		m.loaded = true
-		m.epics = msg.epics
-		m.candidates = make(map[string]bool, len(m.checked))
-		for path := range m.checked {
-			m.candidates[path] = true
+		m.applyEpics(msg.epics)
+		return m, nil
+	case queueSpinnerRestartMsg:
+		// The tick chain dies while the tab is hidden, so a claim that arrived
+		// meanwhile would otherwise show no spinner.
+		if len(m.runningEpics) == 0 {
+			return m, nil
 		}
-		if m.search.HasQuery() {
-			m.recomputeQueueSearchMatches()
-		}
-		m.clampSelected()
-		var cmds []tea.Cmd
-		if !m.autoRefreshStarted {
-			m.autoRefreshStarted = true
-			cmds = append(cmds, cmdAutoRefresh())
-		}
-		if m.serverAPI != nil {
-			cmds = append(cmds, m.syncServerRunState())
-		}
-		return m, tea.Batch(cmds...)
-
-	case autoRefreshMsg:
-		return m, tea.Batch(m.cmdLoadQueue(), cmdAutoRefresh())
+		return m, m.implementSpinner.Tick
 	case spinner.TickMsg:
 		return m.handleQueueSpinnerTick(msg)
 	case tea.MouseWheelMsg:
@@ -534,11 +481,14 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueuePreviewBottom:
 			m.previewVP.GotoBottom()
 		case bindingQueueReload:
-			if m.serverAPI != nil && !m.serverDown {
-				// The shell owns the snapshot; it hands the result back as state.
-				return m, func() tea.Msg { return ResnapshotRequestedMsg{} }
+			switch {
+			case m.serverAPI == nil:
+				return m, m.cmdLoadQueue()
+			case m.serverDown:
+				return m, m.cmdServerProbe()
 			}
-			return m, m.cmdLoadQueue()
+			// The shell owns the snapshot; it hands the result back as state.
+			return m, func() tea.Msg { return ResnapshotRequestedMsg{} }
 		case bindingQueuePauseResume:
 			if m.serverAPI != nil {
 				return m.handleServerPauseKey()

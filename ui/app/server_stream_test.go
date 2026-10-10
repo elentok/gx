@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
@@ -26,6 +27,9 @@ type streamFake struct {
 	snapErr   error
 	snapshots int
 	streams   []*fakeStream
+	mode      string
+	queue     []server.QueueItem
+	queueGets int
 }
 
 type fakeStream struct {
@@ -41,7 +45,7 @@ func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
 	if f.snapErr != nil {
 		return server.Snapshot{}, f.snapErr
 	}
-	return server.Snapshot{Seq: f.seq, Tickets: f.tickets}, nil
+	return server.Snapshot{Seq: f.seq, Tickets: f.tickets, Mode: f.mode}, nil
 }
 
 func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
@@ -52,7 +56,23 @@ func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Ev
 	return s.ch, nil
 }
 
-func (f *streamFake) QueueItems(context.Context) ([]server.QueueItem, error) { return nil, nil }
+func (f *streamFake) QueueItems(context.Context) ([]server.QueueItem, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queueGets++
+	return f.queue, nil
+}
+
+func (f *streamFake) Budget(context.Context) (server.BudgetStatus, error) {
+	return server.BudgetStatus{}, nil
+}
+
+// fetches is how many snapshots and queue reads the server has answered.
+func (f *streamFake) fetches() (snapshots, queueGets int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.snapshots, f.queueGets
+}
 
 func (f *streamFake) counts() (snapshots, streams, live int) {
 	f.mu.Lock()
@@ -80,10 +100,10 @@ type stubPage struct {
 func (p *stubPage) Init() tea.Cmd                       { return nil }
 func (p *stubPage) Update(tea.Msg) (tea.Model, tea.Cmd) { return p, nil }
 func (p *stubPage) View() tea.View                      { return tea.NewView("stub") }
-func (p *stubPage) WithServerState(st *viewmodel.State) tea.Model {
+func (p *stubPage) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
 	p.calls++
 	p.last = st
-	return p
+	return p, nil
 }
 
 // harness runs commands the way the runtime would, so a blocked event read
@@ -107,7 +127,8 @@ func (h *harness) run(cmd tea.Cmd) {
 	}
 	go func() {
 		switch msg := cmd().(type) {
-		case nil, serverProbeTickMsg:
+		// A spinner tick re-arms itself, so feeding it back would never go idle.
+		case nil, serverProbeTickMsg, spinner.TickMsg:
 		case tea.BatchMsg:
 			for _, c := range msg {
 				h.run(c)
@@ -144,8 +165,9 @@ func (h *harness) probeUp() {
 func (h *harness) switchTo(tab nav.TabID) {
 	prev := h.m.navState.Active()
 	tabVS := h.m.navState.Switch(nav.ViewState{Tab: tab, WorktreeRoot: h.m.settings.ActiveWorktreePath})
-	next, _ := h.m.applySwitch(tabVS, prev)
+	next, cmd := h.m.applySwitch(tabVS, prev)
 	h.m = next
+	h.run(cmd)
 }
 
 func herdrEvent(seq uint64) server.Event {
@@ -295,13 +317,15 @@ func TestServerStream_ActivePageGetsEachChangeAndCurrentStateOnSwitch(t *testing
 func TestServerStream_BuiltPageGetsNoSnapshotMarkerThenState(t *testing.T) {
 	h, _ := newStreamHarness(t)
 
-	stub := h.m.withServerState(&stubPage{}).(*stubPage)
+	got, _ := h.m.withServerState(&stubPage{})
+	stub := got.(*stubPage)
 	if stub.calls != 1 || stub.last != nil {
 		t.Fatalf("before snapshot: calls=%d last=%v, want the nil marker", stub.calls, stub.last)
 	}
 
 	h.probeUp()
-	stub = h.m.withServerState(&stubPage{}).(*stubPage)
+	got, _ = h.m.withServerState(&stubPage{})
+	stub = got.(*stubPage)
 	if stub.last == nil || stub.last.Seq != 10 {
 		t.Errorf("after snapshot: last = %+v, want seq 10", stub.last)
 	}
@@ -311,7 +335,8 @@ func TestServerStream_BuiltPageGetsNoSnapshotMarkerThenState(t *testing.T) {
 func ticketsTab(h *harness) ticketsui.Model {
 	h.t.Helper()
 	tm := h.m.newTicketsModel(h.m.settings.ActiveWorktreePath, h.m.settings.Settings)
-	next, _ := h.m.withServerState(tm).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	withState, _ := h.m.withServerState(tm)
+	next, _ := withState.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return next.(ticketsui.Model)
 }
 

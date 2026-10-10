@@ -12,9 +12,10 @@ import (
 )
 
 // serverStatePage is a page that renders the shell's shared server state.
-// st is nil until the first snapshot has arrived ("no snapshot yet").
+// st is nil until the first snapshot has arrived ("no snapshot yet"). The
+// command runs while the page is on screen (the Queue tab's spinner loop).
 type serverStatePage interface {
-	WithServerState(st *viewmodel.State) tea.Model
+	WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd)
 }
 
 // serverStream is the shell's one subscription to the server: the shared state
@@ -180,7 +181,8 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m.stream.vm = m.stream.vm.ApplySnapshot(msg.snap)
 		m.stream.loaded = true
 		m, subscribe := m.subscribe(msg.snap.Seq)
-		cmds := []tea.Cmd{subscribe, m.cmdStreamQueue()}
+		m, deliver := m.deliverServerState()
+		cmds := []tea.Cmd{subscribe, m.cmdStreamQueue(), deliver}
 		if firstLoad {
 			// Reading the snapshot is not news, but not being in a registered
 			// project is worth saying once, whichever tab is open.
@@ -189,7 +191,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 				cmds = append(cmds, notify.Info(hint))
 			}
 		}
-		return m.deliverServerState(), tea.Batch(cmds...), true
+		return m, tea.Batch(cmds...), true
 
 	case streamSubscribedMsg:
 		if msg.ctx != m.stream.streamCtx {
@@ -215,7 +217,8 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if text, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
 			cmds = append(cmds, notify.Warning(text))
 		}
-		return m.deliverServerState(), tea.Batch(cmds...), true
+		m, deliver := m.deliverServerState()
+		return m, tea.Batch(append(cmds, deliver)...), true
 
 	case ticketsui.ResnapshotRequestedMsg:
 		// The queue is refetched when the snapshot lands. Down-mode "R" never
@@ -239,7 +242,8 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.stream.vm = m.stream.vm.SetQueue(msg.items)
-		return m.deliverServerState(), nil, true
+		m, deliver := m.deliverServerState()
+		return m, deliver, true
 	}
 	return m, nil, false
 }
@@ -254,21 +258,22 @@ func (m Model) serverState() *viewmodel.State {
 }
 
 // withServerState gives model the current state if it uses server state.
-func (m Model) withServerState(model tea.Model) tea.Model {
+func (m Model) withServerState(model tea.Model) (tea.Model, tea.Cmd) {
 	if p, ok := model.(serverStatePage); ok {
 		return p.WithServerState(m.serverState())
 	}
-	return model
+	return model, nil
 }
 
 // deliverServerState hands the current state to the active page only; hidden
 // pages catch up when they are switched to (see applySwitch).
-func (m Model) deliverServerState() Model {
+func (m Model) deliverServerState() (Model, tea.Cmd) {
 	current := m.activePage()
 	if current.model == nil {
-		return m
+		return m, nil
 	}
-	current.model = m.withServerState(current.model)
+	var cmd tea.Cmd
+	current.model, cmd = m.withServerState(current.model)
 	m.setActivePage(current)
-	return m
+	return m, cmd
 }

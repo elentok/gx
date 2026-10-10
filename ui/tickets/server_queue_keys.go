@@ -12,15 +12,11 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-const serverModePaused = "paused"
-
 // serverDoneMsg reports a finished server write: ok is the success toast, and a
-// refusal or error becomes an error toast. mode is the queue mode the server
-// reported, when the verb returns one.
+// refusal or error becomes an error toast. The new state arrives on the stream.
 type serverDoneMsg struct {
 	ok      string
 	problem string
-	mode    string
 }
 
 // serverPauseStateMsg carries the budget the "p" key reads before deciding
@@ -153,7 +149,7 @@ func (m QueueModel) openServerPauseConfirm(b server.BudgetStatus) QueueModel {
 			case res.Refused:
 				return serverDoneMsg{problem: res.Message}
 			}
-			return serverDoneMsg{ok: "budget pause overridden", mode: "running"}
+			return serverDoneMsg{ok: "budget pause overridden"}
 		}
 	case serverActionResume:
 		prompt = "Resume the queue?"
@@ -175,7 +171,7 @@ func cmdServerQueueMode(ok string, verb func(context.Context) (server.QueueResul
 		case res.Refused:
 			return serverDoneMsg{problem: res.Message}
 		}
-		return serverDoneMsg{ok: ok, mode: res.Mode}
+		return serverDoneMsg{ok: ok}
 	}
 }
 
@@ -192,16 +188,13 @@ func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 		if msg.problem != "" {
 			return m, notify.Error("refused: " + msg.problem), true
 		}
-		if msg.mode != "" {
-			m.paused = msg.mode == serverModePaused
-		}
 		return m, notify.Success(msg.ok), true
 	case serverRemovedMsg:
 		note := notify.Success(fmt.Sprintf("removed %d ticket(s) from the queue", msg.removed))
 		if msg.problem != "" {
 			note = notify.Error(fmt.Sprintf("removed %d, stopped at %s", msg.removed, msg.problem))
 		}
-		return m, tea.Batch(note, m.cmdLoadQueue()), true
+		return m, note, true
 	}
 	return m, nil, false
 }

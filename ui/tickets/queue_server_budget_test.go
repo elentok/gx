@@ -4,25 +4,15 @@ import (
 	"strings"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/keys"
 )
 
 func loadedServerQueueWithBudget(t *testing.T, budget server.BudgetStatus) QueueModel {
 	t.Helper()
-	api := fakeServerAPI{
-		snap: server.Snapshot{Seq: 1, Budget: budget, Tickets: []server.TicketInfo{
-			{Address: "gx:alpha/01", Title: "First", Status: "open"},
-		}},
-		queue: []server.QueueItem{{Address: "gx:alpha/01"}},
-	}
-	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServerLink(api, nil)
-	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	next, _ = next.(QueueModel).Update(m.cmdLoadQueue()())
-	return next.(QueueModel)
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Budget: budget, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	}}, []server.QueueItem{{Address: "gx:alpha/01"}})
+	return m
 }
 
 func TestQueueServerMode_HeaderShowsTodaysSpendOfLimit(t *testing.T) {

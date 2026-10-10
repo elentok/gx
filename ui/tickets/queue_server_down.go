@@ -56,7 +56,7 @@ func (m QueueModel) updateServerDown(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 		}
 		m.serverDown = true
 		// Whatever the queue showed is now stale; it refills on reconnect.
-		m.epics = nil
+		m.epics, m.shared = nil, nil
 		m.clampSelected()
 		return m, m.cmdServerRetryLater(), true
 	case queueServerRetryMsg:
@@ -69,7 +69,13 @@ func (m QueueModel) updateServerDown(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.serverDown = false
-		return m, m.cmdLoadQueue(), true
+		// Rows come back with the shell's next delivery; one that arrived
+		// while down is applied now.
+		if m.shared == nil {
+			return m, nil, true
+		}
+		next, cmd := m.applyServerState()
+		return next, cmd, true
 	case queueServerStartConfirm:
 		start := m.serverStart
 		return m, func() tea.Msg { return queueServerStartedMsg{err: start(context.Background())} }, true

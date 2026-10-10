@@ -181,11 +181,6 @@ func (m Model) cmdServerEnqueue(addrs []string, agent string) tea.Cmd {
 // a fresh snapshot (the tab's "R" and the reloads after a write).
 type ResnapshotRequestedMsg struct{}
 
-type serverQueueMsg struct {
-	items []server.QueueItem
-	err   error
-}
-
 // WithServer connects the tab: rows come from the state the app shell
 // delivers (WithServerState). Without it the tab stays on the server-down
 // fallback (server_refresh.go).
@@ -197,13 +192,13 @@ func (m Model) WithServer(api ServerAPI) Model {
 // WithServerState hands the tab the app shell's shared state; nil means no
 // snapshot has arrived yet, so the tab keeps showing "loading…". While the tab
 // reads the store itself (server down) the shell's state is stale and ignored.
-func (m Model) WithServerState(st *viewmodel.State) tea.Model {
+func (m Model) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
 	if st == nil || m.onFallback() {
-		return m
+		return m, nil
 	}
 	m.vm = *st
 	m.loaded = true
-	return m.applyServerRows()
+	return m.applyServerRows(), nil
 }
 
 // WithCwdProject scopes the tab to the registered project the TUI started in;
@@ -226,14 +221,6 @@ func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
 	return m.applyServerRows(), notify.Info(label)
 }
 
-func (m Model) cmdServerQueue() tea.Cmd {
-	api := m.serverAPI
-	return func() tea.Msg {
-		items, err := api.QueueItems(context.Background())
-		return serverQueueMsg{items: items, err: err}
-	}
-}
-
 // updateServer handles the server-mode messages; ok is false for any other msg.
 func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
@@ -242,28 +229,22 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.problem != "" {
 			note = notify.Error(fmt.Sprintf("enqueued %d, stopped at %s", msg.added, msg.problem))
 		}
-		return m, tea.Batch(note, m.cmdServerQueue()), true
+		return m, note, true
 
 	case serverReplacedMsg:
 		if msg.problem != "" {
 			return m, notify.Error("replace refused: " + msg.problem), true
 		}
-		return m, tea.Batch(notify.Success(fmt.Sprintf("queue replaced with %d ticket(s)", msg.count)), m.cmdServerQueue()), true
+		return m, notify.Success(fmt.Sprintf("queue replaced with %d ticket(s)", msg.count)), true
 
 	case serverDoneMsg:
 		if msg.problem != "" {
 			return m, notify.Error("refused: " + msg.problem), true
 		}
-		return m, tea.Batch(notify.Success(msg.ok), m.cmdServerQueue()), true
+		return m, notify.Success(msg.ok), true
 
 	case serverWriteMsg:
 		return m, msg.toast(), true
-
-	case serverQueueMsg:
-		if msg.err == nil {
-			m.vm = m.vm.SetQueue(msg.items)
-		}
-		return m, nil, true
 	}
 	return m, nil, false
 }

@@ -76,11 +76,10 @@ type queueEntriesCache struct {
 
 // buildQueueEntriesCached returns buildQueueEntries' result, reusing the
 // previous build when none of its inputs changed since the last render.
-// Queue is polled every 2s by cmdAutoRefresh (auto_refresh.go) whether or
-// not anything on disk actually changed, and View() (queue_view.go) must
-// call this on every single render regardless — so without this cache an
-// idle Queue tab left open still redoes the full tree rebuild (icons,
-// labels, per-ticket wave/order computation) forever.
+// View() (queue_view.go) must call this on every single render, and the
+// spinner re-renders it constantly — so without this cache a running Queue tab
+// redoes the full tree rebuild (icons, labels, per-ticket wave/order
+// computation) every frame.
 func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 	if m.entriesCache == nil {
 		return m.buildQueueEntries()

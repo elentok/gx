@@ -1,11 +1,70 @@
 package tickets
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/viewmodel"
 )
+
+// WithServerState hands the tab the app shell's shared state; nil means no
+// snapshot has arrived yet. The returned command starts the running spinner
+// when the tab goes from idle to running.
+func (m QueueModel) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
+	if st == nil || m.serverAPI == nil {
+		return m, nil
+	}
+	m.shared = st
+	if m.serverDown {
+		return m, nil
+	}
+	return m.applyServerState()
+}
+
+// applyServerState rebuilds rows, queue order, claim times, budget, herdr state
+// and queue mode from the shared state.
+func (m QueueModel) applyServerState() (QueueModel, tea.Cmd) {
+	st := m.shared
+	m.serverClaimedAt = map[string]time.Time{}
+	for _, t := range st.Tickets {
+		if !t.ClaimedAt.IsZero() {
+			m.serverClaimedAt[t.Address] = t.ClaimedAt
+		}
+	}
+	m.herdrDown, m.serverBudget = st.HerdrUnavailable, st.Budget
+	m.paused = st.Mode == server.ModePaused
+	m.checked = make(map[string]bool, len(st.Queue))
+	m.checkOrder = make(map[string]uint64, len(st.Queue))
+	for i, addr := range st.Queue {
+		m.checked[addr] = true
+		m.checkOrder[addr] = uint64(i + 1)
+	}
+	m.applyEpics(epicsFromViewModel(*st, viewmodel.Scope{}))
+	return m, m.syncServerRunState()
+}
+
+// applyEpics swaps the rows in and re-derives what hangs off them.
+func (m *QueueModel) applyEpics(epics []gxtickets.Epic) {
+	m.loaded = true
+	m.epics = epics
+	m.candidates = make(map[string]bool, len(m.checked))
+	for path := range m.checked {
+		m.candidates[path] = true
+	}
+	if m.search.HasQuery() {
+		m.recomputeQueueSearchMatches()
+	}
+	m.clampSelected()
+}
+
+// OnPageActivated restarts the spinner loop, which only matters on screen.
+func (m QueueModel) OnPageActivated() tea.Cmd {
+	return func() tea.Msg { return queueSpinnerRestartMsg{} }
+}
 
 // syncServerRunState derives the Queue tab's running state from the server's
 // ticket snapshot: no run happens in-process, so a claimed ticket is the
