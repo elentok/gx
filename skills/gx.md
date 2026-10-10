@@ -51,7 +51,8 @@ reason: cutting a release - running tests, committing a changelog entry, tagging
 deliberate, explicit-invoke-only, never something to trigger on the model's own reading of a
 conversation. `gx-one-off` sets the same flag: the server launches it for `type: prompt` tickets,
 never the model on its own. `gx-evolve` sets it too: the server launches it for `type: evolve`
-retros, never the model on its own. `gx-to-tickets`, `gx-tdd`,
+retros, never the model on its own. `gx-resolve-follow-ups` sets it as well: draining a follow-ups
+epic closes, moves and creates tickets in bulk, so a person starts it, never the model. `gx-to-tickets`, `gx-tdd`,
 `gx-resolving-merge-conflicts`, and `gx-changelog` carry no such flag: it's fine for the model to reach for
 ticket breakdown, TDD guidance, or merge-conflict resolution on its own when a task calls
 for it — e.g. a code-review ticket that needs to spin up follow-up tickets can invoke
@@ -145,6 +146,8 @@ skills/
   gx-one-off/
     SKILL.md
   gx-evolve/
+    SKILL.md
+  gx-resolve-follow-ups/
     SKILL.md
 ```
 
