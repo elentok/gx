@@ -7,10 +7,10 @@ DEMO_WORK  := $(DEMO_DIR)/.work
 DEMO_TAPES := $(DEMO_DIR)/tapes
 
 build:
-	go build -ldflags "-X github.com/elentok/gx/cmd.version=$(shell git describe --tags --always --dirty)" -o gx .
+	go build -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" -o gx .
 
 install:
-	go install -ldflags "-X github.com/elentok/gx/cmd.version=$(shell git describe --tags --always --dirty)" .
+	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
 
 # -timeout=5m: legitimate tests (incl. real-git/production-style) finish in a few seconds each
 # locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. park/resume
