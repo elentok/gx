@@ -104,6 +104,26 @@ func AppendComment(body, entry string) string {
 	return joinBodySections(preamble, sections)
 }
 
+// AppendToSection appends entry as a new paragraph at the end of body's
+// "## heading" section (heading given without the "## "). A body with no such
+// section is returned unchanged.
+func AppendToSection(body, heading, entry string) string {
+	preamble, sections := splitBodySections(body)
+	for i, s := range sections {
+		if strings.TrimSpace(strings.TrimPrefix(s.heading, "## ")) != heading {
+			continue
+		}
+		existing := strings.TrimRight(s.content, "\n")
+		if strings.TrimSpace(existing) == "" {
+			sections[i].content = "\n" + entry + "\n"
+		} else {
+			sections[i].content = existing + "\n\n" + entry + "\n"
+		}
+		return joinBodySections(preamble, sections)
+	}
+	return body
+}
+
 // appendCommentsEntry appends entry under sections' "## Comments" heading,
 // creating that heading if it doesn't exist yet — the shared write DemoteSection
 // and AppendComment both funnel through.

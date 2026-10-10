@@ -120,8 +120,20 @@ func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), "## Comments") || !strings.Contains(string(raw), "Seen again in proj:epic-a/02") {
-		t.Errorf("ticket has no occurrence line:\n%s", raw)
+	_, body, hasFM := schema.SplitFrontmatter(string(raw))
+	if !hasFM {
+		t.Fatalf("no frontmatter:\n%s", raw)
+	}
+	if !strings.Contains(schema.Section(body, "Evidence"), "Seen again in proj:epic-a/02") {
+		t.Errorf("Evidence has no seen-again entry:\n%s", raw)
+	}
+	for _, h := range []string{"Source", "Problem", "Evidence", "Suggested fix"} {
+		if schema.Section(body, h) == "" {
+			t.Errorf("follow-up has no ## %s section", h)
+		}
+	}
+	if tk, perr := schema.ParseTicket(got[0].Path); perr != nil || tk.Category != schema.CategoryBug {
+		t.Errorf("category = %q, %v; want bug", tk.Category, perr)
 	}
 }
 

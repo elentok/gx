@@ -136,10 +136,11 @@ func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) 
 	}
 	path, _, err := writeNewTicket(epicPath, "", class, func(id string) (schema.Ticket, string) {
 		body := fmt.Sprintf(
-			"\n# %s — Follow up on %s (%s)\n\n## What to build\n\n%s\n\nInvestigate %s proposed a %s. Its report:\n\n%s\n\n## Acceptance criteria\n\n- [ ] Proposal assessed and either built or dropped\n",
-			id, from, class, dedupeLine(key), from, class, result,
+			// The dedupe line sits in Evidence, the section a repeat appends to.
+			"\n# %s — Follow up on %s (%s)\n\n## Source\n\nInvestigate ticket %s, which proposed a %s.\n\n## Problem\n\n%s\n\n## Evidence\n\n%s\n\n## Suggested fix\n\nAssess the %s proposal in the Problem section; build it or drop it.\n",
+			id, from, class, from, class, result, dedupeLine(key), class,
 		)
-		return schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusDraft, Type: schema.TypeResearch}, body
+		return schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusDraft, Type: schema.TypeResearch, Category: schema.CategoryBug}, body
 	})
 	return path, err
 }
@@ -161,7 +162,7 @@ func noteOccurrence(epicPath, key string, from tickets.Address) (path string, fo
 			continue
 		}
 		err = schema.UpdateTicketWithBody(f, func(_ *schema.Ticket, b *string) {
-			*b = schema.AppendComment(*b, fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02")))
+			*b = schema.AppendToSection(*b, "Evidence", fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02")))
 		})
 		return f, true, err
 	}
