@@ -482,6 +482,57 @@ func TestServerStream_FailureStreakToastsOnceAndRetriesOnProbeTick(t *testing.T)
 	}
 }
 
+func TestServerStream_FailedResnapshotWithLiveStreamRetriesOncePerProbeTick(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	snapshots := func() int { n, _ := f.fetches(); return n }
+
+	f.mu.Lock()
+	f.snapErr = context.DeadlineExceeded
+	f.mu.Unlock()
+	base := snapshots()
+	h.send(ticketsui.ResnapshotRequestedMsg{})
+	h.pump()
+	if got := snapshots() - base; got != 1 {
+		t.Fatalf("snapshots after failed R = %d, want 1", got)
+	}
+	if _, _, live := f.counts(); live != 1 {
+		t.Fatalf("live streams = %d, want the old stream kept", live)
+	}
+
+	h.probeUp()
+	if got := snapshots() - base; got != 2 {
+		t.Fatalf("snapshots after one probe tick = %d, want 2", got)
+	}
+	h.probeUp()
+	if got := snapshots() - base; got != 3 {
+		t.Fatalf("snapshots after two probe ticks = %d, want 3", got)
+	}
+
+	f.mu.Lock()
+	f.snapErr = nil
+	f.mu.Unlock()
+	h.probeUp()
+	recovered := snapshots()
+	if recovered-base != 4 {
+		t.Fatalf("snapshots after recovery = %d, want 4", recovered-base)
+	}
+	h.probeUp()
+	if got := snapshots(); got != recovered {
+		t.Fatalf("snapshot retried after success: %d -> %d", recovered, got)
+	}
+}
+
+func TestServerStream_NoRetryWhileLinkDown(t *testing.T) {
+	h, _ := newStreamHarness(t)
+	h.probeUp()
+	h.m.stream.snapshotFailing = true
+	h.m.serverConn = ServerConn{State: ServerDown}
+	if h.m.streamWanted() {
+		t.Fatal("a failing snapshot must not be retried while the link is down")
+	}
+}
+
 func TestServerStream_UnregisteredHintComesFromShellOnFirstSnapshotOnly(t *testing.T) {
 	h, _ := newStreamHarness(t) // the temp worktree is not a registered project
 	hints := func(cmd tea.Cmd) int {

@@ -66,13 +66,15 @@ type streamQueueMsg struct {
 	err   error
 }
 
-// streamWanted: the link is up (or read-only) but no stream is live or being
-// set up, so a snapshot must start one. This is also the retry rule after a
-// failed snapshot: the next probe tick finds the shell still stream-less.
+// streamWanted: the link is up (or read-only), no snapshot is in flight, and
+// either no stream is live or being set up, or the last snapshot failed. The
+// second case is the retry rule: a re-snapshot that fails while a stream is
+// live is retried on the next probe tick.
 func (m Model) streamWanted() bool {
 	return m.settings.Server != nil &&
 		m.serverConn.State != ServerDown &&
-		m.stream.streamCtx == nil && !m.stream.snapshotting
+		!m.stream.snapshotting &&
+		(m.stream.streamCtx == nil || m.stream.snapshotFailing)
 }
 
 // startSnapshot requests one snapshot; requests made while one is in flight
