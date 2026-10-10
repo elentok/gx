@@ -31,6 +31,8 @@ type serverStream struct {
 	// snapshotFailing: the last snapshot failed, so further failures stay quiet
 	// until one succeeds.
 	snapshotFailing bool
+	// queueRequested: R asked for the queue order along with the snapshot.
+	queueRequested bool
 
 	// streamCtx is set from the moment a subscription is requested, so a
 	// non-nil value means "a stream is live or being opened".
@@ -160,6 +162,56 @@ func (m Model) streamEffects(e viewmodel.Effect) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
+// onSnapshotErr: the next probe tick retries while the link is still up; only
+// the first failure of a streak toasts.
+func (m Model) onSnapshotErr(err error) (Model, tea.Cmd) {
+	if m.stream.snapshotFailing {
+		return m, nil
+	}
+	m.stream.snapshotFailing = true
+	return m, notify.Error("server snapshot: " + err.Error())
+}
+
+// onSnapshot applies a snapshot. It subscribes only when no stream is live,
+// since the stream already carries what follows; a fresh subscription, an
+// explicit R, or a first load is also when the queue order is fetched (otherwise
+// only queue-changed refetches it).
+func (m Model) onSnapshot(snap server.Snapshot) (Model, tea.Cmd) {
+	m.stream.snapshotFailing = false
+	firstLoad := !m.stream.loaded
+	m.stream.vm = m.stream.vm.ApplySnapshot(snap)
+	m.stream.loaded = true
+
+	var cmds []tea.Cmd
+	fetchQueue := firstLoad || m.stream.queueRequested
+	m.stream.queueRequested = false
+	if m.stream.streamCtx == nil {
+		var subscribe tea.Cmd
+		m, subscribe = m.subscribe(snap.Seq)
+		cmds = append(cmds, subscribe)
+		fetchQueue = true
+	}
+	if fetchQueue {
+		cmds = append(cmds, m.cmdStreamQueue())
+	}
+	m, deliver := m.deliverServerState()
+	cmds = append(cmds, deliver)
+	if firstLoad {
+		cmds = append(cmds, m.firstLoadHint())
+	}
+	return m, tea.Batch(cmds...)
+}
+
+// firstLoadHint: reading the snapshot is not news, but not being in a
+// registered project is worth saying once, whichever tab is open.
+func (m Model) firstLoadHint() tea.Cmd {
+	scope := viewmodel.Scope{CwdProject: cwdProjectName(m.settings.ActiveWorktreePath)}
+	if hint := scope.UnregisteredHint(); hint != "" {
+		return notify.Info(hint)
+	}
+	return nil
+}
+
 // updateServerStream handles the stream's messages whichever tab is active;
 // ok is false for any other msg.
 func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
@@ -170,30 +222,11 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		m.stream.snapshotting = false
 		if msg.err != nil {
-			// The next probe tick retries while the link is still up; only the
-			// first failure of a streak toasts.
-			if m.stream.snapshotFailing {
-				return m, nil, true
-			}
-			m.stream.snapshotFailing = true
-			return m, notify.Error("server snapshot: " + msg.err.Error()), true
+			m, cmd := m.onSnapshotErr(msg.err)
+			return m, cmd, true
 		}
-		m.stream.snapshotFailing = false
-		firstLoad := !m.stream.loaded
-		m.stream.vm = m.stream.vm.ApplySnapshot(msg.snap)
-		m.stream.loaded = true
-		m, subscribe := m.subscribe(msg.snap.Seq)
-		m, deliver := m.deliverServerState()
-		cmds := []tea.Cmd{subscribe, m.cmdStreamQueue(), deliver}
-		if firstLoad {
-			// Reading the snapshot is not news, but not being in a registered
-			// project is worth saying once, whichever tab is open.
-			scope := viewmodel.Scope{CwdProject: cwdProjectName(m.settings.ActiveWorktreePath)}
-			if hint := scope.UnregisteredHint(); hint != "" {
-				cmds = append(cmds, notify.Info(hint))
-			}
-		}
-		return m, tea.Batch(cmds...), true
+		m, cmd := m.onSnapshot(msg.snap)
+		return m, cmd, true
 
 	case streamSubscribedMsg:
 		if msg.ctx != m.stream.streamCtx {
@@ -213,8 +246,16 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		var effect viewmodel.Effect
 		seqBefore := m.stream.vm.Seq
 		m.stream.vm, effect = m.stream.vm.Reduce(msg.ev)
+		var cmds []tea.Cmd
+		if msg.ev.Seq > seqBefore+1 {
+			// A gap: what was missed is unknowable, so the re-snapshot must
+			// open a new subscription rather than keep this one.
+			m = m.cancelStream()
+		} else {
+			cmds = append(cmds, cmdStreamNext(msg.events))
+		}
 		m, effects := m.streamEffects(effect)
-		cmds := []tea.Cmd{cmdStreamNext(msg.events), effects}
+		cmds = append(cmds, effects)
 		// Only an applied event toasts: a replayed duplicate or a gap is not news.
 		if text, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
 			cmds = append(cmds, notify.Warning(text))
@@ -228,6 +269,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if m.serverConn.State == ServerDown {
 			return m, nil, true
 		}
+		m.stream.queueRequested = true
 		m, cmd := m.startSnapshot()
 		return m, cmd, true
 

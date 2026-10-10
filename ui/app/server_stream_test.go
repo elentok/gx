@@ -559,15 +559,52 @@ func TestServerStream_UnregisteredHintComesFromShellOnFirstSnapshotOnly(t *testi
 func TestServerStream_RefreshAsksForOneSnapshotPlusQueue(t *testing.T) {
 	h, f := newStreamHarness(t)
 	h.probeUp()
-	before, _, _ := f.counts()
+	before, queueBefore := f.fetches()
 	h.send(ticketsui.ResnapshotRequestedMsg{})
 	h.send(ticketsui.ResnapshotRequestedMsg{}) // coalesces into the one in flight
 	h.pump()
-	after, _, live := f.counts()
+	after, queueAfter := f.fetches()
 	if after-before != 1 {
 		t.Fatalf("snapshots = %d, want 1", after-before)
 	}
-	if live != 1 {
+	if queueAfter-queueBefore != 1 {
+		t.Fatalf("queue fetches = %d, want 1", queueAfter-queueBefore)
+	}
+	if _, _, live := f.counts(); live != 1 {
 		t.Fatalf("live streams = %d, want 1", live)
+	}
+}
+
+func TestServerStream_EventResnapshotKeepsStreamAndQueue(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	snapsBefore, streamsBefore, _ := f.counts()
+	_, queueBefore := f.fetches()
+
+	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventIterationStarted, Address: "gx:alpha/01"}
+	h.pump()
+
+	snaps, streams, live := f.counts()
+	if snaps-snapsBefore != 1 || streams != streamsBefore || live != 1 {
+		t.Errorf("snapshots+%d streams=%d live=%d, want +1, %d and 1", snaps-snapsBefore, streams, live, streamsBefore)
+	}
+	if _, queue := f.fetches(); queue != queueBefore {
+		t.Errorf("queue fetches = %d, want %d: an event must not refetch the queue", queue, queueBefore)
+	}
+}
+
+func TestServerStream_QueueChangedRefetchesQueueOnce(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	_, queueBefore := f.fetches()
+
+	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventQueueChanged}
+	h.pump()
+
+	if _, queue := f.fetches(); queue-queueBefore != 1 {
+		t.Errorf("queue fetches = %d, want 1", queue-queueBefore)
+	}
+	if _, streams, _ := f.counts(); streams != 1 {
+		t.Errorf("streams = %d, want 1", streams)
 	}
 }

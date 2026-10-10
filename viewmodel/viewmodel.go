@@ -158,8 +158,10 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 	s.Seq = ev.Seq
 
 	// Events carry no claim times, budget or cost, so every event but the
-	// herdr ones is followed by a re-snapshot. The in-place updates below only
-	// make the row react before that snapshot arrives.
+	// herdr ones asks for a re-snapshot. The caller applies it to the live
+	// stream (no resubscribe) and refetches the queue only on queue-changed.
+	// The in-place updates below only make the row react before that snapshot
+	// arrives.
 	switch ev.Type {
 	case server.EventHerdrUnavailable:
 		s.HerdrUnavailable = true
