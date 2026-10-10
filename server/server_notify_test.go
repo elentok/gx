@@ -329,3 +329,25 @@ func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testin
 		t.Fatalf("sends = %v, want none", got)
 	}
 }
+
+// The read path (index scan, then projectEpics) resolves a cross-epic blocker:
+// a done ticket stays done instead of failing closed to error.
+func TestProjectEpics_CrossEpicBlockerReadsAsDone(t *testing.T) {
+	s, _ := chatServer(t, 0, 0)
+	crossEpicFixture(t, s, "other/01")
+	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+		t.Fatal(err)
+	}
+
+	epics, err := s.projectEpics("p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range epics {
+		for _, tk := range e.Tickets {
+			if got := e.RenderedStatus(tk); got != tickets.StatusDone {
+				t.Errorf("%s/%s = %v, want done", e.Name, tk.Identifier, got)
+			}
+		}
+	}
+}

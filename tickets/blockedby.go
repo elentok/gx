@@ -81,3 +81,15 @@ func ResolveCrossEpic(project string, epics []Epic) []Epic {
 	}
 	return out
 }
+
+// LoadResolved is Load plus ResolveCrossEpic: the project's epics (dir holds
+// all of project's epics) with cross-epic blockers resolved. Use it wherever
+// status, blockers or counts are read; a plain Load fails closed on a
+// qualified blocker, so a done ticket would read as error.
+func LoadResolved(project, dir string) ([]Epic, error) {
+	epics, err := Load(dir)
+	if err != nil {
+		return nil, err
+	}
+	return ResolveCrossEpic(project, epics), nil
+}

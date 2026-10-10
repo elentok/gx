@@ -91,7 +91,7 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		epics, err := tickets.Load(dir)
+		epics, err := tickets.LoadResolved(project, dir)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -187,7 +187,7 @@ func (s *Server) projectEpics(project string) ([]tickets.Epic, error) {
 		if epics, ok := s.idx.epicsOf(dir); ok {
 			return epics, nil
 		}
-		return tickets.Load(dir)
+		return tickets.LoadResolved(project, dir)
 	}
 	return nil, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: "no project " + project}
 }

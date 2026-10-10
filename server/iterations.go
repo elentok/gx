@@ -105,7 +105,7 @@ func (s *Server) queue(w http.ResponseWriter, _ *http.Request) {
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		epics, err := tickets.Load(dir)
+		epics, err := tickets.LoadResolved(project, dir)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

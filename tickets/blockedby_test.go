@@ -1,6 +1,10 @@
 package tickets
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestFlagDanglingBlockers_RendersErrorWithValidateMessage(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
@@ -70,5 +74,41 @@ func TestFlagDanglingBlockers_QualifiedRefFailsClosed(t *testing.T) {
 		if got := epic.RenderedStatus(epic.Tickets[0]); got != StatusError {
 			t.Errorf("%s: got %v, want error", name, got)
 		}
+	}
+}
+
+func TestLoadResolved_ResolvesCrossEpicBlockerButFailsClosedOnUnresolved(t *testing.T) {
+	dir := t.TempDir()
+	write := func(epic, name, body string) {
+		issues := filepath.Join(dir, epic, "issues")
+		if err := os.MkdirAll(issues, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(issues, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("a", "01-x.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n")
+	write("b", "01-y.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by: [a/01]\n---\n")
+	write("b", "02-z.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [a/09]\n---\n")
+
+	raw, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := raw[1].RenderedStatus(raw[1].Tickets[0]); got != StatusError {
+		t.Errorf("plain Load b/01 = %v, want error (fails closed)", got)
+	}
+
+	epics, err := LoadResolved("p", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := epics[1]
+	if got := b.RenderedStatus(b.Tickets[0]); got != StatusOpen {
+		t.Errorf("b/01 = %v, want open once a/01 is done", got)
+	}
+	if got := b.RenderedStatus(b.Tickets[1]); got != StatusError {
+		t.Errorf("b/02 = %v, want error for a/09", got)
 	}
 }

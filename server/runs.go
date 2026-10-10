@@ -376,7 +376,7 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 	if err != nil {
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}
-	epics, err := tickets.Load(dir)
+	epics, err := tickets.LoadResolved(addr.Project, dir)
 	if err != nil {
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
 	}

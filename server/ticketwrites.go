@@ -40,7 +40,7 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 	if err != nil {
 		return ticketRef{}, false, nil
 	}
-	epics, err := tickets.Load(projectDir)
+	epics, err := tickets.LoadResolved(addr.Project, projectDir)
 	if err != nil {
 		return ticketRef{}, false, err
 	}
@@ -113,7 +113,7 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if s.herdr.isUnavailable() {
 			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
 		}
-		epics, err := tickets.Load(ref.projectDir)
+		epics, err := tickets.LoadResolved(ref.addr.Project, ref.projectDir)
 		if err != nil {
 			return QueueResult{}, err
 		}

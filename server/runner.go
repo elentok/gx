@@ -245,7 +245,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, e := range tickets.ResolveCrossEpic(addr.Project, loaded) {
+	for _, e := range loaded {
 		if filepath.Base(e.Path) != addr.Epic {
 			continue
 		}
@@ -596,7 +596,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		s.log.Warn("complete root", "root", root, "err", err)
 		return
 	}
-	epics, err := loadResolved(project, dir)
+	epics, err := tickets.LoadResolved(project, dir)
 	if err != nil {
 		s.log.Warn("complete root", "root", root, "err", err)
 		return
