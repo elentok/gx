@@ -50,31 +50,34 @@ type evolveEnv struct {
 type evolveTarget struct {
 	project, name string
 	epic          tickets.Epic
+	// mode is the project's effective evolve mode.
+	mode string
 }
 
 // evolveGuard refuses a verb in maintainer mode with no `gx` project: the retro
-// would have nowhere to file its findings. Every evolve verb goes through it.
-func evolveGuard(env evolveEnv, projectDir string) error {
+// would have nowhere to file its findings. Every evolve verb goes through it. It
+// returns the project's effective evolve mode.
+func evolveGuard(env evolveEnv, projectDir string) (string, error) {
 	pf, err := config.ReadProjectFile(projectDir)
 	if err != nil {
-		return err
+		return "", err
 	}
 	mode := env.cfg.EvolveMode(pf)
 	if err := server.EnsureOutboxProject(env.storePath, mode); err != nil {
-		return err
+		return "", err
 	}
 	if mode != config.EvolveMaintainer {
-		return nil
+		return mode, nil
 	}
 	if _, err := tickets.ProjectDirByName(env.storePath, evolveGxProject); err != nil {
 		var ae *tickets.AddressError
 		if errors.As(err, &ae) && ae.Code == tickets.CodeUnknownProject {
-			return &tickets.AddressError{Code: CodeEvolveNoGxProject,
+			return "", &tickets.AddressError{Code: CodeEvolveNoGxProject,
 				Msg: "evolve is in maintainer mode but there is no `gx` project; register it with `gx project add`"}
 		}
-		return err
+		return "", err
 	}
-	return nil
+	return mode, nil
 }
 
 // resolveEvolveTarget parses "project:epic" (or a bare epic of the cwd project),
@@ -91,7 +94,8 @@ func resolveEvolveTarget(env evolveEnv, arg string) (evolveTarget, error) {
 	if err != nil {
 		return evolveTarget{}, err
 	}
-	if err := evolveGuard(env, dir); err != nil {
+	mode, err := evolveGuard(env, dir)
+	if err != nil {
 		return evolveTarget{}, err
 	}
 	epics, err := tickets.Load(dir)
@@ -100,7 +104,7 @@ func resolveEvolveTarget(env evolveEnv, arg string) (evolveTarget, error) {
 	}
 	for _, e := range epics {
 		if e.Name == name {
-			return evolveTarget{project: project, name: name, epic: e}, nil
+			return evolveTarget{project: project, name: name, epic: e, mode: mode}, nil
 		}
 	}
 	return evolveTarget{}, &tickets.AddressError{Code: tickets.CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q in project %q", name, project)}
@@ -116,7 +120,10 @@ func runEvolveRun(ctx context.Context, env evolveEnv, w, errW io.Writer, arg str
 	if !t.epic.EvolvedAt.IsZero() && !force {
 		return fmt.Errorf("epic %s:%s was already evolved at %s; pass --force to run it again", t.project, t.name, t.epic.EvolvedAt.Format(time.RFC3339))
 	}
-	return submitRetro(ctx, env, w, errW, t.project, t.name)
+	if err := submitRetro(ctx, env, w, errW, t.project, t.name); err != nil {
+		return err
+	}
+	return evolveReminder(env, t.mode, w)
 }
 
 // submitRetro is the submit step `run` and `all` share.
@@ -150,7 +157,7 @@ func runEvolveSkip(env evolveEnv, w io.Writer, arg string) error {
 		return err
 	}
 	fmt.Fprintf(w, "skipped %s:%s\n", t.project, t.name)
-	return nil
+	return evolveReminder(env, t.mode, w)
 }
 
 // evolveAllWindow is how far back `evolve all` looks by default.
@@ -216,11 +223,14 @@ func runEvolveAll(ctx context.Context, env evolveEnv, w, errW io.Writer, since t
 
 	var errs []error
 	found := 0
+	contributor := false
 	for _, dir := range dirs {
-		if err := evolveGuard(env, dir); err != nil {
+		mode, err := evolveGuard(env, dir)
+		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
+		contributor = contributor || mode == config.EvolveContributor
 		cands, err := evolveCandidates(env, dir, since)
 		if err != nil {
 			errs = append(errs, err)
@@ -246,6 +256,9 @@ func runEvolveAll(ctx context.Context, env evolveEnv, w, errW io.Writer, since t
 	}
 	if found == 0 {
 		fmt.Fprintln(w, "no epics to evolve")
+	}
+	if contributor {
+		errs = append(errs, evolveReminder(env, config.EvolveContributor, w))
 	}
 	return errors.Join(errs...)
 }
@@ -320,7 +333,7 @@ func newEvolveCmd(d deps) *cobra.Command {
 	all.Flags().BoolVar(&allProjects, "all-projects", false, "cover every registered project")
 	all.Flags().BoolVar(&yes, "yes", false, "submit without asking")
 
-	cmd.AddCommand(run, skip, all, newEvolveInputsCmd(env))
+	cmd.AddCommand(run, skip, all, newEvolveInputsCmd(env), newEvolveExportCmd(env))
 	return cmd
 }
 

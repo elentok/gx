@@ -263,14 +263,17 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	if err := writeDigests(env, t, table.DigestDir, &table); err != nil {
 		return err
 	}
+	// The JSON is a machine contract, so the reminder stays out of it.
 	if asJSON {
 		return writeJSON(w, table)
 	}
 	if err := printInputsTable(w, table); err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(w, "digests: %s\n", table.DigestDir)
-	return err
+	if _, err := fmt.Fprintf(w, "digests: %s\n", table.DigestDir); err != nil {
+		return err
+	}
+	return evolveReminder(env, t.mode, w)
 }
 
 func printInputsTable(w io.Writer, table InputsTable) error {
