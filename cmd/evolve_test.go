@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -145,5 +146,120 @@ func TestEvolve_MaintainerWithoutGxProjectRefuses(t *testing.T) {
 	withGx := newEvolveFixture(t, config.EvolveMaintainer, true, "")
 	if err := runEvolveRun(context.Background(), withGx.env, &out, &errOut, "proj:epic", false); err != nil {
 		t.Errorf("with a gx project: %v", err)
+	}
+}
+
+// addEpic writes project/name with the given ticket.md frontmatter and ticket file.
+func addEpic(t *testing.T, store, project, name, epicFM, ticketFile string) {
+	t.Helper()
+	epic := filepath.Join(store, project, name)
+	if err := os.MkdirAll(filepath.Join(epic, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(store, project, "project.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(epic, "ticket.md"), []byte("---\nstatus: done\n"+epicFM+"---\n\n# e\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tk := "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n"
+	if err := os.WriteFile(filepath.Join(epic, "issues", ticketFile), []byte(tk), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func sentEpics(f *evolveFixture) []string {
+	var got []string
+	for _, r := range f.sent {
+		got = append(got, r.Unique)
+	}
+	return got
+}
+
+// newEvolveAllFixture's clock is 2026-03-04; the store has one epic per case.
+func newEvolveAllFixture(t *testing.T) *evolveFixture {
+	t.Helper()
+	f := newEvolveFixture(t, config.EvolveContributor, false, "")
+	f.env.cwdProject = "proj"
+	s := f.env.storePath
+	// the fixture's own "epic" has no completed_at: never a candidate.
+	addEpic(t, s, "proj", "recent", "completed_at: 2026-03-01T00:00:00Z\n", "01-a.md")
+	addEpic(t, s, "proj", "old", "completed_at: 2026-01-01T00:00:00Z\n", "01-a.md")
+	addEpic(t, s, "proj", "mapped", "kind: map\ncompleted_at: 2026-03-01T00:00:00Z\n", "01-a.md")
+	addEpic(t, s, "proj", "oneoff", "completed_at: 2026-03-01T00:00:00Z\n", "01-one-off.md")
+	addEpic(t, s, "proj", "evolved", "completed_at: 2026-03-01T00:00:00Z\nevolved_at: 2026-03-02T00:00:00Z\n", "01-a.md")
+	addEpic(t, s, "other", "theirs", "completed_at: 2026-03-02T00:00:00Z\n", "01-a.md")
+	return f
+}
+
+func TestEvolveAll_WindowAndExclusions(t *testing.T) {
+	t.Parallel()
+	f := newEvolveAllFixture(t)
+	f.env.confirm = func(string) (bool, error) { return true, nil }
+	var out, errOut bytes.Buffer
+	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := sentEpics(f), []string{"evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("default window sent %v, want %v", got, want)
+	}
+
+	f.sent = nil
+	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, 90*24*time.Hour, false, false); err != nil {
+		t.Fatal(err)
+	}
+	got := sentEpics(f)
+	sort.Strings(got)
+	if want := []string{"evolve:proj/old", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("wide window sent %v, want %v", got, want)
+	}
+}
+
+func TestEvolveAll_AllProjectsCoversEach(t *testing.T) {
+	t.Parallel()
+	f := newEvolveAllFixture(t)
+	f.env.confirm = func(string) (bool, error) { return true, nil }
+	var out, errOut bytes.Buffer
+	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, true, false); err != nil {
+		t.Fatal(err)
+	}
+	got := sentEpics(f)
+	sort.Strings(got)
+	if want := []string{"evolve:other/theirs", "evolve:proj/recent"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("sent %v, want %v", got, want)
+	}
+}
+
+func TestEvolveAll_YesSkipsPromptAndNoSubmitsNothing(t *testing.T) {
+	t.Parallel()
+	f := newEvolveAllFixture(t)
+	asked := 0
+	f.env.confirm = func(string) (bool, error) { asked++; return false, nil }
+	var out, errOut bytes.Buffer
+	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if asked != 1 || len(f.sent) != 0 {
+		t.Errorf("asked %d, sent %d; want 1 prompt and nothing sent", asked, len(f.sent))
+	}
+
+	asked = 0
+	if err := runEvolveAll(context.Background(), f.env, &out, &errOut, evolveAllWindow, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if asked != 0 || len(f.sent) != 1 {
+		t.Errorf("--yes: asked %d, sent %d; want no prompt and 1 sent", asked, len(f.sent))
+	}
+}
+
+func TestParseEvolveSince(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]time.Duration{"90d": 90 * 24 * time.Hour, "36h": 36 * time.Hour} {
+		if got, err := parseEvolveSince(in); err != nil || got != want {
+			t.Errorf("%q = %v, %v; want %v", in, got, err, want)
+		}
+	}
+	if _, err := parseEvolveSince("soon"); err == nil {
+		t.Error("want an error for a bad duration")
 	}
 }

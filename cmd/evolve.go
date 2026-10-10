@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/apiclient"
@@ -31,7 +33,9 @@ type evolveEnv struct {
 	cfg        config.Config
 	// submit hands the one-off to the server.
 	submit func(context.Context, server.OneOffRequest) (server.OneOffResult, error)
-	now    func() time.Time
+	// confirm asks a yes/no question; `evolve all` asks before each submit.
+	confirm func(string) (bool, error)
+	now     func() time.Time
 }
 
 // evolveTarget is an epic an evolve verb acts on.
@@ -100,7 +104,12 @@ func runEvolveRun(ctx context.Context, env evolveEnv, w, errW io.Writer, arg str
 	if !t.epic.EvolvedAt.IsZero() && !force {
 		return fmt.Errorf("epic %s:%s was already evolved at %s; pass --force to run it again", t.project, t.name, t.epic.EvolvedAt.Format(time.RFC3339))
 	}
-	res, err := env.submit(ctx, server.RetroSubmit(t.project, t.name, env.now()))
+	return submitRetro(ctx, env, w, errW, t.project, t.name)
+}
+
+// submitRetro is the submit step `run` and `all` share.
+func submitRetro(ctx context.Context, env evolveEnv, w, errW io.Writer, project, epic string) error {
+	res, err := env.submit(ctx, server.RetroSubmit(project, epic, env.now()))
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = server.OneOffResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
@@ -130,6 +139,103 @@ func runEvolveSkip(env evolveEnv, w io.Writer, arg string) error {
 	}
 	fmt.Fprintf(w, "skipped %s:%s\n", t.project, t.name)
 	return nil
+}
+
+// evolveAllWindow is how far back `evolve all` looks by default.
+const evolveAllWindow = 30 * 24 * time.Hour
+
+// parseEvolveSince is time.ParseDuration plus a "d" (days) suffix.
+func parseEvolveSince(s string) (time.Duration, error) {
+	if days, ok := strings.CutSuffix(s, "d"); ok {
+		n, err := strconv.Atoi(days)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("invalid --since %q", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return 0, fmt.Errorf("invalid --since %q", s)
+	}
+	return d, nil
+}
+
+// evolveCandidates lists the project's loop epics that completed inside the
+// window and have not been evolved. Maps and one-offs never get a retro.
+func evolveCandidates(env evolveEnv, projectDir string, since time.Duration) ([]tickets.Epic, error) {
+	epics, err := tickets.Load(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	cutoff := env.now().Add(-since)
+	var out []tickets.Epic
+	for _, e := range epics {
+		if e.IsMap || server.IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
+			continue
+		}
+		if e.CompletedAt.IsZero() || e.CompletedAt.Before(cutoff) {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+// runEvolveAll catches up on unevolved epics: it lists them and, unless yes,
+// asks before submitting each through the same path as `run`. One epic's
+// failure doesn't stop the rest; the failures come back joined.
+func runEvolveAll(ctx context.Context, env evolveEnv, w, errW io.Writer, since time.Duration, allProjects, yes bool) error {
+	var dirs []string
+	if allProjects {
+		var err error
+		if dirs, err = tickets.ProjectDirs(env.storePath); err != nil {
+			return err
+		}
+	} else {
+		if env.cwdProject == "" {
+			return errors.New("the current directory is in no project; pass --all-projects")
+		}
+		dir, err := tickets.ProjectDirByName(env.storePath, env.cwdProject)
+		if err != nil {
+			return err
+		}
+		dirs = []string{dir}
+	}
+
+	var errs []error
+	found := 0
+	for _, dir := range dirs {
+		if err := evolveGuard(env, dir); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		cands, err := evolveCandidates(env, dir, since)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		project := tickets.ProjectName(dir)
+		for _, e := range cands {
+			found++
+			addr := project + ":" + e.Name
+			if !yes {
+				ok, err := env.confirm(fmt.Sprintf("Submit a retro for %s (completed %s)?", addr, e.CompletedAt.Format("2006-01-02")))
+				if err != nil {
+					return err
+				}
+				if !ok {
+					continue
+				}
+			}
+			if err := submitRetro(ctx, env, w, errW, project, e.Name); err != nil {
+				errs = append(errs, fmt.Errorf("%s: %w", addr, err))
+			}
+		}
+	}
+	if found == 0 {
+		fmt.Fprintln(w, "no epics to evolve")
+	}
+	return errors.Join(errs...)
 }
 
 func newEvolveCmd(d deps) *cobra.Command {
@@ -173,7 +279,36 @@ func newEvolveCmd(d deps) *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(run, skip)
+	var since string
+	var allProjects, yes bool
+	all := &cobra.Command{
+		Use:   "all [--since <dur>] [--all-projects] [--yes]",
+		Short: "retro every recently completed, un-evolved epic",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			window := evolveAllWindow
+			if since != "" {
+				var err error
+				if window, err = parseEvolveSince(since); err != nil {
+					return err
+				}
+			}
+			e, err := env()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runEvolveAll(ctx, e, c.OutOrStdout(), c.ErrOrStderr(), window, allProjects, yes)
+		},
+	}
+	all.Flags().StringVar(&since, "since", "", "look back this far, e.g. 90d or 720h (default 30d)")
+	all.Flags().BoolVar(&allProjects, "all-projects", false, "cover every registered project")
+	all.Flags().BoolVar(&yes, "yes", false, "submit without asking")
+
+	cmd.AddCommand(run, skip, all)
 	return cmd
 }
 
@@ -182,7 +317,7 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 	if err != nil {
 		return evolveEnv{}, err
 	}
-	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now}
+	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.confirmForce}
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := ticketRoot(cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)

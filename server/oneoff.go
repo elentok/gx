@@ -473,6 +473,17 @@ func isOneOffTicket(ticketPath string) bool {
 	return filepath.Base(ticketPath) == oneOffFile
 }
 
+// IsOneOffEpic reports whether e is a one-off: its single ticket is the one
+// writeOneOffTicket wrote.
+func IsOneOffEpic(e tickets.Epic) bool {
+	for _, t := range e.Tickets {
+		if isOneOffTicket(t.FilePath()) {
+			return true
+		}
+	}
+	return false
+}
+
 // writeOneOffTicket creates the epic directory and its single ticket. The
 // directory creation is the uniqueness check: an existing epic is os.ErrExist.
 func writeOneOffTicket(projectDir, epic string, tk schema.Ticket, prompt string) error {
