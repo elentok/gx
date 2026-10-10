@@ -373,6 +373,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Pending = s.pendingRows()
+	snap.Mode = s.pause.currentMode()
 	_ = json.NewEncoder(w).Encode(snap)
 }
 

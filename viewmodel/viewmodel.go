@@ -53,6 +53,9 @@ type State struct {
 	// Pending is each queue entry's explain verdict, as the last snapshot
 	// delivered it.
 	Pending []server.PendingRow
+	// Mode is the queue mode (server.ModeRunning, ModePaused or ModeDraining)
+	// from the last snapshot.
+	Mode string
 	// CwdProject is the registered project the TUI started in; "" when the cwd
 	// is not in one. It survives snapshots.
 	CwdProject string
@@ -119,7 +122,8 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Tickets:          slices.Clone(snap.Tickets),
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
-		CwdProject:       s.CwdProject,
+		Mode:             snap.Mode,
+		CwdProject:      s.CwdProject,
 		AllProjects:      s.AllProjects,
 	}
 	for _, t := range next.Tickets {

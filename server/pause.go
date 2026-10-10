@@ -65,6 +65,13 @@ func (p *pauseState) blocked() bool {
 	return p.paused || p.draining
 }
 
+// currentMode is mode for callers that do not already hold the lock.
+func (p *pauseState) currentMode() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.mode()
+}
+
 func (p *pauseState) mode() string {
 	switch {
 	case p.paused:

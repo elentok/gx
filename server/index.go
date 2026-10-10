@@ -62,6 +62,9 @@ type Snapshot struct {
 	// Pending is every queue entry with its explain verdict, so a client never
 	// asks per row. Filled in by the handler, like HerdrUnavailable.
 	Pending []PendingRow `json:"pending"`
+	// Mode is ModeRunning, ModePaused or ModeDraining; filled in by the handler.
+	// Empty from a server that predates it.
+	Mode string `json:"mode,omitempty"`
 }
 
 // index is the server's in-memory view of the ticket store.

@@ -81,6 +81,13 @@ func TestReduce_QueueChangedRefetchesQueue(t *testing.T) {
 	}
 }
 
+func TestApplySnapshot_CarriesQueueMode(t *testing.T) {
+	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 20, Mode: server.ModeDraining})
+	if s.Mode != server.ModeDraining {
+		t.Fatalf("mode = %q", s.Mode)
+	}
+}
+
 func TestApplySnapshot_KeepsIterationsOnlyForClaimedTickets(t *testing.T) {
 	s := reduce(t, snapshot(),
 		server.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:e/01"},

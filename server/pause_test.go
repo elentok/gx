@@ -84,6 +84,32 @@ func TestDrain_StartsNothingNewAndEndsOnResume(t *testing.T) {
 	expectRun(t, h)
 }
 
+func TestSnapshot_ReportsQueueMode(t *testing.T) {
+	h := startPauseHarness(t)
+	ctx := context.Background()
+	steps := []struct {
+		name string
+		do   func(context.Context) (server.QueueResult, error)
+		want string
+	}{
+		{"initial", nil, server.ModeRunning},
+		{"pause", h.Client.QueuePause, server.ModePaused},
+		{"resume", h.Client.QueueResume, server.ModeRunning},
+		{"drain", h.Client.QueueDrain, server.ModeDraining},
+	}
+	for _, st := range steps {
+		if st.do != nil {
+			if _, err := st.do(ctx); err != nil {
+				t.Fatalf("%s: %v", st.name, err)
+			}
+		}
+		snap, err := h.Client.Snapshot(ctx)
+		if err != nil || snap.Mode != st.want {
+			t.Fatalf("%s: mode = %q, %v; want %q", st.name, snap.Mode, err, st.want)
+		}
+	}
+}
+
 func TestQueuePaused(t *testing.T) {
 	dir := t.TempDir()
 	if paused, err := server.QueuePaused(dir); err != nil || paused {
