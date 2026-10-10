@@ -98,7 +98,11 @@ func (s *Server) addProject(req AddProjectRequest) (AddProjectResult, error) {
 	}
 	for _, dir := range dirs {
 		if tickets.ProjectName(dir) == name {
-			return refuseAdd(ReasonNameTaken, "a project named "+name+" already exists")
+			msg := "a project named " + name + " already exists"
+			if pf, err := config.ReadProjectFile(dir); err == nil && pf.VCS != nil && *pf.VCS == config.VCSNone {
+				msg += "; to turn that ticket-only project into this clone, run gx project set-path " + name + " <clone>"
+			}
+			return refuseAdd(ReasonNameTaken, msg)
 		}
 	}
 	pf := config.ProjectFile{Name: &name, Repo: &repo}

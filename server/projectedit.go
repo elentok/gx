@@ -90,12 +90,13 @@ func (s *Server) setProjectPath(req ProjectRequest) (ProjectResult, error) {
 		return ProjectResult{}, err
 	}
 	repo := canonicalDir(req.Path)
-	if pf.VCS == nil || *pf.VCS != config.VCSNone {
-		info, err := git.FindRepo(req.Path)
-		if err != nil {
-			return refuseProject(ReasonNotRepo, req.Path+" is not a git repo")
-		}
+	info, gitErr := git.FindRepo(req.Path)
+	if gitErr == nil {
 		repo = canonicalDir(info.Root)
+		// The outbox became a real clone, so its tickets can commit.
+		pf.VCS = nil
+	} else if pf.VCS == nil || *pf.VCS != config.VCSNone {
+		return refuseProject(ReasonNotRepo, req.Path+" is not a git repo")
 	}
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
