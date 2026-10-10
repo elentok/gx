@@ -61,8 +61,11 @@ func newServerShellOn(t *testing.T, client ServerClient, tab nav.TabID) Model {
 		Server:             &ServerDeps{Client: client, Build: "test"},
 	})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	// Deliver the tab's initial load so it leaves "loading…".
-	next, _ = next.Update(next.(Model).activePage().model.Init()())
+	// Deliver the tab's initial load so it leaves "loading…". The Tickets tab
+	// has none: the shell's stream feeds it.
+	if init := next.(Model).activePage().model.Init(); init != nil {
+		next, _ = next.Update(init())
+	}
 	return next.(Model)
 }
 

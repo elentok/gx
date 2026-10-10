@@ -28,13 +28,14 @@ func TestRefresh_FollowsConnection(t *testing.T) {
 		t.Fatal("going down must start the fallback watch and poll")
 	}
 
+	// The shell re-snapshots on reconnect and delivers; the tab fetches nothing.
 	next, cmd = m.Update(ServerUpMsg{})
 	m = next.(Model)
 	if m.onFallback() {
 		t.Fatal("reconnected tab is on the fallback")
 	}
-	if cmd == nil {
-		t.Fatal("reconnecting must re-snapshot")
+	if cmd != nil {
+		t.Fatal("reconnecting must not fetch a snapshot itself")
 	}
 }
 

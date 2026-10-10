@@ -126,24 +126,38 @@ func newServerModel(t *testing.T) Model {
 	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{})
 }
 
+// withState hands the tab the state the app shell would deliver for snap.
+func withState(m Model, snap server.Snapshot) Model {
+	st := viewmodel.State{}.ApplySnapshot(snap)
+	return m.WithServerState(&st).(Model)
+}
+
 func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {
-	m := newServerModel(t)
 	snap := server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Fork", Status: "open", Parent: "gx:alpha/01"},
 	}}
-	next, cmd, ok := m.updateServer(serverSnapshotMsg{snap: snap})
-	if !ok || cmd == nil {
-		t.Fatalf("snapshot not handled: ok=%v cmd=%v", ok, cmd)
+	m := withState(newServerModel(t), snap)
+	if len(m.epics) != 1 || len(m.epics[0].Tickets) != 2 {
+		t.Fatalf("epics = %+v", m.epics)
 	}
-	if len(next.epics) != 1 || len(next.epics[0].Tickets) != 2 {
-		t.Fatalf("epics = %+v", next.epics)
-	}
+}
 
-	// An event the reducer applies changes the rows without a disk read.
-	next, _, _ = next.updateServer(serverEventMsg{ev: server.Event{Seq: 5, Type: server.EventTicketDone, Address: "gx:alpha/01"}})
-	if got := next.epics[0].Tickets[0].Status; got != "done" {
-		t.Fatalf("status after event = %q", got)
+func TestServerMode_NoStateKeepsLoading(t *testing.T) {
+	m := newServerModel(t)
+	if cmd := m.Init(); cmd != nil {
+		t.Fatal("Init fetched; the shell's stream delivers the state")
+	}
+	next, _ := m.WithServerState(nil).(Model).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	if m := next.(Model); m.loaded || !strings.Contains(m.View().Content, "loading…") {
+		t.Fatalf("loaded=%v, want the loading… state", m.loaded)
+	}
+}
+
+func TestServerMode_ResnapshotRequestFromRefresh(t *testing.T) {
+	msg := newServerModel(t).cmdLoad()()
+	if _, ok := msg.(ResnapshotRequestedMsg); !ok {
+		t.Fatalf("refresh msg = %T, want ResnapshotRequestedMsg", msg)
 	}
 }
 
@@ -153,7 +167,7 @@ var scopeSnap = server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
 }}
 
 func TestServerMode_ScopesToCwdProjectAndToggles(t *testing.T) {
-	m, _, _ := newServerModel(t).WithCwdProject("gx").updateServer(serverSnapshotMsg{snap: scopeSnap})
+	m := withState(newServerModel(t).WithCwdProject("gx"), scopeSnap)
 	if len(m.epics) != 1 || m.epics[0].Name != "gx:alpha" {
 		t.Fatalf("scoped epics = %+v", m.epics)
 	}
@@ -163,95 +177,33 @@ func TestServerMode_ScopesToCwdProjectAndToggles(t *testing.T) {
 	}
 }
 
-func TestServerMode_ScopeToggleSurvivesSnapshotAndEvents(t *testing.T) {
-	m, _, _ := newServerModel(t).WithCwdProject("gx").updateServer(serverSnapshotMsg{snap: scopeSnap})
+func TestServerMode_ScopeToggleSurvivesDeliveredState(t *testing.T) {
+	m := withState(newServerModel(t).WithCwdProject("gx"), scopeSnap)
 	next, _ := m.toggleProjectScope()
-	m = next.(Model)
 
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: scopeSnap})
+	m = withState(next.(Model), scopeSnap)
 	if got := len(m.epics); got != 2 {
-		t.Fatalf("epics after snapshot = %d, want 2 (still all projects)", got)
-	}
-	m, _, _ = m.updateServer(serverEventMsg{
-		ev:     server.Event{Seq: scopeSnap.Seq + 1, Type: server.EventTicketDone, Address: "gx:alpha/01"},
-		events: m.streamEvents,
-	})
-	if got := len(m.epics); got != 2 {
-		t.Fatalf("epics after event = %d, want 2 (still all projects)", got)
+		t.Fatalf("epics after delivery = %d, want 2 (still all projects)", got)
 	}
 }
 
 func TestServerMode_OutsideProjectShowsAllWithHint(t *testing.T) {
-	m, cmd, _ := newServerModel(t).WithCwdProject("").updateServer(serverSnapshotMsg{snap: scopeSnap})
+	m := withState(newServerModel(t).WithCwdProject(""), scopeSnap)
 	if len(m.epics) != 2 {
 		t.Fatalf("epics = %d, want all", len(m.epics))
 	}
+	_, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	if got := toastsOf(cmd); len(got) != 1 || !strings.Contains(got[0].Message, "gx project add .") {
 		t.Fatalf("hint toasts = %+v", got)
 	}
 }
 
-func TestServerMode_GapAndReconnectResnapshot(t *testing.T) {
+func TestServerMode_StaleStateIsIgnoredWhileOnFallback(t *testing.T) {
 	m := newServerModel(t)
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Seq: 4}})
-
-	// A seq gap asks for a re-snapshot.
-	_, cmd, _ := m.updateServer(serverEventMsg{ev: server.Event{Seq: 9, Type: server.EventQueueChanged}})
-	if cmd == nil {
-		t.Fatal("gap produced no command")
-	}
-
-	// The stream ending (reconnect) re-snapshots.
-	_, cmd, ok := m.updateServer(serverStreamEndedMsg{})
-	if !ok || cmd == nil {
-		t.Fatal("stream end produced no command")
-	}
-	if _, isSnap := cmd().(serverSnapshotMsg); !isSnap {
-		t.Fatalf("stream end cmd did not fetch a snapshot")
-	}
-}
-
-// streamAPI hands out a fresh event stream per Events call and records each
-// subscription's context, so a test can see which streams were cancelled.
-type streamAPI struct {
-	fakeServerAPI
-	ctxs *[]context.Context
-}
-
-func (s streamAPI) Events(ctx context.Context, _ uint64) (<-chan server.Event, error) {
-	*s.ctxs = append(*s.ctxs, ctx)
-	return make(chan server.Event), nil
-}
-
-func TestServerMode_ResnapshotReplacesTheEventStream(t *testing.T) {
-	var ctxs []context.Context
-	m := newServerModel(t).WithServer(streamAPI{ctxs: &ctxs})
-	subscribe := func(m Model) (Model, <-chan server.Event) {
-		t.Helper()
-		m, cmd, _ := m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Seq: m.vm.Seq}})
-		var sub serverSubscribedMsg
-		for _, c := range cmd().(tea.BatchMsg) {
-			if msg, ok := c().(serverSubscribedMsg); ok {
-				sub = msg
-			}
-		}
-		m, _, _ = m.updateServer(sub)
-		return m, sub.events
-	}
-
-	m, first := subscribe(m)
-	m, _ = subscribe(m)
-
-	if len(ctxs) != 2 || ctxs[0].Err() == nil || ctxs[1].Err() != nil {
-		t.Fatalf("first stream must be cancelled, second live: %d subscriptions", len(ctxs))
-	}
-	// The old stream's leftovers neither keep it read nor resnapshot.
-	ev := server.Event{Seq: m.vm.Seq + 1, Type: server.EventTicketChanged}
-	if _, cmd, _ := m.updateServer(serverEventMsg{ev: ev, events: first}); cmd != nil {
-		t.Fatal("event from a replaced stream produced a command")
-	}
-	if _, cmd, _ := m.updateServer(serverStreamEndedMsg{events: first}); cmd != nil {
-		t.Fatal("end of a replaced stream produced a command")
+	next, _ := m.Update(ServerDownMsg{})
+	m = withState(next.(Model), scopeSnap)
+	if m.loaded || len(m.epics) != 0 {
+		t.Fatalf("fallback tab took the shell's stale state: loaded=%v epics=%d", m.loaded, len(m.epics))
 	}
 }
 
@@ -273,52 +225,13 @@ func toastsOf(cmd tea.Cmd) []notify.NotifyMsg {
 	return nil
 }
 
-func closedEvents() <-chan server.Event {
-	ch := make(chan server.Event)
-	close(ch)
-	return ch
-}
-
-func TestServerMode_ToastsFromLiveEventsOnly(t *testing.T) {
-	m := newServerModel(t)
-	snap := server.Snapshot{Seq: 4, Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"},
-	}}
-
-	// A snapshot holding a parked ticket is state, not news.
-	m, cmd, _ := m.updateServer(serverSnapshotMsg{snap: snap})
-	if got := toastsOf(cmd); len(got) != 0 {
-		t.Fatalf("snapshot toasted: %+v", got)
-	}
-
-	// A live park event toasts once.
-	park := server.Event{Seq: 5, Type: server.EventIterationParked, Address: "gx:alpha/01"}
-	m.streamEvents = closedEvents()
-	m, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: m.streamEvents})
-	if got := toastsOf(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {
-		t.Fatalf("live park toasts = %+v", got)
-	}
-
-	// The same event replayed after a reconnect is a duplicate: no toast.
-	_, cmd, _ = m.updateServer(serverEventMsg{ev: park, events: m.streamEvents})
-	if got := toastsOf(cmd); len(got) != 0 {
-		t.Fatalf("replayed event toasted: %+v", got)
-	}
-
-	// A reconnect re-snapshot toasts nothing either.
-	_, cmd, _ = m.updateServer(serverSnapshotMsg{snap: snap})
-	if got := toastsOf(cmd); len(got) != 0 {
-		t.Fatalf("re-snapshot toasted: %+v", got)
-	}
-}
-
 func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	m := newServerModel(t)
 	snap := server.Snapshot{Seq: 1,
 		Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "open"}},
 		Pending: []server.PendingRow{{Address: "gx:alpha/01", Verdict: "blocked", Reason: "waiting on 00"}},
 	}
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: snap})
+	m = withState(m, snap)
 
 	var body []string
 	for _, e := range m.buildSidebarEntries() {
@@ -336,10 +249,10 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 func TestServerMode_EnqueueKeyPicksAgent(t *testing.T) {
 	var adds []server.QueueItem
 	m := newServerModel(t).WithServer(fakeServerAPI{adds: &adds})
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "done"},
-	}}})
+	}})
 	m.checked = map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}
 
 	next, _ := m.handleServerEnqueueKey()
@@ -375,9 +288,9 @@ func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
 	var replaced []server.QueueItem
 	api := fakeServerAPI{replaced: &replaced}
 	m := newServerModel(t).WithServer(api)
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-	}}})
+	}})
 	m.checked = map[string]bool{"gx:alpha/01": true}
 
 	next, _ := m.handleServerReplaceKey()
@@ -411,10 +324,10 @@ func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls}
 	m := newServerModel(t).WithServer(api)
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "needs-repair"},
-	}}})
+	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
 
@@ -457,9 +370,9 @@ func serverModelWithTicketFile(t *testing.T) (Model, string) {
 		t.Fatal(err)
 	}
 	m := newServerModel(t)
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file},
-	}}})
+	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return selectTicketRow(t, updated.(Model)), file
 }
@@ -509,9 +422,9 @@ func (f fakeServerAPI) TicketChanged(_ context.Context, address string) error {
 func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
 	m := newServerModel(t).WithServer(api)
-	m, _, _ = m.updateServer(serverSnapshotMsg{snap: server.Snapshot{Tickets: []server.TicketInfo{
+	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
-	}}})
+	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})

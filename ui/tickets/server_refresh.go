@@ -61,7 +61,8 @@ func (m Model) updateServerLink(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if m.serverLink == ServerLinkDown {
 			m.serverLink = ServerLinkUp
 		}
-		return m, m.cmdServerSnapshot(), true
+		// The shell re-snapshots on the same probe and delivers the result.
+		return m, nil, true
 
 	case fallbackPollMsg:
 		if msg.gen != m.fallbackGen || m.fallbackStop == nil {

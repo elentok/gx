@@ -241,7 +241,7 @@ func (m Model) cmdLoad() tea.Cmd {
 	if m.serverAPI == nil || m.onFallback() {
 		return m.cmdLoadDisk()
 	}
-	return m.cmdServerSnapshot()
+	return func() tea.Msg { return ResnapshotRequestedMsg{} }
 }
 
 // cmdRefresh reloads .scratch/ from disk, matching every other tab's manual

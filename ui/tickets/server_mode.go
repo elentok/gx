@@ -177,41 +177,35 @@ func (m Model) cmdServerEnqueue(addrs []string, agent string) tea.Cmd {
 	}
 }
 
-type serverSnapshotMsg struct {
-	snap server.Snapshot
-	err  error
-}
-
-type serverSubscribedMsg struct {
-	ctx    context.Context
-	events <-chan server.Event
-	err    error
-}
-
-type serverEventMsg struct {
-	ev     server.Event
-	events <-chan server.Event
-}
-
-// serverStreamEndedMsg: the stream closed (server dropped us, restarted, or
-// went away). Whatever we missed is unknowable, so re-snapshot.
-type serverStreamEndedMsg struct {
-	events <-chan server.Event
-}
-
-type serverRetryMsg struct{}
+// ResnapshotRequestedMsg asks the app shell, which owns the server stream, for
+// a fresh snapshot (the tab's "R" and the reloads after a write).
+type ResnapshotRequestedMsg struct{}
 
 type serverQueueMsg struct {
 	items []server.QueueItem
 	err   error
 }
 
-// WithServer connects the tab: rows come from the view model fed by the
-// server's snapshot and event stream. Without it the tab stays on the
-// server-down fallback (server_refresh.go).
+// WithServer connects the tab: rows come from the state the app shell
+// delivers (WithServerState). Without it the tab stays on the server-down
+// fallback (server_refresh.go).
 func (m Model) WithServer(api ServerAPI) Model {
 	m.serverAPI = api
 	return m
+}
+
+// WithServerState hands the tab the app shell's shared state; nil means no
+// snapshot has arrived yet, so the tab keeps showing "loading…". While the tab
+// reads the store itself (server down) the shell's state is stale and ignored.
+func (m Model) WithServerState(st *viewmodel.State) tea.Model {
+	if st == nil || m.onFallback() {
+		return m
+	}
+	firstLoad := !m.loaded
+	m.vm = *st
+	m.loaded = true
+	m.hintPending = firstLoad && m.scopeKnown && m.scope.UnregisteredHint() != ""
+	return m.applyServerRows()
 }
 
 // WithCwdProject scopes the tab to the registered project the TUI started in;
@@ -235,39 +229,6 @@ func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
 	return m.applyServerRows(), notify.Info(label)
 }
 
-func (m Model) cmdServerSnapshot() tea.Cmd {
-	api := m.serverAPI
-	return func() tea.Msg {
-		snap, err := api.Snapshot(context.Background())
-		return serverSnapshotMsg{snap: snap, err: err}
-	}
-}
-
-// subscribe replaces the current event stream with a new one from since:
-// the old stream is cancelled, so it can never deliver into this model again.
-func (m Model) subscribe(since uint64) (Model, tea.Cmd) {
-	if m.streamStop != nil {
-		m.streamStop()
-	}
-	ctx, stop := context.WithCancel(context.Background())
-	m.streamCtx, m.streamStop, m.streamEvents = ctx, stop, nil
-	api := m.serverAPI
-	return m, func() tea.Msg {
-		ch, err := api.Events(ctx, since)
-		return serverSubscribedMsg{ctx: ctx, events: ch, err: err}
-	}
-}
-
-func cmdServerNextEvent(events <-chan server.Event) tea.Cmd {
-	return func() tea.Msg {
-		ev, ok := <-events
-		if !ok {
-			return serverStreamEndedMsg{events: events}
-		}
-		return serverEventMsg{ev: ev, events: events}
-	}
-}
-
 func (m Model) cmdServerQueue() tea.Cmd {
 	api := m.serverAPI
 	return func() tea.Msg {
@@ -276,71 +237,9 @@ func (m Model) cmdServerQueue() tea.Cmd {
 	}
 }
 
-func (m Model) cmdServerResnapshotLater() tea.Cmd {
-	return tea.Tick(serverReconnectDelay, func(time.Time) tea.Msg { return serverRetryMsg{} })
-}
-
-func (m Model) cmdServerEffects(e viewmodel.Effect) tea.Cmd {
-	var cmds []tea.Cmd
-	if e&viewmodel.EffectResnapshot != 0 {
-		cmds = append(cmds, m.cmdServerSnapshot())
-	}
-	if e&viewmodel.EffectRefetchQueue != 0 {
-		cmds = append(cmds, m.cmdServerQueue())
-	}
-	return tea.Batch(cmds...)
-}
-
 // updateServer handles the server-mode messages; ok is false for any other msg.
 func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
-	case serverSnapshotMsg:
-		if msg.err != nil {
-			return m, tea.Batch(notify.Error("server snapshot: "+msg.err.Error()), m.cmdServerResnapshotLater()), true
-		}
-		firstLoad := !m.loaded
-		m.vm = m.vm.ApplySnapshot(msg.snap)
-		m.loaded = true
-		m, subscribe := m.subscribe(msg.snap.Seq)
-		cmds := []tea.Cmd{subscribe, m.cmdServerQueue()}
-		if hint := m.scope.UnregisteredHint(); hint != "" && firstLoad && m.scopeKnown {
-			cmds = append(cmds, notify.Info(hint))
-		}
-		return m.applyServerRows(), tea.Batch(cmds...), true
-
-	case serverSubscribedMsg:
-		if msg.ctx != m.streamCtx {
-			return m, nil, true // a newer snapshot already replaced it
-		}
-		if msg.err != nil {
-			return m, m.cmdServerResnapshotLater(), true
-		}
-		m.streamEvents = msg.events
-		return m, cmdServerNextEvent(msg.events), true
-
-	case serverEventMsg:
-		if msg.events != m.streamEvents {
-			return m, nil, true
-		}
-		var effect viewmodel.Effect
-		seqBefore := m.vm.Seq
-		m.vm, effect = m.vm.Reduce(msg.ev)
-		cmds := []tea.Cmd{cmdServerNextEvent(msg.events), m.cmdServerEffects(effect)}
-		// Only an applied event toasts: a replayed duplicate or a gap is not news.
-		if text, ok := viewmodel.ToastFor(msg.ev); ok && m.vm.Seq > seqBefore {
-			cmds = append(cmds, notify.Warning(text))
-		}
-		return m.applyServerRows(), tea.Batch(cmds...), true
-
-	case serverRetryMsg:
-		return m, m.cmdServerSnapshot(), true
-
-	case serverStreamEndedMsg:
-		if msg.events != m.streamEvents {
-			return m, nil, true
-		}
-		return m, m.cmdServerSnapshot(), true
-
 	case serverEnqueuedMsg:
 		note := notify.Success(fmt.Sprintf("enqueued %d ticket(s)", msg.added))
 		if msg.problem != "" {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -19,6 +22,8 @@ type streamFake struct {
 
 	mu        sync.Mutex
 	seq       uint64
+	tickets   []server.TicketInfo
+	snapErr   error
 	snapshots int
 	streams   []*fakeStream
 }
@@ -33,7 +38,10 @@ func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.snapshots++
-	return server.Snapshot{Seq: f.seq}, nil
+	if f.snapErr != nil {
+		return server.Snapshot{}, f.snapErr
+	}
+	return server.Snapshot{Seq: f.seq, Tickets: f.tickets}, nil
 }
 
 func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
@@ -296,5 +304,125 @@ func TestServerStream_BuiltPageGetsNoSnapshotMarkerThenState(t *testing.T) {
 	stub = h.m.withServerState(&stubPage{}).(*stubPage)
 	if stub.last == nil || stub.last.Seq != 10 {
 		t.Errorf("after snapshot: last = %+v, want seq 10", stub.last)
+	}
+}
+
+// ticketsTab builds the Tickets tab the way the shell does and sizes it.
+func ticketsTab(h *harness) ticketsui.Model {
+	h.t.Helper()
+	tm := h.m.newTicketsModel(h.m.settings.ActiveWorktreePath, h.m.settings.Settings)
+	next, _ := h.m.withServerState(tm).Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	return next.(ticketsui.Model)
+}
+
+func TestServerStream_OneStreamWhateverTabsAreVisited(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+
+	h.switchTo(nav.TabTickets)
+	h.pump()
+	h.switchTo(nav.TabWorktrees)
+	h.switchTo(nav.TabTickets)
+	h.pump()
+
+	snapshots, streams, live := f.counts()
+	if snapshots != 1 || streams != 1 || live != 1 {
+		t.Errorf("snapshots=%d streams=%d live=%d, want 1 each", snapshots, streams, live)
+	}
+}
+
+func TestServerStream_TicketsTabLoadingThenCurrentState(t *testing.T) {
+	h, f := newStreamHarness(t)
+	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "Zeta ticket", Status: "open"}}
+
+	if view := ticketsTab(h).View().Content; !strings.Contains(view, "loading…") || strings.Contains(view, "Zeta ticket") {
+		t.Fatalf("before the first snapshot the tab must show loading…:\n%s", view)
+	}
+
+	h.probeUp()
+	// A tab built (or rebuilt after a worktree change) now starts current.
+	if view := ticketsTab(h).View().Content; !strings.Contains(view, "Zeta ticket") {
+		t.Fatalf("rebuilt tab missing delivered state:\n%s", view)
+	}
+}
+
+func TestServerStream_EventWhileQueueOpenShowsOnTicketsAfterSwitchBack(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	h.switchTo(nav.TabTickets)
+	live := h.m.livePageByTab[nav.TabTickets]
+	stub := &stubPage{}
+	live.model = stub
+	h.m.livePageByTab[nav.TabTickets] = live
+
+	h.switchTo(nav.TabQueue)
+	f.stream(0).ch <- herdrEvent(11)
+	h.pump()
+	h.switchTo(nav.TabTickets)
+
+	if stub.last == nil || !stub.last.HerdrUnavailable {
+		t.Errorf("event that arrived meanwhile is missing: %+v", stub.last)
+	}
+}
+
+// toastTexts runs cmd (flattening batches) and returns the toasts it emits. A
+// command that blocks, like the next event read, counts as emitting none.
+func toastTexts(cmd tea.Cmd) []notify.NotifyMsg {
+	if cmd == nil {
+		return nil
+	}
+	res := make(chan tea.Msg, 1)
+	go func() { res <- cmd() }()
+	var got tea.Msg
+	select {
+	case got = <-res:
+	case <-time.After(100 * time.Millisecond):
+		return nil
+	}
+	switch msg := got.(type) {
+	case notify.NotifyMsg:
+		return []notify.NotifyMsg{msg}
+	case tea.BatchMsg:
+		var out []notify.NotifyMsg
+		for _, c := range msg {
+			out = append(out, toastTexts(c)...)
+		}
+		return out
+	}
+	return nil
+}
+
+func TestServerStream_ParkToastsOnLiveEventsOnly(t *testing.T) {
+	h, f := newStreamHarness(t)
+	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
+	h.probeUp() // the snapshot holds a parked ticket: state, not news
+
+	park := server.Event{Seq: 11, Type: server.EventIterationParked, Address: "gx:alpha/01"}
+	events := h.m.stream.streamEvents
+	next, cmd := h.m.Update(streamEventMsg{ev: park, events: events})
+	if got := toastTexts(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {
+		t.Fatalf("live park toasts = %+v", got)
+	}
+
+	// The same event replayed after a reconnect is a duplicate: no toast.
+	_, cmd = next.(Model).Update(streamEventMsg{ev: park, events: events})
+	if got := toastTexts(cmd); len(got) != 0 {
+		t.Fatalf("replayed event toasted: %+v", got)
+	}
+}
+
+func TestServerStream_SnapshotNeverToastsButFailureDoes(t *testing.T) {
+	h, f := newStreamHarness(t)
+	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
+	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3, Tickets: f.tickets}})
+	h.m = next.(Model)
+	for _, got := range toastTexts(cmd) {
+		t.Fatalf("snapshot toasted: %+v", got)
+	}
+
+	h.m.stream.snapshotting = true
+	_, cmd = h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, err: context.DeadlineExceeded})
+	if got := toastTexts(cmd); len(got) != 1 || got[0].Kind != notify.KindError {
+		t.Fatalf("failed snapshot toasts = %+v", got)
 	}
 }

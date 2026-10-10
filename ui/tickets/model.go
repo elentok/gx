@@ -4,7 +4,6 @@
 package tickets
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 
@@ -13,7 +12,6 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -143,13 +141,9 @@ type Model struct {
 	// scope is which projects the tab shows; owned by the tab, so no snapshot
 	// or event can reset it.
 	scope viewmodel.Scope
-	// streamCtx/streamStop are the current event subscription: every
-	// snapshot cancels the one before, and messages from any other stream
-	// (streamEvents) are dropped. Without this each re-snapshot leaked a
-	// live stream that re-delivered every event and rebuilt the sidebar.
-	streamCtx    context.Context
-	streamStop   context.CancelFunc
-	streamEvents <-chan server.Event
+	// hintPending: the first delivered state asked for the "unregistered
+	// project" toast; Update emits it on its next message.
+	hintPending bool
 	// fallbackStop is non-nil while the server is down and the tab reads the
 	// store itself (server_refresh.go); fallbackGen orphans a finished
 	// fallback's in-flight ticks.
@@ -210,7 +204,7 @@ func (m Model) Init() tea.Cmd {
 	if m.serverAPI == nil {
 		return func() tea.Msg { return ServerDownMsg{} }
 	}
-	return m.cmdServerSnapshot()
+	return nil // the app shell's stream delivers the state
 }
 
 // Update delegates to updateInner then re-syncs the preview viewport
@@ -220,6 +214,10 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
+	if nm.hintPending {
+		nm.hintPending = false
+		cmd = tea.Batch(cmd, notify.Info(nm.scope.UnregisteredHint()))
+	}
 	nm.syncPreviewViewport()
 	return nm, cmd
 }

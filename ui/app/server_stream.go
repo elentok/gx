@@ -6,6 +6,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -163,7 +165,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m.stream.snapshotting = false
 		if msg.err != nil {
 			// The next probe tick retries while the link is still up.
-			return m, nil, true
+			return m, notify.Error("server snapshot: " + msg.err.Error()), true
 		}
 		m.stream.vm = m.stream.vm.ApplySnapshot(msg.snap)
 		m.stream.loaded = true
@@ -186,9 +188,19 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		var effect viewmodel.Effect
+		seqBefore := m.stream.vm.Seq
 		m.stream.vm, effect = m.stream.vm.Reduce(msg.ev)
 		m, effects := m.streamEffects(effect)
-		return m.deliverServerState(), tea.Batch(cmdStreamNext(msg.events), effects), true
+		cmds := []tea.Cmd{cmdStreamNext(msg.events), effects}
+		// Only an applied event toasts: a replayed duplicate or a gap is not news.
+		if text, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
+			cmds = append(cmds, notify.Warning(text))
+		}
+		return m.deliverServerState(), tea.Batch(cmds...), true
+
+	case ticketsui.ResnapshotRequestedMsg:
+		m, cmd := m.startSnapshot()
+		return m, cmd, true
 
 	case streamEndedMsg:
 		if msg.events != m.stream.streamEvents {
