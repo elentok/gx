@@ -223,6 +223,15 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 	var changed []string
 
 	err := schema.UpdateTicket(path, func(t *schema.Ticket) {
+		wasCommitless := t.IsCommitless()
+		defer func() {
+			// A fork closes its commitful placeholder as commitless; base is
+			// meaningless then and validation rejects the pair. Only the
+			// transition clears it, so authoring-time rejection is unchanged.
+			if !wasCommitless && t.IsCommitless() {
+				t.Base = ""
+			}
+		}()
 		for _, f := range ticketSetFields {
 			if !c.Flags().Changed(f.flag) {
 				continue

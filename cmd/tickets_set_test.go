@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // nonAgentGetwd returns a getwd fake pointed at a plain (non-git) tempdir, so
@@ -450,6 +451,47 @@ func TestExecute_TicketsSet_IterationStatusFinishedWithCommitlessAccepted(t *tes
 	}
 	if !strings.Contains(string(raw), "iteration_status: finished") {
 		t.Errorf("ticket file = %q, want iteration_status: finished written", string(raw))
+	}
+}
+
+func TestExecute_TicketsSet_CommitlessTransitionClearsBase(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nbase: \"02\"\n---\nBody.\n")
+
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	err := execute([]string{"tickets", "set", path, "--iteration-status=finished", "--commitless=true"}, d)
+	if err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if !tk.Commitless || tk.Base != "" {
+		t.Errorf("commitless=%v base=%q, want commitless true and base cleared", tk.Commitless, tk.Base)
+	}
+}
+
+func TestExecute_TicketsSet_NonCommitlessWriteKeepsBase(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\nbase: \"02\"\n---\nBody.\n")
+
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	if err := execute([]string{"tickets", "set", path, "--iteration-status=working"}, d); err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if tk.Base != "02" {
+		t.Errorf("base = %q, want 02 kept", tk.Base)
 	}
 }
 
