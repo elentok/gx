@@ -131,8 +131,9 @@ anything.
 When the work needs a decision rather than a fact, it belongs in a charting session (`/wayfinder`,
 `/myway`) *before* this skill runs — that's where grilling lives, and grilling must never end up
 inside an implementation ticket. Bounded fact-finding that genuinely belongs inside the epic is an
-explore ticket, typed `task`. A diagnosis for a person to plan goes to `follow-ups` as
-`type: research, status: draft`.
+explore ticket, typed `implement`. A diagnosis or idea for a person to plan is a follow-up: file it
+with `gx tickets follow-up add <project>:follow-ups --body -` in the format gx-local-tracker.md's
+"Follow-ups" section defines (it lands `draft` + `research`), never with a plain `add`.
 
 ### 4. Declare each ticket's test seams
 

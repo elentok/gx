@@ -36,7 +36,10 @@ authoritative.
   bare number is an originally-authored ticket.
 - A ticket's canonical **address** is `project:epic/NN` (e.g. `gx:orchestrator-daemon/06`); `epic/NN`
   and `NN` are accepted as input when the project or epic is implied. Verbs take addresses, not file
-  paths.
+  paths. Any registered project's prefix is accepted on `add`, `show`, `section`, `set`, `close`
+  and `move` (an unknown project refuses with nothing written), so an agent can write into another
+  project's tracker — e.g. `gx:follow-ups` from a different repo. `move` still refuses a target in a
+  different project from its source.
 
 ## Frontmatter
 
@@ -63,7 +66,8 @@ Fields:
   nor counted as finished. `cancelled` is terminal like `done` but means the ticket was withdrawn,
   not performed; it stops counting as outstanding. **Only `draft` and `open` can be written with
   `gx tickets set --status`** (plus `claimed` and `done` in a map epic). Every other status is an
-  orchestration status, written by the gx server alone (see "Who writes which status"). The UI also shows `blocked` and
+  orchestration status, written by the gx server alone, except `cancelled` on a follow-up, which
+  `gx tickets close` also writes (see "Who writes which status"). The UI also shows `blocked` and
   `waiting-for-children`, but those are derived from the graph on every render and are never
   written to a file.
 - **`blocked_by`** (list of ticket IDs) — tickets that must be finished before this one can start;
@@ -84,6 +88,8 @@ Fields:
   original. Omit entirely on a normally-authored ticket.
 - **`type`** (enum) — one of `implement` (the retired `task` fails validation; `gx tickets migrate` rewrites it), `research`, `prototype`, `grilling`, `code-review`, `conflict-resolution`. See
   `code-review` below.
+- **`category`** (enum) — `bug` or `idea`. Optional on any ticket; required on a follow-up (see
+  "Follow-ups"). Not named `kind`, which already means `kind: map` on an epic.
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
   occupy.
 - **`commitless`** (bool) — set `true` when a ticket intentionally finishes an iteration with no
@@ -138,7 +144,26 @@ conversation history.
   are for humans and scripts.
 - **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
-  the stub straight to `<id>-<slug>.md`.
+  the stub straight to `<id>-<slug>.md`. The epic argument may be `project:epic`. Filing into a
+  `follow-ups` epic with a plain `add` and no `category` refuses; use `follow-up add` instead.
+- **File a follow-up**: `gx tickets follow-up add <project:epic> --body -` — the only way a skill
+  files one; see "Follow-ups".
+- **Move a ticket**: `gx tickets move <addr> <epic> [--slug s] [--dry-run] [--json]` — moves one
+  flat, never-run `draft`/`open` ticket to another epic of the same project and rewrites every
+  `blocked_by`/`base` reference to it. It refuses a ticket with run history, a `parent` or fork
+  children, one queued or live on the server, and a map-epic source. A map-epic target is allowed.
+  Prose mentions of the old address are not rewritten; the files that hold one are listed as
+  warnings. Use `--dry-run` first.
+- **Close a follow-up**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it
+  [--note ...]` — see "Follow-ups".
+- **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop --status
+  draft|open [--body -]` creates the epic's `ticket.md` and refuses an existing epic. A frontmatter
+  block at the top of the body may carry the settable epic fields (e.g.
+  `provisional_destination: true`); any other field refuses the add. `gx tickets section` and
+  `gx tickets set` accept an epic address (`project:epic`, no ticket id) and validate it against the
+  epic schema: `set` writes `kind`, `status` and `provisional_destination`; `completed_at`,
+  `evolved_at`, `evolve_skipped` and `evolve_ticket` are server-stamped and read-only. Never
+  hand-edit an epic's `ticket.md`.
 
 ### From `draft` to `open`
 
@@ -166,7 +191,8 @@ A `type: code-review` ticket is exempt from the `blocked_by` check: it becomes e
 
 The gx server is the only scheduler. Orchestration statuses are written by it alone, and
 `gx tickets set --status` refuses them (`claimed`, `done`, `needs-answer`, `needs-repair`,
-`cancelled`):
+`cancelled`). The one other writer is `gx tickets close`, which writes `cancelled` — only on a
+`draft`/`open` ticket in a `follow-ups` epic:
 
 | Status | Written by |
 | --- | --- |
@@ -175,7 +201,7 @@ The gx server is the only scheduler. Orchestration statuses are written by it al
 | `done` | the server, after its own commit count and cherry-pick check |
 | `needs-answer` | the server, when an agent reports `--iteration-status needs-answer` |
 | `needs-repair` | the server, when it hits a fault it can't resolve |
-| `cancelled` | the server, via `gx server tickets cancel` (also cancels non-terminal descendants) |
+| `cancelled` | the server, via `gx server tickets cancel` (also cancels non-terminal descendants); `gx tickets close`, for a follow-up only |
 
 Exception: in a **map epic** the server schedules nothing, so `claimed` and `done` are written by
 hand there — see "Map epics".
@@ -201,22 +227,76 @@ writes the statuses directly:
 
 `needs-answer`, `needs-repair` and `cancelled` stay server-only, even here.
 
+A map epic seeded by gx-resolve-follow-ups carries **`provisional_destination: true`** in its
+`ticket.md`: the Destination is a guess from the follow-ups, not yet confirmed. gx-design confirms
+it with the person, then clears the flag with `gx tickets set <project:epic> --provisional-destination
+false`. Treat a map with the flag set as not ready to chart further.
+
 ### Wayfinding operations
 
-How the `wayfinder` skill's map and tickets map onto this tracker:
+How the `wayfinder` skill's map and tickets map onto this tracker. This is the whole set of
+operations a map needs — chart, claim, close and frontier; a gap belongs here, not in the skill
+that drives it.
 
-- **Map**: the epic's `<root>/<epic>/ticket.md`. Chart it by creating the directory and writing
-  that file by hand (no verb creates an epic): frontmatter `kind: map` and `status: open`, body =
-  the map. Later edits to the map body (Decisions so far, Not yet specified, Out of scope) are also
-  hand edits of `ticket.md`. Then run `gx tickets validate` on any ticket of the epic.
+- **Chart**: `gx tickets epic add <project:epic> --kind map --status open --body -`, body = the map
+  (a frontmatter block at the top may set `provisional_destination: true`). Then run
+  `gx tickets validate` on any ticket of the epic. Later edits to the map body (Decisions so far,
+  Not yet specified, Out of scope) go through `gx tickets section <project:epic> <heading> -`.
 - **Child ticket**: `gx tickets add <epic> --slug <slug> --body -`, with the ticket's `type` and
   `blocked_by` in a frontmatter block at the top of the body and the question under `## Question`.
-- **Blocking**: `blocked_by`, as for any ticket. The **frontier** is the rule under "Frontier"
-  above, applied by hand: the server never computes one for a map epic.
+- **Blocking**: `blocked_by`, as for any ticket.
+- **Frontier**: the rule under "Frontier" above, applied by hand: the lowest-numbered `open` ticket
+  whose `blocked_by` tokens have all resolved. The server never computes one for a map epic.
 - **Claim**: `gx tickets set <addr> --status claimed`.
-- **Resolve**: `gx tickets section <addr> Resolution -`, then
+- **Close**: `gx tickets section <addr> Resolution -`, then
   `gx tickets set <addr> --status done --commitless true`, then append a gist + link to the map's
-  Decisions so far.
+  Decisions so far with `gx tickets section <project:epic> "Decisions so far" -`.
+
+## Follow-ups
+
+A **follow-up** is a diagnosis or an idea filed for a person to plan, not schedulable work. This
+section is the one place the format lives; gx-evolve, gx-resolve-follow-ups, gx-investigate and
+gx-to-tickets link here rather than restating it.
+
+- **A follow-ups epic** is an epic named `follow-ups`. Its archive is `follow-ups-archived`. There
+  is no `type: follow-up`: `type` picks the skill, and "follow-up" is only where a ticket lives.
+- **Routing**: a project-specific finding → `<project>:follow-ups`; a gx tooling finding →
+  `gx:follow-ups`; a closed follow-up → `<project>:follow-ups-archived`. Ask: would this still exist
+  if the epic you were working in had never been authored? If yes, it's tooling.
+- **Always `draft` + `research`.** Filers never guess `implement`; gx-resolve-follow-ups sets the
+  real type and status when it moves the ticket.
+- **Body sections**, for bugs and ideas alike:
+  - `## Source` — the epic, ticket addresses, session ids, and which skill or person filed it.
+  - `## Problem` — bug: what is wrong; idea: what is missing or painful.
+  - `## Evidence` — log lines, ticket ids, commits. Required for a bug, optional for an idea.
+  - `## Suggested fix`
+  - `## Open questions` — optional.
+- **Filing**: only through `gx tickets follow-up add <project:epic> --body -`, never a plain `add`.
+  The body's frontmatter carries `category: bug|idea`. The verb refuses, with nothing written and
+  a code naming the gap, when `category` or a required section is missing, when the body asks for a
+  status or type other than `draft`/`research`, or when the target is not a follow-ups epic.
+- **Seen again**: when a follow-up already exists for the same problem, don't file a duplicate.
+  Append an entry to its `## Evidence` (`gx tickets section <addr> Evidence -`, content = the
+  existing text plus the new entry) naming the new source and date.
+- **Server recovery follow-ups** (filed from investigate reports) use the same format:
+  `category: bug`, Source / Problem / Evidence / Suggested fix, and the same "seen again" entry for a
+  repeat. gx-resolve-follow-ups and `gx evolve export` then see one shape.
+- **Closing**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it [--note ...]`
+  works only on a `draft`/`open` ticket in a `follow-ups` epic. In one step it writes
+  `status: cancelled`, a `## Resolution` with the reason, note and original address, and moves the
+  ticket into `<project>:follow-ups-archived` (created `draft` if missing). For `duplicate`, the note
+  is the kept ticket's address. `gx tickets close --done [project]` is a one-time sweep that moves
+  already-`done` follow-ups into the archive. Old run-log lines, trailers and branch names keep the
+  old address; the Resolution records it.
+
+## Skill conventions
+
+Rules every gx skill follows when it names a model or launches a sub-agent:
+
+- **Models by alias only** — `sonnet`, `opus` — never a pinned model ID.
+- **On Codex**, name a tier (worker / strongest) and give the Claude alias as the example, e.g.
+  "worker (`sonnet`)". Both use the default model; the strongest step runs at the highest effort.
+  There is no tier→ID configuration.
 
 ## Claiming
 

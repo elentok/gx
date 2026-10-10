@@ -179,18 +179,14 @@ looking at when you found it:
   and a suggested fix direction. A follow-up fix ticket can then `blocked_by` it.
 - **Bug is in gx/ralph-loop tooling itself** (scheduler, a skill's own instructions, herdr
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
-  for — publish in `<root>/follow-ups/issues/` instead, even though you found it investigating a
+  for — file it as a follow-up in `gx:follow-ups` instead, even though you found it investigating a
   specific epic. Don't clutter that epic's own issue list with a finding about gx itself.
-  - If `<root>/follow-ups/` doesn't exist yet, create the directory with a `ticket.md` holding
-    `status: draft` frontmatter and a `# follow-ups` heading. An epic without `ticket.md` is
-    invalid.
-  - File it as `type: research, status: draft` — `draft` because it's a diagnosis handed off for a
-    person to plan, not schedulable work; `research` matches `gx-implement`'s commitless-by-type
-    handling for a diagnosis-only ticket.
-  - Follow `follow-ups`'s established ticket shape (see e.g. `follow-ups/issues/01-*.md`): a
-    `## Context` section naming the epic/investigation this came from, followed by the diagnosis
-    itself — what's wrong, the evidence (log lines, ticket IDs), and a suggested fix direction. A
-    follow-up fix ticket can then `blocked_by` it.
+  - Follow gx-local-tracker.md's "Follow-ups" section for the format, routing and the "seen again"
+    entry when the same problem is already filed.
+  - File it only with `gx tickets follow-up add gx:follow-ups --body -`, with `category: bug` in the
+    body's frontmatter and Source (name the epic/investigation), Problem, Evidence (log lines,
+    ticket IDs) and Suggested fix sections. The verb writes it `draft` + `research` and creates
+    nothing if the format is wrong. A follow-up fix ticket can then `blocked_by` it.
   - This is scoped to diagnosis tickets filed by this skill only — other "file into whatever epic
     is active" call sites (code-review fix tickets, spec-review follow-ups) are untouched.
 - **No epic in scope at all** (a one-off question, nothing under the tracker root) — report the
