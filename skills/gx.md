@@ -22,7 +22,10 @@ Linear, ...) selected by a separate setup step. gx's bundle drops both assumptio
   [gx-local-tracker.md](gx-local-tracker.md)) — through `gx tickets` subcommands, not hand-edited
   YAML. There's no provider-selection step and no dependency on a personal dotfiles skill tree,
   setup workflow, or triage-label mapping file: `gx-local-tracker.md` is the complete, self-contained
-  contract.
+  contract. The one exception is `gx-design`: it drives `wayfinder`, `to-spec`, `grilling` and
+  `domain-modeling`, which are not vendored. They must already be in the agent's skill root (same on
+  Codex), from [mattpocock/skills](https://github.com/mattpocock/skills). `gx-design` checks for
+  them first and stops, naming any that are missing.
 - **Seams are decided in the ticket, not live.** Upstream `tdd` asks a human "what's the public
   interface, and which seams should we test?" at the start of every cycle. gx-to-tickets instead
   requires every generated ticket to declare its approved test seams up front (an explicit `none`
@@ -52,7 +55,8 @@ deliberate, explicit-invoke-only, never something to trigger on the model's own 
 conversation. `gx-one-off` sets the same flag: the server launches it for `type: prompt` tickets,
 never the model on its own. `gx-evolve` sets it too: the server launches it for `type: evolve`
 retros, never the model on its own. `gx-resolve-follow-ups` sets it as well: draining a follow-ups
-epic closes, moves and creates tickets in bulk, so a person starts it, never the model. `gx-to-tickets`, `gx-tdd`,
+epic closes, moves and creates tickets in bulk, so a person starts it, never the model. `gx-design`
+sets it too: a person walks one epic through map, review and implement. `gx-to-tickets`, `gx-tdd`,
 `gx-resolving-merge-conflicts`, and `gx-changelog` carry no such flag: it's fine for the model to reach for
 ticket breakdown, TDD guidance, or merge-conflict resolution on its own when a task calls
 for it — e.g. a code-review ticket that needs to spin up follow-up tickets can invoke
@@ -148,6 +152,8 @@ skills/
   gx-evolve/
     SKILL.md
   gx-resolve-follow-ups/
+    SKILL.md
+  gx-design/
     SKILL.md
 ```
 
