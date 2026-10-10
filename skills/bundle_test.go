@@ -37,6 +37,7 @@ var requiredFiles = []string{
 	"gx-changelog/SKILL.md",
 	"gx-bump/SKILL.md",
 	"gx-one-off/SKILL.md",
+	"gx-evolve/SKILL.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -152,6 +153,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-changelog":                 false,
 	"gx-bump":                      true,
 	"gx-one-off":                   true,
+	"gx-evolve":                    true,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
