@@ -54,7 +54,7 @@ func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 // projectRoot is the one resolver for a `project:` address prefix: the ticket
 // store directory of the registered project called project, which may be the
 // cwd project or any other. An unregistered name is refused with
-// tickets.CodeUnknownProject. add and show use it; set, section, close and
+// tickets.CodeUnknownProject. add, show, set and section use it; close and
 // move are meant to reuse it.
 func projectRoot(cwd, project string) (string, error) {
 	if root, err := ticketRoot(cwd); err == nil && tickets.ProjectName(root) == project {
