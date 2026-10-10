@@ -163,6 +163,24 @@ func TestServerMode_ScopesToCwdProjectAndToggles(t *testing.T) {
 	}
 }
 
+func TestServerMode_ScopeToggleSurvivesSnapshotAndEvents(t *testing.T) {
+	m, _, _ := newServerModel(t).WithCwdProject("gx").updateServer(serverSnapshotMsg{snap: scopeSnap})
+	next, _ := m.toggleProjectScope()
+	m = next.(Model)
+
+	m, _, _ = m.updateServer(serverSnapshotMsg{snap: scopeSnap})
+	if got := len(m.epics); got != 2 {
+		t.Fatalf("epics after snapshot = %d, want 2 (still all projects)", got)
+	}
+	m, _, _ = m.updateServer(serverEventMsg{
+		ev:     server.Event{Seq: scopeSnap.Seq + 1, Type: server.EventTicketDone, Address: "gx:alpha/01"},
+		events: m.streamEvents,
+	})
+	if got := len(m.epics); got != 2 {
+		t.Fatalf("epics after event = %d, want 2 (still all projects)", got)
+	}
+}
+
 func TestServerMode_OutsideProjectShowsAllWithHint(t *testing.T) {
 	m, cmd, _ := newServerModel(t).WithCwdProject("").updateServer(serverSnapshotMsg{snap: scopeSnap})
 	if len(m.epics) != 2 {
@@ -566,7 +584,7 @@ func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
 	vm := viewmodel.State{}.ApplySnapshot(server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
 	}})
-	epics := epicsFromViewModel(vm)
+	epics := epicsFromViewModel(vm, viewmodel.Scope{})
 	if len(epics) != 1 || len(epics[0].Tickets) != 1 {
 		t.Fatalf("epics = %+v", epics)
 	}
@@ -583,7 +601,7 @@ func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
 		{Address: "proj:epic-a/27a1", Status: "done", Parent: "proj:epic-a/27a"},
 		{Address: "proj:epic-a/27a3", Status: "claimed", Parent: "proj:epic-a/27a1"},
 	}})
-	epics := epicsFromViewModel(vm)
+	epics := epicsFromViewModel(vm, viewmodel.Scope{})
 	if len(epics) != 1 || len(epics[0].Tickets) != 4 {
 		t.Fatalf("epics = %+v", epics)
 	}

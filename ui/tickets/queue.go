@@ -186,7 +186,7 @@ func (m QueueModel) cmdLoadQueue() tea.Cmd {
 				}
 			}
 			return queueServerLoadedMsg{
-				epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap)), items: items,
+				epics: epicsFromViewModel(viewmodel.State{}.ApplySnapshot(snap), viewmodel.Scope{}), items: items,
 				claimedAt: claimedAt, herdrDown: snap.HerdrUnavailable, budget: snap.Budget, err: err,
 			}
 		}

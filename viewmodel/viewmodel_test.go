@@ -17,16 +17,67 @@ func snapshot() viewmodel.State {
 	}).SetQueue([]server.QueueItem{{Address: "gx:e/01"}, {Address: "gx:e/02"}})
 }
 
+// reduce applies events that must each ask for a re-snapshot, as every
+// non-herdr, non-queue event does.
 func reduce(t *testing.T, s viewmodel.State, evs ...server.Event) viewmodel.State {
 	t.Helper()
 	for _, ev := range evs {
 		var eff viewmodel.Effect
 		s, eff = s.Reduce(ev)
-		if eff != viewmodel.EffectNone {
-			t.Fatalf("event %+v: unexpected effect %v", ev, eff)
+		if eff != viewmodel.EffectResnapshot {
+			t.Fatalf("event %+v: effect %v, want resnapshot", ev, eff)
 		}
 	}
 	return s
+}
+
+func TestReduce_EffectPerEventType(t *testing.T) {
+	const resnap = viewmodel.EffectResnapshot
+	cases := []struct {
+		typ  string
+		want viewmodel.Effect
+	}{
+		{server.EventTicketClaimed, resnap},
+		{server.EventIterationStarted, resnap},
+		{server.EventIterationParked, resnap},
+		{server.EventIterationFailed, resnap},
+		{server.EventIterationLaunchFailed, resnap},
+		{server.EventTicketDone, resnap},
+		{server.EventTicketCancelled, resnap},
+		{server.EventTicketParked, resnap},
+		{server.EventTicketChanged, resnap},
+		{server.EventReclaimed, resnap},
+		{server.EventExplainVerdictChange, resnap},
+		{server.EventRootCompleted, resnap},
+		{server.EventRootParked, resnap},
+		{server.EventLandRolledBack, resnap},
+		{server.EventTicketNudged, resnap},
+		{server.EventQueueChanged, resnap | viewmodel.EffectRefetchQueue},
+		{server.EventHerdrUnavailable, viewmodel.EffectNone},
+		{server.EventHerdrAvailable, viewmodel.EffectNone},
+	}
+	for _, c := range cases {
+		t.Run(c.typ, func(t *testing.T) {
+			got, eff := snapshot().Reduce(server.Event{Seq: 11, Type: c.typ, Address: "gx:e/01"})
+			if eff != c.want {
+				t.Fatalf("effect = %v, want %v", eff, c.want)
+			}
+			if got.Seq != 11 {
+				t.Fatalf("seq = %d, event not applied", got.Seq)
+			}
+		})
+	}
+}
+
+func TestReduce_HerdrAppliedInPlace(t *testing.T) {
+	s, _ := snapshot().Reduce(server.Event{Seq: 11, Type: server.EventHerdrUnavailable})
+	if !s.HerdrUnavailable {
+		t.Fatal("herdr-unavailable not applied")
+	}
+	s, _ = s.Reduce(server.Event{Seq: 12, Type: server.EventHerdrAvailable})
+	if s.HerdrUnavailable {
+		t.Fatal("herdr-available not applied")
+	}
 }
 
 func TestReduce_ClaimIterationDone(t *testing.T) {
@@ -76,7 +127,7 @@ func TestReduce_DuplicateEventIgnored(t *testing.T) {
 
 func TestReduce_QueueChangedRefetchesQueue(t *testing.T) {
 	_, eff := snapshot().Reduce(server.Event{Seq: 11, Type: server.EventQueueChanged})
-	if eff != viewmodel.EffectRefetchQueue {
+	if eff != viewmodel.EffectResnapshot|viewmodel.EffectRefetchQueue {
 		t.Fatalf("effect = %v", eff)
 	}
 }

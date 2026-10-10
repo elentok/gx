@@ -23,33 +23,28 @@ func addresses(ts []server.TicketInfo) []string {
 }
 
 func TestScopedTickets_DefaultsToCwdProjectAndTogglesToAll(t *testing.T) {
-	vm := viewmodel.State{CwdProject: "alpha"}.ApplySnapshot(scopeSnapshot())
+	vm := viewmodel.State{}.ApplySnapshot(scopeSnapshot())
+	scope := viewmodel.Scope{CwdProject: "alpha"}
 
-	if got := addresses(vm.ScopedTickets()); len(got) != 1 || got[0] != "alpha:e/01" {
+	if got := addresses(vm.ScopedTickets(scope)); len(got) != 1 || got[0] != "alpha:e/01" {
 		t.Fatalf("scoped = %v, want only alpha", got)
 	}
-	if got := addresses(vm.ToggleAllProjects().ScopedTickets()); len(got) != 2 {
+	if got := addresses(vm.ScopedTickets(scope.Toggle())); len(got) != 2 {
 		t.Fatalf("all = %v, want both projects", got)
 	}
-	if vm.UnregisteredHint() != "" {
+	if scope.UnregisteredHint() != "" {
 		t.Fatal("registered project must not show the hint")
 	}
 }
 
 func TestScopedTickets_OutsideProjectShowsAllWithHint(t *testing.T) {
 	vm := viewmodel.State{}.ApplySnapshot(scopeSnapshot())
+	scope := viewmodel.Scope{}
 
-	if got := addresses(vm.ScopedTickets()); len(got) != 2 {
+	if got := addresses(vm.ScopedTickets(scope)); len(got) != 2 {
 		t.Fatalf("scoped = %v, want all", got)
 	}
-	if vm.UnregisteredHint() == "" {
+	if scope.UnregisteredHint() == "" {
 		t.Fatal("expected the unregistered hint")
-	}
-}
-
-func TestApplySnapshot_KeepsScope(t *testing.T) {
-	vm := viewmodel.State{CwdProject: "alpha"}.ToggleAllProjects().ApplySnapshot(scopeSnapshot())
-	if vm.CwdProject != "alpha" || !vm.AllProjects {
-		t.Fatalf("scope lost across snapshot: %+v", vm)
 	}
 }

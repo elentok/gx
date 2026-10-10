@@ -80,7 +80,7 @@ type Model struct {
 	// every epicsLoadedMsg) auto-invalidates the cache if the archive's count
 	// changed since it was loaded.
 	archivedLazy tree.LazySection[tickets.Epic]
-	// scopeKnown: WithCwdProject ran, so an empty CwdProject means "not in a
+	// scopeKnown: WithCwdProject ran, so an empty scope.CwdProject means "not in a
 	// registered project" rather than "never told".
 	scopeKnown bool
 
@@ -140,6 +140,9 @@ type Model struct {
 	// serverLink is how the TUI currently reaches the server (server_link.go).
 	serverLink ServerLink
 	vm         viewmodel.State
+	// scope is which projects the tab shows; owned by the tab, so no snapshot
+	// or event can reset it.
+	scope viewmodel.Scope
 	// streamCtx/streamStop are the current event subscription: every
 	// snapshot cancels the one before, and messages from any other stream
 	// (streamEvents) are dropped. Without this each re-snapshot leaked a

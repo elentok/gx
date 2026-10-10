@@ -56,38 +56,43 @@ type State struct {
 	// Mode is the queue mode (server.ModeRunning, ModePaused or ModeDraining)
 	// from the last snapshot.
 	Mode string
+}
+
+// Scope is which projects a view shows. It belongs to the view, not the
+// server state, so it is never touched by snapshots or events.
+type Scope struct {
 	// CwdProject is the registered project the TUI started in; "" when the cwd
-	// is not in one. It survives snapshots.
+	// is not in one.
 	CwdProject string
 	// AllProjects shows every project instead of just CwdProject.
 	AllProjects bool
 }
 
-// ScopedTickets is Tickets narrowed to the cwd project, unless the toggle says
-// all or the cwd is not a registered project.
-func (s State) ScopedTickets() []server.TicketInfo {
-	if s.CwdProject == "" || s.AllProjects {
-		return s.Tickets
-	}
-	prefix := s.CwdProject + ":"
-	return slices.DeleteFunc(slices.Clone(s.Tickets), func(t server.TicketInfo) bool {
-		return !strings.HasPrefix(t.Address, prefix)
-	})
-}
-
-// ToggleAllProjects flips between the cwd project and all projects.
-func (s State) ToggleAllProjects() State {
-	s.AllProjects = !s.AllProjects
-	return s
+// Toggle flips between the cwd project and all projects.
+func (sc Scope) Toggle() Scope {
+	sc.AllProjects = !sc.AllProjects
+	return sc
 }
 
 // UnregisteredHint is the hint shown when the cwd is not a registered project
-// (so the tab shows all); "" when it is.
-func (s State) UnregisteredHint() string {
-	if s.CwdProject != "" {
+// (so the view shows all); "" when it is.
+func (sc Scope) UnregisteredHint() string {
+	if sc.CwdProject != "" {
 		return ""
 	}
 	return "not in a registered project, showing all; run `gx project add .`"
+}
+
+// ScopedTickets is Tickets narrowed to the scope's cwd project, unless the
+// scope says all or the cwd is not a registered project.
+func (s State) ScopedTickets(sc Scope) []server.TicketInfo {
+	if sc.CwdProject == "" || sc.AllProjects {
+		return s.Tickets
+	}
+	prefix := sc.CwdProject + ":"
+	return slices.DeleteFunc(slices.Clone(s.Tickets), func(t server.TicketInfo) bool {
+		return !strings.HasPrefix(t.Address, prefix)
+	})
 }
 
 // PendingRowFor is the pending row for a ticket address, if it is queued.
@@ -123,8 +128,6 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		Mode:             snap.Mode,
-		CwdProject:      s.CwdProject,
-		AllProjects:      s.AllProjects,
 	}
 	for _, t := range next.Tickets {
 		if it, ok := s.Iterations[t.Address]; ok && t.Status == statusClaimed {
@@ -154,32 +157,35 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 	}
 	s.Seq = ev.Seq
 
+	// Events carry no claim times, budget or cost, so every event but the
+	// herdr ones is followed by a re-snapshot. The in-place updates below only
+	// make the row react before that snapshot arrives.
 	switch ev.Type {
-	case server.EventTicketClaimed:
-		return s.withStatus(ev.Address, statusClaimed).withIteration(ev.Address, IterationClaimed), EffectNone
-	case server.EventIterationStarted:
-		return s.withIteration(ev.Address, IterationRunning), EffectNone
-	case server.EventIterationParked:
-		return s.withIteration(ev.Address, IterationParked), EffectNone
-	case server.EventIterationFailed:
-		return s.withIteration(ev.Address, IterationFailed), EffectNone
-	case server.EventIterationLaunchFailed:
-		// The claim was rolled back, so the on-disk status is not ours to guess.
-		return s.withoutIteration(ev.Address), EffectResnapshot
-	case server.EventTicketDone:
-		return s.withStatus(ev.Address, statusDone).withoutIteration(ev.Address).withoutQueued(ev.Address), EffectNone
-	case server.EventTicketCancelled:
-		return s.withStatus(ev.Address, statusCancelled).withoutIteration(ev.Address).withoutQueued(ev.Address), EffectNone
-	case server.EventQueueChanged:
-		return s, EffectRefetchQueue
-	case server.EventTicketChanged, server.EventTicketParked, server.EventReclaimed:
-		return s, EffectResnapshot
 	case server.EventHerdrUnavailable:
 		s.HerdrUnavailable = true
+		return s, EffectNone
 	case server.EventHerdrAvailable:
 		s.HerdrUnavailable = false
+		return s, EffectNone
+	case server.EventQueueChanged:
+		return s, EffectResnapshot | EffectRefetchQueue
+	case server.EventTicketClaimed:
+		s = s.withStatus(ev.Address, statusClaimed).withIteration(ev.Address, IterationClaimed)
+	case server.EventIterationStarted:
+		s = s.withIteration(ev.Address, IterationRunning)
+	case server.EventIterationParked:
+		s = s.withIteration(ev.Address, IterationParked)
+	case server.EventIterationFailed:
+		s = s.withIteration(ev.Address, IterationFailed)
+	case server.EventIterationLaunchFailed:
+		// The claim was rolled back, so the on-disk status is not ours to guess.
+		s = s.withoutIteration(ev.Address)
+	case server.EventTicketDone:
+		s = s.withStatus(ev.Address, statusDone).withoutIteration(ev.Address).withoutQueued(ev.Address)
+	case server.EventTicketCancelled:
+		s = s.withStatus(ev.Address, statusCancelled).withoutIteration(ev.Address).withoutQueued(ev.Address)
 	}
-	return s, EffectNone
+	return s, EffectResnapshot
 }
 
 const (

@@ -217,19 +217,19 @@ func (m Model) WithServer(api ServerAPI) Model {
 // WithCwdProject scopes the tab to the registered project the TUI started in;
 // "" means the cwd is not a registered project, so the tab shows all.
 func (m Model) WithCwdProject(name string) Model {
-	m.vm.CwdProject = name
+	m.scope.CwdProject = name
 	m.scopeKnown = true
 	return m
 }
 
 // toggleProjectScope is "tp": flip between the cwd project and all projects.
 func (m Model) toggleProjectScope() (tea.Model, tea.Cmd) {
-	if m.vm.CwdProject == "" {
-		return m, notify.Info(m.vm.UnregisteredHint())
+	if m.scope.CwdProject == "" {
+		return m, notify.Info(m.scope.UnregisteredHint())
 	}
-	m.vm = m.vm.ToggleAllProjects()
-	label := "project: " + m.vm.CwdProject
-	if m.vm.AllProjects {
+	m.scope = m.scope.Toggle()
+	label := "project: " + m.scope.CwdProject
+	if m.scope.AllProjects {
 		label = "all projects"
 	}
 	return m.applyServerRows(), notify.Info(label)
@@ -303,7 +303,7 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m.loaded = true
 		m, subscribe := m.subscribe(msg.snap.Seq)
 		cmds := []tea.Cmd{subscribe, m.cmdServerQueue()}
-		if hint := m.vm.UnregisteredHint(); hint != "" && firstLoad && m.scopeKnown {
+		if hint := m.scope.UnregisteredHint(); hint != "" && firstLoad && m.scopeKnown {
 			cmds = append(cmds, notify.Info(hint))
 		}
 		return m.applyServerRows(), tea.Batch(cmds...), true
@@ -395,7 +395,7 @@ func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
 }
 
 func (m Model) applyServerRows() Model {
-	m.epics = epicsFromViewModel(m.vm)
+	m.epics = epicsFromViewModel(m.vm, m.scope)
 	m.clampSelected()
 	return m
 }
@@ -403,10 +403,10 @@ func (m Model) applyServerRows() Model {
 // epicsFromViewModel groups the view model's tickets (already in snapshot
 // order) into the epics the sidebar renders. An epic is keyed by project and
 // name, since two projects can share an epic name.
-func epicsFromViewModel(vm viewmodel.State) []gxtickets.Epic {
+func epicsFromViewModel(vm viewmodel.State, scope viewmodel.Scope) []gxtickets.Epic {
 	var epics []gxtickets.Epic
 	byName := map[string]int{}
-	for _, info := range vm.ScopedTickets() {
+	for _, info := range vm.ScopedTickets(scope) {
 		epic, id, ok := gxtickets.SplitTrailerValue(info.Address)
 		if !ok {
 			continue
