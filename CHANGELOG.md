@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.32.2 - 2026-10-10
+
+- TUI: the help modal now shows the gx version in its bottom-right border. Long modal titles are truncated so they fit next to it.
+
 ## v0.32.1 - 2026-10-10
 
 - TUI: the app shell now owns the server stream. The Tickets and Queue tabs read one shared state instead of fetching on their own.
