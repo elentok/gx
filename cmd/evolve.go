@@ -36,6 +36,9 @@ type evolveEnv struct {
 	// confirm asks a yes/no question; `evolve all` asks before each submit.
 	confirm func(string) (bool, error)
 	now     func() time.Time
+	// landed reports the epic's tickets that carry a Ralph-Loop-Ticket trailer
+	// on its branch; nil when there is no way to ask.
+	landed func(project, epic string) (map[string]bool, error)
 }
 
 // evolveTarget is an epic an evolve verb acts on.
@@ -308,7 +311,7 @@ func newEvolveCmd(d deps) *cobra.Command {
 	all.Flags().BoolVar(&allProjects, "all-projects", false, "cover every registered project")
 	all.Flags().BoolVar(&yes, "yes", false, "submit without asking")
 
-	cmd.AddCommand(run, skip, all)
+	cmd.AddCommand(run, skip, all, newEvolveInputsCmd(env))
 	return cmd
 }
 
@@ -317,7 +320,8 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 	if err != nil {
 		return evolveEnv{}, err
 	}
-	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.confirmForce}
+	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.confirmForce,
+		landed: defaultLanded(cfg.TicketStore.Path)}
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := ticketRoot(cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)
