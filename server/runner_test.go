@@ -666,17 +666,14 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 		c.MaxAgents = 2
 	})
 	registerLaunch(h)
-	// Every iteration wait blocks until released, so started agents keep their slot.
-	release := make(chan struct{})
-	var once sync.Once
-	free := func() { once.Do(func() { close(release) }) }
-	defer free()
+	// An iteration's finish wait never returns (herdr's poll timeout), so started
+	// agents keep their slot. Never block in the handler: herdrfake serializes
+	// every command behind it.
 	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}
-	var waits atomic.Int32
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		// The launches' waits come first; a wait for "working" is the prompt's, not an iteration's.
-		if !slices.Contains(argv, "working") && waits.Add(1) > 3 {
-			<-release
+		// Only an iteration's finish wait asks for "blocked"; launch and prompt waits pass.
+		if slices.Contains(argv, "blocked") {
+			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
 		}
 		return idle, herdrfake.Identities{}, nil
 	})
@@ -684,6 +681,7 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	defer cancel()
 
 	order := []string{"proj-a:epic-a/01", "proj-b:epic-b/01", "proj-a:epic-c/01"}
+	var last []server.PendingRow
 	for _, addr := range order {
 		if res, err := h.Client.QueueAdd(ctx, addr, "claude"); err != nil || res.Refused {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
@@ -692,16 +690,17 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	for {
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("snapshot: %v; last pending = %+v", err, last)
 		}
-		if len(snap.Pending) == 3 && snap.Pending[2].Verdict == server.VerdictConcurrencyCap {
-			if a, b := snap.Pending[0].Verdict, snap.Pending[1].Verdict; a != "claimed" || b != "claimed" {
-				t.Errorf("first two verdicts = %q, %q, want both claimed", a, b)
-			}
+		last = snap.Pending
+		// A slot is taken a moment before its ticket reads "claimed", so the first
+		// two verdicts may lag the third's cap; keep polling until they settle.
+		if len(snap.Pending) == 3 && snap.Pending[2].Verdict == server.VerdictConcurrencyCap &&
+			snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == "claimed" {
 			break
 		}
 		if ctx.Err() != nil {
-			t.Fatalf("pending = %+v, want the third root at the cap", snap.Pending)
+			t.Fatalf("pending = %+v, want the first two claimed and the third at the cap", snap.Pending)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
