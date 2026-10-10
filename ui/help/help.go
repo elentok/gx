@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/filter"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/version"
 )
 
 const (
@@ -89,6 +90,8 @@ func (m Model) View() string {
 		RightTitle: m.rightTitle(),
 		Body:       m.bodyWithScrollbar(),
 		Hint:       m.hint(),
+		// Verbatim, so the modal never shows something `gx --version` wouldn't.
+		BottomRightTitle: version.Get(),
 		// Frame width must hold the body, the scrollbar gutter, and the frame's
 		// own border+padding, or the body+bar block overflows and the bar wraps
 		// onto its own line.

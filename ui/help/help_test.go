@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/version"
 )
 
 func TestHelpNewModel(t *testing.T) {
@@ -180,6 +181,38 @@ func TestHelpMouseWheelScrollsContentLikeKeyboard(t *testing.T) {
 	scrolled, _ = scrolled.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
 	if scrolled.Viewport.YOffset() >= bottom.Viewport.YOffset() {
 		t.Error("expected mouse-wheel-up to scroll content back up")
+	}
+}
+
+func TestHelpViewShowsVersionInBottomBorder(t *testing.T) {
+	bindings := make([]keys.Binding, 0, 40)
+	for range 40 {
+		bindings = append(bindings, keys.Binding{Seq: []string{"j"}, Title: "binding"})
+	}
+	m := NewModel([]KeySection{{Title: "Navigation", Bindings: bindings}})
+	m.Open(120, 20)
+
+	bottomBorder := func(m Model) string {
+		lines := strings.Split(ansi.Strip(m.View()), "\n")
+		return lines[len(lines)-1]
+	}
+	want := version.Get()
+
+	if got := bottomBorder(m); !strings.Contains(got, want) {
+		t.Errorf("bottom border %q missing version %q", got, want)
+	}
+
+	m.Viewport.GotoBottom()
+	if got := bottomBorder(m); !strings.Contains(got, want) {
+		t.Errorf("scrolled: bottom border %q missing version %q", got, want)
+	}
+
+	m, _ = m.Update(keyMsg('/'))
+	for _, r := range "binding" {
+		m, _ = m.Update(keyMsg(r))
+	}
+	if got := bottomBorder(m); !strings.Contains(got, want) {
+		t.Errorf("filtered: bottom border %q missing version %q", got, want)
 	}
 }
 
