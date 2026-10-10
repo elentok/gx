@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -121,6 +123,40 @@ func TestExecute_TicketsClose_RefusalsWriteNothing(t *testing.T) {
 			}
 			if after := moveTreeSnapshot(t, f.project); after != before {
 				t.Errorf("refusal wrote something:\nbefore %s\nafter  %s", before, after)
+			}
+		})
+	}
+}
+
+func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		queue []server.QueueItem
+		live  []server.IterationInfo
+	}{
+		{"queued", []server.QueueItem{{Address: "mine:follow-ups/01", Agent: "claude"}}, nil},
+		{"live", nil, []server.IterationInfo{{Address: "mine:follow-ups/01"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := setupCloseProject(t)
+			cl, pings := fakeMoveServer(t, tc.queue, tc.live)
+			before := moveTreeSnapshot(t, f.project)
+			d := deps{
+				stdout:       bytes.NewBuffer(nil),
+				stderr:       bytes.NewBuffer(nil),
+				getwd:        func() (string, error) { return f.repo, nil },
+				serverClient: cl,
+			}
+			err := execute([]string{"tickets", "close", "follow-ups/01", "--reason", "fixed"}, d)
+			requireMoveActive(t, err)
+			if after := moveTreeSnapshot(t, f.project); after != before {
+				t.Errorf("refusal wrote something:\nbefore %s\nafter  %s", before, after)
+			}
+			if _, err := os.Stat(filepath.Join(f.project, followUpsArchivedEpic)); !os.IsNotExist(err) {
+				t.Errorf("archive epic created: %v", err)
+			}
+			if len(*pings) != 0 {
+				t.Errorf("refusal pinged %v", *pings)
 			}
 		})
 	}

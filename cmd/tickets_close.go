@@ -43,6 +43,10 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	root := filepath.Dir(filepath.Dir(filepath.Dir(src.Path)))
 
+	if err := refuseIfActive(d.dial(), a); err != nil {
+		return err
+	}
+
 	resolution := fmt.Sprintf("- reason: %s\n", reason)
 	if note != "" {
 		resolution += fmt.Sprintf("- note: %s\n", note)
