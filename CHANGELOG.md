@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.32.1 - 2026-10-10
+
+- TUI: the app shell now owns the server stream. The Tickets and Queue tabs read one shared state instead of fetching on their own.
+  - The shell owns the link lifecycle, toasts, `R` (refresh) and down mode.
+  - Link state arrives together with the data, so the two no longer disagree.
+  - A failed snapshot is retried while streaming.
+  - A snapshot no longer always resubscribes or refetches the queue, and a status change in up mode no longer triggers a snapshot.
+  - The snapshot carries the queue mode, and the freshness rule and project scope moved out of the viewmodel.
+- Docs: added the missing keys to `config-schema.json`, plus new specs and gotchas.
+
 ## v0.32.0 - 2026-10-10
 
 - Added a headless Claude runner, so gx can run agents without herdr:
