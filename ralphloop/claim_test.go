@@ -186,6 +186,22 @@ func TestMarkChildDone_RepairsInvalidStatus(t *testing.T) {
 	}
 }
 
+func TestMarkChildDone_InvalidStatusPlusOtherInvalidFieldErrorsWithoutWriting(t *testing.T) {
+	t.Parallel()
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: resolved\ntype: bogus-type\n---\n# Ticket\n")
+	before := mustRead(t, path)
+	err := MarkChildDone(path)
+	if err == nil {
+		t.Fatal("MarkChildDone accepted a ticket with another invalid field")
+	}
+	if !strings.Contains(err.Error(), "still invalid") {
+		t.Errorf("err = %v, want a still-invalid error", err)
+	}
+	if after := mustRead(t, path); after != before {
+		t.Errorf("file rewritten: %q", after)
+	}
+}
+
 func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")

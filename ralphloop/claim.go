@@ -154,26 +154,27 @@ func updateTicket(path string, mutate func(*schema.Ticket)) error {
 // need to rewrite the ticket's markdown body (e.g. appending a note),
 // leaving the same atomic-write/torn-read guarantees.
 func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) error {
-	return rewriteTicket(path, schema.ParseTicketFromRaw, mutate)
+	return rewriteTicket(path, false, mutate)
 }
 
-// MarkChildDone is MarkDone for a conflict-resolution child gx closes itself
-// after the agent exits. The agent may have hand-edited the ticket into an
-// invalid status (e.g. "resolved"); gx owns that field, so the parse skips
-// validation and the write repairs status to done rather than failing the
-// close and parking the parent.
+// MarkChildDone differs from MarkDone for a conflict-resolution child gx
+// closes itself after the agent exits: MarkDone refuses a ticket that is
+// invalid on disk, but the agent may have hand-edited the child into an
+// invalid status (e.g. "resolved"). gx owns that field, so MarkChildDone
+// repairs status to done instead of failing the close and parking the parent.
+// Any other invalid field is still an error and nothing is written, since
+// writing it back would make the next Load fail on the child.
 func MarkChildDone(path string) error {
-	return rewriteTicket(path, lenientParseTicket, func(t *schema.Ticket, _ *string) {
+	return rewriteTicket(path, true, func(t *schema.Ticket, _ *string) {
 		t.Status = schema.StatusDone
 	})
 }
 
-func lenientParseTicket(raw, path string) (schema.Ticket, error) {
-	r, err := schema.ParseTicketRaw(raw, path)
-	return r.Ticket, err
-}
-
-func rewriteTicket(path string, parse func(raw, path string) (schema.Ticket, error), mutate func(*schema.Ticket, *string)) error {
+// rewriteTicket applies mutate under the ticket lock and writes the result
+// atomically. With repair, an invalid status is tolerated on read (mutate is
+// expected to fix it) and the ticket is validated after mutate; otherwise the
+// ticket must already be valid.
+func rewriteTicket(path string, repair bool, mutate func(*schema.Ticket, *string)) error {
 	unlock, err := schema.LockTicket(path)
 	if err != nil {
 		return err
@@ -185,13 +186,25 @@ func rewriteTicket(path string, parse func(raw, path string) (schema.Ticket, err
 		return err
 	}
 
-	t, err := parse(string(raw), path)
-	if err != nil {
+	var t schema.Ticket
+	if repair {
+		r, err := schema.ParseTicketRaw(string(raw), path)
+		if err != nil {
+			return fmt.Errorf("reading ticket %s: %w", path, err)
+		}
+		t = r.Ticket
+	} else if t, err = schema.ParseTicketFromRaw(string(raw), path); err != nil {
 		return fmt.Errorf("reading ticket %s: %w", path, err)
 	}
 	body := schema.ParseBody(string(raw))
 
 	mutate(&t, &body)
+
+	if repair {
+		if err := schema.Validate(t); err != nil {
+			return fmt.Errorf("repairing ticket %s: still invalid: %w", path, err)
+		}
+	}
 
 	out, err := schema.MarshalTicket(t, body)
 	if err != nil {
