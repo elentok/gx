@@ -85,9 +85,13 @@ Run the approved table with the tracker's verbs: `gx tickets epic add`, `close`,
 **Ready epic** — one per run, `follow-ups-<date>`:
 
 - `gx tickets epic add <project>:follow-ups-<date> --kind loop --status open`. Do not queue it.
-- `gx tickets move <addr> follow-ups-<date>`, then `gx tickets set <addr> --type implement --status
-  open`. Only `implement` tickets go here: the queue does not run `research` tickets.
-- Chain tickets whose expected files overlap: `gx tickets set <addr> --blocked-by <earlier-id>`.
+- `gx tickets move <addr> follow-ups-<date>`, then `gx tickets set <new-addr> --type implement
+  --status open`. Only `implement` tickets go here: the queue does not run `research` tickets.
+- Chain tickets whose expected files overlap: `gx tickets set <new-addr> --blocked-by
+  <earlier-new-id>`.
+
+**A move renumbers the ticket.** `move` prints the new address; the old one no longer exists. Capture
+it and use it for every later `set`, `section` and `--blocked-by`, never the pre-move address.
 
 **Area map epic** — one per area:
 
@@ -95,10 +99,10 @@ Run the approved table with the tracker's verbs: `gx tickets epic add`, `close`,
   frontmatter block carrying `provisional_destination: true`, then: a **Destination** (provisional:
   "decide these items, then a spec `docs/specs/<slug>.md`"), **Notes** ("Triaged from follow-ups on
   `<date>`" and the source addresses), and empty **Decisions so far** and **Not yet specified**.
-- A design item: move it in, then `gx tickets set <addr> --type grilling --status open`, and add a
-  `## Question` built from its Open questions (`gx tickets section <addr> Question -`). It keeps its
-  follow-up sections.
-- A research-only item: move it in, then `gx tickets set <addr> --type research --status open`.
+- A design item: move it in, then `gx tickets set <new-addr> --type grilling --status open`, and add
+  a `## Question` built from its Open questions (`gx tickets section <new-addr> Question -`). It
+  keeps its follow-up sections.
+- A research-only item: move it in, then `gx tickets set <new-addr> --type research --status open`.
 
 `gx tickets validate` one ticket of each new epic.
 

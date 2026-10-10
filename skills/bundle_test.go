@@ -276,6 +276,22 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 	}
 }
 
+// TestResolveFollowUpsUsesMovedAddress pins that the skill tells the agent to
+// use the address `move` prints: a move renumbers, so the pre-move address
+// targets nothing.
+func TestResolveFollowUpsUsesMovedAddress(t *testing.T) {
+	raw := readFile(t, "gx-resolve-follow-ups/SKILL.md")
+	if !strings.Contains(raw, "A move renumbers the ticket.") {
+		t.Error("skill must explain that a move renumbers the ticket")
+	}
+	for line := range strings.SplitSeq(raw, "\n") {
+		if strings.Contains(line, "<addr> --type") || strings.Contains(line, "<addr> --blocked-by") ||
+			strings.Contains(line, "section <addr> Question") {
+			t.Errorf("post-move step uses the pre-move address: %q", line)
+		}
+	}
+}
+
 // TestInvestigateHasNoNudgeGrant pins that gx-investigate never nudges a pane
 // itself: the daemon's nudge verb owns that now, so a mention may only forbid it.
 func TestInvestigateHasNoNudgeGrant(t *testing.T) {
