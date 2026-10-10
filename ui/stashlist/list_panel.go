@@ -36,7 +36,7 @@ func (m listPanel) WithContainerFocus(focused bool) listPanel {
 }
 
 // WithSidebarMode returns a copy that renders with the sidebar-mode
-// background (see CONTEXT.md) when the stash list is shown alongside the
+// background (see GLOSSARY.md) when the stash list is shown alongside the
 // stash detail panel, as opposed to standalone.
 func (m listPanel) WithSidebarMode(sidebar bool) listPanel {
 	m.sidebarMode = sidebar

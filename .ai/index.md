@@ -9,7 +9,7 @@ Issues live as local markdown files under `.scratch/`. See
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 - See ./design-system.md for UI work
 - Don't show any keymaps on the statusbar, only "? help"

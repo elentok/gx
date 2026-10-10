@@ -11,7 +11,7 @@ the only scheduler; everything below describes the scheduling mechanics it runs,
 how a run was started.
 
 Code pointers throughout are relative to the repo root. This doc describes mechanics as
-implemented; see `CONTEXT.md` for the shorter user-facing glossary (Queue/Attach Lifecycle,
+implemented; see `GLOSSARY.md` for the shorter user-facing glossary (Queue/Attach Lifecycle,
 Ticket Forking sections) this doc expands on.
 
 ## 1. Terminology
@@ -27,7 +27,7 @@ Ticket Forking sections) this doc expands on.
 | **Landing** | Cherry-picking a finished iteration branch's commits onto the shared feature worktree/branch (never a merge — always cherry-pick). Distinct from merging the epic into `main`, which is a separate later step (`gx merge` / `gx-merge` skill). |
 | **Frontier** | The set of tickets currently eligible to claim: `RenderedStatus == Open`, filtered to the run's `RunScope`. |
 | **RunScope** | Which tickets an epic run is allowed to claim — the whole epic, or a restricted `TicketIDs` set (e.g. Queue tab's "Add to queue"). Automatically widens to include any ticket reached by walking `parent`, so forked children are always in scope even if not named explicitly. |
-| **Parked** | A ticket whose `RenderedStatus` is `NeedsAnswer`, `NeedsRepair`, or `Draft` — waiting on a person, not runnable, and not retried on its own (`isParked`). An epic parks when every in-scope ticket left is parked or blocked, and keeps waiting rather than exiting; only a run with no runnable work *and* nothing parked is **deadlocked**, which is a hard error. See CONTEXT.md's Ticket States section. |
+| **Parked** | A ticket whose `RenderedStatus` is `NeedsAnswer`, `NeedsRepair`, or `Draft` — waiting on a person, not runnable, and not retried on its own (`isParked`). An epic parks when every in-scope ticket left is parked or blocked, and keeps waiting rather than exiting; only a run with no runnable work *and* nothing parked is **deadlocked**, which is a hard error. See GLOSSARY.md's Ticket States section. |
 | **Fork** | Splitting a ticket into sibling tickets mid-flight because it outgrew its budget or turned out to mix concerns. Produces one `parent` edge per new ticket, written on the new ticket; nothing is recorded on the original. |
 | **Fork subtree** | A ticket plus every ticket reached by following `parent` reverse-edges down from it, at any depth. The unit `Blocking` recurses over: a `blocked_by` token resolves only once the named ticket's whole fork subtree is done. |
 | **Reconcile** | The pass that runs once at the start of every epic run, before scheduling starts, reconciling on-disk `status:` against live herdr sessions and git reality (crash recovery). |

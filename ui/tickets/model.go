@@ -50,7 +50,7 @@ var TicketProgressSpinner = spinner.Spinner{
 
 // Model is the top-level tickets tab model: an epic/ticket sidebar paired
 // with a focusable preview panel that mirrors the sidebar's selection (see
-// CONTEXT.md's panel vocabulary) — "l"/"enter" on a ticket row hands focus to
+// GLOSSARY.md's panel vocabulary) — "l"/"enter" on a ticket row hands focus to
 // it for scrolling/searching its body; "h"/"left"/"esc" hands focus back.
 type Model struct {
 	worktreeRoot string

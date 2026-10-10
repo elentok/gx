@@ -13,7 +13,7 @@ var SeamColor = ColorBase
 // PanelOptionsFor builds PanelOptions, sharing the
 // layering rules across every screen that renders the frame-free design
 // (status, log, commit). sidebar marks a panel that is currently in sidebar
-// mode (see CONTEXT.md) - shown alongside a detail panel rather than
+// mode (see GLOSSARY.md) - shown alongside a detail panel rather than
 // standalone - so it can render a slightly darker body fill than a
 // standalone panel.
 func PanelOptionsFor(width, height int, title, rightTitle string, lines []string, active bool, titleColor color.Color, accent color.Color, sidebar bool) PanelOptions {
