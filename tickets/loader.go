@@ -192,6 +192,30 @@ func loadEpicTicketMD(epic *Epic) {
 	if wire.CompletedAt != nil {
 		epic.CompletedAt = *wire.CompletedAt
 	}
+	loadEpicEvolveFields(epic, fm)
+}
+
+// loadEpicEvolveFields reads the evolve-related ticket.md keys one at a time
+// rather than through ticketMDYAML, so a malformed value is reported under its
+// own field name and doesn't hide the rest of the frontmatter.
+func loadEpicEvolveFields(epic *Epic, fm string) {
+	var nodes map[string]yaml.Node
+	if err := yaml.Unmarshal([]byte(fm), &nodes); err != nil {
+		return
+	}
+	decode := func(key string, dst any) {
+		node, ok := nodes[key]
+		if !ok {
+			return
+		}
+		if err := node.Decode(dst); err != nil {
+			epic.FrontmatterErrs = append(epic.FrontmatterErrs, fmt.Sprintf("%s: %v", key, err))
+		}
+	}
+	decode("evolved_at", &epic.EvolvedAt)
+	decode("evolve_skipped", &epic.EvolveSkipped)
+	decode("evolve_ticket", &epic.EvolveTicket)
+	decode("provisional_destination", &epic.ProvisionalDestination)
 }
 
 // epicTiming is an epic's optional started_at/completed_at pair, as stored in

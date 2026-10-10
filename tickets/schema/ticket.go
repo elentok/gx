@@ -106,6 +106,9 @@ const (
 	// TypeInvestigate is system-generated only: recovery forks one as a commitless
 	// child of a parked ticket when a failure needs judgment.
 	TypeInvestigate TicketType = "investigate"
+	// TypeEvolve is a commitless, top-level-only run of gx-evolve over an epic's
+	// retros; it is never forked from another ticket.
+	TypeEvolve TicketType = "evolve"
 )
 
 var validTypes = map[TicketType]bool{
@@ -117,11 +120,27 @@ var validTypes = map[TicketType]bool{
 	TypeConflictResolution: true,
 	TypePrompt:             true,
 	TypeInvestigate:        true,
+	TypeEvolve:             true,
 }
 
 // Valid reports whether t is one of the canonical type values.
 func (t TicketType) Valid() bool {
 	return validTypes[t]
+}
+
+// Category classifies what a ticket is about. It is deliberately not called
+// kind: `kind: map` already names a different frontmatter field. The empty
+// string is valid: it means the ticket carries no category.
+type Category string
+
+const (
+	CategoryBug  Category = "bug"
+	CategoryIdea Category = "idea"
+)
+
+// Valid reports whether c is a named category or the empty "absent" value.
+func (c Category) Valid() bool {
+	return c == "" || c == CategoryBug || c == CategoryIdea
 }
 
 // IterationStatus is the per-claim self-report an agent leaves on a ticket
@@ -242,6 +261,11 @@ type Ticket struct {
 	// ResolvedBase is the base (ref + SHA) gx stamped at the last claim.
 	// Read-only for authors; never checked by Validate.
 	ResolvedBase string
+	// Category is the optional bug|idea classification any ticket may carry.
+	Category Category
+	// ExportedAt is when gx exported this ticket. gx-managed: `tickets set`
+	// refuses to write it.
+	ExportedAt time.Time
 }
 
 // MuteRecord is one tripped notification throttle: the event type that
@@ -265,7 +289,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
@@ -313,6 +337,12 @@ func Validate(t Ticket) error {
 	}
 	if t.Parent != nil && *t.Parent == t.ID {
 		errs = append(errs, fmt.Errorf("parent: self-reference %q", *t.Parent))
+	}
+	if !t.Category.Valid() {
+		errs = append(errs, fmt.Errorf("category: invalid category %q, want bug or idea", t.Category))
+	}
+	if t.Type == TypeEvolve && t.Parent != nil {
+		errs = append(errs, fmt.Errorf("parent: an evolve ticket is top-level only, got parent %q", *t.Parent))
 	}
 	if t.Base != "" && t.IsCommitless() {
 		errs = append(errs, fmt.Errorf("base: not allowed on a commitless ticket (it has no branch to base)"))

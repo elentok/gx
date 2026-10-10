@@ -54,6 +54,11 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   elapsed_time — stamped by ralphloop at land time
   mutes — notification throttles tripped for this ticket (event type + timestamp),
     machine-written only
+  exported_at (RFC3339 timestamp) — when gx exported the ticket
+
+Other frontmatter fields:
+  category (enum): bug, idea. Optional on any ticket.
+  type evolve: a commitless, top-level-only ticket (it may not have a parent).
 
 Epic frontmatter fields:
 
@@ -64,6 +69,10 @@ An epic's ticket.md also holds epic-level timing. Both fields are gx-managed, no
 settable via ` + "`tickets set`" + `, and unset until ralph-loop stamps them.
   started_at (RFC3339 timestamp) — when work on the epic began
   completed_at (RFC3339 timestamp) — when the epic's last ticket landed
+
+Evolve fields (optional, validated):
+  evolved_at (RFC3339 timestamp), evolve_skipped (bool), evolve_ticket (address),
+  provisional_destination (bool)
 `
 
 func newTicketsSetCmd(d deps) *cobra.Command {
@@ -97,6 +106,11 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, needs-answer, finished)")
+
+	// Declared only so a write attempt is refused with a clear message rather
+	// than cobra's generic unknown-flag error.
+	cmd.Flags().String("exported-at", "", "refused: exported_at is gx-managed")
+	_ = cmd.Flags().MarkHidden("exported-at")
 
 	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
 
@@ -183,6 +197,10 @@ func inMapEpic(path string) bool {
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
 func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error)) error {
+	if c.Flags().Changed("exported-at") {
+		return fmt.Errorf("%s: exported_at is gx-managed and not settable via `tickets set`", path)
+	}
+
 	if c.Flags().Changed("status") {
 		status, _ := c.Flags().GetString("status")
 		s := schema.Status(status)

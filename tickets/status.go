@@ -95,6 +95,7 @@ var commitlessByDesignTypes = map[string]bool{
 	string(schema.TypeConflictResolution): true,
 	string(schema.TypePrompt):             true,
 	string(schema.TypeInvestigate):        true,
+	string(schema.TypeEvolve):             true,
 }
 
 // ShowsCommitlessSuffix reports whether t's UI row should append

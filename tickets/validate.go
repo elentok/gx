@@ -3,6 +3,7 @@ package tickets
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets/schema"
@@ -29,6 +30,9 @@ func ValidateProject(projectDir string) error {
 	for _, epic := range epics {
 		if !epic.HasTicketMD {
 			errs = append(errs, fmt.Errorf("%s: epic directory has no ticket.md (run `gx tickets migrate`)", epic.Path))
+		}
+		for _, msg := range epic.FrontmatterErrs {
+			errs = append(errs, fmt.Errorf("%s: %s", filepath.Join(epic.Path, "ticket.md"), msg))
 		}
 		for _, t := range epic.Tickets {
 			if _, err := schema.ParseTicket(t.Path); err != nil {

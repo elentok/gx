@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -34,6 +35,8 @@ type ticketYAML struct {
 	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
 	Base                  string       `yaml:"base,omitempty"`
 	ResolvedBase          string       `yaml:"resolved_base,omitempty"`
+	Category              string       `yaml:"category,omitempty"`
+	ExportedAt            time.Time    `yaml:"exported_at,omitempty"`
 
 	// Children is the retired field, declared here and nowhere else: the wire
 	// struct is the only place that has to recognize it (yaml.v3 silently
@@ -73,6 +76,8 @@ func (w ticketYAML) toTicket() Ticket {
 		Mutes:                 copyMutes(w.Mutes),
 		Base:                  w.Base,
 		ResolvedBase:          w.ResolvedBase,
+		Category:              Category(w.Category),
+		ExportedAt:            w.ExportedAt,
 	}
 	if w.Parent != "" {
 		id := TicketID(w.Parent)
@@ -101,6 +106,8 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Mutes:                 copyMutes(t.Mutes),
 		Base:                  t.Base,
 		ResolvedBase:          t.ResolvedBase,
+		Category:              string(t.Category),
+		ExportedAt:            t.ExportedAt,
 	}
 	if t.Parent != nil {
 		w.Parent = string(*t.Parent)

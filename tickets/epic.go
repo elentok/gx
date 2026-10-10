@@ -37,6 +37,16 @@ type Epic struct {
 	// it doesn't set the field.
 	StartedAt   time.Time
 	CompletedAt time.Time
+
+	// The evolve fields come from ticket.md's frontmatter; zero when unset.
+	EvolvedAt              time.Time
+	EvolveSkipped          bool
+	EvolveTicket           string // address of the epic's evolve ticket
+	ProvisionalDestination bool
+
+	// FrontmatterErrs holds ticket.md field values that failed to parse, each
+	// prefixed with its field name; ValidateProject reports them.
+	FrontmatterErrs []string
 }
 
 // TotalCount is the epic's total ticket count.
