@@ -366,6 +366,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	followUpAddCmd.Flags().BoolVar(&followUpJSON, "json", false, "emit {address, path} JSON")
 	followUpCmd.AddCommand(followUpAddCmd)
 	cmd.AddCommand(followUpCmd)
+	cmd.AddCommand(newTicketsEpicCmd(d))
 	var sectionJSON bool
 	sectionCmd := &cobra.Command{
 		Use:   "section <addr|path> <heading> <content|->",
