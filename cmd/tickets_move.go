@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -104,6 +106,8 @@ type movePlan struct {
 	ticket    schema.Ticket
 	body      string
 	rewritten []string
+	inbound   []inboundEdit
+	warnings  []string
 }
 
 // planMove runs the refusals and computes the moved ticket, writing nothing.
@@ -191,11 +195,209 @@ func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 	if _, err := os.Stat(p.newPath); err == nil {
 		return movePlan{}, fmt.Errorf("%s already exists", p.newPath)
 	}
+	if err := p.planInbound(root, epics); err != nil {
+		return movePlan{}, err
+	}
 	return p, nil
 }
 
-// applyMove writes the new file, then deletes the old one, under the old
-// file's ticket lock.
+// inboundEdit is one file (a ticket, or an epic's ticket.md) holding refs to
+// the moved ticket.
+type inboundEdit struct {
+	path string
+	fn   func(ref string) string
+}
+
+// respeller returns the function that re-spells a ref written in epic inEpic
+// when it names the moved ticket, matched by sibling key rather than spelling;
+// every other ref comes back unchanged.
+func respeller(project string, from, to tickets.Address, inEpic string) func(string) string {
+	return func(ref string) string {
+		rest := ref
+		if proj, r, ok := strings.Cut(ref, ":"); ok {
+			if proj != project {
+				return ref
+			}
+			rest = r
+		}
+		epic, id := inEpic, rest
+		if e, i, ok := strings.Cut(rest, "/"); ok {
+			epic, id = e, i
+		}
+		if epic != from.Epic || !schema.TicketID(id).Valid() || tickets.SiblingKey(id) != tickets.SiblingKey(from.ID) {
+			return ref
+		}
+		if inEpic == to.Epic {
+			return to.ID
+		}
+		return to.Epic + "/" + to.ID
+	}
+}
+
+// planInbound finds every blocked_by/base ref to the moved ticket in the
+// project (terminal tickets and epic ticket.md files included), validates the
+// rewritten project in memory and lists files that still mention the old
+// address in prose. It writes nothing; applyMove replays p.inbound.
+//
+// Only errors the move introduces refuse it: a project that was already
+// broken elsewhere must not become unmovable.
+func (p *movePlan) planInbound(root string, epics []tickets.Epic) error {
+	project := p.from.Project
+	rewrittenFiles := map[string]string{} // path -> content after the rewrite
+	post := make([]tickets.Epic, len(epics))
+
+	describe := func(path string, fn func(string) string, blockedBy []string, base string) {
+		for _, ref := range blockedBy {
+			if next := fn(ref); next != ref {
+				p.rewritten = append(p.rewritten, fmt.Sprintf("%s: blocked_by: %s -> %s", path, ref, next))
+			}
+		}
+		if next := fn(base); base != "" && next != base {
+			p.rewritten = append(p.rewritten, fmt.Sprintf("%s: base: %s -> %s", path, base, next))
+		}
+	}
+	// scan reads path, records what its rewrite yields and queues the edit.
+	scan := func(path string, fn func(string) string) (changed bool, err error) {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return false, err
+		}
+		next, changed, err := tickets.RewriteFrontmatterRefs(string(raw), fn)
+		if err != nil {
+			return false, fmt.Errorf("%s: %w", path, err)
+		}
+		rewrittenFiles[path] = next
+		if changed {
+			p.inbound = append(p.inbound, inboundEdit{path: path, fn: fn})
+		}
+		return changed, nil
+	}
+	mapRefs := func(refs []string, fn func(string) string) []string {
+		out := make([]string, len(refs))
+		for i, r := range refs {
+			out[i] = fn(r)
+		}
+		return out
+	}
+
+	for i, e := range epics {
+		fn := respeller(project, p.from, p.to, e.Name)
+		post[i] = e
+		post[i].Tickets = nil
+
+		mdPath := filepath.Join(root, e.Name, "ticket.md")
+		if e.HasTicketMD {
+			changed, err := scan(mdPath, fn)
+			if err != nil {
+				return err
+			}
+			if changed {
+				describe(mdPath, fn, e.BlockedBy, e.Base)
+				post[i].BlockedBy = mapRefs(e.BlockedBy, fn)
+				post[i].Base = fn(e.Base)
+			}
+		}
+		for _, t := range e.Tickets {
+			if t.Path == p.oldPath {
+				continue
+			}
+			changed, err := scan(t.Path, fn)
+			if err != nil {
+				return err
+			}
+			if changed {
+				describe(t.Path, fn, t.BlockedBy, t.Base)
+				t.BlockedBy = mapRefs(t.BlockedBy, fn)
+				t.Base = fn(t.Base)
+			}
+			post[i].Tickets = append(post[i].Tickets, t)
+		}
+		if e.Name == p.to.Epic {
+			moved := tickets.Ticket{
+				Number:     leadingNumber(p.to.ID),
+				Identifier: p.to.ID,
+				Path:       p.newPath,
+				Type:       string(p.ticket.Type),
+				BlockedBy:  idsToStrings(p.ticket.BlockedBy),
+				Status:     string(p.ticket.Status),
+				Base:       p.ticket.Base,
+			}
+			post[i].Tickets = append(post[i].Tickets, moved)
+		}
+	}
+
+	before := map[string]bool{}
+	for _, err := range tickets.ValidateRefs(project, epics) {
+		before[err.Error()] = true
+	}
+	var broken []string
+	for _, err := range tickets.ValidateRefs(project, post) {
+		if !before[err.Error()] {
+			broken = append(broken, err.Error())
+		}
+	}
+	if len(broken) > 0 {
+		return moveRefusal(tickets.CodeMoveBrokenProj, "moving %s would break the project:\n  %s", p.from.ID, strings.Join(broken, "\n  "))
+	}
+
+	p.warnings = p.proseMentions(root, rewrittenFiles)
+	return nil
+}
+
+func idsToStrings(ids []schema.TicketID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = string(id)
+	}
+	return out
+}
+
+// leadingNumber is the numeric prefix of a ticket id ("12a" -> 12).
+func leadingNumber(id string) int {
+	n, _ := strconv.Atoi(strings.TrimRightFunc(id, unicode.IsLetter))
+	return n
+}
+
+// proseMentions lists the markdown files that still spell the old address
+// ("epic/NN") after the ref rewrites; prose is never rewritten, only reported.
+// after holds the post-rewrite content of the files planInbound already read.
+func (p movePlan) proseMentions(root string, after map[string]string) []string {
+	old := regexp.MustCompile(`(?:^|[^A-Za-z0-9_/-])` + regexp.QuoteMeta(p.from.Epic+"/"+p.from.ID) + `(?:[^A-Za-z0-9]|$)`)
+	var out []string
+	if old.MatchString(p.body) {
+		out = append(out, p.newPath)
+	}
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() && path != root && strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".md") || path == p.oldPath {
+			return nil
+		}
+		content, ok := after[path]
+		if !ok {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			content = string(data)
+		}
+		if old.MatchString(content) {
+			out = append(out, path)
+		}
+		return nil
+	})
+	slices.Sort(out)
+	return out
+}
+
+// applyMove writes the new file, rewrites the inbound refs, then deletes the
+// old file, so a crash in between leaves a valid project with the ticket in
+// both epics rather than a dangling ref or a lost ticket. The old file's
+// ticket lock is held throughout.
 func applyMove(p movePlan) error {
 	unlock, err := schema.LockTicket(p.oldPath)
 	if err != nil {
@@ -213,6 +415,11 @@ func applyMove(p movePlan) error {
 	if err := os.WriteFile(p.newPath, out, 0644); err != nil {
 		return fmt.Errorf("writing ticket %s: %w", p.newPath, err)
 	}
+	for _, e := range p.inbound {
+		if _, err := tickets.RewriteRefsInFile(e.path, e.fn); err != nil {
+			return err
+		}
+	}
 	return os.Remove(p.oldPath)
 }
 
@@ -222,23 +429,35 @@ func printMove(w io.Writer, p movePlan, jsonOut bool, mode string) error {
 		if rewritten == nil {
 			rewritten = []string{}
 		}
+		warnings := p.warnings
+		if warnings == nil {
+			warnings = []string{}
+		}
 		return writeStamped(w, struct {
 			From      string   `json:"from"`
 			To        string   `json:"to"`
 			Path      string   `json:"path"`
 			Rewritten []string `json:"rewritten"`
+			Warnings  []string `json:"warnings"`
 			DryRun    bool     `json:"dry_run,omitempty"`
-		}{p.from.String(), p.to.String(), p.newPath, rewritten, mode == "dry-run"}, viaDirect, callerActor(os.Getwd))
+		}{p.from.String(), p.to.String(), p.newPath, rewritten, warnings, mode == "dry-run"}, viaDirect, callerActor(os.Getwd))
 	}
 	if mode != "dry-run" {
-		_, err := fmt.Fprintln(w, p.to.String())
-		return err
+		if _, err := fmt.Fprintln(w, p.to.String()); err != nil {
+			return err
+		}
+	} else {
+		if _, err := fmt.Fprintf(w, "%s -> %s (%s)\n", p.from, p.to, p.newPath); err != nil {
+			return err
+		}
+		for _, r := range p.rewritten {
+			if _, err := fmt.Fprintln(w, "  "+r); err != nil {
+				return err
+			}
+		}
 	}
-	if _, err := fmt.Fprintf(w, "%s -> %s (%s)\n", p.from, p.to, p.newPath); err != nil {
-		return err
-	}
-	for _, r := range p.rewritten {
-		if _, err := fmt.Fprintln(w, "  "+r); err != nil {
+	for _, path := range p.warnings {
+		if _, err := fmt.Fprintf(w, "warning: %s still mentions %s\n", path, p.from); err != nil {
 			return err
 		}
 	}

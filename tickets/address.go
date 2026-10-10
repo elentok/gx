@@ -28,6 +28,7 @@ const (
 	CodeMoveMapSource    = "move-map-source"
 	CodeMoveSameEpic     = "move-same-epic"
 	CodeMoveCrossProject = "move-cross-project"
+	CodeMoveBrokenProj   = "move-broken-project"
 )
 
 // AddressError is a refused address with a stable Code.

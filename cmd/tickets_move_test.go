@@ -240,3 +240,145 @@ func moveTreeSnapshot(t *testing.T, root string) string {
 	}
 	return b.String()
 }
+
+// addInboundFixtures adds tickets that point at src/01 in every ref shape: a
+// target-epic ticket, a project-qualified ref and a terminal ticket in another
+// epic, that epic's ticket.md, and a prose mention.
+func addInboundFixtures(t *testing.T, f moveFixture) {
+	t.Helper()
+	far := filepath.Join(f.project, "far")
+	testutil.EnsureEpicTicketMD(t, far)
+	if err := os.MkdirAll(filepath.Join(far, "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, far, "ticket.md", "---\nstatus: open\nblocked_by:\n  - src/01\n---\n\n# far\n")
+	testutil.WriteFile(t, filepath.Join(far, "issues"), "01-q.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - mine:src/01\n---\n\n# 01\n")
+	testutil.WriteFile(t, filepath.Join(far, "issues"), "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nblocked_by:\n  - src/01\n---\n\n# 02\n")
+	testutil.WriteFile(t, filepath.Join(f.project, "dst", "issues"), "04-in.md", "---\nid: \"04\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/01\n  - src/02\n---\n\n# 04\n")
+	testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "08-note.md", "---\nid: \"08\"\nstatus: open\ntype: implement\n---\n\n# 08\n\nsee src/01 and src/010 for context\n")
+}
+
+func TestExecute_TicketsMove_RewritesInboundRefsAndWarnsOnProse(t *testing.T) {
+	f := setupMoveProject(t)
+	addInboundFixtures(t, f)
+
+	out, err := runIn(t, f.repo, "tickets", "move", "src/01", "dst", "--json")
+	if err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name, path string
+		want       []schema.TicketID
+	}{
+		{"bare in source epic", filepath.Join(f.project, "src", "issues", "02-second.md"), []schema.TicketID{"dst/05"}},
+		{"inside target epic", filepath.Join(f.project, "dst", "issues", "04-in.md"), []schema.TicketID{"05", "src/02"}},
+		{"project-qualified", filepath.Join(f.project, "far", "issues", "01-q.md"), []schema.TicketID{"dst/05"}},
+		{"terminal ticket", filepath.Join(f.project, "far", "issues", "02-done.md"), []schema.TicketID{"dst/05"}},
+	} {
+		got, err := schema.ParseTicket(tc.path)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if !equalIDs(got.BlockedBy, tc.want) {
+			t.Errorf("%s: blocked_by = %v, want %v", tc.name, got.BlockedBy, tc.want)
+		}
+	}
+	md, _ := os.ReadFile(filepath.Join(f.project, "far", "ticket.md"))
+	if !strings.Contains(string(md), "dst/05") || strings.Contains(string(md), "src/01") || !strings.Contains(string(md), "# far") {
+		t.Errorf("epic ticket.md not rewritten:\n%s", md)
+	}
+
+	m := decodeJSON(t, []byte(out))
+	rewritten, _ := m["rewritten"].([]any)
+	for _, p := range []string{
+		filepath.Join(f.project, "src", "issues", "02-second.md"),
+		filepath.Join(f.project, "dst", "issues", "04-in.md"),
+		filepath.Join(f.project, "far", "issues", "01-q.md"),
+		filepath.Join(f.project, "far", "issues", "02-done.md"),
+		filepath.Join(f.project, "far", "ticket.md"),
+	} {
+		if !listMentions(rewritten, p) {
+			t.Errorf("rewritten %v does not list %s", rewritten, p)
+		}
+	}
+	warnings, _ := m["warnings"].([]any)
+	note := filepath.Join(f.project, "src", "issues", "08-note.md")
+	if len(warnings) != 1 || warnings[0] != note {
+		t.Errorf("warnings = %v, want only %s (src/010 is another ticket)", warnings, note)
+	}
+	if raw, _ := os.ReadFile(note); !strings.Contains(string(raw), "see src/01 and") {
+		t.Errorf("prose was rewritten:\n%s", raw)
+	}
+}
+
+func TestExecute_TicketsMove_TextOutputWarnsOnProse(t *testing.T) {
+	f := setupMoveProject(t)
+	addInboundFixtures(t, f)
+
+	out, err := runIn(t, f.repo, "tickets", "move", "src/01", "dst")
+	if err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	if !strings.HasPrefix(out, "mine:dst/05\n") || !strings.Contains(out, "warning: "+filepath.Join(f.project, "src", "issues", "08-note.md")) {
+		t.Errorf("stdout = %q", out)
+	}
+}
+
+func TestExecute_TicketsMove_DryRunPlansInboundWithoutWriting(t *testing.T) {
+	f := setupMoveProject(t)
+	addInboundFixtures(t, f)
+	before := moveTreeSnapshot(t, f.project)
+
+	out, err := runIn(t, f.repo, "tickets", "move", "src/01", "dst", "--dry-run")
+	if err != nil {
+		t.Fatalf("dry-run: %v", err)
+	}
+	if !strings.Contains(out, "04-in.md: blocked_by: src/01 -> 05") {
+		t.Errorf("plan = %q, want the inbound rewrite", out)
+	}
+	if after := moveTreeSnapshot(t, f.project); after != before {
+		t.Errorf("dry-run wrote something")
+	}
+}
+
+// The move itself never makes a good ref bad; these projects were already
+// broken in a way the move would carry over, so it refuses and writes nothing.
+func TestExecute_TicketsMove_BrokenResultRefusesWritingNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name, ticket string
+	}{
+		// dst/09 doesn't exist: after the move it is bare 09 in the target.
+		{"dangling", "---\nid: \"09\"\nstatus: open\ntype: implement\nblocked_by:\n  - dst/09\n---\n\n# 09\n"},
+		// src/09 waits on dst/01, which waits on src/09.
+		{"cycle", "---\nid: \"09\"\nstatus: open\ntype: implement\nblocked_by:\n  - dst/01\n---\n\n# 09\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := setupMoveProject(t)
+			testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "09-x.md", tc.ticket)
+			if tc.name == "cycle" {
+				testutil.WriteFile(t, filepath.Join(f.project, "dst", "issues"), "01-one.md",
+					"---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/09\n---\n\n# 01\n")
+			}
+			before := moveTreeSnapshot(t, f.project)
+
+			_, err := runIn(t, f.repo, "tickets", "move", "src/09", "dst")
+			var ae *tickets.AddressError
+			if !errors.As(err, &ae) || ae.Code != tickets.CodeMoveBrokenProj {
+				t.Fatalf("err = %v, want code %s", err, tickets.CodeMoveBrokenProj)
+			}
+			if after := moveTreeSnapshot(t, f.project); after != before {
+				t.Errorf("refusal wrote something")
+			}
+		})
+	}
+}
+
+func listMentions(items []any, sub string) bool {
+	for _, it := range items {
+		if s, _ := it.(string); strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
+}
