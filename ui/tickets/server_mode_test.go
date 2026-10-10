@@ -187,14 +187,15 @@ func TestServerMode_ScopeToggleSurvivesDeliveredState(t *testing.T) {
 	}
 }
 
-func TestServerMode_OutsideProjectShowsAllWithHint(t *testing.T) {
+// The first-load hint comes from the app shell, so the tab stays quiet.
+func TestServerMode_OutsideProjectShowsAllWithoutToasting(t *testing.T) {
 	m := withState(newServerModel(t).WithCwdProject(""), scopeSnap)
 	if len(m.epics) != 2 {
 		t.Fatalf("epics = %d, want all", len(m.epics))
 	}
 	_, cmd := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	if got := toastsOf(cmd); len(got) != 1 || !strings.Contains(got[0].Message, "gx project add .") {
-		t.Fatalf("hint toasts = %+v", got)
+	if got := toastsOf(cmd); len(got) != 0 {
+		t.Fatalf("tab toasts = %+v", got)
 	}
 }
 

@@ -78,9 +78,6 @@ type Model struct {
 	// every epicsLoadedMsg) auto-invalidates the cache if the archive's count
 	// changed since it was loaded.
 	archivedLazy tree.LazySection[tickets.Epic]
-	// scopeKnown: WithCwdProject ran, so an empty scope.CwdProject means "not in a
-	// registered project" rather than "never told".
-	scopeKnown bool
 
 	// sidebarTree owns the sidebar's selection/scroll/collapse state (ticket
 	// 02e1): a tree.Model[sidebarNode] built from buildSidebarEntries,
@@ -141,9 +138,6 @@ type Model struct {
 	// scope is which projects the tab shows; owned by the tab, so no snapshot
 	// or event can reset it.
 	scope viewmodel.Scope
-	// hintPending: the first delivered state asked for the "unregistered
-	// project" toast; Update emits it on its next message.
-	hintPending bool
 	// fallbackStop is non-nil while the server is down and the tab reads the
 	// store itself (server_refresh.go); fallbackGen orphans a finished
 	// fallback's in-flight ticks.
@@ -214,10 +208,6 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
-	if nm.hintPending {
-		nm.hintPending = false
-		cmd = tea.Batch(cmd, notify.Info(nm.scope.UnregisteredHint()))
-	}
 	nm.syncPreviewViewport()
 	return nm, cmd
 }

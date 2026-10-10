@@ -27,6 +27,9 @@ type serverStream struct {
 	// that a link-down (or a newer request) has outdated.
 	snapshotting bool
 	gen          uint64
+	// snapshotFailing: the last snapshot failed, so further failures stay quiet
+	// until one succeeds.
+	snapshotFailing bool
 
 	// streamCtx is set from the moment a subscription is requested, so a
 	// non-nil value means "a stream is live or being opened".
@@ -164,13 +167,29 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		m.stream.snapshotting = false
 		if msg.err != nil {
-			// The next probe tick retries while the link is still up.
+			// The next probe tick retries while the link is still up; only the
+			// first failure of a streak toasts.
+			if m.stream.snapshotFailing {
+				return m, nil, true
+			}
+			m.stream.snapshotFailing = true
 			return m, notify.Error("server snapshot: " + msg.err.Error()), true
 		}
+		m.stream.snapshotFailing = false
+		firstLoad := !m.stream.loaded
 		m.stream.vm = m.stream.vm.ApplySnapshot(msg.snap)
 		m.stream.loaded = true
 		m, subscribe := m.subscribe(msg.snap.Seq)
-		return m.deliverServerState(), tea.Batch(subscribe, m.cmdStreamQueue()), true
+		cmds := []tea.Cmd{subscribe, m.cmdStreamQueue()}
+		if firstLoad {
+			// Reading the snapshot is not news, but not being in a registered
+			// project is worth saying once, whichever tab is open.
+			scope := viewmodel.Scope{CwdProject: cwdProjectName(m.settings.ActiveWorktreePath)}
+			if hint := scope.UnregisteredHint(); hint != "" {
+				cmds = append(cmds, notify.Info(hint))
+			}
+		}
+		return m.deliverServerState(), tea.Batch(cmds...), true
 
 	case streamSubscribedMsg:
 		if msg.ctx != m.stream.streamCtx {
@@ -199,6 +218,11 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m.deliverServerState(), tea.Batch(cmds...), true
 
 	case ticketsui.ResnapshotRequestedMsg:
+		// The queue is refetched when the snapshot lands. Down-mode "R" never
+		// reaches here: the tabs reload from disk.
+		if m.serverConn.State == ServerDown {
+			return m, nil, true
+		}
 		m, cmd := m.startSnapshot()
 		return m, cmd, true
 

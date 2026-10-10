@@ -534,6 +534,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueuePreviewBottom:
 			m.previewVP.GotoBottom()
 		case bindingQueueReload:
+			if m.serverAPI != nil && !m.serverDown {
+				// The shell owns the snapshot; it hands the result back as state.
+				return m, func() tea.Msg { return ResnapshotRequestedMsg{} }
+			}
 			return m, m.cmdLoadQueue()
 		case bindingQueuePauseResume:
 			if m.serverAPI != nil {

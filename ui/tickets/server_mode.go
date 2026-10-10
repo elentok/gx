@@ -201,10 +201,8 @@ func (m Model) WithServerState(st *viewmodel.State) tea.Model {
 	if st == nil || m.onFallback() {
 		return m
 	}
-	firstLoad := !m.loaded
 	m.vm = *st
 	m.loaded = true
-	m.hintPending = firstLoad && m.scopeKnown && m.scope.UnregisteredHint() != ""
 	return m.applyServerRows()
 }
 
@@ -212,7 +210,6 @@ func (m Model) WithServerState(st *viewmodel.State) tea.Model {
 // "" means the cwd is not a registered project, so the tab shows all.
 func (m Model) WithCwdProject(name string) Model {
 	m.scope.CwdProject = name
-	m.scopeKnown = true
 	return m
 }
 

@@ -417,12 +417,81 @@ func TestServerStream_SnapshotNeverToastsButFailureDoes(t *testing.T) {
 	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3, Tickets: f.tickets}})
 	h.m = next.(Model)
 	for _, got := range toastTexts(cmd) {
-		t.Fatalf("snapshot toasted: %+v", got)
+		if got.Kind == notify.KindWarning { // the unregistered-project hint is Info
+			t.Fatalf("snapshot toasted: %+v", got)
+		}
 	}
 
 	h.m.stream.snapshotting = true
 	_, cmd = h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, err: context.DeadlineExceeded})
 	if got := toastTexts(cmd); len(got) != 1 || got[0].Kind != notify.KindError {
 		t.Fatalf("failed snapshot toasts = %+v", got)
+	}
+}
+
+func TestServerStream_FailureStreakToastsOnceAndRetriesOnProbeTick(t *testing.T) {
+	h, f := newStreamHarness(t)
+	f.snapErr = context.DeadlineExceeded
+	h.m.serverConn = ServerConn{State: ServerUp}
+	fail := func() []notify.NotifyMsg {
+		h.m.stream.snapshotting = true
+		next, cmd := h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, err: f.snapErr})
+		h.m = next.(Model)
+		return toastTexts(cmd)
+	}
+	if got := fail(); len(got) != 1 {
+		t.Fatalf("first failure toasts = %+v", got)
+	}
+	if !h.m.streamWanted() {
+		t.Fatal("a failed snapshot must leave the shell wanting a stream, for the next probe tick")
+	}
+	if got := fail(); len(got) != 0 {
+		t.Fatalf("same streak toasted again: %+v", got)
+	}
+
+	// A success ends the streak, so the next failure toasts again.
+	next, _ := h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen})
+	h.m = next.(Model)
+	if got := fail(); len(got) != 1 {
+		t.Fatalf("failure after a success toasts = %+v", got)
+	}
+}
+
+func TestServerStream_UnregisteredHintComesFromShellOnFirstSnapshotOnly(t *testing.T) {
+	h, _ := newStreamHarness(t) // the temp worktree is not a registered project
+	hints := func(cmd tea.Cmd) int {
+		n := 0
+		for _, got := range toastTexts(cmd) {
+			if got.Kind == notify.KindInfo && strings.Contains(got.Message,"not in a registered project") {
+				n++
+			}
+		}
+		return n
+	}
+	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3}})
+	if got := hints(cmd); got != 1 {
+		t.Fatalf("first snapshot hints = %d, want 1", got)
+	}
+	h.m = next.(Model)
+	h.m.stream.snapshotting = true
+	_, cmd = h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, snap: server.Snapshot{Seq: 4}})
+	if got := hints(cmd); got != 0 {
+		t.Fatalf("later snapshot hints = %d, want 0", got)
+	}
+}
+
+func TestServerStream_RefreshAsksForOneSnapshotPlusQueue(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	before, _, _ := f.counts()
+	h.send(ticketsui.ResnapshotRequestedMsg{})
+	h.send(ticketsui.ResnapshotRequestedMsg{}) // coalesces into the one in flight
+	h.pump()
+	after, _, live := f.counts()
+	if after-before != 1 {
+		t.Fatalf("snapshots = %d, want 1", after-before)
+	}
+	if live != 1 {
+		t.Fatalf("live streams = %d, want 1", live)
 	}
 }
