@@ -959,7 +959,7 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Se
 		return "", fmt.Errorf("closing reattached conflict-resolution session: %w", err)
 	}
 
-	if err := MarkDone(childPath); err != nil {
+	if err := MarkChildDone(childPath); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
 
@@ -1040,7 +1040,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		return "", parkConflictResolutionChildNeedsRepair(p, childPath, childID, label, reason)
 	}
 
-	if err := MarkDone(childPath); err != nil {
+	if err := MarkChildDone(childPath); err != nil {
 		return "", fmt.Errorf("marking conflict-resolution ticket %s done: %w", childPath, err)
 	}
 

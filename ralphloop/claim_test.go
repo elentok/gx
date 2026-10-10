@@ -170,6 +170,22 @@ func TestMarkDone_RewritesStatus(t *testing.T) {
 	}
 }
 
+func TestMarkChildDone_RepairsInvalidStatus(t *testing.T) {
+	t.Parallel()
+	for _, status := range []string{"resolved", "claimed"} {
+		path := writeFrontmatterTicket(t, status)
+		if err := MarkDone(path); status == "resolved" && err == nil {
+			t.Fatalf("MarkDone accepted invalid status %q", status)
+		}
+		if err := MarkChildDone(path); err != nil {
+			t.Fatalf("MarkChildDone(%s): %v", status, err)
+		}
+		if got := mustParse(t, path).Status; got != schema.StatusDone {
+			t.Errorf("from %s: Status = %q, want %q", status, got, schema.StatusDone)
+		}
+	}
+}
+
 func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
 	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")

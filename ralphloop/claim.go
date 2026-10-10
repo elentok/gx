@@ -154,6 +154,26 @@ func updateTicket(path string, mutate func(*schema.Ticket)) error {
 // need to rewrite the ticket's markdown body (e.g. appending a note),
 // leaving the same atomic-write/torn-read guarantees.
 func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) error {
+	return rewriteTicket(path, schema.ParseTicketFromRaw, mutate)
+}
+
+// MarkChildDone is MarkDone for a conflict-resolution child gx closes itself
+// after the agent exits. The agent may have hand-edited the ticket into an
+// invalid status (e.g. "resolved"); gx owns that field, so the parse skips
+// validation and the write repairs status to done rather than failing the
+// close and parking the parent.
+func MarkChildDone(path string) error {
+	return rewriteTicket(path, lenientParseTicket, func(t *schema.Ticket, _ *string) {
+		t.Status = schema.StatusDone
+	})
+}
+
+func lenientParseTicket(raw, path string) (schema.Ticket, error) {
+	r, err := schema.ParseTicketRaw(raw, path)
+	return r.Ticket, err
+}
+
+func rewriteTicket(path string, parse func(raw, path string) (schema.Ticket, error), mutate func(*schema.Ticket, *string)) error {
 	unlock, err := schema.LockTicket(path)
 	if err != nil {
 		return err
@@ -165,7 +185,7 @@ func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) err
 		return err
 	}
 
-	t, err := schema.ParseTicketFromRaw(string(raw), path)
+	t, err := parse(string(raw), path)
 	if err != nil {
 		return fmt.Errorf("reading ticket %s: %w", path, err)
 	}
