@@ -110,7 +110,7 @@ func (m QueueModel) handleCascadeDeleteConfirmed(msg cascadeDeleteConfirmedMsg) 
 			return m, notify.Error("update ticket: " + err.Error())
 		}
 	}
-	return m, m.cmdLoadQueue()
+	return m, nil
 }
 
 // toTicketIDs lifts plain blocked_by token strings back to schema.TicketID,

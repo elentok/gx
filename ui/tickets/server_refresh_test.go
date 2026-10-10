@@ -6,47 +6,46 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
 
-// Seam D: refresh mode follows the connection.
+// Seam D: the tab reads the store only while the server is down.
 func TestRefresh_FollowsConnection(t *testing.T) {
 	m := newServerModel(t)
-	if m.onFallback() {
-		t.Fatal("connected tab is on the fallback")
+	if m.readsDisk() {
+		t.Fatal("connected tab reads the store")
 	}
 
 	next, cmd := m.Update(ServerDownMsg{})
 	m = next.(Model)
-	if !m.onFallback() {
-		t.Fatal("down tab is not on the fallback")
+	if !m.readsDisk() {
+		t.Fatal("down tab does not read the store")
 	}
 	if cmd == nil {
-		t.Fatal("going down must start the fallback watch and poll")
+		t.Fatal("going down must load from disk")
 	}
 
 	// The shell re-snapshots on reconnect and delivers; the tab fetches nothing.
 	next, cmd = m.Update(ServerUpMsg{})
 	m = next.(Model)
-	if m.onFallback() {
-		t.Fatal("reconnected tab is on the fallback")
+	if m.readsDisk() {
+		t.Fatal("reconnected tab reads the store")
 	}
 	if cmd != nil {
 		t.Fatal("reconnecting must not fetch a snapshot itself")
 	}
 }
 
-// Seam B: with no client the tab starts, and stays, on the down fallback.
+// Seam B: with no client the tab starts, and stays, reading the store.
 func TestRefresh_NoClientStartsDown(t *testing.T) {
-	m := NewModel(t.TempDir(), ui.Settings{}, keys.Manager{})
-	next, _ := m.Update(m.Init()())
-	m = next.(Model)
-	t.Cleanup(m.fallbackStop)
-	if !m.onFallback() || m.serverLink != ServerLinkDown {
-		t.Fatalf("fallback=%v link=%v, want the down fallback", m.onFallback(), m.serverLink)
+	// The shell builds the tab down when it has no client (ServerConn.link).
+	m := NewModel(t.TempDir(), ui.Settings{}, keys.Manager{}).WithServerLink(ServerLinkDown)
+	if m.Init() == nil {
+		t.Fatal("a tab with no client must load from disk on Init")
+	}
+	if !m.readsDisk() {
+		t.Fatal("a tab with no client does not read the store")
 	}
 	if _, blocked := m.serverKeyGuard(bindingTicketsAddToQueue); !blocked {
 		t.Fatal(`"a" is not blocked without a server`)
@@ -55,34 +54,44 @@ func TestRefresh_NoClientStartsDown(t *testing.T) {
 
 func TestRefresh_NoDiskPollWhileConnected(t *testing.T) {
 	m := newServerModel(t)
-	next, cmd := m.Update(epicsLoadedMsg{})
+	_, cmd := m.Update(epicsLoadedMsg{})
 	if cmd != nil {
 		t.Fatalf("a connected load scheduled %v; want no poll timer", cmd)
 	}
-	_ = next
 }
 
-func TestRefresh_DownFallbackPollsAndIgnoresStaleTicks(t *testing.T) {
+// The shell tells the tab the store changed; a connected tab ignores it, and a
+// down tab reloads. The tab keeps no loop of its own.
+func TestRefresh_StoreChangedReloadsOnlyWhenDown(t *testing.T) {
 	m := newServerModel(t)
-	next, _ := m.Update(ServerDownMsg{})
-	m = next.(Model)
-
-	_, cmd := m.Update(fallbackPollMsg{gen: m.fallbackGen})
-	if cmd == nil {
-		t.Fatal("a live poll tick must reload and re-arm")
+	if _, cmd := m.Update(StoreChangedMsg{}); cmd != nil {
+		t.Fatal("a connected tab reloaded on a store change")
 	}
 
-	next, _ = m.Update(ServerUpMsg{})
-	m = next.(Model)
-	_, cmd = m.Update(fallbackPollMsg{gen: m.fallbackGen - 1})
-	if cmd != nil {
-		t.Fatal("a tick from a finished fallback must be dropped")
+	next, _ := m.Update(ServerDownMsg{})
+	_, cmd := next.Update(StoreChangedMsg{})
+	if cmd == nil {
+		t.Fatal("a down tab must reload on a store change")
+	}
+	if _, ok := cmd().(epicsLoadedMsg); !ok {
+		t.Fatal("a store change must be a single disk read, not a loop")
 	}
 }
 
-func TestRefresh_DownWatchFiresOnStoreChange(t *testing.T) {
+func TestRefresh_ActivationReloadsOnlyWhenDown(t *testing.T) {
+	m := newServerModel(t)
+	if m.OnPageActivated() != nil {
+		t.Fatal("a connected tab reloaded on activation")
+	}
+	next, _ := m.Update(ServerDownMsg{})
+	if next.(Model).OnPageActivated() == nil {
+		t.Fatal("a down tab must reload on activation")
+	}
+}
+
+func TestRefresh_WatchFiresOnStoreChange(t *testing.T) {
 	dir := t.TempDir()
-	events, stop, err := watchStore(dir)
+	events, stop, err := WatchStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,5 +105,3 @@ func TestRefresh_DownWatchFiresOnStoreChange(t *testing.T) {
 		t.Fatal("no change signal after a store write")
 	}
 }
-
-var _ tea.Msg = fallbackPollMsg{}

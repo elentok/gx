@@ -42,26 +42,37 @@ type serverConnMsg struct {
 	// slow: the handshake failed for a reason other than "nothing listens", so
 	// the last known state stands.
 	slow bool
+	// manual: asked for by a page ("R", a finished start), not by the probe
+	// loop, so the result must not arm another tick.
+	manual bool
 }
 
-func (m Model) cmdServerProbe() tea.Cmd {
+func (m Model) cmdServerProbe() tea.Cmd { return m.cmdProbe(false) }
+
+func (m Model) cmdProbe(manual bool) tea.Cmd {
 	d := m.settings.Server
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), serverProbeTimeout)
-		defer cancel()
-		n, err := d.Client.Negotiate(ctx, d.Build)
-		switch {
-		case err != nil && !apiclient.IsNotRunning(err):
-			return serverConnMsg{slow: true}
-		case err != nil:
-			return serverConnMsg{conn: ServerConn{State: ServerDown}}
-		case n.ReadOnly:
-			return serverConnMsg{conn: ServerConn{State: ServerReadOnly, PID: n.Pid}}
-		case n.HerdrUnavailable:
-			return serverConnMsg{conn: ServerConn{State: ServerHerdrUnavailable, PID: n.Pid}}
-		}
-		return serverConnMsg{conn: ServerConn{State: ServerUp, PID: n.Pid}}
+		msg := handshake(d)
+		msg.manual = manual
+		return msg
 	}
+}
+
+func handshake(d *ServerDeps) serverConnMsg {
+	ctx, cancel := context.WithTimeout(context.Background(), serverProbeTimeout)
+	defer cancel()
+	n, err := d.Client.Negotiate(ctx, d.Build)
+	switch {
+	case err != nil && !apiclient.IsNotRunning(err):
+		return serverConnMsg{slow: true}
+	case err != nil:
+		return serverConnMsg{conn: ServerConn{State: ServerDown}}
+	case n.ReadOnly:
+		return serverConnMsg{conn: ServerConn{State: ServerReadOnly, PID: n.Pid}}
+	case n.HerdrUnavailable:
+		return serverConnMsg{conn: ServerConn{State: ServerHerdrUnavailable, PID: n.Pid}}
+	}
+	return serverConnMsg{conn: ServerConn{State: ServerUp, PID: n.Pid}}
 }
 
 func (m Model) cmdServerProbeLater() tea.Cmd {
@@ -77,11 +88,17 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, m.cmdServerProbe(), true
 	case serverConnMsg:
 		if msg.slow {
+			if msg.manual {
+				return m, nil, true
+			}
 			return m, m.cmdServerProbeLater(), true
 		}
 		prev := m.serverConn
 		m.serverConn = msg.conn
-		cmds := []tea.Cmd{m.cmdServerProbeLater()}
+		var cmds []tea.Cmd
+		if !msg.manual {
+			cmds = append(cmds, m.cmdServerProbeLater())
+		}
 		// Pages start "up", so only a crossing of the down line is announced.
 		wasDown := prev.State == ServerDown
 		isDown := msg.conn.State == ServerDown
@@ -95,6 +112,16 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if announce != nil {
 			cmds = append(cmds, m.broadcastToLivePages(announce))
 		}
+		// The shell, not a page, watches the store while the server is down, so
+		// the watch runs whichever tab is on screen.
+		switch {
+		case isDown:
+			var watchCmd tea.Cmd
+			m, watchCmd = m.startStoreWatch()
+			cmds = append(cmds, watchCmd)
+		default:
+			m = m.stopStoreWatch()
+		}
 		if msg.conn.State == ServerReadOnly && prev.State != ServerReadOnly {
 			m.markTicketsReadOnly()
 		}
@@ -103,6 +130,12 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m, streamCmd := m.onLinkChange()
 		cmds = append(cmds, streamCmd)
 		return m, tea.Batch(cmds...), true
+
+	case ticketsui.ProbeRequestedMsg:
+		if m.settings.Server == nil {
+			return m, nil, true // permanently down: nothing to ask
+		}
+		return m, m.cmdProbe(true), true
 	}
 	return m, nil, false
 }

@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"context"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -10,42 +9,41 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// ServerDownMsg tells the Queue tab the server stopped answering; ServerUpMsg
-// that it answers again. The app shell delivers them from the connection state.
+// ServerDownMsg tells the tabs the server stopped answering; ServerUpMsg that it
+// answers again. The app shell delivers them from the connection state.
 type (
 	ServerDownMsg struct{}
 	ServerUpMsg   struct{}
 )
 
+// ProbeRequestedMsg asks the app shell, which owns the connection, to check the
+// server now (the Queue tab's "R" and a finished server start).
+type ProbeRequestedMsg struct{}
+
 type (
-	queueServerRetryMsg     struct{}
 	queueServerStartedMsg   struct{ err error }
 	queueServerStartConfirm struct{}
 )
 
 const queueServerDownBanner = "server down — s to start"
 
-// WithServerLink puts the Queue tab in server mode: api is probed in the
-// background while the server is down, and start launches it on "s".
+// WithServerLink puts the Queue tab in server mode: rows come from the state
+// the app shell delivers, and start launches the server on "s".
 func (m QueueModel) WithServerLink(api ServerAPI, start func(context.Context) error) QueueModel {
 	m.serverAPI = api
 	m.serverStart = start
 	return m
 }
 
-func (m QueueModel) cmdServerRetryLater() tea.Cmd {
-	return tea.Tick(serverReconnectDelay, func(time.Time) tea.Msg { return queueServerRetryMsg{} })
+// WithServerDown starts the tab in the down state: the server is already
+// unreachable (the tab gets no ServerDownMsg crossing), or there is no client at
+// all, which reads the same.
+func (m QueueModel) WithServerDown() QueueModel {
+	m.serverDown = true
+	return m
 }
 
-func (m QueueModel) cmdServerProbe() tea.Cmd {
-	api := m.serverAPI
-	return func() tea.Msg {
-		if _, err := api.Snapshot(context.Background()); err != nil {
-			return queueServerRetryMsg{}
-		}
-		return ServerUpMsg{}
-	}
-}
+func cmdProbeRequested() tea.Msg { return ProbeRequestedMsg{} }
 
 // updateServerDown handles the server-link messages; ok is false for any other msg.
 func (m QueueModel) updateServerDown(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
@@ -58,12 +56,7 @@ func (m QueueModel) updateServerDown(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 		// Whatever the queue showed is now stale; it refills on reconnect.
 		m.epics, m.shared = nil, nil
 		m.clampSelected()
-		return m, m.cmdServerRetryLater(), true
-	case queueServerRetryMsg:
-		if !m.serverDown {
-			return m, nil, true
-		}
-		return m, tea.Batch(m.cmdServerProbe(), m.cmdServerRetryLater()), true
+		return m, nil, true
 	case ServerUpMsg:
 		if !m.serverDown {
 			return m, nil, true
@@ -83,7 +76,7 @@ func (m QueueModel) updateServerDown(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 		if msg.err != nil {
 			return m, notify.Error("start server: " + msg.err.Error()), true
 		}
-		return m, m.cmdServerProbe(), true
+		return m, cmdProbeRequested, true
 	}
 	return m, nil, false
 }

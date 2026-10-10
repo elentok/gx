@@ -62,6 +62,7 @@ type Model struct {
 
 	serverConn ServerConn
 	stream     serverStream
+	store      storeWatch
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -93,7 +94,8 @@ func New(repo git.Repo, settings Settings) Model {
 
 func (m Model) Init() tea.Cmd {
 	if m.settings.Server == nil {
-		return m.activePage().model.Init()
+		// Permanently down: the store watch starts with the program.
+		return tea.Batch(m.activePage().model.Init(), func() tea.Msg { return storeWatchStartMsg{} })
 	}
 	return tea.Batch(m.activePage().model.Init(), m.cmdServerProbe())
 }
@@ -120,6 +122,11 @@ func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
 	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
+	}
+	// A tab built while down gets no ServerDownMsg crossing; with no client the
+	// shell is down for good (its serverConn starts there).
+	if m.serverConn.State == ServerDown {
+		qm = qm.WithServerDown()
 	}
 	return qm
 }

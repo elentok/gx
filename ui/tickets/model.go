@@ -127,8 +127,8 @@ type Model struct {
 	// watch backs the Watch agent modal (watch_agent.go).
 	watch watchModal
 
-	// serverAPI feeds vm (server_mode.go); nil keeps the tab on the down
-	// fallback for good.
+	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
+	// store for good.
 	serverAPI ServerAPI
 	// ticketStore locates the ticket files "Answer…" edits directly in server mode.
 	ticketStore string
@@ -138,12 +138,6 @@ type Model struct {
 	// scope is which projects the tab shows; owned by the tab, so no snapshot
 	// or event can reset it.
 	scope viewmodel.Scope
-	// fallbackStop is non-nil while the server is down and the tab reads the
-	// store itself (server_refresh.go); fallbackGen orphans a finished
-	// fallback's in-flight ticks.
-	fallbackStop   func()
-	fallbackEvents <-chan struct{}
-	fallbackGen    int
 }
 
 // NewModel creates a new tickets tab model scoped to worktreeRoot's own
@@ -195,8 +189,8 @@ func (m Model) ModalOpen() bool {
 }
 
 func (m Model) Init() tea.Cmd {
-	if m.serverAPI == nil {
-		return func() tea.Msg { return ServerDownMsg{} }
+	if m.readsDisk() {
+		return m.cmdLoadDisk()
 	}
 	return nil // the app shell's stream delivers the state
 }
@@ -229,8 +223,8 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case epicsLoadedMsg:
-		if m.serverAPI != nil && !m.onFallback() {
-			// A disk read that outlived the fallback must not overwrite stream rows.
+		if !m.readsDisk() {
+			// A disk read that outlived down mode must not overwrite stream rows.
 			return m, nil
 		}
 		m.autoCheckForkedChildren(msg.epics)

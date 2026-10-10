@@ -751,12 +751,22 @@ func withChecked(m QueueModel, checked map[string]bool) QueueModel {
 	return m
 }
 
+// seedFromDisk fills the rows from the fixture's store, standing in for the
+// state the app shell delivers.
+func seedFromDisk(t *testing.T, m QueueModel) QueueModel {
+	t.Helper()
+	epics, err := tickets.Load(scratchDirFor(m.worktreeRoot))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.applyEpics(epics)
+	return m
+}
+
 func loadQueueModel(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
-	msg := m.Init()()
-	updated, _ := m.Update(msg)
-	m = updated.(QueueModel)
-	updated, _ = m.Update(tea.WindowSizeMsg{Width: 220, Height: 40})
+	m = seedFromDisk(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 220, Height: 40})
 	return updated.(QueueModel)
 }
 
@@ -987,11 +997,8 @@ func TestQueueModelScrollsWithKeysAndMouse(t *testing.T) {
 		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
 
-	m := withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)
-	msg := m.Init()()
-	updated, _ := m.Update(msg)
-	m = updated.(QueueModel)
-	updated, _ = m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
+	m := seedFromDisk(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 10})
 	m = updated.(QueueModel)
 
 	if m.queueTree.ScrollOffset() != 0 {
@@ -1055,11 +1062,8 @@ func queueModelForHoverScroll(t *testing.T) QueueModel {
 		checked[ticketPath(root, "alpha", filename)] = true
 	}
 
-	m := withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)
-	msg := m.Init()()
-	updated, _ := m.Update(msg)
-	m = updated.(QueueModel)
-	updated, _ = m.Update(tea.WindowSizeMsg{Width: 220, Height: 20})
+	m := seedFromDisk(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 220, Height: 20})
 	m = updated.(QueueModel)
 	m = selectFirstQueueTicketRow(t, m)
 
@@ -1159,11 +1163,8 @@ func TestQueueModelMouseWheelWhileHelpOpenScrollsHelpNotQueue(t *testing.T) {
 		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
 
-	m := withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)
-	msg := m.Init()()
-	updated, _ := m.Update(msg)
-	m = updated.(QueueModel)
-	updated, _ = m.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	m := seedFromDisk(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	m = updated.(QueueModel)
 
 	m.help.Open(m.width, m.height)

@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -21,10 +20,6 @@ import (
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
 )
-
-// serverReconnectDelay spaces re-snapshot attempts while the server is
-// unreachable, so a down daemon is polled rather than spun on.
-const serverReconnectDelay = 2 * time.Second
 
 // ServerAPI is the slice of apiclient.Client the tab uses in server mode.
 type ServerAPI interface {
@@ -182,8 +177,8 @@ func (m Model) cmdServerEnqueue(addrs []string, agent string) tea.Cmd {
 type ResnapshotRequestedMsg struct{}
 
 // WithServer connects the tab: rows come from the state the app shell
-// delivers (WithServerState). Without it the tab stays on the server-down
-// fallback (server_refresh.go).
+// delivers (WithServerState). Without it the tab reads the store itself
+// (server_refresh.go).
 func (m Model) WithServer(api ServerAPI) Model {
 	m.serverAPI = api
 	return m
@@ -193,7 +188,7 @@ func (m Model) WithServer(api ServerAPI) Model {
 // snapshot has arrived yet, so the tab keeps showing "loading…". While the tab
 // reads the store itself (server down) the shell's state is stale and ignored.
 func (m Model) WithServerState(st *viewmodel.State) (tea.Model, tea.Cmd) {
-	if st == nil || m.onFallback() {
+	if st == nil || m.readsDisk() {
 		return m, nil
 	}
 	m.vm = *st

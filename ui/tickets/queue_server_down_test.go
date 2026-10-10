@@ -33,8 +33,8 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil })
 	next, cmd := m.Update(ServerDownMsg{})
 	m = next.(QueueModel)
-	if cmd == nil {
-		t.Fatal("no background reconnect scheduled")
+	if cmd != nil {
+		t.Fatal("the tab must not run a reconnect loop of its own")
 	}
 	if len(m.epics) != 0 {
 		t.Fatalf("rows not cleared: %+v", m.epics)

@@ -107,7 +107,8 @@ type QueueModel struct {
 	previewFocus
 
 	// serverAPI/serverStart/serverDown back the server-down banner (see
-	// queue_server_down.go); serverAPI is nil outside server mode.
+	// queue_server_down.go); serverDown is also how a tab with no client at all
+	// shows the banner (WithServerDown).
 	serverAPI   ServerAPI
 	serverStart func(context.Context) error
 	serverDown  bool
@@ -148,29 +149,11 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 }
 
 func (m QueueModel) Init() tea.Cmd {
-	return m.cmdLoadQueue()
-}
-
-type queueEpicsLoadedMsg struct {
-	epics []tickets.Epic
-	err   error
+	return nil // the app shell delivers the state (WithServerState)
 }
 
 // queueSpinnerRestartMsg restarts the running spinner on page activation.
 type queueSpinnerRestartMsg struct{}
-
-// cmdLoadQueue reads the store; in server mode there is nothing to load, since
-// the app shell delivers the state (WithServerState).
-func (m QueueModel) cmdLoadQueue() tea.Cmd {
-	if m.serverAPI != nil {
-		return nil
-	}
-	scratchDir := scratchDirFor(m.worktreeRoot)
-	return func() tea.Msg {
-		epics, err := tickets.Load(scratchDir)
-		return queueEpicsLoadedMsg{epics: epics, err: err}
-	}
-}
 
 // Update delegates to updateInner then re-syncs the preview viewport,
 // mirroring the Tickets tab's own Update/syncPreviewViewport split (see
@@ -197,12 +180,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
 		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
-		return m, nil
-	case queueEpicsLoadedMsg:
-		if m.serverDown {
-			return m, nil
-		}
-		m.applyEpics(msg.epics)
 		return m, nil
 	case queueSpinnerRestartMsg:
 		// The tick chain dies while the tab is hidden, so a claim that arrived
@@ -261,8 +238,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseClick(msg)
 	case cascadeDeleteConfirmedMsg:
 		return m.handleCascadeDeleteConfirmed(msg)
-	case queueActionAppliedMsg:
-		return m, m.cmdLoadQueue()
 	}
 	return m, nil
 }
@@ -481,13 +456,11 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case bindingQueuePreviewBottom:
 			m.previewVP.GotoBottom()
 		case bindingQueueReload:
-			switch {
-			case m.serverAPI == nil:
-				return m, m.cmdLoadQueue()
-			case m.serverDown:
-				return m, m.cmdServerProbe()
+			// The shell owns the connection and the snapshot; it hands the result
+			// back as state.
+			if m.serverDown {
+				return m, cmdProbeRequested
 			}
-			// The shell owns the snapshot; it hands the result back as state.
 			return m, func() tea.Msg { return ResnapshotRequestedMsg{} }
 		case bindingQueuePauseResume:
 			if m.serverAPI != nil {

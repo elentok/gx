@@ -48,6 +48,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
+	if next, cmd, ok := m.updateStoreWatch(msg); ok {
+		return next, tea.Batch(notifyCmd, cmd)
+	}
+
 	// Before any page routing: the stream is read whichever tab is open.
 	if next, cmd, ok := m.updateServerStream(msg); ok {
 		return next, tea.Batch(notifyCmd, cmd)

@@ -236,9 +236,9 @@ type epicsLoadedMsg struct {
 }
 
 // cmdLoad reloads from wherever the rows currently come from: the server's
-// snapshot, or the store itself while the tab is on the down fallback.
+// snapshot, or the store itself in down mode.
 func (m Model) cmdLoad() tea.Cmd {
-	if m.serverAPI == nil || m.onFallback() {
+	if m.readsDisk() {
 		return m.cmdLoadDisk()
 	}
 	return func() tea.Msg { return ResnapshotRequestedMsg{} }
