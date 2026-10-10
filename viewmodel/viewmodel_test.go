@@ -94,7 +94,7 @@ func TestReduce_ClaimIterationDone(t *testing.T) {
 	if s.Tickets[0].Status != "done" || len(s.Iterations) != 0 {
 		t.Fatalf("after done: %+v", s)
 	}
-	if len(s.Queue) != 1 || s.Queue[0] != "gx:e/02" {
+	if len(s.Queue) != 2 || s.Queue[0] != "gx:e/01" || s.Queue[1] != "gx:e/02" {
 		t.Fatalf("queue = %v", s.Queue)
 	}
 	if s.Seq != 13 {
@@ -103,6 +103,18 @@ func TestReduce_ClaimIterationDone(t *testing.T) {
 
 	if start.Tickets[0].Status != "open" || len(start.Queue) != 2 {
 		t.Fatalf("reduce mutated its input: %+v", start)
+	}
+}
+
+// The server's cancel verb only writes the ticket file; it never touches the
+// queue item, so the reducer keeps the address queued too.
+func TestReduce_TicketCancelledKeepsQueueItemLikeServerCancel(t *testing.T) {
+	s := reduce(t, snapshot(), server.Event{Seq: 11, Type: server.EventTicketCancelled, Address: "gx:e/01"})
+	if s.Tickets[0].Status != "cancelled" {
+		t.Fatalf("status = %q", s.Tickets[0].Status)
+	}
+	if len(s.Queue) != 2 || s.Queue[0] != "gx:e/01" {
+		t.Fatalf("queue = %v", s.Queue)
 	}
 }
 

@@ -183,9 +183,12 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 		// The claim was rolled back, so the on-disk status is not ours to guess.
 		s = s.withoutIteration(ev.Address)
 	case server.EventTicketDone:
-		s = s.withStatus(ev.Address, statusDone).withoutIteration(ev.Address).withoutQueued(ev.Address)
+		// The server dequeues a root only when its epic completes, never a
+		// single ticket, so the address stays queued until the queue says
+		// otherwise. The same holds for cancel, which only writes the file.
+		s = s.withStatus(ev.Address, statusDone).withoutIteration(ev.Address)
 	case server.EventTicketCancelled:
-		s = s.withStatus(ev.Address, statusCancelled).withoutIteration(ev.Address).withoutQueued(ev.Address)
+		s = s.withStatus(ev.Address, statusCancelled).withoutIteration(ev.Address)
 	}
 	return s, EffectResnapshot
 }
@@ -221,10 +224,5 @@ func (s State) withoutIteration(address string) State {
 	}
 	s.Iterations = maps.Clone(s.Iterations)
 	delete(s.Iterations, address)
-	return s
-}
-
-func (s State) withoutQueued(address string) State {
-	s.Queue = slices.DeleteFunc(slices.Clone(s.Queue), func(a string) bool { return a == address })
 	return s
 }

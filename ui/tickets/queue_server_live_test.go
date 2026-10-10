@@ -231,3 +231,20 @@ func TestQueueServerMode_InitDoesNotFetch(t *testing.T) {
 		t.Errorf("Init returned a command in server mode")
 	}
 }
+
+// The server dequeues a root only when its epic completes, so a ticket that
+// turns done after a ticket-done event keeps its row without a queue refetch.
+func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testing.T) {
+	m, _ := loadedServerQueue(t, "claimed")
+	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+	st, _ = st.Reduce(server.Event{Seq: 2, Type: server.EventTicketDone, Address: "gx:alpha/01"})
+
+	next, _ := m.WithServerState(&st, ServerLinkUp)
+	view := next.(QueueModel).View().Content
+	if !strings.Contains(view, "First") {
+		t.Fatalf("done ticket's row vanished:\n%s", view)
+	}
+}
