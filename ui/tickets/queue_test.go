@@ -759,7 +759,7 @@ func seedFromDisk(t *testing.T, m QueueModel) QueueModel {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m.applyEpics(epics)
+	m.applyEpics(epics, false)
 	return m
 }
 

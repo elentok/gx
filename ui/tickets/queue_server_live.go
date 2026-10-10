@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -45,17 +46,28 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 		m.checked[addr] = true
 		m.checkOrder[addr] = uint64(i + 1)
 	}
-	m.applyEpics(epicsFromViewModel(*st, viewmodel.Scope{}))
+	m.applyEpics(epicsFromViewModel(*st, viewmodel.Scope{}), true)
 	return m, m.syncServerRunState()
 }
 
-// applyEpics swaps the rows in and re-derives what hangs off them.
-func (m *QueueModel) applyEpics(epics []gxtickets.Epic) {
+// applyEpics swaps the rows in and re-derives what hangs off them. With
+// wholeEpic, every ticket of an epic holding a queue item is a candidate: the
+// server schedules the epic's whole frontier, so a ticket added after the epic
+// was queued must show too.
+func (m *QueueModel) applyEpics(epics []gxtickets.Epic, wholeEpic bool) {
 	m.loaded = true
 	m.epics = epics
 	m.candidates = make(map[string]bool, len(m.checked))
 	for path := range m.checked {
 		m.candidates[path] = true
+	}
+	for _, epic := range epics {
+		if !wholeEpic || !slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.checked[t.Path] }) {
+			continue
+		}
+		for _, t := range epic.Tickets {
+			m.candidates[t.Path] = true
+		}
 	}
 	if m.search.HasQuery() {
 		m.recomputeQueueSearchMatches()
