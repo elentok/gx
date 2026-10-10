@@ -618,6 +618,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
 				s.log.Warn("land root", "root", root, "err", err)
 				s.events.publish(EventIterationFailed, root.String())
+				s.submitRetro(root, dir, e, one.Ticket.Path)
 				return
 			} else if reason != "" {
 				s.events.publish(EventRootParked, root.String())
@@ -625,6 +626,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 				if s.chat != nil {
 					s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
 				}
+				s.submitRetro(root, dir, e, one.Ticket.Path)
 				return
 			}
 		}
@@ -645,8 +647,8 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 }
 
 // submitRetro files the evolve one-off for a completed loop epic. It runs once
-// the epic is done (auto-merge off) or landed (auto-merge on); a parked or
-// failed land returns before it. A refused submit is logged, never an error:
+// the epic is done, whatever the land attempt's outcome: a parked or failed
+// land is part of the evidence. A refused submit is logged, never an error:
 // the dedupe key refuses a second live retro of the same epic.
 func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ticketPath string) {
 	if e.IsMap || isOneOffTicket(ticketPath) || !e.EvolvedAt.IsZero() {

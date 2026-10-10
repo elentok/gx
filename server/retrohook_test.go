@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -106,6 +107,80 @@ func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 	}
 	servertest.SetProjectRepo(t, f.store, "gx", f.repo)
 	if got := f.completeEpic(t); len(got) != 1 {
+		t.Errorf("retros = %v, want one", got)
+	}
+}
+
+// retrosAfter waits for the one retro the hook submits after a root event: the
+// submit follows the park/fail event, so the glob is polled.
+func (f *schedFixture) retrosAfter(t *testing.T) []string {
+	t.Helper()
+	var retros []string
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		var err error
+		retros, err = filepath.Glob(filepath.Join(f.store, "proj", "evolve-"+schedEpic+"-*"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(retros) > 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return retros
+}
+
+func TestRetroHook_SubmitsWhenTheLandNeedsARebase(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+		if strings.Contains(p.Address, "evolve-") {
+			return
+		}
+		commitWork(t, p, id)
+		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.repo, "main moves on")
+	}, withEvolve(config.EvolveContributor))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+
+	if got := f.retrosAfter(t); len(got) != 1 {
+		t.Errorf("retros = %v, want one", got)
+	}
+}
+
+func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
+	f := retroFixture(t, withEvolve(config.EvolveContributor))
+	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+
+	if got := f.retrosAfter(t); len(got) != 1 {
+		t.Errorf("retros = %v, want one", got)
+	}
+}
+
+func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{
+		"01": {},
+		"02": {BlockedBy: []string{"01"}},
+	}, func(f *schedFixture, p servertest.Prompt, id string) {
+		if strings.Contains(p.Address, "evolve-") {
+			return
+		}
+		commitWork(t, p, id)
+		if id == "02" {
+			f.git(t, "branch", "-m", "main", "trunk") // the land target vanishes
+		}
+	}, withEvolve(config.EvolveContributor))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	f.queueEpic(ctx, t, "01")
+
+	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
 	}
 }
