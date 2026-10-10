@@ -140,10 +140,14 @@ func cmdApplyTicketStatus(path string, status schema.Status) tea.Cmd {
 	}
 }
 
-// handleStatusChanged applies statusChangedMsg: reload from disk so the
-// sidebar/preview reflect the write, plus a toast naming the new status.
+// handleStatusChanged applies statusChangedMsg. Up mode does nothing: the
+// store watch turns the file write into a ticket-changed event. Down mode has
+// no stream, so it reloads from disk.
 func (m Model) handleStatusChanged() (tea.Model, tea.Cmd) {
-	return m, m.cmdLoad()
+	if m.readsDisk() {
+		return m, m.cmdLoadDisk()
+	}
+	return m, nil
 }
 
 func (m Model) statusMenuView() string {
