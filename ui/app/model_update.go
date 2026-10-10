@@ -48,6 +48,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
+	// Before any page routing: the stream is read whichever tab is open.
+	if next, cmd, ok := m.updateServerStream(msg); ok {
+		return next, tea.Batch(notifyCmd, cmd)
+	}
+
 	if nav.IsRepoMutated(msg) {
 		m.gate.Mutated()
 		// Trust-the-self-reload invariant: the page that emitted RepoMutated

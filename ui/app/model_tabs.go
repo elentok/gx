@@ -48,7 +48,14 @@ func (m Model) openNotifyHistory() (Model, tea.Cmd) {
 	return m, nil
 }
 
+// applySwitch activates tabVS and hands its page the current server state:
+// hidden pages are not kept up to date, so every switch catches the page up.
 func (m Model) applySwitch(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
+	m, cmd := m.switchToTab(tabVS, prevVS)
+	return m.deliverServerState(), cmd
+}
+
+func (m Model) switchToTab(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 	// Derive outgoing model from model-side state: m.navState.activeTab has already been
 	// updated by the pointer-receiver Switch call, so m.activePage() would return the
 	// new page. Use the model-side stack or prevVS to find what the user was seeing.

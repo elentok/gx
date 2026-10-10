@@ -45,18 +45,23 @@ func (f *fakeServerClient) Negotiate(context.Context, string) (apiclient.Negotia
 
 func newServerShell(t *testing.T, client ServerClient) Model {
 	t.Helper()
+	return newServerShellOn(t, client, nav.TabQueue)
+}
+
+func newServerShellOn(t *testing.T, client ServerClient, tab nav.TabID) Model {
+	t.Helper()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: repoDir},
+		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 		Server:             &ServerDeps{Client: client, Build: "test"},
 	})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	// Deliver the Queue tab's initial load so it leaves "loading…".
+	// Deliver the tab's initial load so it leaves "loading…".
 	next, _ = next.Update(next.(Model).activePage().model.Init()())
 	return next.(Model)
 }

@@ -61,6 +61,7 @@ type Model struct {
 	gate          *reloadgate.ReloadGate
 
 	serverConn ServerConn
+	stream     serverStream
 }
 
 func New(repo git.Repo, settings Settings) Model {
@@ -213,7 +214,15 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 	return strings.Join(lines, "\n")
 }
 
+// newHistoryEntry builds a page and, if it uses server state, hands it the
+// current state (or the "no snapshot yet" marker).
 func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
+	entry := m.buildHistoryEntry(viewState)
+	entry.model = m.withServerState(entry.model)
+	return entry
+}
+
+func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 	s := m.settings.Settings
 	s.EnableNavigation = true
 	switch viewState.Tab {

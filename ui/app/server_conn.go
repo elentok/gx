@@ -98,6 +98,10 @@ func (m Model) updateServerConn(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.conn.State == ServerReadOnly && prev.State != ServerReadOnly {
 			m.markTicketsReadOnly()
 		}
+		// Startup goes unknown → up without crossing the down line, so the
+		// stream is started from "no stream yet", not from a transition.
+		m, streamCmd := m.onLinkChange()
+		cmds = append(cmds, streamCmd)
 		return m, tea.Batch(cmds...), true
 	}
 	return m, nil, false
