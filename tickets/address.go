@@ -15,6 +15,7 @@ const (
 	CodeUnknownProject   = "unknown-project"
 	CodeUnknownEpic      = "unknown-epic"
 	CodeUnknownTicket    = "unknown-ticket"
+	CodeCategoryRequired = "category-required"
 )
 
 // AddressError is a refused address with a stable Code.

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/tickets"
@@ -84,6 +85,7 @@ type addFrontmatter struct {
 	ExpectedContextWindow int      `yaml:"expected_context_window"`
 	Commitless            bool     `yaml:"commitless"`
 	Parent                string   `yaml:"parent"`
+	Category              string   `yaml:"category"`
 }
 
 // bodyFrontmatter splits a leading frontmatter block off body and validates
@@ -97,7 +99,7 @@ func bodyFrontmatter(body string) (addFrontmatter, string, error) {
 	dec := yaml.NewDecoder(strings.NewReader(yamlPart))
 	dec.KnownFields(true)
 	if err := dec.Decode(&fm); err != nil && !errors.Is(err, io.EOF) {
-		return fm, "", fmt.Errorf("body frontmatter: %w (settable: blocked_by, type, expected_context_window, commitless, parent)", err)
+		return fm, "", fmt.Errorf("body frontmatter: %w (settable: blocked_by, type, expected_context_window, commitless, parent, category)", err)
 	}
 	switch schema.Status(fm.Status) {
 	case "", schema.StatusOpen, schema.StatusDraft:
@@ -106,6 +108,9 @@ func bodyFrontmatter(body string) (addFrontmatter, string, error) {
 	}
 	if fm.Type != "" && !schema.TicketType(fm.Type).Valid() {
 		return fm, "", fmt.Errorf("body frontmatter: unknown type %q", fm.Type)
+	}
+	if !schema.Category(fm.Category).Valid() {
+		return fm, "", fmt.Errorf("body frontmatter: invalid category %q, want bug or idea", fm.Category)
 	}
 	if fm.ExpectedContextWindow < 0 {
 		return fm, "", errors.New("body frontmatter: expected_context_window must not be negative")
@@ -122,6 +127,10 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 	}
 
 	epicPath = filepath.Clean(epicPath)
+	// Checked before anything is created, so a refusal leaves no epic behind.
+	if filepath.Base(epicPath) == followUpsEpic && fm.Category == "" {
+		return "", &tickets.AddressError{Code: tickets.CodeCategoryRequired, Msg: "a ticket filed into " + followUpsEpic + " needs a category (bug or idea)"}
+	}
 	// Also repairs an existing epic directory that has no ticket.md.
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
 		return "", err
@@ -168,6 +177,7 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 		t.BlockedBy = parseCSVIDs(strings.Join(fm.BlockedBy, ","))
 		t.ExpectedContextWindow = fm.ExpectedContextWindow
 		t.Commitless = fm.Commitless
+		t.Category = schema.Category(fm.Category)
 	}
 
 	out, err := schema.MarshalTicket(t, text)
@@ -188,9 +198,17 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 	return path, nil
 }
 
+// projectEpicRe matches `project:epic`, the cross-project spelling of an epic.
+var projectEpicRe = regexp.MustCompile(`^([^:/\s]+):([^:/\s]+)$`)
+
+// followUpsEpic is the epic every project's contributor outbox lands in; its
+// tickets must say what kind of follow-up they are.
+const followUpsEpic = "follow-ups"
+
 // resolveAddTarget turns add's argument into the epic to allocate in and the
-// parent ticket id: an epic (name or path) as before, or a ticket address,
-// which names the epic and the parent in one go.
+// parent ticket id: an epic (name or path) as before, `project:epic` for an
+// epic of another registered project, or a ticket address, which names the
+// epic and the parent in one go.
 func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, err error) {
 	cwd, err := d.getwd()
 	if err != nil {
@@ -199,6 +217,13 @@ func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, 
 	epicPath = resolveEpicArg(arg, cwd)
 	if info, statErr := os.Stat(epicPath); statErr == nil && info.IsDir() {
 		return epicPath, parentFlag, nil
+	}
+	if m := projectEpicRe.FindStringSubmatch(arg); m != nil {
+		root, err := projectRoot(cwd, m[1])
+		if err != nil {
+			return "", "", err
+		}
+		return filepath.Join(root, m[2]), parentFlag, nil
 	}
 	_, t, findErr := findTicket(cwd, arg)
 	if findErr != nil {

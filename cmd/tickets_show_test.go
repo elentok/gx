@@ -86,3 +86,34 @@ func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
 		}
 	}
 }
+
+func TestExecute_TicketsShow_CrossProject(t *testing.T) {
+	repo, project := setupShowProject(t)
+	theirs := addProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
+	if err := os.MkdirAll(filepath.Join(theirs, "epic", "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(theirs, "epic"))
+	testutil.WriteFile(t, filepath.Join(theirs, "epic", "issues"), "03-remote.md",
+		"---\nid: \"03\"\nstatus: open\ntype: implement\n---\n\n# 03 — Remote\n\nremote body\n")
+
+	out, err := runIn(t, repo, "tickets", "show", "theirs:epic/03")
+	if err != nil {
+		t.Fatalf("show: %v", err)
+	}
+	if !strings.HasPrefix(out, "theirs:epic/03  Remote\n") || !strings.Contains(out, "remote body") {
+		t.Errorf("show printed %q", out)
+	}
+
+	// A prefix that is a directory of the store but not a project is unknown too.
+	if err := os.MkdirAll(filepath.Join(filepath.Dir(project), "plain", "epic", "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, addr := range []string{"nope:epic/03", "plain:epic/03"} {
+		_, err = runIn(t, repo, "tickets", "show", addr)
+		var ae *tickets.AddressError
+		if !errors.As(err, &ae) || ae.Code != tickets.CodeUnknownProject {
+			t.Errorf("show %s err = %v, want %s", addr, err, tickets.CodeUnknownProject)
+		}
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -14,17 +15,22 @@ import (
 // address that names nothing is refused with a tickets.AddressError carrying
 // a stable code.
 func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
-	root, err := ticketRoot(cwd)
-	if err != nil {
-		return tickets.Address{}, tickets.Ticket{}, err
+	cwdRoot, rootErr := ticketRoot(cwd)
+	ctxProject := ""
+	if rootErr == nil {
+		ctxProject = tickets.ProjectName(cwdRoot)
 	}
-	project := tickets.ProjectName(root)
-	a, err := tickets.ParseAddress(addr, tickets.AddressContext{Project: project, Epic: currentEpic(cwd)})
+	a, err := tickets.ParseAddress(addr, tickets.AddressContext{Project: ctxProject, Epic: currentEpic(cwd)})
 	if err != nil {
 		return a, tickets.Ticket{}, err
 	}
-	if a.Project != project {
-		return a, tickets.Ticket{}, &tickets.AddressError{Code: tickets.CodeUnknownProject, Msg: fmt.Sprintf("project %q is not the current project (%q)", a.Project, project)}
+	if a.Project == "" {
+		// A short form needs the cwd project, which cwd doesn't have.
+		return a, tickets.Ticket{}, rootErr
+	}
+	root, err := projectRoot(cwd, a.Project)
+	if err != nil {
+		return a, tickets.Ticket{}, err
 	}
 
 	epics, err := tickets.Load(root)
@@ -43,6 +49,22 @@ func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 		return a, tickets.Ticket{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: fmt.Sprintf("no ticket %s in epic %q", a.ID, a.Epic)}
 	}
 	return a, tickets.Ticket{}, &tickets.AddressError{Code: tickets.CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q in project %q", a.Epic, a.Project)}
+}
+
+// projectRoot is the one resolver for a `project:` address prefix: the ticket
+// store directory of the registered project called project, which may be the
+// cwd project or any other. An unregistered name is refused with
+// tickets.CodeUnknownProject. add and show use it; set, section, close and
+// move are meant to reuse it.
+func projectRoot(cwd, project string) (string, error) {
+	if root, err := ticketRoot(cwd); err == nil && tickets.ProjectName(root) == project {
+		return root, nil
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return "", err
+	}
+	return tickets.ProjectDirByName(cfg.TicketStore.Path, project)
 }
 
 // resolveTicketRef turns a command's ticket argument — a file path or an

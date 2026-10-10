@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -339,4 +340,53 @@ func addedPath(t *testing.T, epicPath, out string) string {
 		t.Fatalf("address %q resolves to files %v (err %v), want exactly one", addr, matches, err)
 	}
 	return matches[0]
+}
+
+func TestExecute_TicketsAdd_CrossProject(t *testing.T) {
+	repo, project := setupShowProject(t)
+	theirs := addProject(t, filepath.Dir(project), "theirs", testutil.TempRepo(t))
+	cwd := t.TempDir()
+
+	out, err := runIn(t, repo, "tickets", "add", "theirs:inbox", "--slug", "hello", "--body",
+		"---\nstatus: draft\ncategory: idea\n---\n\n# Hello\n\ntext\n")
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if got := strings.TrimSpace(out); got != "theirs:inbox/01" {
+		t.Errorf("printed %q, want theirs:inbox/01", got)
+	}
+	tk, err := schema.ParseTicket(filepath.Join(theirs, "inbox", "issues", "01-hello.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status != schema.StatusDraft || tk.Category != schema.CategoryIdea {
+		t.Errorf("status/category = %s/%s, want draft/idea", tk.Status, tk.Category)
+	}
+
+	_, err = runIn(t, cwd, "tickets", "add", "nope:inbox", "--slug", "x")
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeUnknownProject {
+		t.Errorf("unknown project err = %v, want %s", err, tickets.CodeUnknownProject)
+	}
+	if _, statErr := os.Stat(filepath.Join(cwd, "nope:inbox")); !os.IsNotExist(statErr) {
+		t.Errorf("stray directory created in cwd: %v", statErr)
+	}
+}
+
+func TestExecute_TicketsAdd_FollowUpsNeedsCategory(t *testing.T) {
+	repo, project := setupShowProject(t)
+
+	_, err := runIn(t, repo, "tickets", "add", "mine:follow-ups", "--slug", "x", "--body", "# X\n\ntext\n")
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeCategoryRequired {
+		t.Fatalf("err = %v, want %s", err, tickets.CodeCategoryRequired)
+	}
+	if _, statErr := os.Stat(filepath.Join(project, "follow-ups")); !os.IsNotExist(statErr) {
+		t.Errorf("follow-ups was created: %v", statErr)
+	}
+
+	if _, err := runIn(t, repo, "tickets", "add", "mine:follow-ups", "--slug", "x", "--body",
+		"---\ncategory: bug\n---\n\n# X\n\ntext\n"); err != nil {
+		t.Errorf("add with category: %v", err)
+	}
 }

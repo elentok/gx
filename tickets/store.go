@@ -34,6 +34,26 @@ func ProjectDir(storePath, repoRoot string) (string, error) {
 	return found, nil
 }
 
+// ProjectDirByName finds the registered project whose address name is name
+// (see ProjectName). An unregistered name is refused with CodeUnknownProject.
+func ProjectDirByName(storePath, name string) (string, error) {
+	found := ""
+	err := forEachProject(storePath, func(dir string, _ config.ProjectFile) bool {
+		if ProjectName(dir) == name {
+			found = dir
+			return true
+		}
+		return false
+	})
+	if err != nil {
+		return "", err
+	}
+	if found == "" {
+		return "", &AddressError{Code: CodeUnknownProject, Msg: fmt.Sprintf("project %q is not a registered project", name)}
+	}
+	return found, nil
+}
+
 // ProjectDirs lists every project directory in the ticket store: each
 // subdirectory holding a project.json. A missing store has no projects.
 func ProjectDirs(storePath string) ([]string, error) {
