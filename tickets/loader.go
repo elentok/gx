@@ -221,13 +221,68 @@ func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
 // completed_at already on disk is left alone, so completion is only ever
 // recorded once, at genuine completion.
 func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
-	return stampEpicTiming(scratchDir, epicName, func(wire *epicTiming) bool {
-		if wire.CompletedAt != nil {
-			return false
+	return StampEpicFields(filepath.Join(scratchDir, epicName), map[string]any{"completed_at": now})
+}
+
+// StampEpicFields sets each key in fields on the epic's ticket.md frontmatter
+// unless the key is already there: an existing stamp is never overwritten, and
+// every other key and the body are kept. Retro stamping and `gx evolve skip`
+// reuse it for their own keys.
+func StampEpicFields(epicPath string, fields map[string]any) error {
+	ticketPath := filepath.Join(epicPath, "ticket.md")
+	if _, err := os.Stat(ticketPath); err != nil {
+		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
+	}
+	unlock, err := schema.LockTicket(ticketPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		return err
+	}
+	fm, body, ok := schema.SplitFrontmatter(string(raw))
+	if !ok {
+		return fmt.Errorf("%s: no frontmatter to stamp into", ticketPath)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(fm), &doc); err != nil {
+		return fmt.Errorf("parsing %s: %w", ticketPath, err)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("%s: frontmatter is not a mapping", ticketPath)
+	}
+	mapping := doc.Content[0]
+	changed := false
+	for key, value := range fields {
+		if hasMappingKey(mapping, key) {
+			continue
 		}
-		wire.CompletedAt = &now
-		return true
-	})
+		var val yaml.Node
+		if err := val.Encode(value); err != nil {
+			return fmt.Errorf("encoding %s: %w", key, err)
+		}
+		mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	out, err := yaml.Marshal(mapping)
+	if err != nil {
+		return fmt.Errorf("marshaling %s: %w", ticketPath, err)
+	}
+	return writeFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
+}
+
+func hasMappingKey(mapping *yaml.Node, key string) bool {
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return true
+		}
+	}
+	return false
 }
 
 // stampEpicTiming reads scratchDir/epicName's ticket.md timing, hands it to

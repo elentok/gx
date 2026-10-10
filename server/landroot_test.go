@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -90,6 +92,65 @@ func TestLandRoot_NeedsRebaseParksTheRootWithoutRebasing(t *testing.T) {
 	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("main contains the feature branch: %q", out)
 	}
+}
+
+// epicMD is the epic's ticket.md, read after the root settled.
+func (f *schedFixture) epicMD(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(f.store, "proj", schedEpic, "ticket.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+func (f *schedFixture) assertCompletedAtStamped(t *testing.T) {
+	t.Helper()
+	md := f.epicMD(t)
+	if !strings.Contains(md, "completed_at:") {
+		t.Errorf("epic ticket.md has no completed_at:\n%s", md)
+	}
+	if !strings.Contains(md, "status:") {
+		t.Errorf("epic ticket.md lost its other keys:\n%s", md)
+	}
+}
+
+func TestLandRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+		commitWork(t, p, id)
+	}, func(c *server.Config) { c.AutoMergeEpic = false })
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+
+	f.assertCompletedAtStamped(t)
+}
+
+func TestLandRoot_StampsCompletedAtWhenTheEpicLands(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+		commitWork(t, p, id)
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+
+	f.assertCompletedAtStamped(t)
+}
+
+func TestLandRoot_StampsCompletedAtWhenTheLandParks(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+		commitWork(t, p, id)
+		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
+		testutil.CommitAll(t, f.repo, "main moves on")
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+
+	f.assertCompletedAtStamped(t)
 }
 
 func TestLandRoot_AutoMergeOffLeavesTheBranchAndDequeuesTheRoot(t *testing.T) {

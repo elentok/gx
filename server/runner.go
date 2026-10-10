@@ -605,6 +605,11 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
 			continue
 		}
+		// Stamped before the land attempt so a parked or failed land still
+		// leaves the epic completed for `gx evolve all`.
+		if err := tickets.StampEpicFields(e.Path, map[string]any{"completed_at": time.Now().UTC()}); err != nil {
+			s.log.Warn("stamp epic completed_at", "root", root, "err", err)
+		}
 		if s.cfg.AutoMergeEpic {
 			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
 				s.log.Warn("land root", "root", root, "err", err)
