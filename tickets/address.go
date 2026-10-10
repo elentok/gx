@@ -20,6 +20,14 @@ const (
 	CodeSectionRequired  = "section-required"
 	CodeStatusOverride   = "status-override"
 	CodeTypeOverride     = "type-override"
+
+	// `tickets move` refusals.
+	CodeMoveStatus       = "move-status"
+	CodeMoveRunHistory   = "move-run-history"
+	CodeMoveLineage      = "move-lineage"
+	CodeMoveMapSource    = "move-map-source"
+	CodeMoveSameEpic     = "move-same-epic"
+	CodeMoveCrossProject = "move-cross-project"
 )
 
 // AddressError is a refused address with a stable Code.

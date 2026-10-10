@@ -386,6 +386,20 @@ func newTicketsCmd(d deps) *cobra.Command {
 	}
 	sectionCmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
 	cmd.AddCommand(sectionCmd)
+	var moveSlug string
+	var moveDryRun, moveJSON bool
+	moveCmd := &cobra.Command{
+		Use:   "move <addr> <epic>",
+		Short: "move one flat, never-run draft/open ticket to another epic of the same project",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runTicketsMove(d, args[0], args[1], moveSlug, moveDryRun, moveJSON, c.OutOrStdout())
+		},
+	}
+	moveCmd.Flags().StringVar(&moveSlug, "slug", "", "filename slug in the target epic (default: the ticket's current slug)")
+	moveCmd.Flags().BoolVar(&moveDryRun, "dry-run", false, "print the plan, write nothing")
+	moveCmd.Flags().BoolVar(&moveJSON, "json", false, "emit {from, to, path, rewritten} JSON")
+	cmd.AddCommand(moveCmd)
 	var filterTicket string
 	var filterEvents []string
 	filterRunLogCmd := newEpicScopedCmd(d, "filter-run-log <epic>",
