@@ -65,6 +65,12 @@
           "minimum": 1,
           "default": 2
         },
+        "max-agents": {
+          "type": "integer",
+          "description": "Maximum live agents across every project (the server's slot cap). Default: 4.",
+          "minimum": 1,
+          "default": 4
+        },
         "retry-storm-launches": {
           "type": "integer",
           "description": "Consecutive failed launches of one ticket before it is parked needs-repair as retry-exhausted. Default: 3.",
@@ -85,6 +91,7 @@
       },
       "default": {
         "max-agents-per-epic": 2,
+        "max-agents": 4,
         "retry-storm-launches": 3,
         "spin-cycles": 3,
         "spin-window": "5m"
@@ -220,6 +227,68 @@
           "type": "boolean",
           "default": false,
           "description": "Also listen on loopback TCP (127.0.0.1:7421), serving the same routes as the socket. No auth."
+        },
+        "tab-env": {
+          "type": "array",
+          "description": "KEY=VALUE entries set on every iteration tab's shell, to override what the shell rc would decide (e.g. PATH). Default: empty.",
+          "items": { "type": "string", "pattern": "^[^=]+=" },
+          "default": []
+        },
+        "auto-merge-epic": {
+          "type": "boolean",
+          "default": false,
+          "description": "Merge an epic's branch into its target once every ticket is done. Off by default: a person runs gx-merge."
+        },
+        "log-retention": {
+          "type": "string",
+          "default": "720h",
+          "description": "Go duration string (e.g. \"168h\") for how long a headless agent's logs outlive its last activity. Unparsable or non-positive values keep the default. Default: \"720h\" (30 days)."
+        }
+      }
+    },
+    "agent-runner": {
+      "type": "string",
+      "enum": ["auto", "herdr", "headless"],
+      "default": "auto",
+      "description": "How the server runs agents. auto uses herdr when it answers within 2s, else headless. herdr requires herdr to be up; headless requires claude on PATH. Checked when the server starts. Default: auto."
+    },
+    "recovery": {
+      "type": "object",
+      "description": "Recovery catalog: automatic investigation of parked tickets.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Global kill switch for the recovery catalog. Default: true."
+        },
+        "disabled": {
+          "type": "array",
+          "description": "Catalog entry IDs to switch off. Default: empty.",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "follow-ups": {
+          "type": "string",
+          "default": "gx:follow-ups",
+          "description": "Epic (project:epic) that receives the draft research tickets an investigate ticket files. Default: gx:follow-ups."
+        },
+        "notify-hold": {
+          "type": "string",
+          "default": "10m",
+          "description": "Go duration string for how long a park's chat message waits for recovery before it is sent anyway. Unparsable or non-positive values keep the default. Default: \"10m\"."
+        }
+      }
+    },
+    "subscription": {
+      "type": "object",
+      "description": "Subscription extra-usage safety check.",
+      "additionalProperties": false,
+      "properties": {
+        "suppress-extra-usage-warning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Permanently silence the extra-usage-enabled warning once you have acknowledged it. Default: false."
         }
       }
     },
@@ -237,6 +306,11 @@
           "minimum": 1,
           "default": 60,
           "description": "Seconds of quiet after a ticket-store change before the store commit loop commits it."
+        },
+        "push-remote": {
+          "type": "string",
+          "default": "",
+          "description": "Git remote of the store to push to after each commit, best effort. Empty means no push."
         }
       }
     },
