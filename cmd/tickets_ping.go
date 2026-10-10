@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"time"
+
+	"github.com/elentok/gx/apiclient"
 )
 
 const pingTimeout = time.Second
@@ -12,11 +14,19 @@ const pingTimeout = time.Second
 // is the truth, so a down server (or any failure) is silent — the server's own
 // watch and poll pick the change up when it runs.
 func pingServer(path string) {
-	cl, err := serverClient()
+	pingLabels(serverClient, ticketLabel(path))
+}
+
+// pingLabels is pingServer for callers that already hold the labels, such as a
+// path that no longer exists, through the given dialer.
+func pingLabels(dial func() (*apiclient.Client, error), labels ...string) {
+	cl, err := dial()
 	if err != nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
-	defer cancel()
-	_ = cl.TicketChanged(ctx, ticketLabel(path))
+	for _, l := range labels {
+		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
+		_ = cl.TicketChanged(ctx, l)
+		cancel()
+	}
 }

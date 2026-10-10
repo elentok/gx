@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
@@ -49,6 +50,16 @@ type deps struct {
 	skillsAgentRoots     func() ([]string, error)
 	skillsManifestPath   func() (string, error)
 	explainAgent         func(target string) (herdr.AgentExplainResult, error)
+	// serverClient dials the server; nil means the real one (tests inject a fake).
+	serverClient func() (*apiclient.Client, error)
+}
+
+// dial returns the injected server client factory, or the real one.
+func (d deps) dial() func() (*apiclient.Client, error) {
+	if d.serverClient != nil {
+		return d.serverClient
+	}
+	return serverClient
 }
 
 func defaultDeps() deps {

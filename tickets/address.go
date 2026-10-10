@@ -29,6 +29,7 @@ const (
 	CodeMoveSameEpic     = "move-same-epic"
 	CodeMoveCrossProject = "move-cross-project"
 	CodeMoveBrokenProj   = "move-broken-project"
+	CodeMoveActive       = "move-active" // queued or live on the server
 
 	// `tickets close` refusals (a ticket outside follow-ups is
 	// CodeNotFollowUpsEpic).

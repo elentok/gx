@@ -1,7 +1,16 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
+	"net"
+	"net/http"
+	"slices"
+	"sync"
+
 	"errors"
+	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/server"
 	"os"
 	"path/filepath"
 	"strings"
@@ -381,4 +390,109 @@ func listMentions(items []any, sub string) bool {
 		}
 	}
 	return false
+}
+
+// moveWithServer runs `tickets move src/01 dst` with the server client
+// replaced; the state dir is isolated so the persisted files are the test's.
+func moveWithServer(t *testing.T, f moveFixture, cl func() (*apiclient.Client, error)) error {
+	t.Helper()
+	d := deps{
+		stdout:       bytes.NewBuffer(nil),
+		stderr:       bytes.NewBuffer(nil),
+		getwd:        func() (string, error) { return f.repo, nil },
+		serverClient: cl,
+	}
+	return execute([]string{"tickets", "move", "src/01", "dst"}, d)
+}
+
+func fakeMoveServer(t *testing.T, queue []server.QueueItem, live []server.IterationInfo) (func() (*apiclient.Client, error), *[]string) {
+	t.Helper()
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	pings := []string{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/queue/items", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(queue)
+	})
+	mux.HandleFunc("/v1/iterations", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(live)
+	})
+	mux.HandleFunc("/v1/tickets/changed", func(w http.ResponseWriter, r *http.Request) {
+		var req server.ChangedRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		mu.Lock()
+		pings = append(pings, req.Address)
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+	return func() (*apiclient.Client, error) { return apiclient.New(sock), nil }, &pings
+}
+
+func requireMoveActive(t *testing.T, err error) {
+	t.Helper()
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeMoveActive {
+		t.Fatalf("err = %v, want code %s", err, tickets.CodeMoveActive)
+	}
+}
+
+func TestTicketsMove_RefusesQueuedAndLiveTickets(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		queue []server.QueueItem
+		live  []server.IterationInfo
+	}{
+		{"queued", []server.QueueItem{{Address: "mine:src/01", Agent: "claude"}}, nil},
+		{"live", nil, []server.IterationInfo{{Address: "mine:src/01"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := setupMoveProject(t)
+			cl, pings := fakeMoveServer(t, tc.queue, tc.live)
+			requireMoveActive(t, moveWithServer(t, f, cl))
+			if _, err := os.Stat(filepath.Join(f.project, "src", "issues", "01-first.md")); err != nil {
+				t.Errorf("refused move touched the ticket: %v", err)
+			}
+			if len(*pings) != 0 {
+				t.Errorf("refusal pinged %v", *pings)
+			}
+		})
+	}
+}
+
+func TestTicketsMove_ServerDownReadsPersistedQueueAndRuns(t *testing.T) {
+	for _, file := range []string{"queue.json", "runs.json"} {
+		t.Run(file, func(t *testing.T) {
+			f := setupMoveProject(t)
+			stateDir := t.TempDir()
+			t.Setenv("XDG_STATE_HOME", stateDir)
+			if err := os.MkdirAll(filepath.Join(stateDir, "gx"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			testutil.WriteFile(t, filepath.Join(stateDir, "gx"), file, `[{"address":"mine:src/01"}]`)
+			down := func() (*apiclient.Client, error) {
+				return apiclient.New(filepath.Join(shortTempDir(t), "none.sock")), nil
+			}
+			requireMoveActive(t, moveWithServer(t, f, down))
+		})
+	}
+}
+
+func TestTicketsMove_SuccessPingsOldAndNewAddress(t *testing.T) {
+	f := setupMoveProject(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cl, pings := fakeMoveServer(t, nil, nil)
+	if err := moveWithServer(t, f, cl); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"mine:src/01", "mine:dst/03"}
+	if !slices.Equal(*pings, want) {
+		t.Errorf("pings = %v, want %v", *pings, want)
+	}
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,9 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -63,6 +67,10 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	}
 	defer unlock()
 
+	if err := refuseIfActive(d.dial(), a); err != nil {
+		return err
+	}
+
 	plan, err := planMove(root, a, src, dstEpic, slug, moveOpts{})
 	if err != nil {
 		return err
@@ -74,8 +82,47 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	if err := applyMove(plan); err != nil {
 		return err
 	}
-	pingServer(plan.newPath)
+	// The old file is gone, so both sides are pinged by address, not by path.
+	pingLabels(d.dial(), plan.from.String(), plan.to.String())
 	return printMove(w, plan, jsonOut, "")
+}
+
+// refuseIfActive refuses a ticket that is queued or has a live iteration. A
+// reachable server answers; otherwise the persisted queue and run files do, and
+// if those can't be read either the move is refused rather than guessed.
+func refuseIfActive(dial func() (*apiclient.Client, error), a tickets.Address) error {
+	active, err := activeAddresses(dial)
+	if err != nil {
+		return moveRefusal(tickets.CodeMoveActive, "cannot tell whether %s is queued or live: %v", a, err)
+	}
+	if slices.Contains(active, a.String()) {
+		return moveRefusal(tickets.CodeMoveActive, "ticket %s is queued or live on the server", a)
+	}
+	return nil
+}
+
+func activeAddresses(dial func() (*apiclient.Client, error)) ([]string, error) {
+	if cl, err := dial(); err == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
+		defer cancel()
+		items, qerr := cl.QueueItems(ctx)
+		its, ierr := cl.Iterations(ctx)
+		if qerr == nil && ierr == nil {
+			var out []string
+			for _, i := range items {
+				out = append(out, i.Address)
+			}
+			for _, i := range its {
+				out = append(out, i.Address)
+			}
+			return out, nil
+		}
+	}
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return nil, err
+	}
+	return server.PersistedActive(stateDir)
 }
 
 // lockEpics locks every epic in path order, so two moves in opposite
