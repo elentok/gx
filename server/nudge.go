@@ -1,11 +1,13 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
@@ -90,6 +92,46 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 			return QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
 		}
 		s.events.publish(EventTicketNudged, address)
+		if !s.registry.has(address) {
+			s.watchNudgedPane(ref, it, label)
+		}
 		return QueueResult{}, nil
+	})
+}
+
+// nudgeWatchStart bounds how long a watched pane gets to start working on the
+// nudge; nudgeWatchPoll is one wait for it to settle again.
+const (
+	nudgeWatchStart = 30 * time.Second
+	nudgeWatchPoll  = 5 * time.Minute
+)
+
+// watchNudgedPane tracks a pane a nudge set working after its run ended (a
+// parked ticket's pane, as recovery's R7 nudges): until it settles it counts
+// as a run, so the budget meters it and the hard limit stops it. It is never
+// finished or landed; the parked ticket stays with whoever handles the park.
+func (s *Server) watchNudgedPane(ref ticketRef, it IterationInfo, label string) {
+	t := trackedRun{
+		Run: Run{Address: ref.addr.String(), Runner: runnerHerdr,
+			Session: agentrunner.Session{Label: label, ID: it.Pane, SessionID: it.Session}},
+		Root: ref.root().String(), TicketPath: ref.ticket.Path, StartedAt: time.Now(), Watched: true,
+	}
+	s.registry.put(t)
+	r := s.runnerOf(t.Run)
+	s.goSettle(func() {
+		defer s.registry.deleteWatched(t)
+		// The nudge may not have shown as working yet; a pane already idle
+		// again by the deadline simply settles below.
+		_, err := r.Wait(t.Session, []agentrunner.State{agentrunner.StateWorking}, nudgeWatchStart)
+		for err == nil || errors.Is(err, agentrunner.ErrTimeout) {
+			if _, err = r.Wait(t.Session, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, nudgeWatchPoll); err == nil {
+				break
+			}
+		}
+		if stopping, first := s.registry.claimBudgetStop(t.Address); stopping && first {
+			if perr := s.parkBudgetKilled(t); perr != nil {
+				s.log.Error("budget kill", "ticket", t.Address, "err", perr)
+			}
+		}
 	})
 }

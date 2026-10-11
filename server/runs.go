@@ -66,6 +66,10 @@ type trackedRun struct {
 	// StartedAt is when the claim launched; it survives a restart with the
 	// registry file. Zero for a run an older server recorded.
 	StartedAt time.Time `json:"started_at,omitzero"`
+	// Watched marks a pane a nudge set working again after its run ended
+	// (see watchNudgedPane): it is metered and budget-stopped like a run, but
+	// never finished, and never saved, so a restart cannot reclaim it.
+	Watched bool `json:"-"`
 }
 
 // runRegistry is the server's own record of launched iterations, keyed by
@@ -115,7 +119,9 @@ func openRuns(stateDir string, log *slog.Logger) (*runRegistry, []trackedRun, er
 func (r *runRegistry) save() {
 	list := make([]trackedRun, 0, len(r.runs))
 	for _, t := range r.runs {
-		list = append(list, t)
+		if !t.Watched {
+			list = append(list, t)
+		}
 	}
 	data, err := json.Marshal(list)
 	if err == nil {
@@ -254,9 +260,23 @@ func (r *runRegistry) claimBudgetStop(address string) (stopping, first bool) {
 	return true, !parked
 }
 
+// deleteWatched drops the watched pane t, unless a run has since replaced it
+// (e.g. a relaunch claimed the ticket again).
+func (r *runRegistry) deleteWatched(t trackedRun) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cur, ok := r.runs[t.Address]; ok && cur.Watched && cur.Session.ID == t.Session.ID {
+		r.deleteLocked(t.Address)
+	}
+}
+
 func (r *runRegistry) delete(address string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.deleteLocked(address)
+}
+
+func (r *runRegistry) deleteLocked(address string) {
 	delete(r.runs, address)
 	delete(r.released, address)
 	delete(r.budgetStops, address)

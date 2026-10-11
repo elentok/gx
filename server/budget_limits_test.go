@@ -47,6 +47,72 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	}
 }
 
+// A nudge into a parked ticket's still-open pane (recovery's R7 does this)
+// sets an agent working outside any run; it must be metered and the hard
+// limit must stop it like any other live agent.
+func TestBudget_NudgedParkedPaneIsMeteredAndKilled(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.BudgetHardLimit = 5
+		c.BudgetKillGrace = 50 * time.Millisecond
+		c.BudgetPollInterval = time.Hour
+	})
+	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "compaction timed out"); err != nil {
+		t.Fatal(err)
+	}
+	var gone, closed atomic.Bool
+	t.Cleanup(func() { gone.Store(true) }) // lets the pane's watch end
+	working := map[string]any{"agent": map[string]any{
+		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
+		"agent_session": map[string]any{"value": "sess"},
+	}}
+	live := func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if gone.Load() {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		}
+		return working, herdrfake.Identities{}, nil
+	}
+	h.Herdr.Register("agent", "get", live)
+	h.Herdr.Register("agent", "wait", live)
+	h.Herdr.Register("agent", "prompt", live)
+	h.Herdr.Register("agent", "send-keys", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		closed.Store(true)
+		gone.Store(true)
+		return map[string]any{}, herdrfake.Identities{}, nil
+	})
+	var mu sync.Mutex
+	cost := 0.0
+	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { mu.Lock(); defer mu.Unlock(); cost += 3; return cost, true })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "finish up"); err != nil || res.Refused {
+		t.Fatalf("nudge = %+v, %v", res, err)
+	}
+	if runs := h.Server.Runs(); len(runs) != 1 {
+		t.Fatalf("runs = %+v, want the nudged pane tracked", runs)
+	}
+	for len(h.Server.Runs()) != 0 && ctx.Err() == nil {
+		h.Server.PollBudget()
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !closed.Load() {
+		t.Error("the hard limit did not close the nudged pane")
+	}
+	tk, err := schema.ParseTicket(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(tk.ParkKind) != string(events.BudgetKilled) {
+		t.Errorf("park kind = %s, want budget-killed", tk.ParkKind)
+	}
+}
+
 func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

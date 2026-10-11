@@ -234,13 +234,24 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 		c.Recovery = recovery.Default()
 	})
 	var mu sync.Mutex
-	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+	// After the test the pane is gone, so the watch a nudge starts on it ends.
+	var gone atomic.Bool
+	t.Cleanup(func() { gone.Store(true) })
+	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if gone.Load() {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		}
 		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
 	})
-	h.Herdr.Register("agent", "wait", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if gone.Load() {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		}
 		mu.Lock()
 		defer mu.Unlock()
-		waits++
+		if len(typed) == 0 { // R7's own wait; later ones watch the nudged pane
+			waits++
+		}
 		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "idle"}}, herdrfake.Identities{}, waitErr
 	})
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {

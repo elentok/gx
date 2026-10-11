@@ -425,11 +425,12 @@ func (s *Server) budgetIteration(address string) (IterationInfo, bool) {
 	return IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: st.SessionID}, true
 }
 
-// pollBudget adds every live iteration's cost delta to the ledger. All ticket
-// kinds count.
+// pollBudget adds every live iteration's cost delta to the ledger: claimed
+// tickets, and parked ones whose pane a nudge set working (a watched run). All
+// ticket kinds count.
 func (s *Server) pollBudget(now time.Time) {
 	for _, t := range s.idx.snapshot().Tickets {
-		if t.Status != "claimed" {
+		if t.Status != "claimed" && !s.registry.has(t.Address) {
 			continue
 		}
 		it, ok := s.budgetIteration(t.Address)
