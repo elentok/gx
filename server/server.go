@@ -195,6 +195,7 @@ type Server struct {
 	// decision; a reload swaps in a new value and never mutates the old one.
 	settings atomic.Pointer[Settings]
 	reloadMu sync.Mutex // serializes config reloads
+	reloads  reloadHistory
 	// storeCommits is nil until the store commit loop starts; guarded by
 	// reloadMu so a reload racing the start is never lost.
 	storeCommits *storecommit.Loop
@@ -378,6 +379,7 @@ var routeTable = []struct {
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/config/reload", (*Server).configReloadWrite},
+	{"GET /v1/config/status", (*Server).configStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},

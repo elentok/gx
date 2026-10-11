@@ -125,7 +125,7 @@ func newServerCmd(_ deps) *cobra.Command {
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd(), newServerReloadConfigCmd())
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd(), newServerReloadConfigCmd(), newServerConfigStatusCmd())
 	return cmd
 }
 
@@ -185,6 +185,10 @@ type StatusInfo struct {
 	Warnings []string `json:"warnings,omitempty"`
 	// Budget is today's spend and limits; nil when the server did not answer.
 	Budget *server.BudgetStatus `json:"budget,omitempty"`
+	// Config is the reload status; nil when there is nothing to show.
+	Config *server.ConfigStatus `json:"config,omitempty"`
+	// ConfigError is why config.json does not load; status then uses defaults.
+	ConfigError string `json:"config_error,omitempty"`
 }
 
 func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
@@ -195,13 +199,17 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	return runServerStatusWith(ctx, c, jsonOut, w)
+}
+
+func runServerStatusWith(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
+	cfg, cfgErr := config.Load()
+	if cfgErr != nil {
+		cfg = config.Default()
+	}
 	info := StatusInfo{}
 	n, err := c.Negotiate(ctx, getVersion())
 	if err == nil {
-		cfg, cerr := config.Load()
-		if cerr != nil {
-			return cerr
-		}
 		stateDir, serr := config.StateDir()
 		if serr != nil {
 			return serr
@@ -214,6 +222,12 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 		if b, berr := c.Budget(ctx); berr == nil {
 			info.Budget = &b
 		}
+		if st, serr := c.ConfigStatus(ctx); serr == nil && !st.Empty() {
+			info.Config = &st
+		}
+	}
+	if cfgErr != nil {
+		info.ConfigError = cfgErr.Error()
 	}
 	if !info.Running {
 		if stateDir, serr := config.StateDir(); serr == nil {
@@ -228,6 +242,11 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 			via = viaServer
 		}
 		return encodeProvenance(w, info, via, callerActor(os.Getwd))
+	}
+	if info.ConfigError != "" {
+		if _, err = fmt.Fprintln(w, "config error: "+info.ConfigError); err != nil {
+			return err
+		}
 	}
 	if info.Starting {
 		_, werr := fmt.Fprintf(w, "starting (pid %d): indexing the ticket store, not answering yet\n", info.Pid)
@@ -247,6 +266,11 @@ func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
 	}
 	if info.Budget != nil {
 		if _, err = fmt.Fprintln(w, "budget: "+budgetLine(*info.Budget)); err != nil {
+			return err
+		}
+	}
+	if info.Config != nil {
+		if err = writeConfigBlock(w, *info.Config, time.Now()); err != nil {
 			return err
 		}
 	}

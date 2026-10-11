@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Added config reload without a server restart:
+  - `gx server reload-config` reloads `config.json` into the running server. A broken file is refused and the live settings stay as they were.
+  - The server also reloads `config.json` on its own whenever it is saved. Turn this off with `server.watch-config: false`.
+  - Each reload shows an OS banner (through `terminal-notifier` on macOS when it is installed) and a TUI toast at its level: success, warning or error.
+  - Startup-only keys (`ticket-store.path`, `server.tcp-listen`, `agent-runner`) still need a restart; a reload warns about them.
+  - A reload that sets the hard budget limit at or below today's spend waits 60 seconds before stopping agents. Raising the limit or running `gx budget increase` cancels the stop.
+- Added `gx server config-status` (`GET /v1/config/status`): the last reload's result, startup-only changes waiting for a restart and any hard-limit countdown. `gx server status` shows the same as a Config block.
+- Changed `gx server status` to work with a broken `config.json`: it prints the config error at the top instead of failing.
+
 ## v0.32.6 - 2026-10-11
 
 - Fixed the budget hard limit:

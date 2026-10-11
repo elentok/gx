@@ -82,7 +82,12 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 
 	old := s.settings.Load()
 	next := reloadableSettings(*old, SettingsFromConfig(cfg))
-	res := ReloadResult{Changed: changedKeys(*old, next), Warnings: s.startupOnlyWarnings(cfg)}
+	pending := s.startupOnlyChanges(cfg)
+	s.reloads.addPending(pending)
+	res := ReloadResult{Changed: changedKeys(*old, next)}
+	for _, key := range pending {
+		res.Warnings = append(res.Warnings, "restart needed for "+key)
+	}
 	if warning := s.applyBudgetLimits(*old, next); warning != "" {
 		res.Warnings = append(res.Warnings, warning)
 	}
@@ -183,20 +188,20 @@ func changedKeys(old, next Settings) []string {
 	return keys
 }
 
-// startupOnlyWarnings compares the startup-only keys with the values the
+// startupOnlyChanges compares the startup-only keys with the values the
 // server started with, so a warning repeats on every reload until restart.
-func (s *Server) startupOnlyWarnings(cfg config.Config) []string {
-	var warnings []string
+func (s *Server) startupOnlyChanges(cfg config.Config) []string {
+	var keys []string
 	if cfg.TicketStore.Path != s.cfg.TicketStore {
-		warnings = append(warnings, "restart needed for ticket-store.path")
+		keys = append(keys, "ticket-store.path")
 	}
 	if cfg.Server.TCPListen != (s.cfg.TCPAddr != "") {
-		warnings = append(warnings, "restart needed for server.tcp-listen")
+		keys = append(keys, "server.tcp-listen")
 	}
 	if runnerChoice(cfg.AgentRunner) != runnerChoice(s.cfg.AgentRunner) {
-		warnings = append(warnings, "restart needed for agent-runner")
+		keys = append(keys, "agent-runner")
 	}
-	return warnings
+	return keys
 }
 
 // runnerChoice treats an unset agent-runner as auto, its documented default.
@@ -220,7 +225,9 @@ func (s *Server) reportReload(trigger string, res ReloadResult) {
 	} else {
 		s.log.Info("config reloaded", "trigger", trigger, "changed", res.Changed, "warnings", res.Warnings)
 	}
-	s.banner(reloadBanner(res))
+	level, title, body := reloadBanner(res)
+	s.reloads.setLast(ReloadRecord{At: time.Now(), Trigger: trigger, Outcome: level, Message: joinBanner(title, body)})
+	s.banner(level, title, body)
 }
 
 // banner shows one OS banner and streams it as a config-reloaded event, for
@@ -231,11 +238,14 @@ func (s *Server) banner(level, title, body string) {
 			s.log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()
-	msg := title
-	if body != "" {
-		msg += ": " + body
+	s.events.publishEvent(Event{Type: EventConfigReloaded, Level: level, Message: joinBanner(title, body)})
+}
+
+func joinBanner(title, body string) string {
+	if body == "" {
+		return title
 	}
-	s.events.publishEvent(Event{Type: EventConfigReloaded, Level: level, Message: msg})
+	return title + ": " + body
 }
 
 // maxBannerBody keeps a long parse error from overflowing the banner.

@@ -22,6 +22,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/budget":             "budget status",
 	"POST /v1/budget/override":   "budget override",
 	"POST /v1/config/reload":     "server reload-config",
+	"GET /v1/config/status":      "server config-status",
 	"POST /v1/budget/increase":   "budget increase",
 	"GET /v1/tickets/history":    "server tickets history",
 	"GET /v1/tickets/explain":    "server tickets explain",

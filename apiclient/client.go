@@ -349,6 +349,14 @@ func (c *Client) ReloadConfig(ctx context.Context) (server.ReloadResult, error) 
 	return res, err
 }
 
+// ConfigStatus is the last reload result, the startup-only keys waiting for a
+// restart and the hard-limit grace countdown.
+func (c *Client) ConfigStatus(ctx context.Context) (server.ConfigStatus, error) {
+	var st server.ConfigStatus
+	err := c.get(ctx, "/v1/config/status", &st)
+	return st, err
+}
+
 // BudgetIncrease raises the live budget limits until the server restarts. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {

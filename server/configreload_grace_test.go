@@ -75,6 +75,18 @@ func (f graceFixture) lowerBelowSpend(t *testing.T) {
 	}
 }
 
+func TestHardLimitGrace_ConfigStatusShowsCountdown(t *testing.T) {
+	f := startGraceServer(t, time.Hour)
+	f.lowerBelowSpend(t)
+	st, err := f.h.Client.ConfigStatus(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if left := time.Until(st.HardStopAt); left <= 0 || left > time.Hour {
+		t.Errorf("hard stop at = %v, want within the next hour", st.HardStopAt)
+	}
+}
+
 // hasBanner waits briefly for a banner titled title.
 func (f graceFixture) hasBanner(title string) bool {
 	for range 50 {
