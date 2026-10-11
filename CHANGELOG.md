@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.32.5 - 2026-10-11
+
+- Fixed the finish gate releasing too early:
+  - It now holds on async subagents through interim notices, and until a notification-woken turn ends.
+  - A completed compaction is no longer hidden from the unavailable-snapshot recovery gate when its boundary is undated or has the same instant as the cutoff.
+  - Codex context exhaustion is now recovered when it shows up on a blocked pane.
+- Fixed commitless tickets losing their commits: the commits are now kept.
+- Fixed budget notices counting spend from before a budget override. Only post-override spend is counted.
+- Fixed `actual_context_window` being overwritten when a ticket is marked done. The peak value is kept.
+- Fixed the run preflight to cover every skill the run scope can launch.
+- Added a preview toggle for the Tickets and Queue tabs.
+- Added epic titles to Tickets and Queue search.
+- Changed the Tickets preview to show `category`, `exported_at` and epic timestamps.
+- Changed Queue ticket rows to drop the project prefix.
+- Changed the `gx-to-tickets` skill to chain same-file and cross-cutting sibling tickets.
+- Docs: updated the GLOSSARY and the `gx-investigate` gotchas for async-subagent finish-gate behavior.
+
 ## v0.32.4 - 2026-10-11
 
 - Added `gx evolve`, a retrospective workflow that turns finished work into follow-up tickets:
