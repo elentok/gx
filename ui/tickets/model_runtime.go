@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -60,10 +59,11 @@ func (m Model) selectedEditTarget() (path string, ok bool, warning string) {
 	}
 	epic := m.epicAt(r)
 	if r.isEpic() {
-		if !epic.HasTicketMD {
+		path, ok := epicTicketMDPath(epic)
+		if !ok {
 			return "", false, "epic has no ticket.md to edit"
 		}
-		return filepath.Join(epic.Path, "ticket.md"), true, ""
+		return path, true, ""
 	}
 	return epic.Tickets[r.ticketIdx].FilePath(), true, ""
 }

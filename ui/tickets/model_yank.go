@@ -20,14 +20,19 @@ func formatTicketSummary(epicName string, t tickets.Ticket) string {
 }
 
 // yankTicketSummary implements the Tickets tab's "yy" chord: copies the
-// selected ticket's epic/id/title to the clipboard. No-ops (with a warning)
-// on an epic row, which has no ticket to summarize.
+// selected ticket's epic/id/title to the clipboard, or an epic row's name.
 func (m Model) yankTicketSummary() tea.Cmd {
 	r, ok := m.selectedRow()
-	if !ok || r.isEpic() {
-		return notify.Warning("no ticket selected")
+	if !ok {
+		return notify.Warning("nothing selected")
 	}
 	epic := m.epicAt(r)
+	if r.isEpic() {
+		if err := ticketsClipboardWrite(epic.Name); err != nil {
+			return notify.Error("clipboard copy failed: " + err.Error())
+		}
+		return notify.Info("yanked epic")
+	}
 	text := formatTicketSummary(epic.Name, epic.Tickets[r.ticketIdx])
 	if err := ticketsClipboardWrite(text); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
@@ -36,14 +41,12 @@ func (m Model) yankTicketSummary() tea.Cmd {
 }
 
 // yankTicketFilePath implements the Tickets tab's "yf" chord: copies the
-// selected ticket's file path to the clipboard.
+// selected row's file path (an epic row's ticket.md) to the clipboard.
 func (m Model) yankTicketFilePath() tea.Cmd {
-	r, ok := m.selectedRow()
-	if !ok || r.isEpic() {
-		return notify.Warning("no ticket selected")
+	path, ok, warning := m.selectedEditTarget()
+	if !ok {
+		return notify.Warning(warning)
 	}
-	epic := m.epicAt(r)
-	path := epic.Tickets[r.ticketIdx].Path
 	if err := ticketsClipboardWrite(path); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
 	}
@@ -72,7 +75,7 @@ func (m QueueModel) yankQueueTicketFilePath() tea.Cmd {
 	if !ok {
 		return notify.Warning("no ticket selected")
 	}
-	path := r.ticket.Path
+	path := r.ticket.FilePath()
 	if err := ticketsClipboardWrite(path); err != nil {
 		return notify.Error("clipboard copy failed: " + err.Error())
 	}

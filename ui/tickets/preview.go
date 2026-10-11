@@ -211,6 +211,21 @@ func withEpicTicketMD(epic tickets.Epic) tickets.Epic {
 	return epic
 }
 
+// epicTicketMDPath is epic's ticket.md file. A server-mode epic's Path is its
+// name, not a directory, so its directory is found from a ticket's file.
+func epicTicketMDPath(epic tickets.Epic) (string, bool) {
+	if !epic.HasTicketMD {
+		if len(epic.Tickets) == 0 || epic.Tickets[0].File == "" {
+			return "", false
+		}
+		epic = tickets.LoadEpicTicketMD(filepath.Dir(filepath.Dir(epic.Tickets[0].File)))
+		if !epic.HasTicketMD {
+			return "", false
+		}
+	}
+	return filepath.Join(epic.Path, "ticket.md"), true
+}
+
 func previewEpicHeaderLine(epic tickets.Epic) string {
 	line := "  " + ui.StyleBold.Render(epic.Name)
 	if epic.IsMap {
