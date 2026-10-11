@@ -64,21 +64,24 @@ func countDirty(dir string) (int, string, error) {
 
 // Loop is a running store commit loop.
 type Loop struct {
-	dir      string
-	debounce time.Duration
-	poll     time.Duration
-	refs     int        // guarded by regMu
-	mu       sync.Mutex // serializes commits
-	stop     chan struct{}
-	done     chan struct{}
+	dir  string
+	refs int        // guarded by regMu
+	mu   sync.Mutex // serializes commits
+	stop chan struct{}
+	done chan struct{}
 
+	// settingsMu guards the fields SetSettings changes while the loop runs.
+	settingsMu sync.Mutex
+	debounce   time.Duration
+	poll       time.Duration
 	// pushRemote is empty when pushing is off. Pushes run on their own
 	// goroutine so a slow or dead remote never delays a commit.
 	pushRemote string
-	onError    func(error)
-	pushKick   chan struct{}
-	pushStop   chan struct{}
-	pushDone   chan struct{}
+
+	onError  func(error)
+	pushKick chan struct{}
+	pushStop chan struct{}
+	pushDone chan struct{}
 }
 
 // Options configures StartWith.
@@ -157,6 +160,21 @@ func (l *Loop) Stop() {
 	<-l.pushDone
 }
 
+// SetSettings changes the debounce and push remote of the running loop, for a
+// config reload. The loop keeps running, so Immediate commits are never lost
+// to a restart; its ticker moves to the new interval on its next tick.
+func (l *Loop) SetSettings(debounce time.Duration, pushRemote string) {
+	l.settingsMu.Lock()
+	defer l.settingsMu.Unlock()
+	l.debounce, l.poll, l.pushRemote = debounce, pollFor(debounce), pushRemote
+}
+
+func (l *Loop) settings() (debounce, poll time.Duration, pushRemote string) {
+	l.settingsMu.Lock()
+	defer l.settingsMu.Unlock()
+	return l.debounce, l.poll, l.pushRemote
+}
+
 // Flush commits any pending change now. A server calls it on start to commit
 // edits made while it was down.
 func (l *Loop) Flush() error { return l.commit("") }
@@ -166,10 +184,11 @@ func (l *Loop) Flush() error { return l.commit("") }
 func (l *Loop) runPush() {
 	defer close(l.pushDone)
 	push := func() {
-		if l.pushRemote == "" {
+		_, _, remote := l.settings()
+		if remote == "" {
 			return
 		}
-		if _, err := git(l.dir, "push", l.pushRemote, "HEAD"); err != nil && l.onError != nil {
+		if _, err := git(l.dir, "push", remote, "HEAD"); err != nil && l.onError != nil {
 			l.onError(err)
 		}
 	}
@@ -192,13 +211,19 @@ func (l *Loop) run() {
 	defer close(l.done)
 	var lastSig string
 	var quietSince time.Time
-	t := time.NewTicker(l.poll)
+	_, ticking, _ := l.settings()
+	t := time.NewTicker(ticking)
 	defer t.Stop()
 	for {
 		select {
 		case <-l.stop:
 			return
 		case <-t.C:
+		}
+		debounce, poll, _ := l.settings()
+		if poll != ticking {
+			ticking = poll
+			t.Reset(poll)
 		}
 		n, sig, err := countDirty(l.dir)
 		if err != nil || n == 0 {
@@ -210,7 +235,7 @@ func (l *Loop) run() {
 			lastSig, quietSince = sig, now
 			continue
 		}
-		if now.Sub(quietSince) >= l.debounce {
+		if now.Sub(quietSince) >= debounce {
 			_ = l.commit("")
 			lastSig = ""
 		}

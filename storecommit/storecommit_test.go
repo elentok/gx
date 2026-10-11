@@ -116,6 +116,31 @@ func TestPush_PushesAfterCommit(t *testing.T) {
 	}
 }
 
+func TestSetSettings_NextCommitUsesNewDebounceAndRemote(t *testing.T) {
+	remote := t.TempDir()
+	if _, err := git(remote, "init", "-q", "--bare"); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	l, err := StartWith(dir, Options{Debounce: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.SetSettings(100*time.Millisecond, remote)
+	write(t, dir, "a.md", "x")
+	deadline := time.Now().Add(5 * time.Second)
+	for len(logLines(t, dir)) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if got := logLines(t, dir); len(got) != 1 || got[0] != "sync: 1 files" {
+		t.Fatalf("log = %v, want one debounced sync commit", got)
+	}
+	l.Stop()
+	if out, err := git(remote, "log", "--format=%s", "HEAD"); err != nil || strings.TrimSpace(out) != "sync: 1 files" {
+		t.Fatalf("remote log = %q, err %v", out, err)
+	}
+}
+
 func TestPush_FailureIsReportedAndDoesNotBlockCommits(t *testing.T) {
 	dir := t.TempDir()
 	failed := make(chan error, 4)

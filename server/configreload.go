@@ -89,6 +89,9 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 	if next.Chat != old.Chat {
 		closeRetired = s.chat.SetGlobal(next.Chat)
 	}
+	if s.storeCommits != nil && (next.StoreCommitDebounce != old.StoreCommitDebounce || next.StorePushRemote != old.StorePushRemote) {
+		s.storeCommits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
+	}
 	s.settings.Store(&next)
 	if next.LogRetention != old.LogRetention {
 		s.pruneAgentLogs(time.Now())
@@ -134,12 +137,10 @@ func (s *Server) applyBudgetLimits(old, next Settings) string {
 	return warning
 }
 
-// reloadableSettings is next with the fields reload does not apply yet (store
-// commits) kept at their live values. The chat test seams are not config keys,
-// so they carry over too.
+// reloadableSettings is next with the chat test seams, which are not config
+// keys, carried over from the live settings.
 func reloadableSettings(old, next Settings) Settings {
 	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
-	next.StoreCommitDebounce, next.StorePushRemote = old.StoreCommitDebounce, old.StorePushRemote
 	return next
 }
 
@@ -165,6 +166,8 @@ func changedKeys(old, next Settings) []string {
 		{"notifications.telegram.bot-token", old.Chat.TelegramBotToken, next.Chat.TelegramBotToken},
 		{"notifications.telegram.chat-id", old.Chat.TelegramChatID, next.Chat.TelegramChatID},
 		{"notifications.slack.webhook-url", old.Chat.SlackWebhookURL, next.Chat.SlackWebhookURL},
+		{"ticket-store.commit-debounce", old.StoreCommitDebounce, next.StoreCommitDebounce},
+		{"ticket-store.push-remote", old.StorePushRemote, next.StorePushRemote},
 	}
 	var keys []string
 	for _, f := range fields {

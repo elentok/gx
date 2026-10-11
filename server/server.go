@@ -189,13 +189,16 @@ type Server struct {
 	// decision; a reload swaps in a new value and never mutates the old one.
 	settings atomic.Pointer[Settings]
 	reloadMu sync.Mutex // serializes config reloads
-	lock     *serverLock
-	ln       net.Listener
-	tcp      net.Listener // nil unless Config.TCPAddr is set
-	http     *http.Server
-	logf     *rotatingFile
-	log      *slog.Logger
-	idx      *index
+	// storeCommits is nil until the store commit loop starts; guarded by
+	// reloadMu so a reload racing the start is never lost.
+	storeCommits *storecommit.Loop
+	lock         *serverLock
+	ln           net.Listener
+	tcp          net.Listener // nil unless Config.TCPAddr is set
+	http         *http.Server
+	logf         *rotatingFile
+	log          *slog.Logger
+	idx          *index
 
 	queued      *queueStore
 	pause       *pauseState
@@ -576,22 +579,28 @@ func (s *Server) Serve(ctx context.Context) error {
 	return nil
 }
 
+func (s Settings) storeCommitDebounce() time.Duration {
+	if s.StoreCommitDebounce <= 0 {
+		return time.Duration(config.DefaultCommitDebounceSeconds) * time.Second
+	}
+	return s.StoreCommitDebounce
+}
+
 // startStoreCommits makes the server the store's committer and commits edits
 // made while it was down.
 func (s *Server) startStoreCommits() (stop func(), err error) {
 	if s.cfg.TicketStore == "" {
 		return func() {}, nil
 	}
+	s.reloadMu.Lock()
 	set := s.settings.Load()
-	debounce := set.StoreCommitDebounce
-	if debounce <= 0 {
-		debounce = time.Duration(config.DefaultCommitDebounceSeconds) * time.Second
-	}
 	loop, err := storecommit.StartWith(s.cfg.TicketStore, storecommit.Options{
-		Debounce:   debounce,
+		Debounce:   set.storeCommitDebounce(),
 		PushRemote: set.StorePushRemote,
 		OnError:    func(err error) { s.log.Warn("store push failed", "err", err) },
 	})
+	s.storeCommits = loop
+	s.reloadMu.Unlock()
 	if err != nil {
 		return nil, err
 	}
