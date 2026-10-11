@@ -125,24 +125,30 @@ func TestQueueServerMode_LoadsRowsAndQueuedSetFromServer(t *testing.T) {
 	}
 }
 
-// Seam D: a snapshot with two projects renders project-prefixed rows, and "tp"
+// Seam D: a snapshot with two projects names each project in its epic header
+// only — a row prefix misaligned idle titles against live ones — and "tp"
 // filters them by project.
-func TestQueueServerMode_PrefixesRowsAndFiltersByProject(t *testing.T) {
+func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "blog:beta/01", Title: "Second", Status: "open"},
 	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "blog:beta/01"}})
 
 	view := ansi.Strip(m.View().Content)
-	for _, want := range []string{"gx: 01 First", "blog: 01 Second"} {
+	for _, want := range []string{"gx:alpha", "blog:beta", " 01 First", " 01 Second"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("view missing %q:\n%s", want, view)
+		}
+	}
+	for _, unwanted := range []string{"gx: 01", "blog: 01"} {
+		if strings.Contains(view, unwanted) {
+			t.Errorf("view has project-prefixed row %q:\n%s", unwanted, view)
 		}
 	}
 
 	m.projectFilter = nextProject(m.epics, "")
 	view = ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "blog: 01 Second") || strings.Contains(view, "gx: 01 First") {
+	if !strings.Contains(view, "01 Second") || strings.Contains(view, "01 First") {
 		t.Errorf("filter %q should show only blog:\n%s", m.projectFilter, view)
 	}
 	if got := nextProject(m.epics, "gx"); got != "" {
