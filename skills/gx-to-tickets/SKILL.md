@@ -95,6 +95,18 @@ Break the work into **tracer bullet** tickets.
 Give each ticket its **blocking edges** — the other tickets that must complete before it can start.
 A ticket with no blockers can start immediately.
 
+Every set of tickets that share the same blockers runs **in parallel** — ralph-loop starts them
+together, each on its own branch, and cherry-picks them back one by one. Two rules follow:
+
+- **Siblings that edit the same files get chained, not fanned out.** If two tickets would touch the
+  same source file, test file, or test fake, make one block the other. A common blocker alone
+  guarantees cherry-pick conflicts and conflict-fix child tickets. `blf-herdr-impl` gave three
+  tickets editing one command file and its test the same single blocker; all three conflicted.
+- **A cross-cutting ticket (logging, config, metrics, tracing) is blocked by the features it
+  instruments** — or, if it's plumbing they should call, the features are blocked by it. Never run
+  it beside them: it can't see code that hasn't landed yet, so it ships incomplete and code review
+  spawns a follow-up to wire it in.
+
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical
 change — rename a column, retype a shared symbol — whose **blast radius** fans across the whole
 codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land
@@ -162,7 +174,8 @@ Present the proposed breakdown as a numbered list. For each ticket, show:
 Ask the user:
 
 - Does the granularity feel right? (too coarse / too fine)
-- Are the blocking edges correct — does each ticket only depend on tickets that genuinely gate it?
+- Are the blocking edges correct — does each ticket only depend on tickets that genuinely gate it,
+  and are same-file siblings and cross-cutting tickets chained rather than run in parallel?
 - Are the declared seams the right ones to test against?
 - Should any tickets be merged or split further?
 
