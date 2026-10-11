@@ -658,7 +658,10 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 			return true, nil
 		}
 
-		outstanding := false
+		// The pane can still read idle while a notification-woken turn runs
+		// quick tool calls, so the transcript's turn end decides, not herdr.
+		outstanding := reading.AwaitingTurnEnd
+		gated = gated || outstanding
 		for _, m := range reading.Markers {
 			switch m.Status {
 			case transcript.BackgroundTaskOutstandingFresh:

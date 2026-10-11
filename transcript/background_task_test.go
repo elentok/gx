@@ -375,6 +375,40 @@ func TestReadBackgroundTasks_AsyncAgentAgesOutAtTheCap(t *testing.T) {
 	}
 }
 
+func assistantLine(stopReason, timestamp string) string {
+	return `{"isSidechain":false,"type":"assistant","timestamp":"` + timestamp + `","message":{"stop_reason":"` + stopReason + `","content":[{"type":"text","text":"..."}]}}`
+}
+
+// A notification wakes an agent that ended its turn waiting on it, so the
+// iteration isn't over until the agent ends the turn that notification began.
+func TestReadBackgroundTasks_AwaitsTurnEndAfterResolution(t *testing.T) {
+	start := startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z")
+	waiting := assistantLine("end_turn", "2026-08-12T17:00:05.000000000Z")
+	notice := notificationLine("task-1", "tool-1", "completed", "2026-08-12T17:10:00.000000000Z")
+	toolCall := assistantLine("tool_use", "2026-08-12T17:10:03.000000000Z")
+	done := assistantLine("end_turn", "2026-08-12T17:12:00.000000000Z")
+	for _, tc := range []struct {
+		name  string
+		lines []string
+		now   string
+		want  bool
+	}{
+		{"outstanding", []string{start, waiting}, "2026-08-12T18:00:00.000000000Z", false},
+		{"notified, no reply yet", []string{start, waiting, notice}, "2026-08-12T18:00:00.000000000Z", true},
+		{"notified, mid-turn", []string{start, waiting, notice, toolCall}, "2026-08-12T18:00:00.000000000Z", true},
+		{"notified, turn ended", []string{start, waiting, notice, toolCall, done}, "2026-08-12T18:00:00.000000000Z", false},
+		{"turn never ended, past the cap", []string{start, waiting, notice, toolCall}, "2026-08-12T19:11:00.000000000Z", false},
+	} {
+		reading, err := ReadBackgroundTasks(writeTranscript(t, tc.lines...), capDuration, mustParseTime(tc.now))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reading.AwaitingTurnEnd != tc.want {
+			t.Errorf("%s: AwaitingTurnEnd = %v, want %v", tc.name, reading.AwaitingTurnEnd, tc.want)
+		}
+	}
+}
+
 // A Monitor that never reported expires on its own timeout (400s here), long
 // before the 2h cap of a backgrounded shell command.
 func TestReadBackgroundTasks_MonitorAgesOutAtItsOwnTimeout(t *testing.T) {

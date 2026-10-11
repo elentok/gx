@@ -58,6 +58,11 @@ type BackgroundTaskMarker struct {
 type BackgroundTaskReading struct {
 	Markers    []BackgroundTaskMarker
 	FileStatus BackgroundTaskStatus
+	// AwaitingTurnEnd is true when the latest line resolving a marker has no
+	// assistant turn end after it yet. The resolving notification wakes an
+	// agent that ended its turn to wait, and the pane can still read idle
+	// while that new turn runs short tool calls. Past cap it reads false.
+	AwaitingTurnEnd bool
 }
 
 // backgroundTaskLine is the subset of a transcript JSONL line
@@ -66,9 +71,11 @@ type BackgroundTaskReading struct {
 // any particular field — see ReadBackgroundTasks — so nothing else needs
 // parsing.
 type backgroundTaskLine struct {
-	Type          string `json:"type"`
-	IsSidechain   bool   `json:"isSidechain"`
-	Timestamp     string `json:"timestamp"`
+	Type        string `json:"type"`
+	IsSidechain bool   `json:"isSidechain"`
+	Timestamp   string `json:"timestamp"`
+	// Raw so an unexpected message shape can't fail the whole line's parse.
+	Message       json.RawMessage `json:"message"`
 	ToolUseResult struct {
 		BackgroundTaskID string `json:"backgroundTaskId"`
 		// A Monitor start result: {taskId, timeoutMs, persistent}. The agent
@@ -123,6 +130,18 @@ func containsTaskIDToken(raw, taskID string) bool {
 	}
 }
 
+// endsTurn reports whether an assistant message closes the agent's turn: any
+// stop_reason except tool_use (streamed partial lines carry none).
+func endsTurn(message json.RawMessage) bool {
+	var m struct {
+		StopReason string `json:"stop_reason"`
+	}
+	if json.Unmarshal(message, &m) != nil {
+		return false
+	}
+	return m.StopReason != "" && m.StopReason != "tool_use"
+}
+
 func isIDTokenChar(b byte) bool {
 	return b == '_' || b == '-' ||
 		(b >= '0' && b <= '9') ||
@@ -152,6 +171,8 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 	}
 	markers := map[string]*markerState{}
 	var order []string
+	awaitingTurnEnd := false
+	var lastResolvedAt time.Time
 
 	totalNonBlank := 0
 	parsedOK := 0
@@ -181,8 +202,13 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 				m := markers[taskID]
 				if !m.resolved && containsTaskIDToken(raw, taskID) {
 					m.resolved = true
+					awaitingTurnEnd = true
+					lastResolvedAt, _ = time.Parse(time.RFC3339Nano, entry.Timestamp)
 				}
 			}
+		}
+		if entry.Type == "assistant" && endsTurn(entry.Message) {
+			awaitingTurnEnd = false
 		}
 
 		taskID, markerCap := entry.ToolUseResult.BackgroundTaskID, cap
@@ -213,7 +239,7 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		return BackgroundTaskReading{FileStatus: BackgroundTaskUnreadable}, nil
 	}
 
-	reading := BackgroundTaskReading{}
+	reading := BackgroundTaskReading{AwaitingTurnEnd: awaitingTurnEnd && now.Sub(lastResolvedAt) <= cap}
 	for _, taskID := range order {
 		m := markers[taskID]
 		status := BackgroundTaskOutstandingFresh

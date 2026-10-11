@@ -1979,6 +1979,31 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 	}
 }
 
+// TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds covers the
+// race that parked a working agent as zero-commit: the task's notification
+// woke the agent, but the pane still read idle through its first quick tool
+// calls, so an idle recheck alone passed. The transcript's turn end decides.
+func TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds(t *testing.T) {
+	t.Parallel()
+	scratchDir := epicScratchDir(t, "epic")
+	var sleeps, reads int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		return transcript.BackgroundTaskReading{
+			Markers:         []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskResolved}},
+			AwaitingTurnEnd: reads < 3,
+		}, nil
+	}
+	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+
+	if err := waitForFinish(d, backgroundTaskGateParams(scratchDir), "sess-30"); err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if reads != 3 {
+		t.Errorf("ReadBackgroundTasks calls = %d, want 3 (awaiting, awaiting, turn ended)", reads)
+	}
+}
+
 // TestWaitForFinish_BackgroundTaskUnreadableAndUnsupportedNeverHoldGate covers
 // the fail-open requirement: neither a transcript that failed to parse nor an
 // agent with no transcript at all (Codex, via ReadBackgroundTasks == nil at
