@@ -380,9 +380,9 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 
 	d, _, _ := fakeDeps()
 	hostLiveAgentWithSession(t, d, "epic-iter-01", "sess-live")
-	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) {
 		if cwd == "/fake/worktrees/epic-item-01" && sessionID == "sess-live" {
-			return 54321, true, nil
+			return 3, true, nil
 		}
 		return 0, false, nil
 	}
@@ -395,8 +395,8 @@ func TestRun_ReattachedCloseUsesLiveSessionInsteadOfStaleRunLog(t *testing.T) {
 	if got.Status != schema.StatusDone {
 		t.Errorf("Status = %q, want done", got.Status)
 	}
-	if got.ActualContextWindow != 54321 {
-		t.Errorf("ActualContextWindow = %d, want 54321 from the live session", got.ActualContextWindow)
+	if got.Compactions != 3 {
+		t.Errorf("Compactions = %d, want 3 from the live session", got.Compactions)
 	}
 }
 

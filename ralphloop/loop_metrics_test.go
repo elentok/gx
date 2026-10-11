@@ -38,30 +38,86 @@ func setHomeEnv(t *testing.T, dir string) {
 	})
 }
 
-// TestRun_FreshIteration_StampsContextWindowOnDone verifies ticket 06: a
-// ticket marked done from a fresh (non-reattached) iteration, whose context
-// occupancy is known this run, gets it written into its frontmatter's
-// actual_context_window field alongside status: done.
-func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
-	t.Parallel()
+// compactedLandingFixture writes a transcript whose occupancy peaks before a
+// compaction and ends far lower, and wires d's live readers to report the
+// post-compaction (last) value, so a test can tell peak from last.
+func compactedLandingFixture(t *testing.T, cwd, sessionID string) (d Deps, peak int) {
+	t.Helper()
+	writeFakeTranscript(t, "", cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		[3]any{"claude-sonnet-5", 1000, 129000},
+		[3]any{"claude-sonnet-5", 1000, 69000},
+	)
+	d, _, _ = fakeDeps()
+	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 70000, true, nil }
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 1, true, nil }
+	return d, 130000
+}
+
+// TestLandAndMarkDone_CompactedSession_StampsPeakNotLast pins
+// follow-ups-2026-10-11/04: closing a fresh iteration whose session compacted
+// keeps landCherryPick's peak actual_context_window instead of overwriting it
+// with the post-compaction occupancy.
+func TestLandAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
+	setHomeEnv(t, t.TempDir())
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
-	d, _, _ := fakeDeps()
-	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
-		return 12345, true, nil
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	sessionID := "sess-land-01"
+	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
+	d, peak := compactedLandingFixture(t, cwd, sessionID)
+	p := iterationParams{
+		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: AgentClaude,
+		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
 	}
 
-	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
+	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
+		t.Fatalf("landCherryPick() error = %v", err)
+	}
+	if err := markDoneStampingCloseMetadata(d, p, cwd, sessionID); err != nil {
+		t.Fatalf("markDoneStampingCloseMetadata() error = %v", err)
 	}
 
-	got := mustParse(t, filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
-	if got.Status != schema.StatusDone {
-		t.Errorf("Status = %q, want done", got.Status)
+	got := mustParse(t, ticketPath)
+	if got.Status != schema.StatusDone || got.ActualContextWindow != peak || got.Compactions != 1 {
+		t.Errorf("got status=%q actual_context_window=%d compactions=%d, want done/%d/1", got.Status, got.ActualContextWindow, got.Compactions, peak)
 	}
-	if got.ActualContextWindow != 12345 {
-		t.Errorf("ActualContextWindow = %d, want 12345", got.ActualContextWindow)
+}
+
+// TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak covers the
+// reattached close: landCherryPick has no session to stamp from, so the
+// backfill recovers the run log's session and must stamp its peak itself.
+func TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) {
+	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
+	setHomeEnv(t, t.TempDir())
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
+	})
+	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	sessionID := "sess-orig-01"
+	cwd := "/fake/worktrees/epic-item-01"
+	d, peak := compactedLandingFixture(t, cwd, sessionID)
+	if err := logEvent(scratchDir, "epic", Event{
+		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: sessionID, Cwd: cwd,
+	}); err != nil {
+		t.Fatalf("logEvent: %v", err)
+	}
+	p := iterationParams{
+		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: AgentClaude,
+		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
+	}
+
+	if _, err := landCherryPick(d, p, "base", "branch", "", ""); err != nil {
+		t.Fatalf("landCherryPick() error = %v", err)
+	}
+	if err := markDoneStampingCloseMetadata(d, p, cwd, ""); err != nil {
+		t.Fatalf("markDoneStampingCloseMetadata() error = %v", err)
+	}
+
+	got := mustParse(t, ticketPath)
+	if got.Status != schema.StatusDone || got.ActualContextWindow != peak || got.Compactions != 1 {
+		t.Errorf("got status=%q actual_context_window=%d compactions=%d, want done/%d/1", got.Status, got.ActualContextWindow, got.Compactions, peak)
 	}
 }
 
@@ -70,8 +126,7 @@ func TestRun_FreshIteration_StampsContextWindowOnDone(t *testing.T) {
 // path (landCherryPick's writeLandedMetrics, then
 // markDoneStampingCloseMetadata's MarkDoneWithMetadata, both writing into the
 // same ticket file in one run) ends up with valid, gx-tickets-validate
-// -passing frontmatter — status: done, and actual_context_window set from
-// the closing occupancy — rather than a corrupted YAML block from the old
+// -passing frontmatter — rather than a corrupted YAML block from the old
 // line-splicing writer.
 func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testing.T) {
 	t.Parallel()
@@ -79,8 +134,8 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) {
-		return 12345, true, nil
+	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) {
+		return 2, true, nil
 	}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
@@ -102,8 +157,8 @@ func TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter(t *testin
 	if ticket.Status != schema.StatusDone {
 		t.Errorf("Status = %q, want done", ticket.Status)
 	}
-	if ticket.ActualContextWindow != 12345 {
-		t.Errorf("ActualContextWindow = %d, want 12345", ticket.ActualContextWindow)
+	if ticket.Compactions != 2 {
+		t.Errorf("Compactions = %d, want 2", ticket.Compactions)
 	}
 }
 

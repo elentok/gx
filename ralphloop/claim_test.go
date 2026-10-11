@@ -202,18 +202,15 @@ func TestMarkChildDone_InvalidStatusPlusOtherInvalidFieldErrorsWithoutWriting(t 
 	}
 }
 
-func TestMarkDoneWithMetadata_SetsStatusAndActualContextWindow(t *testing.T) {
+func TestMarkDoneWithMetadata_SetsStatusAndCompactions(t *testing.T) {
 	t.Parallel()
 	path := writeFrontmatterTicket(t, "claimed")
-	if err := MarkDoneWithMetadata(path, 42000, 2, "sess-123"); err != nil {
+	if err := MarkDoneWithMetadata(path, 2, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
 	got := mustParse(t, path)
 	if got.Status != schema.StatusDone {
 		t.Errorf("Status = %q, want %q", got.Status, schema.StatusDone)
-	}
-	if got.ActualContextWindow != 42000 {
-		t.Errorf("ActualContextWindow = %d, want 42000", got.ActualContextWindow)
 	}
 	if got.Compactions != 2 {
 		t.Errorf("Compactions = %d, want 2", got.Compactions)
@@ -456,17 +453,16 @@ func TestMarkNeedsAnswerWithReasonAndStub_WritesStatusReasonAndStub(t *testing.T
 	}
 }
 
-// TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow
+// TestMarkDoneWithMetadata_FrontmatterTicket_KeepsLandedContextWindow
 // verifies ticket 07's fix for the corruption described in its issue: a
 // frontmatter ticket already carrying actual_context_window/elapsed_time
-// (as ticket 05a's landCherryPick writes) stays valid and gx-tickets-validate
-// -passing after MarkDoneWithMetadata, with status: done and
-// actual_context_window updated in place — not spliced as stray Context
-// window:/Session: lines inside the YAML block.
-func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *testing.T) {
+// (as landCherryPick writes) stays valid and gx-tickets-validate-passing
+// after MarkDoneWithMetadata, with status: done — and, since
+// follow-ups-2026-10-11/04, the landed peak actual_context_window untouched.
+func TestMarkDoneWithMetadata_FrontmatterTicket_KeepsLandedContextWindow(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
-	if err := MarkDoneWithMetadata(path, 42000, 0, "sess-123"); err != nil {
+	if err := MarkDoneWithMetadata(path, 0, "sess-123"); err != nil {
 		t.Fatalf("MarkDoneWithMetadata: %v", err)
 	}
 
@@ -481,8 +477,8 @@ func TestMarkDoneWithMetadata_FrontmatterTicket_WritesActualContextWindow(t *tes
 	if ticket.Status != schema.StatusDone {
 		t.Errorf("Status = %q, want done", ticket.Status)
 	}
-	if ticket.ActualContextWindow != 42000 {
-		t.Errorf("ActualContextWindow = %d, want 42000", ticket.ActualContextWindow)
+	if ticket.ActualContextWindow != 500 {
+		t.Errorf("ActualContextWindow = %d, want 500 (untouched)", ticket.ActualContextWindow)
 	}
 	if ticket.ElapsedTime != 10 {
 		t.Errorf("ElapsedTime = %d, want 10 (untouched)", ticket.ElapsedTime)

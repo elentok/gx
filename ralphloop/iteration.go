@@ -565,45 +565,53 @@ func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, session
 }
 
 // markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
-// iteration's context-window occupancy and session id alongside Status when
-// sessionID is a live, fresh-iteration session (runIteration's case) and its
-// occupancy is available — a reattached close (sessionID == "") has no live
-// session of its own to read occupancy from, so it backfills from the
-// ticket's original iteration-started session in the run log instead.
+// iteration's compaction count when sessionID is a live, fresh-iteration
+// session (runIteration's case) — its peak context window was already
+// stamped by landCherryPick. A reattached close (sessionID == "") skipped
+// that stamp, so it backfills from the ticket's original iteration-started
+// session in the run log instead.
 func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID string) error {
 	if sessionID == "" {
 		return backfillDoneMetadata(d, p)
 	}
-	occupancy, ok, occErr := contextOccupancy(d, p.Agent, cwd, sessionID)
-	if occErr != nil || !ok {
-		return MarkDone(p.Ticket.Path)
-	}
-	compactions, _, _ := sessionCompactions(d, p.Agent, cwd, sessionID)
-	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, compactions, sessionID)
+	return markDoneWithCompactions(d, p.Agent, p.Ticket.Path, cwd, sessionID)
 }
 
 // backfillDoneMetadata handles a reattached ticket close: it looks up the
 // ticket's original iteration-started session from the run log (ticket 06a)
-// and stamps context-window/session from that session's own transcript,
-// rather than leaving the fields blank or attributing them to a fresh
-// session that didn't do the work. Falls back to a plain MarkDone whenever
-// no prior session can be found, or its occupancy can't be read — these
-// fields are a best-effort convenience, not required for a ticket to close.
+// and stamps the landed metrics and compactions from that session's own
+// transcript, rather than leaving the fields blank or attributing them to a
+// fresh session that didn't do the work. Falls back to a plain MarkDone
+// whenever no prior session can be found — these fields are a best-effort
+// convenience, not required for a ticket to close.
 func backfillDoneMetadata(d Deps, p iterationParams) error {
-	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
-	if err != nil || !ok {
-		return MarkDone(p.Ticket.Path)
-	}
-	sessionID, sessionCwd, agent, ok := lastIterationSession(events, p.Ticket.Identifier)
+	sessionID, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	occupancy, ok, occErr := contextOccupancy(d, agent, sessionCwd, sessionID)
-	if occErr != nil || !ok {
-		return MarkDone(p.Ticket.Path)
+	if _, _, _, _, err := writeLandedMetrics(agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
+		return fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
-	compactions, _, _ := sessionCompactions(d, agent, sessionCwd, sessionID)
-	return MarkDoneWithMetadata(p.Ticket.Path, occupancy, compactions, sessionID)
+	return markDoneWithCompactions(d, agent, p.Ticket.Path, sessionCwd, sessionID)
+}
+
+func markDoneWithCompactions(d Deps, agent AgentKind, path, cwd, sessionID string) error {
+	compactions, ok, err := sessionCompactions(d, agent, cwd, sessionID)
+	if err != nil || !ok {
+		return MarkDone(path)
+	}
+	return MarkDoneWithMetadata(path, compactions, sessionID)
+}
+
+// recoverIterationSession finds the session of p.Ticket's last
+// iteration-started run-log event, for a reattached close that has no live
+// session of its own.
+func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent AgentKind, ok bool) {
+	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
+	if err != nil || !ok {
+		return "", "", "", false
+	}
+	return lastIterationSession(events, p.Ticket.Identifier)
 }
 
 // stampCommitlessMetrics writes actual_context_window/elapsed_time for a
@@ -620,11 +628,7 @@ func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 		writeLandedMetrics(p.Agent, cwd, sessionID, p.Ticket.Path)
 		return
 	}
-	events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch)
-	if err != nil || !ok {
-		return
-	}
-	sid, sessionCwd, agent, ok := lastIterationSession(events, p.Ticket.Identifier)
+	sid, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
 		return
 	}

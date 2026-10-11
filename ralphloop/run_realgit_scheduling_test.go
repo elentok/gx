@@ -36,18 +36,17 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	wtDir := testWorktreeDir(t, repoDir)
 	featurePath := filepath.Join(wtDir, epicName)
 	type ticketContract struct {
-		filename      string
-		body          string
-		blockedBy     []string
-		tokens        int
-		trailerTokens int
-		elapsed       int
-		compactions   int
+		filename    string
+		body        string
+		blockedBy   []string
+		tokens      int
+		elapsed     int
+		compactions int
 	}
 	contracts := map[string]ticketContract{
 		"01": {filename: "01-a.md", body: "# A\n", tokens: 1100, elapsed: 1},
 		"02": {filename: "02-b.md", body: "# B\n", blockedBy: []string{"01"}, tokens: 1200, elapsed: 1},
-		"03": {filename: "03-c.md", body: "# C\n", blockedBy: []string{"01"}, tokens: 50, trailerTokens: 600, elapsed: 180, compactions: 1},
+		"03": {filename: "03-c.md", body: "# C\n", blockedBy: []string{"01"}, tokens: 600, elapsed: 180, compactions: 1},
 		"04": {filename: "04-d.md", body: "# D\n", blockedBy: []string{"02", "03"}, tokens: 1400, elapsed: 1},
 		"05": {filename: "05-e.md", body: "# E\n", blockedBy: []string{"02", "03"}, tokens: 1500, elapsed: 1},
 		"06": {filename: "06-f.md", body: "# F\n", blockedBy: []string{"04", "05"}, tokens: 1600, elapsed: 1},
@@ -369,13 +368,9 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		if err != nil {
 			t.Fatalf("git show %s: %v", sha, err)
 		}
-		trailerTokens := contracts[id].tokens
-		if contracts[id].trailerTokens != 0 {
-			trailerTokens = contracts[id].trailerTokens
-		}
 		wantTrailers := map[string]string{
 			ticketTrailerKey:  addressTrailerValue(scratchDir, epicName, id),
-			tokensTrailerKey:  strconv.Itoa(trailerTokens),
+			tokensTrailerKey:  strconv.Itoa(contracts[id].tokens),
 			elapsedTrailerKey: strconv.Itoa(contracts[id].elapsed) + "s",
 		}
 		for key, wantValue := range wantTrailers {
