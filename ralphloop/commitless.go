@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
@@ -57,29 +58,41 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 	return finishCleanup(d, &worktreeLock, o.RepoDir, "", w.Path, "", agentrunner.Session{}, false)
 }
 
-// FinishCommitless settles a commitless one-off whose agent has gone idle: an
+// FinishCommitless settles a commitless one-off whose agent has gone idle: a
+// detached worktree holding commits nothing else reaches parks and stays, an
 // agent that reported finished is marked done, a needs-answer report parks, and
-// anything else parks as a zero-commit finish. Every outcome but the last
-// takes the worktree away; the tab always closes once the ticket is done.
+// anything else parks as a zero-commit finish. Both reports take the worktree
+// away; the tab always closes once the ticket is done.
 func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Ticket: o.Ticket,
 		ScratchDir: o.ScratchDir, Sink: noopEventSink{},
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-	adopted, err := adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
-	if err == nil && !adopted {
-		adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID)
+	stranded, err := parkStrandedCommits(d, p, w, pane, sessionID)
+	if err != nil {
+		return FinishOutcome{}, err
+	}
+	adopted := false
+	if !stranded {
+		adopted, err = adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
+		if err == nil && !adopted {
+			adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID)
+		}
 	}
 	if err != nil {
 		return FinishOutcome{}, err
 	}
-	if !adopted {
+	switch {
+	case stranded:
+	case !adopted:
 		if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
 			return FinishOutcome{}, fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
-	} else if err := cleanupCommitless(d, o, w, commitlessSession(w, pane)); err != nil {
-		return FinishOutcome{}, err
+	default:
+		if err := cleanupCommitless(d, o, w, commitlessSession(w, pane)); err != nil {
+			return FinishOutcome{}, err
+		}
 	}
 	t, err := schema.ParseTicket(o.Ticket.Path)
 	if err != nil {
@@ -89,6 +102,28 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 		return FinishOutcome{Landed: true}, nil
 	}
 	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
+}
+
+// parkStrandedCommits parks the ticket when w is a detached worktree whose HEAD
+// carries commits nothing else reaches: removing it would leave them dangling,
+// so the worktree stays until a person lands or drops them. A scratch directory
+// has no commits to strand.
+func parkStrandedCommits(d Deps, p iterationParams, w IterationWorktree, pane, sessionID string) (bool, error) {
+	if w.keep {
+		return false, nil
+	}
+	commits, err := d.UnreachableCommits(w.Path)
+	if err != nil {
+		return false, fmt.Errorf("listing commits on %s: %w", w.Path, err)
+	}
+	if len(commits) == 0 {
+		return false, nil
+	}
+	reason := fmt.Sprintf("commitless ticket committed on its detached worktree %s; land or drop: %s", w.Path, strings.Join(commits, "; "))
+	if _, err := p.parkNeedsAnswer(events.StrandedCommits, reason, pane, sessionID, w.Path); err != nil {
+		return false, fmt.Errorf("marking ticket needs-answer: %w", err)
+	}
+	return true, nil
 }
 
 // commitlessSession is the live session of w's one-off, the zero Session when

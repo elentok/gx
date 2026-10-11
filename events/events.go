@@ -112,6 +112,9 @@ const (
 	// BackgroundTaskGate is a finish held on a background task. The loop logs
 	// the hold kind-less; the failure recovery raises from it carries this.
 	BackgroundTaskGate Kind = "background-task-gate"
+	// StrandedCommits is a commitless ticket that committed on its detached
+	// worktree anyway; the worktree stays until a person lands or drops them.
+	StrandedCommits Kind = "stranded-commits"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -128,7 +131,7 @@ var kinds = map[Kind]bool{
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
-	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true,
+	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes
@@ -148,13 +151,13 @@ func (k Kind) Valid() bool { return kinds[k] }
 // kindNeedsAnswer lists the kinds that park a ticket as a question for a
 // person; every other kind parks needs-repair.
 var kindNeedsAnswer = map[Kind]bool{
-	ZeroCommit: true, BlockedPane: true, SelfReported: true, AmbiguousBase: true,
+	ZeroCommit: true, BlockedPane: true, SelfReported: true, AmbiguousBase: true, StrandedCommits: true,
 }
 
 // kindNeedsStub lists the kinds whose question lives nowhere in the ticket, so
 // the park writes a "## Needs Answer" stub carrying the reason. Ticket-answered
 // kinds (zero-commit, self-reported) stay bare.
-var kindNeedsStub = map[Kind]bool{BlockedPane: true, AmbiguousBase: true}
+var kindNeedsStub = map[Kind]bool{BlockedPane: true, AmbiguousBase: true, StrandedCommits: true}
 
 // ParkType is the event type a park of this kind writes.
 func (k Kind) ParkType() Type {

@@ -44,6 +44,17 @@ func CommitSubjects(dir, fromExclusive, toRef string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
+// UnreachableCommits lists the commits on dir's HEAD that no branch, remote or
+// tag reaches, oldest first, as "<short hash> <subject>" — what a detached
+// worktree's removal would leave dangling.
+func UnreachableCommits(dir string) ([]string, error) {
+	out, _, err := run(dir, []string{"log", "--reverse", "--format=%h %s", "HEAD", "--not", "--branches", "--remotes", "--tags"})
+	if err != nil || out == "" {
+		return nil, err
+	}
+	return strings.Split(out, "\n"), nil
+}
+
 // CommitsAhead returns how many commits toRef has that fromExclusive
 // doesn't (git rev-list --count fromExclusive..toRef) — zero means toRef has
 // landed nothing new since fromExclusive.

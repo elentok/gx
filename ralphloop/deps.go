@@ -63,7 +63,10 @@ type Deps struct {
 	// CommitSubjects lists fromExclusive..toRef's subjects, oldest first, so
 	// startup reconciliation can tell an interrupted landing's commits from
 	// anything else that reached the feature branch.
-	CommitSubjects       func(dir, fromExclusive, toRef string) ([]string, error)
+	CommitSubjects func(dir, fromExclusive, toRef string) ([]string, error)
+	// UnreachableCommits lists dir's HEAD commits no branch, remote or tag
+	// reaches, so a commitless finish never deletes the only copy of a commit.
+	UnreachableCommits   func(dir string) ([]string, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
 	// AbortCherryPick clears sequencer state in the shared feature worktree;
@@ -216,6 +219,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		MergeBase:            git.MergeBase,
 		CommitsAhead:         git.CommitsAhead,
 		CommitSubjects:       git.CommitSubjects,
+		UnreachableCommits:   git.UnreachableCommits,
 		CherryPickRange:      git.CherryPickRange,
 		CherryPickInProgress: git.CherryPickInProgress,
 		AbortCherryPick:      git.AbortCherryPick,

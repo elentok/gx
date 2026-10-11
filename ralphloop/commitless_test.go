@@ -8,7 +8,10 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func gitIn(t *testing.T, dir string, args ...string) string {
@@ -51,6 +54,63 @@ func TestCommitlessGitOneOff_RunsDetachedAndIsGoneAfterwards(t *testing.T) {
 	}
 	if got := gitIn(t, repo, "branch", "--list"); strings.Contains(got, "fix-it") {
 		t.Errorf("a branch was left behind: %s", got)
+	}
+}
+
+// finishedCommitlessOneOff prepares a detached one-off for a ticket that has
+// reported finished, commitless.
+func finishedCommitlessOneOff(t *testing.T) (Deps, OneIteration, IterationWorktree) {
+	t.Helper()
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-b", "main")
+	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
+	scratchDir := writeEpic(t, "fix-it", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: investigate\niteration_status: finished\ncommitless: true\n---\n# A\n",
+	})
+	path := ticketPath(scratchDir, "fix-it", "01-a.md")
+	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
+	d := DefaultDeps()
+	d.Runner = runnerfake.NewRunner()
+	wt, err := PrepareCommitless(d, one, "", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d, one, wt
+}
+
+func TestFinishCommitless_NoCommitsMarksDoneAndRemovesWorktree(t *testing.T) {
+	d, one, wt := finishedCommitlessOneOff(t)
+
+	out, err := FinishCommitless(d, one, wt, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !out.Landed {
+		t.Errorf("outcome = %+v, want landed", out)
+	}
+	if _, err := os.Stat(wt.Path); !os.IsNotExist(err) {
+		t.Errorf("worktree still exists: %v", err)
+	}
+}
+
+func TestFinishCommitless_StrandedCommitsParkAndKeepWorktree(t *testing.T) {
+	d, one, wt := finishedCommitlessOneOff(t)
+	gitIn(t, wt.Path, "commit", "--allow-empty", "-m", "the fix")
+	sha := gitIn(t, wt.Path, "rev-parse", "--short", "HEAD")
+
+	out, err := FinishCommitless(d, one, wt, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Status != schema.StatusNeedsAnswer || out.Kind != events.StrandedCommits {
+		t.Errorf("outcome = %+v, want needs-answer/%s", out, events.StrandedCommits)
+	}
+	if _, err := os.Stat(wt.Path); err != nil {
+		t.Errorf("worktree gone: %v", err)
+	}
+	evs, _, _ := ReadEvents(one.ScratchDir, "fix-it")
+	if len(evs) != 1 || !strings.Contains(evs[0].Reason, sha+" the fix") {
+		t.Errorf("events = %+v, want one park naming %s", evs, sha)
 	}
 }
 

@@ -99,7 +99,7 @@ func writeInvestigateTicket(ref ticketRef, f recovery.Failure, entry string) (pa
 	return writeNewTicket(filepath.Join(ref.projectDir, ref.addr.Epic), ref.addr.ID, "investigate", func(id string) (schema.Ticket, string) {
 		child := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeInvestigate, Parent: parent}
 		body := fmt.Sprintf(
-			"\n# %s — Investigate %s\n\n## What to build\n\n%s %s (%s): %s\n\nFind out why and fix it or report what a person must do.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and %s, or the findings reported\n",
+			"\n# %s — Investigate %s\n\n## What to build\n\n%s %s (%s): %s\n\nFind out why and fix it or report what a person must do. This ticket is commitless: put any code fix in a follow-up ticket (`gx tickets add --parent`) instead of committing here.\n\n## %s\n\n%s\n\n## Acceptance criteria\n\n- [ ] Cause found and %s, or the findings reported\n",
 			id, subject, what, f.Type, f.Kind, f.Reason, matchedEntryHeading, entry, done,
 		)
 		return child, body
