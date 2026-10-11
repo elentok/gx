@@ -41,8 +41,9 @@ const (
 // abandoned or unresolvable rather than waited on forever.
 const BackgroundTaskAgedOutCap = 2 * time.Hour
 
-// BackgroundTaskMarker is one non-sidechain backgrounded-shell-command start
-// marker found in a transcript, together with its resolution state.
+// BackgroundTaskMarker is one non-sidechain start marker (a backgrounded shell
+// command, Monitor or async Agent) found in a transcript, together with its
+// resolution state.
 type BackgroundTaskMarker struct {
 	TaskID    string
 	Status    BackgroundTaskStatus
@@ -74,8 +75,16 @@ type backgroundTaskLine struct {
 		// that ends its turn waiting on one is not finished either.
 		MonitorTaskID string `json:"taskId"`
 		TimeoutMs     *int   `json:"timeoutMs"`
+		// An async Agent launch: {isAsync, status: "async_launched", agentId}.
+		Status  string `json:"status"`
+		AgentID string `json:"agentId"`
 	} `json:"toolUseResult"`
 }
+
+// interimNotificationNote marks a task-notification for a subagent that ended
+// its turn still waiting on background work of its own: the same id notifies
+// again when it really finishes, so this one must not resolve the marker.
+const interimNotificationNote = "the result below may be interim"
 
 // ReadBackgroundTasks scans the transcript at path for non-sidechain
 // backgrounded-shell-command start markers (a tool_result carrying
@@ -167,14 +176,19 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		// The agent's own tool calls name its task (a Monitor on the output
 		// path, say) without the task having finished: only what the CLI
 		// reports back can resolve it.
-		for _, taskID := range order {
-			m := markers[taskID]
-			if !m.resolved && entry.Type != "assistant" && containsTaskIDToken(raw, taskID) {
-				m.resolved = true
+		if entry.Type != "assistant" && !strings.Contains(raw, interimNotificationNote) {
+			for _, taskID := range order {
+				m := markers[taskID]
+				if !m.resolved && containsTaskIDToken(raw, taskID) {
+					m.resolved = true
+				}
 			}
 		}
 
 		taskID, markerCap := entry.ToolUseResult.BackgroundTaskID, cap
+		if taskID == "" && entry.ToolUseResult.Status == "async_launched" {
+			taskID = entry.ToolUseResult.AgentID
+		}
 		if taskID == "" && entry.ToolUseResult.TimeoutMs != nil {
 			taskID = entry.ToolUseResult.MonitorTaskID
 			// A Monitor expires on its own timeout; waiting longer than that

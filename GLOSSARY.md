@@ -175,9 +175,10 @@ verb).
 **Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either — a
 genuine dependency error, reported as a failure rather than parked on.
 
-**Background task** — a shell command a Claude agent moved off its own foreground turn (recorded as
-a `backgroundTaskId` in the session transcript), resolved later by a `task-notification` matched on
-task id. "Outstanding" while unresolved, "resolved" once a matching notification is seen (its
+**Background task** — a shell command, Monitor or async subagent a Claude agent moved off its own
+foreground turn (recorded as a `backgroundTaskId`, Monitor `taskId` or async `agentId` in the session
+transcript), resolved later by a `task-notification` matched on task id — except an interim one for
+a subagent still waiting on its own background work. "Outstanding" while unresolved, "resolved" once a matching notification is seen (its
 reported status — success, failure, killed — doesn't matter, only that one exists), "aged out" once
 it's stayed outstanding past a generous cap without resolving. Turn-level, inside one still-live
 iteration — distinct from the pane-level **Reclaim** (see The Server), which describes the iteration as

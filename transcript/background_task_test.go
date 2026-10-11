@@ -327,6 +327,54 @@ func TestReadBackgroundTasks_TaskIDWithoutTimeoutIsNotAMarker(t *testing.T) {
 	}
 }
 
+func asyncAgentLaunchLine(agentID, timestamp string) string {
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"type":"tool_result","content":"Async agent launched"}]},"toolUseResult":{"isAsync":true,"status":"async_launched","agentId":"` + agentID + `","description":"Migrate tests"}}`
+}
+
+// interimAgentNotificationLine mirrors the notice Claude Code sends when a
+// subagent ends its turn waiting on background work of its own.
+func interimAgentNotificationLine(agentID, timestamp string) string {
+	content := "<task-notification>\\n<task-id>" + agentID + "</task-id>\\n<status>completed</status>\\n<note>This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports, and the same task-id notifies again if it does; the result below may be interim.</note>\\n</task-notification>"
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
+}
+
+func TestReadBackgroundTasks_AsyncAgentHoldsThroughInterimNotification(t *testing.T) {
+	launch := asyncAgentLaunchLine("agent-1", "2026-08-12T17:00:00.000000000Z")
+	interim := interimAgentNotificationLine("agent-1", "2026-08-12T17:20:00.000000000Z")
+	final := notificationLine("agent-1", "tool-1", "completed", "2026-08-12T17:40:00.000000000Z")
+	for _, tc := range []struct {
+		name  string
+		lines []string
+		want  BackgroundTaskStatus
+	}{
+		{"launched", []string{launch}, BackgroundTaskOutstandingFresh},
+		{"interim only", []string{launch, interim}, BackgroundTaskOutstandingFresh},
+		{"final after interim", []string{launch, interim, final}, BackgroundTaskResolved},
+	} {
+		reading, err := ReadBackgroundTasks(writeTranscript(t, tc.lines...), capDuration, readAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reading.Markers) != 1 || reading.Markers[0].TaskID != "agent-1" || reading.Markers[0].Status != tc.want {
+			t.Errorf("%s: Markers = %+v, want agent-1 %s", tc.name, reading.Markers, tc.want)
+		}
+	}
+}
+
+func TestReadBackgroundTasks_AsyncAgentAgesOutAtTheCap(t *testing.T) {
+	path := writeTranscript(t,
+		asyncAgentLaunchLine("agent-1", "2026-08-12T15:00:00.000000000Z"),
+		interimAgentNotificationLine("agent-1", "2026-08-12T15:20:00.000000000Z"),
+	)
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskOutstandingAgedOut {
+		t.Errorf("Markers = %+v, want agent-1 outstanding-aged-out", reading.Markers)
+	}
+}
+
 // A Monitor that never reported expires on its own timeout (400s here), long
 // before the 2h cap of a backgrounded shell command.
 func TestReadBackgroundTasks_MonitorAgesOutAtItsOwnTimeout(t *testing.T) {
