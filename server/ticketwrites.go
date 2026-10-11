@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/events"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -17,7 +18,19 @@ const (
 	ReasonIterationRunning = "iteration-running"
 	ReasonTicketDone       = "ticket-done"
 	ReasonHerdrUnavailable = "herdr-unavailable"
+	// ReasonBudgetLimit refuses a relaunch or nudge past the daily soft
+	// limit (the hard limit implies it), as claims are held back.
+	ReasonBudgetLimit = "budget-limit"
 )
+
+// budgetRefusal refuses new agent work past the daily soft limit; ok is
+// false when there is nothing to refuse.
+func (s *Server) budgetRefusal() (QueueResult, bool) {
+	if !s.budgetSoftReached(time.Now()) {
+		return QueueResult{}, false
+	}
+	return refusal(ReasonBudgetLimit, "the daily budget limit is reached; raise it with `gx budget override`"), true
+}
 
 // ticketRef is a ticket found in the store, with where it lives.
 type ticketRef struct {
@@ -112,6 +125,9 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		}
 		if s.herdr.isUnavailable() {
 			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
+		}
+		if res, refused := s.budgetRefusal(); refused {
+			return res, nil
 		}
 		epics, err := tickets.LoadResolved(ref.addr.Project, ref.projectDir)
 		if err != nil {

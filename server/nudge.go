@@ -67,6 +67,9 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 		if s.herdr.isUnavailable() {
 			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
 		}
+		if res, refused := s.budgetRefusal(); refused {
+			return res, nil
+		}
 		it, live := s.liveIteration(address)
 		if !live {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+address), nil

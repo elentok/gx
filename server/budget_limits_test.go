@@ -19,6 +19,34 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// Relaunch and nudge start agent work outside the queue (recovery remedies use
+// them too), so the soft limit refuses them the way it holds claims back.
+func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.BudgetSoftLimit = 5
+	})
+	start, _, _ := registerLaunch(h)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+		t.Fatalf("park = %+v, %v", res, err)
+	}
+	h.Server.RecordSpend("spent", 6)
+
+	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01"); err != nil || !res.Refused || res.Reason != server.ReasonBudgetLimit {
+		t.Errorf("relaunch = %+v, %v; want refusal %s", res, err, server.ReasonBudgetLimit)
+	}
+	if len(*start) != 0 {
+		t.Errorf("agent started past the soft limit: %v", *start)
+	}
+	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "finish up"); err != nil || !res.Refused || res.Reason != server.ReasonBudgetLimit {
+		t.Errorf("nudge = %+v, %v; want refusal %s", res, err, server.ReasonBudgetLimit)
+	}
+}
+
 func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
