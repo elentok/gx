@@ -460,39 +460,30 @@ func (s *Server) budgetSoftReached(now time.Time) bool { return s.budgetLatches(
 func (s *Server) budgetHardReached(now time.Time) bool { return s.budgetLatches(now).Hard }
 
 // killForBudget stops every live pane: ctrl+c, a grace period, then it closes
-// and parks the panes whose cost still rose. A pane that went quiet is left to
-// its own finish.
+// and parks every pane budget-killed. Each run is marked first, so a run that
+// settles on its own during the grace parks budget-killed too (see settleRun)
+// instead of finishing, landing or parking for another reason.
 func (s *Server) killForBudget(now time.Time) {
 	grace := s.cfg.BudgetKillGrace
 	if grace <= 0 {
 		grace = defaultBudgetKillGrace
 	}
 	runs := s.registry.list()
-	before := map[string]float64{}
 	for _, t := range runs {
-		before[t.Address] = s.liveCost(t.Address)
+		s.registry.markBudgetStop(t.Address)
 		if err := s.runnerOf(t.Run).Interrupt(t.Session); err != nil {
 			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
 		}
 	}
 	time.Sleep(grace)
 	for _, t := range runs {
-		if s.liveCost(t.Address) <= before[t.Address] {
-			continue
+		if _, first := s.registry.claimBudgetStop(t.Address); !first {
+			continue // its run already settled and parked it
 		}
 		if err := s.parkBudgetKilled(t); err != nil {
 			s.log.Error("budget kill", "ticket", t.Address, "err", err)
 		}
 	}
-}
-
-func (s *Server) liveCost(address string) float64 {
-	it, ok := s.budgetIteration(address)
-	if !ok {
-		return 0
-	}
-	cost, _ := s.costOf(it)
-	return cost
 }
 
 // runnerOf is the runner hosting the run's session.

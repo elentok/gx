@@ -79,6 +79,9 @@ type runRegistry struct {
 	// released are the runs whose background-task gate recovery forced open.
 	// In memory only: a reclaimed run starts with its gate closed again.
 	released map[string]bool
+	// budgetStops are the runs the budget hard limit is stopping, true once
+	// one path has parked it budget-killed. In memory only.
+	budgetStops map[string]bool
 }
 
 // openRuns returns the registry and the handles the previous server left behind.
@@ -224,11 +227,39 @@ func (r *runRegistry) gateReleased(address string) func() bool {
 	}
 }
 
+// markBudgetStop records that the budget hard limit is stopping the run at
+// address, before its agent is interrupted.
+func (r *runRegistry) markBudgetStop(address string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.budgetStops == nil {
+		r.budgetStops = map[string]bool{}
+	}
+	if _, ok := r.budgetStops[address]; !ok {
+		r.budgetStops[address] = false
+	}
+}
+
+// claimBudgetStop reports whether the run at address is being budget-stopped,
+// and whether this caller is the first to claim it, so the run is parked
+// budget-killed exactly once: by the kill or by the run's own settle.
+func (r *runRegistry) claimBudgetStop(address string) (stopping, first bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	parked, ok := r.budgetStops[address]
+	if !ok {
+		return false, false
+	}
+	r.budgetStops[address] = true
+	return true, !parked
+}
+
 func (r *runRegistry) delete(address string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.runs, address)
 	delete(r.released, address)
+	delete(r.budgetStops, address)
 	r.save()
 }
 

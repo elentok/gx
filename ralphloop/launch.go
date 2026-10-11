@@ -290,7 +290,11 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 // session (e.g. a second gx process racing the same ticket): that one is
 // returned unprompted with Adopted set, since it may be mid-turn.
 func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error)) (launched, error) {
-	_, adopted, _ := r.Find(opts.Label)
+	_, adopted, err := r.Find(opts.Label)
+	if err != nil {
+		// Not fatal: Start still runs, it just can't be an adoption.
+		log.Printf("looking up %s before start: %v", opts.Label, err)
+	}
 	for attempt := 1; ; attempt++ {
 		s, err := r.Start(opts)
 		if err != nil {

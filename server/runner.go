@@ -548,6 +548,16 @@ func (s *Server) settleRun(rc runContext, err error) {
 			s.registry.delete(ticketAddr)
 		}
 	}()
+	// A run the budget hard limit is stopping never finishes, lands or parks
+	// for its own reason: the first of it and the kill parks it budget-killed.
+	if stopping, first := s.registry.claimBudgetStop(ticketAddr); stopping {
+		if t, ok := s.registry.tracked(ticketAddr); ok && first {
+			if perr := s.parkBudgetKilled(t); perr != nil {
+				s.log.Error("budget kill", "ticket", ticketAddr, "err", perr)
+			}
+		}
+		return
+	}
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	var out ralphloop.FinishOutcome
 	if err == nil {

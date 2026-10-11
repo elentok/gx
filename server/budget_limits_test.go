@@ -5,15 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
@@ -159,7 +162,23 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 	}
 }
 
+// An agent that keeps spending after the ctrl+c is closed and parked
+// budget-killed, and its run's own finish must not overwrite that park.
 func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
+	var mu sync.Mutex
+	cost := 0.0
+	testBudgetKillParksBudgetKilled(t, func() float64 { mu.Lock(); defer mu.Unlock(); cost += 3; return cost })
+}
+
+// An agent that goes quiet on the ctrl+c is parked budget-killed too, not
+// left to its own finish (which would park it zero-commit, a kind recovery
+// relaunches past the hard limit).
+func TestBudget_HardLimitParksAQuietRunBudgetKilledToo(t *testing.T) {
+	testBudgetKillParksBudgetKilled(t, func() float64 { return 6 })
+}
+
+func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64) {
+	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -167,14 +186,10 @@ func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Runner = fake
 		c.BudgetHardLimit = 5
-		c.BudgetKillGrace = time.Millisecond
+		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
-		// The kill's ctrl+c idles the agent; the real finish debounce keeps the
-		// run from parking it zero-commit before the budget park lands.
-		c.Sleep = time.Sleep
 	})
-	cost := 0.0
-	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { cost += 3; return cost, true })
+	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return cost(), true })
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -184,18 +199,20 @@ func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 	for len(h.Server.Runs()) == 0 && ctx.Err() == nil {
 		time.Sleep(20 * time.Millisecond)
 	}
-	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	for ctx.Err() == nil {
+	// Poll until the run has settled, and judge the ticket only then: the
+	// run's own finish is what used to overwrite the budget park.
+	for len(h.Server.Runs()) != 0 && ctx.Err() == nil {
 		h.Server.PollBudget()
-		data, _ := os.ReadFile(path)
-		if strings.Contains(string(data), "budget-killed") {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 	}
-	data, _ := os.ReadFile(path)
-	if !strings.Contains(string(data), "budget-killed") {
-		t.Fatalf("ticket not parked budget-killed:\n%s", data)
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	tk, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status != schema.StatusNeedsRepair || string(tk.ParkKind) != string(events.BudgetKilled) {
+		data, _ := os.ReadFile(path)
+		t.Fatalf("ticket = %s/%s, want needs-repair/budget-killed:\n%s", tk.Status, tk.ParkKind, data)
 	}
 	if live, _ := fake.List("epic-a"); len(live) != 0 {
 		t.Errorf("sessions still live after budget kill: %v", live)
