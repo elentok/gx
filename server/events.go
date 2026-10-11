@@ -22,7 +22,17 @@ type Event struct {
 	Seq     uint64 `json:"seq"`
 	Type    string `json:"type"`
 	Address string `json:"address,omitempty"`
+	// Level (EventLevel*) and Message are set only by events that report an
+	// outcome, such as config-reloaded.
+	Level   string `json:"level,omitempty"`
+	Message string `json:"message,omitempty"`
 }
+
+const (
+	EventLevelSuccess = "success"
+	EventLevelWarning = "warning"
+	EventLevelError   = "error"
+)
 
 // errSeqGone means the requested seq is outside the replay window: the client
 // must re-snapshot.
@@ -53,10 +63,15 @@ func (b *broker) currentSeq() uint64 {
 }
 
 func (b *broker) publish(typ, address string) {
+	b.publishEvent(Event{Type: typ, Address: address})
+}
+
+// publishEvent numbers ev (its Seq is overwritten) and fans it out.
+func (b *broker) publishEvent(ev Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.seq++
-	ev := Event{Seq: b.seq, Type: typ, Address: address}
+	ev.Seq = b.seq
 	b.recent = append(b.recent, ev)
 	if len(b.recent) > replayWindow {
 		b.recent = b.recent[len(b.recent)-replayWindow:]

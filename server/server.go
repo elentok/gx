@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/storecommit"
@@ -168,6 +169,10 @@ type Config struct {
 
 	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
 	ExtraUsageCheck func() subscription.State
+
+	// Notifier shows OS banners for config reloads; nil means
+	// osnotify.NewSystemNotifier.
+	Notifier osnotify.Notifier
 }
 
 // DefaultTCPAddr is where the opt-in TCP listener binds.
@@ -220,6 +225,9 @@ type Server struct {
 func New(cfg Config) (*Server, error) {
 	if cfg.Runner == nil {
 		cfg.Runner = herdrrunner.New()
+	}
+	if cfg.Notifier == nil {
+		cfg.Notifier = osnotify.NewSystemNotifier()
 	}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return nil, err

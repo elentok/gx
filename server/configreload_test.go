@@ -2,13 +2,20 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -136,6 +143,118 @@ func TestConfigReload_StartupOnlyKeyWarnsUntilRestart(t *testing.T) {
 	}
 	if res := reload(t, h); slices.Contains(res.Changed, "execution-queue.max-agents") || !slices.Equal(res.Warnings, want) {
 		t.Errorf("second = %+v, want no max-agents change and warnings %v", res, want)
+	}
+}
+
+// Seam A: every outcome is one banner and one config-reloaded event, and
+// never a chat message.
+func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
+	var mu sync.Mutex
+	var chat []string
+	hook := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		defer mu.Unlock()
+		chat = append(chat, string(b))
+	}))
+	t.Cleanup(hook.Close)
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
+		c.MaxAgents = 3
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: time.Millisecond}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cases := []struct {
+		name   string
+		write  func()
+		level  string
+		banner servertest.Banner
+	}{
+		{"success", func() { servertest.WriteConfig(t, path, store, maxAgents(4)) },
+			server.EventLevelSuccess, servertest.Banner{Title: "gx config reloaded successfully", Body: "changed: execution-queue.max-agents"}},
+		{"unchanged", func() {},
+			server.EventLevelSuccess, servertest.Banner{Title: "gx config reloaded successfully", Body: "no changes"}},
+		{"warning", func() {
+			servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 4}, "server": map[string]any{"tcp-listen": true}})
+		}, server.EventLevelWarning, servertest.Banner{Title: "gx config reloaded with warnings", Body: "restart needed for server.tcp-listen"}},
+		{"invalid", func() {
+			if err := os.WriteFile(path, []byte(`{`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}, server.EventLevelError, servertest.Banner{Title: "gx config reload failed"}},
+	}
+	// Baseline: the harness settings differ from any file in many keys.
+	servertest.WriteConfig(t, path, store, maxAgents(3))
+	reload(t, h)
+	waitBanners(ctx, t, h, 1)
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, tc := range cases {
+		tc.write()
+		reload(t, h)
+		ev := servertest.WaitForEvent(ctx, t, evs, server.EventConfigReloaded, "")
+		if ev.Level != tc.level || !strings.HasPrefix(ev.Message, tc.banner.Title) {
+			t.Errorf("%s: event = %+v, want level %s and message from %q", tc.name, ev, tc.level, tc.banner.Title)
+		}
+		banners := waitBanners(ctx, t, h, i+2)
+		got := banners[i+1]
+		if tc.banner.Body == "" {
+			got.Body = "" // the parse error's wording is the parser's
+		}
+		if got != tc.banner {
+			t.Errorf("%s: banner = %+v, want %+v", tc.name, got, tc.banner)
+		}
+	}
+	time.Sleep(100 * time.Millisecond)
+	if n := len(h.Banners.Sent()); n != len(cases)+1 {
+		t.Errorf("banners = %d, want one per reload (%d)", n, len(cases)+1)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	// The server's own "server started" message is not a reload's.
+	for _, body := range chat {
+		if strings.Contains(body, "config") {
+			t.Errorf("chat send %q, want none for a reload", body)
+		}
+	}
+}
+
+func waitBanners(ctx context.Context, t *testing.T, h *servertest.Harness, n int) []servertest.Banner {
+	t.Helper()
+	for {
+		if got := h.Banners.Sent(); len(got) >= n {
+			return got
+		}
+		if ctx.Err() != nil {
+			t.Fatalf("banners = %+v, want %d", h.Banners.Sent(), n)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+type failingNotifier struct{}
+
+func (failingNotifier) Notify(context.Context, string, string) error {
+	return errors.New("terminal-notifier: exit status 1")
+}
+
+// Seam A: a banner that fails to send does not fail the reload.
+func TestConfigReload_NotifierFailureDoesNotFailReload(t *testing.T) {
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) { c.Notifier = failingNotifier{} })
+	servertest.WriteConfig(t, path, store, maxAgents(4))
+	if res := reload(t, h); res.Refused || !slices.Contains(res.Changed, "execution-queue.max-agents") {
+		t.Errorf("reload = %+v, want max-agents changed", res)
 	}
 }
 

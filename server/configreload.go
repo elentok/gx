@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -29,6 +31,9 @@ const (
 	ReasonReloadUnavailable = "reload-unavailable"
 )
 
+// EventConfigReloaded reports one reload result; its Level and Message are set.
+const EventConfigReloaded = "config-reloaded"
+
 // Reload triggers, as logged.
 const (
 	reloadTriggerCommand = "command"
@@ -44,7 +49,7 @@ func (s *Server) reloadConfig(trigger string) ReloadResult {
 	s.reloadMu.Lock()
 	defer s.reloadMu.Unlock()
 	res := s.reloadLocked()
-	s.logReload(trigger, res)
+	s.reportReload(trigger, res)
 	return res
 }
 
@@ -142,10 +147,39 @@ func refuseReload(reason, message string) ReloadResult {
 	return ReloadResult{Refused: true, Reason: reason, Message: message}
 }
 
-func (s *Server) logReload(trigger string, res ReloadResult) {
+// reportReload sends one result to the log, an OS banner and the event
+// stream. Never to chat: a reload is something the person just did at the
+// machine, not news worth a phone notification.
+func (s *Server) reportReload(trigger string, res ReloadResult) {
 	if res.Refused {
 		s.log.Warn("config reload refused", "trigger", trigger, "reason", res.Reason, "message", res.Message)
-		return
+	} else {
+		s.log.Info("config reloaded", "trigger", trigger, "changed", res.Changed, "warnings", res.Warnings)
 	}
-	s.log.Info("config reloaded", "trigger", trigger, "changed", res.Changed, "warnings", res.Warnings)
+	level, title, body := reloadBanner(res)
+	go func() {
+		if err := s.cfg.Notifier.Notify(context.Background(), title, body); err != nil {
+			s.log.Warn("config reload banner failed", "error", err)
+		}
+	}()
+	s.events.publishEvent(Event{Type: EventConfigReloaded, Level: level, Message: title + ": " + body})
+}
+
+// maxBannerBody keeps a long parse error from overflowing the banner.
+const maxBannerBody = 200
+
+func reloadBanner(res ReloadResult) (level, title, body string) {
+	switch {
+	case res.Refused:
+		body = res.Message
+		if r := []rune(body); len(r) > maxBannerBody {
+			body = string(r[:maxBannerBody-1]) + "…"
+		}
+		return EventLevelError, "gx config reload failed", body
+	case len(res.Warnings) > 0:
+		return EventLevelWarning, "gx config reloaded with warnings", strings.Join(res.Warnings, "; ")
+	case len(res.Changed) > 0:
+		return EventLevelSuccess, "gx config reloaded successfully", "changed: " + strings.Join(res.Changed, ", ")
+	}
+	return EventLevelSuccess, "gx config reloaded successfully", "no changes"
 }

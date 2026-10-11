@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,7 +33,10 @@ type Harness struct {
 	StateDir    string
 	TicketStore string
 	TCPAddr     string // empty unless started with StartWithTCP
-	herdrDown   atomic.Bool
+	// Banners records the OS banners the server sent, unless an option set
+	// its own Notifier. A harness never shows a real banner.
+	Banners   *Banners
+	herdrDown atomic.Bool
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -219,6 +223,29 @@ func flagValue(argv []string, flag string) string {
 	return ""
 }
 
+// Banner is one OS banner the server sent.
+type Banner struct{ Title, Body string }
+
+// Banners is an osnotify.Notifier that records every banner.
+type Banners struct {
+	mu   sync.Mutex
+	sent []Banner
+}
+
+func (b *Banners) Notify(_ context.Context, title, body string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.sent = append(b.sent, Banner{title, body})
+	return nil
+}
+
+// Sent returns the banners recorded so far.
+func (b *Banners) Sent() []Banner {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.sent)
+}
+
 // WaitForEvent returns the first streamed event of typ for address (any
 // address when empty), failing the test if the stream ends or ctx expires first.
 func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, typ, address string) server.Event {
@@ -330,6 +357,10 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
 	for _, o := range opts {
 		o(&h.cfg)
+	}
+	if h.cfg.Notifier == nil {
+		h.Banners = &Banners{}
+		h.cfg.Notifier = h.Banners
 	}
 	h.serve(t)
 	return h
