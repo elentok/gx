@@ -96,6 +96,9 @@ type Settings struct {
 
 	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
 	SuppressExtraUsageWarning bool
+
+	// WatchConfig reloads Config.ConfigPath whenever it is saved.
+	WatchConfig bool
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -120,6 +123,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 			SlackWebhookURL:  cfg.Notifications.Slack.WebhookURL,
 		},
 		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
+		WatchConfig:               cfg.Server.WatchConfig,
 	}
 }
 
@@ -138,6 +142,8 @@ type Config struct {
 
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only
+
+	ConfigWatchDebounce time.Duration // zero means the default
 
 	HerdrRetryInterval time.Duration // zero means the default
 
@@ -192,13 +198,16 @@ type Server struct {
 	// storeCommits is nil until the store commit loop starts; guarded by
 	// reloadMu so a reload racing the start is never lost.
 	storeCommits *storecommit.Loop
-	lock         *serverLock
-	ln           net.Listener
-	tcp          net.Listener // nil unless Config.TCPAddr is set
-	http         *http.Server
-	logf         *rotatingFile
-	log          *slog.Logger
-	idx          *index
+	// configWatch runs the config watcher; guarded by reloadMu, so a reload
+	// toggling server.watch-config only ever cancels a context.
+	configWatch configWatch
+	lock        *serverLock
+	ln          net.Listener
+	tcp         net.Listener // nil unless Config.TCPAddr is set
+	http        *http.Server
+	logf        *rotatingFile
+	log         *slog.Logger
+	idx         *index
 
 	queued      *queueStore
 	pause       *pauseState
@@ -505,6 +514,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.seedBudgetNotes(time.Now())
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
 	s.checkExtraUsage(time.Now())
+	freshCtx, stopFresh := context.WithCancel(ctx)
+	// Armed before the socket serves, so no save after startup goes unseen.
+	s.startConfigWatch(freshCtx)
 	errc := make(chan error, 2)
 	lns := []net.Listener{s.ln}
 	if s.tcp != nil {
@@ -523,7 +535,6 @@ func (s *Server) Serve(ctx context.Context) error {
 	} else {
 		stopCommits = stop
 	}
-	freshCtx, stopFresh := context.WithCancel(ctx)
 	freshDone := make(chan struct{})
 	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
 	herdrDone := make(chan struct{})
@@ -560,6 +571,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-pruneDone
 	<-budgetDone
 	<-gatesDone
+	s.configWatch.running.Wait()
 	timeout := s.cfg.LandStopTimeout
 	if timeout <= 0 {
 		timeout = DefaultLandStopTimeout

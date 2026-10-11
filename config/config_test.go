@@ -987,3 +987,12 @@ func TestLoadServerAutoMergeEpic(t *testing.T) {
 		}
 	}
 }
+
+func TestParseServerWatchConfig(t *testing.T) {
+	for body, want := range map[string]bool{`{}`: true, `{"server":{}}`: true, `{"server":{"watch-config":false}}`: false, `{"server":{"watch-config":true}}`: true} {
+		cfg, err := Parse([]byte(body))
+		if err != nil || cfg.Server.WatchConfig != want {
+			t.Errorf("%s: WatchConfig = %v (err %v), want %v", body, cfg.Server.WatchConfig, err, want)
+		}
+	}
+}

@@ -105,6 +105,8 @@ type ServerConfig struct {
 	// LogRetention is how long a headless agent's logs outlive its last
 	// activity. Zero means the runner's default.
 	LogRetention time.Duration `json:"-"`
+	// WatchConfig reloads the config file whenever it is saved.
+	WatchConfig bool `json:"watch-config"`
 }
 
 // Default returns the default configuration.
@@ -122,6 +124,7 @@ func Default() Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
+		Server:                ServerConfig{WatchConfig: true},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		AgentRunner:           "auto",
 		Evolve:                EvolveOff,
@@ -218,6 +221,7 @@ func Parse(data []byte) (Config, error) {
 			TabEnv        []string `json:"tab-env"`
 			AutoMergeEpic *bool    `json:"auto-merge-epic"`
 			LogRetention  *string  `json:"log-retention"`
+			WatchConfig   *bool    `json:"watch-config"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
 		Evolve            *string `json:"evolve"`
@@ -335,6 +339,9 @@ func Parse(data []byte) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.AutoMergeEpic != nil {
 		cfg.Server.AutoMergeEpic = *raw.Server.AutoMergeEpic
+	}
+	if raw.Server != nil && raw.Server.WatchConfig != nil {
+		cfg.Server.WatchConfig = *raw.Server.WatchConfig
 	}
 	if raw.Server != nil && raw.Server.LogRetention != nil {
 		if d, err := time.ParseDuration(*raw.Server.LogRetention); err == nil && d > 0 {

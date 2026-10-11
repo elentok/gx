@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -53,13 +54,19 @@ func WithConfigFile(path string) func(*server.Config) {
 
 // WriteConfig writes fields as a config.json at path. The ticket-store path
 // is set to store unless fields names one, so a reload sees no startup-only
-// change by default.
+// change by default. server.watch-config is off unless fields sets it, so a
+// command reload never starts a watcher behind a test's back.
 func WriteConfig(t *testing.T, path, store string, fields map[string]any) {
 	t.Helper()
 	all := map[string]any{"ticket-store": map[string]any{"path": store}}
 	for k, v := range fields {
 		all[k] = v
 	}
+	srv := map[string]any{"watch-config": false}
+	if given, ok := all["server"].(map[string]any); ok {
+		maps.Copy(srv, given)
+	}
+	all["server"] = srv
 	data, err := json.Marshal(all)
 	if err != nil {
 		t.Fatal(err)

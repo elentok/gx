@@ -39,6 +39,7 @@ const EventConfigReloaded = "config-reloaded"
 // Reload triggers, as logged.
 const (
 	reloadTriggerCommand = "command"
+	reloadTriggerWatch   = "watch"
 )
 
 func (s *Server) configReloadWrite(w http.ResponseWriter, _ *http.Request) {
@@ -93,6 +94,9 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 		s.storeCommits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
 	}
 	s.settings.Store(&next)
+	if next.WatchConfig != old.WatchConfig {
+		s.setConfigWatchLocked(next.WatchConfig)
+	}
 	if next.LogRetention != old.LogRetention {
 		s.pruneAgentLogs(time.Now())
 	}
@@ -157,6 +161,7 @@ func changedKeys(old, next Settings) []string {
 		{"server.tab-env", old.TabEnv, next.TabEnv},
 		{"server.auto-merge-epic", old.AutoMergeEpic, next.AutoMergeEpic},
 		{"server.log-retention", old.LogRetention, next.LogRetention},
+		{"server.watch-config", old.WatchConfig, next.WatchConfig},
 		{"evolve", old.Evolve, next.Evolve},
 		{"recovery.enabled", old.RecoverySettings.Enabled, next.RecoverySettings.Enabled},
 		{"recovery.disabled", old.RecoverySettings.Disabled, next.RecoverySettings.Disabled},

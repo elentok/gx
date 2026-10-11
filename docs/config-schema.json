@@ -239,6 +239,11 @@
           "default": false,
           "description": "Merge an epic's branch into its target once every ticket is done. Off by default: a person runs gx-merge."
         },
+        "watch-config": {
+          "type": "boolean",
+          "default": true,
+          "description": "Reload this config file automatically when it is saved. `gx server reload-config` works either way."
+        },
         "log-retention": {
           "type": "string",
           "default": "720h",
