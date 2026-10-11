@@ -262,11 +262,36 @@ func TestCountCompactionsAfter_CountsOnlyNewerBoundaries(t *testing.T) {
 	if got := CountCompactionsAfter(lines, since); got != 1 {
 		t.Errorf("CountCompactionsAfter(since 00:00:02) = %d, want 1", got)
 	}
-	if got := CountCompactionsAfter(lines, time.Date(2026, 1, 1, 0, 0, 3, 0, time.UTC)); got != 0 {
-		t.Errorf("CountCompactionsAfter(since 00:00:03) = %d, want 0: a boundary at since is not after it", got)
+	if got := CountCompactionsAfter(lines, time.Date(2026, 1, 1, 0, 0, 3, 0, time.UTC)); got != 1 {
+		t.Errorf("CountCompactionsAfter(since 00:00:03) = %d, want 1: a boundary stamped at since counts", got)
+	}
+	if got := CountCompactionsAfter(lines, time.Date(2026, 1, 1, 0, 0, 4, 0, time.UTC)); got != 0 {
+		t.Errorf("CountCompactionsAfter(since 00:00:04) = %d, want 0", got)
 	}
 	if got := CountCompactionsAfter(lines, time.Time{}); got != 2 {
 		t.Errorf("CountCompactionsAfter(zero time) = %d, want 2", got)
+	}
+}
+
+func TestCountCompactionsAfter_UndatedBoundaryCounts(t *testing.T) {
+	path := writeTranscript(t,
+		`{"type":"user","timestamp":"not-a-time","message":{}}`,
+		`{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"}}`,
+		`{"type":"system","subtype":"compact_boundary","timestamp":"garbage","compactMetadata":{"trigger":"manual"}}`,
+	)
+
+	lines, ok, err := ReadAll(path)
+	if err != nil || !ok {
+		t.Fatalf("ReadAll() = (ok %v, err %v), want (true, nil)", ok, err)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("ReadAll() kept %d lines, want 2: undated boundaries kept, the undated user line dropped", len(lines))
+	}
+	if got := CountCompactions(lines); got != 2 {
+		t.Errorf("CountCompactions() = %d, want 2", got)
+	}
+	if got := CountCompactionsAfter(lines, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)); got != 2 {
+		t.Errorf("CountCompactionsAfter() = %d, want 2: a boundary gx can't date still proves a compaction", got)
 	}
 }
 

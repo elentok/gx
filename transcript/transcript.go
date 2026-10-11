@@ -312,7 +312,10 @@ func (l Line) IsCompactBoundary() bool {
 // ReadAll parses every line of the transcript at path in order, skipping
 // lines that are malformed JSON or lack a parseable timestamp (both
 // possible on a torn final line from a killed process) rather than failing
-// the whole read. ok is false if the file doesn't exist yet.
+// the whole read. The one exception is a compaction boundary, kept with a zero
+// Timestamp: an undated boundary is still proof a compaction happened, and
+// dropping it would hide a completed compaction from the recovery gate. ok is
+// false if the file doesn't exist yet.
 func ReadAll(path string) (lines []Line, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -334,17 +337,18 @@ func ReadAll(path string) (lines []Line, ok bool, err error) {
 		if jsonErr := json.Unmarshal([]byte(raw), &entry); jsonErr != nil {
 			continue
 		}
-		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
-		if tsErr != nil {
-			continue
-		}
-		lines = append(lines, Line{
+		line := Line{
 			Type:           entry.Type,
 			Subtype:        entry.Subtype,
 			CompactTrigger: entry.CompactMetadata.Trigger,
-			Timestamp:      ts,
 			Usage:          usageFromLine(entry),
-		})
+		}
+		ts, tsErr := time.Parse(time.RFC3339Nano, entry.Timestamp)
+		if tsErr != nil && !line.IsCompactBoundary() {
+			continue
+		}
+		line.Timestamp = ts
+		lines = append(lines, line)
 	}
 	if scanErr := scanner.Err(); scanErr != nil {
 		return nil, false, scanErr
@@ -368,14 +372,20 @@ func CountCompactions(lines []Line) int {
 }
 
 // CountCompactionsAfter counts the compaction-boundary markers in lines that
-// were written strictly after since. It answers "has a compaction landed since
+// were written at or after since. It answers "has a compaction landed since
 // I asked for one" for a caller that has no trustworthy count from before the
 // ask — a question a total count can't answer, because a count read after the
 // boundary already includes it and is indistinguishable from one read before.
+//
+// since comes from gx's clock and the boundary's timestamp from Claude Code's,
+// so the two aren't finely ordered: an equal timestamp counts, and so does an
+// undated boundary (zero Timestamp). Both err towards confirming a compaction,
+// because the caller's failure mode for a missed one is failing a healthy
+// iteration.
 func CountCompactionsAfter(lines []Line, since time.Time) int {
 	n := 0
 	for _, l := range lines {
-		if l.IsCompactBoundary() && l.Timestamp.After(since) {
+		if l.IsCompactBoundary() && (l.Timestamp.IsZero() || !l.Timestamp.Before(since)) {
 			n++
 		}
 	}

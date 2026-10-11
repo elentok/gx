@@ -441,7 +441,7 @@ func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, s
 // ticket to needs-repair.
 //
 // An unavailable baseline therefore doesn't get a substitute count at all; it
-// switches predicates instead, to "a boundary was written after since" (see
+// switches predicates instead, to "a boundary was written at or after since" (see
 // boundaryLandedSince), which needs no pre-submission count to compare
 // against. That reads an auto-compaction landing in the gap between the
 // baseline read and submission as ours, which is the right call anyway: the

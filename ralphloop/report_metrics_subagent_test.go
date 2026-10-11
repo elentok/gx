@@ -63,3 +63,30 @@ func TestReadSessionStats_SubagentTranscripts(t *testing.T) {
 		}
 	})
 }
+
+func TestReadSessionStats_UndatedBoundaryDoesNotBoundSession(t *testing.T) {
+	const cwd, session = "/work/tree", "sess-1"
+	home := t.TempDir()
+	setHomeEnv(t, home)
+	path := transcript.PathIn(home, cwd, session)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual"}}` + "\n" +
+		`{"type":"user","timestamp":"2026-01-01T00:00:01Z","message":{}}` + "\n" +
+		`{"type":"user","timestamp":"2026-01-01T00:00:05Z","message":{}}` + "\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := readSessionStats(cwd, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Date(2026, 1, 1, 0, 0, 1, 0, time.UTC); !got.start.Equal(want) {
+		t.Errorf("start = %v, want %v", got.start, want)
+	}
+	if want := time.Date(2026, 1, 1, 0, 0, 5, 0, time.UTC); !got.end.Equal(want) {
+		t.Errorf("end = %v, want %v", got.end, want)
+	}
+}

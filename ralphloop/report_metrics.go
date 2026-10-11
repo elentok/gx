@@ -91,13 +91,16 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 		return sessionStats{}, err
 	}
 
-	stats := sessionStats{start: lines[0].Timestamp, end: lines[0].Timestamp, ok: true}
+	stats := sessionStats{ok: true}
 	for _, l := range lines {
-		if l.Timestamp.Before(stats.start) {
-			stats.start = l.Timestamp
-		}
-		if l.Timestamp.After(stats.end) {
-			stats.end = l.Timestamp
+		// ReadAll keeps undated compaction boundaries; they can't bound the session.
+		if !l.Timestamp.IsZero() {
+			if stats.start.IsZero() || l.Timestamp.Before(stats.start) {
+				stats.start = l.Timestamp
+			}
+			if l.Timestamp.After(stats.end) {
+				stats.end = l.Timestamp
+			}
 		}
 		if l.Type != "assistant" {
 			continue
