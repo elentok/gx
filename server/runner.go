@@ -608,7 +608,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 // notifyDone tells chat a ticket landed. A one-off stays silent: it speaks
 // only through notifyResult, when its submit asked for it.
 func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
-	if s.chat == nil || isOneOffTicket(ticketPath) {
+	if !s.chat.Enabled() || isOneOffTicket(ticketPath) {
 		return
 	}
 	e, ok := s.freshEpic(addr.Project, addr.Epic)
@@ -657,7 +657,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			} else if reason != "" {
 				s.events.publish(EventRootParked, root.String())
 				s.log.Warn("root parked", "root", root, "reason", reason)
-				if s.chat != nil {
+				if s.chat.Enabled() {
 					s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
 				}
 				s.submitRetro(root, dir, e, one.Ticket.Path)
@@ -671,7 +671,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			s.events.publish(EventQueueChanged, root.String())
 		}
 		s.events.publish(EventRootCompleted, root.String())
-		if s.chat != nil {
+		if s.chat.Enabled() {
 			elapsed, cost := ralphloop.EpicTotals(e)
 			counts := ralphloop.CountsOf(e)
 			counts.Recovered = recoveredCount(dir, one.Epic)

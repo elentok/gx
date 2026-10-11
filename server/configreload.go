@@ -49,29 +49,34 @@ func (s *Server) configReloadWrite(w http.ResponseWriter, _ *http.Request) {
 // swap → kick → log. Live settings are untouched on any refusal.
 func (s *Server) reloadConfig(trigger string) ReloadResult {
 	s.reloadMu.Lock()
-	defer s.reloadMu.Unlock()
-	res := s.reloadLocked()
+	res, closeRetired := s.reloadLocked()
 	s.reportReload(trigger, res)
+	s.reloadMu.Unlock()
+	if closeRetired != nil {
+		go closeRetired()
+	}
 	return res
 }
 
-func (s *Server) reloadLocked() ReloadResult {
+// reloadLocked returns, besides the result, a func that closes what the
+// reload retired; it waits on the network, so it runs after the unlock.
+func (s *Server) reloadLocked() (ReloadResult, func()) {
 	if s.cfg.ConfigPath == "" {
-		return refuseReload(ReasonReloadUnavailable, "this server has no config file to reload")
+		return refuseReload(ReasonReloadUnavailable, "this server has no config file to reload"), nil
 	}
 	data, err := os.ReadFile(s.cfg.ConfigPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		return refuseReload(ReasonConfigMissing, "config file "+s.cfg.ConfigPath+" does not exist; settings unchanged")
+		return refuseReload(ReasonConfigMissing, "config file "+s.cfg.ConfigPath+" does not exist; settings unchanged"), nil
 	}
 	if err != nil {
-		return refuseReload(ReasonInvalidConfig, err.Error())
+		return refuseReload(ReasonInvalidConfig, err.Error()), nil
 	}
 	cfg, err := config.Parse(data)
 	if err == nil {
 		err = agentrunner.ValidateSetting(cfg.AgentRunner)
 	}
 	if err != nil {
-		return refuseReload(ReasonInvalidConfig, err.Error())
+		return refuseReload(ReasonInvalidConfig, err.Error()), nil
 	}
 
 	old := s.settings.Load()
@@ -80,12 +85,16 @@ func (s *Server) reloadLocked() ReloadResult {
 	if warning := s.applyBudgetLimits(*old, next); warning != "" {
 		res.Warnings = append(res.Warnings, warning)
 	}
+	var closeRetired func()
+	if next.Chat != old.Chat {
+		closeRetired = s.chat.SetGlobal(next.Chat)
+	}
 	s.settings.Store(&next)
 	if next.LogRetention != old.LogRetention {
 		s.pruneAgentLogs(time.Now())
 	}
 	s.kickRunner()
-	return res
+	return res, closeRetired
 }
 
 // applyBudgetLimits applies each budget limit whose file value changed since
@@ -125,10 +134,11 @@ func (s *Server) applyBudgetLimits(old, next Settings) string {
 	return warning
 }
 
-// reloadableSettings is next with the fields reload does not apply yet
-// (chat, store commits) kept at their live values.
+// reloadableSettings is next with the fields reload does not apply yet (store
+// commits) kept at their live values. The chat test seams are not config keys,
+// so they carry over too.
 func reloadableSettings(old, next Settings) Settings {
-	next.Chat = old.Chat
+	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
 	next.StoreCommitDebounce, next.StorePushRemote = old.StoreCommitDebounce, old.StorePushRemote
 	return next
 }
@@ -152,6 +162,9 @@ func changedKeys(old, next Settings) []string {
 		{"recovery.follow-ups", old.RecoverySettings.FollowUps, next.RecoverySettings.FollowUps},
 		{"recovery.notify-hold", old.RecoverySettings.NotifyHold, next.RecoverySettings.NotifyHold},
 		{"subscription.suppress-extra-usage-warning", old.SuppressExtraUsageWarning, next.SuppressExtraUsageWarning},
+		{"notifications.telegram.bot-token", old.Chat.TelegramBotToken, next.Chat.TelegramBotToken},
+		{"notifications.telegram.chat-id", old.Chat.TelegramChatID, next.Chat.TelegramChatID},
+		{"notifications.slack.webhook-url", old.Chat.SlackWebhookURL, next.Chat.SlackWebhookURL},
 	}
 	var keys []string
 	for _, f := range fields {

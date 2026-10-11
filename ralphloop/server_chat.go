@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -29,23 +30,62 @@ type ServerChatConfig struct {
 // goes out once no matter how many clients are connected and two projects with
 // the same target share one batch.
 type ServerChat struct {
-	base ServerChatConfig // carries the test seams a project destination reuses
-
 	mu     sync.Mutex
+	base   ServerChatConfig          // carries the test seams a project destination reuses
 	dests  map[string]*chatEventSink // destination key -> its sink
 	global []*chatEventSink
 	closed bool
 }
 
-// NewServerChat starts a sink for each configured global destination. It
-// returns nil when none is configured; a nil *ServerChat is safe to use.
+// NewServerChat starts a sink for each configured global destination. With
+// none configured nothing is sent, project overrides included, until SetGlobal
+// names one. A nil *ServerChat is safe to use.
 func NewServerChat(cfg ServerChatConfig) *ServerChat {
 	c := &ServerChat{base: cfg, dests: map[string]*chatEventSink{}}
 	c.global = c.sinksFor(cfg)
-	if len(c.global) == 0 {
+	return c
+}
+
+// Enabled reports whether a global destination is configured.
+func (c *ServerChat) Enabled() bool {
+	return len(c.globalSinks()) > 0
+}
+
+func (c *ServerChat) globalSinks() []*chatEventSink {
+	if c == nil {
 		return nil
 	}
-	return c
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.global
+}
+
+// SetGlobal swaps the global destinations for the ones cfg names, keeping the
+// test seams the chat was built with and every project sink with its batch
+// and throttle state. It returns a func that closes the retired global sinks;
+// Close waits on the network, so callers run it off their critical path.
+func (c *ServerChat) SetGlobal(cfg ServerChatConfig) (closeRetired func()) {
+	c.mu.Lock()
+	c.base.TelegramBotToken, c.base.TelegramChatID, c.base.SlackWebhookURL = cfg.TelegramBotToken, cfg.TelegramChatID, cfg.SlackWebhookURL
+	old := c.global
+	c.mu.Unlock()
+	next := c.sinksFor(cfg)
+
+	c.mu.Lock()
+	c.global = next
+	var retired []*chatEventSink
+	for key, s := range c.dests {
+		if slices.Contains(old, s) && !slices.Contains(next, s) {
+			delete(c.dests, key)
+			retired = append(retired, s)
+		}
+	}
+	c.mu.Unlock()
+	return func() {
+		for _, s := range retired {
+			s.Close()
+		}
+	}
 }
 
 // sinksFor returns the sink of each destination cfg names, starting any that
@@ -96,8 +136,9 @@ func firstNonEmptyStr(vals ...string) string {
 // projectSinks picks where a project's notifications go: its override block
 // replaces the global one whole (no per-transport merge), nil uses global.
 func (c *ServerChat) projectSinks(override *ServerChatConfig) []*chatEventSink {
-	if override == nil {
-		return c.global
+	global := c.globalSinks()
+	if override == nil || len(global) == 0 {
+		return global
 	}
 	return c.sinksFor(*override)
 }
@@ -203,7 +244,7 @@ func (c *ServerChat) ParkDigest(lines []string) {
 		return
 	}
 	title := fmt.Sprintf("%d parked while herdr was down", len(lines))
-	for _, s := range c.global {
+	for _, s := range c.globalSinks() {
 		s.send(s.style.chatStyle.Message("🅿️", title, "", strings.Join(lines, "\n"), s.style.identityLine("server", "")), notifyKindTicketNeedsHuman, serverSource, "")
 	}
 }
@@ -226,7 +267,7 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	if c == nil {
 		return
 	}
-	for _, s := range c.global {
+	for _, s := range c.globalSinks() {
 		s.send(s.style.chatStyle.Message(n.Emoji, n.Title, "", n.Detail, s.style.identityLine("server", "")), n.Kind, serverSource, "")
 	}
 }
