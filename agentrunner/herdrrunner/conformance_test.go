@@ -150,16 +150,36 @@ func TestPrompt_CompactWaitsOutCodexConfirmation(t *testing.T) {
 	if err := state.ConfirmCompact(s.Label); err != nil {
 		t.Fatal(err)
 	}
+	// Answer the confirmation only once the fake has raised it: a fixed sleep
+	// can fire before a slow "agent prompt" dispatch, which then re-blocks
+	// the agent with nobody left to move it on.
+	done := make(chan struct{})
 	go func() {
-		time.Sleep(50 * time.Millisecond)
+		for !promptDispatched(state, "/compact") {
+			select {
+			case <-done:
+				return
+			case <-time.After(5 * time.Millisecond):
+			}
+		}
 		_ = state.SetAgentStatus(s.Label, "working", "")
 	}()
-	if err := r.Prompt(s, "/compact"); err != nil {
+	err := r.Prompt(s, "/compact")
+	close(done)
+	if err != nil {
 		t.Fatalf("Prompt(/compact) = %v, want nil", err)
 	}
 	if st, err := r.Status(s); err != nil || st.State != agentrunner.StateWorking {
 		t.Fatalf("status after /compact = %+v, %v; want working", st, err)
 	}
+}
+
+// promptDispatched reports whether the fake has handled an "agent prompt"
+// carrying text.
+func promptDispatched(state *herdrfake.State, text string) bool {
+	return slices.ContainsFunc(state.Trace(), func(e herdrfake.TraceEntry) bool {
+		return len(e.Argv) > 3 && e.Argv[0] == "agent" && e.Argv[1] == "prompt" && e.Argv[3] == text
+	})
 }
 
 func TestPrompt_CompactConfirmationNeverAnsweredIsNotDelivered(t *testing.T) {
