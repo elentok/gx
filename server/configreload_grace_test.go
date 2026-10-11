@@ -169,7 +169,7 @@ func (f graceFixture) expectHeld(t *testing.T) {
 		t.Fatalf("runs = %+v, want only the running agent during the grace period", runs)
 	}
 	st := f.h.Server.BudgetStatusAt(time.Now())
-	if st.HardLatched || !st.BudgetPaused || st.HardStopAt.IsZero() {
+	if st.HardLatched || !st.BudgetPaused || f.h.Server.HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want paused, unlatched, with a stop time", st)
 	}
 }
@@ -182,7 +182,7 @@ func (f graceFixture) expectCancelled(t *testing.T) {
 		t.Fatalf("banners = %+v, want the cancel banner", f.h.Banners.Sent())
 	}
 	waitRuns(f.ctx, t, f.h, 2) // starts resume
-	if st := f.h.Server.BudgetStatusAt(time.Now()); st.BudgetPaused || !st.HardStopAt.IsZero() {
+	if st := f.h.Server.BudgetStatusAt(time.Now()); st.BudgetPaused || !f.h.Server.HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want unpaused with no stop time", st)
 	}
 	if kind := f.parkKind(t); kind != "" {
@@ -248,7 +248,7 @@ func TestHardLimitGrace_BudgetIncreaseCancels(t *testing.T) {
 func TestHardLimitGrace_OverrideCancels(t *testing.T) {
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
-	stopAt := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt
+	stopAt := f.h.Server.HardStopAt()
 	f.expectHeld(t)
 
 	if res, err := f.h.Client.BudgetOverride(f.ctx); err != nil || res.Refused {
@@ -267,7 +267,7 @@ func TestHardLimitGrace_OverrideCancels(t *testing.T) {
 	if n := f.waitBanners(f.startTitle, 2); n != 2 {
 		t.Errorf("start banners = %d, want a second one for the fresh countdown", n)
 	}
-	if got := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt; !got.After(stopAt) {
+	if got := f.h.Server.HardStopAt(); !got.After(stopAt) {
 		t.Errorf("stop time = %v, want a fresh deadline after %v", got, stopAt)
 	}
 }
@@ -340,7 +340,7 @@ func TestHardLimitGrace_ShutdownStopsCountdownAfterWatcher(t *testing.T) {
 func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
-	stopAt := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt
+	stopAt := f.h.Server.HardStopAt()
 
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 5))
 	reload(t, f.h)
@@ -348,7 +348,7 @@ func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 	if n := f.countBanners(f.startTitle); n != 1 {
 		t.Errorf("start banners = %d, want 1", n)
 	}
-	if got := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt; !got.Equal(stopAt) {
+	if got := f.h.Server.HardStopAt(); !got.Equal(stopAt) {
 		t.Errorf("stop time = %v, want unchanged %v", got, stopAt)
 	}
 }
@@ -357,7 +357,7 @@ func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 func TestHardLimitGrace_SpendCrossingStillLatchesAtOnce(t *testing.T) {
 	f := startGraceServer(t, time.Hour)
 	f.h.Server.RecordSpend("more", 15)
-	if st := f.h.Server.BudgetStatusAt(time.Now()); !st.HardLatched || !st.HardStopAt.IsZero() {
+	if st := f.h.Server.BudgetStatusAt(time.Now()); !st.HardLatched || !f.h.Server.HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want latched at once with no countdown", st)
 	}
 }

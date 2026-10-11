@@ -274,9 +274,6 @@ type BudgetStatus struct {
 	HardLimit    float64 `json:"hard_limit"`
 	BudgetPaused bool    `json:"budget_paused"`
 	HardLatched  bool    `json:"hard_latched"`
-	// HardStopAt is when a reload-lowered hard limit stops agents unless it is
-	// raised first; zero when no such countdown runs.
-	HardStopAt time.Time `json:"hard_stop_at,omitzero"`
 	// Override is today's total at the last override; zero means none today.
 	// Limits count only spend beyond it.
 	Override float64 `json:"override,omitempty"`
@@ -293,12 +290,7 @@ func (s *Server) budgetStatus(now time.Time) BudgetStatus {
 	latch := s.budgetLatches(now)
 	soft, hard := s.ledger.limits()
 	day := now.Format(budgetDayLayout)
-	var stopAt time.Time
-	if s.ledger.held() {
-		stopAt = s.hardGrace.deadline()
-	}
 	return BudgetStatus{
-		HardStopAt:   stopAt,
 		Day:          day,
 		Total:        s.ledger.today(now),
 		Projects:     s.ledger.byProject(day),

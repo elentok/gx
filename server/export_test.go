@@ -74,6 +74,9 @@ func (s *Server) PollBudget() { s.pollBudget(time.Now()) }
 // BudgetStatusAt is the budget status as of now.
 func (s *Server) BudgetStatusAt(now time.Time) BudgetStatus { return s.budgetStatus(now) }
 
+// HardStopAt is the config status's grace countdown deadline.
+func (s *Server) HardStopAt() time.Time { return s.configStatus().HardStopAt }
+
 // RecordProjectSpend adds spend attributed to a project to today's ledger.
 func (s *Server) RecordProjectSpend(project, key string, cost float64) {
 	s.ledger.record(project, key, cost, time.Now())

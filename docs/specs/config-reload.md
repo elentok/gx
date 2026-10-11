@@ -166,7 +166,8 @@ also shows the result as a toast. Reload results are never sent to Telegram or S
   decision and uses that snapshot, so one decision never sees half of an old config and half of a
   new one. A reload builds a new `Settings` value and swaps the pointer; values are never mutated
   in place.
-- The chat notifier is also held in an atomic pointer, since a reload may replace it.
+- The chat notifier is not swapped: a reload replaces its global sink in place under the notifier's
+  own mutex, so every send sees either the old sink or the new one.
 
 ### Per-field semantics
 
@@ -304,7 +305,8 @@ Every reload result goes to three places from the same reporting step:
 - `gx server status` no longer fails on a broken config.json: on a config load error it uses the
   default paths to reach the server and prints the config error at the top.
 - The server keeps the last reload result (time, trigger, success / warnings / refusal and its
-  message) and the startup-only keys whose file value differs from the running value.
+  message) and the startup-only keys a reload found changed; a key stays listed until restart, even
+  if the file is set back.
 - `gx server status` (and its `--json`) gains a "Config" block with both, plus the hard-limit
   grace countdown while one runs. The block is omitted when no reload has happened since startup
   and nothing is pending.

@@ -226,7 +226,7 @@ type Server struct {
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 	rewatch     func()            // set by keepFresh when the watch is active
 
-	chat        *ralphloop.ServerChat // nil when no chat destination is configured
+	chat        *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry    *runRegistry
 	savedRuns   []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused     refusals
