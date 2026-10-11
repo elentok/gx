@@ -4,13 +4,13 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/yankfmt"
 )
 
-var stageClipboardWrite = clipboard.WriteAll
+var stageClipboardWrite = clip.Write
 
 func (m *Model) yankFilename() tea.Cmd {
 	file, ok := m.selectedStatusFile()

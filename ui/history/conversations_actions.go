@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 
 	"github.com/elentok/gx/claudehistory"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
@@ -24,7 +24,7 @@ var (
 	historyLookPath       = exec.LookPath
 	historyExportMarkdown = claudehistory.ExportMarkdown
 	historyCreateTempFile = os.CreateTemp
-	historyClipboardWrite = clipboard.WriteAll
+	historyClipboardWrite = clip.Write
 )
 
 type convExportedMsg struct {

@@ -3,7 +3,7 @@ package commit
 import (
 	"strings"
 
-	"github.com/atotto/clipboard"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/yankfmt"
@@ -11,7 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-var commitClipboardWrite = clipboard.WriteAll
+var commitClipboardWrite = clip.Write
 
 func (m *Model) selectedFile() (path string, ok bool) {
 	file, ok := m.selectedCommitFile()

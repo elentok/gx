@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/atotto/clipboard"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/notify"
 )
 
-var ticketsClipboardWrite = clipboard.WriteAll
+var ticketsClipboardWrite = clip.Write
 
 // formatTicketSummary renders a ticket for the "yy" chord: "{epic} - {id}
 // {title}", mirroring the "%s %s" id+title format already used across this

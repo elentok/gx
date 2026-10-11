@@ -1,14 +1,14 @@
 package log
 
 import (
-	"github.com/atotto/clipboard"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
 
-var logClipboardWrite = clipboard.WriteAll
+var logClipboardWrite = clip.Write
 
 func (m Model) selectedCommit() (git.LogEntry, bool) {
 	rows := m.listPanel.Rows()
