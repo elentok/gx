@@ -1785,3 +1785,31 @@ func TestQueueEditChordCancelsOnEsc(t *testing.T) {
 		t.Fatalf("expected plain esc after cancel to navigate back")
 	}
 }
+
+func TestQueueSearch_MatchesTicketIDAndEpicName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "27-second.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "27-second.md"): true,
+		ticketPath(root, "beta", "01-other.md"):   true,
+	}
+
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+
+	m.search.Start("27")
+	m.recomputeQueueSearchMatches()
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected ticket id %q to match one ticket, got %d", "27", m.search.MatchesCount())
+	}
+
+	// Only the alpha epic header: its tickets' titles don't say alpha.
+	m.search.Start("alpha")
+	m.recomputeQueueSearchMatches()
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected epic name %q to match only its epic header, got %d", "alpha", m.search.MatchesCount())
+	}
+}

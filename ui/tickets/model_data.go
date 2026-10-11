@@ -386,11 +386,14 @@ func closedEpicDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) map[
 	return defaults
 }
 
-// ticketMatchesQuery is the Tickets tab's search rule for a ticket row:
-// case-insensitive substring over its title plus rendered status word. q
-// must already be lowercased and trimmed.
+// ticketMatchesQuery is the search rule for a ticket row, shared by both
+// tabs: case-insensitive substring over its "<id> <title>" row text and its
+// rendered status word. An epic-name match is epicMatchesQuery's job, so it
+// lands on the epic row rather than on every ticket inside it. q must already
+// be lowercased and trimmed.
 func ticketMatchesQuery(epic tickets.Epic, t tickets.Ticket, q string) bool {
-	return strings.Contains(strings.ToLower(t.Title+" "+epic.RenderedStatus(t).Word()), q)
+	haystack := t.DisplayNumber() + " " + t.Title + " " + epic.RenderedStatus(t).Word()
+	return strings.Contains(strings.ToLower(haystack), q)
 }
 
 // epicMatchesQuery is the search rule for an epic row, shared by both tabs.
