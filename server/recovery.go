@@ -127,7 +127,7 @@ func (s *Server) planEpicRecovery(f recovery.Failure) (recoveryPlan, bool) {
 // inside of (claim, land), which would otherwise wait on themselves.
 func (s *Server) recoverAsync(f recovery.Failure) {
 	if plan, ok := s.planRecovery(f); ok {
-		go s.recoverFrom(plan, f)
+		s.goSettle(func() { s.recoverFrom(plan, f) })
 	}
 }
 
@@ -213,20 +213,20 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 	}
 	if !plan.holdsPark() {
 		s.parkHold.start(f.Address)
-		go func() {
+		s.goSettle(func() {
 			s.recoverFrom(plan, f)
 			// An opened investigation keeps it pending from here: see recoveryState.
 			if s.parkHold.started(f.Address) {
 				s.events.publish(EventTicketChanged, f.Address)
 			}
-		}()
+		})
 		return false
 	}
 	s.parkHold.hold(f.Address, s.cfg.RecoverySettings.NotifyHold, func() {
 		s.events.publish(EventTicketChanged, f.Address)
 		s.notifyPark(addr, ticketPath, kind, reason)
 	})
-	go s.recoverFrom(plan, f)
+	s.goSettle(func() { s.recoverFrom(plan, f) })
 	return true
 }
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -297,6 +298,15 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
 	herdrfake.StartState(t, h.Herdr)
+
+	// Every store commit starts git's auto maintenance, which detaches by
+	// default and can outlive the test: its lock file in .git/objects then
+	// races t.TempDir's cleanup. Keep it in the foreground, as testutil's repos do.
+	if err := storecommit.EnsureRepo(store); err != nil {
+		t.Fatal(err)
+	}
+	testutil.MustGitExported(t, store, "config", "gc.auto", "0")
+	testutil.MustGitExported(t, store, "config", "gc.autoDetach", "false")
 
 	h.cfg = server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	// The product default is off; most tests exercise the landing.

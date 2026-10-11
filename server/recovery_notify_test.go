@@ -129,11 +129,13 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 	})
 	t.Run("cleared when the hold expires", func(t *testing.T) {
 		release := make(chan struct{})
-		t.Cleanup(func() { close(release) })
 		h, _ := startNotifyRecovery(t, 300*time.Millisecond, func(recovery.Failure, recovery.Verbs) error {
 			<-release
 			return nil
 		})
+		// Registered after the server, so it runs before the server's
+		// cleanup waits for this remedy to end.
+		t.Cleanup(func() { close(release) })
 		if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 			t.Fatal(err)
 		}
@@ -328,11 +330,13 @@ func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigatio
 
 func TestRecoveryNotify_SlowRecoverySendsTheOriginalParkAfterTheHold(t *testing.T) {
 	release := make(chan struct{})
-	t.Cleanup(func() { close(release) })
 	h, sent := startNotifyRecovery(t, 200*time.Millisecond, func(recovery.Failure, recovery.Verbs) error {
 		<-release
 		return nil
 	})
+	// Registered after the server, so it runs before the server's cleanup
+	// waits for this remedy to end.
+	t.Cleanup(func() { close(release) })
 	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}

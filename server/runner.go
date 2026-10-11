@@ -130,7 +130,8 @@ func (g *landGuard) closeAndWait(timeout time.Duration) bool {
 	}
 }
 
-// goSettle runs f, a finishRun or settleRun, on its own goroutine.
+// goSettle runs f, a finishRun, settleRun or recoverFrom, on its own
+// goroutine. Each writes to the ticket store and may outlive Serve's stop.
 func (s *Server) goSettle(f func()) {
 	s.settling.Add(1)
 	go func() {
@@ -139,7 +140,7 @@ func (s *Server) goSettle(f func()) {
 	}()
 }
 
-// WaitSettled waits for every finishRun/settleRun goroutine and reports
+// WaitSettled waits for every goSettle goroutine and reports
 // whether they all ended within timeout. Serve's stop leaves them running
 // (agents outlive the server), so a test must wait before deleting their dirs.
 func (s *Server) WaitSettled(timeout time.Duration) bool {

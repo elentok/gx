@@ -167,7 +167,7 @@ type Server struct {
 	nudges      nudgeLimiter
 	unavailable unavailableNotes
 	kick        chan struct{}  // wakes keepClaiming
-	settling    sync.WaitGroup // finishRun/settleRun goroutines; Serve's stop leaves them running
+	settling    sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
