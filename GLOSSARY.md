@@ -212,6 +212,7 @@ the row can't go stale between a park and a restart.
 
 **Agent runner** — the thing that hosts one agent session for an iteration: it starts the agent,
 takes its prompts, and reports whether it is working, idle or blocked. herdr is one agent runner.
+An iteration keeps the agent runner that started it; changing the setting affects only new launches.
 _Avoid_: "runner" alone, "backend", "run".
 
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
