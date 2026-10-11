@@ -319,9 +319,13 @@ func (s *State) runWatchdog(stop <-chan struct{}) {
 func (s *State) dumpTrace(reason string) {
 	s.dumped.Store(true)
 	trace := s.Trace()
-	s.logf("herdrfake: watchdog dump (%s), %d trace entries:", reason, len(trace))
+	// One logf call, not one per entry: a reader polling the log for the
+	// header must never see it without the entries that follow.
+	var b strings.Builder
+	fmt.Fprintf(&b, "herdrfake: watchdog dump (%s), %d trace entries:", reason, len(trace))
 	for _, e := range trace {
-		s.logf("  #%d argv=%v virtualTime=%s identities=%+v exitCode=%d output=%s\n    before: %s\n    after:  %s",
+		fmt.Fprintf(&b, "\n  #%d argv=%v virtualTime=%s identities=%+v exitCode=%d output=%s\n    before: %s\n    after:  %s",
 			e.Seq, e.Argv, e.VirtualTime, e.Identities, e.ExitCode, e.Output, e.Before, e.After)
 	}
+	s.logf("%s", b.String())
 }

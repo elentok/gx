@@ -212,11 +212,6 @@ func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 // only happen if the scheduler noticed ticket 01's answer on its own, not by
 // coincidentally waiting for ticket 02 anyway.
 func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *testing.T) {
-	// not parallel-safe: asserts len(*removed) immediately after observing
-	// ticket 01's "status: done" write, with no synchronization between that
-	// write and the worktree-removal step it's racing — under the CPU
-	// contention of running alongside many other parallel tests, the removal
-	// can lag behind and flake the assertion.
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
@@ -224,6 +219,15 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	path01 := ticketPath(scratchDir, "my-epic", "01-a.md")
 	path02 := ticketPath(scratchDir, "my-epic", "02-b.md")
 	d, _, removed := fakeDeps()
+	// The "status: done" write lands before the worktree removal, so the
+	// removal count is only meaningful once a removal has been signalled.
+	removedSignal := make(chan struct{}, 2)
+	removeWorktree := d.RemoveWorktree
+	d.RemoveWorktree = func(repoDir, path string, force bool) error {
+		err := removeWorktree(repoDir, path, force)
+		removedSignal <- struct{}{}
+		return err
+	}
 
 	var mu sync.Mutex
 	unblocked01 := false
@@ -266,6 +270,11 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	// arrived — which the still-held ticket02Gate prevents.
 	waitForFileContains(t, path01, "status: done")
 
+	select {
+	case <-removedSignal:
+	case <-time.After(5 * time.Second):
+		t.Fatal("ticket 01's worktree was never removed after it landed")
+	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches after ticket 01 reattached+landed = %v, want exactly one (ticket 01), ticket 02 still running", *removed)
 	}
