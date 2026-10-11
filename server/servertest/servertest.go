@@ -7,6 +7,7 @@ package servertest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -41,6 +42,29 @@ type Harness struct {
 
 // WriteTicket creates <store>/<project>/<epic>/issues/<id>-<slug>.md (and the
 // project's project.json) with minimal valid frontmatter. Call it before Start.
+// WithConfigFile points the server's config reload at path.
+func WithConfigFile(path string) func(*server.Config) {
+	return func(c *server.Config) { c.ConfigPath = path }
+}
+
+// WriteConfig writes fields as a config.json at path. The ticket-store path
+// is set to store unless fields names one, so a reload sees no startup-only
+// change by default.
+func WriteConfig(t *testing.T, path, store string, fields map[string]any) {
+	t.Helper()
+	all := map[string]any{"ticket-store": map[string]any{"path": store}}
+	for k, v := range fields {
+		all[k] = v
+	}
+	data, err := json.Marshal(all)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func WriteTicket(t *testing.T, store, project, epic, id, slug, blockedBy string) {
 	t.Helper()
 	opts := TicketOpts{}

@@ -32,6 +32,9 @@ type Probe struct {
 // Select resolves setting to the runner to use. pty is rejected. An explicit
 // herdr with herdr down is an error, not a fallback.
 func Select(setting string, p Probe) (Choice, error) {
+	if err := ValidateSetting(setting); err != nil {
+		return "", err
+	}
 	c := Choice(setting)
 	switch c {
 	case "", ChoiceAuto:
@@ -44,16 +47,24 @@ func Select(setting string, p Probe) (Choice, error) {
 			return "", fmt.Errorf("agent-runner is herdr but herdr is unavailable: %w", err)
 		}
 		return ChoiceHerdr, nil
-	case ChoiceHeadless:
-	case choicePTY:
-		return "", fmt.Errorf("agent-runner pty is not supported: want auto, herdr or headless")
-	default:
-		return "", fmt.Errorf("invalid agent-runner %q: want auto, herdr or headless", setting)
 	}
 	if _, err := p.LookPath("claude"); err != nil {
 		return "", fmt.Errorf("agent-runner %s needs claude on PATH: %w", c, err)
 	}
 	return c, nil
+}
+
+// ValidateSetting checks setting against the allowed values without probing
+// the machine.
+func ValidateSetting(setting string) error {
+	switch Choice(setting) {
+	case "", ChoiceAuto, ChoiceHerdr, ChoiceHeadless:
+		return nil
+	case choicePTY:
+		return fmt.Errorf("agent-runner pty is not supported: want auto, herdr or headless")
+	default:
+		return fmt.Errorf("invalid agent-runner %q: want auto, herdr or headless", setting)
+	}
 }
 
 func herdrUp(p Probe) error {

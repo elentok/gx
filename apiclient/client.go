@@ -341,6 +341,14 @@ func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error
 	return res, err
 }
 
+// ReloadConfig reloads the global config file into the server. A refusal is
+// a result (Refused set), not an error.
+func (c *Client) ReloadConfig(ctx context.Context) (server.ReloadResult, error) {
+	var res server.ReloadResult
+	err := c.post(ctx, "/v1/config/reload", struct{}{}, &res)
+	return res, err
+}
+
 // BudgetIncrease raises the live budget limits until the server restarts. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {

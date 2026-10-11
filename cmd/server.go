@@ -125,7 +125,7 @@ func newServerCmd(_ deps) *cobra.Command {
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd())
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd(), newServerReloadConfigCmd())
 	return cmd
 }
 
@@ -153,7 +153,7 @@ func runServer(ctx context.Context) error {
 		return err
 	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
-		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, TCPAddr: tcpAddr})
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr})
 	if err != nil {
 		return err
 	}
