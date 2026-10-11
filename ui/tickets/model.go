@@ -509,14 +509,7 @@ func (m Model) normalView() string {
 	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.focus == focusSidebar, true)
 	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
-	var body string
-	if m.useStackedLayout() {
-		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)
-		body = lipgloss.JoinVertical(lipgloss.Left, sidebarView, seam, previewView)
-	} else {
-		seam := ui.RenderSeamColumn(sidebarH, ui.SeamColor)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, sidebarView, seam, previewView)
-	}
+	body := m.joinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
 	return lipgloss.JoinVertical(lipgloss.Left, body, m.footerView())
 }
 
@@ -552,13 +545,13 @@ func (m Model) useStackedLayout() bool {
 }
 
 func (m Model) splitWidth() (sidebarW, previewW int) {
-	return splitPanelWidth(m.width)
+	return m.panelWidths(m.width)
 }
 
 // splitHeight divides a stacked tickets view evenly between its selection-
 // driving list and preview. Wide views remain a full-height side-by-side split.
 func (m Model) splitHeight(total int) (sidebarH, previewH int) {
-	return splitPanelHeight(m.width, total)
+	return m.panelHeights(m.width, total)
 }
 
 // useStackedLayout, splitPanelWidth and splitPanelHeight are free functions
@@ -594,7 +587,7 @@ func splitPanelHeight(width, total int) (sidebarH, previewH int) {
 // mirroring normalView's layout math so mouse hit-testing (click-to-focus,
 // wheel routing) stays in sync with what's actually rendered.
 func (m Model) previewRect() (x, y, w, h int) {
-	return previewRect(m.width, m.contentHeight())
+	return m.previewFocus.previewRect(m.width, m.contentHeight())
 }
 
 // sidebarRect returns the sidebar panel's absolute on-screen bounds,

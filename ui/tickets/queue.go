@@ -274,15 +274,15 @@ func (m QueueModel) handleQueueMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea
 // mirroring previewRect's layout math (same splitPanelWidth/splitPanelHeight
 // call) for the Queue tab's own panel pair.
 func (m QueueModel) queueTreeRect() ui.Rect {
-	sidebarW, _ := splitPanelWidth(m.width)
-	sidebarH, _ := splitPanelHeight(m.width, m.contentHeight())
+	sidebarW, _ := m.panelWidths(m.width)
+	sidebarH, _ := m.panelHeights(m.width, m.contentHeight())
 	return ui.Rect{X: 0, Y: 0, W: sidebarW, H: sidebarH}
 }
 
 // queuePreviewRect wraps the shared previewRect in a ui.Rect for
 // HoverHitTest.
 func (m QueueModel) queuePreviewRect() ui.Rect {
-	x, y, w, h := previewRect(m.width, m.contentHeight())
+	x, y, w, h := m.previewRect()
 	return ui.Rect{X: x, Y: y, W: w, H: h}
 }
 
@@ -295,7 +295,7 @@ func (m QueueModel) contentHeight() int {
 // previewRect returns the preview panel's absolute on-screen bounds,
 // mirroring Model.previewRect for the Queue tab's own layout.
 func (m QueueModel) previewRect() (x, y, w, h int) {
-	return previewRect(m.width, m.contentHeight())
+	return m.previewFocus.previewRect(m.width, m.contentHeight())
 }
 
 // handleQueueMouseClick selects the row under the click without triggering
@@ -339,6 +339,8 @@ const bindingQueueToggleHideDone keys.BindingID = "toggle-hide-done"
 
 // bindingQueueCycleProject is "tp": all projects, then each project in turn.
 const bindingQueueCycleProject keys.BindingID = "cycle-project"
+
+const bindingQueueTogglePreview keys.BindingID = "toggle-preview"
 
 // bindingQueueSelectFirst is the "gg" chord (ticket 11), dispatched through
 // keys.Manager since it's a two-key sequence like bindingQueueToggleHideDone
@@ -384,6 +386,7 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueHelp, Seq: []string{"?"}, Categories: []string{"Other"}, Title: "help"},
 		{ID: bindingQueueToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingQueueCycleProject, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "filter by project"},
+		{ID: bindingQueueTogglePreview, Seq: []string{"t", "v"}, Categories: []string{"Navigation"}, Title: "toggle preview"},
 		{ID: bindingQueueEditInPlace, Seq: []string{"e", "e"}, Categories: []string{"Navigation"}, Title: "edit file"},
 		{ID: bindingQueueEditHSplit, Seq: []string{"e", "s"}, Categories: []string{"Navigation"}, Title: "edit file (split)"},
 		{ID: bindingQueueEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
@@ -431,6 +434,9 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				label = "project: " + m.projectFilter
 			}
 			return m, notify.Info(label)
+		case bindingQueueTogglePreview:
+			m.togglePreview()
+			m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		case bindingQueueEditInPlace:
 			return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 		case bindingQueueEditHSplit:
@@ -499,7 +505,7 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// leaves-are-a-no-op behavior).
 	next, cmd, result := m.queueTree.Update(msg)
 	if result.ExpandNoop {
-		m.focus = focusPreview
+		m.focusPreviewPane()
 		return m, cmd
 	}
 	m.queueTree = next
@@ -510,13 +516,13 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if result.OpenSelected {
-		m.focus = focusPreview
+		m.focusPreviewPane()
 	}
 	return m, cmd
 }
 
 type checkedEpicPlan struct {
-	epic tickets.Epic
+	epic      tickets.Epic
 	ticketIDs []string
 	ordinal   uint64
 	ordered   bool
@@ -593,6 +599,6 @@ func (m *QueueModel) clampSelected() {
 // (splitPanelHeight), since a stacked (narrow-terminal) layout shares the
 // available height with the preview pane below it.
 func (m QueueModel) queueViewportHeight() int {
-	sidebarH, _ := splitPanelHeight(m.width, m.contentHeight())
+	sidebarH, _ := m.panelHeights(m.width, m.contentHeight())
 	return max(sidebarH-1, 0)
 }

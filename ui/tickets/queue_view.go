@@ -27,8 +27,8 @@ func (m QueueModel) View() tea.View {
 		// didn't change, rather than always rebuilding from scratch.
 		m.queueTree.SetEntries(m.buildQueueEntriesCached())
 	}
-	sidebarW, previewW := splitPanelWidth(m.width)
-	sidebarH, previewH := splitPanelHeight(m.width, m.contentHeight())
+	sidebarW, previewW := m.panelWidths(m.width)
+	sidebarH, previewH := m.panelHeights(m.width, m.contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
 		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(sidebarW-2), m.focus == focusSidebar, ui.ColorBlue, nil, true,
@@ -37,14 +37,7 @@ func (m QueueModel) View() tea.View {
 		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, ui.ColorBlue, nil, false,
 	))
 
-	var content string
-	if useStackedLayout(m.width) {
-		seam := ui.RenderSeamRow(sidebarW, ui.SeamColor)
-		content = lipgloss.JoinVertical(lipgloss.Left, queueView, seam, previewView)
-	} else {
-		seam := ui.RenderSeamColumn(sidebarH, ui.SeamColor)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, queueView, seam, previewView)
-	}
+	content := m.joinPanels(m.width, sidebarW, sidebarH, queueView, previewView)
 
 	if m.actionsMenu.IsOpen {
 		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)

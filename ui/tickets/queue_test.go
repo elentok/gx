@@ -1104,7 +1104,7 @@ func TestQueueModelHoverScrollFollowsCursorNotFocus(t *testing.T) {
 		m := queueModelForHoverScroll(t)
 		m.focus = focusSidebar
 
-		px, _, _, _ := previewRect(m.width, m.contentHeight())
+		px, _, _, _ := m.previewRect()
 		updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
 		m = updated.(QueueModel)
 
@@ -1134,7 +1134,7 @@ func TestQueueModelHoverScrollNoOpsWithNoOverflow(t *testing.T) {
 	treeBefore := m.queueTree.ScrollOffset()
 	previewBefore := m.previewVP.YOffset()
 
-	px, _, _, _ := previewRect(m.width, m.contentHeight())
+	px, _, _, _ := m.previewRect()
 	updated, _ := m.Update(tea.MouseWheelMsg{X: px + 1, Y: 1, Button: tea.MouseWheelDown})
 	m = updated.(QueueModel)
 	updated, _ = m.Update(tea.MouseWheelMsg{X: 1, Y: 1, Button: tea.MouseWheelDown})

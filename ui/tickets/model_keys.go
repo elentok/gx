@@ -25,6 +25,7 @@ const (
 	bindingTicketsToggleCheck        keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone     keys.BindingID = "toggle-hide-done"
 	bindingTicketsToggleProjectScope keys.BindingID = "toggle-project-scope"
+	bindingTicketsTogglePreview      keys.BindingID = "toggle-preview"
 	bindingTicketsSelectFirst        keys.BindingID = "select-first"
 	bindingTicketsSelectLast         keys.BindingID = "select-last"
 	bindingTicketsPreviewBottom      keys.BindingID = "preview-bottom"
@@ -67,6 +68,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingTicketsToggleProjectScope, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "cwd project / all projects"},
+		{ID: bindingTicketsTogglePreview, Seq: []string{"t", "v"}, Categories: []string{"Navigation"}, Title: "toggle preview"},
 		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
 		{ID: bindingTicketsSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
 		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
@@ -152,6 +154,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.toggleHideDone()
 		case bindingTicketsToggleProjectScope:
 			return m.toggleProjectScope()
+		case bindingTicketsTogglePreview:
+			m.togglePreview()
+			m.sidebarTree.SetVisibleHeight(m.sidebarViewportHeight())
 		case bindingTicketsSelectFirst:
 			m.selectFirstRow()
 		case bindingTicketsSelectLast:
@@ -194,7 +199,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	next, cmd, result := m.sidebarTree.Update(msg)
 	if result.ExpandNoop {
-		m.focus = focusPreview
+		m.focusPreviewPane()
 		return m, cmd
 	}
 	m.sidebarTree = next
@@ -220,7 +225,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	if result.OpenSelected {
-		m.focus = focusPreview
+		m.focusPreviewPane()
 	}
 	// BindingMoveDown/BindingMoveUp already self-skip non-selectable rows
 	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no

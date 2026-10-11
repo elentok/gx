@@ -3,7 +3,9 @@ package tickets
 import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 )
 
@@ -23,6 +25,55 @@ type previewFocus struct {
 	previewVP     viewport.Model
 	previewSelKey string // identifies the previewed row, to reset scroll on selection change
 	previewSearch search.Model
+	// previewHidden backs the "tv" chord. Kept per tab, in memory only.
+	previewHidden bool
+}
+
+// togglePreview flips previewHidden. Hiding hands focus back to the list,
+// since a hidden panel can't receive keys.
+func (p *previewFocus) togglePreview() {
+	p.previewHidden = !p.previewHidden
+	if p.previewHidden {
+		p.focus = focusSidebar
+	}
+}
+
+// focusPreviewPane is the one way to give the preview focus, a no-op while
+// it's hidden.
+func (p *previewFocus) focusPreviewPane() {
+	if !p.previewHidden {
+		p.focus = focusPreview
+	}
+}
+
+// panelWidths/panelHeights wrap splitPanelWidth/splitPanelHeight, giving the
+// list the whole area while the preview is hidden.
+func (p previewFocus) panelWidths(width int) (sidebarW, previewW int) {
+	if p.previewHidden {
+		return width, 0
+	}
+	return splitPanelWidth(width)
+}
+
+func (p previewFocus) panelHeights(width, total int) (sidebarH, previewH int) {
+	if p.previewHidden {
+		return total, 0
+	}
+	return splitPanelHeight(width, total)
+}
+
+// joinPanels lays the list and preview out side by side (or stacked on
+// narrow terminals) with a seam between them, or the list alone while the
+// preview is hidden.
+func (p previewFocus) joinPanels(width, sidebarW, sidebarH int, sidebarView, previewView string) string {
+	switch {
+	case p.previewHidden:
+		return sidebarView
+	case useStackedLayout(width):
+		return lipgloss.JoinVertical(lipgloss.Left, sidebarView, ui.RenderSeamRow(sidebarW, ui.SeamColor), previewView)
+	default:
+		return lipgloss.JoinHorizontal(lipgloss.Top, sidebarView, ui.RenderSeamColumn(sidebarH, ui.SeamColor), previewView)
+	}
 }
 
 func newPreviewFocus() previewFocus {
@@ -78,10 +129,13 @@ func (p previewFocus) previewLines() []string {
 
 // previewRect returns the preview panel's absolute on-screen bounds for a
 // tab of the given width/contentHeight, computed from the same
-// splitPanelWidth/splitPanelHeight/useStackedLayout math each tab's View
-// uses to lay out its panels - so click hit-testing stays in sync with
-// what's actually rendered, in both tabs at once.
-func previewRect(width, contentHeight int) (x, y, w, h int) {
+// panelWidths/panelHeights/useStackedLayout math each tab's View uses to lay
+// out its panels - so click hit-testing stays in sync with what's actually
+// rendered, in both tabs at once. A hidden preview has an empty rect.
+func (p previewFocus) previewRect(width, contentHeight int) (x, y, w, h int) {
+	if p.previewHidden {
+		return 0, 0, 0, 0
+	}
 	sidebarW, previewW := splitPanelWidth(width)
 	sidebarH, previewH := splitPanelHeight(width, contentHeight)
 	if useStackedLayout(width) {
@@ -96,9 +150,9 @@ func previewRect(width, contentHeight int) (x, y, w, h int) {
 // whether the click was handled this way, so the caller's own
 // row-under-click selection logic can skip running when it was.
 func (p *previewFocus) clickToFocus(mouse tea.Mouse, width, contentHeight int) bool {
-	px, py, pw, ph := previewRect(width, contentHeight)
+	px, py, pw, ph := p.previewRect(width, contentHeight)
 	if mouse.X >= px && mouse.X < px+pw && mouse.Y >= py && mouse.Y < py+ph {
-		p.focus = focusPreview
+		p.focusPreviewPane()
 		return true
 	}
 	return false
