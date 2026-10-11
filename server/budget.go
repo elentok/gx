@@ -337,6 +337,7 @@ func (s *Server) budgetOverride(now time.Time) (BudgetResult, error) {
 	if err := s.ledger.save(now); err != nil {
 		return BudgetResult{}, err
 	}
+	s.cancelHardGrace()
 	status := s.budgetStatus(now)
 	s.rearmBudgetNotes(status)
 	s.events.publish(EventQueueChanged, "")

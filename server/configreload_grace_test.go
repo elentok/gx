@@ -2,12 +2,17 @@ package server_test
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -27,20 +32,21 @@ type graceFixture struct {
 
 // startGraceServer runs epic-a's one ticket as a live agent with today's spend
 // at $8 and a $20 hard limit, and leaves epic-b unqueued.
-func startGraceServer(t *testing.T, grace time.Duration) graceFixture {
+func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Config)) graceFixture {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	path := filepath.Join(t.TempDir(), "config.json")
-	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
+	opts = append([]func(*server.Config){servertest.WithConfigFile(path), func(c *server.Config) {
 		c.Runner = runnerfake.NewRunner()
 		c.BudgetHardLimit = 20
 		c.BudgetKillGrace = 10 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
 		c.HardLimitGrace = grace
-	})
+	}}, opts...)
+	h := servertest.StartWithStore(t, store, opts...)
 	h.Server.RecordSpend("spent", 8)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
@@ -98,6 +104,18 @@ func (f graceFixture) hasBanner(title string) bool {
 		time.Sleep(10 * time.Millisecond)
 	}
 	return false
+}
+
+// waitBanners waits briefly for n banners titled title, and returns the count.
+func (f graceFixture) waitBanners(title string, n int) int {
+	got := 0
+	for range 50 {
+		if got = f.countBanners(title); got >= n {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return got
 }
 
 func (f graceFixture) countBanners(title string) int {
@@ -202,6 +220,98 @@ func TestHardLimitGrace_BudgetIncreaseCancels(t *testing.T) {
 		t.Fatalf("increase = %+v, %v", res, err)
 	}
 	f.expectCancelled(t)
+}
+
+// Seam: `gx budget override` cancels the countdown, so a later lowering reload
+// starts a fresh one instead of inheriting the old deadline.
+func TestHardLimitGrace_OverrideCancels(t *testing.T) {
+	f := startGraceServer(t, time.Hour)
+	f.lowerBelowSpend(t)
+	stopAt := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt
+	f.expectHeld(t)
+
+	if res, err := f.h.Client.BudgetOverride(f.ctx); err != nil || res.Refused {
+		t.Fatalf("override = %+v, %v", res, err)
+	}
+	f.expectCancelled(t)
+	if f.h.Server.HardGraceRunning() {
+		t.Fatal("countdown still running after the override")
+	}
+
+	// Spend since the override stays under the $6 limit, so only the reload
+	// lowering it to $5 reaches it.
+	f.h.Server.RecordSpend("more", 5.5)
+	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 5))
+	reload(t, f.h)
+	if n := f.waitBanners(graceStartTitle, 2); n != 2 {
+		t.Errorf("start banners = %d, want a second one for the fresh countdown", n)
+	}
+	if got := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt; !got.After(stopAt) {
+		t.Errorf("stop time = %v, want a fresh deadline after %v", got, stopAt)
+	}
+}
+
+// Seam: grace expiry racing frequent budget polls sends no hard-limit chat
+// notice, and stops the agents once.
+func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
+	var mu sync.Mutex
+	var bodies []string
+	hook := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+	}))
+	t.Cleanup(hook.Close)
+	f := startGraceServer(t, 300*time.Millisecond, func(c *server.Config) {
+		c.BudgetPollInterval = time.Millisecond
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL,
+			GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: 20 * time.Millisecond}
+	})
+	f.h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return 0, false })
+	f.lowerBelowSpend(t)
+
+	const done = "gx: 1 agents stopped — hard budget limit reached."
+	time.Sleep(300 * time.Millisecond) // the countdown ends
+	if !f.hasBanner(done) {
+		t.Fatalf("banners = %+v, want the done banner", f.h.Banners.Sent())
+	}
+	time.Sleep(300 * time.Millisecond) // a chat batch would flush by now
+	if n := f.countBanners(done); n != 1 {
+		t.Errorf("done banners = %d, want 1", n)
+	}
+	if kind := f.parkKind(t); kind != string(events.BudgetKilled) {
+		t.Errorf("park kind = %q, want budget-killed", kind)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	for _, b := range bodies {
+		if strings.Contains(b, "hard limit") {
+			t.Errorf("chat got a hard-limit notice: %s", b)
+		}
+	}
+}
+
+// Seam: a watcher reload still in flight at shutdown cannot leave a countdown
+// running after Serve returns.
+func TestHardLimitGrace_ShutdownStopsCountdownAfterWatcher(t *testing.T) {
+	f := startGraceServer(t, time.Hour, func(c *server.Config) {
+		c.WatchConfig = true
+		c.ConfigWatchDebounce = 10 * time.Millisecond
+	})
+	unlock := f.h.Server.LockReload()
+	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 6))
+	time.Sleep(200 * time.Millisecond) // the watcher's reload now waits on the lock
+	stopped := make(chan error, 1)
+	go func() { stopped <- f.h.Stop() }()
+	time.Sleep(200 * time.Millisecond) // shutdown now waits on the watcher
+	unlock()
+	if err := <-stopped; err != nil {
+		t.Fatal(err)
+	}
+	if f.h.Server.HardGraceRunning() {
+		t.Error("countdown still running after shutdown")
+	}
 }
 
 // Seam: a second lowering reload during the countdown neither restarts it nor

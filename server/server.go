@@ -566,14 +566,15 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Stop claiming, let a land in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
 	stopFresh()
-	s.stopHardGrace()
 	<-freshDone
 	<-herdrDone
 	<-claimDone
 	<-pruneDone
 	<-budgetDone
 	<-gatesDone
+	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()
+	s.stopHardGrace()
 	timeout := s.cfg.LandStopTimeout
 	if timeout <= 0 {
 		timeout = DefaultLandStopTimeout

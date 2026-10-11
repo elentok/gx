@@ -74,30 +74,40 @@ func (s *Server) stopHardGrace() bool {
 }
 
 // endHardGrace lifts the hold and checks again: spend still at the hard limit
-// latches it and stops agents the way spend crossing it does.
+// latches it and stops agents the way spend crossing it does. The reload lock
+// keeps a lowering reload from starting a new countdown between the generation
+// check and the latch; it is let go before the stop, which sleeps.
 func (s *Server) endHardGrace(gen int) {
+	s.reloadMu.Lock()
 	g := &s.hardGrace
 	g.mu.Lock()
 	if g.timer == nil || g.gen != gen {
 		g.mu.Unlock()
+		s.reloadMu.Unlock()
 		return
 	}
 	g.timer, g.until = nil, time.Time{}
 	g.mu.Unlock()
 
 	now := time.Now()
+	// The banners below are this stop's report, so the hard notice is marked
+	// sent before the hold lifts: a budget poll in between must not send one.
+	s.budgetNotes.markHard()
 	s.ledger.releaseHold()
-	if !s.budgetLatches(now).Hard {
-		s.events.publish(EventQueueChanged, "")
+	hard := s.budgetLatches(now).Hard
+	if hard {
+		if err := s.ledger.save(now); err != nil {
+			s.log.Error("save budget ledger", "err", err)
+		}
+	} else {
+		s.rearmBudgetNotes(s.budgetStatus(now))
+	}
+	s.reloadMu.Unlock()
+	s.events.publish(EventQueueChanged, "")
+	if !hard {
 		s.kickRunner()
 		return
 	}
-	if err := s.ledger.save(now); err != nil {
-		s.log.Error("save budget ledger", "err", err)
-	}
-	// The banners below are this stop's report; no chat notice follows it.
-	s.budgetNotes.markHard()
-	s.events.publish(EventQueueChanged, "")
 	n := s.killForBudget(now)
 	s.banner(EventLevelError, fmt.Sprintf("gx: %d agents stopped — hard budget limit reached.", n), "")
 }

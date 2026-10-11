@@ -13,6 +13,16 @@ import (
 
 var RecoveryState = recoveryState
 
+// LockReload holds the reload lock until the returned func runs, so a test can
+// keep a reload in flight.
+func (s *Server) LockReload() (unlock func()) {
+	s.reloadMu.Lock()
+	return s.reloadMu.Unlock
+}
+
+// HardGraceRunning reports whether a hard-limit countdown is running.
+func (s *Server) HardGraceRunning() bool { return !s.hardGrace.deadline().IsZero() }
+
 // PutRun records a launched iteration without launching one, so tests can hold
 // a run live as long as they need.
 func (s *Server) PutRun(root string, r Run) { s.registry.put(trackedRun{Run: r, Root: root}) }
