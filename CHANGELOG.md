@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.32.4 - 2026-10-11
+
+- Added `gx evolve`, a retrospective workflow that turns finished work into follow-up tickets:
+  - `gx evolve inputs` writes per-session transcript digests and a flag table. `gx evolve run` and `skip` share a maintainer lock. `gx evolve all` catches up on every completed epic that has not been evolved.
+  - A retro is submitted automatically when a loop epic completes and when a ticket is land-parked or land-errored. Server recovery follow-ups are filed in the follow-up queue. The retro'd epic is stamped when its evolve one-off finishes.
+  - `gx evolve export` writes follow-ups to a ticket-only `gx outbox` project in contrib, with the source project name in the metadata block. A reminder lists follow-ups that were not exported yet.
+  - Codex evolve launches get follow-ups and gx project context.
+  - New settings for evolve. Subagent transcripts now count in session cost.
+- Added tracker commands for follow-ups and epics:
+  - `gx tickets follow-up add` enforces the follow-up rules, and `gx tickets epic add` adds an epic.
+  - `gx tickets move` renumbers a ticket, rewrites its own refs and inbound refs, and validates the target project. It refuses queued or live tickets.
+  - `gx tickets close` cancels a follow-up with a resolution. It refuses queued or live tickets too.
+  - `add`, `show`, `set` and `section` work across projects. `add` takes a category, and `set` and `section` accept an epic address.
+  - The ticket model gained `category`, the `evolve` type, `exported_at` and epic evolve fields. The server stamps an epic's `completed_at` when its root completes.
+- Added skills to the bundle: `gx-evolve`, `gx-resolve-follow-ups` and `gx-design`. The tracker contract now documents Follow-ups and the epic verbs.
+- Changed `gx project add` to print a `set-path` hint. `set-path` now clears `vcs none`.
+- Changed the default Claude model to the `sonnet` alias.
+- Renamed `CONTEXT.md` to `GLOSSARY.md` and updated live references.
+- Fixed a flaky global-cap runner test in the server.
+- CI: raised the `go test` timeout to 10 minutes.
+- Docs: added the gx-evolve spec and the follow-up terms.
+
 ## v0.32.3 - 2026-10-10
 
 - Fixed a ticket that blocks on a ticket in another epic: an epic can now complete, because cross-epic blockers are resolved when gx checks whether the epic is done.
