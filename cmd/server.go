@@ -17,8 +17,6 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
@@ -150,17 +148,12 @@ func runServer(ctx context.Context) error {
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
 	}
-	srv, err := server.New(server.Config{StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, TicketStore: cfg.TicketStore.Path, TCPAddr: tcpAddr, TabEnv: cfg.Server.TabEnv, AutoMergeEpic: cfg.Server.AutoMergeEpic, Evolve: cfg.Evolve, MaxAgents: cfg.ExecutionQueue.MaxAgents, MaxAgentsPerRoot: cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
-		BudgetSoftLimit: cfg.Budget.SoftLimit, BudgetHardLimit: cfg.Budget.HardLimit,
-		LogRetention:              cfg.Server.LogRetention,
-		Recovery:                  recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
-		RecoverySettings:          cfg.Recovery,
-		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
-		StoreCommitDebounce:       time.Duration(cfg.TicketStore.CommitDebounce) * time.Second, StorePushRemote: cfg.TicketStore.PushRemote,
-		Chat: ralphloop.ServerChatConfig{
-			TelegramBotToken: cfg.Notifications.Telegram.BotToken, TelegramChatID: cfg.Notifications.Telegram.ChatID,
-			SlackWebhookURL: cfg.Notifications.Slack.WebhookURL,
-		}})
+	configPath, err := config.FilePath()
+	if err != nil {
+		return err
+	}
+	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, TCPAddr: tcpAddr})
 	if err != nil {
 		return err
 	}

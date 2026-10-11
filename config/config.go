@@ -153,7 +153,16 @@ func Load() (Config, error) {
 		}
 		return cfg, fmt.Errorf("read config %s: %w", path, err)
 	}
+	cfg, err = Parse(data)
+	if err != nil {
+		return cfg, fmt.Errorf("config %s: %w", path, err)
+	}
+	return cfg, nil
+}
 
+// Parse decodes config file bytes over the defaults and validates them.
+func Parse(data []byte) (Config, error) {
+	cfg := Default()
 	var raw struct {
 		UseNerdFontIcons      *bool             `json:"use-nerdfont-icons"`
 		ImageDiffs            *bool             `json:"image-diffs"`
@@ -221,7 +230,7 @@ func Load() (Config, error) {
 		} `json:"recovery"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return cfg, fmt.Errorf("parse config %s: %w", path, err)
+		return cfg, fmt.Errorf("parse: %w", err)
 	}
 	if raw.UseNerdFontIcons != nil {
 		cfg.UseNerdFontIcons = *raw.UseNerdFontIcons
@@ -340,7 +349,7 @@ func Load() (Config, error) {
 	}
 	if raw.Evolve != nil {
 		if !validEvolveMode(*raw.Evolve) {
-			return cfg, fmt.Errorf("config %s: evolve must be off, maintainer or contributor, got %q", path, *raw.Evolve)
+			return cfg, fmt.Errorf("evolve must be off, maintainer or contributor, got %q", *raw.Evolve)
 		}
 		cfg.Evolve = *raw.Evolve
 	}

@@ -40,7 +40,7 @@ func TestExtraUsage_OffOrSuppressedStaysQuiet(t *testing.T) {
 		t.Fatal("disabled: warned")
 	}
 	s.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateEnabled }
-	s.cfg.SuppressExtraUsageWarning = true
+	s.settings.Store(&Settings{SuppressExtraUsageWarning: true})
 	if s.checkExtraUsage(time.Now()) {
 		t.Fatal("suppressed: warned")
 	}

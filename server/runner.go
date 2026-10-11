@@ -216,8 +216,8 @@ func (s *Server) claimNext() {
 
 // perRootLimit is how many agents one root may run at once.
 func (s *Server) perRootLimit() int {
-	if s.cfg.MaxAgentsPerRoot > 0 {
-		return s.cfg.MaxAgentsPerRoot
+	if n := s.settings.Load().MaxAgentsPerRoot; n > 0 {
+		return n
 	}
 	return config.DefaultExecutionQueueConfig().MaxConcurrentTicketsPerEpic
 }
@@ -239,8 +239,8 @@ func (s *Server) projectAtCap(project string) (running, limit int, atCap bool) {
 }
 
 func (s *Server) concurrencyLimit() int {
-	if s.cfg.MaxAgents > 0 {
-		return s.cfg.MaxAgents
+	if n := s.settings.Load().MaxAgents; n > 0 {
+		return n
 	}
 	return config.DefaultExecutionQueueConfig().MaxAgents
 }
@@ -648,7 +648,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		if err := tickets.StampEpicFields(e.Path, map[string]any{"completed_at": time.Now().UTC()}); err != nil {
 			s.log.Warn("stamp epic completed_at", "root", root, "err", err)
 		}
-		if s.cfg.AutoMergeEpic {
+		if s.settings.Load().AutoMergeEpic {
 			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
 				s.log.Warn("land root", "root", root, "err", err)
 				s.events.publish(EventIterationFailed, root.String())
@@ -693,7 +693,7 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ti
 		s.log.Warn("retro hook: read project file", "root", root, "err", err)
 		return
 	}
-	mode := config.Config{Evolve: s.cfg.Evolve}.EvolveMode(pf)
+	mode := config.Config{Evolve: s.settings.Load().Evolve}.EvolveMode(pf)
 	if mode == config.EvolveOff || mode == "" {
 		return
 	}
@@ -801,7 +801,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, t tickets.T
 		Cwd:   cwd,
 		Kind:  agentrunner.Kind(agent),
 		Args:  ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", "", extraDirs...),
-		Env:   s.cfg.TabEnv,
+		Env:   s.settings.Load().TabEnv,
 	}, launchPrompt(agent, skill, note, ticket.String()))
 	if err != nil {
 		return Run{}, err

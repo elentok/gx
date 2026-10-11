@@ -58,6 +58,7 @@ const ViaDirect = "direct"
 // server and a direct run still exclude each other.
 func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult, error) {
 	s := &Server{cfg: Config{TicketStore: ticketStore}}
+	s.settings.Store(&Settings{})
 	var do func(RepairRequest) (RepairResult, error)
 	switch verb {
 	case "land":

@@ -81,11 +81,12 @@ func (p *recoveryPlan) decide(f recovery.Failure, diagnose bool) bool {
 
 // planRecovery reports the recovery a failure would get, if any.
 func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
-	if !s.cfg.Recovery.Enabled || !f.Triggers() {
+	catalog := s.settings.Load().Recovery
+	if !catalog.Enabled || !f.Triggers() {
 		return recoveryPlan{}, false
 	}
 	if f.DiagnosisOnly() {
-		return s.planEpicRecovery(f)
+		return s.planEpicRecovery(f, catalog)
 	}
 	ref, ok, err := s.findTicket(f.Address)
 	// An investigate ticket's own failure is a person's to handle, never another
@@ -94,7 +95,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 		return recoveryPlan{}, false
 	}
 	log := s.ticketEvents(ref, f)
-	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
+	entry, matched := catalog.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
 	if !plan.decide(f, false) {
 		return recoveryPlan{}, false
@@ -106,7 +107,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 // failure, addressed by its root: no rule remedy runs on it, so a match only
 // names the entry the investigation is told about. Its run-log events are the
 // epic's own, with no ticket.
-func (s *Server) planEpicRecovery(f recovery.Failure) (recoveryPlan, bool) {
+func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) (recoveryPlan, bool) {
 	root, err := parseRootRef(f.Address)
 	if err != nil {
 		return recoveryPlan{}, false
@@ -117,7 +118,7 @@ func (s *Server) planEpicRecovery(f recovery.Failure) (recoveryPlan, bool) {
 	}
 	ref := ticketRef{addr: tickets.Address{Project: root.Project, Epic: root.Epic}, projectDir: projectDir, repo: repo}
 	log := s.ticketEvents(ref, f)
-	entry, matched := s.cfg.Recovery.Match(failureSequence(log, f))
+	entry, matched := catalog.Match(failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
 	return plan, plan.decide(f, true)
 }
@@ -222,7 +223,7 @@ func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, ki
 		})
 		return false
 	}
-	s.parkHold.hold(f.Address, s.cfg.RecoverySettings.NotifyHold, func() {
+	s.parkHold.hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
 		s.events.publish(EventTicketChanged, f.Address)
 		s.notifyPark(addr, ticketPath, kind, reason)
 	})

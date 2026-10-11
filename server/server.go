@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -50,16 +51,86 @@ type Handshake struct {
 	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
 }
 
-type Config struct {
-	StateDir    string
-	Build       string
-	TicketStore string   // ticket-store root; kept fresh by watch + poll
-	TabEnv      []string // KEY=VALUE entries set on each iteration tab
+// Settings are the Config fields a config reload may change. The server reads
+// them through an atomic snapshot (Server.settings), never from Config.
+type Settings struct {
+	TabEnv []string // KEY=VALUE entries set on each iteration tab
 	// AutoMergeEpic merges a finished epic's branch into its target; off leaves
 	// the merge to gx-merge.
 	AutoMergeEpic bool
 	// Evolve is the global evolve mode (config.Evolve*); empty means off.
 	Evolve string
+
+	// LogRetention is how long a headless agent's logs are kept after its last
+	// activity; zero means nativerunner.DefaultLogRetention.
+	LogRetention time.Duration
+
+	// BudgetSoftLimit and BudgetHardLimit are config.Budget's daily limits in
+	// dollars, reported in the budget status; zero means off.
+	BudgetSoftLimit float64
+	BudgetHardLimit float64
+
+	// Recovery is the catalog with the user's kill switch and disables applied.
+	// The zero value is off.
+	Recovery recovery.Catalog
+	// RecoverySettings is the loaded config recovery block, defaults applied.
+	// An empty FollowUps means DefaultFollowUps; a zero NotifyHold sends a
+	// park's chat message without waiting for recovery.
+	RecoverySettings config.RecoveryConfig
+
+	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
+	// A zero debounce means 60s.
+	StoreCommitDebounce time.Duration
+	StorePushRemote     string
+
+	// MaxAgents caps live agents across all projects (config
+	// execution-queue.max-agents); zero means the config default.
+	MaxAgents int
+	// MaxAgentsPerRoot caps live agents of one root (config
+	// execution-queue.max-agents-per-epic). Zero means the default.
+	MaxAgentsPerRoot int
+
+	// Chat names the chat destinations the server notifies; empty means none.
+	Chat ralphloop.ServerChatConfig
+
+	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
+	SuppressExtraUsageWarning bool
+}
+
+// SettingsFromConfig maps the user config to the server's reloadable
+// settings. Startup and reload both use it, so the two never disagree.
+func SettingsFromConfig(cfg config.Config) Settings {
+	return Settings{
+		TabEnv:              cfg.Server.TabEnv,
+		AutoMergeEpic:       cfg.Server.AutoMergeEpic,
+		Evolve:              cfg.Evolve,
+		LogRetention:        cfg.Server.LogRetention,
+		BudgetSoftLimit:     cfg.Budget.SoftLimit,
+		BudgetHardLimit:     cfg.Budget.HardLimit,
+		Recovery:            recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
+		RecoverySettings:    cfg.Recovery,
+		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second,
+		StorePushRemote:     cfg.TicketStore.PushRemote,
+		MaxAgents:           cfg.ExecutionQueue.MaxAgents,
+		MaxAgentsPerRoot:    cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
+		Chat: ralphloop.ServerChatConfig{
+			TelegramBotToken: cfg.Notifications.Telegram.BotToken,
+			TelegramChatID:   cfg.Notifications.Telegram.ChatID,
+			SlackWebhookURL:  cfg.Notifications.Slack.WebhookURL,
+		},
+		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
+	}
+}
+
+type Config struct {
+	Settings
+
+	StateDir    string
+	Build       string
+	TicketStore string // ticket-store root; kept fresh by watch + poll
+	// ConfigPath is the config file a reload reads; empty means reload is
+	// unavailable.
+	ConfigPath string
 
 	PollInterval time.Duration // zero means the default
 	DisableWatch bool          // poll only
@@ -78,53 +149,20 @@ type Config struct {
 	// Runner still answers host health and any project RunnerFor returns nil for.
 	RunnerFor func(project string) agentrunner.Runner
 
-	// LogRetention is how long a headless agent's logs are kept after its last
-	// activity; zero means nativerunner.DefaultLogRetention.
-	LogRetention time.Duration
-
 	BudgetPollInterval time.Duration // zero means the default
-
-	// BudgetSoftLimit and BudgetHardLimit are config.Budget's daily limits in
-	// dollars, reported in the budget status; zero means off.
-	BudgetSoftLimit float64
-	BudgetHardLimit float64
 
 	BudgetKillGrace time.Duration // wait between ctrl+c and closing a pane; zero means the default
 
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
-	// Recovery is the catalog with the user's kill switch and disables applied.
-	// The zero value is off.
-	Recovery recovery.Catalog
-	// RecoverySettings is the loaded config recovery block, defaults applied.
-	// An empty FollowUps means DefaultFollowUps; a zero NotifyHold sends a
-	// park's chat message without waiting for recovery.
-	RecoverySettings config.RecoveryConfig
-
-	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
-	// A zero debounce means 60s.
-	StoreCommitDebounce time.Duration
-	StorePushRemote     string
 	// LandStopTimeout bounds how long a stop waits for a land in flight; zero
 	// means DefaultLandStopTimeout.
 	LandStopTimeout time.Duration
-
-	// MaxAgents caps live agents across all projects (config
-	// execution-queue.max-agents); zero means the config default.
-	MaxAgents int
-	// MaxAgentsPerRoot caps live agents of one root (config
-	// execution-queue.max-agents-per-epic). Zero means the default.
-	MaxAgentsPerRoot int
 
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string
 
-	// Chat names the chat destinations the server notifies; empty means none.
-	Chat ralphloop.ServerChatConfig
-
-	// SuppressExtraUsageWarning is config subscription.suppress-extra-usage-warning.
-	SuppressExtraUsageWarning bool
 	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
 	ExtraUsageCheck func() subscription.State
 }
@@ -134,14 +172,17 @@ const DefaultTCPAddr = "127.0.0.1:7421"
 
 // Server owns the state-dir lock and the listening socket.
 type Server struct {
-	cfg  Config
-	lock *serverLock
-	ln   net.Listener
-	tcp  net.Listener // nil unless Config.TCPAddr is set
-	http *http.Server
-	logf *rotatingFile
-	log  *slog.Logger
-	idx  *index
+	cfg Config
+	// settings is the live copy of cfg.Settings. A reader loads it once per
+	// decision; a reload swaps in a new value and never mutates the old one.
+	settings atomic.Pointer[Settings]
+	lock     *serverLock
+	ln       net.Listener
+	tcp      net.Listener // nil unless Config.TCPAddr is set
+	http     *http.Server
+	logf     *rotatingFile
+	log      *slog.Logger
+	idx      *index
 
 	queued      *queueStore
 	pause       *pauseState
@@ -280,6 +321,7 @@ func New(cfg Config) (*Server, error) {
 		events: events,
 		kick:   make(chan struct{}, 1),
 	}
+	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()
 	for _, r := range routeTable {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
@@ -521,13 +563,14 @@ func (s *Server) startStoreCommits() (stop func(), err error) {
 	if s.cfg.TicketStore == "" {
 		return func() {}, nil
 	}
-	debounce := s.cfg.StoreCommitDebounce
+	set := s.settings.Load()
+	debounce := set.StoreCommitDebounce
 	if debounce <= 0 {
 		debounce = time.Duration(config.DefaultCommitDebounceSeconds) * time.Second
 	}
 	loop, err := storecommit.StartWith(s.cfg.TicketStore, storecommit.Options{
 		Debounce:   debounce,
-		PushRemote: s.cfg.StorePushRemote,
+		PushRemote: set.StorePushRemote,
 		OnError:    func(err error) { s.log.Warn("store push failed", "err", err) },
 	})
 	if err != nil {

@@ -25,8 +25,8 @@ type reattacher interface {
 }
 
 func (s *Server) logRetention() time.Duration {
-	if s.cfg.LogRetention > 0 {
-		return s.cfg.LogRetention
+	if d := s.settings.Load().LogRetention; d > 0 {
+		return d
 	}
 	return nativerunner.DefaultLogRetention
 }

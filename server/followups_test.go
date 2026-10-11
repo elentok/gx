@@ -40,7 +40,8 @@ func landedInvestigation(t *testing.T, body string, followUps string) (*Server, 
 	if err := os.WriteFile(path, out, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{cfg: Config{TicketStore: store, RecoverySettings: config.RecoveryConfig{FollowUps: followUps}}, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	s := &Server{cfg: Config{TicketStore: store}, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	s.settings.Store(&Settings{RecoverySettings: config.RecoveryConfig{FollowUps: followUps}})
 	return s, store, tickets.Address{Project: "proj", Epic: "epic-a", ID: "02"}, path
 }
 

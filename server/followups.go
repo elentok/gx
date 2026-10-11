@@ -106,7 +106,7 @@ func dedupeLine(key string) string { return "Dedupe key: " + key }
 // followUpsEpicPath is the follow-ups epic dir that receives follow-ups from
 // fromProject's tickets.
 func (s *Server) followUpsEpicPath(fromProject string) (string, error) {
-	target := s.cfg.RecoverySettings.FollowUps
+	target := s.settings.Load().RecoverySettings.FollowUps
 	if target == "" {
 		target = DefaultFollowUps
 	}

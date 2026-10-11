@@ -29,7 +29,7 @@ func (n *extraUsageNotes) firstToday(day string) bool {
 
 // extraUsageOn re-reads the subscription state; a suppressed warning counts as off.
 func (s *Server) extraUsageOn() bool {
-	if s.cfg.SuppressExtraUsageWarning {
+	if s.settings.Load().SuppressExtraUsageWarning {
 		return false
 	}
 	check := s.cfg.ExtraUsageCheck
