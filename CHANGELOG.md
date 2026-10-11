@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.32.6 - 2026-10-11
+
+- Fixed the budget hard limit:
+  - A stopped run now always parks budget-killed, exactly once. Before, the run's own finish raced the kill and re-parked it as zero-commit or iteration-error. Auto-recovery then relaunched it, and two park notifications were sent.
+  - Agents that go quiet on ctrl+c are now closed and parked budget-killed too. Their partial work no longer lands.
+  - A parked ticket's pane that a nudge sets working again (e.g. recovery R7) is now metered against the budget and stopped by the hard limit.
+- Fixed relaunch and nudge spending past the daily budget. Once the soft limit is reached they are refused with `budget-limit`. This covers recovery remedies and agent/CLI verbs. `gx budget override` gets past it.
+- Fixed launch discarding the agent lookup error. It is now logged before start.
+- Changed `make test` to skip the real-herdr e2e tests unless `GX_E2E=1` is set; `make e2e` sets it.
+
 ## v0.32.5 - 2026-10-11
 
 - Fixed the finish gate releasing too early:
