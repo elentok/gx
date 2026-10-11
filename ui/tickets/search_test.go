@@ -339,3 +339,69 @@ func TestSearch_NAndShiftNCycleMatches(t *testing.T) {
 		t.Fatalf("expected shift+n to move selection back to previous match")
 	}
 }
+
+func TestSearch_MatchesEpicRowsInRowOrderWithTickets(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "widget-queue", "01-widget-polish.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "widget-queue", "02-other.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "unrelated", "01-nothing.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	m.search.Start("Widget")
+	m.recomputeSearchMatches()
+
+	if m.search.MatchesCount() != 2 {
+		t.Fatalf("expected the epic row and one ticket to match, got %d", m.search.MatchesCount())
+	}
+	entries := m.sidebarTree.Entries()
+	first, _ := m.search.Match(0)
+	second, _ := m.search.Match(1)
+	if first.DataIndex >= second.DataIndex {
+		t.Fatalf("expected matches in row order, got %d then %d", first.DataIndex, second.DataIndex)
+	}
+	if e := entries[first.DataIndex].Value; e.kind != nodeEpic || m.epics[e.epicIdx].Name != "widget-queue" {
+		t.Fatalf("expected first match to be the widget-queue epic row, got %+v", e)
+	}
+	if e := entries[second.DataIndex].Value; e.kind != nodeTicket || m.epics[e.epicIdx].Tickets[e.ticketIdx].Title != "Widget polish" {
+		t.Fatalf("expected second match to be the widget-polish ticket row, got %+v", e)
+	}
+
+	dimPrefix := strings.SplitN(ui.StyleDim.Render("PROBE"), "PROBE", 2)[0]
+	if line := m.renderEpicRow(m.epics[entries[first.DataIndex].Value.epicIdx]); strings.Contains(line, dimPrefix) {
+		t.Fatalf("expected matched epic row undimmed, got: %q", line)
+	}
+}
+
+func TestSearch_EpicMatchExpandsClosedSectionButNotTheEpic(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "closed-epic", "01-done.md", "Status: done\n\nBody.\n")
+	writeTicket(t, root, "open-epic", "01-other.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+
+	m.search.Start("closed-epic")
+	m.recomputeSearchMatches()
+
+	if m.search.MatchesCount() != 1 {
+		t.Fatalf("expected the closed epic row to match, got %d", m.search.MatchesCount())
+	}
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		t.Fatalf("expected the Closed section to auto-expand for an epic match")
+	}
+	closed := m.epics[0]
+	if closed.Name != "closed-epic" {
+		t.Fatalf("expected closed-epic at index 0, got %q", closed.Name)
+	}
+	if !m.sidebarTree.CollapsedIDs()[closed.Path] {
+		t.Fatalf("expected an epic-only match to leave the epic itself collapsed")
+	}
+}

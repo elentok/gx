@@ -1615,6 +1615,37 @@ func TestQueueSearch_TypedCharactersFilterAndHighlight(t *testing.T) {
 	}
 }
 
+func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-alpha-tweak.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-other.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-alpha-tweak.md"): true,
+		ticketPath(root, "beta", "01-other.md"):        true,
+	}
+
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+
+	for _, r := range "/alpha" {
+		updated, _ := m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		m = updated.(QueueModel)
+	}
+
+	if m.search.MatchesCount() != 2 {
+		t.Fatalf("expected the alpha epic header and its ticket to match, got %d", m.search.MatchesCount())
+	}
+	entries := m.queueTree.Entries()
+	first, _ := m.search.Match(0)
+	second, _ := m.search.Match(1)
+	if e := entries[first.DataIndex].Value; e.kind != nodeEpicStatus || e.epic.Name != "alpha" {
+		t.Fatalf("expected first match to be the alpha epic header, got %+v", e)
+	}
+	if e := entries[second.DataIndex].Value; e.kind != nodeQueueTicket || e.ticket.ticket.Title != "Alpha tweak" {
+		t.Fatalf("expected second match to be the alpha-tweak ticket, got %+v", e)
+	}
+}
+
 func TestQueueSearch_EscExitsSearchMode(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

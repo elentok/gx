@@ -16,13 +16,12 @@ type ticketRef struct {
 // recomputeSearchMatches matches against the underlying epic/ticket data
 // directly (m.epics), not m.sidebarTree.Entries(), so a match inside a
 // collapsed epic or a collapsed Closed section (see deriveCollapsedSidebar)
-// is still found: case-insensitive substring over each ticket's title
-// concatenated with its rendered status word. Any epic containing a match is
-// auto-expanded first, along with its containing section (via
-// m.sidebarTree's collapsed IDs), so the match's eventual DataIndex (looked
-// up post-expansion, post-rebuild) lands on an entry that's actually
-// rendered. Epic/section header rows never match. A query matching nothing
-// leaves collapse state untouched.
+// is still found: ticketMatchesQuery for ticket rows, epicMatchesQuery for
+// epic rows. Any epic containing a match is auto-expanded first, along with
+// its containing section (via m.sidebarTree's collapsed IDs), so the match's
+// eventual DataIndex (looked up post-expansion, post-rebuild) lands on an
+// entry that's actually rendered. Section header rows never match. A query
+// matching nothing leaves collapse state untouched.
 func (m *Model) recomputeSearchMatches() {
 	q := strings.ToLower(strings.TrimSpace(m.search.Query()))
 	if q == "" {
@@ -40,17 +39,21 @@ func (m *Model) recomputeSearchMatches() {
 		return
 	}
 
-	var matchedRefs []ticketRef
+	// An epic row is keyed as ticketRef{epicIdx, -1}, matching its
+	// sidebarNode's ticketIdx.
+	wanted := map[ticketRef]bool{}
 	for epicIdx, epic := range m.epics {
+		if epicMatchesQuery(epic, q) {
+			wanted[ticketRef{epicIdx: epicIdx, ticketIdx: -1}] = true
+		}
 		for ticketIdx, t := range epic.Tickets {
-			text := strings.ToLower(t.Title + " " + epic.RenderedStatus(t).Word())
-			if strings.Contains(text, q) {
-				matchedRefs = append(matchedRefs, ticketRef{epicIdx: epicIdx, ticketIdx: ticketIdx})
+			if ticketMatchesQuery(epic, t, q) {
+				wanted[ticketRef{epicIdx: epicIdx, ticketIdx: ticketIdx}] = true
 			}
 		}
 	}
 
-	if len(matchedRefs) == 0 {
+	if len(wanted) == 0 {
 		m.search.SetMatches(nil)
 		m.sidebarTree.Search().SetPassiveResults("", nil)
 		m.refreshSidebarCollapse()
@@ -58,10 +61,6 @@ func (m *Model) recomputeSearchMatches() {
 		return
 	}
 
-	wanted := make(map[ticketRef]bool, len(matchedRefs))
-	for _, ref := range matchedRefs {
-		wanted[ref] = true
-	}
 	// deriveCollapsedSidebar (via refreshSidebarCollapse) computes the same
 	// per-epic/section auto-expand this loop used to write directly into
 	// m.sidebarTree's collapsed map — but transiently, off m.search.Query()
@@ -69,9 +68,11 @@ func (m *Model) recomputeSearchMatches() {
 	m.refreshSidebarCollapse()
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 
-	matches := make([]search.Match, 0, len(matchedRefs))
+	matches := make([]search.Match, 0, len(wanted))
 	for i, e := range m.sidebarTree.Entries() {
-		if e.Value.kind != nodeTicket {
+		// Archived nodes index m.archivedEpics, not m.epics, so their
+		// epicIdx would collide with an unrelated wanted ref.
+		if (e.Value.kind != nodeTicket && e.Value.kind != nodeEpic) || e.Value.archived {
 			continue
 		}
 		if wanted[ticketRef{epicIdx: e.Value.epicIdx, ticketIdx: e.Value.ticketIdx}] {

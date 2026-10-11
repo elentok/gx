@@ -386,13 +386,26 @@ func closedEpicDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) map[
 	return defaults
 }
 
+// ticketMatchesQuery is the Tickets tab's search rule for a ticket row:
+// case-insensitive substring over its title plus rendered status word. q
+// must already be lowercased and trimmed.
+func ticketMatchesQuery(epic tickets.Epic, t tickets.Ticket, q string) bool {
+	return strings.Contains(strings.ToLower(t.Title+" "+epic.RenderedStatus(t).Word()), q)
+}
+
+// epicMatchesQuery is the search rule for an epic row, shared by both tabs.
+// An epic's Name is both its slug and its displayed title. q must already be
+// lowercased and trimmed.
+func epicMatchesQuery(epic tickets.Epic, q string) bool {
+	return strings.Contains(strings.ToLower(epic.Name), q)
+}
+
 // searchExpandOverrides is the transient half of the sidebar's collapse
-// layering: every epic containing a query match (recomputeSearchMatches'
-// own matching rule, duplicated here as a pure function so
-// deriveCollapsedSidebar can call it without a *Model) reports its own path
-// and containing section as wanting to render expanded. Declared fresh from
-// epics/query every call — nil once query is empty, so it carries no state
-// of its own between searches.
+// layering: every epic containing a ticket match reports its own path and
+// containing section as wanting to render expanded, and an epic whose own
+// row matches reports just its section (so the row is reachable without
+// unfolding its tickets). Declared fresh from epics/query every call — nil
+// once query is empty, so it carries no state of its own between searches.
 func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
@@ -400,21 +413,22 @@ func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 	}
 	var overrides map[string]bool
 	for _, epic := range epics {
-		matched := false
+		ticketMatched := false
 		for _, t := range epic.Tickets {
-			text := strings.ToLower(t.Title + " " + epic.RenderedStatus(t).Word())
-			if strings.Contains(text, q) {
-				matched = true
+			if ticketMatchesQuery(epic, t, q) {
+				ticketMatched = true
 				break
 			}
 		}
-		if !matched {
+		if !ticketMatched && !epicMatchesQuery(epic, q) {
 			continue
 		}
 		if overrides == nil {
 			overrides = map[string]bool{}
 		}
-		overrides[epic.Path] = false
+		if ticketMatched {
+			overrides[epic.Path] = false
+		}
 		section := sectionOpen
 		if epic.AllDone() {
 			section = sectionClosed

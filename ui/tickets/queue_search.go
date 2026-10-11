@@ -22,8 +22,9 @@ func (m QueueModel) ModalOpen() bool {
 
 // recomputeQueueSearchMatches rebuilds the match set against the current
 // m.queueTree.Entries() order: case-insensitive substring over each ticket
-// entry's title, mirroring the Tickets tab's recomputeSearchMatches
-// (search.go). Header/separator/error entries never match.
+// entry's title, and epicMatchesQuery for each epic header (status) row,
+// mirroring the Tickets tab's recomputeSearchMatches (search.go).
+// Separator/context/error entries never match.
 func (m *QueueModel) recomputeQueueSearchMatches() {
 	rawQuery := m.search.Query()
 	q := strings.ToLower(strings.TrimSpace(rawQuery))
@@ -35,10 +36,14 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 
 	matches := make([]search.Match, 0)
 	for i, e := range m.queueTree.Entries() {
-		if e.Value.kind != nodeQueueTicket {
-			continue
+		matched := false
+		switch e.Value.kind {
+		case nodeQueueTicket:
+			matched = strings.Contains(strings.ToLower(e.Value.ticket.ticket.Title), q)
+		case nodeEpicStatus:
+			matched = epicMatchesQuery(e.Value.epic, q)
 		}
-		if strings.Contains(strings.ToLower(e.Value.ticket.ticket.Title), q) {
+		if matched {
 			matches = append(matches, search.Match{DataIndex: i})
 		}
 	}
