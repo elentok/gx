@@ -69,6 +69,58 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 	}
 }
 
+func TestReduce_ConfigReloadedResnapshotsUnlessError(t *testing.T) {
+	cases := []struct {
+		level string
+		want  viewmodel.Effect
+	}{
+		{server.EventLevelSuccess, viewmodel.EffectResnapshot},
+		{server.EventLevelWarning, viewmodel.EffectResnapshot},
+		{server.EventLevelError, viewmodel.EffectNone},
+	}
+	for _, c := range cases {
+		t.Run(c.level, func(t *testing.T) {
+			got, eff := snapshot().Reduce(server.Event{Seq: 11, Type: server.EventConfigReloaded, Level: c.level, Message: "m"})
+			if eff != c.want {
+				t.Fatalf("effect = %v, want %v", eff, c.want)
+			}
+			if got.Seq != 11 {
+				t.Fatalf("seq = %d, event not applied", got.Seq)
+			}
+		})
+	}
+}
+
+func TestToastFor(t *testing.T) {
+	cases := []struct {
+		name string
+		ev   server.Event
+		want viewmodel.Toast
+	}{
+		{"iteration parked", server.Event{Type: server.EventIterationParked, Address: "gx:e/01"},
+			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 parked"}},
+		{"ticket parked", server.Event{Type: server.EventTicketParked, Address: "gx:e/01"},
+			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 parked"}},
+		{"reload success", server.Event{Type: server.EventConfigReloaded, Level: server.EventLevelSuccess, Message: "ok"},
+			viewmodel.Toast{Level: server.EventLevelSuccess, Text: "ok"}},
+		{"reload warning", server.Event{Type: server.EventConfigReloaded, Level: server.EventLevelWarning, Message: "warn"},
+			viewmodel.Toast{Level: server.EventLevelWarning, Text: "warn"}},
+		{"reload error", server.Event{Type: server.EventConfigReloaded, Level: server.EventLevelError, Message: "bad"},
+			viewmodel.Toast{Level: server.EventLevelError, Text: "bad"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, ok := viewmodel.ToastFor(c.ev)
+			if !ok || got != c.want {
+				t.Fatalf("ToastFor = %+v, %v; want %+v, true", got, ok, c.want)
+			}
+		})
+	}
+	if _, ok := viewmodel.ToastFor(server.Event{Type: server.EventTicketDone, Address: "gx:e/01"}); ok {
+		t.Fatal("ticket-done should not toast")
+	}
+}
+
 func TestReduce_HerdrAppliedInPlace(t *testing.T) {
 	s, _ := snapshot().Reduce(server.Event{Seq: 11, Type: server.EventHerdrUnavailable})
 	if !s.HerdrUnavailable {

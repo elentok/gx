@@ -107,12 +107,20 @@ func (s State) PendingRowFor(address string) (server.PendingRow, bool) {
 // ToastFor is the toast a live event warrants. Only the caller's event path
 // may use it: a snapshot or a reconnect re-snapshot describes state, not
 // something that just happened, so it must never produce a toast.
-func ToastFor(ev server.Event) (string, bool) {
+func ToastFor(ev server.Event) (Toast, bool) {
 	switch ev.Type {
 	case server.EventIterationParked, server.EventTicketParked:
-		return ev.Address + " parked", true
+		return Toast{Level: server.EventLevelWarning, Text: ev.Address + " parked"}, true
+	case server.EventConfigReloaded:
+		return Toast{Level: ev.Level, Text: ev.Message}, true
 	}
-	return "", false
+	return Toast{}, false
+}
+
+// Toast is a live event's toast text and its server.EventLevel* level.
+type Toast struct {
+	Level string
+	Text  string
 }
 
 // ApplySnapshot replaces the ticket rows and resets Seq. Live iteration state
@@ -171,6 +179,11 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 		return s, EffectNone
 	case server.EventQueueChanged:
 		return s, EffectResnapshot | EffectRefetchQueue
+	case server.EventConfigReloaded:
+		// A failed reload kept the old settings, so there is nothing to refresh.
+		if ev.Level == server.EventLevelError {
+			return s, EffectNone
+		}
 	case server.EventTicketClaimed:
 		s = s.withStatus(ev.Address, statusClaimed).withIteration(ev.Address, IterationClaimed)
 	case server.EventIterationStarted:

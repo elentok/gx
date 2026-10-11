@@ -275,8 +275,8 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		m, effects := m.streamEffects(effect)
 		cmds = append(cmds, effects)
 		// Only an applied event toasts: a replayed duplicate or a gap is not news.
-		if text, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
-			cmds = append(cmds, notify.Warning(text))
+		if toast, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
+			cmds = append(cmds, toastCmd(toast))
 		}
 		m, deliver := m.deliverServerState()
 		return m, tea.Batch(append(cmds, deliver)...), true
@@ -308,6 +308,16 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		return m, deliver, true
 	}
 	return m, nil, false
+}
+
+func toastCmd(t viewmodel.Toast) tea.Cmd {
+	switch t.Level {
+	case server.EventLevelSuccess:
+		return notify.Success(t.Text)
+	case server.EventLevelError:
+		return notify.Error(t.Text)
+	}
+	return notify.Warning(t.Text)
 }
 
 // serverState is the state to hand a page: nil before the first snapshot.
