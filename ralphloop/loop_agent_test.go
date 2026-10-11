@@ -184,6 +184,104 @@ func TestRun_MissingSkill_FailsBeforeClaimingAnyTicket(t *testing.T) {
 	}
 }
 
+func TestRun_SkillPreflight_CoversTypeRoutedSkillsInScope(t *testing.T) {
+	t.Parallel()
+	const (
+		implement = "01-first.md"
+		review    = "02-code-review.md"
+	)
+	implementTicket := "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n"
+	reviewTicket := func(status string) string {
+		return "---\nid: \"02\"\nstatus: " + status + "\ntype: code-review\n---\n# Review\n"
+	}
+	tests := []struct {
+		name      string
+		files     map[string]string
+		ticketIDs []string
+		missing   []string
+		want      []string
+		wantErr   []string
+	}{
+		{
+			name:  "open code-review ticket requires the review skill",
+			files: map[string]string{implement: implementTicket, review: reviewTicket("open")},
+			want:  []string{"implement", codeReviewSkill},
+		},
+		{
+			name:    "missing review skill fails preflight",
+			files:   map[string]string{implement: implementTicket, review: reviewTicket("open")},
+			missing: []string{codeReviewSkill},
+			want:    []string{"implement", codeReviewSkill},
+			wantErr: []string{`claude skill "gx-code-review"`},
+		},
+		{
+			name:  "no code-review ticket preflights only the worker skill",
+			files: map[string]string{implement: implementTicket},
+			want:  []string{"implement"},
+		},
+		{
+			name:  "done code-review ticket does not count",
+			files: map[string]string{implement: implementTicket, review: reviewTicket("done")},
+			want:  []string{"implement"},
+		},
+		{
+			name:      "code-review ticket outside the run scope does not count",
+			files:     map[string]string{implement: implementTicket, review: reviewTicket("open")},
+			ticketIDs: []string{"01"},
+			want:      []string{"implement"},
+		},
+		{
+			name:    "every missing skill is reported",
+			files:   map[string]string{implement: implementTicket, review: reviewTicket("open")},
+			missing: []string{"implement", codeReviewSkill},
+			want:    []string{"implement", codeReviewSkill},
+			wantErr: []string{`claude skill "implement"`, `claude skill "gx-code-review"`},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			scratchDir := writeEpic(t, "my-epic", tc.files)
+			d, _, _ := fakeDeps()
+			var verified []string
+			d.VerifySkill = func(agent AgentKind, skill string) error {
+				verified = append(verified, skill)
+				if slices.Contains(tc.missing, skill) {
+					return errors.New("not installed")
+				}
+				return nil
+			}
+			passedPreflight := false
+			d.WorktreeDir = func(string) (string, error) {
+				passedPreflight = true
+				return "", errors.New("stop after preflight")
+			}
+
+			err := Run(RunOptions{
+				EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
+				TicketIDs: tc.ticketIDs,
+			}, d, noopEventSink{})
+			if !slices.Equal(verified, tc.want) {
+				t.Errorf("VerifySkill() skills = %v, want %v", verified, tc.want)
+			}
+			if len(tc.wantErr) == 0 {
+				if !passedPreflight {
+					t.Errorf("Run() error = %v, want preflight to pass", err)
+				}
+				return
+			}
+			for _, want := range tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), want) {
+					t.Errorf("Run() error = %v, want containing %q", err, want)
+				}
+			}
+			if passedPreflight {
+				t.Error("Run() continued past a failed preflight")
+			}
+		})
+	}
+}
+
 func TestRun_ClaudeDoesNotRunCodexLaunchPreflight(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{

@@ -75,11 +75,7 @@ func runIteration(d Deps, p iterationParams) error {
 	}
 	p.logTicketEventReason(string(events.DepsInstalled), "", "", path, command)
 
-	skill := p.Skill
-	if p.Ticket.IsCodeReview() {
-		skill = codeReviewSkill
-	}
-	prompt := skillPrompt(p.Agent, skill, ticketAddress(p.Ticket))
+	prompt := skillPrompt(p.Agent, launchSkill(p.Ticket, p.Skill), ticketAddress(p.Ticket))
 
 	l, err := startAndPrompt(d.Runner, agentrunner.StartOptions{
 		Label: label,

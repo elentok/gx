@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -65,12 +66,38 @@ const defaultWorkerSkill = "gx-implement"
 
 // codeReviewSkill is the skill launched directly for type: code-review
 // tickets instead of defaultWorkerSkill/RunOptions.Skill (see
-// runIteration). It's launched as its own fresh /command rather than
+// launchSkill). It's launched as its own fresh /command rather than
 // entered from inside a gx-implement session because gx-code-review sets
 // disable-model-invocation: true, which blocks an in-session Skill-tool
 // hand-off but not the harness starting a session with the command
 // already resolved.
 const codeReviewSkill = "gx-code-review"
+
+// launchSkill is the skill an iteration on t starts under: workerSkill,
+// unless t's type routes it to its own skill.
+func launchSkill(t tickets.Ticket, workerSkill string) string {
+	if t.IsCodeReview() {
+		return codeReviewSkill
+	}
+	return workerSkill
+}
+
+// requiredSkills is every skill this run can launch: workerSkill always, plus
+// the type-routed skill of each unfinished in-scope ticket. Done tickets and
+// out-of-scope ones never launch, so a skill only they need must not fail
+// preflight.
+func requiredSkills(epic tickets.Epic, scope RunScope, workerSkill string) []string {
+	skills := []string{workerSkill}
+	for _, t := range epic.Tickets {
+		if !scope.Contains(t, epic) || epic.RenderedStatus(t).Terminal() {
+			continue
+		}
+		if skill := launchSkill(t, workerSkill); !slices.Contains(skills, skill) {
+			skills = append(skills, skill)
+		}
+	}
+	return skills
+}
 
 // AgentKind identifies the coding agent that drives an iteration.
 type AgentKind string
@@ -399,8 +426,14 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 	}
 	if d.VerifySkill != nil {
-		if err := d.VerifySkill(agent, skill); err != nil {
-			return fmt.Errorf("preflighting %s skill %q: %w", agent, skill, err)
+		var errs []error
+		for _, s := range requiredSkills(*initial, scope, skill) {
+			if err := d.VerifySkill(agent, s); err != nil {
+				errs = append(errs, fmt.Errorf("preflighting %s skill %q: %w", agent, s, err))
+			}
+		}
+		if err := errors.Join(errs...); err != nil {
+			return err
 		}
 	}
 
