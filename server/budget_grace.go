@@ -46,9 +46,18 @@ func (s *Server) startHardGrace(now time.Time, limit, spent float64) {
 	g.until = now.Add(grace)
 	g.timer = time.AfterFunc(grace, func() { s.endHardGrace(gen) })
 	g.mu.Unlock()
-	s.banner(EventLevelWarning, "gx: agents stop in 60s", fmt.Sprintf(
+	s.banner(EventLevelWarning, hardGraceTitle(grace), fmt.Sprintf(
 		"New hard budget limit (%s) is below today's spend (%s). %d agents will stop. Raise the limit in config.json or run `gx budget increase` to cancel.",
 		tickets.FormatCost(limit), tickets.FormatCost(spent), len(s.registry.list())))
+}
+
+// hardGraceTitle counts whole-second durations in seconds, as the spec's
+// "60s", where Duration.String would say "1m0s".
+func hardGraceTitle(grace time.Duration) string {
+	if grace%time.Second == 0 {
+		return fmt.Sprintf("gx: agents stop in %ds", int(grace/time.Second))
+	}
+	return "gx: agents stop in " + grace.String()
 }
 
 // cancelHardGrace ends a running countdown once a raise has lifted the hold.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -84,16 +83,16 @@ func TestConfigReload_LoweredSoftLimitLatchesAtNextCheck(t *testing.T) {
 	}
 }
 
-// Seam: a hard limit lowered to or below spend warns and never latches hard,
-// so it stops no agent.
-func TestConfigReload_LoweredHardLimitBelowSpendWarnsWithoutLatching(t *testing.T) {
+// Seam: a hard limit lowered to or below spend reloads without warnings and
+// never latches hard, so it stops no agent.
+func TestConfigReload_LoweredHardLimitBelowSpendDoesNotLatch(t *testing.T) {
 	h, path, store := startBudgetReloadServer(t, 5, 20)
 	h.Server.RecordSpend("spent", 8)
 
 	servertest.WriteConfig(t, path, store, budgetLimits(5, 6))
 	res := reload(t, h)
-	if res.Refused || len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "budget.hard-limit") {
-		t.Fatalf("reload = %+v, want one budget.hard-limit warning", res)
+	if res.Refused || len(res.Warnings) != 0 || !slices.Contains(res.Changed, "budget.hard-limit") {
+		t.Fatalf("reload = %+v, want budget.hard-limit changed with no warnings", res)
 	}
 	h.Server.PollBudget()
 	if st := h.Server.BudgetStatusAt(time.Now()); st.HardLimit != 6 || st.HardLatched {

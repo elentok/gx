@@ -11,7 +11,10 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-var RecoveryState = recoveryState
+var (
+	RecoveryState  = recoveryState
+	HardGraceTitle = hardGraceTitle
+)
 
 // LockReload holds the reload lock until the returned func runs, so a test can
 // keep a reload in flight.

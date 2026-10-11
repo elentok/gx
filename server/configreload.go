@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/tickets"
 )
 
 // ReloadResult is the outcome of one config reload. A refusal is a result
@@ -88,9 +86,7 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 	for _, key := range pending {
 		res.Warnings = append(res.Warnings, "restart needed for "+key)
 	}
-	if warning := s.applyBudgetLimits(*old, next); warning != "" {
-		res.Warnings = append(res.Warnings, warning)
-	}
+	s.applyBudgetLimits(*old, next)
 	var closeRetired func()
 	if next.Chat != old.Chat {
 		closeRetired = s.chat.SetGlobal(next.Chat)
@@ -113,25 +109,23 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 // the last load to the ledger's live limit, then re-evaluates the latches as
 // `gx budget increase` does. Comparing file values, not live ones, keeps a
 // live increase on the field the person did not edit. A lowered hard limit
-// already reached starts the grace countdown and returns a warning; a raise
-// that lifts the hold cancels it.
-func (s *Server) applyBudgetLimits(old, next Settings) string {
+// already reached starts the grace countdown, whose start banner is the only
+// report of it, so the reload's own banner stays a plain one; a raise that
+// lifts the hold cancels it.
+func (s *Server) applyBudgetLimits(old, next Settings) {
 	softChanged := next.BudgetSoftLimit != old.BudgetSoftLimit
 	hardChanged := next.BudgetHardLimit != old.BudgetHardLimit
 	if !softChanged && !hardChanged {
-		return ""
+		return
 	}
 	now := time.Now()
 	soft, hard := s.ledger.limits()
 	if softChanged {
 		soft = next.BudgetSoftLimit
 	}
-	var warning string
 	if hardChanged {
 		held, spent := s.ledger.setLimitsHoldingHard(now, soft, next.BudgetHardLimit)
 		if held {
-			warning = fmt.Sprintf("budget.hard-limit (%s) is at or below today's spend (%s); agents stop when the grace period ends",
-				tickets.FormatCost(next.BudgetHardLimit), tickets.FormatCost(spent))
 			s.startHardGrace(now, next.BudgetHardLimit, spent)
 		}
 	} else {
@@ -143,7 +137,6 @@ func (s *Server) applyBudgetLimits(old, next Settings) string {
 	s.cancelHardGrace()
 	s.rearmBudgetNotes(s.budgetStatus(now))
 	s.events.publish(EventQueueChanged, "")
-	return warning
 }
 
 // reloadableSettings is next with the chat test seams, which are not config

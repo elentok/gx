@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,14 +21,26 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-const graceStartTitle = "gx: agents stop in 60s"
-
 type graceFixture struct {
-	h     *servertest.Harness
-	path  string
-	store string
-	evs   <-chan server.Event
-	ctx   context.Context
+	h          *servertest.Harness
+	path       string
+	store      string
+	evs        <-chan server.Event
+	ctx        context.Context
+	startTitle string
+}
+
+// Seam: the start banner title shows the configured grace duration.
+func TestHardLimitGrace_StartTitleShowsGrace(t *testing.T) {
+	for grace, want := range map[time.Duration]string{
+		60 * time.Second:       "gx: agents stop in 60s",
+		90 * time.Second:       "gx: agents stop in 90s",
+		600 * time.Millisecond: "gx: agents stop in 600ms",
+	} {
+		if got := server.HardGraceTitle(grace); got != want {
+			t.Errorf("title(%v) = %q, want %q", grace, got, want)
+		}
+	}
 }
 
 // startGraceServer runs epic-a's one ticket as a live agent with today's spend
@@ -62,21 +75,29 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 	if err != nil {
 		t.Fatal(err)
 	}
-	return graceFixture{h: h, path: path, store: store, evs: evs, ctx: ctx}
+	return graceFixture{h: h, path: path, store: store, evs: evs, ctx: ctx, startTitle: server.HardGraceTitle(grace)}
 }
 
-// lowerBelowSpend reloads a $6 hard limit and checks the start report.
+// lowerBelowSpend reloads a $6 hard limit and checks the reports: the start
+// banner plus one plain reload banner, not a second one for the grace period.
 func (f graceFixture) lowerBelowSpend(t *testing.T) {
 	t.Helper()
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 6))
-	reload(t, f.h)
+	res := reload(t, f.h)
+	if res.Refused || len(res.Warnings) != 0 || !slices.Contains(res.Changed, "budget.hard-limit") {
+		t.Fatalf("reload = %+v, want budget.hard-limit changed with no warnings", res)
+	}
 	ev := servertest.WaitForEvent(f.ctx, t, f.evs, server.EventConfigReloaded, "")
-	want := graceStartTitle + ": New hard budget limit ($6.00) is below today's spend ($8.00). 1 agents will stop. " +
+	want := f.startTitle + ": New hard budget limit ($6.00) is below today's spend ($8.00). 1 agents will stop. " +
 		"Raise the limit in config.json or run `gx budget increase` to cancel."
 	if ev.Level != server.EventLevelWarning || ev.Message != want {
 		t.Fatalf("start event = %+v, want warning %q", ev, want)
 	}
-	if !f.hasBanner(graceStartTitle) {
+	ev = servertest.WaitForEvent(f.ctx, t, f.evs, server.EventConfigReloaded, "")
+	if ev.Level != server.EventLevelSuccess || !strings.HasPrefix(ev.Message, "gx config reloaded successfully") {
+		t.Fatalf("reload event = %+v, want the success banner", ev)
+	}
+	if !f.hasBanner(f.startTitle) {
 		t.Errorf("banners = %+v, want the start banner", f.h.Banners.Sent())
 	}
 }
@@ -243,7 +264,7 @@ func TestHardLimitGrace_OverrideCancels(t *testing.T) {
 	f.h.Server.RecordSpend("more", 5.5)
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 5))
 	reload(t, f.h)
-	if n := f.waitBanners(graceStartTitle, 2); n != 2 {
+	if n := f.waitBanners(f.startTitle, 2); n != 2 {
 		t.Errorf("start banners = %d, want a second one for the fresh countdown", n)
 	}
 	if got := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt; !got.After(stopAt) {
@@ -324,7 +345,7 @@ func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 5))
 	reload(t, f.h)
 	time.Sleep(100 * time.Millisecond)
-	if n := f.countBanners(graceStartTitle); n != 1 {
+	if n := f.countBanners(f.startTitle); n != 1 {
 		t.Errorf("start banners = %d, want 1", n)
 	}
 	if got := f.h.Server.BudgetStatusAt(time.Now()).HardStopAt; !got.Equal(stopAt) {
