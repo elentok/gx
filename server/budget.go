@@ -192,7 +192,25 @@ func (l *budgetLedger) latches(now time.Time) budgetLatch {
 	if l.soft > 0 && spent >= l.soft || l.Latch.Hard {
 		l.Latch.Soft = true
 	}
-	return l.Latch
+	latch := l.Latch
+	// A held hard limit pauses starts without the sticky soft latch, so
+	// lifting the hold resumes them.
+	latch.Soft = latch.Soft || l.hardHeld
+	return latch
+}
+
+// held reports whether a reload-lowered hard limit is being held.
+func (l *budgetLedger) held() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.hardHeld
+}
+
+// releaseHold lets the hard limit latch again at the next check.
+func (l *budgetLedger) releaseHold() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.hardHeld = false
 }
 
 // setLimits sets the live limits, then drops each latch that spend since the
@@ -256,6 +274,9 @@ type BudgetStatus struct {
 	HardLimit    float64 `json:"hard_limit"`
 	BudgetPaused bool    `json:"budget_paused"`
 	HardLatched  bool    `json:"hard_latched"`
+	// HardStopAt is when a reload-lowered hard limit stops agents unless it is
+	// raised first; zero when no such countdown runs.
+	HardStopAt time.Time `json:"hard_stop_at,omitzero"`
 	// Override is today's total at the last override; zero means none today.
 	// Limits count only spend beyond it.
 	Override float64 `json:"override,omitempty"`
@@ -272,7 +293,12 @@ func (s *Server) budgetStatus(now time.Time) BudgetStatus {
 	latch := s.budgetLatches(now)
 	soft, hard := s.ledger.limits()
 	day := now.Format(budgetDayLayout)
+	var stopAt time.Time
+	if s.ledger.held() {
+		stopAt = s.hardGrace.deadline()
+	}
 	return BudgetStatus{
+		HardStopAt:   stopAt,
 		Day:          day,
 		Total:        s.ledger.today(now),
 		Projects:     s.ledger.byProject(day),
@@ -362,6 +388,7 @@ func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (Budge
 	if err := s.ledger.save(now); err != nil {
 		return BudgetResult{}, err
 	}
+	s.cancelHardGrace()
 	status := s.budgetStatus(now)
 	s.rearmBudgetNotes(status)
 	s.events.publish(EventQueueChanged, "")
@@ -490,8 +517,9 @@ func (s *Server) budgetHardReached(now time.Time) bool { return s.budgetLatches(
 // killForBudget stops every live pane: ctrl+c, a grace period, then it closes
 // and parks every pane budget-killed. Each run is marked first, so a run that
 // settles on its own during the grace parks budget-killed too (see settleRun)
-// instead of finishing, landing or parking for another reason.
-func (s *Server) killForBudget(now time.Time) {
+// instead of finishing, landing or parking for another reason. It returns how
+// many runs it stopped.
+func (s *Server) killForBudget(now time.Time) int {
 	grace := s.cfg.BudgetKillGrace
 	if grace <= 0 {
 		grace = defaultBudgetKillGrace
@@ -512,6 +540,7 @@ func (s *Server) killForBudget(now time.Time) {
 			s.log.Error("budget kill", "ticket", t.Address, "err", err)
 		}
 	}
+	return len(runs)
 }
 
 // runnerOf is the runner hosting the run's session.

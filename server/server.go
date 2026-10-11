@@ -157,6 +157,10 @@ type Config struct {
 
 	BudgetKillGrace time.Duration // wait between ctrl+c and closing a pane; zero means the default
 
+	// HardLimitGrace is how long a reload-lowered hard limit waits before it
+	// stops agents; zero means the default.
+	HardLimitGrace time.Duration
+
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
 
 	// LandStopTimeout bounds how long a stop waits for a land in flight; zero
@@ -197,6 +201,7 @@ type Server struct {
 	pause       *pauseState
 	ledger      *budgetLedger
 	budgetNotes budgetNotes
+	hardGrace   hardGrace
 	extraUsage  extraUsageNotes
 	costOf      func(IterationInfo) (float64, bool) // swapped in tests
 	events      *broker
@@ -545,6 +550,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Stop claiming, let a land in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
 	stopFresh()
+	s.stopHardGrace()
 	<-freshDone
 	<-herdrDone
 	<-claimDone

@@ -44,6 +44,13 @@ func (b *budgetNotes) rearm(spent, soft, hard float64) {
 	b.hard = b.hard && spent >= hard
 }
 
+// markHard counts the hard limit as announced today.
+func (b *budgetNotes) markHard() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.hard = true
+}
+
 func (s *Server) seedBudgetNotes(now time.Time) {
 	st := s.budgetStatus(now)
 	s.budgetNotes.seed(st.Day, st.spent(), st.SoftLimit, st.HardLimit)

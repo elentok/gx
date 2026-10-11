@@ -91,8 +91,9 @@ func (s *Server) reloadLocked() ReloadResult {
 // applyBudgetLimits applies each budget limit whose file value changed since
 // the last load to the ledger's live limit, then re-evaluates the latches as
 // `gx budget increase` does. Comparing file values, not live ones, keeps a
-// live increase on the field the person did not edit. It returns a warning
-// when a lowered hard limit is already reached.
+// live increase on the field the person did not edit. A lowered hard limit
+// already reached starts the grace countdown and returns a warning; a raise
+// that lifts the hold cancels it.
 func (s *Server) applyBudgetLimits(old, next Settings) string {
 	softChanged := next.BudgetSoftLimit != old.BudgetSoftLimit
 	hardChanged := next.BudgetHardLimit != old.BudgetHardLimit
@@ -108,8 +109,9 @@ func (s *Server) applyBudgetLimits(old, next Settings) string {
 	if hardChanged {
 		held, spent := s.ledger.setLimitsHoldingHard(now, soft, next.BudgetHardLimit)
 		if held {
-			warning = fmt.Sprintf("budget.hard-limit (%s) is at or below today's spend (%s); running agents keep going",
+			warning = fmt.Sprintf("budget.hard-limit (%s) is at or below today's spend (%s); agents stop when the grace period ends",
 				tickets.FormatCost(next.BudgetHardLimit), tickets.FormatCost(spent))
+			s.startHardGrace(now, next.BudgetHardLimit, spent)
 		}
 	} else {
 		s.ledger.setLimits(now, soft, hard)
@@ -117,6 +119,7 @@ func (s *Server) applyBudgetLimits(old, next Settings) string {
 	if err := s.ledger.save(now); err != nil {
 		s.log.Error("save budget ledger", "err", err)
 	}
+	s.cancelHardGrace()
 	s.rearmBudgetNotes(s.budgetStatus(now))
 	s.events.publish(EventQueueChanged, "")
 	return warning
@@ -196,13 +199,22 @@ func (s *Server) reportReload(trigger string, res ReloadResult) {
 	} else {
 		s.log.Info("config reloaded", "trigger", trigger, "changed", res.Changed, "warnings", res.Warnings)
 	}
-	level, title, body := reloadBanner(res)
+	s.banner(reloadBanner(res))
+}
+
+// banner shows one OS banner and streams it as a config-reloaded event, for
+// the TUI to toast at its level.
+func (s *Server) banner(level, title, body string) {
 	go func() {
 		if err := s.cfg.Notifier.Notify(context.Background(), title, body); err != nil {
-			s.log.Warn("config reload banner failed", "error", err)
+			s.log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()
-	s.events.publishEvent(Event{Type: EventConfigReloaded, Level: level, Message: title + ": " + body})
+	msg := title
+	if body != "" {
+		msg += ": " + body
+	}
+	s.events.publishEvent(Event{Type: EventConfigReloaded, Level: level, Message: msg})
 }
 
 // maxBannerBody keeps a long parse error from overflowing the banner.
