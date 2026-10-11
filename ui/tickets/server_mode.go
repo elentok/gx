@@ -329,6 +329,9 @@ func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
 		ElapsedTime:           info.ElapsedTime,
 		ActualCost:            info.ActualCost,
 		Compactions:           info.Compactions,
+
+		Category:   info.Category,
+		ExportedAt: info.ExportedAt,
 	}
 	if info.Parent != "" {
 		_, parent, _ := gxtickets.SplitTrailerValue(info.Parent)

@@ -3,6 +3,7 @@ package tickets
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
@@ -83,6 +84,30 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 	if t.Commitless {
 		add("commitless", "true")
 	}
+	add("category", t.Category)
+	add("exported_at", formatTimestamp(t.ExportedAt))
+	return fields
+}
+
+// formatTimestamp is "" for a zero time, so add() skips the row.
+func formatTimestamp(ts time.Time) string {
+	if ts.IsZero() {
+		return ""
+	}
+	return ts.Local().Format("2006-01-02 15:04")
+}
+
+// epicFrontmatterFields lists epic's populated ticket.md timestamps.
+func epicFrontmatterFields(epic tickets.Epic) []frontmatterField {
+	var fields []frontmatterField
+	for _, f := range []frontmatterField{
+		{"completed_at", formatTimestamp(epic.CompletedAt)},
+		{"evolved_at", formatTimestamp(epic.EvolvedAt)},
+	} {
+		if f.value != "" {
+			fields = append(fields, f)
+		}
+	}
 	return fields
 }
 
@@ -92,7 +117,10 @@ func ticketFrontmatterFields(t tickets.Ticket, status tickets.RenderedStatus) []
 // Each line is word-wrapped to width so a long value (e.g. a blocked_by list
 // with many entries) wraps within the pane instead of overflowing it.
 func renderFrontmatterBlock(t tickets.Ticket, status tickets.RenderedStatus, width int) string {
-	fields := ticketFrontmatterFields(t, status)
+	return renderFrontmatterFields(ticketFrontmatterFields(t, status), width)
+}
+
+func renderFrontmatterFields(fields []frontmatterField, width int) string {
 	lines := make([]string, len(fields))
 	for i, f := range fields {
 		line := "  " + frontmatterLabelStyle.Render(prettifyFieldName(f.key)+":") + " " + f.value

@@ -92,6 +92,8 @@ func loadEpic(scratchDir, name string) Epic {
 		ticket.ActualCost = parsed.ActualCost
 		ticket.Compactions = parsed.Compactions
 		ticket.Commitless = parsed.IsCommitless()
+		ticket.Category = string(parsed.Category)
+		ticket.ExportedAt = parsed.ExportedAt
 		ticket.Notify = parsed.Notify
 		ticket.NoRecover = parsed.NoRecover
 		ticket.Unique = parsed.Unique

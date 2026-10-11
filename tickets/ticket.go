@@ -6,6 +6,7 @@ package tickets
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -62,6 +63,10 @@ type Ticket struct {
 	// Commitless mirrors schema.Ticket.Commitless: true means a zero-commit
 	// iteration finish is intentional for this ticket, not a stalled agent.
 	Commitless bool
+
+	// Category and ExportedAt mirror schema.Ticket's fields of the same name.
+	Category   string
+	ExportedAt time.Time
 
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool

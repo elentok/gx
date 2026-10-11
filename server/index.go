@@ -40,6 +40,9 @@ type TicketInfo struct {
 	ActualCost            float64 `json:"actual_cost,omitempty"`
 	Compactions           int     `json:"compactions,omitempty"`
 
+	Category   string    `json:"category,omitempty"`
+	ExportedAt time.Time `json:"exported_at,omitzero"`
+
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.
 	sum string
@@ -177,6 +180,9 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		ElapsedTime:           t.ElapsedTime,
 		ActualCost:            t.ActualCost,
 		Compactions:           t.Compactions,
+
+		Category:   t.Category,
+		ExportedAt: t.ExportedAt,
 	}
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)

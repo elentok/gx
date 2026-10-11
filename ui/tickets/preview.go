@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"charm.land/bubbles/v2/viewport"
@@ -79,7 +80,7 @@ func (m Model) previewContent(width int) (string, int, bool) {
 		return ui.StyleDim.Render("  no ticket selected"), 0, false
 	}
 	if r.isEpic() {
-		return previewEpicContent(m.epicAt(r), width), 0, false
+		return previewEpicContent(withEpicTicketMD(m.epicAt(r)), width), 0, false
 	}
 
 	epic := m.epicAt(r)
@@ -182,6 +183,9 @@ func highlightParkSection(rendered string, status tickets.RenderedStatus) (out s
 // has no single representative file to preview, so it's header-only.
 func previewEpicContent(epic tickets.Epic, width int) string {
 	header := previewEpicHeaderLine(epic)
+	if fields := epicFrontmatterFields(epic); len(fields) > 0 {
+		header += "\n" + renderFrontmatterFields(fields, width)
+	}
 	if !epic.IsMap {
 		return header
 	}
@@ -193,6 +197,18 @@ func previewEpicContent(epic tickets.Epic, width int) string {
 	b.WriteString("\n")
 	b.WriteString(renderTicketMarkdown(epic.MapBody, width))
 	return b.String()
+}
+
+// withEpicTicketMD fills a server-mode epic's ticket.md timestamps. The
+// snapshot carries tickets only, so they are read from the epic directory
+// that holds the first ticket's file (<epic>/issues/<ticket>.md).
+func withEpicTicketMD(epic tickets.Epic) tickets.Epic {
+	if epic.HasTicketMD || len(epic.Tickets) == 0 || epic.Tickets[0].File == "" {
+		return epic
+	}
+	md := tickets.LoadEpicTicketMD(filepath.Dir(filepath.Dir(epic.Tickets[0].File)))
+	epic.CompletedAt, epic.EvolvedAt = md.CompletedAt, md.EvolvedAt
+	return epic
 }
 
 func previewEpicHeaderLine(epic tickets.Epic) string {

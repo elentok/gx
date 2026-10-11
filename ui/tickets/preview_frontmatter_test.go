@@ -1,8 +1,11 @@
 package tickets
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/tickets"
@@ -97,5 +100,63 @@ func TestRenderFrontmatterBlock_NoRegressionForShortValues(t *testing.T) {
 	lines := strings.Split(out, "\n")
 	if len(lines) != 2 {
 		t.Fatalf("expected 2 short frontmatter lines (status, type), got %d:\n%s", len(lines), out)
+	}
+}
+
+func TestTicketFrontmatterFields_ShowsCategoryAndExportedAt(t *testing.T) {
+	t.Parallel()
+	tk := tickets.Ticket{
+		Category:   "idea",
+		ExportedAt: time.Date(2026, 10, 11, 9, 30, 0, 0, time.Local),
+	}
+
+	got := map[string]string{}
+	for _, f := range ticketFrontmatterFields(tk, tickets.StatusOpen) {
+		got[f.key] = f.value
+	}
+	if got["category"] != "idea" {
+		t.Fatalf("expected category idea, got %q", got["category"])
+	}
+	if got["exported_at"] != "2026-10-11 09:30" {
+		t.Fatalf("expected exported_at 2026-10-11 09:30, got %q", got["exported_at"])
+	}
+}
+
+func TestPreviewEpicContent_ShowsEvolvedAtAndCompletedAt(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{
+		Name:        "widgets",
+		CompletedAt: time.Date(2026, 10, 10, 8, 0, 0, 0, time.Local),
+		EvolvedAt:   time.Date(2026, 10, 11, 9, 30, 0, 0, time.Local),
+	}
+
+	out := ansi.Strip(previewEpicContent(epic, 80))
+	for _, want := range []string{"Completed at: 2026-10-10 08:00", "Evolved at: 2026-10-11 09:30"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in epic preview, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestPreviewEpicContent_OmitsUnsetTimes(t *testing.T) {
+	t.Parallel()
+	out := ansi.Strip(previewEpicContent(tickets.Epic{Name: "widgets"}, 80))
+	if strings.Contains(out, "Completed at") || strings.Contains(out, "Evolved at") {
+		t.Fatalf("expected no time rows for an epic without them, got:\n%s", out)
+	}
+}
+
+func TestWithEpicTicketMD_ReadsServerModeEpicTimesFromDisk(t *testing.T) {
+	t.Parallel()
+	epicDir := t.TempDir()
+	md := "---\nstatus: done\ncompleted_at: 2026-10-10T08:00:00Z\nevolved_at: 2026-10-11T09:30:00Z\n---\n"
+	if err := os.WriteFile(filepath.Join(epicDir, "ticket.md"), []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	epic := tickets.Epic{Name: "p:widgets", Tickets: []tickets.Ticket{{File: filepath.Join(epicDir, "issues", "01-a.md")}}}
+
+	got := withEpicTicketMD(epic)
+	if !got.CompletedAt.Equal(time.Date(2026, 10, 10, 8, 0, 0, 0, time.UTC)) || !got.EvolvedAt.Equal(time.Date(2026, 10, 11, 9, 30, 0, 0, time.UTC)) {
+		t.Fatalf("expected ticket.md times, got completed=%v evolved=%v", got.CompletedAt, got.EvolvedAt)
 	}
 }

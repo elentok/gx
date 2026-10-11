@@ -15,6 +15,14 @@ func IsMapEpic(epicPath string) bool {
 	return epic.IsMap
 }
 
+// LoadEpicTicketMD reads the epic at epicPath's ticket.md, without loading
+// its tickets.
+func LoadEpicTicketMD(epicPath string) Epic {
+	epic := Epic{Path: epicPath}
+	loadEpicTicketMD(&epic)
+	return epic
+}
+
 // Epic is one immediate subdirectory of `.scratch/`. Discovery is dumb: an
 // epic is counted regardless of which files exist inside it (ticket.md,
 // spec.md, only issues/, or nothing yet).
