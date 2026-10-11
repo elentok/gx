@@ -35,6 +35,9 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 	var bodies []string
 	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(b), "server started") { // the start notice is not the park message
+			return
+		}
 		mu.Lock()
 		bodies = append(bodies, string(b))
 		mu.Unlock()
@@ -42,7 +45,7 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 	defer chat.Close()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond // several ticks pass while the test waits
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	var prompts atomic.Int32
 	h.RegisterLaunch(func(servertest.Prompt) { prompts.Add(1) })

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -274,6 +275,13 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
+	// Runs after the server stops (cleanups run last-in first-out).
+	t.Cleanup(func() {
+		if t.Failed() {
+			log, _ := os.ReadFile(server.LogPath(filepath.Join(stateDir, "state")))
+			t.Logf("server log:\n%s", log)
+		}
+	})
 
 	h := &Harness{
 		Herdr:       herdrfake.NewState(t),
@@ -293,6 +301,9 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.cfg = server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	// The product default is off; most tests exercise the landing.
 	h.cfg.AutoMergeEpic = true
+	// Every land pauses on ralphloop's 3s finish debounce; the fake agents
+	// settle at once, so a hundredth keeps the order without the wait.
+	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
 	for _, o := range opts {
 		o(&h.cfg)
 	}
@@ -330,6 +341,11 @@ func (h *Harness) serve(t *testing.T) {
 	t.Cleanup(func() {
 		if err := h.Stop(); err != nil {
 			t.Errorf("server: %v", err)
+		}
+		// Runs outlive Stop and still write to the ticket store; let them end
+		// before t.TempDir's cleanup removes it.
+		if !srv.WaitSettled(10 * time.Second) {
+			t.Logf("servertest: a run was still settling 10s after stop")
 		}
 	})
 

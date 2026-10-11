@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -19,6 +20,8 @@ type ServerChatConfig struct {
 	// GateStatePath replaces the per-user notification gate state file; empty
 	// means the real one.
 	GateStatePath string
+	// FlushInterval replaces batchFlushInterval; zero means the real one.
+	FlushInterval time.Duration
 }
 
 // ServerChat is the chat sink a server owns: one batcher and one gate per
@@ -66,14 +69,14 @@ func (c *ServerChat) sinksFor(cfg ServerChatConfig) []*chatEventSink {
 	if target := telegramTarget(cfg.TelegramBotToken, cfg.TelegramChatID); target != "" {
 		add("telegram\x00"+target, func() *chatEventSink {
 			base := firstNonEmptyStr(cfg.TelegramBaseURL, c.base.TelegramBaseURL, telegramAPIBaseURL)
-			s := newServerChatSink(telegramStyle, newTelegramTransport(cfg.TelegramBotToken, cfg.TelegramChatID, base), c.base.GateStatePath)
+			s := newServerChatSink(telegramStyle, newTelegramTransport(cfg.TelegramBotToken, cfg.TelegramChatID, base), c.base)
 			s.gateKey = destinationKey(transportTelegram, target, telegramTarget(c.base.TelegramBotToken, c.base.TelegramChatID))
 			return s
 		})
 	}
 	if cfg.SlackWebhookURL != "" {
 		add("slack\x00"+cfg.SlackWebhookURL, func() *chatEventSink {
-			s := newServerChatSink(slackStyle, newSlackTransport(cfg.SlackWebhookURL), c.base.GateStatePath)
+			s := newServerChatSink(slackStyle, newSlackTransport(cfg.SlackWebhookURL), c.base)
 			s.gateKey = destinationKey(transportSlack, cfg.SlackWebhookURL, slackTarget(c.base.SlackWebhookURL))
 			return s
 		})
@@ -99,12 +102,16 @@ func (c *ServerChat) projectSinks(override *ServerChatConfig) []*chatEventSink {
 	return c.sinksFor(*override)
 }
 
-func newServerChatSink(style mrkdwnStyle, transport chatTransport, gateStatePath string) *chatEventSink {
+func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerChatConfig) *chatEventSink {
 	// The server has no TUI to relay to and tracks the epic by address, so the
 	// sink decorates a noop and carries no scratch dir or epic of its own.
 	s := newChatEventSink(noopEventSink{}, style, transport, "", "")
-	s.gateStatePath = gateStatePath
-	s.startFlushLoop(batchFlushInterval)
+	s.gateStatePath = seams.GateStatePath
+	interval := seams.FlushInterval
+	if interval <= 0 {
+		interval = batchFlushInterval
+	}
+	s.startFlushLoop(interval)
 	return s
 }
 

@@ -66,6 +66,10 @@ type Config struct {
 
 	HerdrRetryInterval time.Duration // zero means the default
 
+	// Sleep paces the ralphloop waits (finish debounce, poll backoffs); nil
+	// means time.Sleep. Tests shrink it so each land skips the real seconds.
+	Sleep func(time.Duration)
+
 	// Runner is the configured agent runner; nil means herdr. Herdr health
 	// is only probed when it reports health (agentrunner.HealthChecker).
 	Runner agentrunner.Runner
@@ -162,7 +166,8 @@ type Server struct {
 	verdicts    verdictLog
 	nudges      nudgeLimiter
 	unavailable unavailableNotes
-	kick        chan struct{} // wakes keepClaiming
+	kick        chan struct{}  // wakes keepClaiming
+	settling    sync.WaitGroup // finishRun/settleRun goroutines; Serve's stop leaves them running
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.

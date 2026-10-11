@@ -18,6 +18,10 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
+// testFlushInterval stands in for the chat batcher's 6s tick in tests that
+// count sends but never assert two notices share one batch.
+const testFlushInterval = 100 * time.Millisecond
+
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
 	os.Exit(m.Run())

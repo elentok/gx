@@ -82,6 +82,7 @@ jobs:
 
       - name: Test
         env:
+          GX_E2E: "1"
           HERDR_ENV: "1"
         run: go test ./e2e/... -timeout=6m
 

@@ -9,7 +9,7 @@ import (
 )
 
 func TestExtraUsage_EnqueueWarnsAndNotifiesOncePerDay(t *testing.T) {
-	s, wait := chatServer(t, 0, 0)
+	s, wait := chatServerFlushing(t, 0, 0, 100*time.Millisecond)
 	s.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateEnabled }
 
 	for i := 0; i < 2; i++ {
@@ -44,6 +44,7 @@ func TestExtraUsage_OffOrSuppressedStaysQuiet(t *testing.T) {
 	if s.checkExtraUsage(time.Now()) {
 		t.Fatal("suppressed: warned")
 	}
+	s.chat.Close()
 	if got := wait(-1); len(got) != 0 {
 		t.Fatalf("sends = %v, want none", got)
 	}

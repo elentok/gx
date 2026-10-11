@@ -48,12 +48,6 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 			o(c)
 		}
 	})
-	t.Cleanup(func() {
-		if t.Failed() {
-			log, _ := os.ReadFile(server.LogPath(f.h.StateDir))
-			t.Logf("server log:\n%s", log)
-		}
-	})
 	f.h.RegisterLaunch(func(p servertest.Prompt) {
 		_, id, _ := strings.Cut(p.Address, "/")
 		f.mu.Lock()

@@ -325,10 +325,10 @@ func (s *Server) reclaimHeadless(t trackedRun) error {
 	deps := s.depsFor(addr.Project)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished {
-		go s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil)
+		s.goSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
 		return nil
 	}
-	go s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address})
+	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
 }
 
@@ -362,7 +362,7 @@ func (s *Server) reclaim(t trackedRun) error {
 	}
 	deps := s.depsFor(addr.Project)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
-	go s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address})
+	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
 }
 

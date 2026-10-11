@@ -75,11 +75,16 @@ func hasActiveWorkspace(t *testing.T) bool {
 	return false
 }
 
-// RequireHerdr skips the test unless a real herdr daemon is reachable: herdr
-// must be on PATH, and HERDR_ENV=1 must be set (herdr's own gate on its
-// socket API being available in the current terminal session).
+// RequireHerdr skips the test unless it was asked for and a real herdr daemon
+// is reachable: GX_E2E=1 must be set (`make e2e` sets it), herdr must be on
+// PATH, and HERDR_ENV=1 must be set (herdr's own gate on its socket API being
+// available in the current terminal session). GX_E2E keeps a plain
+// `go test ./...` run inside herdr from driving the live daemon.
 func RequireHerdr(t *testing.T) {
 	t.Helper()
+	if os.Getenv("GX_E2E") != "1" {
+		t.Skip("herdrctl: GX_E2E=1 not set; run `make e2e`")
+	}
 	if _, err := exec.LookPath("herdr"); err != nil {
 		t.Skip("herdrctl: herdr not found on PATH")
 	}

@@ -960,15 +960,27 @@ func TestRun_Drain_WithInFlightTickets_FinishesInFlightThenEndsWithoutNewClaims(
 	d, prompts, _ := fakeDeps()
 
 	gate := NewGate()
-	var drainOnce sync.Once
+	var drainOnce, waiting02Once sync.Once
 	drained := make(chan struct{})
+	waiting02 := make(chan struct{})
 	onRunnerWait(d, func(s agentrunner.Session) {
 		if s.Label == iterLabel("my-epic", "01") {
 			drainOnce.Do(func() {
+				// launch is async, so 01's goroutine can reach this wait
+				// before the loop claims 02. Draining then would leave 02
+				// unclaimed, so hold the drain until 02 is in flight too.
+				select {
+				case <-waiting02:
+				case <-time.After(10 * time.Second):
+					t.Error("ticket 02 never reached its wait")
+				}
 				gate.Drain()
 				close(drained)
 			})
 		} else {
+			if s.Label == iterLabel("my-epic", "02") {
+				waiting02Once.Do(func() { close(waiting02) })
+			}
 			// Ticket 02 runs concurrently with 01 (maxParallel defaults to 2)
 			// with no guaranteed order between its own wait and 01's.
 			// Block here until 01 has drained, so 02's iteration can never

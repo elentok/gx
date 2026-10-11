@@ -21,7 +21,16 @@ import (
 )
 
 // chatServer is a server wired to a fake Slack webhook that records each body.
+// It keeps the real 6s batch tick, so notices sent before s.chat.Close() share
+// one batch; use chatServerFlushing to wait on the tick instead.
 func chatServer(t *testing.T, soft, hard float64) (*Server, func(n int) []string) {
+	t.Helper()
+	return chatServerFlushing(t, soft, hard, 0)
+}
+
+// chatServerFlushing is chatServer with the batch tick set to flush (zero
+// means the real one).
+func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (*Server, func(n int) []string) {
 	t.Helper()
 	var mu sync.Mutex
 	var bodies []string
@@ -45,27 +54,25 @@ func chatServer(t *testing.T, soft, hard float64) (*Server, func(n int) []string
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	s, err := New(Config{StateDir: stateDir, TicketStore: t.TempDir(), BudgetSoftLimit: soft, BudgetHardLimit: hard,
-		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}})
+		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	// wait returns what was sent once n messages arrived, or after a grace
-	// period when fewer ever will; n < 0 just waits out the grace period.
+	// wait returns what was sent once n messages arrived, plus a grace period
+	// for an extra one to show. n < 0 returns at once: the caller has already
+	// called s.chat.Close(), which sends what is queued and waits for it.
 	wait := func(n int) []string {
-		deadline := time.Now().Add(10 * time.Second)
-		if n < 0 {
-			deadline = time.Now().Add(1500 * time.Millisecond)
-		}
-		for time.Now().Before(deadline) {
-			mu.Lock()
-			got := len(bodies)
-			mu.Unlock()
-			if n >= 0 && got >= n {
-				break
+		if n >= 0 {
+			for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+				mu.Lock()
+				got := len(bodies)
+				mu.Unlock()
+				if got >= n {
+					break
+				}
 			}
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond) // anything extra would show up now
 		}
-		time.Sleep(500 * time.Millisecond) // anything extra would show up now
 		mu.Lock()
 		defer mu.Unlock()
 		return append([]string(nil), bodies...)
@@ -74,7 +81,7 @@ func chatServer(t *testing.T, soft, hard float64) (*Server, func(n int) []string
 }
 
 func TestServerNotices_RestartSendsOneServerLevelMessage(t *testing.T) {
-	s, wait := chatServer(t, 0, 0)
+	s, wait := chatServerFlushing(t, 0, 0, 100*time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- s.Serve(ctx) }()

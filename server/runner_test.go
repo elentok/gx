@@ -665,6 +665,9 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj-b", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.MaxAgents = 2
+		// The fake's finish wait times out at once, so only real-time pacing
+		// keeps the agents from exhausting their finish budget mid-test.
+		c.Sleep = time.Sleep
 	})
 	registerLaunch(h)
 	// An iteration's finish wait never returns (herdr's poll timeout), so started
@@ -867,7 +870,7 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	}))
 	defer chat.Close()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")}
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	registerLaunch(h) // the agent finishes without committing, so the ticket parks
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -956,6 +959,8 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	if len(runs) != 1 || runs[0].Runner != "fake" {
 		t.Fatalf("runs = %+v, want one recorded as fake", runs)
 	}
+	// End the agent's turn so its run settles before the harness tears down.
+	t.Cleanup(func() { fake.SetState(runs[0].Session.Label, agentrunner.StateDone, "") })
 	if _, ok, _ := fake.Find(runs[0].Session.Label); !ok {
 		t.Error("the agent was not started on the configured runner")
 	}

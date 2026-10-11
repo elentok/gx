@@ -41,12 +41,42 @@ func TempRepo(t *testing.T) string {
 	t.Helper()
 	dir := evalDir(t, t.TempDir())
 	RetryRemoveAll(t, dir)
-	mustGit(t, dir, "init", "--initial-branch=main")
-	configUser(t, dir)
-	WriteFile(t, dir, "README.md", "# test")
-	mustGit(t, dir, "add", ".")
-	mustGit(t, dir, "commit", "-m", "initial")
+	if err := os.CopyFS(dir, os.DirFS(repoTemplate(t))); err != nil {
+		t.Fatalf("copy repo template: %v", err)
+	}
 	return dir
+}
+
+// repoTemplateName is the shared template repo under os.TempDir(); bump the
+// version whenever TempRepo's content changes.
+const repoTemplateName = "gx-testutil-repo-template-v1"
+
+// repoTemplate returns a repo TempRepo copies instead of running its seven
+// git commands per test. Every test binary shares one template across runs:
+// the first to need it builds it aside and renames it into place.
+func repoTemplate(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(os.TempDir(), repoTemplateName)
+	if _, err := os.Stat(filepath.Join(path, ".git", "HEAD")); err == nil {
+		return path
+	}
+	tmp, err := os.MkdirTemp("", repoTemplateName+"-build-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmp) // a no-op once renamed into place
+	mustGit(t, tmp, "init", "--initial-branch=main")
+	configUser(t, tmp)
+	WriteFile(t, tmp, "README.md", "# test")
+	mustGit(t, tmp, "add", ".")
+	mustGit(t, tmp, "commit", "-m", "initial")
+	// Losing the race to another process is fine: its template is the same.
+	if err := os.Rename(tmp, path); err != nil {
+		if _, serr := os.Stat(filepath.Join(path, ".git", "HEAD")); serr != nil {
+			t.Fatalf("install repo template: %v", err)
+		}
+	}
+	return path
 }
 
 // TempBareRepo creates a bare git repo by cloning a regular repo.

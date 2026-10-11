@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,9 @@ func TestStop_WaitsForALandInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	})
 	// The land closes the iteration's tab; hold it there.
 	landing, release := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	releaseLand := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseLand) // a failure before the release must not hold herdrfake forever
 	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		close(landing)
 		<-release
@@ -54,7 +58,7 @@ func TestStop_WaitsForALandInFlightAndFlushesTheStoreCommit(t *testing.T) {
 		t.Fatalf("stop returned during a land: %v", err)
 	case <-time.After(300 * time.Millisecond):
 	}
-	close(release)
+	releaseLand()
 	select {
 	case err := <-stopped:
 		if err != nil {
@@ -84,9 +88,11 @@ func TestStop_LeavesALiveAgentRunningAndUnlanded(t *testing.T) {
 		closed <- struct{}{}
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
-	// The agent keeps working: its second wait (the finish wait) blocks until the test ends.
+	// The agent keeps working: its second wait (the finish wait) blocks until
+	// the test ends. A cleanup, not a defer, so the release lands before the
+	// harness waits for the run to settle.
 	block := make(chan struct{})
-	defer close(block)
+	t.Cleanup(func() { close(block) })
 	waits := 0
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		// A wait for "working" is the launch prompt's, not the finish wait.

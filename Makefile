@@ -12,16 +12,17 @@ build:
 install:
 	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
 
-# -timeout=10m (per package; the server package alone sums to ~260s): legitimate tests (incl. real-git/production-style) finish in a few seconds each
+# -timeout=10m (per package; the server package alone sums to ~100s): legitimate tests (incl. real-git/production-style) finish in a few seconds each
 # locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. park/resume
 # against a permit cap) more room to legitimately run long; 2m proved too tight there.
+# The real-herdr e2e tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
 test:
 	go test ./... -timeout=10m
 
 # e2e runs the herdr e2e suite against a real, already-running herdr daemon
 # (herdr must be on PATH). Tests skip themselves if either isn't available.
 e2e:
-	HERDR_ENV=1 go test ./e2e/... -timeout=2m
+	GX_E2E=1 HERDR_ENV=1 go test ./e2e/... -timeout=2m
 
 coverage:
 	go test ./... -coverprofile=coverage.out

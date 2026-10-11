@@ -83,6 +83,13 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 		c.BudgetPollInterval = time.Hour
 	})
 	registerLaunch(h)
+	// The pane never goes quiet, so the run's finish wait would poll herdr
+	// until the package ends; take the agent away so the run settles first.
+	t.Cleanup(func() {
+		h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
+		})
+	})
 	live := map[string]any{"agent": map[string]any{
 		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
 		"agent_session": map[string]any{"value": "sess"},
@@ -162,6 +169,9 @@ func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour
+		// The kill's ctrl+c idles the agent; the real finish debounce keeps the
+		// run from parking it zero-commit before the budget park lands.
+		c.Sleep = time.Sleep
 	})
 	cost := 0.0
 	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { cost += 3; return cost, true })

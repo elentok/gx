@@ -130,6 +130,29 @@ func (g *landGuard) closeAndWait(timeout time.Duration) bool {
 	}
 }
 
+// goSettle runs f, a finishRun or settleRun, on its own goroutine.
+func (s *Server) goSettle(f func()) {
+	s.settling.Add(1)
+	go func() {
+		defer s.settling.Done()
+		f()
+	}()
+}
+
+// WaitSettled waits for every finishRun/settleRun goroutine and reports
+// whether they all ended within timeout. Serve's stop leaves them running
+// (agents outlive the server), so a test must wait before deleting their dirs.
+func (s *Server) WaitSettled(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() { s.settling.Wait(); close(done) }()
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 // kickRunner asks the runner to look at the queue now instead of at its next tick.
 func (s *Server) kickRunner() {
 	select {
@@ -381,7 +404,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: time.Now(),
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
-	go s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr})
+	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
 	return true, nil
 }
 
@@ -734,6 +757,9 @@ func (s *Server) runnerFor(project string) agentrunner.Runner {
 func (s *Server) depsFor(project string) ralphloop.Deps {
 	deps := ralphloop.DefaultDeps()
 	deps.Runner = s.runnerFor(project)
+	if s.cfg.Sleep != nil {
+		deps.Sleep = s.cfg.Sleep
+	}
 	return deps
 }
 
