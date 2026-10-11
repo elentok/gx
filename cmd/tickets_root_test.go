@@ -18,6 +18,7 @@ func isolateTicketStore(t *testing.T) string {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", "")
 	return filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets")
 }
