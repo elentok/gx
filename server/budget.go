@@ -238,6 +238,9 @@ type BudgetStatus struct {
 	Roots map[string]float64 `json:"roots,omitempty"`
 }
 
+// spent is the spend the limits count: today's total beyond the override.
+func (st BudgetStatus) spent() float64 { return st.Total - st.Override }
+
 func (s *Server) budgetStatus(now time.Time) BudgetStatus {
 	latch := s.budgetLatches(now)
 	soft, hard := s.ledger.limits()
@@ -281,9 +284,10 @@ func (s *Server) budgetOverride(now time.Time) (BudgetResult, error) {
 	if err := s.ledger.save(now); err != nil {
 		return BudgetResult{}, err
 	}
+	status := s.budgetStatus(now)
+	s.rearmBudgetNotes(status)
 	s.events.publish(EventQueueChanged, "")
 	s.kickRunner()
-	status := s.budgetStatus(now)
 	return BudgetResult{Budget: &status}, nil
 }
 
@@ -331,10 +335,10 @@ func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (Budge
 	if err := s.ledger.save(now); err != nil {
 		return BudgetResult{}, err
 	}
-	s.budgetNotes.rearm(s.ledger.today(now), soft, hard)
+	status := s.budgetStatus(now)
+	s.rearmBudgetNotes(status)
 	s.events.publish(EventQueueChanged, "")
 	s.kickRunner()
-	status := s.budgetStatus(now)
 	return BudgetResult{Budget: &status}, nil
 }
 

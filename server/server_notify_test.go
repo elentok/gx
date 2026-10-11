@@ -122,6 +122,82 @@ func TestServerNotices_BudgetAlreadyOverAtStartIsNotAnnounced(t *testing.T) {
 	}
 }
 
+func TestServerNotices_BudgetLimitsCountSpendBeyondOverride(t *testing.T) {
+	s, wait := chatServer(t, 20, 50)
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
+	s.seedBudgetNotes(now)
+
+	s.ledger.record("", "a", 30, now)
+	s.notifyBudget(now)
+	if _, err := s.budgetOverride(now); err != nil {
+		t.Fatal(err)
+	}
+	s.ledger.record("", "a", 45, now.Add(time.Minute))
+	s.notifyBudget(now.Add(time.Minute)) // 15 beyond the override: nothing
+	s.ledger.record("", "a", 55, now.Add(2*time.Minute))
+	s.notifyBudget(now.Add(2 * time.Minute)) // 25 beyond: soft again, not hard
+	s.ledger.record("", "a", 85, now.Add(3*time.Minute))
+	s.notifyBudget(now.Add(3 * time.Minute)) // 55 beyond: hard
+
+	s.chat.Close()
+	all := strings.Join(wait(-1), "\n")
+	if n := strings.Count(all, "soft limit reached"); n != 2 {
+		t.Errorf("soft notices = %d, want 2: %s", n, all)
+	}
+	if n := strings.Count(all, "hard limit reached"); n != 1 {
+		t.Errorf("hard notices = %d, want 1: %s", n, all)
+	}
+	for _, want := range []string{"$25.00 of $20.00", "$55.00 of $50.00"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("missing post-override detail %q: %s", want, all)
+		}
+	}
+}
+
+func TestServerNotices_RestartAfterOverrideSeedsFromSpendBeyondIt(t *testing.T) {
+	s, wait := chatServer(t, 20, 0)
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
+	s.ledger.record("", "a", 30, now)
+	if _, err := s.budgetOverride(now); err != nil {
+		t.Fatal(err)
+	}
+	s.ledger.record("", "a", 45, now.Add(time.Minute))
+	s.seedBudgetNotes(now.Add(time.Minute)) // restart: 15 beyond, not yet crossed
+	s.notifyBudget(now.Add(time.Minute))
+	s.ledger.record("", "a", 55, now.Add(2*time.Minute))
+	s.notifyBudget(now.Add(2 * time.Minute))
+
+	s.chat.Close()
+	all := strings.Join(wait(-1), "\n")
+	if n := strings.Count(all, "soft limit reached"); n != 1 {
+		t.Errorf("soft notices = %d, want 1: %s", n, all)
+	}
+}
+
+func TestServerNotices_IncreaseRearmsAgainstSpendBeyondOverride(t *testing.T) {
+	s, wait := chatServer(t, 20, 0)
+	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
+	s.seedBudgetNotes(now)
+	s.ledger.record("", "a", 30, now)
+	if _, err := s.budgetOverride(now); err != nil {
+		t.Fatal(err)
+	}
+	s.ledger.record("", "a", 55, now.Add(time.Minute))
+	s.notifyBudget(now.Add(time.Minute)) // 25 beyond: soft
+	soft := 30.0
+	if _, err := s.budgetIncrease(now.Add(time.Minute), BudgetIncreaseRequest{Soft: &soft}); err != nil {
+		t.Fatal(err)
+	}
+	s.ledger.record("", "a", 62, now.Add(2*time.Minute))
+	s.notifyBudget(now.Add(2 * time.Minute)) // 32 beyond the raised 30: soft again
+
+	s.chat.Close()
+	all := strings.Join(wait(-1), "\n")
+	if n := strings.Count(all, "soft limit reached"); n != 2 {
+		t.Errorf("soft notices = %d, want 2: %s", n, all)
+	}
+}
+
 func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	now := time.Date(2026, 10, 6, 23, 59, 0, 0, time.Local)
