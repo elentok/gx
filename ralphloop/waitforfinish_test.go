@@ -113,6 +113,38 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	}
 }
 
+func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfParking(t *testing.T) {
+	t.Parallel()
+	ticketPath := writeFrontmatterTicket(t, "claimed")
+	r := &blipRunner{
+		Runner:           idlePromptRunner("iter-22", "codex-session-22"),
+		contextExhausted: "■ Codex ran out of room in the model's context window.",
+	}
+	r.SetState("iter-22", agentrunner.StateBlocked, "")
+	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
+
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-22", Agent: AgentCodex, Pane: "pane-1", Ticket: "22", TicketPath: ticketPath,
+		SmartZone: 150_000, Gate: NewGate(),
+	}, "codex-session-22")
+	if err != nil {
+		t.Fatalf("waitForFinish: %v", err)
+	}
+	if r.interrupts != 1 {
+		t.Errorf("pane interruptions = %d, want 1", r.interrupts)
+	}
+	if prompts := r.Prompts("iter-22"); len(prompts) != 2 || prompts[0] != "/compact" {
+		t.Errorf("prompts = %v, want compact then finish-up", prompts)
+	}
+	raw, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(raw), "needs-answer") {
+		t.Errorf("ticket was parked despite recoverable context exhaustion:\n%s", raw)
+	}
+}
+
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")

@@ -73,12 +73,24 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					continue
 				}
 				if p.Agent == AgentCodex {
-					resetAt, limited, _, limitErr := runnerRateLimit(d, p)
+					resetAt, limited, evidence, limitErr := runnerRateLimit(d, p)
 					if limitErr != nil {
 						return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
 					}
 					if limited {
 						if err := recoverCodexRateLimit(d, p, sessionID, resetAt); err != nil {
+							return err
+						}
+						elapsedMs = 0
+						continue
+					}
+					// Codex can sit blocked on its own context-exhaustion
+					// banner; that is recoverable, not a question for a human.
+					if evidence != "" {
+						if err := d.Runner.Interrupt(p.session()); err != nil {
+							return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
+						}
+						if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
 							return err
 						}
 						elapsedMs = 0
