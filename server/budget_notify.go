@@ -65,7 +65,8 @@ func (s *Server) notifyBudget(now time.Time) {
 	}
 	spent := st.spent()
 	softNow := !b.soft && st.SoftLimit > 0 && spent >= st.SoftLimit
-	hardNow := !b.hard && st.HardLimit > 0 && spent >= st.HardLimit
+	// The latch, not the limit: a hard limit held after a reload has stopped nothing.
+	hardNow := !b.hard && st.HardLatched
 	b.soft = b.soft || softNow
 	b.hard = b.hard || hardNow
 	b.mu.Unlock()

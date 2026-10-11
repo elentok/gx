@@ -50,6 +50,9 @@ type budgetLedger struct {
 	// soft and hard are the live daily limits: config.Budget's at startup,
 	// raised by an increase. Not persisted; a restart reads config again.
 	soft, hard float64
+	// hardHeld keeps a reload-lowered hard limit from latching while spend
+	// still reaches it.
+	hardHeld bool
 }
 
 // budgetLatch is sticky: once a limit is reached it stays reached until an
@@ -181,12 +184,9 @@ func (l *budgetLedger) limits() (soft, hard float64) {
 func (l *budgetLedger) latches(now time.Time) budgetLatch {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	day := now.Format(budgetDayLayout)
-	if l.Latch.Day != day {
-		l.Latch = budgetLatch{Day: day}
-	}
+	day := l.rollLocked(now)
 	spent := l.Days[day] - l.Latch.Override
-	if l.hard > 0 && spent >= l.hard {
+	if l.hard > 0 && spent >= l.hard && !l.hardHeld {
 		l.Latch.Hard = true
 	}
 	if l.soft > 0 && spent >= l.soft || l.Latch.Hard {
@@ -195,19 +195,45 @@ func (l *budgetLedger) latches(now time.Time) budgetLatch {
 	return l.Latch
 }
 
-// raise sets the live limits, then drops each latch that spend since the
+// setLimits sets the live limits, then drops each latch that spend since the
 // override no longer reaches. The override point stays where it is.
-func (l *budgetLedger) raise(now time.Time, soft, hard float64) {
+func (l *budgetLedger) setLimits(now time.Time, soft, hard float64) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	l.setLimitsLocked(now, soft, hard)
+}
+
+// setLimitsHoldingHard is setLimits for a reload: a hard limit that spend
+// already reaches is held instead of latched, so lowering it in config never
+// stops agents at once. It reports whether the hold is on.
+func (l *budgetLedger) setLimitsHoldingHard(now time.Time, soft, hard float64) (held bool, spent float64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	spent = l.setLimitsLocked(now, soft, hard)
+	l.hardHeld = l.hardHeld || hard > 0 && spent >= hard && !l.Latch.Hard
+	return l.hardHeld, spent
+}
+
+// setLimitsLocked returns today's spend since the override. Callers hold l.mu.
+func (l *budgetLedger) setLimitsLocked(now time.Time, soft, hard float64) float64 {
 	l.soft, l.hard = soft, hard
-	day := now.Format(budgetDayLayout)
-	if l.Latch.Day != day {
-		return
-	}
+	day := l.rollLocked(now)
 	spent := l.Days[day] - l.Latch.Override
 	l.Latch.Hard = l.Latch.Hard && hard > 0 && spent >= hard
 	l.Latch.Soft = l.Latch.Hard || l.Latch.Soft && soft > 0 && spent >= soft
+	l.hardHeld = l.hardHeld && hard > 0 && spent >= hard
+	return spent
+}
+
+// rollLocked starts a fresh latch when now is a new budget day, and returns
+// the day. Callers hold l.mu.
+func (l *budgetLedger) rollLocked(now time.Time) string {
+	day := now.Format(budgetDayLayout)
+	if l.Latch.Day != day {
+		l.Latch = budgetLatch{Day: day}
+		l.hardHeld = false
+	}
+	return day
 }
 
 // override clears the latches and moves the override point to today's total.
@@ -216,6 +242,7 @@ func (l *budgetLedger) override(now time.Time) {
 	defer l.mu.Unlock()
 	day := now.Format(budgetDayLayout)
 	l.Latch = budgetLatch{Day: day, Override: l.Days[day], Notified: l.Latch.Notified}
+	l.hardHeld = false
 }
 
 // BudgetStatus is today's spend against the configured limits, in dollars. A
@@ -331,7 +358,7 @@ func (s *Server) budgetIncrease(now time.Time, req BudgetIncreaseRequest) (Budge
 	if soft > 0 && hard > 0 && hard < soft {
 		hard = soft
 	}
-	s.ledger.raise(now, soft, hard)
+	s.ledger.setLimits(now, soft, hard)
 	if err := s.ledger.save(now); err != nil {
 		return BudgetResult{}, err
 	}

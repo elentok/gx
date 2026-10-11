@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/tickets"
 )
 
 // ReloadResult is the outcome of one config reload. A refusal is a result
@@ -75,6 +77,9 @@ func (s *Server) reloadLocked() ReloadResult {
 	old := s.settings.Load()
 	next := reloadableSettings(*old, SettingsFromConfig(cfg))
 	res := ReloadResult{Changed: changedKeys(*old, next), Warnings: s.startupOnlyWarnings(cfg)}
+	if warning := s.applyBudgetLimits(*old, next); warning != "" {
+		res.Warnings = append(res.Warnings, warning)
+	}
 	s.settings.Store(&next)
 	if next.LogRetention != old.LogRetention {
 		s.pruneAgentLogs(time.Now())
@@ -83,10 +88,43 @@ func (s *Server) reloadLocked() ReloadResult {
 	return res
 }
 
+// applyBudgetLimits applies each budget limit whose file value changed since
+// the last load to the ledger's live limit, then re-evaluates the latches as
+// `gx budget increase` does. Comparing file values, not live ones, keeps a
+// live increase on the field the person did not edit. It returns a warning
+// when a lowered hard limit is already reached.
+func (s *Server) applyBudgetLimits(old, next Settings) string {
+	softChanged := next.BudgetSoftLimit != old.BudgetSoftLimit
+	hardChanged := next.BudgetHardLimit != old.BudgetHardLimit
+	if !softChanged && !hardChanged {
+		return ""
+	}
+	now := time.Now()
+	soft, hard := s.ledger.limits()
+	if softChanged {
+		soft = next.BudgetSoftLimit
+	}
+	var warning string
+	if hardChanged {
+		held, spent := s.ledger.setLimitsHoldingHard(now, soft, next.BudgetHardLimit)
+		if held {
+			warning = fmt.Sprintf("budget.hard-limit (%s) is at or below today's spend (%s); running agents keep going",
+				tickets.FormatCost(next.BudgetHardLimit), tickets.FormatCost(spent))
+		}
+	} else {
+		s.ledger.setLimits(now, soft, hard)
+	}
+	if err := s.ledger.save(now); err != nil {
+		s.log.Error("save budget ledger", "err", err)
+	}
+	s.rearmBudgetNotes(s.budgetStatus(now))
+	s.events.publish(EventQueueChanged, "")
+	return warning
+}
+
 // reloadableSettings is next with the fields reload does not apply yet
-// (budget, chat, store commits) kept at their live values.
+// (chat, store commits) kept at their live values.
 func reloadableSettings(old, next Settings) Settings {
-	next.BudgetSoftLimit, next.BudgetHardLimit = old.BudgetSoftLimit, old.BudgetHardLimit
 	next.Chat = old.Chat
 	next.StoreCommitDebounce, next.StorePushRemote = old.StoreCommitDebounce, old.StorePushRemote
 	return next
@@ -100,6 +138,8 @@ func changedKeys(old, next Settings) []string {
 	}{
 		{"execution-queue.max-agents", old.MaxAgents, next.MaxAgents},
 		{"execution-queue.max-agents-per-epic", old.MaxAgentsPerRoot, next.MaxAgentsPerRoot},
+		{"budget.soft-limit", old.BudgetSoftLimit, next.BudgetSoftLimit},
+		{"budget.hard-limit", old.BudgetHardLimit, next.BudgetHardLimit},
 		{"server.tab-env", old.TabEnv, next.TabEnv},
 		{"server.auto-merge-epic", old.AutoMergeEpic, next.AutoMergeEpic},
 		{"server.log-retention", old.LogRetention, next.LogRetention},
