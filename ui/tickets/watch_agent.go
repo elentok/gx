@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
@@ -117,8 +118,19 @@ func (w watchModal) View() string {
 	return components.RenderOutputModal(w.title, w.vp.View(), hint, ui.ColorBorder, ui.ColorGreen, ui.ColorGray, w.vp.Width())
 }
 
-// cmdWatchAgent reads address's native log and renders it with the same
-// renderer as `gx server agents watch`.
+// holderScreen is a package-level seam so tests can fake a pty holder's
+// visible screen rows.
+var holderScreen = func(ptyDir string) ([]string, error) {
+	h, err := nativerunner.DialHolder(ptyDir)
+	if err != nil {
+		return nil, err
+	}
+	rows, _, err := h.Screen(0)
+	return rows, err
+}
+
+// cmdWatchAgent shows address's native agent: a pty agent's holder screen,
+// else its log rendered with the same renderer as `gx server agents watch`.
 func cmdWatchAgent(address string) tea.Cmd {
 	var cmd tea.Cmd
 	cmd = func() tea.Msg {
@@ -126,7 +138,12 @@ func cmdWatchAgent(address string) tea.Cmd {
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}
-		lines, err := renderedLog(log)
+		var lines []string
+		if log.PtyDir != "" && !log.Pruned {
+			lines, err = holderScreen(log.PtyDir)
+		} else {
+			lines, err = renderedLog(log)
+		}
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}

@@ -64,6 +64,36 @@ func TestWatchAgent_HeadlessRefreshShowsNewLines(t *testing.T) {
 	}
 }
 
+func TestWatchAgent_PtyShowsHolderScreenAndRefreshes(t *testing.T) {
+	fakeNativeLog(t, agentlog.Log{Path: "transcript.jsonl", PtyDir: "/pty/dir"}, nil)
+	prev := holderScreen
+	t.Cleanup(func() { holderScreen = prev })
+	screen := []string{"first screen"}
+	var dirs []string
+	holderScreen = func(dir string) ([]string, error) {
+		dirs = append(dirs, dir)
+		return screen, nil
+	}
+
+	modal := watchModal{}.Open(cmdWatchAgent("gx:epic/01")().(watchLoadedMsg), 120, 40)
+	if view := modal.View(); !strings.Contains(view, "first screen") {
+		t.Fatalf("modal missing the holder screen:\n%s", view)
+	}
+
+	screen = []string{"second screen"}
+	modal, cmd := modal.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if cmd == nil {
+		t.Fatal("r returned no refresh command")
+	}
+	modal = modal.Open(cmd().(watchLoadedMsg), 120, 40)
+	if view := modal.View(); !strings.Contains(view, "second screen") {
+		t.Errorf("refreshed modal missing the new screen:\n%s", view)
+	}
+	if len(dirs) != 2 || dirs[0] != "/pty/dir" {
+		t.Errorf("holder screen fetched from %q, want /pty/dir twice", dirs)
+	}
+}
+
 func TestWatchAgent_PrunedLogPointsAtTranscript(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{Pruned: true, Transcript: "/t/x.jsonl"}, nil)
 	loaded := cmdWatchAgent("gx:epic/01")().(watchLoadedMsg)
