@@ -294,10 +294,11 @@ func (t *tui) submit() error {
 
 const escKey = 0x1b
 
-// interrupt is Esc: it ends a running turn and keeps the session.
+// interrupt is Esc: it ends a running turn, or denies a dialog, and keeps
+// the session.
 func (t *tui) interrupt() error {
 	t.typed.Reset()
-	if t.pid.Status != StatusBusy {
+	if t.pid.Status != StatusBusy && t.pid.Status != StatusWaiting {
 		return nil
 	}
 	return t.setStatus(StatusIdle, "")

@@ -3,6 +3,7 @@ package claudeui
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -80,6 +81,20 @@ func TestMatches(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			if got := Matches(c.text, c.anchor); got != c.want {
 				t.Errorf("Matches(%q) = %v, want %v\ntext: %q", c.anchor, got, c.want, c.text)
+			}
+		})
+	}
+}
+
+// The pty runner's allow is Enter on the selected first option, so it must be
+// a "Yes" on every dialog claude reports as a permission prompt.
+func TestPermissionPromptsSelectYesFirst(t *testing.T) {
+	firstOption := regexp.MustCompile(`❯ 1\. (\S+)`)
+	for _, name := range []string{"permission-w160", "plan-approval"} {
+		t.Run(name, func(t *testing.T) {
+			m := firstOption.FindStringSubmatch(screenFixture(t, name))
+			if m == nil || !strings.HasPrefix(m[1], "Yes") {
+				t.Fatalf("selected first option = %q, want Yes", m)
 			}
 		})
 	}

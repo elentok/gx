@@ -54,8 +54,17 @@ func TestPty_Conformance(t *testing.T) {
 			FinishTurn: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFinish})
 			},
-			Block: func(t *testing.T, s agentrunner.Session, reason string) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: reason})
+			// The reason is dropped: the suite answers allow, which only a
+			// permission prompt takes.
+			Block: func(t *testing.T, s agentrunner.Session, _ string) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"})
+			},
+			BlockOnDialog: func(t *testing.T, s agentrunner.Session, permission bool) {
+				waitingFor := "input needed"
+				if permission {
+					waitingFor = "permission prompt"
+				}
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: waitingFor})
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
@@ -75,10 +84,6 @@ func TestPty_Conformance(t *testing.T) {
 					}
 				}
 				return r
-			},
-			Skip: map[string]string{
-				"BlockedThenAnswer": "pty answer lands in ticket 30",
-				"AnswerNotBlocked":  "pty answer lands in ticket 30",
 			},
 		}
 	})

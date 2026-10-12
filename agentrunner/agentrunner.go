@@ -100,6 +100,9 @@ var (
 	// (the agent exited, or its host crashed). Build it with SessionDied so
 	// the message carries why; callers park needs-repair with that message.
 	ErrSessionDied = errors.New("agentrunner: session died")
+	// ErrInvalidDecision: Answer got a decision the blocked prompt can't take,
+	// e.g. allow on a dialog that is not a permission prompt.
+	ErrInvalidDecision = errors.New("agentrunner: invalid decision")
 )
 
 // SessionDied wraps ErrSessionDied with reason, e.g. "claude exited (code 1)".

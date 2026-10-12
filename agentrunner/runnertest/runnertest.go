@@ -31,6 +31,10 @@ type Harness struct {
 	// Restart returns a fresh Runner over the same host, as after a gx
 	// restart.
 	Restart func(t *testing.T) agentrunner.Runner
+	// BlockOnDialog makes the agent behind s wait on a permission prompt, or
+	// on another dialog that only deny may answer. Leave it nil for a runner
+	// that doesn't tell dialogs apart; the dialog scenarios then skip.
+	BlockOnDialog func(t *testing.T, s agentrunner.Session, permission bool)
 	// Skip maps a scenario this runner can't pass yet to the reason why.
 	Skip map[string]string
 }
@@ -60,6 +64,10 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"Blocked", blocked},
 		{"BlockedThenAnswer", blockedThenAnswer},
 		{"AnswerNotBlocked", answerNotBlocked},
+		{"PermissionAllow", permissionAllow},
+		{"PermissionDeny", permissionDeny},
+		{"OtherDialogDeny", otherDialogDeny},
+		{"OtherDialogAllowRefused", otherDialogAllowRefused},
 		{"RateLimit", rateLimit},
 		{"RestartThenFind", restartThenFind},
 		{"TurnSurvivesRestart", turnSurvivesRestart},
@@ -328,6 +336,65 @@ func answerNotBlocked(t *testing.T, h Harness) {
 	err := h.Runner.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionAllow})
 	if !errors.Is(err, agentrunner.ErrNotReady) {
 		t.Fatalf("Answer on idle agent err = %v, want ErrNotReady", err)
+	}
+}
+
+// blockOnDialog prompts a fresh session and waits until it is blocked on a
+// dialog, skipping when the runner has no BlockOnDialog hook.
+func blockOnDialog(t *testing.T, h Harness, permission bool) agentrunner.Session {
+	t.Helper()
+	if h.BlockOnDialog == nil {
+		t.Skip("runner has no BlockOnDialog hook")
+	}
+	s := start(t, h.Runner, "e-01", "e")
+	prompt(t, h.Runner, s, "do it")
+	h.BlockOnDialog(t, s, permission)
+	if _, err := h.Runner.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, waitTimeout); err != nil {
+		t.Fatalf("Wait blocked: %v", err)
+	}
+	return s
+}
+
+func answer(t *testing.T, r agentrunner.Runner, s agentrunner.Session, d agentrunner.Decision) {
+	t.Helper()
+	if err := r.Answer(s, agentrunner.Answer{Decision: d}); err != nil {
+		t.Fatalf("Answer(%s): %v", d, err)
+	}
+}
+
+// permissionAllow: allow resumes the turn the prompt interrupted.
+func permissionAllow(t *testing.T, h Harness) {
+	s := blockOnDialog(t, h, true)
+	answer(t, h.Runner, s, agentrunner.DecisionAllow)
+	if st := status(t, h.Runner, s); st.State != agentrunner.StateWorking {
+		t.Fatalf("status after allow = %+v, want working", st)
+	}
+}
+
+func permissionDeny(t *testing.T, h Harness) {
+	s := blockOnDialog(t, h, true)
+	answer(t, h.Runner, s, agentrunner.DecisionDeny)
+	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
+		t.Fatalf("Wait idle after deny: %v", err)
+	}
+}
+
+func otherDialogDeny(t *testing.T, h Harness) {
+	s := blockOnDialog(t, h, false)
+	answer(t, h.Runner, s, agentrunner.DecisionDeny)
+	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
+		t.Fatalf("Wait idle after deny: %v", err)
+	}
+}
+
+func otherDialogAllowRefused(t *testing.T, h Harness) {
+	s := blockOnDialog(t, h, false)
+	err := h.Runner.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionAllow})
+	if !errors.Is(err, agentrunner.ErrInvalidDecision) {
+		t.Fatalf("allow on a non-permission dialog err = %v, want ErrInvalidDecision", err)
+	}
+	if st := status(t, h.Runner, s); st.State != agentrunner.StateBlocked {
+		t.Fatalf("status after refused allow = %+v, want still blocked", st)
 	}
 }
 

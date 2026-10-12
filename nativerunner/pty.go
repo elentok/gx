@@ -486,9 +486,14 @@ func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 	if err != nil {
 		return err
 	}
-	_, turn, err := ss.holder.Status()
+	claude, turn, err := ss.holder.Status()
 	if err != nil {
 		return p.died(ss, err)
+	}
+	// Enter on a dialog would pick its first option, allowing a permission
+	// prompt nobody answered.
+	if claude != nil && claude.Status == ClaudeWaiting {
+		return fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, claude.WaitingFor)
 	}
 	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
 	err = claudeui.PromptWithNudge(pr, text, time.Time{}, time.Now)
@@ -559,11 +564,53 @@ func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	return time.Time{}, false, err
 }
 
-func (p *Pty) Answer(s agentrunner.Session, _ agentrunner.Answer) error {
-	if _, err := p.live(s); err != nil {
+// permissionPrompt is the waitingFor of both tool permission and plan
+// approval. Their first option is "Yes", so Enter allows.
+const permissionPrompt = "permission prompt"
+
+// Answer presses Enter to allow a permission prompt or Esc to deny any
+// dialog, and returns once Turn moved. Allow on any other dialog is
+// ErrInvalidDecision: its options aren't known, but Esc always cancels it.
+func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
+	ss, err := p.live(s)
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%w: answer", errPtyNotYet)
+	claude, turn, err := ss.holder.Status()
+	if err != nil {
+		return p.died(ss, err)
+	}
+	if claude == nil || claude.Status != ClaudeWaiting {
+		return fmt.Errorf("%w: answer on a session that is not blocked", agentrunner.ErrNotReady)
+	}
+	var key string
+	switch a.Decision {
+	case agentrunner.DecisionAllow:
+		if claude.WaitingFor != permissionPrompt {
+			return fmt.Errorf("%w: %q is not a permission prompt; deny cancels it",
+				agentrunner.ErrInvalidDecision, claude.WaitingFor)
+		}
+		key = "\r"
+	case agentrunner.DecisionDeny:
+		if a.Text != "" {
+			return fmt.Errorf("%w: deny with a reason", errPtyNotYet)
+		}
+		key = "\x1b"
+	default:
+		return fmt.Errorf("%w: %q", agentrunner.ErrInvalidDecision, a.Decision)
+	}
+	if err := p.died(ss, ss.holder.SendKeys(key)); err != nil {
+		return err
+	}
+	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
+	moved, err := pr.WaitStart(p.promptGrace())
+	if err != nil {
+		return err
+	}
+	if !moved {
+		return fmt.Errorf("%w: %s left the dialog open", agentrunner.ErrNotDelivered, a.Decision)
+	}
+	return nil
 }
 
 func (p *Pty) backgroundTasks(s agentrunner.Session) bool {
