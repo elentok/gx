@@ -18,7 +18,8 @@ install:
 # The real-herdr e2e tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
 # The PTY-runner packages also run under -race: they share a vt emulator with
 # a background goroutine, and data races there only surface under the detector.
-RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor
+# herdrrunner runs under it too, for its concurrent use of the herdr fake.
+RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor ./agentrunner/herdrrunner
 
 test: test-race
 	go test ./... -timeout=10m

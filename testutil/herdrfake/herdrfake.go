@@ -133,6 +133,9 @@ func Start(t *testing.T, handler Handler) *Coordinator {
 
 	t.Setenv(helperSocketEnv, sockPath)
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	// Under -race, each helper would otherwise sleep on exit waiting for
+	// races to report, which made every fake herdr call slow.
+	t.Setenv("GORACE", strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=0"))
 
 	return c
 }
