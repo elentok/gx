@@ -209,7 +209,8 @@ The skill owns the dedupe rules; no caller restates them.
 - **Candidates**: every ticket in `<project>:follow-ups`, in `<project>:follow-ups-archived`, and
   every open ticket in the project carrying a `category` (follow-ups already moved out). The skill
   lists them with `gx tickets show <project:epic>` and reads each one's title and `## Problem`.
-- **Judge**: the skill itself, one finding at a time. No subagent.
+- **Judge**: the skill itself, one finding at a time, by title and `## Problem` — the same problem,
+  not the same area. No subagent.
 - **Outcomes**:
   - No match → file it.
   - Matches an open ticket carrying a `category` → append a dated "seen again" entry naming the new
