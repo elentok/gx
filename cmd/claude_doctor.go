@@ -5,11 +5,15 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/claudedoctor"
 	"github.com/elentok/gx/nativerunner"
 )
@@ -53,12 +57,16 @@ whose dependency did not pass is skipped. Never checks herdr.`,
 
 // liveDoctorSource runs checks against the installed claude.
 func liveDoctorSource() claudedoctor.Source {
+	ptyRun := sync.OnceValues(livePty)
 	src := claudedoctor.Source{
 		Live: true,
 		Session: func(name string) (claudedoctor.Recording, error) {
-			if name == "turn" {
+			switch name {
+			case "turn":
 				events, err := liveTurn()
 				return claudedoctor.Recording{Events: events}, err
+			case "pty-status", "pty-trust":
+				return ptyRun()
 			}
 			return claudedoctor.Recording{}, fmt.Errorf("%w: %s", claudedoctor.ErrNoLiveSession, name)
 		},
@@ -67,6 +75,31 @@ func liveDoctorSource() claudedoctor.Source {
 		src.ClaudeVersion = claudedoctor.ParseVersion(string(out))
 	}
 	return src
+}
+
+// livePty runs one real claude through the PTY runner in a fresh temp dir, so
+// it shows the trust dialog, then opens /model to reach a waiting status. One
+// run serves every pty session.
+func livePty() (claudedoctor.Recording, error) {
+	// Short root: holder.sock lives under it and socket paths are length-capped.
+	root, err := os.MkdirTemp("", "gxd")
+	if err != nil {
+		return claudedoctor.Recording{}, err
+	}
+	defer os.RemoveAll(root)
+	cwd, err := os.MkdirTemp("", "gx-doctor-pty-")
+	if err != nil {
+		return claudedoctor.Recording{}, err
+	}
+	defer os.RemoveAll(cwd)
+	p := &nativerunner.Pty{Root: root}
+	return claudedoctor.PtyLive(p, cwd, func(s agentrunner.Session) error {
+		if err := p.Prompt(s, "/model"); err != nil {
+			return err
+		}
+		_, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 30*time.Second)
+		return err
+	})
 }
 
 // liveTurn runs one real headless turn and returns its raw events.
