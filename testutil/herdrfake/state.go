@@ -161,8 +161,11 @@ func NewState(t testing.TB) *State {
 // Register installs fn as the implementation of the herdr subcommand named
 // by verb and noun (e.g. Register("workspace", "list", ...)). Dispatching a
 // command with no registered implementation fails fast instead of guessing
-// at a default response.
+// at a default response. A test may Register after the fake has started
+// serving, so it takes mu like any dispatch; a CommandFunc must not call it.
 func (s *State) Register(verb, noun string, fn CommandFunc) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.commands[verb+" "+noun] = fn
 }
 
