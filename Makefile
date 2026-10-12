@@ -1,4 +1,4 @@
-.PHONY: build install test e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build install test test-race e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -16,8 +16,15 @@ install:
 # locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. park/resume
 # against a permit cap) more room to legitimately run long; 2m proved too tight there.
 # The real-herdr e2e tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
-test:
+# The PTY-runner packages also run under -race: they share a vt emulator with
+# a background goroutine, and data races there only surface under the detector.
+RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor
+
+test: test-race
 	go test ./... -timeout=10m
+
+test-race:
+	go test -race $(RACE_PKGS) -timeout=10m
 
 # e2e runs the herdr e2e suite against a real, already-running herdr daemon
 # (herdr must be on PATH). Tests skip themselves if either isn't available.

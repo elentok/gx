@@ -31,6 +31,13 @@ func TestMain(m *testing.M) {
 }
 
 func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
+	// PtyLive's recorder polls the screen, and Start answers the trust
+	// dialog on its own poll, so the dialog can come and go between two
+	// samples. The race detector's slowdown makes that miss common; the plain
+	// run keeps covering this test.
+	if raceEnabled {
+		t.Skip("trust frame capture is timing-sensitive under -race")
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)

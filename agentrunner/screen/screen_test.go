@@ -102,6 +102,20 @@ func TestScreen_ScrollbackTailIsLastN(t *testing.T) {
 	}
 }
 
+// Run under -race: the drain goroutine must not touch the emulator after
+// Close returns.
+func TestScreen_CloseWhileDrainingIsRaceFree(t *testing.T) {
+	s := screen.NewScreen(10, 2)
+	// Cursor-position and device-attribute queries make the emulator reply.
+	_, _ = s.Write([]byte("\x1b[6n\x1b[c"))
+	if err := s.Close(); err != nil {
+		t.Fatalf("Close() = %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatalf("second Close() = %v", err)
+	}
+}
+
 func TestScreen_Resize(t *testing.T) {
 	s := screen.NewScreen(10, 2)
 	t.Cleanup(func() { _ = s.Close() })

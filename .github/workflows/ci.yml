@@ -49,6 +49,13 @@ jobs:
           GIT_CONFIG_VALUE_0: "false"
         run: go test ./... -timeout=10m
 
+      - name: Test (race)
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: maintenance.auto
+          GIT_CONFIG_VALUE_0: "false"
+        run: make test-race
+
       - name: Build
         run: go build ./...
 

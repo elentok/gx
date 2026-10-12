@@ -15,17 +15,25 @@ import (
 // Screen is a concurrency-safe virtual terminal fed with a child's raw
 // output.
 type Screen struct {
-	mu  sync.Mutex
-	emu *vt.Emulator
+	mu      sync.Mutex
+	emu     *vt.Emulator
+	drained chan struct{}
 }
 
 // NewScreen returns a cols×rows screen. Call Close when done.
 func NewScreen(cols, rows int) *Screen {
 	emu := vt.NewEmulator(cols, rows)
-	// The emulator writes its replies to terminal queries into a pipe; an
-	// undrained pipe blocks the next Write that triggers one.
-	go func() { _, _ = io.Copy(io.Discard, emu) }()
-	return &Screen{emu: emu}
+	s := &Screen{emu: emu, drained: make(chan struct{})}
+	// The emulator writes its replies to terminal queries (cursor position,
+	// device attributes) into a pipe, and an undrained pipe blocks the next
+	// Write that triggers one. The replies are discarded on purpose: the real
+	// terminal attached to the PTY answers the child's queries, not this
+	// screen.
+	go func() {
+		defer close(s.drained)
+		_, _ = io.Copy(io.Discard, emu)
+	}()
+	return s
 }
 
 // Write feeds raw output bytes to the emulator.
@@ -64,9 +72,16 @@ func (s *Screen) ScrollbackTail(n int) []string {
 	return rows
 }
 
-// Close stops the emulator.
+// Close stops the drain goroutine, waits for it to exit, then stops the
+// emulator.
 func (s *Screen) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// emu.Read checks the emulator's closed flag without a lock, so
+	// emu.Close must not run until the drain goroutine is gone. Closing the
+	// reply pipe first ends its io.Copy. The unchecked assertion panics
+	// rather than hangs if the emulator ever stops handing back a closer.
+	_ = s.emu.InputPipe().(io.Closer).Close()
+	<-s.drained
 	return s.emu.Close()
 }
