@@ -44,7 +44,7 @@ func runTicketsShow(cwd, addr string, jsonOut bool, w io.Writer) error {
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
 		if project, epic, ok := parseEpicArg(addr); ok {
 			if jsonOut {
-				return errors.New("--json is not supported for an epic address")
+				return &tickets.AddressError{Code: tickets.CodeEpicJSON, Msg: "--json is not supported for an epic address"}
 			}
 			return showEpic(cwd, project, epic, w)
 		}

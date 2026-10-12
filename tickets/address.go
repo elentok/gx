@@ -20,6 +20,7 @@ const (
 	CodeSectionRequired  = "section-required"
 	CodeStatusOverride   = "status-override"
 	CodeTypeOverride     = "type-override"
+	CodeEpicJSON         = "epic-json-unsupported" // `tickets show --json` on an epic
 
 	// `tickets move` refusals.
 	CodeMoveStatus       = "move-status"

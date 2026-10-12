@@ -140,7 +140,9 @@ conversation history.
 - **Address a ticket**: agents name a ticket by its address, `project:epic/NN` (`epic/NN` or `NN`
   work as input when the epic is implied). Read it with `gx tickets show <addr>`; given an epic
   address (`project:epic`, or a bare `epic` in the cwd project) `show` prints the epic's
-  `ticket.md` (frontmatter and body) followed by its tickets, one `id  status  title` line each. Change a body
+  `ticket.md` (frontmatter and body) followed by its tickets, one `id  status  title` line each
+  (no `--json`). An all-numeric bare argument resolves as a ticket ID, so an epic named like
+  `2024` needs its `project:epic` form. Change a body
   section with `gx tickets section <addr> <heading> <content|->`, change fields with `gx tickets
   set <addr>`. Never read or write a ticket file by path — `gx tickets root` / `gx tickets epics`
   are for humans and scripts.

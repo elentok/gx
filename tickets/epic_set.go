@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
@@ -137,8 +138,14 @@ func setMappingValue(mapping *yaml.Node, key string, value any) error {
 // or CodeUnknownEpic when there is none.
 func EpicTicketMDPath(projectDir, project, name string) (string, error) {
 	path := filepath.Join(projectDir, name, "ticket.md")
+	// The loader skips dot-dirs, so they are never epics; refusing them also
+	// keeps ".." from escaping projectDir.
+	unknown := &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q in project %q", name, project)}
+	if strings.HasPrefix(name, ".") {
+		return "", unknown
+	}
 	if _, err := os.Stat(path); err != nil {
-		return "", &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q in project %q", name, project)}
+		return "", unknown
 	}
 	return path, nil
 }

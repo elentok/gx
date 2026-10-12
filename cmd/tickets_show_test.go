@@ -89,24 +89,39 @@ func TestExecute_TicketsShow_EpicAddressPrintsEntryAndTickets(t *testing.T) {
 }
 
 func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
-	repo, _ := setupShowProject(t)
+	repo, project := setupShowProject(t)
 
-	for addr, code := range map[string]string{
-		"mine:epic/99":  tickets.CodeUnknownTicket,
-		"mine:nope/06":  tickets.CodeUnknownEpic,
-		"other:epic/06": tickets.CodeUnknownProject,
-		"06":            tickets.CodeEpicRequired,
-		"mine:nope":     tickets.CodeUnknownEpic,
-		"nope":          tickets.CodeUnknownEpic,
-		"a/b/c":         tickets.CodeMalformedAddress,
+	// A ticket.md one level above the epic dirs must stay unreachable via "..".
+	testutil.WriteFile(t, filepath.Dir(project), "ticket.md", "escaped\n")
+	if err := os.MkdirAll(filepath.Join(project, ".archive"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, ".archive"))
+
+	for _, tc := range []struct {
+		args []string
+		code string
+	}{
+		{[]string{"mine:epic/99"}, tickets.CodeUnknownTicket},
+		{[]string{"mine:nope/06"}, tickets.CodeUnknownEpic},
+		{[]string{"other:epic/06"}, tickets.CodeUnknownProject},
+		{[]string{"06"}, tickets.CodeEpicRequired},
+		{[]string{"mine:nope"}, tickets.CodeUnknownEpic},
+		{[]string{"nope"}, tickets.CodeUnknownEpic},
+		{[]string{"a/b/c"}, tickets.CodeMalformedAddress},
+		{[]string{".."}, tickets.CodeUnknownEpic},
+		{[]string{".archive"}, tickets.CodeUnknownEpic},
+		{[]string{"mine:.archive"}, tickets.CodeUnknownEpic},
+		{[]string{"epic", "--json"}, tickets.CodeEpicJSON},
+		{[]string{"mine:epic", "--json"}, tickets.CodeEpicJSON},
 	} {
-		out, err := runIn(t, repo, "tickets", "show", addr)
+		out, err := runIn(t, repo, append([]string{"tickets", "show"}, tc.args...)...)
 		var ae *tickets.AddressError
-		if !errors.As(err, &ae) || ae.Code != code {
-			t.Errorf("show %s err = %v, want code %s", addr, err, code)
+		if !errors.As(err, &ae) || ae.Code != tc.code {
+			t.Errorf("show %v err = %v, want code %s", tc.args, err, tc.code)
 		}
 		if out != "" {
-			t.Errorf("show %s stdout = %q, want empty", addr, out)
+			t.Errorf("show %v stdout = %q, want empty", tc.args, out)
 		}
 	}
 }
@@ -127,6 +142,15 @@ func TestExecute_TicketsShow_CrossProject(t *testing.T) {
 	}
 	if !strings.HasPrefix(out, "theirs:epic/03  Remote\n") || !strings.Contains(out, "remote body") {
 		t.Errorf("show printed %q", out)
+	}
+
+	out, err = runIn(t, repo, "tickets", "show", "theirs:epic")
+	if err != nil {
+		t.Fatalf("show theirs:epic: %v", err)
+	}
+	if !strings.HasPrefix(out, "theirs:epic\npath: "+filepath.Join(theirs, "epic", "ticket.md")) ||
+		!strings.HasSuffix(out, "\ntickets:\n03  open  Remote\n") {
+		t.Errorf("show theirs:epic printed %q", out)
 	}
 
 	// A prefix that is a directory of the store but not a project is unknown too.
