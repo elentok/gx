@@ -77,8 +77,9 @@ type holderServer struct {
 	proc *os.Process
 	pid  *pidWatcher
 	ops  []string
-	// exited closes once the child has exited.
-	exited chan struct{}
+	// exited closes once the child has exited and exitCode is set.
+	exited   chan struct{}
+	exitCode int
 }
 
 func (h *holderServer) serve(ln net.Listener) {
@@ -114,6 +115,13 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	case opPing:
 		return holderResponse{Version: HolderProtocolVersion, Ops: h.ops, Pid: h.proc.Pid}, nil
 	case opStatus:
+		// The pid file's last status outlives claude, and the holder keeps
+		// answering while it drains, so an exit must not read as idle.
+		select {
+		case <-h.exited:
+			return holderResponse{Error: fmt.Sprintf("claude exited (code %d)", h.exitCode)}, nil
+		default:
+		}
 		claude, turn := h.pid.state()
 		return holderResponse{Claude: claude, Turn: turn}, nil
 	case opScreen:

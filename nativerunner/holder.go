@@ -35,6 +35,10 @@ const (
 // exits: a grandchild that inherited the tty can keep it open forever.
 const holderDrainTimeout = time.Second
 
+// holderAfterExit runs once the child has exited, before the drain; tests
+// hold the holder there.
+var holderAfterExit = func() {}
+
 // RunHolder runs argv in a pty, appends its output to raw.log in dir and
 // feeds it to a screen. Once the child exits it saves the last screen and
 // the exit code to dir and returns. The caller starts the holder in its own
@@ -102,7 +106,9 @@ func RunHolder(dir string, argv []string) error {
 	}()
 
 	waitErr := cmd.Wait()
+	srv.exitCode = cmd.ProcessState.ExitCode()
 	close(srv.exited)
+	holderAfterExit()
 	// The holder keeps its own tty fd open until now: on macOS the child's
 	// last output is dropped once every tty fd is closed, so it is read out
 	// of the pty before the holder lets go.
@@ -124,7 +130,7 @@ func RunHolder(dir string, argv []string) error {
 		return err
 	}
 	// ExitCode is -1 for a child killed by a signal.
-	code := strconv.Itoa(cmd.ProcessState.ExitCode())
+	code := strconv.Itoa(srv.exitCode)
 	return os.WriteFile(filepath.Join(dir, ExitCodeFile), []byte(code+"\n"), 0o644)
 }
 

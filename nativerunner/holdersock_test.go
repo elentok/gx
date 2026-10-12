@@ -141,6 +141,37 @@ func TestHolderSocket_DenyReasonIdleTimeout(t *testing.T) {
 	}
 }
 
+// idleThenExit goes idle, then exits on the next line.
+const idleThenExit = `st idle; read -r l; exit 3`
+
+func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
+	// Hold the holder before its drain, while holder.sock still answers.
+	release := make(chan struct{})
+	nativerunner.SetHolderAfterExit(t, func() { <-release })
+	c := startDenyHolder(t, idleThenExit)
+	defer close(release)
+	if err := c.SendKeys("x"); err != nil {
+		t.Fatal(err)
+	}
+	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, 2)
+
+	if err := c.SendKeys("quit\r"); err != nil {
+		t.Fatal(err)
+	}
+	var err error
+	waitFor(t, "status fails", func() bool {
+		var s *nativerunner.PidStatus
+		s, _, err = c.Status()
+		if err == nil && s.Status != nativerunner.ClaudeIdle {
+			t.Fatalf("status = %+v; want idle until it fails", s)
+		}
+		return err != nil
+	})
+	if !strings.Contains(err.Error(), "claude exited (code 3)") {
+		t.Errorf("status error = %v; want claude exited (code 3)", err)
+	}
+}
+
 func waitForScreen(t *testing.T, c *nativerunner.HolderClient, want string) {
 	t.Helper()
 	waitFor(t, "the screen shows "+want, func() bool {
