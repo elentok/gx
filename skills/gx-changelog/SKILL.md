@@ -14,8 +14,8 @@ This skill is entered two ways, and its last step differs between them:
 - **Invoked directly by a user** (`/gx-changelog`): after drafting and reviewing the entry, write it
   into `CHANGELOG.md` yourself.
 - **Invoked as a sub-agent by another skill** (e.g. `gx-bump`): do the same drafting and review, but
-  return the drafted entry text to the caller instead of writing it — the caller owns the
-  review-pause and commit steps in that case.
+  return the drafted entry text to the caller instead of writing it — the caller owns the write
+  and commit steps in that case.
 
 Everything through "review the summary" below is identical in both cases; only the final "write vs.
 return" step differs.
