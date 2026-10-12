@@ -35,7 +35,7 @@ func TestReadProjectFile_RejectsNonWhitelistedKeysByName(t *testing.T) {
 func TestReadProjectFile_AcceptsWhitelist(t *testing.T) {
 	dir := writeProjectJSON(t, `{
 		"$schema": "s",
-		"name": "p", "repo": "/r", "vcs": "none", "trunk": "main", "landing": "pr",
+		"name": "p", "repo": "/r", "vcs": "none", "trunk": "main", "landing": "on-done",
 		"auto-ff-merge": true, "max-agents": 2,
 		"agents": {"claude": {"model": "m"}},
 		"skills": {"implement": "s"},
@@ -44,6 +44,19 @@ func TestReadProjectFile_AcceptsWhitelist(t *testing.T) {
 	}`)
 	if _, err := ReadProjectFile(dir); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestParseProjectFile_RejectsBadEnumsAndTypes(t *testing.T) {
+	cases := map[string]string{
+		"landing":    `{"landing": "pr"}`,
+		"vcs":        `{"vcs": "hg"}`,
+		"max-agents": `{"max-agents": "two"}`,
+	}
+	for key, body := range cases {
+		if _, err := ParseProjectFile([]byte(body)); err == nil || !strings.Contains(err.Error(), key) {
+			t.Errorf("%s: want error naming it, got %v", key, err)
+		}
 	}
 }
 

@@ -42,7 +42,7 @@ func serverRead[T any](ctx context.Context, jsonOut bool, w io.Writer, fetch fun
 	return text(w, v)
 }
 
-func newProjectCmd(_ deps) *cobra.Command {
+func newProjectCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "project", Short: "ticket-store projects", Args: cobra.NoArgs}
 	var jsonOut bool
 	list := &cobra.Command{
@@ -126,7 +126,7 @@ func newProjectCmd(_ deps) *cobra.Command {
 		},
 	}
 	setPath.Flags().BoolVar(&setJSON, "json", false, "emit structured JSON instead of human-readable text")
-	cmd.AddCommand(setPath)
+	cmd.AddCommand(setPath, newProjectEditConfigCmd(d))
 	return cmd
 }
 

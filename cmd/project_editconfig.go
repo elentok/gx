@@ -1,0 +1,190 @@
+package cmd
+
+import (
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
+	"github.com/spf13/cobra"
+)
+
+func newProjectEditConfigCmd(d deps) *cobra.Command {
+	return &cobra.Command{
+		Use:   "edit-config [project]",
+		Short: "edit a project's project.json in $EDITOR, validated before it is saved (project defaults to the current repo's)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			name := ""
+			if len(args) == 1 {
+				name = args[0]
+			}
+			return runProjectEditConfig(d, name)
+		},
+	}
+}
+
+// runProjectEditConfig edits a temp copy of project.json so neither the server
+// nor a concurrent writer ever sees a half-written or invalid file.
+func runProjectEditConfig(d deps, name string) error {
+	dir, err := projectDirFor(d, name)
+	if err != nil {
+		return err
+	}
+	livePath := filepath.Join(dir, config.ProjectFileName)
+	orig, err := os.ReadFile(livePath)
+	if os.IsNotExist(err) {
+		return tickets.ErrNoProject
+	}
+	if err != nil {
+		return err
+	}
+	editor := d.getenv("EDITOR")
+	if strings.TrimSpace(editor) == "" {
+		return fmt.Errorf("$EDITOR is not set")
+	}
+	tmp, err := os.CreateTemp("", "gx-project-*.json")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	_, err = tmp.Write(orig)
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	keepTmp := false
+	defer func() {
+		if !keepTmp {
+			os.Remove(tmpPath)
+		}
+	}()
+	if err != nil {
+		return err
+	}
+
+	tty := d.stdinIsTerminal != nil && d.stdinIsTerminal()
+	answers := bufio.NewReader(d.stdin)
+	for {
+		if err := d.runEditor(editor, tmpPath, d.stdin, d.stdout, d.stderr); err != nil {
+			return err
+		}
+		edited, err := os.ReadFile(tmpPath)
+		if err != nil {
+			return err
+		}
+		if bytes.Equal(edited, orig) {
+			fmt.Fprintln(d.stdout, "no changes")
+			return nil
+		}
+		if err := validateProjectConfig(edited); err != nil {
+			if !tty {
+				return fmt.Errorf("invalid project.json, not saved: %w", err)
+			}
+			fmt.Fprintf(d.stderr, "invalid project.json: %v\n", err)
+			if !askEditAgain(answers, d.stdout) {
+				fmt.Fprintln(d.stdout, "edits discarded; project.json unchanged")
+				return nil
+			}
+			continue
+		}
+		live, err := os.ReadFile(livePath)
+		if err != nil || !bytes.Equal(live, orig) {
+			keepTmp = true
+			return fmt.Errorf("project.json changed while you were editing; your edits are in %s", tmpPath)
+		}
+		if err := writeFileAtomic(livePath, edited); err != nil {
+			return err
+		}
+		fmt.Fprintf(d.stdout, "saved %s\n", livePath)
+		return nil
+	}
+}
+
+// projectDirFor resolves a bare project name, or with none the cwd's project.
+func projectDirFor(d deps, name string) (string, error) {
+	cfg, err := d.loadConfig()
+	if err != nil {
+		return "", err
+	}
+	if name != "" {
+		return tickets.ProjectDirByName(cfg.TicketStore.Path, name)
+	}
+	cwd, err := d.getwd()
+	if err != nil {
+		return "", err
+	}
+	repo, err := git.FindRepo(cwd)
+	if err != nil {
+		return "", tickets.ErrNoProject
+	}
+	return tickets.ProjectDir(cfg.TicketStore.Path, repo.Root)
+}
+
+// validateProjectConfig accepts only what the server's loader accepts, plus a
+// well-formed trunk. Whether the trunk branch exists is not checked: it may be
+// set before the branch is created.
+func validateProjectConfig(data []byte) error {
+	pf, err := config.ParseProjectFile(data)
+	if err != nil {
+		return err
+	}
+	if pf.Trunk == nil {
+		return nil
+	}
+	out, err := exec.Command("git", "check-ref-format", "--branch", *pf.Trunk).CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return fmt.Errorf("trunk: %q is not a valid branch name", *pf.Trunk)
+		}
+		return fmt.Errorf("git check-ref-format: %w: %s", err, out)
+	}
+	return nil
+}
+
+// askEditAgain defaults to yes; end of input means no.
+func askEditAgain(in *bufio.Reader, out io.Writer) bool {
+	fmt.Fprint(out, "Edit again? [Y/n] ")
+	line, err := in.ReadString('\n')
+	if err != nil && line == "" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "", "y", "yes":
+		return true
+	}
+	return false
+}
+
+func writeFileAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	return nil
+}

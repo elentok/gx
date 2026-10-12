@@ -44,6 +44,7 @@ type deps struct {
 	getenv               func(string) string
 	userHomeDir          func() (string, error)
 	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
+	stdinIsTerminal      func() bool
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
 	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
 	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
@@ -85,6 +86,7 @@ func defaultDeps() deps {
 		getenv:               os.Getenv,
 		userHomeDir:          os.UserHomeDir,
 		runEditor:            runEditorCommand,
+		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
 		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
 		verifyCodexSession:   codexsession.VerifyIdentity,
 		readCodexContext:     codexsession.LastContextTokens,

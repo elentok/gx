@@ -96,11 +96,27 @@ func ReadProjectFile(projectDir string) (ProjectFile, error) {
 	if err != nil {
 		return pf, err
 	}
-	if err := checkProjectKeys(data); err != nil {
+	pf, err = ParseProjectFile(data)
+	if err != nil {
 		return pf, fmt.Errorf("%s: %w", path, err)
 	}
+	return pf, nil
+}
+
+// ParseProjectFile is the project.json loader: key whitelist, types, enums.
+func ParseProjectFile(data []byte) (ProjectFile, error) {
+	var pf ProjectFile
+	if err := checkProjectKeys(data); err != nil {
+		return pf, err
+	}
 	if err := json.Unmarshal(data, &pf); err != nil {
-		return pf, fmt.Errorf("parse %s: %w", path, err)
+		return pf, fmt.Errorf("parse: %w", err)
+	}
+	if pf.VCS != nil && *pf.VCS != VCSNone {
+		return pf, fmt.Errorf("vcs: %q is not allowed (want %q or absent)", *pf.VCS, VCSNone)
+	}
+	if pf.Landing != nil && *pf.Landing != "" && *pf.Landing != LandingOnLanded && *pf.Landing != LandingOnDone {
+		return pf, fmt.Errorf("landing: %q is not allowed (want %q or %q)", *pf.Landing, LandingOnLanded, LandingOnDone)
 	}
 	return pf, nil
 }

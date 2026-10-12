@@ -74,9 +74,10 @@ func runWithSpinner(in io.Reader, out io.Writer, label string, fn func() error) 
 
 func isTerminalWriter(w io.Writer) bool {
 	f, ok := w.(*os.File)
-	if !ok {
-		return false
-	}
+	return ok && isTerminalFile(f)
+}
+
+func isTerminalFile(f *os.File) bool {
 	fd := f.Fd()
 	return isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
 }
