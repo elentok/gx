@@ -139,19 +139,19 @@ conversation history.
   nothing written. Then validate it.
 - **Address a ticket**: agents name a ticket by its address, `project:epic/NN` (`epic/NN` or `NN`
   work as input when the epic is implied). Read it with `gx tickets show <addr>`; given an epic
-  address (`project:epic`, or a bare `epic` in the cwd project) `show` prints the epic's
-  `ticket.md` (frontmatter and body) followed by its tickets, one `id  status  title` line each
-  (no `--json`). An all-numeric bare argument resolves as a ticket ID, so an epic named like
-  `2024` needs its `project:epic` form. Change a body
-  section with `gx tickets section <addr> <heading> <content|->`, change fields with `gx tickets
-  set <addr>`. Never read or write a ticket file by path — `gx tickets root` / `gx tickets epics`
-  are for humans and scripts.
+  address (`project:epic`, or a bare `epic` in the cwd project) `show` prints the epic's `ticket.md`
+  (frontmatter and body) followed by its tickets, one `id  status  title` line each (no `--json`).
+  An all-numeric bare argument resolves as a ticket ID, so an epic named like `2024` needs its
+  `project:epic` form. Change a body section with `gx tickets section <addr> <heading> <content|->`,
+  change fields with `gx tickets set <addr>`. Never read or write a ticket file by path —
+  `gx tickets root` / `gx tickets epics` are for humans and scripts.
 - **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
   the stub straight to `<id>-<slug>.md`. The epic argument may be `project:epic`. Filing into a
   `follow-ups` epic with a plain `add` and no `category` refuses; use `follow-up add` instead.
-- **File a follow-up**: `gx tickets follow-up add <project:epic> --body -` — the only way a skill
-  files one; see "Follow-ups".
+- **File a follow-up**: `gx tickets follow-up add <project:epic> --body -`. Skills never call it
+  directly: they file through the [gx-follow-up](gx-follow-up/SKILL.md) skill, which calls this
+  verb. See "Follow-ups".
 - **Move a ticket**: `gx tickets move <addr> <epic> [--slug s] [--dry-run] [--json]` — moves one
   flat, never-run `draft`/`open` ticket to another epic of the same project and rewrites every
   `blocked_by`/`base` reference to it. It refuses a ticket with run history, a `parent` or fork
@@ -277,8 +277,9 @@ here rather than restating it. The filing procedure lives in the
   - `## Suggested fix`
   - `## Open questions` — optional.
 - **Filing**: follow the [gx-follow-up](gx-follow-up/SKILL.md) skill; it is the procedure. It files
-  only through `gx tickets follow-up add <project:epic> --body -`, never a plain `add`. The body's frontmatter carries `category: bug|idea`. The verb refuses, with nothing written and
-  a code naming the gap, when `category` or a required section is missing, when the body asks for a
+  only through `gx tickets follow-up add <project:epic> --body -`, never a plain `add`. The body's
+  frontmatter carries `category: bug|idea`. The verb refuses, with nothing written and a code
+  naming the gap, when `category` or a required section is missing, when the body asks for a
   status or type other than `draft`/`research`, or when the target is not a follow-ups epic.
 - **Seen again**: never file a duplicate; see the dedupe step of
   [gx-follow-up](gx-follow-up/SKILL.md).

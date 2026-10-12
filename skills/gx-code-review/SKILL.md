@@ -97,7 +97,8 @@ already shipped, what the epic was for). Ask it to:
   - **deferred** — real, but not worth fixing in this epic; it becomes a follow-up;
   - **rejected** — dropped.
 - For each deferred finding, also give a target (`gx` for a gx tooling finding, else `<project>`)
-  and a `category` (`bug` for a defect, else `idea`). Group deferred findings that name the same fix.
+  and a `category` (`bug` for a defect, else `idea`). Group deferred findings that name the same fix;
+  a group counts as one problem, so it files as one follow-up.
 
 The consultant only advises: it must not edit anything. Its output is the input to steps 6 and 7.
 

@@ -115,11 +115,12 @@ diagnosis) applies unchanged; only the writes differ.
 <unattended-verbs>
 
 - allowed: exactly the verbs the matched entry lists in its `verbs` (as named in the prompt),
-  whatever they are — e.g. R3's entry grants its `land`. The entry's verbs are the whole grant; the
-  prompt's entry is the authority, not your own judgment of what would help. Filing a tooling bug
-  via the `gx-follow-up` skill (target `gx`, `unattended`) is always allowed too.
+  whatever they are — e.g. R3's entry grants its `land`. The entry's verbs are the whole grant,
+  with one exception: filing a tooling bug via the `gx-follow-up` skill (target `gx`, `unattended`)
+  is always allowed. The prompt's entry is the authority, not your own judgment of what would help.
 - never: a pane nudge or any other verb the matched entry does not list (an unlisted `land`,
-  `reset`, `unpark` or `land --continue/--abort` included), or editing product code.
+  `reset`, `unpark` or `land --continue/--abort` included), or editing product code. The one
+  exception is filing via the `gx-follow-up` skill, above.
 
 </unattended-verbs>
 

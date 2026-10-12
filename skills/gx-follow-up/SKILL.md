@@ -45,11 +45,13 @@ Unattended: the routing test decides; an unregistered cwd with no target → `gx
 
 ## 2. Dedupe
 
-A passed match skips the search, not the outcomes below. Otherwise the candidates
-are the tickets of `<project>:follow-ups` and `<project>:follow-ups-archived`, and every open ticket
-carrying a `category` (follow-ups already moved out). List an epic's tickets with `gx tickets show
-<project:epic>`. Judge a match yourself, by title and `## Problem`: the same problem, not the same
-area.
+A passed match skips the search, not the outcomes below: run `gx tickets show <addr>` on it to learn
+its state (open, archived `fixed`, or other archived) before picking an outcome. `match: none` goes
+straight to step 3.
+
+Otherwise the candidates are the tickets of `<project>:follow-ups` and
+`<project>:follow-ups-archived` only. List an epic's tickets with `gx tickets show <project:epic>`.
+Judge a match yourself, by title and `## Problem`: the same problem, not the same area.
 
 - **No match** → file it (step 3).
 - **An open ticket** → file nothing. Append a dated "seen again" entry naming the new source to its
@@ -62,11 +64,12 @@ area.
 ## 3. Fill and file
 
 - **Category**: the caller's, else infer `bug` (something behaves wrongly) or `idea` (something is
-  missing or painful). Ask only when truly unclear. Unattended: `bug` when there is concrete evidence
-  of wrong behaviour, else `idea`.
+  missing or painful). Ask only when truly unclear, and never when a target project was passed or
+  unattended: then pick `bug` when there is concrete evidence of wrong behaviour, else `idea`.
 - **Sections**: fill Source, Problem, Evidence, Suggested fix and (only when there are any) Open
   questions from the conversation or the caller's input. No preview.
-- **Several problems** → one follow-up each, each through step 2.
+- **Several problems** → one follow-up each, each through step 2. A caller's group of findings that
+  name the same fix counts as one problem.
 - File each with `gx tickets follow-up add <project>:follow-ups --body -`. If the verb refuses, fix
   the gap its code names and retry. Never fall back to a plain `gx tickets add`.
 
