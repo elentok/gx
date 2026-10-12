@@ -787,8 +787,13 @@ func (s *Server) runnerNamed(name, project string) agentrunner.Runner {
 // depsFor is the default deps with the project's runner, so launch, wait and
 // finish all talk to the runner that hosts the agent.
 func (s *Server) depsFor(project string) ralphloop.Deps {
+	return s.depsWith(s.runnerFor(project))
+}
+
+// depsWith is the default deps talking to runner.
+func (s *Server) depsWith(runner agentrunner.Runner) ralphloop.Deps {
 	deps := ralphloop.DefaultDeps()
-	deps.Runner = s.runnerFor(project)
+	deps.Runner = runner
 	if s.cfg.Sleep != nil {
 		deps.Sleep = s.cfg.Sleep
 	}

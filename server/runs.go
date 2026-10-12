@@ -340,12 +340,12 @@ func (s *Server) parkMismatch(t trackedRun, cause error) {
 // reclaimHeadless takes over a headless iteration: a live agent keeps running
 // on the adopted session, a finished one lands as if it had just finished, and
 // one that died with the server down parks needs-repair with its dir kept.
-func (s *Server) reclaimHeadless(t trackedRun) error {
+func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return err
 	}
-	re, ok := s.runnerFor(addr.Project).(reattacher)
+	re, ok := runner.(reattacher)
 	if !ok {
 		return fmt.Errorf("%w: runner %s cannot reattach", errHandleMismatch, t.Runner)
 	}
@@ -373,7 +373,7 @@ func (s *Server) reclaimHeadless(t trackedRun) error {
 	}
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
-	deps := s.depsFor(addr.Project)
+	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished {
 		s.goSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
@@ -383,9 +383,22 @@ func (s *Server) reclaimHeadless(t trackedRun) error {
 	return nil
 }
 
+// reclaim goes through the runner that started t, whatever runner is
+// configured now: a herdr run under a headless server is still herdr's.
 func (s *Server) reclaim(t trackedRun) error {
-	if t.Runner != "" && t.Runner != runnerHerdr {
-		return s.reclaimHeadless(t)
+	name := t.Runner
+	if name == "" {
+		name = runnerHerdr
+	}
+	runner := s.runnerForRun(t.Run)
+	if runner == nil {
+		return fmt.Errorf("%w: started by %s; %s unavailable", errHandleMismatch, name, name)
+	}
+	if err := agentrunner.Healthy(runner); err != nil {
+		return fmt.Errorf("%w: started by %s; %s unavailable: %v", errHandleMismatch, name, name, err)
+	}
+	if name != runnerHerdr {
+		return s.reclaimHeadless(t, runner)
 	}
 	label := iterationLabel(t.Address)
 	agent, err := herdr.AgentGet(label)
@@ -407,11 +420,7 @@ func (s *Server) reclaim(t trackedRun) error {
 	t.Session = agentrunner.Session{Label: label, ID: agent.PaneID, SessionID: t.Session.SessionID}
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
-	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
-	if err != nil {
-		return err
-	}
-	deps := s.depsFor(addr.Project)
+	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
