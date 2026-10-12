@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/elentok/gx/nativerunner"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +21,27 @@ func newAgentCmd(d deps) *cobra.Command {
 		Short: "agent-neutral inspection of the running coding-agent session",
 	}
 	cmd.AddCommand(newAgentContextWindowCmd(d))
+	return cmd
+}
+
+func newAgentHolderCmd() *cobra.Command {
+	var sessionID, dir string
+	cmd := &cobra.Command{
+		Use:   "agent-holder --session-id <uuid> --dir <agent-dir> -- <cmd...>",
+		Short: "run a pty agent and record its output (started by the pty runner)",
+		// Internal helper; the pty runner launches it under setsid.
+		Hidden: true,
+		Args:   cobra.MinimumNArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
+			return nativerunner.RunHolder(dir, args)
+		},
+	}
+	// The session id is unused here: it only puts the id in the holder's
+	// cmdline, which the liveness check requires.
+	cmd.Flags().StringVar(&sessionID, "session-id", "", "the agent's session id")
+	cmd.Flags().StringVar(&dir, "dir", "", "the agent directory")
+	_ = cmd.MarkFlagRequired("session-id")
+	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }
 

@@ -32,6 +32,14 @@ func TestMain(m *testing.M) {
 		fakeClaude()
 		return
 	}
+	if os.Getenv(holderLaunchEnv) == "1" {
+		launchHolder()
+		return
+	}
+	if os.Getenv(holderEnv) == "1" {
+		testHolder()
+		return
+	}
 	if os.Getenv(agentfake.ClaudeEnv) == "1" {
 		agentfake.Claude()
 	}
