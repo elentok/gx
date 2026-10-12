@@ -24,7 +24,7 @@ func TestGGJumpsToTop(t *testing.T) {
 	m := New(*repo, "")
 	m.ready = true
 	m.worktrees = []git.Worktree{
-		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch},
+		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk},
 		{Name: "feature-a", Path: filepath.Join(repoDir, "feature-a"), Branch: "feature-a"},
 	}
 	resizeTable(&m.table, 100, 10)
@@ -123,7 +123,7 @@ func TestLTriggersLazygitLogCommand(t *testing.T) {
 
 	m := New(*repo, "")
 	m.ready = true
-	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
@@ -145,7 +145,7 @@ func TestGLIsNotHandledByWorktreesView(t *testing.T) {
 
 	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true})
 	m.ready = true
-	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
@@ -172,7 +172,7 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 
 	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true})
 	m.ready = true
-	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
@@ -200,7 +200,7 @@ func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
 
 	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalHerdr, HerdrUnavailable: true})
 	m.ready = true
-	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 
@@ -220,7 +220,7 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 
 	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalTmux})
 	m.ready = true
-	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch}}
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())
 

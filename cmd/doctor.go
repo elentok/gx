@@ -169,7 +169,7 @@ func findRepoWithFallback(dir string) (*git.Repo, error) {
 		Root:        bareDir,
 		WorktreeDir: dir,
 		IsBare:      true,
-		MainBranch:  git.RemoteDefaultBranch(bareDir),
+		Trunk:       git.RemoteDefaultBranch(bareDir),
 	}
 	return repo, nil
 }

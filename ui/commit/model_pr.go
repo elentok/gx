@@ -10,14 +10,14 @@ import (
 type gotoPRMsg struct {
 	url      string
 	err      error
-	fatalErr error // non-nil means show as error (from IsCommitMergedToMain)
+	fatalErr error // non-nil means show as error (from IsCommitMergedToTrunk)
 }
 
 func (m Model) cmdGotoPR() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	ref := m.ref
 	return func() tea.Msg {
-		merged, err := git.IsCommitMergedToMain(worktreeRoot, ref)
+		merged, err := git.IsCommitMergedToTrunk(worktreeRoot, ref)
 		if err != nil {
 			return gotoPRMsg{fatalErr: err}
 		}

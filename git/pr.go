@@ -225,14 +225,14 @@ func CommitPRURL(worktreeRoot, hash string) (string, error) {
 	})
 }
 
-// IsCommitMergedToMain reports whether hash is an ancestor of the repo's main
+// IsCommitMergedToTrunk reports whether hash is an ancestor of the repo's main
 // branch. Returns false (not an error) when git exits with code 1.
-func IsCommitMergedToMain(worktreeRoot, hash string) (bool, error) {
+func IsCommitMergedToTrunk(worktreeRoot, hash string) (bool, error) {
 	repo, err := FindRepo(worktreeRoot)
 	if err != nil {
-		return false, fmt.Errorf("IsCommitMergedToMain: %w", err)
+		return false, fmt.Errorf("IsCommitMergedToTrunk: %w", err)
 	}
-	_, _, err = run(repo.Root, []string{"merge-base", "--is-ancestor", hash, repo.MainBranch})
+	_, _, err = run(repo.Root, []string{"merge-base", "--is-ancestor", hash, repo.Trunk})
 	if err != nil {
 		if runErr, ok := err.(*RunError); ok && runErr.Code == 1 {
 			return false, nil

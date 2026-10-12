@@ -10,7 +10,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Commit, aheadCommits, behindCommits []git.Commit, rebasedOnMain *bool, isMainBranch bool, changes []git.Change, spinnerView string, useNerdFontIcons bool) string {
+func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Commit, aheadCommits, behindCommits []git.Commit, rebasedOnTrunk *bool, isTrunk bool, changes []git.Change, spinnerView string, useNerdFontIcons bool) string {
 	if wt == nil {
 		return ui.StyleDim.Render("  no worktree selected")
 	}
@@ -41,14 +41,14 @@ func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Comm
 	}
 	b.WriteString("\n")
 
-	if !isMainBranch {
+	if !isTrunk {
 		b.WriteString("\n")
 		b.WriteString(ui.StyleBold.Render(ic.baseTitle))
 		b.WriteString("\n\n")
 		switch {
-		case rebasedOnMain == nil:
+		case rebasedOnTrunk == nil:
 			b.WriteString(ui.StyleDim.Render("  loading…") + "\n")
-		case *rebasedOnMain:
+		case *rebasedOnTrunk:
 			b.WriteString(ui.StyleStatusSynced.Render("  "+ic.checkmark+" rebased on main") + "\n")
 		default:
 			b.WriteString(ui.StyleStatusDiverged.Render("  "+ic.x+" needs rebase on main") + "\n")

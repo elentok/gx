@@ -10,17 +10,17 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-var styleMainBranch = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+var styleTrunk = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 
 // sortedWorktrees returns a copy of wts with the main branch worktree first.
-func sortedWorktrees(wts []git.Worktree, mainBranch string) []git.Worktree {
-	if mainBranch == "" {
+func sortedWorktrees(wts []git.Worktree, trunk string) []git.Worktree {
+	if trunk == "" {
 		return wts
 	}
 	out := make([]git.Worktree, 0, len(wts))
 	var main *git.Worktree
 	for i := range wts {
-		if wts[i].Branch == mainBranch {
+		if wts[i].Branch == trunk {
 			main = &wts[i]
 		} else {
 			out = append(out, wts[i])
@@ -172,7 +172,7 @@ func (m Model) buildRows() []table.Row {
 	for i, wt := range m.worktrees {
 		isCursorRow := i == m.table.Cursor()
 		isTagged := m.selectedWorktrees[wt.Name]
-		isMain := wt.Branch == m.repo.MainBranch
+		isMain := wt.Branch == m.repo.Trunk
 		selCell := ""
 		if isTagged {
 			selCell = styleSelected.Render(ic.checkmark)
@@ -185,7 +185,7 @@ func (m Model) buildRows() []table.Row {
 			selCell,
 			nameCol,
 			dirtyCell(m.dirties[wt.Path], ic, isCursorRow),
-			baseCell(m.baseStatus[wt.Branch], ic, wt.Branch == m.repo.MainBranch, isCursorRow),
+			baseCell(m.baseStatus[wt.Branch], ic, wt.Branch == m.repo.Trunk, isCursorRow),
 			statusCell(m.statuses[wt.Branch], ic, isCursorRow, m.settings.UseNerdFontIcons),
 		}
 	}
@@ -216,7 +216,7 @@ func worktreeCell(name, branch string, ic uiIcons, isMain, _ bool) string {
 	if branch != "" && branch != name {
 		branchSuffix := "(" + ic.branchPrefix + branch + ")"
 		if isMain {
-			return styleMainBranch.Render(text + " " + branchSuffix)
+			return styleTrunk.Render(text + " " + branchSuffix)
 		} else {
 			text += " " + ui.StyleDim.Render(branchSuffix)
 		}
@@ -224,7 +224,7 @@ func worktreeCell(name, branch string, ic uiIcons, isMain, _ bool) string {
 	}
 
 	if isMain {
-		return styleMainBranch.Render(text)
+		return styleTrunk.Render(text)
 	}
 	return text
 }
@@ -241,8 +241,8 @@ func dirtyCell(d dirtyState, ic uiIcons, _ bool) string {
 	return ui.StyleDim.Render(ic.dash)
 }
 
-func baseCell(rebased *bool, ic uiIcons, isMainBranch bool, _ bool) string {
-	if isMainBranch {
+func baseCell(rebased *bool, ic uiIcons, isTrunk bool, _ bool) string {
+	if isTrunk {
 		return ui.StyleDim.Render(ic.dash)
 	}
 	if rebased == nil {

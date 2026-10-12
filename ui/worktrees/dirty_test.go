@@ -86,7 +86,7 @@ func TestWorktreeCellBranchSuffix(t *testing.T) {
 		t.Errorf("selected: branch name missing in %q", plain)
 	}
 
-	// Main branch with differing branch name — whole cell is orange (styleMainBranch).
+	// Main branch with differing branch name — whole cell is orange (styleTrunk).
 	got = worktreeCell("main-wt", "main", ic, true, false)
 	if !strings.Contains(got, "main-wt") {
 		t.Errorf("main+diff: worktree name missing in %q", got)

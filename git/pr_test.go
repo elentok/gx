@@ -9,22 +9,22 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-func TestIsCommitMergedToMain_merged(t *testing.T) {
+func TestIsCommitMergedToTrunk_merged(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 
 	hash := headHash(t, repoDir)
 
-	merged, err := git.IsCommitMergedToMain(repoDir, hash)
+	merged, err := git.IsCommitMergedToTrunk(repoDir, hash)
 	if err != nil {
-		t.Fatalf("IsCommitMergedToMain: %v", err)
+		t.Fatalf("IsCommitMergedToTrunk: %v", err)
 	}
 	if !merged {
 		t.Error("expected commit on main to be merged to main")
 	}
 }
 
-func TestIsCommitMergedToMain_unmerged(t *testing.T) {
+func TestIsCommitMergedToTrunk_unmerged(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 
@@ -35,9 +35,9 @@ func TestIsCommitMergedToMain_unmerged(t *testing.T) {
 
 	hash := headHash(t, repoDir)
 
-	merged, err := git.IsCommitMergedToMain(repoDir, hash)
+	merged, err := git.IsCommitMergedToTrunk(repoDir, hash)
 	if err != nil {
-		t.Fatalf("IsCommitMergedToMain: %v", err)
+		t.Fatalf("IsCommitMergedToTrunk: %v", err)
 	}
 	if merged {
 		t.Error("expected feature commit to not be merged to main")

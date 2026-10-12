@@ -50,14 +50,14 @@ func TestCloneBare_dotBareLayout(t *testing.T) {
 		t.Errorf("LinkedWorktreeDir = %q, want %q", repo.LinkedWorktreeDir(), outerDir)
 	}
 
-	mainBranch := repo.MainBranch
-	if mainBranch != "main" && mainBranch != "master" {
-		t.Fatalf("unexpected default branch: %q", mainBranch)
+	trunk := repo.Trunk
+	if trunk != "main" && trunk != "master" {
+		t.Fatalf("unexpected default branch: %q", trunk)
 	}
 
 	// Bootstrap the initial worktree under the outer directory (not under .bare/).
-	wtPath := filepath.Join(repo.LinkedWorktreeDir(), mainBranch)
-	if err := git.AddWorktreeFromRemote(*repo, wtPath, mainBranch, "origin/"+mainBranch); err != nil {
+	wtPath := filepath.Join(repo.LinkedWorktreeDir(), trunk)
+	if err := git.AddWorktreeFromRemote(*repo, wtPath, trunk, "origin/"+trunk); err != nil {
 		t.Fatalf("AddWorktreeFromRemote: %v", err)
 	}
 
@@ -71,8 +71,8 @@ func TestCloneBare_dotBareLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CurrentBranch: %v", err)
 	}
-	if branch != mainBranch {
-		t.Fatalf("CurrentBranch = %q, want %q", branch, mainBranch)
+	if branch != trunk {
+		t.Fatalf("CurrentBranch = %q, want %q", branch, trunk)
 	}
 
 	// ListWorktrees from the outer dir should find the worktree with its short name.
@@ -83,8 +83,8 @@ func TestCloneBare_dotBareLayout(t *testing.T) {
 	if len(worktrees) != 1 {
 		t.Fatalf("got %d worktrees, want 1", len(worktrees))
 	}
-	if worktrees[0].Name != mainBranch {
-		t.Errorf("worktree Name = %q, want %q", worktrees[0].Name, mainBranch)
+	if worktrees[0].Name != trunk {
+		t.Errorf("worktree Name = %q, want %q", worktrees[0].Name, trunk)
 	}
 
 	// IdentifyDir from inside the worktree should resolve back to the outer dir.

@@ -35,7 +35,7 @@ func setupDotBareForCmd(t *testing.T) (outerDir string) {
 		t.Fatalf("UpdateRemotes: %v", err)
 	}
 
-	branch := repo.MainBranch
+	branch := repo.Trunk
 	wtPath := filepath.Join(outerDir, branch)
 	if err := git.AddWorktreeFromRemote(*repo, wtPath, branch, "origin/"+branch); err != nil {
 		t.Fatalf("AddWorktreeFromRemote: %v", err)

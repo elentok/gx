@@ -16,7 +16,7 @@ import (
 type EpicScan struct {
 	Name                string `json:"name"`
 	AllDone             bool   `json:"all_done"`
-	MergedToMain        bool   `json:"merged_to_main"`
+	MergedToTrunk       bool   `json:"merged_to_main"`
 	HasCodeReviewTicket bool   `json:"has_code_review_ticket"`
 	CodeReviewDone      bool   `json:"code_review_done"`
 }
@@ -140,11 +140,11 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 		}
 	}
 	if branchExists {
-		merged, err := git.IsCommitMergedToMain(repo.Root, epic.Name)
+		merged, err := git.IsCommitMergedToTrunk(repo.Root, epic.Name)
 		if err != nil {
 			return EpicScan{}, err
 		}
-		scan.MergedToMain = merged
+		scan.MergedToTrunk = merged
 	}
 
 	return scan, nil
@@ -217,7 +217,7 @@ func printCleanupScanText(w io.Writer, result CleanupScanResult) {
 				codeReview = "code-review pending"
 			}
 		}
-		fmt.Fprintf(w, "  %s: done=%t merged=%t %s\n", e.Name, e.AllDone, e.MergedToMain, codeReview)
+		fmt.Fprintf(w, "  %s: done=%t merged=%t %s\n", e.Name, e.AllDone, e.MergedToTrunk, codeReview)
 	}
 
 	fmt.Fprintln(w, "Worktrees:")
@@ -230,9 +230,9 @@ func printCleanupScanText(w io.Writer, result CleanupScanResult) {
 		case "iteration":
 			detail = fmt.Sprintf("iteration epic=%s ticket=%s done=%t landed=%t", ws.Epic, ws.TicketID, ws.TicketDone, ws.Landed)
 		case "feature":
-			detail = fmt.Sprintf("feature epic=%s merged=%t", ws.Epic, ws.MergedToMain)
+			detail = fmt.Sprintf("feature epic=%s merged=%t", ws.Epic, ws.MergedToTrunk)
 		case "other":
-			detail = fmt.Sprintf("other merged=%t", ws.MergedToMain)
+			detail = fmt.Sprintf("other merged=%t", ws.MergedToTrunk)
 		}
 		rec := ws.Recommendation
 		if rec == "" {

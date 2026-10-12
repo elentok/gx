@@ -36,7 +36,7 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 
 	branch := resolveMergeBranch(branchArg, worktrees)
 
-	outcome, err := git.MergeBranchInto(repo, worktrees, branch, repo.MainBranch)
+	outcome, err := git.MergeBranchInto(repo, worktrees, branch, repo.Trunk)
 	if err != nil {
 		return err
 	}

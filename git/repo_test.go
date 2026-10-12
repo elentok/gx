@@ -187,14 +187,14 @@ func TestScratchRoot_standardRepoLinkedWorktree(t *testing.T) {
 	}
 }
 
-func TestDetectMainBranch(t *testing.T) {
+func TestDetectTrunk(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 	repo, err := git.FindRepo(dir)
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	if repo.MainBranch != "main" {
-		t.Errorf("MainBranch = %q, want %q", repo.MainBranch, "main")
+	if repo.Trunk != "main" {
+		t.Errorf("Trunk = %q, want %q", repo.Trunk, "main")
 	}
 }

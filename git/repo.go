@@ -11,7 +11,7 @@ type Repo struct {
 	Root        string
 	WorktreeDir string // directory where linked worktrees live; if empty, defaults to Root
 	IsBare      bool
-	MainBranch  string // "main" or "master"
+	Trunk       string // "main" or "master"
 }
 
 // LinkedWorktreeDir returns the directory where linked worktrees are created.
@@ -80,7 +80,7 @@ func IdentifyDir(dir string) (*DirInfo, error) {
 	}
 
 	return &DirInfo{
-		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, MainBranch: detectMainBranch(repoRoot)},
+		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, Trunk: detectTrunk(repoRoot)},
 		IsRepoRoot:     repoRoot == dir || worktreeDir == dir,
 		IsWorktreeRoot: false,
 	}, nil
@@ -112,7 +112,7 @@ func identifyWorktree(dir string) (*DirInfo, error) {
 		root := filepath.Dir(commonDir)
 		worktreeDir := filepath.Join(root, ".worktrees")
 		info := &DirInfo{
-			Repo:           Repo{Root: root, WorktreeDir: worktreeDir, IsBare: false, MainBranch: detectMainBranch(root)},
+			Repo:           Repo{Root: root, WorktreeDir: worktreeDir, IsBare: false, Trunk: detectTrunk(root)},
 			IsRepoRoot:     root == dir,
 			IsWorktreeRoot: topLevel == dir,
 		}
@@ -132,15 +132,15 @@ func identifyWorktree(dir string) (*DirInfo, error) {
 	}
 
 	return &DirInfo{
-		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, MainBranch: detectMainBranch(repoRoot)},
+		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, Trunk: detectTrunk(repoRoot)},
 		WorktreeRoot:   topLevel,
 		IsRepoRoot:     repoRoot == dir,
 		IsWorktreeRoot: topLevel == dir,
 	}, nil
 }
 
-// detectMainBranch returns "main" or "master" depending on what exists in the repo.
-func detectMainBranch(repoRoot string) string {
+// detectTrunk returns "main" or "master" depending on what exists in the repo.
+func detectTrunk(repoRoot string) string {
 	return RemoteDefaultBranch(repoRoot)
 }
 

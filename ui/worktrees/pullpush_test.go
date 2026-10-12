@@ -18,7 +18,7 @@ func TestCmdOpenURL_NonNil(t *testing.T) {
 
 func TestCmdRebasePreflight_ReturnsMsg(t *testing.T) {
 	t.Parallel()
-	repo := git.Repo{MainBranch: "main"}
+	repo := git.Repo{Trunk: "main"}
 	wt := git.Worktree{Name: "feature", Branch: "feature"}
 	cmd := cmdRebasePreflight(repo, wt)
 	if cmd == nil {
@@ -34,7 +34,7 @@ func TestCmdRebase_NoStash(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	wt := git.Worktree{Name: "main", Path: repoDir}
-	repo := git.Repo{MainBranch: "main"}
+	repo := git.Repo{Trunk: "main"}
 	cmd := cmdRebase(repo, wt, false)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from cmdRebase")
@@ -49,7 +49,7 @@ func TestCmdRebase_WithStash(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	wt := git.Worktree{Name: "main", Path: repoDir}
-	repo := git.Repo{MainBranch: "main"}
+	repo := git.Repo{Trunk: "main"}
 	cmd := cmdRebase(repo, wt, true)
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from cmdRebase with stash")
@@ -106,7 +106,7 @@ func TestPromptableJobOutputTitle_Default(t *testing.T) {
 
 func TestPromptableJobArgs_PushAndForcePush(t *testing.T) {
 	t.Parallel()
-	repo := git.Repo{MainBranch: "main"}
+	repo := git.Repo{Trunk: "main"}
 	wt := git.Worktree{Name: "feature", Branch: "feature"}
 
 	pushArgs := promptableJobArgs(repo, promptableJobPush, wt)

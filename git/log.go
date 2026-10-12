@@ -56,13 +56,13 @@ type LogEntry struct {
 // CommitsSinceMain returns commits on branch that are not reachable from the
 // repo's local main branch, ordered newest first.
 func CommitsSinceMain(repo Repo, branch string) ([]Commit, error) {
-	return commitsBetween(repo, repo.MainBranch, branch)
+	return commitsBetween(repo, repo.Trunk, branch)
 }
 
 // CommitsBehindMain returns commits on main that are not reachable from branch,
 // ordered newest first.
 func CommitsBehindMain(repo Repo, branch string) ([]Commit, error) {
-	return commitsBetween(repo, branch, repo.MainBranch)
+	return commitsBetween(repo, branch, repo.Trunk)
 }
 
 // HeadCommit returns the latest commit on the given branch.

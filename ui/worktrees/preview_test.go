@@ -54,7 +54,7 @@ func TestRenderPreviewContent_UsesNerdFontIcons(t *testing.T) {
 	}
 }
 
-func TestRenderPreviewContent_RebasedOnMain(t *testing.T) {
+func TestRenderPreviewContent_RebasedOnTrunk(t *testing.T) {
 	t.Parallel()
 	wt := &git.Worktree{Name: "feature-a", Branch: "feature-a"}
 	out := renderPreviewContent(wt, "origin/feature-a", git.Commit{}, nil, nil, boolPtr(true), false, nil, "", false)
@@ -72,7 +72,7 @@ func TestRenderPreviewContent_NeedsRebase(t *testing.T) {
 	}
 }
 
-func TestRenderPreviewContent_MainBranchHidesSection(t *testing.T) {
+func TestRenderPreviewContent_TrunkHidesSection(t *testing.T) {
 	t.Parallel()
 	wt := &git.Worktree{Name: "main", Branch: "main"}
 	out := renderPreviewContent(wt, "origin/main", git.Commit{}, nil, nil, nil, true, nil, "", false)

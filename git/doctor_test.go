@@ -60,7 +60,7 @@ func setupDotBareRepo(t *testing.T) (outerDir string, repo git.Repo) {
 	}
 
 	// Create one linked worktree.
-	branch := repo.MainBranch
+	branch := repo.Trunk
 	wtPath := filepath.Join(outerDir, branch)
 	if err := git.AddWorktreeFromRemote(repo, wtPath, branch, "origin/"+branch); err != nil {
 		t.Fatalf("AddWorktreeFromRemote: %v", err)
@@ -134,7 +134,7 @@ func TestCheckRepo_DetectsBadWorktreeGitFile(t *testing.T) {
 	outerDir, repo := setupDotBareRepo(t)
 
 	// Corrupt the worktree .git file.
-	wtGitFile := filepath.Join(outerDir, repo.MainBranch, ".git")
+	wtGitFile := filepath.Join(outerDir, repo.Trunk, ".git")
 	if err := os.WriteFile(wtGitFile, []byte("gitdir: /nonexistent/path\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestCheckRepo_FixesWorktreeGitFile(t *testing.T) {
 	outerDir, repo := setupDotBareRepo(t)
 
 	// Corrupt the worktree .git file.
-	branch := repo.MainBranch
+	branch := repo.Trunk
 	wtGitFile := filepath.Join(outerDir, branch, ".git")
 	if err := os.WriteFile(wtGitFile, []byte("gitdir: /nonexistent/path\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
@@ -229,7 +229,7 @@ func TestCheckRepo_NoIssuesForStandardRepoWithWorktree(t *testing.T) {
 	}
 
 	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
-	if err := git.AddWorktree(*repo, "feature", newPath, repo.MainBranch); err != nil {
+	if err := git.AddWorktree(*repo, "feature", newPath, repo.Trunk); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 
@@ -251,7 +251,7 @@ func TestCheckRepo_DetectsAndFixesMissingWorktreesExclude(t *testing.T) {
 	}
 
 	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
-	if err := git.AddWorktree(*repo, "feature", newPath, repo.MainBranch); err != nil {
+	if err := git.AddWorktree(*repo, "feature", newPath, repo.Trunk); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 

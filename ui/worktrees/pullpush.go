@@ -119,8 +119,8 @@ func cmdRebase(repo git.Repo, wt git.Worktree, stash bool) tea.Cmd {
 			}
 			stashed = true
 		}
-		out, err := git.Rebase(wt.Path, repo.MainBranch)
-		log.AppendCommand("git", []string{"rebase", repo.MainBranch}, out)
+		out, err := git.Rebase(wt.Path, repo.Trunk)
+		log.AppendCommand("git", []string{"rebase", repo.Trunk}, out)
 		return rebaseResultMsg{err: err, log: log.String(), stashed: stashed, wtPath: wt.Path}
 	}
 }

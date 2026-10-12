@@ -26,7 +26,7 @@ func (m Model) handlePullUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{notify.Info(ui.MessageComplete("pull"))}
 	if wt != nil && wt.Branch != "" {
 		cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch), cmdLoadPreviewData(m.repo, *wt))
-		if wt.Branch == m.repo.MainBranch {
+		if wt.Branch == m.repo.Trunk {
 			for _, w := range m.worktrees {
 				if w.Branch != "" {
 					cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))

@@ -39,15 +39,15 @@ type WorktreeScan struct {
 	// into the epic's feature branch, or already reachable from main.
 	Landed bool `json:"landed,omitempty"`
 
-	// MergedToMain is set for Kind == "feature" and "other".
-	MergedToMain bool `json:"merged_to_main,omitempty"`
+	// MergedToTrunk is set for Kind == "feature" and "other".
+	MergedToTrunk bool `json:"merged_to_main,omitempty"`
 
 	// Recommendation is "delete", "merge", or "" (no action proposed).
 	// Always "" when Active is true.
 	Recommendation string `json:"recommendation,omitempty"`
 }
 
-// scanWorktrees classifies every local branch other than repo.MainBranch
+// scanWorktrees classifies every local branch other than repo.Trunk
 // into an iteration/feature/other WorktreeScan, using epics (as loaded from
 // .scratch) to resolve iteration branches to their ticket and feature
 // branches to their epic.
@@ -74,7 +74,7 @@ func scanWorktrees(repo git.Repo, epics []tickets.Epic) ([]WorktreeScan, error) 
 
 	result := []WorktreeScan{}
 	for _, b := range branches {
-		if b.IsRemote || b.Name == repo.MainBranch {
+		if b.IsRemote || b.Name == repo.Trunk {
 			continue
 		}
 		scan, err := classifyBranch(repo, b.Name, pathByBranch[b.Name], epicByName)
@@ -129,11 +129,11 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 		scan.Kind = "other"
 	}
 
-	merged, err := git.IsCommitMergedToMain(repo.Root, branch)
+	merged, err := git.IsCommitMergedToTrunk(repo.Root, branch)
 	if err != nil {
 		return WorktreeScan{}, err
 	}
-	scan.MergedToMain = merged
+	scan.MergedToTrunk = merged
 	if !scan.Active && merged {
 		scan.Recommendation = "delete"
 	}
@@ -197,7 +197,7 @@ func iterationLanded(repo git.Repo, branch, epicName string) (bool, error) {
 		}
 	}
 
-	return git.IsCommitMergedToMain(repo.Root, branch)
+	return git.IsCommitMergedToTrunk(repo.Root, branch)
 }
 
 // isActiveWork reports whether branch has a commit within worktreeActiveWindow,

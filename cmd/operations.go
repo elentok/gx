@@ -46,7 +46,7 @@ func runCloneWT(args []string, d deps) error {
 		return fmt.Errorf("clone succeeded but could not open repo: %w", err)
 	}
 
-	branch := repo.MainBranch
+	branch := repo.Trunk
 	if branch == "" {
 		return fmt.Errorf("unable to determine default branch for %s", outerDir)
 	}

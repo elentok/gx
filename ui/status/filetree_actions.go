@@ -137,7 +137,7 @@ func detectRebaseTarget(root string) string {
 	if err != nil {
 		return "origin/main"
 	}
-	main := strings.TrimSpace(repo.MainBranch)
+	main := strings.TrimSpace(repo.Trunk)
 	if main == "" {
 		main = "main"
 	}

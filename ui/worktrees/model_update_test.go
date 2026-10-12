@@ -23,7 +23,7 @@ func newUpdateTestModel(t *testing.T) Model {
 	m := New(*repo, "")
 	m.ready = true
 	m.worktrees = []git.Worktree{
-		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch},
+		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk},
 	}
 	resizeTable(&m.table, 100, 10)
 	m.table.SetRows(m.buildRows())

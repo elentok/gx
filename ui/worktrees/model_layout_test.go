@@ -65,7 +65,7 @@ func TestWindowSizeMsgWithNegativeTableCursorDoesNotPanic(t *testing.T) {
 
 	m := New(*repo, "")
 	m.worktrees = []git.Worktree{
-		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch},
+		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk},
 		{Name: "feature-a", Path: filepath.Join(repoDir, "feature-a"), Branch: "feature-a"},
 	}
 

@@ -20,7 +20,7 @@ func TestWorktreesLoadedMsg_PreservesSelectionAcrossReload(t *testing.T) {
 	}
 
 	wts := []git.Worktree{
-		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch},
+		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk},
 		{Name: "feature-a", Path: filepath.Join(repoDir, "feature-a"), Branch: "feature-a"},
 		{Name: "feature-b", Path: filepath.Join(repoDir, "feature-b"), Branch: "feature-b"},
 	}
@@ -52,7 +52,7 @@ func TestWorktreesLoadedMsg_FirstLoadSelectsActiveWorktree(t *testing.T) {
 	}
 
 	wts := []git.Worktree{
-		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.MainBranch},
+		{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk},
 		{Name: "feature-a", Path: filepath.Join(repoDir, "feature-a"), Branch: "feature-a"},
 	}
 

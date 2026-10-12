@@ -170,13 +170,13 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if wt.Branch == "" {
 			return m.showError("cannot rebase: worktree is in detached HEAD state"), nil
 		}
-		if m.repo.MainBranch == "" {
+		if m.repo.Trunk == "" {
 			return m.showError("cannot rebase: no main branch detected"), nil
 		}
-		if wt.Branch == m.repo.MainBranch {
-			return m.showError("cannot rebase: already on " + m.repo.MainBranch), nil
+		if wt.Branch == m.repo.Trunk {
+			return m.showError("cannot rebase: already on " + m.repo.Trunk), nil
 		}
-		prompt := fmt.Sprintf("Rebase %s on %s?", wt.Branch, m.repo.MainBranch)
+		prompt := fmt.Sprintf("Rebase %s on %s?", wt.Branch, m.repo.Trunk)
 		dirty := m.dirties[wt.Path]
 		if dirty.hasModified || dirty.hasUntracked {
 			return m.enterConfirm(prompt, cmdRebasePreflight(m.repo, *wt), ""), nil

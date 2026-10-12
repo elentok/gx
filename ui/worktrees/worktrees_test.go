@@ -399,7 +399,7 @@ func TestPullMainRefreshesBaseStatus(t *testing.T) {
 	t.Parallel()
 	// Regression: after pulling main the base-status column for feature branches
 	// must update. Before the fix, pullResultMsg only refreshed base statuses
-	// when the selected branch matched MainBranch — verify the happy path.
+	// when the selected branch matched Trunk — verify the happy path.
 	repoDir := testutil.TempBareRepoWithMainWorktreeAhead(t, "feature-a")
 	_, tm := startTUI(t, repoDir)
 

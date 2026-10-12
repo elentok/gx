@@ -79,21 +79,21 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	}
 
 	if got, want := byName["epic-done-merged-review-done"], (EpicScan{
-		Name: "epic-done-merged-review-done", AllDone: true, MergedToMain: true,
+		Name: "epic-done-merged-review-done", AllDone: true, MergedToTrunk: true,
 		HasCodeReviewTicket: true, CodeReviewDone: true,
 	}); got != want {
 		t.Errorf("epic-done-merged-review-done = %+v, want %+v", got, want)
 	}
 
 	if got, want := byName["epic-done-unmerged-review-pending"], (EpicScan{
-		Name: "epic-done-unmerged-review-pending", AllDone: false, MergedToMain: false,
+		Name: "epic-done-unmerged-review-pending", AllDone: false, MergedToTrunk: false,
 		HasCodeReviewTicket: true, CodeReviewDone: false,
 	}); got != want {
 		t.Errorf("epic-done-unmerged-review-pending = %+v, want %+v", got, want)
 	}
 
 	if got, want := byName["epic-open-no-review"], (EpicScan{
-		Name: "epic-open-no-review", AllDone: false, MergedToMain: false,
+		Name: "epic-open-no-review", AllDone: false, MergedToTrunk: false,
 		HasCodeReviewTicket: false, CodeReviewDone: false,
 	}); got != want {
 		t.Errorf("epic-open-no-review = %+v, want %+v", got, want)

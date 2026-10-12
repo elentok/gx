@@ -266,7 +266,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 				}
 			}
 		case "pull":
-			if wt := m.cursorWorktree(); wt != nil && wt.Branch == m.repo.MainBranch {
+			if wt := m.cursorWorktree(); wt != nil && wt.Branch == m.repo.Trunk {
 				for _, w := range m.worktrees {
 					if w.Branch != "" {
 						cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
@@ -393,7 +393,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if cursor := m.table.Cursor(); cursor >= 0 && cursor < len(m.worktrees) {
 			selectedPath = m.worktrees[cursor].Path
 		}
-		m.worktrees = sortedWorktrees(msg.worktrees, m.repo.MainBranch)
+		m.worktrees = sortedWorktrees(msg.worktrees, m.repo.Trunk)
 		m.dirties = make(map[string]dirtyState)
 		m = m.resized()
 		m.table.SetRows(m.buildRows())
