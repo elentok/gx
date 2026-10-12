@@ -51,6 +51,8 @@ func ClaudeSessionsDir() (string, error) {
 // changes as turns.
 type pidWatcher struct {
 	path string
+	// notBefore is the earliest startedAt, in Unix ms, of a file to trust.
+	notBefore int64
 
 	mu   sync.Mutex
 	live pidState
@@ -64,8 +66,17 @@ type pidState struct {
 	turn int
 }
 
-func newPidWatcher(sessionsDir string, pid int) *pidWatcher {
-	return &pidWatcher{path: filepath.Join(sessionsDir, strconv.Itoa(pid)+".json")}
+// pidStartSlack is how far before the spawn claude's startedAt may fall and
+// still be this claude's: covers clock rounding, not a reused pid.
+const pidStartSlack = 2 * time.Second
+
+// newPidWatcher ignores a file whose startedAt is before spawned: a claude
+// that crashed left it, and the OS has since reused its pid.
+func newPidWatcher(sessionsDir string, pid int, spawned time.Time) *pidWatcher {
+	return &pidWatcher{
+		path:      filepath.Join(sessionsDir, strconv.Itoa(pid)+".json"),
+		notBefore: spawned.Add(-pidStartSlack).UnixMilli(),
+	}
 }
 
 // watch polls the file until stop closes.
@@ -89,10 +100,14 @@ func (w *pidWatcher) poll() {
 	if err != nil {
 		return
 	}
-	s, err := ParsePidStatus(data)
-	if err != nil {
+	var f struct {
+		PidStatus
+		StartedAt int64 `json:"startedAt"`
+	}
+	if json.Unmarshal(data, &f) != nil || f.StartedAt < w.notBefore {
 		return
 	}
+	s := f.PidStatus
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	// last starts as ClaudeStarting, so a first read past starting still

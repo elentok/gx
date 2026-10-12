@@ -80,6 +80,7 @@ func RunHolder(dir string, argv []string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
+	spawned := time.Now()
 	if err := cmd.Start(); err != nil {
 		_ = tty.Close()
 		return err
@@ -88,7 +89,7 @@ func RunHolder(dir string, argv []string) error {
 		scr:    scr,
 		ptmx:   ptmx,
 		proc:   cmd.Process,
-		pid:    newPidWatcher(sessionsDir, cmd.Process.Pid),
+		pid:    newPidWatcher(sessionsDir, cmd.Process.Pid, spawned),
 		ops:    holderOptionalOps,
 		exited: make(chan struct{}),
 	}

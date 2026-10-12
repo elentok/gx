@@ -66,11 +66,11 @@ func TestClaudeSessionsDir(t *testing.T) {
 
 // pidChild writes a starting pid status file, then sets each status line it
 // reads, adding a waitingFor only while waiting, as claude does.
-const pidChild = `d="$HOME/.claude/sessions"; mkdir -p "$d"; f="$d/$$.json"
-printf '{"pid":%s}' $$ > "$f"; printf 'ready\n'
+const pidChild = `d="$HOME/.claude/sessions"; mkdir -p "$d"; f="$d/$$.json"; t=$(date +%s)000
+printf '{"pid":%s,"startedAt":%s}' $$ "$t" > "$f"; printf 'ready\n'
 while read -r s; do
   w=""; [ "$s" = waiting ] && w=',"waitingFor":"input needed"'
-  printf '{"pid":%s,"status":"%s"%s}' $$ "$s" "$w" > "$f.tmp" && mv "$f.tmp" "$f"
+  printf '{"pid":%s,"startedAt":%s,"status":"%s"%s}' $$ "$t" "$s" "$w" > "$f.tmp" && mv "$f.tmp" "$f"
   printf 'set:%s\n' "$s"
 done`
 

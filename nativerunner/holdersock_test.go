@@ -78,8 +78,8 @@ func TestHolderSocket_NoOptionalOps(t *testing.T) {
 }
 
 // denyChild sits at a permission prompt; on the first key typed it runs tail.
-const denyChild = `d="$HOME/.claude/sessions"; mkdir -p "$d"; f="$d/$$.json"
-st() { printf '{"pid":%s,"status":"%s"%s}' $$ "$1" "$2" > "$f.tmp" && mv "$f.tmp" "$f"; }
+const denyChild = `d="$HOME/.claude/sessions"; mkdir -p "$d"; f="$d/$$.json"; t=$(date +%s)000
+st() { printf '{"pid":%s,"startedAt":%s,"status":"%s"%s}' $$ "$t" "$1" "$2" > "$f.tmp" && mv "$f.tmp" "$f"; }
 st waiting ',"waitingFor":"permission prompt"'
 stty -icanon min 1; printf 'ready\n'; dd bs=1 count=1 2>/dev/null >/dev/null; stty icanon
 `
