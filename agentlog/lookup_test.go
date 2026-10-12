@@ -97,6 +97,19 @@ func TestAgentLog_Pruned(t *testing.T) {
 	}
 }
 
+func TestAgentLog_UnknownRunner(t *testing.T) {
+	stateDir := t.TempDir()
+	dir := writeAgentDir(t, stateDir, true)
+	meta, _ := json.Marshal(nativerunner.Meta{Runner: "martian", SessionID: session})
+	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	if !errors.Is(err, nativerunner.ErrUnknownRunner) {
+		t.Errorf("got %v, want ErrUnknownRunner", err)
+	}
+}
+
 func herdrWith(it agentlog.HerdrIteration, ok bool) func(context.Context, string) (agentlog.HerdrIteration, bool, error) {
 	return func(_ context.Context, address string) (agentlog.HerdrIteration, bool, error) {
 		if address != addr.String() {

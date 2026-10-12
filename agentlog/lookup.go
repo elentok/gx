@@ -56,19 +56,22 @@ type Locator struct {
 // AgentLog finds the log of a's agent.
 func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 	label, _, _ := ralphloop.IterationIdentity(a.Epic, a.ID, "")
-	h := &nativerunner.Headless{Root: nativerunner.AgentsRoot(l.StateDir, a.Project), Procs: l.Procs}
-	meta, _, err := h.Inspect(label)
+	path := filepath.Join(nativerunner.AgentsRoot(l.StateDir, a.Project), label)
+	d, err := nativerunner.OpenDir(path)
 	switch {
 	case err == nil:
-		dir := filepath.Join(h.Root, label)
-		if nativerunner.Pruned(dir) {
-			p, _ := transcript.Path(meta.Cwd, meta.SessionID)
+		if d.Pruned() {
+			p, _ := transcript.Path(d.Meta.Cwd, d.Meta.SessionID)
 			return Log{Pruned: true, Transcript: p}, nil
 		}
 		return Log{
-			Path: filepath.Join(dir, nativerunner.OutFile), Offset: meta.Offset,
+			Path: d.Log(), Offset: d.Meta.Offset,
 			Ended: func() bool {
-				_, live, err := h.Inspect(label)
+				d, err := nativerunner.OpenDir(path)
+				if err != nil {
+					return false
+				}
+				live, err := d.Alive(l.Procs)
 				return err == nil && !live
 			},
 		}, nil

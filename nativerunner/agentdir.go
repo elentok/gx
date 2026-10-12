@@ -57,16 +57,42 @@ func (h *Headless) Cleanup(label string) error {
 	return removeAll(dir, l.transient)
 }
 
+// Dir is an agent directory read through the layout of the runner its
+// meta.json names, so readers like watch need no runner of their own.
+type Dir struct {
+	Path string
+	Meta Meta
+	l    layout
+}
+
+// OpenDir reads dir's meta.json. A missing directory is
+// agentrunner.ErrNotFound; an unknown runner is ErrUnknownRunner.
+func OpenDir(dir string) (Dir, error) {
+	meta, l, err := readLayout(dir)
+	if err != nil {
+		return Dir{}, err
+	}
+	return Dir{Path: dir, Meta: meta, l: l}, nil
+}
+
+// Log is the primary log's path. It is gone once Pruned.
+func (d Dir) Log() string { return filepath.Join(d.Path, d.l.logs[0]) }
+
+// Pruned reports whether Prune already removed the logs.
+func (d Dir) Pruned() bool { return d.l.pruned(d.Path) }
+
+// Alive reports whether the agent still runs. Nil procs means ps.
+func (d Dir) Alive(procs ProcessTable) (bool, error) { return d.l.alive(orPS(procs), d.Meta) }
+
 // Inspect reads label's meta.json and reports whether its agent still runs.
-// A missing directory is agentrunner.ErrNotFound; an unknown runner is
-// ErrUnknownRunner.
+// Errors are OpenDir's.
 func (h *Headless) Inspect(label string) (Meta, bool, error) {
-	meta, l, err := readLayout(filepath.Join(h.Root, label))
+	d, err := OpenDir(filepath.Join(h.Root, label))
 	if err != nil {
 		return Meta{}, false, err
 	}
-	live, err := l.alive(h.procs(), meta)
-	return meta, live, err
+	live, err := d.Alive(h.procs())
+	return d.Meta, live, err
 }
 
 // Prune removes the logs of agent directories untouched for longer than
@@ -112,13 +138,6 @@ func (h *Headless) Prune(maxAge time.Duration, now time.Time, parked func(label 
 		pruned = append(pruned, label)
 	}
 	return pruned, nil
-}
-
-// Pruned reports whether Prune already removed dir's logs. A directory with
-// no layout is never pruned.
-func Pruned(dir string) bool {
-	_, l, err := readLayout(dir)
-	return err == nil && l.pruned(dir)
 }
 
 // AgentsRoot is where a project's native agent directories live.

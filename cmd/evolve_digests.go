@@ -109,11 +109,10 @@ func lookupSession(env evolveEnv, t evolveTarget, ticket, session string) (md, s
 	}
 	if env.stateDir != "" {
 		label, _, _ := ralphloop.IterationIdentity(t.name, ticket, "")
-		h := &nativerunner.Headless{Root: nativerunner.AgentsRoot(env.stateDir, t.project)}
-		meta, _, err := h.Inspect(label)
+		d, err := nativerunner.OpenDir(filepath.Join(nativerunner.AgentsRoot(env.stateDir, t.project), label))
 		switch {
-		case err == nil && meta.SessionID == session && !nativerunner.Pruned(filepath.Join(h.Root, label)):
-			if md, err = claudehistory.ExportMarkdown(filepath.Join(h.Root, label, nativerunner.OutFile)); err != nil {
+		case err == nil && d.Meta.SessionID == session && !d.Pruned():
+			if md, err = claudehistory.ExportMarkdown(d.Log()); err != nil {
 				return "", "", nil, err
 			}
 			return md, digestNative, nil, nil

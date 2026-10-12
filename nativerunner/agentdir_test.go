@@ -57,8 +57,33 @@ func TestAgentDir_UnknownRunnerIsNeverTouched(t *testing.T) {
 		t.Errorf("Cleanup = %v, want nil", err)
 	}
 	assertUntouched(t, dir)
-	if nativerunner.Pruned(dir) {
-		t.Error("Pruned(foreign) = true, want false")
+}
+
+func TestOpenDir_ReadsThroughTheNamedRunner(t *testing.T) {
+	root := t.TempDir()
+	dir := prepareAgent(t, root, "done", "", lines(evAssistant, evResult))
+	d, err := nativerunner.OpenDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Log() != filepath.Join(dir, nativerunner.OutFile) || d.Pruned() {
+		t.Errorf("Log = %s, Pruned = %v; want live out.jsonl", d.Log(), d.Pruned())
+	}
+	if live, err := d.Alive(agentProcs()); err != nil || !live {
+		t.Errorf("Alive = %v, %v; want live", live, err)
+	}
+	if err := os.Remove(d.Log()); err != nil {
+		t.Fatal(err)
+	}
+	if !d.Pruned() {
+		t.Error("Pruned = false after the log was removed")
+	}
+}
+
+func TestOpenDir_UnknownRunner(t *testing.T) {
+	dir := prepareForeignAgent(t, t.TempDir(), "foreign")
+	if _, err := nativerunner.OpenDir(dir); !errors.Is(err, nativerunner.ErrUnknownRunner) {
+		t.Errorf("OpenDir(foreign) err = %v, want ErrUnknownRunner", err)
 	}
 }
 
