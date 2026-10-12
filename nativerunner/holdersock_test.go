@@ -12,15 +12,15 @@ import (
 // echoChild prints a ready line, then echoes every line it reads.
 const echoChild = `printf 'ready\n'; while read -r l; do printf 'got:%s\n' "$l"; done`
 
-// startHolder runs a holder over echoChild in-process and dials it.
-func startHolder(t *testing.T) (dir string, c *nativerunner.HolderClient, done <-chan error) {
+// startHolder runs a holder over child in-process and dials it.
+func startHolder(t *testing.T, child string) (dir string, c *nativerunner.HolderClient, done <-chan error) {
 	t.Helper()
 	dir = shortTempDir(t)
 	errc := make(chan error, 1)
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
-		errc <- nativerunner.RunHolder(dir, []string{"sh", "-c", echoChild})
+		errc <- nativerunner.RunHolder(dir, []string{"sh", "-c", child})
 	}()
 	waitFor(t, "holder.sock answers", func() bool {
 		var err error
@@ -36,7 +36,7 @@ func startHolder(t *testing.T) (dir string, c *nativerunner.HolderClient, done <
 
 func TestHolderSocket_CoreOps(t *testing.T) {
 	nativerunner.SetHolderOptionalOps(t, []string{"deny-reason"})
-	dir, c, done := startHolder(t)
+	dir, c, done := startHolder(t, echoChild)
 
 	if c.Version() != nativerunner.HolderProtocolVersion {
 		t.Errorf("version = %d; want %d", c.Version(), nativerunner.HolderProtocolVersion)
@@ -65,7 +65,7 @@ func TestHolderSocket_CoreOps(t *testing.T) {
 }
 
 func TestHolderSocket_NoOptionalOps(t *testing.T) {
-	_, c, _ := startHolder(t)
+	_, c, _ := startHolder(t, echoChild)
 
 	if c.Supports("deny-reason") {
 		t.Error("holder with no optional ops reports one supported")

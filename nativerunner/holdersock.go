@@ -25,6 +25,7 @@ const HolderProtocolVersion = 1
 // is an optional op the client checks with Supports first.
 const (
 	opPing   = "ping"
+	opStatus = "status"
 	opScreen = "screen"
 	opKeys   = "keys"
 	opStop   = "stop"
@@ -53,6 +54,9 @@ type holderResponse struct {
 	Ops        []string `json:"ops,omitempty"`
 	Screen     []string `json:"screen,omitempty"`
 	Scrollback []string `json:"scrollback,omitempty"`
+	// Claude is nil until claude's pid status file first appears.
+	Claude *PidStatus `json:"claude,omitempty"`
+	Turn   int        `json:"turn,omitempty"`
 }
 
 // holderServer answers holder.sock requests for one child.
@@ -60,6 +64,7 @@ type holderServer struct {
 	scr  *screen.Screen
 	ptmx *os.File
 	proc *os.Process
+	pid  *pidWatcher
 	ops  []string
 	// exited closes once the child has exited.
 	exited chan struct{}
@@ -95,6 +100,9 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	switch req.Op {
 	case opPing:
 		return holderResponse{Version: HolderProtocolVersion, Ops: h.ops}, nil
+	case opStatus:
+		claude, turn := h.pid.state()
+		return holderResponse{Claude: claude, Turn: turn}, nil
 	case opScreen:
 		return holderResponse{Screen: h.scr.Rows(), Scrollback: h.scr.ScrollbackTail(req.Scrollback)}, nil
 	case opKeys:
@@ -144,6 +152,13 @@ func (c *HolderClient) Version() int { return c.version }
 // it before an optional op and fall back to the core ops, or refuse just that
 // action, when an older holder lacks it.
 func (c *HolderClient) Supports(op string) bool { return slices.Contains(c.ops, op) }
+
+// Status returns claude's last pid file status, nil before the file first
+// appears, and the number of status changes the holder has seen.
+func (c *HolderClient) Status() (*PidStatus, int, error) {
+	resp, err := c.call(holderRequest{Op: opStatus})
+	return resp.Claude, resp.Turn, err
+}
 
 // Screen returns the visible screen rows and up to the last scrollback rows
 // that scrolled off it, oldest first.

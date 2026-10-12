@@ -64,6 +64,11 @@ func RunHolder(dir string, argv []string) error {
 		_ = tty.Close()
 		return err
 	}
+	sessionsDir, err := ClaudeSessionsDir()
+	if err != nil {
+		_ = tty.Close()
+		return err
+	}
 	ln, err := net.Listen("unix", filepath.Join(dir, HolderSocketFile))
 	if err != nil {
 		_ = tty.Close()
@@ -79,8 +84,16 @@ func RunHolder(dir string, argv []string) error {
 		_ = tty.Close()
 		return err
 	}
-	srv := &holderServer{scr: scr, ptmx: ptmx, proc: cmd.Process, ops: holderOptionalOps, exited: make(chan struct{})}
+	srv := &holderServer{
+		scr:    scr,
+		ptmx:   ptmx,
+		proc:   cmd.Process,
+		pid:    newPidWatcher(sessionsDir, cmd.Process.Pid),
+		ops:    holderOptionalOps,
+		exited: make(chan struct{}),
+	}
 	go srv.serve(ln)
+	go srv.pid.watch(srv.exited)
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
