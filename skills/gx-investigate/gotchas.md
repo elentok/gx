@@ -297,7 +297,7 @@ kept as history of what the code did at the time, not as a description of today'
   `RunScope.Contains`/`containsChain` (scheduler scope) and the Queue tab's tree nesting walk the
   *child's own* `parent` field, so the new tickets stayed silently out-of-scope until directly
   requested. Fixed in `35c0d2e` (`ralphloop: log scheduler scans; fix review-ticket scoping`),
-  `skills/gx-code-review/SKILL.md` step 7.
+  `skills/gx-code-review/SKILL.md` "Close out" step.
 - **Telegram notifications silently drop on any transient network blip, including epic-complete.**
   `ralphloop/telegram_eventsink.go`'s `send` is one-shot, 10s timeout, zero retries
   (`ralphloop/eventlog.go:216-227`) — a ~3min DNS/network stall reaching `api.telegram.org`

@@ -92,10 +92,14 @@ already shipped, what the epic was for). Ask it to:
 - Read the two axes against each other: a quality finding on code the Spec axis flags as scope creep
   argues for deleting the code rather than polishing it.
 - Prioritize by actual impact, not by how many reviewers happened to flag it.
-- Decide, for each finding, whether it's worth a follow-up ticket — and give a one-line reason either
-  way (approved / rejected / deferred).
+- Give each finding one verdict and a one-line reason:
+  - **approved** — worth a fix ticket in this epic;
+  - **deferred** — real, but not worth fixing in this epic; it becomes a follow-up;
+  - **rejected** — dropped.
+- For each deferred finding, also give a target (`gx` for a gx tooling finding, else `<project>`)
+  and a `category` (`bug` for a defect, else `idea`). Group deferred findings that name the same fix.
 
-The consultant only advises: it must not edit anything. Its output is the input to step 6.
+The consultant only advises: it must not edit anything. Its output is the input to steps 6 and 7.
 
 ## 6. Turn approved findings into tickets
 
@@ -111,7 +115,16 @@ extra guard is needed here to avoid a duplicate.
 
 If the consultant approved zero findings, skip this step entirely; there's nothing to publish.
 
-## 7. Close out
+## 7. File deferred findings as follow-ups
+
+For each deferred group, call the `gx-follow-up` skill, `unattended`, passing the consultant's target
+and category, and the group as the finding. Its Source names this epic and this code-review ticket's
+address. Its normal dedupe applies, so a group may be appended to an existing follow-up or dropped
+against an archived one. Note the address it reports for each group.
+
+If the consultant deferred zero findings, skip this step.
+
+## 8. Close out
 
 - For every ticket `gx-to-tickets` created in step 6, `gx tickets set <new-ticket-addr> --parent
   <this-ticket-id>` — this is what makes the new ticket a scheduling/UI child of this one (the
@@ -121,7 +134,8 @@ If the consultant approved zero findings, skip this step entirely; there's nothi
 - Write the ticket body (append under the existing sections, don't replace them) with three parts:
   - **Raw findings**, per axis and reviewer skill, verbatim from step 4.
   - **Consultant triage**, verbatim from step 5.
-  - **Final disposition** of each finding: which ticket it became, or why it was rejected/deferred.
+  - **Final disposition** of each finding: the fix ticket it became; for a deferred finding, the
+    follow-up it became, was appended to, or was dropped against; or why it was rejected.
 - `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits
   code of its own, so `commitless: true` is always correct here, not just the no-findings case.
   `--status done` will be refused on a `ralph-loop/*` branch (landing status is gx's alone to set);

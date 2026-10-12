@@ -314,6 +314,26 @@ func TestFollowUpTriggersAndNeverAsksUnattended(t *testing.T) {
 	}
 }
 
+// TestCodeReviewDefinesDeferred pins the verdict that routes a finding to
+// gx-follow-up instead of a fix ticket in the epic.
+func TestCodeReviewDefinesDeferred(t *testing.T) {
+	raw := readFile(t, "gx-code-review/SKILL.md")
+	if !strings.Contains(raw, "**deferred** — real, but not worth fixing in this epic") {
+		t.Error("gx-code-review must define the deferred verdict")
+	}
+}
+
+// TestFollowUpAddHasOneRoute pins gx-follow-up as the only skill that files a
+// follow-up: any other caller naming the verb would skip its dedupe.
+func TestFollowUpAddHasOneRoute(t *testing.T) {
+	allowed := map[string]bool{"gx-local-tracker.md": true, "gx-follow-up/SKILL.md": true}
+	for _, rel := range bundleMarkdownFiles(t) {
+		if !allowed[rel] && strings.Contains(readFile(t, rel), "follow-up add") {
+			t.Errorf("%s names `follow-up add`; file follow-ups through the gx-follow-up skill", rel)
+		}
+	}
+}
+
 // TestInvestigateHasNoNudgeGrant pins that gx-investigate never nudges a pane
 // itself: the daemon's nudge verb owns that now, so a mention may only forbid it.
 func TestInvestigateHasNoNudgeGrant(t *testing.T) {
