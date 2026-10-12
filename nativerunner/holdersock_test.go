@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/nativerunner"
 )
@@ -35,14 +36,13 @@ func startHolder(t *testing.T, child string) (dir string, c *nativerunner.Holder
 }
 
 func TestHolderSocket_CoreOps(t *testing.T) {
-	nativerunner.SetHolderOptionalOps(t, []string{"deny-reason"})
 	dir, c, done := startHolder(t, echoChild)
 
 	if c.Version() != nativerunner.HolderProtocolVersion {
 		t.Errorf("version = %d; want %d", c.Version(), nativerunner.HolderProtocolVersion)
 	}
-	if !c.Supports("deny-reason") {
-		t.Error("advertised optional op reported unsupported")
+	if !c.Supports(nativerunner.OpDenyReason) {
+		t.Error("ping does not list deny-reason")
 	}
 	waitForScreen(t, c, "ready")
 	if err := c.SendKeys("hi\r"); err != nil {
@@ -65,12 +65,80 @@ func TestHolderSocket_CoreOps(t *testing.T) {
 }
 
 func TestHolderSocket_NoOptionalOps(t *testing.T) {
+	nativerunner.SetHolderOptionalOps(t, nil)
 	_, c, _ := startHolder(t, echoChild)
 
-	if c.Supports("deny-reason") {
+	if c.Supports(nativerunner.OpDenyReason) {
 		t.Error("holder with no optional ops reports one supported")
 	}
+	if err := c.DenyWithReason("no"); err == nil {
+		t.Error("holder without deny-reason served it")
+	}
 	waitForScreen(t, c, "ready")
+}
+
+// denyChild sits at a permission prompt; on the first key typed it runs tail.
+const denyChild = `d="$HOME/.claude/sessions"; mkdir -p "$d"; f="$d/$$.json"
+st() { printf '{"pid":%s,"status":"%s"%s}' $$ "$1" "$2" > "$f.tmp" && mv "$f.tmp" "$f"; }
+st waiting ',"waitingFor":"permission prompt"'
+stty -icanon min 1; printf 'ready\n'; dd bs=1 count=1 2>/dev/null >/dev/null; stty icanon
+`
+
+// Esc idles the prompt; the next line is the reason claude starts on.
+const denyGoesIdle = `st idle; read -r l; st busy; printf 'got:%s\n' "$l"; cat >/dev/null`
+
+const denyStaysWaiting = `cat >/dev/null`
+
+func startDenyHolder(t *testing.T, tail string) *nativerunner.HolderClient {
+	t.Helper()
+	t.Setenv("HOME", shortTempDir(t))
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	_, c, _ := startHolder(t, denyChild+tail)
+	waitForScreen(t, c, "ready")
+	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
+	return c
+}
+
+func TestHolderSocket_DenyReason(t *testing.T) {
+	c := startDenyHolder(t, denyGoesIdle)
+
+	stop := make(chan struct{})
+	sawIdle := make(chan bool, 1)
+	go func() {
+		idle := false
+		defer func() { sawIdle <- idle }()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(5 * time.Millisecond):
+			}
+			if s, _, err := c.Status(); err == nil && s.Status == nativerunner.ClaudeIdle {
+				idle = true
+			}
+		}
+	}()
+	err := c.DenyWithReason("use rg")
+	close(stop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if <-sawIdle {
+		t.Error("status showed idle during the op")
+	}
+	waitForScreen(t, c, "got:use rg")
+	if s, _, _ := c.Status(); s == nil || s.Status != nativerunner.ClaudeBusy {
+		t.Errorf("status after the op = %+v; want busy", s)
+	}
+}
+
+func TestHolderSocket_DenyReasonIdleTimeout(t *testing.T) {
+	nativerunner.SetHolderDenyTimeout(t, 300*time.Millisecond)
+	c := startDenyHolder(t, denyStaysWaiting)
+
+	if err := c.DenyWithReason("use rg"); err == nil {
+		t.Fatal("deny-reason succeeded with no idle")
+	}
 }
 
 func waitForScreen(t *testing.T, c *nativerunner.HolderClient, want string) {

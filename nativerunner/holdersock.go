@@ -31,8 +31,12 @@ const (
 	opStop   = "stop"
 )
 
+// OpDenyReason denies a permission prompt with a reason: Esc, wait for idle,
+// then the reason as a prompt, as one step.
+const OpDenyReason = "deny-reason"
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps []string
+var holderOptionalOps = []string{OpDenyReason}
 
 const (
 	holderIOTimeout = 5 * time.Second
@@ -41,11 +45,16 @@ const (
 	holderStopGrace = 5 * time.Second
 )
 
+// holderDenyTimeout bounds each wait in deny-reason: for idle after Esc, and
+// for claude to pick the reason up after it is typed.
+var holderDenyTimeout = 3 * time.Second
+
 // One request and one response per connection, each a JSON object.
 type holderRequest struct {
 	Op         string `json:"op"`
 	Keys       string `json:"keys,omitempty"`
 	Scrollback int    `json:"scrollback,omitempty"`
+	Reason     string `json:"reason,omitempty"`
 }
 
 type holderResponse struct {
@@ -88,6 +97,8 @@ func (h *holderServer) handle(conn net.Conn) {
 		return
 	}
 	resp, after := h.answer(req)
+	// deny-reason can outlast the first deadline.
+	_ = conn.SetDeadline(time.Now().Add(holderIOTimeout))
 	_ = json.NewEncoder(conn).Encode(resp)
 	if after != nil {
 		after()
@@ -113,7 +124,40 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	case opStop:
 		return holderResponse{}, h.stop
 	}
+	if req.Op == OpDenyReason && slices.Contains(h.ops, OpDenyReason) {
+		if err := h.denyReason(req.Reason); err != nil {
+			return holderResponse{Error: err.Error()}, nil
+		}
+		return holderResponse{}, nil
+	}
 	return holderResponse{Error: fmt.Sprintf("unsupported op %q", req.Op)}, nil
+}
+
+// denyReason holds the served status at the prompt's blocked status until
+// claude has taken the reason, so a status reader never sees the idle gap
+// between Esc and the reason, nor the one before claude starts on it.
+func (h *holderServer) denyReason(reason string) error {
+	h.pid.hold()
+	defer h.pid.release()
+	if _, err := h.ptmx.Write([]byte("\x1b")); err != nil {
+		return err
+	}
+	typedAt, ok := h.pid.waitLive(holderDenyTimeout, func(s PidStatus, _ int) bool { return s.Status == ClaudeIdle })
+	if !ok {
+		return errors.New("claude did not go idle after Esc")
+	}
+	if _, err := h.ptmx.Write([]byte(reason)); err != nil {
+		return err
+	}
+	// Enter apart from the text, so claude reads it as a submit rather than
+	// part of a paste.
+	if _, err := h.ptmx.Write([]byte("\r")); err != nil {
+		return err
+	}
+	if _, ok := h.pid.waitLive(holderDenyTimeout, func(_ PidStatus, turn int) bool { return turn > typedAt }); !ok {
+		return errors.New("claude did not take the reason")
+	}
+	return nil
 }
 
 // stop ends the child's whole session; the holder exits once the child does.
@@ -179,14 +223,24 @@ func (c *HolderClient) Stop() error {
 	return err
 }
 
+// DenyWithReason runs the optional deny-reason op; check Supports first.
+func (c *HolderClient) DenyWithReason(reason string) error {
+	_, err := c.callWithin(holderRequest{Op: OpDenyReason, Reason: reason}, holderIOTimeout+2*holderDenyTimeout)
+	return err
+}
+
 func (c *HolderClient) call(req holderRequest) (holderResponse, error) {
+	return c.callWithin(req, holderIOTimeout)
+}
+
+func (c *HolderClient) callWithin(req holderRequest, timeout time.Duration) (holderResponse, error) {
 	var resp holderResponse
 	conn, err := net.DialTimeout("unix", c.sock, holderIOTimeout)
 	if err != nil {
 		return resp, err
 	}
 	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(holderIOTimeout))
+	_ = conn.SetDeadline(time.Now().Add(timeout))
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return resp, err
 	}

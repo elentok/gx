@@ -53,6 +53,12 @@ type pidWatcher struct {
 	path string
 
 	mu   sync.Mutex
+	live pidState
+	// held, while set, is what state reports in place of the live status.
+	held *pidState
+}
+
+type pidState struct {
 	seen bool
 	last PidStatus
 	turn int
@@ -91,19 +97,54 @@ func (w *pidWatcher) poll() {
 	defer w.mu.Unlock()
 	// last starts as ClaudeStarting, so a first read past starting still
 	// counts the change a poll missed.
-	if s.Status != w.last.Status {
-		w.turn++
+	if s.Status != w.live.last.Status {
+		w.live.turn++
 	}
-	w.seen, w.last = true, s
+	w.live.seen, w.live.last = true, s
 }
 
 // state returns the last status read, nil before the file first appears.
 func (w *pidWatcher) state() (*PidStatus, int) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if !w.seen {
-		return nil, w.turn
+	st := w.live
+	if w.held != nil {
+		st = *w.held
 	}
-	s := w.last
-	return &s, w.turn
+	if !st.seen {
+		return nil, st.turn
+	}
+	return &st.last, st.turn
+}
+
+// hold freezes what state reports at the current status until release.
+func (w *pidWatcher) hold() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	held := w.live
+	w.held = &held
+}
+
+func (w *pidWatcher) release() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.held = nil
+}
+
+// waitLive waits up to timeout for the live status to meet cond and returns
+// the live turn it met it at.
+func (w *pidWatcher) waitLive(timeout time.Duration, cond func(s PidStatus, turn int) bool) (int, bool) {
+	deadline := time.Now().Add(timeout)
+	for {
+		w.mu.Lock()
+		turn, ok := w.live.turn, cond(w.live.last, w.live.turn)
+		w.mu.Unlock()
+		if ok {
+			return turn, true
+		}
+		if time.Now().After(deadline) {
+			return 0, false
+		}
+		time.Sleep(pidStatusPoll / 4)
+	}
 }
