@@ -105,11 +105,15 @@ func RootFor(dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("not inside a git repo: %w", err)
 	}
+	return rootForRepo(repo.Root)
+}
+
+func rootForRepo(repoRoot string) (string, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return "", err
 	}
-	return ProjectDir(cfg.TicketStore.Path, repo.Root)
+	return ProjectDir(cfg.TicketStore.Path, repoRoot)
 }
 
 // ProjectName is the name addresses carry for projectDir: project.json's
