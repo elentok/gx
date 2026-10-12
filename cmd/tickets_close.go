@@ -68,10 +68,11 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	return printMove(w, p, false, "")
 }
 
-// runTicketsCloseDone is the one-time sweep: every done follow-up of the
-// project moves into the archive unchanged (no Resolution, status stays done).
-// An empty project argument means the cwd project.
-func runTicketsCloseDone(d deps, project string, w io.Writer) error {
+// runTicketsCloseSweep moves every done or cancelled follow-up of the project
+// into the archive, keeping its status. A cancelled one without a Resolution
+// gets one naming its original address. An empty project argument means the
+// cwd project.
+func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 	cwd, err := d.getwd()
 	if err != nil {
 		return err
@@ -91,26 +92,27 @@ func runTicketsCloseDone(d deps, project string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	var done []tickets.Ticket
+	var swept []tickets.Ticket
 	for _, e := range epics {
 		if e.Name != followUpsEpic {
 			continue
 		}
 		for _, t := range e.Tickets {
-			if t.Status == string(schema.StatusDone) {
-				done = append(done, t)
+			if t.Status == string(schema.StatusDone) || t.Status == string(schema.StatusCancelled) {
+				swept = append(swept, t)
 			}
 		}
 	}
-	if len(done) == 0 {
+	if len(swept) == 0 {
 		return nil
 	}
 	if _, err := ensureArchiveEpic(root, filepath.Join(root, followUpsEpic)); err != nil {
 		return err
 	}
-	for _, t := range done {
+	for _, t := range swept {
 		a := tickets.Address{Project: project, Epic: followUpsEpic, ID: t.Identifier}
-		p, err := archiveTicket(root, a, t, moveOpts{archive: true})
+		opts := moveOpts{archive: true, recordOriginal: t.Status == string(schema.StatusCancelled)}
+		p, err := archiveTicket(root, a, t, opts)
 		if err != nil {
 			return err
 		}
@@ -154,21 +156,21 @@ func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts move
 
 func newTicketsCloseCmd(d deps) *cobra.Command {
 	var reason, note string
-	var sweep bool
+	var sweep, sweepDone bool
 	closeCmd := &cobra.Command{
 		Use:   "close <addr> --reason fixed|obsolete|duplicate|not-worth-it [--note ...]",
-		Short: "cancel a draft/open follow-up with a reason and archive it; --done sweeps done follow-ups into the archive",
+		Short: "cancel a draft/open follow-up with a reason and archive it; --sweep moves done and cancelled follow-ups into the archive",
 		Args:  cobra.RangeArgs(0, 1),
 		RunE: func(c *cobra.Command, args []string) error {
-			if sweep {
+			if sweep || sweepDone {
 				if reason != "" || note != "" {
-					return fmt.Errorf("--done takes no --reason or --note")
+					return fmt.Errorf("--sweep takes no --reason or --note")
 				}
 				project := ""
 				if len(args) == 1 {
 					project = args[0]
 				}
-				return runTicketsCloseDone(d, project, c.OutOrStdout())
+				return runTicketsCloseSweep(d, project, c.OutOrStdout())
 			}
 			if len(args) != 1 {
 				return fmt.Errorf("close needs one ticket address")
@@ -178,6 +180,9 @@ func newTicketsCloseCmd(d deps) *cobra.Command {
 	}
 	closeCmd.Flags().StringVar(&reason, "reason", "", "fixed, obsolete, duplicate or not-worth-it")
 	closeCmd.Flags().StringVar(&note, "note", "", "free text; for duplicate, the kept ticket's address")
-	closeCmd.Flags().BoolVar(&sweep, "done", false, "move every done follow-up of the project (the optional argument, default the cwd's) into the archive")
+	closeCmd.Flags().BoolVar(&sweep, "sweep", false, "move every done or cancelled follow-up of the project (the optional argument, default the cwd's) into the archive")
+	// --done is the flag's old name, kept so existing skill text and habits work.
+	closeCmd.Flags().BoolVar(&sweepDone, "done", false, "alias of --sweep")
+	_ = closeCmd.Flags().MarkHidden("done")
 	return closeCmd
 }

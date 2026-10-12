@@ -290,8 +290,9 @@ here rather than restating it. The filing procedure lives in the
   works only on a `draft`/`open` ticket in a `follow-ups` epic. In one step it writes
   `status: cancelled`, a `## Resolution` with the reason, note and original address, and moves the
   ticket into `<project>:follow-ups-archived` (created `draft` if missing). For `duplicate`, the note
-  is the kept ticket's address. `gx tickets close --done [project]` is a one-time sweep that moves
-  already-`done` follow-ups into the archive. Old run-log lines, trailers and branch names keep the
+  is the kept ticket's address. `gx tickets close --sweep [project]` moves every `done` and
+  `cancelled` follow-up into the archive, keeping its status; a cancelled one with no `## Resolution`
+  gets one recording its original address. Old run-log lines, trailers and branch names keep the
   old address; the Resolution records it.
 
 ## Skill conventions

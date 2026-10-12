@@ -111,8 +111,8 @@ it and use it for every later `set`, `section` and `--blocked-by`, never the pre
 **Done** = `<project>:follow-ups` holds no tickets. Run `gx tickets show <project>:follow-ups` and
 report what is left, if anything; a ticket the user held back stays and the run isn't done.
 
-For follow-ups already `done` before this run, `gx tickets close --done [project]` is the one-time
-sweep that moves them into `follow-ups-archived`; run it first when the epic has such tickets.
+For follow-ups already `done` or `cancelled` before this run, `gx tickets close --sweep [project]`
+moves them into `follow-ups-archived`; run it first when the epic has such tickets.
 
 Finish with a short report: counts per action, the ready epic's address, and each map epic's
 address. Finish with zero background shells.

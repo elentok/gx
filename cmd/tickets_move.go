@@ -166,6 +166,9 @@ type moveOpts struct {
 	// resolution, when set, cancels the ticket and records it as its
 	// ## Resolution section.
 	resolution string
+	// recordOriginal adds a ## Resolution naming the old address when the
+	// ticket has none, leaving its status alone.
+	recordOriginal bool
 }
 
 // planMove runs the refusals and computes the moved ticket, writing nothing.
@@ -269,6 +272,8 @@ func planMove(root string, a tickets.Address, src tickets.Ticket, dstEpic, slug 
 		// After planInbound: the resolution names the old address on purpose,
 		// which is no stale prose mention.
 		p.body = schema.SetSection(p.body, "Resolution", opts.resolution)
+	} else if opts.recordOriginal && schema.Section(p.body, "Resolution") == "" {
+		p.body = schema.SetSection(p.body, "Resolution", fmt.Sprintf("- original: %s\n", a))
 	}
 	return p, nil
 }

@@ -162,25 +162,49 @@ func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsClose_DoneSweepMovesOnlyDone(t *testing.T) {
-	f := setupCloseProject(t)
-	out, err := runIn(t, f.repo, "tickets", "close", "--done")
-	if err != nil {
-		t.Fatalf("sweep: %v", err)
-	}
-	if out != "mine:follow-ups-archived/01\n" {
-		t.Errorf("stdout = %q", out)
-	}
-	got, err := schema.ParseTicket(filepath.Join(f.project, followUpsArchivedEpic, "issues", "01-two.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Status != schema.StatusDone {
-		t.Errorf("status = %q, want done kept", got.Status)
-	}
-	for _, name := range []string{"01-one.md", "03-run.md", "04-gone.md"} {
-		if _, err := os.Stat(filepath.Join(f.project, followUpsEpic, "issues", name)); err != nil {
-			t.Errorf("%s should stay: %v", name, err)
-		}
+func TestExecute_TicketsClose_SweepMovesDoneAndCancelled(t *testing.T) {
+	for _, flag := range []string{"--sweep", "--done"} {
+		t.Run(flag, func(t *testing.T) {
+			f := setupCloseProject(t)
+			fu := filepath.Join(f.project, followUpsEpic, "issues")
+			testutil.WriteFile(t, fu, "05-kept.md", "---\nid: \"05\"\nstatus: cancelled\ntype: research\n---\n\n# 05 — Kept\n\n## Resolution\n\n- reason: fixed\n")
+			out, err := runIn(t, f.repo, "tickets", "close", flag)
+			if err != nil {
+				t.Fatalf("sweep: %v", err)
+			}
+			if out != "mine:follow-ups-archived/01\nmine:follow-ups-archived/02\nmine:follow-ups-archived/03\n" {
+				t.Errorf("stdout = %q", out)
+			}
+			archived := filepath.Join(f.project, followUpsArchivedEpic, "issues")
+			for _, tc := range []struct {
+				name       string
+				status     schema.Status
+				resolution string
+			}{
+				{"01-two.md", schema.StatusDone, ""},
+				{"02-gone.md", schema.StatusCancelled, "- original: mine:follow-ups/04"},
+				{"03-kept.md", schema.StatusCancelled, "- reason: fixed"},
+			} {
+				got, err := schema.ParseTicket(filepath.Join(archived, tc.name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got.Status != tc.status {
+					t.Errorf("%s status = %q, want %q kept", tc.name, got.Status, tc.status)
+				}
+				raw, err := os.ReadFile(filepath.Join(archived, tc.name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if res := strings.TrimSpace(schema.Section(schema.ParseBody(string(raw)), "Resolution")); res != tc.resolution {
+					t.Errorf("%s resolution = %q, want %q", tc.name, res, tc.resolution)
+				}
+			}
+			for _, name := range []string{"01-one.md", "03-run.md"} {
+				if _, err := os.Stat(filepath.Join(fu, name)); err != nil {
+					t.Errorf("%s should stay: %v", name, err)
+				}
+			}
+		})
 	}
 }
