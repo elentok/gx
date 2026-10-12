@@ -47,7 +47,7 @@ whose dependency did not pass is skipped. Never checks herdr.`,
 	}
 	cmd.Flags().StringVar(&opts.runner, "runner", "", "runner to check: headless|pty (default: pty if config agent-runner is pty, else headless)")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "print results as a JSON array of {runner,name,mode,status,detail}")
-	cmd.Flags().StringVar(&opts.record, "record", "", "save each canned session's raw events to this directory, in test-fixture format")
+	cmd.Flags().StringVar(&opts.record, "record", "", "save each canned session's raw events, screen frames and status snapshots to this directory, in test-fixture format")
 	return cmd
 }
 
@@ -55,11 +55,12 @@ whose dependency did not pass is skipped. Never checks herdr.`,
 func liveDoctorSource() claudedoctor.Source {
 	src := claudedoctor.Source{
 		Live: true,
-		Session: func(name string) ([]json.RawMessage, error) {
+		Session: func(name string) (claudedoctor.Recording, error) {
 			if name == "turn" {
-				return liveTurn()
+				events, err := liveTurn()
+				return claudedoctor.Recording{Events: events}, err
 			}
-			return nil, fmt.Errorf("%w: %s", claudedoctor.ErrNoLiveSession, name)
+			return claudedoctor.Recording{}, fmt.Errorf("%w: %s", claudedoctor.ErrNoLiveSession, name)
 		},
 	}
 	if out, err := exec.Command("claude", "--version").Output(); err == nil {

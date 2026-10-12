@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -58,15 +59,16 @@ func TestHeadlessChecks_FixtureChecksPassAndLiveChecksSkip(t *testing.T) {
 func TestCheckPermission_CountsRequiresAction(t *testing.T) {
 	t.Parallel()
 	src, _ := FixtureSource()
-	events, err := src.Session("permission")
+	rec, err := src.Session("permission")
 	if err != nil {
 		t.Fatal(err)
 	}
-	detail, ok := checkPermission(Input{Events: events})
+	events := rec.Events
+	detail, ok := checkPermission(Input{Recording: Recording{Events: events}})
 	if !ok || !strings.HasPrefix(detail, "1 requires_action") {
 		t.Errorf("checkPermission = %q, %v", detail, ok)
 	}
-	if _, ok := checkPermission(Input{Events: events[:2]}); ok {
+	if _, ok := checkPermission(Input{Recording: Recording{Events: events[:2]}}); ok {
 		t.Error("a session without a permission request must fail")
 	}
 }
@@ -77,7 +79,7 @@ func TestCheckSessionID_FailsOnMismatch(t *testing.T) {
 		json.RawMessage(`{"type":"system","subtype":"init","session_id":"5beba6a5-403e-4eb4-82b7-063505e30940"}`),
 		json.RawMessage(`{"type":"result","session_id":"11111111-403e-4eb4-82b7-063505e30940"}`),
 	}
-	if _, ok := checkSessionID(Input{Events: events}); ok {
+	if _, ok := checkSessionID(Input{Recording: Recording{Events: events}}); ok {
 		t.Error("a later event with a different session_id must fail")
 	}
 }
@@ -88,7 +90,7 @@ func TestCheckCompact_FailsWhenSessionChanges(t *testing.T) {
 		json.RawMessage(`{"type":"system","subtype":"init","session_id":"a"}`),
 		json.RawMessage(`{"type":"system","subtype":"compact_boundary","session_id":"b"}`),
 	}
-	if _, ok := checkCompact(Input{Events: events}); ok {
+	if _, ok := checkCompact(Input{Recording: Recording{Events: events}}); ok {
 		t.Error("compact into a new session must fail")
 	}
 }
@@ -147,11 +149,11 @@ func TestRun_PassesSessionEventsAndFailsOnSessionError(t *testing.T) {
 		}},
 		{Runner: "headless", Name: "missing", Mode: Fixture, Session: "nope", Run: pass},
 	}
-	src := Source{Session: func(name string) ([]json.RawMessage, error) {
+	src := Source{Session: func(name string) (Recording, error) {
 		if name == "init" {
-			return []json.RawMessage{json.RawMessage(`{}`), json.RawMessage(`{}`)}, nil
+			return Recording{Events: []json.RawMessage{json.RawMessage(`{}`), json.RawMessage(`{}`)}}, nil
 		}
-		return nil, errors.New("no such session")
+		return Recording{}, errors.New("no such session")
 	}}
 	got := Run(table, "headless", src)
 	if got[0].Status != Pass || seen != 2 {
@@ -211,12 +213,12 @@ func TestFixtureVersionComesFromHeaders(t *testing.T) {
 	if src.ClaudeVersion != "2.1.293" {
 		t.Errorf("fixture version = %q, want 2.1.293", src.ClaudeVersion)
 	}
-	events, err := src.Session("init")
+	rec, err := src.Session("init")
 	if err != nil {
 		t.Fatalf("Session(init): %v", err)
 	}
-	if len(events) != 1 {
-		t.Errorf("init events = %d, want 1 (header excluded)", len(events))
+	if len(rec.Events) != 1 {
+		t.Errorf("init events = %d, want 1 (header excluded)", len(rec.Events))
 	}
 }
 
@@ -226,8 +228,8 @@ func TestRecord_WritesSessionsWithVersionHeaderAndRoundTrips(t *testing.T) {
 	live := Source{
 		Live:          true,
 		ClaudeVersion: "2.1.300",
-		Session: func(string) ([]json.RawMessage, error) {
-			return []json.RawMessage{json.RawMessage(`{"type":"system","subtype":"init"}`)}, nil
+		Session: func(string) (Recording, error) {
+			return Recording{Events: []json.RawMessage{json.RawMessage(`{"type":"system","subtype":"init"}`)}}, nil
 		},
 	}
 	rec := Record(live, dir)
@@ -250,6 +252,61 @@ func TestRecord_WritesSessionsWithVersionHeaderAndRoundTrips(t *testing.T) {
 	}
 	if loaded.ClaudeVersion != "2.1.300" {
 		t.Errorf("round-trip version = %q", loaded.ClaudeVersion)
+	}
+}
+
+func TestRecord_FramesAndSnapshotsRoundTripIntoCheckInput(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	want := Recording{
+		Events:    []json.RawMessage{json.RawMessage(`{"type":"system"}`)},
+		Frames:    []string{"> hello\n  ok", "? Allow Bash\n  1. Yes"},
+		Snapshots: []json.RawMessage{json.RawMessage(`{"state":"busy"}`), json.RawMessage(`{"state":"idle"}`)},
+	}
+	live := Source{
+		Live:          true,
+		ClaudeVersion: "2.1.300",
+		Session:       func(string) (Recording, error) { return want, nil },
+	}
+	if _, err := Record(live, dir).Session("pty-turn"); err != nil {
+		t.Fatalf("recorded Session: %v", err)
+	}
+
+	loaded, err := LoadFixtures(os.DirFS(dir))
+	if err != nil {
+		t.Fatalf("LoadFixtures: %v", err)
+	}
+	var got Input
+	table := []Check{{Runner: "pty", Name: "reads", Mode: Fixture, Session: "pty-turn", Run: func(in Input) (string, bool) {
+		got = in
+		return "", true
+	}}}
+	if r := Run(table, "pty", loaded); r[0].Status != Pass {
+		t.Fatalf("result = %+v, want PASS", r[0])
+	}
+	if !reflect.DeepEqual(got.Frames, want.Frames) {
+		t.Errorf("frames = %q, want %q", got.Frames, want.Frames)
+	}
+	if len(got.Events) != 1 || len(got.Snapshots) != 2 || string(got.Snapshots[1]) != `{"state":"idle"}` {
+		t.Errorf("events %d, snapshots %q", len(got.Events), got.Snapshots)
+	}
+}
+
+func TestRecord_SkipsEmptySidecars(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	live := Source{ClaudeVersion: "2.1.300", Session: func(string) (Recording, error) {
+		return Recording{Events: []json.RawMessage{json.RawMessage(`{}`)}}, nil
+	}}
+	if _, err := Record(live, dir).Session("turn"); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "turn.jsonl" {
+		t.Errorf("recorded files = %v, want only turn.jsonl", entries)
 	}
 }
 

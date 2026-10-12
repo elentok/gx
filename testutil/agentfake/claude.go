@@ -85,12 +85,12 @@ func initEvent(sessionID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	events, err := src.Session("init")
+	rec, err := src.Session("init")
 	if err != nil {
 		return "", err
 	}
 	var e map[string]any
-	if err := json.Unmarshal(events[0], &e); err != nil {
+	if err := json.Unmarshal(rec.Events[0], &e); err != nil {
 		return "", err
 	}
 	e["session_id"] = sessionID

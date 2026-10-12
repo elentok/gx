@@ -22,8 +22,8 @@ const (
 	Skip Status = "SKIP"
 )
 
-// Mode says where a check can run. A Fixture check only reads recorded
-// session events, so CI runs it too; a Live check needs a real claude
+// Mode says where a check can run. A Fixture check only reads a recorded
+// session, so CI runs it too; a Live check needs a real claude
 // process (e.g. process survival) and is skipped against fixtures.
 type Mode string
 
@@ -36,15 +36,23 @@ type Check struct {
 	Runner string // "headless" or "pty"
 	Name   string
 	Mode   Mode
-	// Session names the canned session whose events Run reads; "" for none.
+	// Session names the canned session whose recording Run reads; "" for none.
 	Session   string
 	DependsOn []string
 	Run       func(Input) (detail string, ok bool)
 }
 
+// Recording is what one canned session produced: headless stream-json
+// events, PTY screen frames, and status-file snapshots, each in order.
+type Recording struct {
+	Events    []json.RawMessage
+	Frames    []string
+	Snapshots []json.RawMessage
+}
+
 type Input struct {
 	ClaudeVersion string
-	Events        []json.RawMessage
+	Recording
 }
 
 type Result struct {
@@ -60,7 +68,7 @@ type Result struct {
 type Source struct {
 	Live          bool
 	ClaudeVersion string
-	Session       func(name string) ([]json.RawMessage, error)
+	Session       func(name string) (Recording, error)
 }
 
 // ErrNoLiveSession is what a live Source returns for a canned session it
@@ -77,7 +85,7 @@ var Table = append([]Check{
 func Run(table []Check, runner string, src Source) []Result {
 	var results []Result
 	status := map[string]Status{}
-	sessions := map[string][]json.RawMessage{}
+	sessions := map[string]Recording{}
 	for _, c := range table {
 		if c.Runner != runner {
 			continue
@@ -89,7 +97,7 @@ func Run(table []Check, runner string, src Source) []Result {
 	return results
 }
 
-func runCheck(c Check, src Source, status map[string]Status, sessions map[string][]json.RawMessage) Result {
+func runCheck(c Check, src Source, status map[string]Status, sessions map[string]Recording) Result {
 	r := Result{Runner: c.Runner, Name: c.Name, Mode: c.Mode}
 	for _, dep := range c.DependsOn {
 		if status[dep] != Pass {
@@ -104,13 +112,13 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 
 	in := Input{ClaudeVersion: src.ClaudeVersion}
 	if c.Session != "" {
-		events, ok := sessions[c.Session]
+		rec, ok := sessions[c.Session]
 		if !ok {
 			var err error
 			if src.Session == nil {
 				err = fmt.Errorf("no session source")
 			} else {
-				events, err = src.Session(c.Session)
+				rec, err = src.Session(c.Session)
 			}
 			if errors.Is(err, ErrNoLiveSession) {
 				r.Status, r.Detail = Skip, err.Error()
@@ -120,9 +128,9 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 				r.Status, r.Detail = Fail, fmt.Sprintf("session %s: %v", c.Session, err)
 				return r
 			}
-			sessions[c.Session] = events
+			sessions[c.Session] = rec
 		}
-		in.Events = events
+		in.Recording = rec
 	}
 
 	detail, ok := c.Run(in)
