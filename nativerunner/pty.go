@@ -38,6 +38,9 @@ type Pty struct {
 	PollInterval time.Duration
 	// StartTimeout bounds Start's wait for claude to turn idle.
 	StartTimeout time.Duration
+	// PromptGrace bounds each wait of Prompt for Turn to move; defaults to
+	// claudeui.NudgeGrace.
+	PromptGrace time.Duration
 	// StopGrace is how long Stop waits for the holder to exit before it
 	// kills it.
 	StopGrace time.Duration
@@ -396,11 +399,65 @@ func (p *Pty) List(epic string) ([]agentrunner.Session, error) {
 	return out, nil
 }
 
-func (p *Pty) Prompt(s agentrunner.Session, _ string) error {
-	if _, err := p.live(s); err != nil {
+// Prompt types text plus Enter and returns once Turn moved past its value
+// before, nudging and retyping through claudeui.PromptWithNudge.
+func (p *Pty) Prompt(s agentrunner.Session, text string) error {
+	ss, err := p.live(s)
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("%w: prompt", errPtyNotYet)
+	_, turn, err := ss.holder.Status()
+	if err != nil {
+		return err
+	}
+	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
+	err = claudeui.PromptWithNudge(pr, text, time.Time{}, time.Now)
+	if errors.Is(err, claudeui.ErrStuckSubmission) || errors.Is(err, claudeui.ErrStartTimeout) {
+		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
+	}
+	return err
+}
+
+// ptyPrompter is claudeui.Prompter over holder.sock. A turn has started once
+// the holder's Turn passes turn.
+type ptyPrompter struct {
+	p    *Pty
+	ss   *ptySession
+	turn int
+}
+
+func (pr *ptyPrompter) Submit(text string) error {
+	if err := pr.ss.holder.SendKeys(text); err != nil {
+		return err
+	}
+	return pr.SendEnter()
+}
+
+func (pr *ptyPrompter) SendEnter() error { return pr.ss.holder.SendKeys("\r") }
+
+// WaitStart caps timeout at PromptGrace, which is how a test keeps the
+// nudge rounds short.
+func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
+	deadline := time.Now().Add(min(timeout, pr.p.promptGrace()))
+	for {
+		_, turn, err := pr.ss.holder.Status()
+		if err != nil || turn > pr.turn {
+			return err == nil, err
+		}
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		select {
+		case <-pr.ss.exited:
+			return false, fmt.Errorf("%w: holder exited", agentrunner.ErrNotDelivered)
+		case <-time.After(pr.p.pollInterval()):
+		}
+	}
+}
+
+func (pr *ptyPrompter) Screen() (string, error) {
+	rows, _, err := pr.ss.holder.Screen(0)
+	return strings.Join(rows, "\n"), err
 }
 
 func (p *Pty) Interrupt(s agentrunner.Session) error {
@@ -428,6 +485,13 @@ func (p *Pty) pollInterval() time.Duration {
 		return 100 * time.Millisecond
 	}
 	return p.PollInterval
+}
+
+func (p *Pty) promptGrace() time.Duration {
+	if p.PromptGrace <= 0 {
+		return claudeui.NudgeGrace
+	}
+	return p.PromptGrace
 }
 
 func (p *Pty) startTimeout() time.Duration {

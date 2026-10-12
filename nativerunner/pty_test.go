@@ -35,6 +35,7 @@ func newPty(t *testing.T) *nativerunner.Pty {
 		Claude:       exe,
 		PollInterval: 10 * time.Millisecond,
 		StartTimeout: 10 * time.Second,
+		PromptGrace:  500 * time.Millisecond,
 	}
 }
 
@@ -42,13 +43,16 @@ func TestPty_Conformance(t *testing.T) {
 	runnertest.Run(t, func(t *testing.T) runnertest.Harness {
 		return runnertest.Harness{
 			Runner: newPty(t),
+			FinishTurn: func(t *testing.T, s agentrunner.Session) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFinish})
+			},
 			Block: func(t *testing.T, s agentrunner.Session, reason string) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: reason})
 			},
+			Stall: func(t *testing.T, s agentrunner.Session) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+			},
 			Skip: map[string]string{
-				"PromptStartsTurn":             "pty prompt lands in ticket 23",
-				"PromptNotDelivered":           "pty prompt lands in ticket 23",
-				"WaitTimeout":                  "pty prompt lands in ticket 23",
 				"InterruptKeepsSession":        "pty interrupt lands in ticket 24",
 				"CompactAfterInterrupt":        "pty interrupt and compact land in ticket 24",
 				"FinishWaitsForBackgroundTask": "pty background tasks land in ticket 24",
