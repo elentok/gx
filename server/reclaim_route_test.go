@@ -34,12 +34,12 @@ func newRenamedFake(name string, verdict nativerunner.Verdict) renamedFake {
 // restartUnder leaves an iteration whose handle names savedRunner ("" keeps
 // the herdr handle), then restarts a server configured with configured, whose
 // RunnerFor builds only the runners in others. It returns the ticket path.
-func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runner, others map[string]agentrunner.Runner) (*servertest.Harness, string) {
+func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runner, others map[string]agentrunner.Runner, opts ...func(*server.Config)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) {
 		c.Runner = configured
 		c.RunnerFor = func(name, _ string) agentrunner.Runner {
 			if name == configured.Name() {
@@ -47,7 +47,7 @@ func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runne
 			}
 			return others[name]
 		}
-	})
+	}}, opts...)...)
 	registerLiveAgent(h)
 	_, ticketPath := leaveIteration(t, h, store, repo)
 	if savedRunner != "" {

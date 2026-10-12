@@ -772,6 +772,35 @@ func (s *Server) runnerForRun(run Run) agentrunner.Runner {
 	return s.runnerNamed(name, project)
 }
 
+// runnerOf is runnerForRun, failing when the run's runner cannot be built.
+func (s *Server) runnerOf(run Run) (agentrunner.Runner, error) {
+	if r := s.runnerForRun(run); r != nil {
+		return r, nil
+	}
+	name := run.Runner
+	if name == "" {
+		name = runnerHerdr
+	}
+	return nil, fmt.Errorf("started by %s; %s unavailable", name, name)
+}
+
+// liveSession is the session of address's live iteration and the runner
+// hosting it: a tracked run's own runner, else the configured one (a parked
+// ticket's agent can outlive its run).
+func (s *Server) liveSession(addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
+	runner := s.runnerFor(addr.Project)
+	if run, ok := s.registry.runOf(addr.String()); ok {
+		r, err := s.runnerOf(run)
+		if err != nil {
+			return nil, agentrunner.Session{}, false, err
+		}
+		runner = r
+	}
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
+	sess, ok, err := runner.Find(label)
+	return runner, sess, ok, err
+}
+
 func (s *Server) runnerNamed(name, project string) agentrunner.Runner {
 	if s.cfg.RunnerFor != nil {
 		if r := s.cfg.RunnerFor(name, project); r != nil {

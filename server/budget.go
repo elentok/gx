@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -459,9 +458,8 @@ func (s *Server) budgetIteration(address string) (IterationInfo, bool) {
 	if err != nil {
 		return IterationInfo{}, false
 	}
-	r := s.runnerFor(a.Project)
-	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
-	sess, found, err := r.Find(label)
+	_, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
+	r, sess, found, err := s.liveSession(a)
 	if err != nil || !found {
 		return IterationInfo{}, false
 	}
@@ -520,7 +518,11 @@ func (s *Server) killForBudget(now time.Time) int {
 	runs := s.registry.list()
 	for _, t := range runs {
 		s.registry.markBudgetStop(t.Address)
-		if err := s.runnerOf(t.Run).Interrupt(t.Session); err != nil {
+		r, err := s.runnerOf(t.Run)
+		if err == nil {
+			err = r.Interrupt(t.Session)
+		}
+		if err != nil {
 			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
 		}
 	}
@@ -536,15 +538,6 @@ func (s *Server) killForBudget(now time.Time) int {
 	return len(runs)
 }
 
-// runnerOf is the runner hosting the run's session.
-func (s *Server) runnerOf(t Run) agentrunner.Runner {
-	project := ""
-	if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
-		project = addr.Project
-	}
-	return s.runnerFor(project)
-}
-
 // parkBudgetKilled stops the session through its runner, then parks the ticket
 // needs-repair.
 func (s *Server) parkBudgetKilled(t trackedRun) error {
@@ -556,7 +549,10 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 	if err != nil {
 		return err
 	}
-	closeErr := s.runnerOf(t.Run).Stop(t.Session)
+	r, closeErr := s.runnerOf(t.Run)
+	if closeErr == nil {
+		closeErr = r.Stop(t.Session)
+	}
 	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
 	return errors.Join(closeErr, parkErr)
 }

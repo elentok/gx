@@ -170,7 +170,11 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonTicketLive, live[0].Address+" has a live pane; use --stop"), nil
 		}
 		for _, run := range live {
-			if err := s.runnerOf(run).Stop(run.Session); err != nil {
+			r, err := s.runnerOf(run)
+			if err == nil {
+				err = r.Stop(run.Session)
+			}
+			if err != nil {
 				return QueueResult{}, fmt.Errorf("stop %s: %w", run.Address, err)
 			}
 		}

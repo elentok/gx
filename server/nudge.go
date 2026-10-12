@@ -116,8 +116,12 @@ func (s *Server) watchNudgedPane(ref ticketRef, it IterationInfo, label string) 
 			Session: agentrunner.Session{Label: label, ID: it.Pane, SessionID: it.Session}},
 		Root: ref.root().String(), TicketPath: ref.ticket.Path, StartedAt: time.Now(), Watched: true,
 	}
+	r, err := s.runnerOf(t.Run)
+	if err != nil {
+		s.log.Warn("watch nudged pane", "ticket", t.Address, "err", err)
+		return
+	}
 	s.registry.put(t)
-	r := s.runnerOf(t.Run)
 	s.goSettle(func() {
 		defer s.registry.deleteWatched(t)
 		// The nudge may not have shown as working yet; a pane already idle

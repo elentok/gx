@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/ralphloop"
 )
 
 // Refusal reasons of the agent verbs. iteration-not-live is shared with nudge.
@@ -19,9 +18,7 @@ const (
 // prompt, interrupt and answer reach the agent whichever runner hosts it.
 func (s *Server) agentVerb(req QueueRequest, do func(agentrunner.Runner, agentrunner.Session) (QueueResult, error)) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
-		label, _, _ := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, "")
-		runner := s.runnerFor(ref.addr.Project)
-		sess, ok, err := runner.Find(label)
+		runner, sess, ok, err := s.liveSession(ref.addr)
 		if err != nil {
 			return QueueResult{}, err
 		}
