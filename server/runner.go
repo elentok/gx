@@ -477,19 +477,23 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 	if err != nil {
 		return "", "", err
 	}
-	trunk, err := tickets.Trunk(dir, repo)
-	if err != nil {
-		return "", "", err
-	}
+	trunk, trunkErr := tickets.Trunk(dir, repo)
 	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.landingOnLanded(project))
 	if err != nil {
 		return "", "", err
 	}
+	targetsTrunk := derived == "" || explicitBase(epics, epic, t)
 	switch {
+	case targetsTrunk && trunkErr != nil:
+		return "", "", trunkErr
 	case derived == "":
 		return trunk, trunk, nil
-	case explicitBase(epics, epic, t):
+	case targetsTrunk:
 		return derived, trunk, nil
+	case trunkErr != nil:
+		// Only a root targeting trunk needs it; a blocker's branch can't have
+		// landed on a trunk that isn't there.
+		return derived, derived, nil
 	}
 	ref := retargetIfLanded(derived, trunk, func(a, d string) (bool, error) { return git.IsAncestor(repo, a, d) })
 	return ref, ref, nil
@@ -596,15 +600,6 @@ func (s *Server) settleRun(rc runContext, err error) {
 			return
 		}
 		defer s.lands.end()
-		if !mode.commitless && s.parkIfTrunkMissing(one.ScratchDir, addr, one.Ticket.Path) {
-			// The work waits on its iteration branch; a live tab would make the
-			// recovery land need --ignore-live-tab.
-			if serr := deps.Runner.Stop(run.Session); serr != nil {
-				s.log.Warn("stop agent", "ticket", ticketAddr, "err", serr)
-			}
-			s.events.publish(EventIterationParked, ticketAddr)
-			return
-		}
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
@@ -753,6 +748,11 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 		return fmt.Sprintf("auto-ff-merge is off for %s; run gx-merge %s", project, one.Epic), nil
 	}
 	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repoDir)
+	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
+		// Nothing lands; the project stops claiming until a person fixes trunk.
+		s.enterTrunkMissing(project, err.Error())
+		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, one.Epic), nil
+	}
 	if err != nil {
 		return "", err
 	}

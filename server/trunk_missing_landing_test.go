@@ -1,66 +1,75 @@
 package server_test
 
 import (
-	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
 
-// trunkDeletedMidRun runs the one-ticket epic with trunk develop deleted while
-// the agent works, and waits for the landing to park.
-func trunkDeletedMidRun(t *testing.T, ctx context.Context) (f *schedFixture, evs <-chan server.Event, develop string) {
+// trunkDeletedMidRun is a one-ticket epic whose trunk develop is deleted while
+// the agent works. It returns develop's tip and a count of chat text sent.
+func trunkDeletedMidRun(t *testing.T, cfgOpts ...func(*server.Config)) (f *schedFixture, develop string, chatCount func(string) int) {
 	t.Helper()
-	f = trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
+	var mu sync.Mutex
+	var sent strings.Builder
+	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		sent.Write(b)
+		mu.Unlock()
+	}))
+	t.Cleanup(chat.Close)
+	chatCount = func(s string) int {
+		mu.Lock()
+		defer mu.Unlock()
+		return strings.Count(sent.String(), s)
+	}
+	cfgOpts = append(cfgOpts, func(c *server.Config) {
+		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
+	})
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "-D", "develop")
-	})
-	develop = f.rev(t, "develop")
-	evs = f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationParked, "")
-	return f, evs, develop
+	}, cfgOpts...)
+	f.git(t, "branch", "develop")
+	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
+	return f, f.rev(t, "develop"), chatCount
 }
 
-func TestTrunkMissingAtLanding_ParksTheTicketAndLandsNothing(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	f, _, develop := trunkDeletedMidRun(t, ctx)
+func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T) {
+	f, develop, chatCount := trunkDeletedMidRun(t)
+	f.runEpic(t, server.EventRootParked)
 
-	body := readFile(t, f.ticketFile(t, "01"))
-	for _, want := range []string{"status: needs-repair", "park_kind: trunk-missing", "## Needs Repair", `trunk "develop" from project.json is not a local branch`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("ticket lacks %q:\n%s", want, body)
-		}
+	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
+		t.Errorf("ticket did not land on its root's branch:\n%s", body)
 	}
-	if out := f.git(t, "log", "--all", "--format=%s", "--not", "--glob=refs/heads/ralph-loop/*"); strings.Contains(out, "work 01") {
-		t.Errorf("work landed outside its iteration branch:\n%s", out)
+	if got := f.git(t, "show", schedEpic+":01.txt"); got != "01" {
+		t.Errorf("%s:01.txt = %q, want the ticket's work", schedEpic, got)
 	}
 	if got := f.rev(t, "main"); got != develop {
 		t.Errorf("main moved to %s", got)
 	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && chatCount("trunk-missing: project") == 0; time.Sleep(50 * time.Millisecond) {
+	}
+	if chatCount("trunk-missing: project") == 0 {
+		t.Errorf("no root park with reason trunk-missing reached chat")
+	}
 }
 
-func TestTrunkMissingAtLanding_LandAfterTheFixLandsOnTrunk(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	f, evs, develop := trunkDeletedMidRun(t, ctx)
+func TestTrunkMissingAtLanding_AutoMergeOffIsNotParked(t *testing.T) {
+	f, _, _ := trunkDeletedMidRun(t, func(c *server.Config) { c.AutoMergeEpic = false })
+	f.runEpic(t, server.EventRootCompleted)
 
-	res, err := f.h.Client.Repair(ctx, "land", server.RepairRequest{Address: "proj:" + schedEpic + "/01"})
-	if err != nil || !res.Refused || !strings.Contains(res.Message, `trunk "develop"`) {
-		t.Fatalf("land with trunk still missing = %+v, %v; want a refusal naming the trunk", res, err)
-	}
-
-	f.git(t, "branch", "develop", develop)
-	res, err = f.h.Client.Repair(ctx, "land", server.RepairRequest{Address: "proj:" + schedEpic + "/01"})
-	if err != nil || res.Refused {
-		t.Fatalf("land: %+v, %v", res, err)
-	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
-
-	if got := f.git(t, "show", "develop:01.txt"); got != "01" {
-		t.Errorf("develop:01.txt = %q, want the ticket's work", got)
+	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
+		t.Errorf("ticket not done:\n%s", body)
 	}
 }

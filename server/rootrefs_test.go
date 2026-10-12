@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -74,5 +75,19 @@ func TestRootRefs(t *testing.T) {
 				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantLand)
 			}
 		})
+	}
+}
+
+func TestRootRefs_MissingTrunkFailsOnlyARootTargetingTrunk(t *testing.T) {
+	s, repo := rootRefsFixture(t)
+	runGit(t, repo, "branch", "-D", "develop")
+	blocker := tickets.Epic{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
+	stacked := tickets.Epic{Name: "b", BlockedBy: []string{"a/01"}, Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open"}}}
+	if base, target, err := s.rootRefs("proj", []tickets.Epic{blocker, stacked}, "b", stacked.Tickets[0], repo); err != nil || base != "a" || target != "a" {
+		t.Errorf("stacked root = (%q, %q, %v), want (a, a)", base, target, err)
+	}
+	var missing *tickets.ErrTrunkMissing
+	if _, _, err := s.rootRefs("proj", []tickets.Epic{blocker}, "a", blocker.Tickets[0], repo); !errors.As(err, &missing) {
+		t.Errorf("top-level root err = %v, want ErrTrunkMissing", err)
 	}
 }

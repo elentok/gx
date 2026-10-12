@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -55,6 +54,17 @@ func (m *missingTrunks) clear(project string) bool {
 	return was
 }
 
+// keepOnly forgets every project not in projects, announcing nothing.
+func (m *missingTrunks) keepOnly(projects map[string]bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for p := range m.reason {
+		if !projects[p] {
+			delete(m.reason, p)
+		}
+	}
+}
+
 func (m *missingTrunks) get(project string) (string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -64,10 +74,11 @@ func (m *missingTrunks) get(project string) (string, bool) {
 
 // checkTrunks resolves trunk for every project with a queued root, on every
 // pass, so claimRoot can refuse a Missing trunk project before it derives any
-// base. A project with nothing queued keeps whatever state it had: nothing of
-// it can be claimed, and explain only asks about queued tickets.
+// base. A project with nothing queued leaves the state silently: a re-queue
+// after a fix must not announce a stale "trunk found".
 func (s *Server) checkTrunks() {
 	seen := map[string]bool{}
+	defer s.trunkMissing.keepOnly(seen)
 	for _, item := range s.queued.list() {
 		addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
 		if err != nil || seen[addr.Project] {
@@ -97,21 +108,6 @@ func (s *Server) enterTrunkMissing(project, reason string) {
 	s.events.publishEvent(Event{Type: EventTrunkMissing, Address: project, Level: EventLevelWarning, Message: reason})
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
-}
-
-// parkIfTrunkMissing resolves trunk again before a ticket lands: with it
-// missing nothing lands anywhere, the ticket parks for a person to fix the
-// branch and run `gx server tickets land`, and the project stops claiming.
-func (s *Server) parkIfTrunkMissing(scratchDir string, addr tickets.Address, ticketPath string) bool {
-	reason, missing := s.trunkProblem(addr.Project)
-	if !missing {
-		return false
-	}
-	s.enterTrunkMissing(addr.Project, reason)
-	if err := s.parkTicket(scratchDir, addr, ticketPath, events.TrunkMissing, reason); err != nil {
-		s.log.Warn("park trunk missing", "ticket", addr.String(), "err", err)
-	}
-	return true
 }
 
 // trunkProblem reports why project's trunk can't be used, if it can't. A

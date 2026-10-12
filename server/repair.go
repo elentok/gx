@@ -144,20 +144,13 @@ func (s *Server) repairLand(req RepairRequest) (RepairResult, error) {
 	return repairOK(res)
 }
 
-// ReasonTrunkMissing refuses a land into a queued root whose project's trunk
-// is missing: the root could not land after it.
-const ReasonTrunkMissing = "trunk-missing"
-
 // landInQueue is the server's land. A ticket of a queued root may be the
-// one a landing parked (trunk-missing, say), so once it lands the root
-// completes as if its iteration had settled. A direct land has no queue.
+// one a landing parked, so once it lands the root completes as if its
+// iteration had settled. A direct land has no queue.
 func (s *Server) landInQueue(req RepairRequest) (RepairResult, error) {
 	addr, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
 	if err != nil || !s.rootQueued(rootOf(addr)) {
 		return s.repairLand(req)
-	}
-	if reason, missing := s.trunkProblem(addr.Project); missing {
-		return repairRefusal(&repair.RefusalError{Reason: ReasonTrunkMissing, Message: reason}), nil
 	}
 	res, err := s.repairLand(req)
 	if err != nil || res.Refused {

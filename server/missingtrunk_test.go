@@ -64,23 +64,7 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 
 	evs := f.queueEpic(ctx, t, "01")
 	counts := map[string]int{}
-	next := func(want string) {
-		t.Helper()
-		for {
-			select {
-			case ev, ok := <-evs:
-				if !ok {
-					t.Fatalf("event stream closed waiting for %s", want)
-				}
-				counts[ev.Type]++
-				if ev.Type == want {
-					return
-				}
-			case <-ctx.Done():
-				t.Fatalf("timed out waiting for %s; saw %v", want, counts)
-			}
-		}
-	}
+	next := func(want string) { t.Helper(); countUntil(ctx, t, evs, counts, want) }
 	next(server.EventTrunkMissing)
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && chatCount("proj: trunk missing") == 0; time.Sleep(50 * time.Millisecond) {
 	}
@@ -113,5 +97,49 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	}
 	if n := chatCount("proj: trunk missing"); n != 1 {
 		t.Fatalf("trunk-missing chat notices = %d, want 1", n)
+	}
+}
+
+// countUntil reads evs, counting each type, until one of type want arrives.
+func countUntil(ctx context.Context, t *testing.T, evs <-chan server.Event, counts map[string]int, want string) {
+	t.Helper()
+	for {
+		select {
+		case ev, ok := <-evs:
+			if !ok {
+				t.Fatalf("event stream closed waiting for %s", want)
+			}
+			counts[ev.Type]++
+			if ev.Type == want {
+				return
+			}
+		case <-ctx.Done():
+			t.Fatalf("timed out waiting for %s; saw %v", want, counts)
+		}
+	}
+}
+
+func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}},
+		func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
+	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	evs := f.queueEpic(ctx, t, "01")
+	counts := map[string]int{}
+	countUntil(ctx, t, evs, counts, server.EventTrunkMissing)
+	if res, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
+		t.Fatalf("remove: %+v, %v", res, err)
+	}
+	time.Sleep(500 * time.Millisecond) // many polls pass with nothing queued
+
+	f.git(t, "branch", "develop")
+	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("re-add: %+v, %v", res, err)
+	}
+	countUntil(ctx, t, evs, counts, server.EventRootCompleted)
+	if counts[server.EventTrunkFound] != 0 {
+		t.Fatalf("events = %v, want no stale trunk-found", counts)
 	}
 }
