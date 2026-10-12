@@ -6,6 +6,7 @@ package agentrunner
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -95,7 +96,16 @@ var (
 	// ErrMissingCapability: the agent lacks a protocol capability the runner
 	// relies on. Retrying cannot help; the agent needs upgrading.
 	ErrMissingCapability = errors.New("agentrunner: agent missing capability")
+	// ErrSessionDied: Status or Wait found the session gone without a Stop
+	// (the agent exited, or its host crashed). Build it with SessionDied so
+	// the message carries why; callers park needs-repair with that message.
+	ErrSessionDied = errors.New("agentrunner: session died")
 )
+
+// SessionDied wraps ErrSessionDied with reason, e.g. "claude exited (code 1)".
+func SessionDied(reason string) error {
+	return fmt.Errorf("%w: %s", ErrSessionDied, reason)
+}
 
 type Runner interface {
 	// Name identifies the runner kind; it is recorded on every run it hosts.

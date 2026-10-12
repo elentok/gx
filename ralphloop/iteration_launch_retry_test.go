@@ -194,6 +194,31 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	}
 }
 
+func TestRunIteration_SessionDiedInWait_ParksNeedsRepairWithReason(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.DieAfterPrompt(launchLabel, agentrunner.SessionDied("claude exited (code 1)"))
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketStatus(t, scratchDir, "needs-repair")
+	evs, _, err := ReadEvents(scratchDir, launchEpic)
+	if err != nil {
+		t.Fatalf("ReadEvents() error = %v", err)
+	}
+	var parked []Event
+	for _, ev := range evs {
+		if ev.Type == string(events.NeedsRepair) {
+			parked = append(parked, ev)
+		}
+	}
+	if len(parked) != 1 || parked[0].Kind != string(events.IterationError) ||
+		!strings.Contains(parked[0].Reason, "claude exited (code 1)") {
+		t.Errorf("needs-repair events = %+v, want one iteration_error carrying the died reason", parked)
+	}
+}
+
 func TestRunIteration_OtherPromptError_ParksWithoutRetry(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()

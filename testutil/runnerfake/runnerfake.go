@@ -22,6 +22,7 @@ type session struct {
 	limited   bool
 	resetAt   time.Time
 	limitErr  error
+	diedErr   error
 	bgTask    bool
 	prompts   []string
 	answers   []agentrunner.Answer
@@ -57,6 +58,7 @@ type Runner struct {
 	healthErr error
 	startErrs map[string]error
 	failNext  map[string]failPrompts
+	dieAfter  map[string]error
 }
 
 type failPrompts struct {
@@ -71,6 +73,7 @@ func NewRunner() *Runner {
 		changed:     make(chan struct{}),
 		startErrs:   map[string]error{},
 		failNext:    map[string]failPrompts{},
+		dieAfter:    map[string]error{},
 	}
 }
 
@@ -151,6 +154,10 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 	ss.prompts = append(ss.prompts, text)
 	ss.status.Turn++
 	ss.status.State = r.PromptState
+	if err := r.dieAfter[s.Label]; err != nil {
+		delete(r.dieAfter, s.Label)
+		ss.diedErr = err
+	}
 	r.notify()
 	return nil
 }
@@ -162,6 +169,9 @@ func (r *Runner) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	if err != nil {
 		return agentrunner.Status{}, err
 	}
+	if ss.diedErr != nil {
+		return agentrunner.Status{}, ss.diedErr
+	}
 	return ss.view(), nil
 }
 
@@ -170,6 +180,9 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	for {
 		r.mu.Lock()
 		ss, err := r.live(s)
+		if err == nil {
+			err = ss.diedErr
+		}
 		if err != nil {
 			r.mu.Unlock()
 			return agentrunner.Status{}, err
@@ -300,6 +313,15 @@ func (r *Runner) FailNextPrompts(label string, n int, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.failNext[label] = failPrompts{n: n, err: err}
+}
+
+// DieAfterPrompt makes the next delivered Prompt to label kill its session:
+// from then on Status and Wait fail with err (e.g. agentrunner.SessionDied).
+// Like FailNextPrompts, it can be set before the session exists.
+func (r *Runner) DieAfterPrompt(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.dieAfter[label] = err
 }
 
 // SetStartErr makes every Start of label fail with err (e.g. ErrLabelTaken)
