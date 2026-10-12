@@ -24,8 +24,8 @@ var (
 
 // Log is where one agent's log lives.
 type Log struct {
-	// Path is the JSONL file to read from Offset: out.jsonl for a native
-	// agent, the claude transcript for a herdr one. Empty when Pruned.
+	// Path is the JSONL file to read from Offset: out.jsonl for a headless
+	// agent, the claude transcript for a pty or herdr one. Empty when Pruned.
 	Path   string
 	Offset int64
 	// Ended reports whether the agent is gone, so follow knows to stop.
@@ -64,17 +64,22 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			p, _ := transcript.Path(d.Meta.Cwd, d.Meta.SessionID)
 			return Log{Pruned: true, Transcript: p}, nil
 		}
-		return Log{
-			Path: d.Log(), Offset: d.Meta.Offset,
-			Ended: func() bool {
-				d, err := nativerunner.OpenDir(path)
-				if err != nil {
-					return false
-				}
-				live, err := d.Alive(l.Procs)
-				return err == nil && !live
-			},
-		}, nil
+		ended := func() bool {
+			d, err := nativerunner.OpenDir(path)
+			if err != nil {
+				return false
+			}
+			live, err := d.Alive(l.Procs)
+			return err == nil && !live
+		}
+		if d.ReadsTranscript() {
+			p, err := transcript.Path(d.Meta.Cwd, d.Meta.SessionID)
+			if err != nil {
+				return Log{}, err
+			}
+			return Log{Path: p, Ended: ended}, nil
+		}
+		return Log{Path: d.Log(), Offset: d.Meta.Offset, Ended: ended}, nil
 	case !errors.Is(err, agentrunner.ErrNotFound):
 		return Log{}, err
 	}

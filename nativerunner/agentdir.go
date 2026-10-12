@@ -21,10 +21,17 @@ type layout struct {
 	// transient files are removed by Cleanup on land or cancel.
 	transient []string
 	alive     func(procs ProcessTable, meta Meta) (bool, error)
+	// readsTranscript: the readable log is the claude transcript, not
+	// logs[0]. raw.log is terminal bytes nothing should parse.
+	readsTranscript bool
 }
 
 var layouts = map[string]layout{
 	runnerName: {logs: []string{OutFile, ErrFile}, transient: []string{StdinFile}, alive: headlessAlive},
+	ptyRunnerName: {
+		logs: []string{RawLogFile, ScreenFile}, transient: []string{HolderSocketFile},
+		alive: ptyAlive, readsTranscript: true,
+	},
 }
 
 func layoutOf(meta Meta) (layout, error) {
@@ -77,6 +84,10 @@ func OpenDir(dir string) (Dir, error) {
 
 // Log is the primary log's path. It is gone once Pruned.
 func (d Dir) Log() string { return filepath.Join(d.Path, d.l.logs[0]) }
+
+// ReadsTranscript reports whether readers should follow the claude transcript
+// instead of Log.
+func (d Dir) ReadsTranscript() bool { return d.l.readsTranscript }
 
 // Pruned reports whether Prune already removed the logs.
 func (d Dir) Pruned() bool { return d.l.pruned(d.Path) }

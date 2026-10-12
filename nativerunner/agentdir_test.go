@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -98,6 +99,117 @@ func TestAgentDir_InspectReportsUnknownRunner(t *testing.T) {
 	if want := `"martian"`; !strings.Contains(err.Error(), want) {
 		t.Errorf("Inspect(foreign) err = %q, want it to name runner %s", err, want)
 	}
+}
+
+// prepareOldDir writes an agent directory for runner whose files all predate
+// the retention window.
+func prepareOldDir(t *testing.T, root, label, runner string, files ...string) string {
+	t.Helper()
+	dir := filepath.Join(root, label)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(nativerunner.Meta{
+		Runner: runner, Label: label, SessionID: agentSID, PID: agentPID, PIDStart: agentStart,
+		HolderPID: holderPID, HolderPIDStart: holderStart,
+	})
+	old := time.Now().Add(-2 * nativerunner.DefaultLogRetention)
+	for _, name := range append([]string{nativerunner.MetaFile}, files...) {
+		path := filepath.Join(dir, name)
+		content := []byte(nil)
+		if name == nativerunner.MetaFile {
+			content = data
+		}
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func assertFiles(t *testing.T, dir string, kept, gone []string) {
+	t.Helper()
+	for _, name := range kept {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s: %s missing: %v", filepath.Base(dir), name, err)
+		}
+	}
+	for _, name := range gone {
+		if _, err := os.Stat(filepath.Join(dir, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%s: %s survived: %v", filepath.Base(dir), name, err)
+		}
+	}
+}
+
+var (
+	headlessFiles = []string{nativerunner.OutFile, nativerunner.ErrFile, nativerunner.StdinFile}
+	ptyFiles      = []string{nativerunner.RawLogFile, nativerunner.ScreenFile, nativerunner.HolderSocketFile}
+)
+
+func TestAgentDir_PruneMixedRootByEachRunnersFiles(t *testing.T) {
+	root := t.TempDir()
+	h := prepareOldDir(t, root, "h", "headless", headlessFiles...)
+	p := prepareOldDir(t, root, "p", "pty", ptyFiles...)
+	r := &nativerunner.Headless{Root: root, Procs: &fakeProcs{}}
+
+	pruned, err := r.Prune(nativerunner.DefaultLogRetention, time.Now(), func(string) bool { return false })
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(pruned)
+	if !slices.Equal(pruned, []string{"h", "p"}) {
+		t.Errorf("Prune = %q, want [h p]", pruned)
+	}
+	assertFiles(t, h, []string{nativerunner.MetaFile}, headlessFiles)
+	assertFiles(t, p, []string{nativerunner.MetaFile}, ptyFiles)
+
+	d, err := nativerunner.OpenDir(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Pruned() {
+		t.Error("pty dir not Pruned after Prune")
+	}
+}
+
+func TestAgentDir_PruneKeepsLivePtyAgent(t *testing.T) {
+	root := t.TempDir()
+	p := prepareOldDir(t, root, "p", "pty", ptyFiles...)
+	r := &nativerunner.Headless{Root: root, Procs: ptyAgentProcs()}
+
+	pruned, err := r.Prune(nativerunner.DefaultLogRetention, time.Now(), func(string) bool { return false })
+	if err != nil || len(pruned) != 0 {
+		t.Errorf("Prune = %q, %v; want nothing pruned", pruned, err)
+	}
+	assertFiles(t, p, ptyFiles, nil)
+
+	_, live, err := r.Inspect("p")
+	if err != nil || !live {
+		t.Errorf("Inspect = %v, %v; want live", live, err)
+	}
+	procs := ptyAgentProcs()
+	procs.kill(holderPID)
+	r.Procs = procs
+	if _, live, err := r.Inspect("p"); err != nil || live {
+		t.Errorf("Inspect with the holder gone = %v, %v; want dead", live, err)
+	}
+}
+
+func TestAgentDir_CleanupMixedRootByEachRunnersFiles(t *testing.T) {
+	root := t.TempDir()
+	h := prepareOldDir(t, root, "h", "headless", headlessFiles...)
+	p := prepareOldDir(t, root, "p", "pty", ptyFiles...)
+	r := &nativerunner.Headless{Root: root, Procs: &fakeProcs{}}
+	for _, label := range []string{"h", "p"} {
+		if err := r.Cleanup(label); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assertFiles(t, h, []string{nativerunner.MetaFile, nativerunner.OutFile, nativerunner.ErrFile}, []string{nativerunner.StdinFile})
+	assertFiles(t, p, []string{nativerunner.MetaFile, nativerunner.RawLogFile, nativerunner.ScreenFile}, []string{nativerunner.HolderSocketFile})
 }
 
 func TestAgentDir_HeadlessCleanupRemovesOnlyTheFIFO(t *testing.T) {

@@ -32,17 +32,31 @@ var liveProcs = fakeProcs{42: {Start: "t0", Cmdline: "claude --session-id " + se
 // leaves it as Prune does.
 func writeAgentDir(t *testing.T, stateDir string, withLog bool) string {
 	t.Helper()
+	log := ""
+	if withLog {
+		log = nativerunner.OutFile
+	}
+	return writeRunnerDir(t, stateDir, "headless", log)
+}
+
+// writeRunnerDir lays out runner's agent directory for addr with log, or no
+// log when empty.
+func writeRunnerDir(t *testing.T, stateDir, runner, log string) string {
+	t.Helper()
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
 	dir := filepath.Join(nativerunner.AgentsRoot(stateDir, addr.Project), label)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	meta, _ := json.Marshal(nativerunner.Meta{Runner: "headless", PID: 42, PIDStart: "t0", SessionID: session, Label: label, Cwd: "/work/tree", Offset: 17})
+	meta, _ := json.Marshal(nativerunner.Meta{
+		Runner: runner, PID: 42, PIDStart: "t0", HolderPID: 41, HolderPIDStart: "t0",
+		SessionID: session, Label: label, Cwd: "/work/tree", Offset: 17,
+	})
 	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if withLog {
-		if err := os.WriteFile(filepath.Join(dir, nativerunner.OutFile), nil, 0o600); err != nil {
+	if log != "" {
+		if err := os.WriteFile(filepath.Join(dir, log), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -93,6 +107,45 @@ func TestAgentLog_Pruned(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := transcript.PathIn(home, "/work/tree", session); !l.Pruned || l.Transcript != want || l.Path != "" {
+		t.Errorf("got %+v, want pruned with transcript %s", l, want)
+	}
+}
+
+func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stateDir := t.TempDir()
+	writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	procs := fakeProcs{
+		41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session},
+		42: liveProcs[42],
+	}
+	l, err := agentlog.Locator{StateDir: stateDir, Procs: procs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := transcript.PathIn(home, "/work/tree", session); l.Path != want || l.Offset != 0 || l.Pruned {
+		t.Errorf("got %+v, want transcript %s from offset 0", l, want)
+	}
+	if l.Ended() {
+		t.Error("live pty agent reported ended")
+	}
+	delete(procs, 41)
+	if !l.Ended() {
+		t.Error("pty agent with its holder gone not reported ended")
+	}
+}
+
+func TestAgentLog_PtyPruned(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stateDir := t.TempDir()
+	writeRunnerDir(t, stateDir, "pty", "")
+	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := transcript.PathIn(home, "/work/tree", session); !l.Pruned || l.Transcript != want {
 		t.Errorf("got %+v, want pruned with transcript %s", l, want)
 	}
 }

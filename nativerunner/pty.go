@@ -453,7 +453,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 
 // Cleanup removes label's holder.sock, which a crashed holder leaves behind.
 func (p *Pty) Cleanup(label string) error {
-	return removeAll(filepath.Join(p.Root, label), []string{HolderSocketFile})
+	return removeAll(filepath.Join(p.Root, label), layouts[ptyRunnerName].transient)
 }
 
 func (p *Pty) Find(label string) (agentrunner.Session, bool, error) {
