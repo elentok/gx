@@ -66,6 +66,9 @@ func TestPty_Conformance(t *testing.T) {
 				}
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: waitingFor})
 			},
+			LastPrompt: func(t *testing.T, s agentrunner.Session) string {
+				return ptyLastPrompt(t, p, s)
+			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
 			},
@@ -94,6 +97,89 @@ func ptyControl(t *testing.T, s agentrunner.Session, c agentfake.Control) {
 	t.Helper()
 	if err := agentfake.SendTUIControl(os.Getenv("HOME"), s.SessionID, c); err != nil {
 		t.Fatalf("control %s: %v", c.Action, err)
+	}
+}
+
+// ptyLastPrompt reads the prompt off the TUI fake's working screen.
+func ptyLastPrompt(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) string {
+	t.Helper()
+	c, err := nativerunner.DialHolder(filepath.Join(p.Root, s.Label))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, _, err := c.Screen(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if prompt, ok := strings.CutPrefix(row, "> "); ok {
+			return strings.TrimSpace(prompt)
+		}
+	}
+	return ""
+}
+
+// blockedPty starts a pty agent and leaves it on a permission prompt; a
+// stalled one keeps the prompt open on Esc.
+func blockedPty(t *testing.T, p *nativerunner.Pty, stalled bool) agentrunner.Session {
+	t.Helper()
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = p.Stop(s) })
+	// Stall goes first: controls arrive in order, so the blocked wait below
+	// also confirms the stall landed before any Esc.
+	if stalled {
+		ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+	}
+	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"})
+	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestPty_DenyReasonFallbackOnOlderHolder(t *testing.T) {
+	p := newPty(t)
+	t.Setenv(holderNoOpsEnv, "1")
+	s := blockedPty(t, p, false)
+
+	if err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"}); err != nil {
+		t.Fatal(err)
+	}
+	if st, err := p.Status(s); err != nil || st.State != agentrunner.StateWorking {
+		t.Fatalf("Status = %+v, %v; want working on the reason", st, err)
+	}
+	if got := ptyLastPrompt(t, p, s); got != "use rg" {
+		t.Fatalf("last prompt = %q, want the reason", got)
+	}
+}
+
+// A deny that never reaches idle leaves the session died, so the loop's next
+// Wait parks the ticket needs-repair.
+func TestPty_DenyReasonIdleTimeoutIsSessionDied(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		noOps string
+	}{
+		{"holder op", ""},
+		{"fallback", "1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newPty(t)
+			t.Setenv(holderDenyTimeoutEnv, "200ms")
+			t.Setenv(holderNoOpsEnv, tc.noOps)
+			s := blockedPty(t, p, true)
+
+			err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"})
+			if !errors.Is(err, agentrunner.ErrSessionDied) {
+				t.Fatalf("Answer = %v; want ErrSessionDied", err)
+			}
+			if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, time.Second); !errors.Is(err, agentrunner.ErrSessionDied) {
+				t.Fatalf("Wait after a failed deny = %v; want ErrSessionDied", err)
+			}
+		})
 	}
 }
 

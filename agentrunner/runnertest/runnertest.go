@@ -35,6 +35,9 @@ type Harness struct {
 	// on another dialog that only deny may answer. Leave it nil for a runner
 	// that doesn't tell dialogs apart; the dialog scenarios then skip.
 	BlockOnDialog func(t *testing.T, s agentrunner.Session, permission bool)
+	// LastPrompt returns the prompt the agent behind s last started a turn
+	// on. Leave it nil to skip DenyWithReason.
+	LastPrompt func(t *testing.T, s agentrunner.Session) string
 	// Skip maps a scenario this runner can't pass yet to the reason why.
 	Skip map[string]string
 }
@@ -66,6 +69,7 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"AnswerNotBlocked", answerNotBlocked},
 		{"PermissionAllow", permissionAllow},
 		{"PermissionDeny", permissionDeny},
+		{"DenyWithReason", denyWithReason},
 		{"OtherDialogDeny", otherDialogDeny},
 		{"OtherDialogAllowRefused", otherDialogAllowRefused},
 		{"RateLimit", rateLimit},
@@ -376,6 +380,53 @@ func permissionDeny(t *testing.T, h Harness) {
 	answer(t, h.Runner, s, agentrunner.DecisionDeny)
 	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
 		t.Fatalf("Wait idle after deny: %v", err)
+	}
+}
+
+// denyWithReason: the session stays blocked until the reason is typed, so a
+// waiter never takes the gap for the turn's end, and the reason is the next
+// prompt.
+func denyWithReason(t *testing.T, h Harness) {
+	if h.LastPrompt == nil {
+		t.Skip("runner has no LastPrompt hook")
+	}
+	s := blockOnDialog(t, h, true)
+	stop := make(chan struct{})
+	sawIdle := make(chan agentrunner.Status, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if st, err := h.Runner.Status(s); err == nil && slices.Contains(idleOrDone, st.State) {
+				sawIdle <- st
+				return
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}()
+	const reason = "use rg instead"
+	err := h.Runner.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: reason})
+	close(stop)
+	<-done
+	if err != nil {
+		t.Fatalf("Answer(deny, %q): %v", reason, err)
+	}
+	select {
+	case st := <-sawIdle:
+		t.Fatalf("status during deny with a reason = %+v, want never idle", st)
+	default:
+	}
+	deadline := time.Now().Add(waitTimeout)
+	for got := h.LastPrompt(t, s); got != reason; got = h.LastPrompt(t, s) {
+		if time.Now().After(deadline) {
+			t.Fatalf("last prompt = %q, want %q", got, reason)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

@@ -295,10 +295,10 @@ func (t *tui) submit() error {
 const escKey = 0x1b
 
 // interrupt is Esc: it ends a running turn, or denies a dialog, and keeps
-// the session.
+// the session. A stalled fake leaves a dialog open.
 func (t *tui) interrupt() error {
 	t.typed.Reset()
-	if t.pid.Status != StatusBusy && t.pid.Status != StatusWaiting {
+	if t.pid.Status != StatusBusy && (t.pid.Status != StatusWaiting || t.stalled) {
 		return nil
 	}
 	return t.setStatus(StatusIdle, "")

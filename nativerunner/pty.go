@@ -19,9 +19,6 @@ import (
 // ptyRunnerName is the Runner value a pty agent records in meta.json.
 const ptyRunnerName = "pty"
 
-// errPtyNotYet marks a verb the pty runner does not serve yet.
-var errPtyNotYet = errors.New("pty runner: not supported yet")
-
 // Pty runs interactive claude in a pty owned by a `gx agent-holder` process,
 // started in its own session so it outlives the server. The holder serves
 // claude's state and screen over holder.sock.
@@ -70,6 +67,9 @@ type ptySession struct {
 	// exited closes once the holder process is gone.
 	exited  chan struct{}
 	stopped bool
+	// died is set once a step left claude in a state gx can't trust; every
+	// later call fails with it, so the loop parks the ticket needs-repair.
+	died error
 }
 
 func (p *Pty) Name() string { return ptyRunnerName }
@@ -362,7 +362,16 @@ func (p *Pty) live(s agentrunner.Session) (*ptySession, error) {
 	if !ok || ss.session.ID != s.ID {
 		return nil, fmt.Errorf("%w: %s", agentrunner.ErrNotFound, s.Label)
 	}
+	if ss.died != nil {
+		return nil, ss.died
+	}
 	return ss, nil
+}
+
+func (p *Pty) markDied(ss *ptySession, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ss.died = err
 }
 
 // died maps a failed holder call to ErrSessionDied: claude's exit code when
@@ -571,6 +580,7 @@ const permissionPrompt = "permission prompt"
 // Answer presses Enter to allow a permission prompt or Esc to deny any
 // dialog, and returns once Turn moved. Allow on any other dialog is
 // ErrInvalidDecision: its options aren't known, but Esc always cancels it.
+// Deny with a reason also sends the reason as claude's next prompt.
 func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	ss, err := p.live(s)
 	if err != nil {
@@ -593,7 +603,7 @@ func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 		key = "\r"
 	case agentrunner.DecisionDeny:
 		if a.Text != "" {
-			return fmt.Errorf("%w: deny with a reason", errPtyNotYet)
+			return p.denyWithReason(ss, a.Text)
 		}
 		key = "\x1b"
 	default:
@@ -611,6 +621,45 @@ func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 		return fmt.Errorf("%w: %s left the dialog open", agentrunner.ErrNotDelivered, a.Decision)
 	}
 	return nil
+}
+
+// denyWithReason prefers the holder's deny-reason op, which keeps Status
+// blocked until claude takes the reason; between a bare Esc and the reason,
+// a waiter would see idle and end the turn. A failed step leaves claude
+// somewhere between the dialog and the reason, so the session is marked died.
+func (p *Pty) denyWithReason(ss *ptySession, reason string) error {
+	var err error
+	if ss.holder.Supports(OpDenyReason) {
+		err = p.died(ss, ss.holder.DenyWithReason(reason))
+	} else {
+		err = p.escThenPrompt(ss, reason)
+	}
+	if errors.Is(err, agentrunner.ErrSessionDied) {
+		p.markDied(ss, err)
+	}
+	return err
+}
+
+// escThenPrompt is deny-reason over core ops, for a holder that predates the
+// op: Esc, then the reason as a normal prompt once claude is idle.
+func (p *Pty) escThenPrompt(ss *ptySession, reason string) error {
+	if err := p.died(ss, ss.holder.SendKeys("\x1b")); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(p.promptGrace())
+	for {
+		claude, _, err := ss.holder.Status()
+		if err != nil {
+			return p.died(ss, err)
+		}
+		if claude != nil && claude.Status == ClaudeIdle {
+			return p.Prompt(ss.session, reason)
+		}
+		if time.Now().After(deadline) {
+			return agentrunner.SessionDied("claude did not go idle after Esc")
+		}
+		time.Sleep(p.pollInterval())
+	}
 }
 
 func (p *Pty) backgroundTasks(s agentrunner.Session) bool {

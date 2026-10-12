@@ -24,7 +24,8 @@ const (
 	ActionBlock = "block"
 	// ActionRateLimit reports a rejected rate limit resetting at ResetsAt.
 	ActionRateLimit = "ratelimit"
-	// ActionStall leaves every later prompt unstarted.
+	// ActionStall leaves every later prompt unstarted, and on the TUI fake a
+	// dialog open on Esc.
 	ActionStall = "stall"
 	// ActionBackground starts (Running) or ends a background task.
 	ActionBackground = "background"

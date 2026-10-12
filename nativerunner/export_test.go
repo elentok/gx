@@ -15,6 +15,13 @@ func SetHolderOptionalOps(t *testing.T, ops []string) {
 	t.Cleanup(func() { holderOptionalOps = old })
 }
 
+// HolderOptionalOps and HolderDenyTimeout configure a holder the test binary
+// runs as a subprocess, which has no *testing.T to restore them.
+var (
+	HolderOptionalOps = &holderOptionalOps
+	HolderDenyTimeout = &holderDenyTimeout
+)
+
 // SetHolderDenyTimeout shortens deny-reason's waits for the test.
 func SetHolderDenyTimeout(t *testing.T, d time.Duration) {
 	old := holderDenyTimeout

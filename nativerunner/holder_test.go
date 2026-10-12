@@ -19,6 +19,10 @@ import (
 const (
 	holderEnv       = "GX_TEST_HOLDER"
 	holderLaunchEnv = "GX_TEST_HOLDER_LAUNCH"
+	// holderNoOpsEnv makes the holder an older one, serving only core ops.
+	holderNoOpsEnv = "GX_TEST_HOLDER_NO_OPS"
+	// holderDenyTimeoutEnv overrides the holder's deny-reason timeout.
+	holderDenyTimeoutEnv = "GX_TEST_HOLDER_DENY_TIMEOUT"
 )
 
 // testHolder takes the gx agent-holder flags: --session-id <id> --dir <dir> -- <cmd...>.
@@ -27,6 +31,12 @@ func testHolder() {
 	dir := args[slices.Index(args, "--dir")+1]
 	// The child may be this binary too, as the TUI fake.
 	_ = os.Unsetenv(holderEnv)
+	if os.Getenv(holderNoOpsEnv) == "1" {
+		*nativerunner.HolderOptionalOps = nil
+	}
+	if d, err := time.ParseDuration(os.Getenv(holderDenyTimeoutEnv)); err == nil {
+		*nativerunner.HolderDenyTimeout = d
+	}
 	if err := nativerunner.RunHolder(dir, args[slices.Index(args, "--")+1:]); err != nil {
 		os.Exit(1)
 	}
