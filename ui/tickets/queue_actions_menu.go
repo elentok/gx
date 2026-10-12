@@ -37,6 +37,11 @@ func (m QueueModel) handleQueueActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, t
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
 	}
+	if result.Action == actionTranscript {
+		// A queue row's Path is its file, not an address, so the native
+		// agent dir is skipped.
+		return m, cmdTranscript(result.Path, "", m.width)
+	}
 	if cmd, ok := answerActionCmd(m.worktreeRoot, m.settings, result); ok {
 		return m, cmd
 	}

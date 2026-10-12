@@ -53,16 +53,6 @@ type actionsMenuResult struct {
 // Update drives the open menu's navigation/cancel/accept handling, mirroring
 // confirm.Model.Update. handled reports whether msg was consumed at all.
 func (m actionsMenuModel) Update(msg tea.KeyPressMsg) (actionsMenuModel, actionsMenuResult, bool) {
-	// The menu opens on every row, so it can be empty, and UpdateMenu
-	// ignores every key on an empty list — including the cancel keys.
-	if len(m.state.Items) == 0 {
-		switch msg.String() {
-		case "esc", "q":
-			m.IsOpen = false
-			return m, actionsMenuResult{Done: true}, true
-		}
-		return m, actionsMenuResult{}, false
-	}
 	next, decided, accepted, handled := components.UpdateMenu(msg, m.state)
 	if !handled {
 		return m, actionsMenuResult{}, false
@@ -144,6 +134,13 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
+	}
+	if result.Action == actionTranscript {
+		file, err := ticketFile(m.ticketStore, result.Path)
+		if err != nil {
+			return m, notify.Error("transcript: " + err.Error())
+		}
+		return m, cmdTranscript(file, result.Path, m.width)
 	}
 	if cmd, ok := m.serverAnswerActionCmd(result); ok {
 		return m, cmd

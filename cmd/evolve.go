@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -347,12 +347,7 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 	// Missing dirs only cost digests, which then report "missing".
 	env.homeDir, _ = d.userHomeDir()
 	env.stateDir, _ = config.StateDir()
-	if home, err := os.UserHomeDir(); err == nil {
-		env.codexHome = filepath.Join(home, ".codex")
-	}
-	if v := os.Getenv("CODEX_HOME"); v != "" {
-		env.codexHome = v
-	}
+	env.codexHome = sessionlookup.DefaultRoots().CodexHome
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := ticketRoot(cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)

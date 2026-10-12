@@ -69,6 +69,7 @@ type QueueModel struct {
 	// Model.actionsMenu — a deliberate, narrow exception to this tab's
 	// otherwise read-only selection (ticket 08).
 	actionsMenu  actionsMenuModel
+	watch        watchModal
 	runningEpics map[string]bool
 	paused       bool
 
@@ -198,10 +199,18 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg, func() tea.Msg { return queueActionAppliedMsg{} })
 		return m, cmd
+	case watchLoadedMsg:
+		m.watch = m.watch.Open(msg.title, msg.lines, m.width, m.height)
+		return m, nil
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd
 			m.help, cmd = m.help.Update(msg)
+			return m, cmd
+		}
+		if m.watch.open {
+			var cmd tea.Cmd
+			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
 		if m.confirm.IsOpen {
@@ -225,7 +234,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleQueueKey(msg)
 	case tea.MouseClickMsg:
-		if m.actionsMenu.IsOpen {
+		if m.actionsMenu.IsOpen || m.watch.open {
 			return m, nil
 		}
 		if m.confirm.IsOpen {

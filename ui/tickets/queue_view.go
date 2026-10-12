@@ -44,6 +44,9 @@ func (m QueueModel) View() tea.View {
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}
+	if m.watch.open {
+		content = ui.OverlayCenter(content, m.watch.View(), m.width, m.height)
+	}
 	if m.help.IsOpen {
 		content = ui.OverlayCenter(content, m.help.View(), m.width, m.height)
 	}

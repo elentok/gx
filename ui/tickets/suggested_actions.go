@@ -50,8 +50,8 @@ const actionAnswerInPane = "answer-in-pane"
 // park whose pane is gone. Dispatched like actionAnswerInPane (see cmdAnswer).
 const actionAnswer = "answer"
 
-// suggestedActionItems returns ticket's suggested-action menu items, empty
-// when none apply, given its rendered status. The answer items and
+// suggestedActionItems returns ticket's suggested-action menu items, given
+// its rendered status. The answer items and
 // resume-answered only apply to needs-answer, paneLive picking between
 // "Answer in pane" and "Answer…" (the badge in the row lists pass false: it
 // only needs to know the list is non-empty, and a herdr lookup per rendered
@@ -62,14 +62,21 @@ const actionAnswer = "answer"
 // WaitingForChildren (own work already done), none of which have a live or
 // stalled session worth investigating. Whitelisting also fails closed for
 // any status added to the enum later, instead of showing the badge by
-// default. The menu still opens on an empty list; only the row badge
-// (ticketHasSuggestedActions) depends on it being non-empty.
+// default.
 //
 // native (the ticket's agent runs on a native runner) swaps Answer in pane
 // for Watch agent. herdrDown (ui.Settings.HerdrUnavailable) drops the
 // herdr-only items: Investigate, whose launch opens a herdr tab, and Answer
 // in pane.
+//
+// Transcript closes every list; it is not a status action, so it never
+// counts toward the badge.
 func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, native, herdrDown bool) []components.MenuItem {
+	return append(statusActionItems(status, ticket, paneLive, native, herdrDown),
+		components.MenuItem{Label: "Transcript", Value: actionTranscript})
+}
+
+func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, native, herdrDown bool) []components.MenuItem {
 	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
 		if native {
@@ -95,7 +102,7 @@ func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, 
 // ticketHasSuggestedActions reports whether ticket's row should carry the
 // "m" suggested-actions badge (ui.IconSet.SuggestedAction).
 func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) bool {
-	return len(suggestedActionItems(status, ticket, false, false, herdrDown)) > 0
+	return len(statusActionItems(status, ticket, false, false, herdrDown)) > 0
 }
 
 // applySuggestedAction performs action's write against the ticket at path.

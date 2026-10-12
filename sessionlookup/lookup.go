@@ -4,6 +4,7 @@ package sessionlookup
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -27,6 +28,20 @@ const (
 type Roots struct {
 	Home      string
 	CodexHome string
+}
+
+// DefaultRoots are the user's own roots: $HOME, and $CODEX_HOME falling back
+// to ~/.codex. An unknown home leaves its roots empty.
+func DefaultRoots() Roots {
+	var r Roots
+	if home, err := os.UserHomeDir(); err == nil {
+		r.Home = home
+		r.CodexHome = filepath.Join(home, ".codex")
+	}
+	if v := os.Getenv("CODEX_HOME"); v != "" {
+		r.CodexHome = v
+	}
+	return r
 }
 
 // Session is one resolved session.

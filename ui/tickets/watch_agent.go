@@ -63,12 +63,16 @@ type watchModal struct {
 }
 
 func (w watchModal) Open(title string, lines []string, width, height int) watchModal {
-	vpW := min(max(width*2/3, 40), 120)
 	vpH := max(height-10, 3)
-	vp := viewport.New(viewport.WithWidth(vpW-2), viewport.WithHeight(vpH))
+	vp := viewport.New(viewport.WithWidth(watchContentWidth(width)), viewport.WithHeight(vpH))
 	vp.SetContent(strings.Join(lines, "\n"))
 	vp.GotoBottom()
 	return watchModal{open: true, title: title, vp: vp}
+}
+
+// watchContentWidth is the modal's content width on a width-wide screen.
+func watchContentWidth(width int) int {
+	return min(max(width*2/3, 40), 120) - 2
 }
 
 func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {

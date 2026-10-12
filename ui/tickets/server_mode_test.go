@@ -471,7 +471,7 @@ func TestServerMode_AnswerInPaneAndResume(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
 	m := openAnswerMenu(t, api)
-	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswerInPane, actionResumeAnswered, actionInvestigate}; !slices.Equal(got, want) {
+	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswerInPane, actionResumeAnswered, actionInvestigate, actionTranscript}; !slices.Equal(got, want) {
 		t.Fatalf("menu = %v, want %v", got, want)
 	}
 
