@@ -753,14 +753,35 @@ func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string
 	return prompt
 }
 
-// runnerFor is the runner hosting project's iterations.
+// runnerFor is the configured runner for project: the one new launches use.
 func (s *Server) runnerFor(project string) agentrunner.Runner {
+	return s.runnerNamed(s.cfg.Runner.Name(), project)
+}
+
+// runnerForRun is the runner that started run, whatever the configured one is.
+// It is nil when that runner cannot be built.
+func (s *Server) runnerForRun(run Run) agentrunner.Runner {
+	name := run.Runner
+	if name == "" {
+		name = runnerHerdr
+	}
+	project := ""
+	if addr, err := tickets.ParseAddress(run.Address, tickets.AddressContext{}); err == nil {
+		project = addr.Project
+	}
+	return s.runnerNamed(name, project)
+}
+
+func (s *Server) runnerNamed(name, project string) agentrunner.Runner {
 	if s.cfg.RunnerFor != nil {
-		if r := s.cfg.RunnerFor(project); r != nil {
+		if r := s.cfg.RunnerFor(name, project); r != nil {
 			return r
 		}
 	}
-	return s.cfg.Runner
+	if name == s.cfg.Runner.Name() {
+		return s.cfg.Runner
+	}
+	return nil
 }
 
 // depsFor is the default deps with the project's runner, so launch, wait and

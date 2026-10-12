@@ -68,15 +68,35 @@ func TestPreflightAgentRunner(t *testing.T) {
 func TestServerRunner_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 	state := t.TempDir()
 	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, state)
-	h, ok := runnerFor("proj").(*nativerunner.Headless)
+	h, ok := runnerFor("headless", "proj").(*nativerunner.Headless)
 	if !ok {
-		t.Fatalf("runnerFor(proj) = %T, want *Headless", runnerFor("proj"))
+		t.Fatalf("runnerFor(headless, proj) = %T, want *Headless", runnerFor("headless", "proj"))
 	}
 	if want := nativerunner.AgentsRoot(state, "proj"); h.Root != want {
 		t.Errorf("Root = %q, want %q", h.Root, want)
 	}
-	if runnerFor("proj") != agentrunner.Runner(h) {
+	if runnerFor("headless", "proj") != agentrunner.Runner(h) {
 		t.Error("a project must keep one Headless: its live sessions are in memory")
+	}
+}
+
+func TestServerRunner_BuildsAnyRunnerPerPairLazily(t *testing.T) {
+	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, t.TempDir())
+	herdrA := runnerFor("herdr", "a")
+	if herdrA == nil || herdrA.Name() != "herdr" {
+		t.Fatalf("runnerFor(herdr, a) = %v, want a herdr runner", herdrA)
+	}
+	if runnerFor("herdr", "a") != herdrA {
+		t.Error("a (runner, project) pair must be built once and kept")
+	}
+	if runnerFor("herdr", "b") == herdrA {
+		t.Error("each project gets its own runner")
+	}
+	if runnerFor("headless", "a") == herdrA {
+		t.Error("each runner name gets its own runner")
+	}
+	if r := runnerFor("tmux", "a"); r != nil {
+		t.Errorf("unknown runner = %v, want nil", r)
 	}
 }
 
@@ -96,8 +116,9 @@ func TestServerRunner_NamesComeFromTheRunners(t *testing.T) {
 	}
 }
 
-func TestServerRunner_HerdrNeedsNoPerProjectRunner(t *testing.T) {
-	if _, runnerFor := serverRunner(agentrunner.ChoiceHerdr, t.TempDir()); runnerFor != nil {
-		t.Error("herdr has no per-project state")
+func TestServerRunner_HerdrServerCanBuildHeadless(t *testing.T) {
+	_, runnerFor := serverRunner(agentrunner.ChoiceHerdr, t.TempDir())
+	if _, ok := runnerFor("headless", "proj").(*nativerunner.Headless); !ok {
+		t.Error("a herdr server must still reach a headless run's runner")
 	}
 }

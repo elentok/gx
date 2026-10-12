@@ -54,26 +54,34 @@ func preflightAgentRunner(setting string, p agentrunner.Probe, logPath string) (
 
 const fallbackProject = "_default"
 
-// serverRunner is the runner the server launches through. A headless runner
-// keeps its agent dirs per project, so runnerFor hands out one Headless per
-// project (kept, because its live sessions are in memory); it is nil for herdr.
+// serverRunner is the runner the server launches through, plus runnerFor, which
+// builds any runner by name for a project. Each (runner, project) pair is built
+// once and kept, because a headless runner's live sessions are in memory and
+// its agent dirs are per project; runnerFor is nil for a runner it cannot build.
 // The returned runner answers host health and projects runnerFor never sees, so
-// it is a Headless with its own root too.
-func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, runnerFor func(project string) agentrunner.Runner) {
-	if c == agentrunner.ChoiceHerdr {
-		return herdrrunner.New(), nil
-	}
+// it is built for a fallback project.
+func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
+	type pair struct{ runner, project string }
 	var mu sync.Mutex
-	byProject := map[string]*nativerunner.Headless{}
-	runnerFor = func(project string) agentrunner.Runner {
+	built := map[pair]agentrunner.Runner{}
+	runnerFor = func(runner, project string) agentrunner.Runner {
 		mu.Lock()
 		defer mu.Unlock()
-		h, ok := byProject[project]
-		if !ok {
-			h = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project)}
-			byProject[project] = h
+		key := pair{runner, project}
+		if r, ok := built[key]; ok {
+			return r
 		}
-		return h
+		var r agentrunner.Runner
+		switch agentrunner.Choice(runner) {
+		case agentrunner.ChoiceHerdr:
+			r = herdrrunner.New()
+		case agentrunner.ChoiceHeadless:
+			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project)}
+		default:
+			return nil
+		}
+		built[key] = r
+		return r
 	}
-	return runnerFor(fallbackProject), runnerFor
+	return runnerFor(string(c), fallbackProject), runnerFor
 }
