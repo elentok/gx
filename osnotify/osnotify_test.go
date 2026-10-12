@@ -25,6 +25,12 @@ func (f *fakeRunner) run(_ context.Context, name string, args ...string) error {
 
 const quotedBody = `bad value "x" at line 3`
 
+func TestNewSystemNotifier_NoopInTests(t *testing.T) {
+	if _, ok := NewSystemNotifier().(noop); !ok {
+		t.Fatalf("NewSystemNotifier() in a test binary = %T, want noop", NewSystemNotifier())
+	}
+}
+
 func TestTerminalNotifier_Argv(t *testing.T) {
 	r := &fakeRunner{}
 	if err := newTerminalNotifier("/opt/bin/terminal-notifier", r.run).Notify(context.Background(), "gx title", quotedBody); err != nil {

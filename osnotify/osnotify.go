@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"testing"
 	"time"
 )
 
@@ -22,8 +23,12 @@ type Runner func(ctx context.Context, name string, args ...string) error
 const sendTimeout = 5 * time.Second
 
 // NewSystemNotifier picks the backend for this machine, looking up
-// terminal-notifier once.
+// terminal-notifier once. Inside a test binary it returns a no-op, so tests
+// that start a server without injecting a Notifier never show a real banner.
 func NewSystemNotifier() Notifier {
+	if testing.Testing() {
+		return noop{}
+	}
 	return Select(runtime.GOOS, exec.LookPath, execRunner)
 }
 
