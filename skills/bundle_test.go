@@ -269,6 +269,9 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 	if !strings.Contains(allowed, "matched entry lists in its `verbs`") {
 		t.Errorf("allowed bullet must defer to the matched entry's verbs: %q", allowed)
 	}
+	if !strings.Contains(allowed, "`gx-follow-up` skill (target `gx`, `unattended`)") {
+		t.Errorf("allowed bullet must always grant filing via gx-follow-up: %q", allowed)
+	}
 	for _, verb := range []string{"park", "relaunch"} {
 		if strings.Contains(allowed, "`"+verb+"`") {
 			t.Errorf("allowed bullet pins a fixed verb %q: %q", verb, allowed)

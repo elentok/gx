@@ -116,7 +116,8 @@ diagnosis) applies unchanged; only the writes differ.
 
 - allowed: exactly the verbs the matched entry lists in its `verbs` (as named in the prompt),
   whatever they are — e.g. R3's entry grants its `land`. The entry's verbs are the whole grant; the
-  prompt's entry is the authority, not your own judgment of what would help.
+  prompt's entry is the authority, not your own judgment of what would help. Filing a tooling bug
+  via the `gx-follow-up` skill (target `gx`, `unattended`) is always allowed too.
 - never: a pane nudge or any other verb the matched entry does not list (an unlisted `land`,
   `reset`, `unpark` or `land --continue/--abort` included), or editing product code.
 
@@ -181,12 +182,9 @@ looking at when you found it:
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
   for — file it as a follow-up in `gx:follow-ups` instead, even though you found it investigating a
   specific epic. Don't clutter that epic's own issue list with a finding about gx itself.
-  - Follow gx-local-tracker.md's "Follow-ups" section for the format, routing and the "seen again"
-    entry when the same problem is already filed.
-  - File it only with `gx tickets follow-up add gx:follow-ups --body -`, with `category: bug` in the
-    body's frontmatter and Source (name the epic/investigation), Problem, Evidence (log lines,
-    ticket IDs) and Suggested fix sections. The verb writes it `draft` + `research` and creates
-    nothing if the format is wrong. A follow-up fix ticket can then `blocked_by` it.
+  - File it with the `gx-follow-up` skill, target `gx` (and `unattended` when running unattended).
+    Name the epic/investigation in Source and put log lines and ticket IDs in Evidence. A
+    follow-up fix ticket can then `blocked_by` it.
   - This is scoped to diagnosis tickets filed by this skill only — other "file into whatever epic
     is active" call sites (code-review fix tickets, spec-review follow-ups) are untouched.
 - **No epic in scope at all** (a one-off question, nothing under the tracker root) — report the
