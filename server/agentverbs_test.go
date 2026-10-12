@@ -57,6 +57,24 @@ func TestAgentVerbs_ReachTheLiveIteration(t *testing.T) {
 	}
 }
 
+func TestAgentVerbs_AnswerInvalidDecisionRefuses(t *testing.T) {
+	h, fake := startAgentVerbs(t)
+	const label = "epic-a-iter-01"
+	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	fake.SetState(label, agentrunner.StateBlocked, "a plan approval")
+	fake.SetAnswerErr(label, agentrunner.ErrInvalidDecision)
+
+	res, err := h.Client.AgentAnswer(context.Background(), "proj:epic-a/01", "allow", "")
+	if err != nil || !res.Refused || res.Reason != server.ReasonBadDecision {
+		t.Fatalf("answer = %+v, %v; want refusal %s", res, err, server.ReasonBadDecision)
+	}
+	if want := "not a permission prompt; deny cancels it"; res.Message != want {
+		t.Errorf("message = %q, want %q", res.Message, want)
+	}
+}
+
 func TestAgentVerbs_Refusals(t *testing.T) {
 	h, _ := startAgentVerbs(t)
 	ctx := context.Background()

@@ -56,8 +56,11 @@ func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 	}
 	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (QueueResult, error) {
 		err := r.Answer(sess, agentrunner.Answer{Decision: decision, Text: req.Text})
-		if errors.Is(err, agentrunner.ErrNotReady) {
+		switch {
+		case errors.Is(err, agentrunner.ErrNotReady):
 			return refusal(ReasonNotBlocked, "the agent is not waiting on a request"), nil
+		case errors.Is(err, agentrunner.ErrInvalidDecision):
+			return refusal(ReasonBadDecision, "not a permission prompt; deny cancels it"), nil
 		}
 		return QueueResult{}, err
 	})

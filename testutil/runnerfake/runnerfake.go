@@ -18,6 +18,7 @@ type session struct {
 	cwd       string
 	status    agentrunner.Status
 	promptErr error
+	answerErr error
 	stopErr   error
 	limited   bool
 	resetAt   time.Time
@@ -272,6 +273,9 @@ func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	if ss.status.State != agentrunner.StateBlocked {
 		return fmt.Errorf("%w: not blocked", agentrunner.ErrNotReady)
 	}
+	if ss.answerErr != nil {
+		return ss.answerErr
+	}
 	ss.answers = append(ss.answers, a)
 	ss.status.State = agentrunner.StateWorking
 	ss.status.BlockedReason = ""
@@ -297,6 +301,14 @@ func (r *Runner) SetState(label string, state agentrunner.State, reason string) 
 		ss.status.BlockedReason = reason
 	}
 	r.notify()
+}
+
+// SetAnswerErr makes every Answer to label fail with err until cleared with
+// nil.
+func (r *Runner) SetAnswerErr(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).answerErr = err
 }
 
 // SetPromptErr makes every Prompt to label fail with err until cleared with
