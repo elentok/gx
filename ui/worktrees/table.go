@@ -12,22 +12,22 @@ import (
 
 var styleTrunk = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 
-// sortedWorktrees returns a copy of wts with the main branch worktree first.
+// sortedWorktrees returns a copy of wts with the trunk worktree first.
 func sortedWorktrees(wts []git.Worktree, trunk string) []git.Worktree {
 	if trunk == "" {
 		return wts
 	}
 	out := make([]git.Worktree, 0, len(wts))
-	var main *git.Worktree
+	var trunkWT *git.Worktree
 	for i := range wts {
 		if wts[i].Branch == trunk {
-			main = &wts[i]
+			trunkWT = &wts[i]
 		} else {
 			out = append(out, wts[i])
 		}
 	}
-	if main != nil {
-		out = append([]git.Worktree{*main}, out...)
+	if trunkWT != nil {
+		out = append([]git.Worktree{*trunkWT}, out...)
 	}
 	return out
 }
@@ -172,12 +172,12 @@ func (m Model) buildRows() []table.Row {
 	for i, wt := range m.worktrees {
 		isCursorRow := i == m.table.Cursor()
 		isTagged := m.selectedWorktrees[wt.Name]
-		isMain := m.isTrunk(wt.Branch)
+		isTrunk := m.isTrunk(wt.Branch)
 		selCell := ""
 		if isTagged {
 			selCell = styleSelected.Render(ic.checkmark)
 		}
-		nameCol := worktreeCell(wt.Name, wt.Branch, ic, isMain, isCursorRow)
+		nameCol := worktreeCell(wt.Name, wt.Branch, ic, isTrunk, isCursorRow)
 		if q := m.search.Query(); q != "" && !isCursorRow {
 			nameCol = highlightMatch(nameCol, q)
 		}
@@ -185,7 +185,7 @@ func (m Model) buildRows() []table.Row {
 			selCell,
 			nameCol,
 			dirtyCell(m.dirties[wt.Path], ic, isCursorRow),
-			baseCell(m.baseStatus[wt.Branch], ic, isMain, isCursorRow),
+			baseCell(m.baseStatus[wt.Branch], ic, isTrunk, isCursorRow),
 			statusCell(m.statuses[wt.Branch], ic, isCursorRow, m.settings.UseNerdFontIcons),
 		}
 	}
@@ -206,16 +206,16 @@ func highlightMatch(text, query string) string {
 	return text[:idx] + styleSearchHighlight.Render(text[idx:idx+len(query)]) + text[idx+len(query):]
 }
 
-func worktreeCell(name, branch string, ic uiIcons, isMain, _ bool) string {
+func worktreeCell(name, branch string, ic uiIcons, isTrunk, _ bool) string {
 	prefix := ic.worktreePrefix
-	if isMain && ic.mainPrefix != "" {
+	if isTrunk && ic.mainPrefix != "" {
 		prefix = ic.mainPrefix
 	}
 	text := prefix + name
 
 	if branch != "" && branch != name {
 		branchSuffix := "(" + ic.branchPrefix + branch + ")"
-		if isMain {
+		if isTrunk {
 			return styleTrunk.Render(text + " " + branchSuffix)
 		} else {
 			text += " " + ui.StyleDim.Render(branchSuffix)
@@ -223,7 +223,7 @@ func worktreeCell(name, branch string, ic uiIcons, isMain, _ bool) string {
 		return text
 	}
 
-	if isMain {
+	if isTrunk {
 		return styleTrunk.Render(text)
 	}
 	return text

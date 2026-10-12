@@ -129,7 +129,7 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 		scan.Kind = "other"
 	}
 
-	merged, err := mergedToTrunk(repo, branch)
+	merged, err := git.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
 	if err != nil {
 		return WorktreeScan{}, err
 	}
@@ -197,13 +197,7 @@ func iterationLanded(repo git.Repo, branch, epicName string) (bool, error) {
 		}
 	}
 
-	return mergedToTrunk(repo, branch)
-}
-
-// mergedToTrunk checks against repo.Trunk as OpenRepo resolved it, not
-// git.IsCommitMergedToTrunk, which re-detects the repo's default branch.
-func mergedToTrunk(repo git.Repo, ref string) (bool, error) {
-	return git.IsAncestor(repo.Root, ref, repo.Trunk)
+	return git.IsCommitMergedToTrunk(repo.Root, repo.Trunk, branch)
 }
 
 // isActiveWork reports whether branch has a commit within worktreeActiveWindow,

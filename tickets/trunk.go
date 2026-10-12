@@ -33,9 +33,10 @@ func (e *ErrTrunkMissing) Error() string {
 		problem = "is not a valid branch name"
 	}
 	msg := fmt.Sprintf("%s: %s %s", subject, source, problem)
-	switch {
-	case e.RemoteOnly:
+	if e.RemoteOnly {
 		msg += fmt.Sprintf("; create it with %q", "git branch "+e.Trunk+" origin/"+e.Trunk)
+	}
+	switch {
 	case e.Project == "":
 		msg += `; run "gx project add ." then set "trunk" in its project.json`
 	case !e.FromProjectFile:

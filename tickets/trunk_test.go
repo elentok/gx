@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil"
@@ -23,6 +24,25 @@ func trunkFixture(t *testing.T, projectJSON string) (repo, projectDir string) {
 		testutil.WriteFile(t, projectDir, "project.json", projectJSON)
 	}
 	return repo, projectDir
+}
+
+func TestErrTrunkMissing_RemoteOnlyKeepsOtherHints(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		err  ErrTrunkMissing
+		want string
+	}{
+		"unregistered": {ErrTrunkMissing{Repo: "/r", Trunk: "dev", RemoteOnly: true}, `gx project add .`},
+		"detected":     {ErrTrunkMissing{Project: "p", Repo: "/r", Trunk: "dev", RemoteOnly: true}, `set "trunk" in project.json`},
+	}
+	for name, tc := range cases {
+		msg := tc.err.Error()
+		for _, hint := range []string{"git branch dev origin/dev", tc.want} {
+			if !strings.Contains(msg, hint) {
+				t.Errorf("%s: %q lacks %q", name, msg, hint)
+			}
+		}
+	}
 }
 
 func registered(repo, extra string) string {

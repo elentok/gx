@@ -112,9 +112,7 @@ func TestTrunkHelpers_RefuseEmptyTrunk(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	repo := git.Repo{Root: dir}
 	calls := map[string]func() error{
-		"IsRebasedOnTrunk":  func() error { _, err := git.IsRebasedOnTrunk(repo, "main"); return err },
-		"CommitsSinceMain":  func() error { _, err := git.CommitsSinceMain(repo, "main"); return err },
-		"CommitsBehindMain": func() error { _, err := git.CommitsBehindMain(repo, "main"); return err },
+		"IsRebasedOnTrunk": func() error { _, err := git.IsRebasedOnTrunk(repo, "main"); return err },
 		"BranchHistorySinceTrunk": func() error {
 			_, err := git.BranchHistorySinceTrunk(repo, "main", "")
 			return err

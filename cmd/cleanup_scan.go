@@ -146,7 +146,7 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 		}
 	}
 	if branchExists {
-		merged, err := mergedToTrunk(repo, epic.Name)
+		merged, err := git.IsCommitMergedToTrunk(repo.Root, repo.Trunk, epic.Name)
 		if err != nil {
 			return EpicScan{}, err
 		}
