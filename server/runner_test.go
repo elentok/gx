@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -857,24 +854,14 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	var mu sync.Mutex
-	var bodies []string
-	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
-		if strings.Contains(string(b), "server started") { // the start notice is not a park message
-			return
-		}
-		mu.Lock()
-		bodies = append(bodies, string(b))
-		mu.Unlock()
-	}))
-	defer chat.Close()
+	chat := newSlackHook(t)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	registerLaunch(h) // the agent finishes without committing, so the ticket parks
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	started := chat.waitStarted(t) // so the park message never shares a post with it
 
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
@@ -899,26 +886,12 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 		}
 	}
 
-	waitFor := func(n int) {
-		t.Helper()
-		for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-			mu.Lock()
-			got := len(bodies)
-			mu.Unlock()
-			if got >= n {
-				return
-			}
-		}
+	posts := chat.postsSince(started)
+	if len(posts) != 1 {
+		t.Fatalf("chat sends = %d, want exactly 1: %v", len(posts), posts)
 	}
-	waitFor(1)
-	time.Sleep(time.Second)
-	mu.Lock()
-	defer mu.Unlock()
-	if len(bodies) != 1 {
-		t.Fatalf("chat sends = %d, want exactly 1: %v", len(bodies), bodies)
-	}
-	if !strings.Contains(bodies[0], "*proj*") {
-		t.Errorf("message lacks the project header: %s", bodies[0])
+	if !strings.Contains(posts[0], "*proj*") {
+		t.Errorf("message lacks the project header: %s", posts[0])
 	}
 }
 

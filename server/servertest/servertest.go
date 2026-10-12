@@ -22,6 +22,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -368,6 +369,11 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}
 		h.cfg.Notifier = h.Banners
+	}
+	// The real check reads ~/.claude.json, which would leak an extra-usage
+	// notice into the chat on a machine that has it on.
+	if h.cfg.ExtraUsageCheck == nil {
+		h.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateDisabled }
 	}
 	h.serve(t)
 	return h

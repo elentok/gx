@@ -6,14 +6,10 @@ package server_test
 import (
 	"context"
 	"errors"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,18 +27,7 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	var mu sync.Mutex
-	var bodies []string
-	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
-		if strings.Contains(string(b), "server started") { // the start notice is not the park message
-			return
-		}
-		mu.Lock()
-		bodies = append(bodies, string(b))
-		mu.Unlock()
-	}))
-	defer chat.Close()
+	chat := newSlackHook(t)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond // several ticks pass while the test waits
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
@@ -57,6 +42,7 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	started := chat.waitStarted(t) // so the park message never shares a post with it
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -69,22 +55,10 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventIterationLaunchFailed, "proj:epic-a/01")
-	// The chat batches its sends; wait for the one message, then for any retry's extras.
-	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		mu.Lock()
-		got := len(bodies)
-		mu.Unlock()
-		if got > 0 {
-			break
-		}
-	}
-	time.Sleep(time.Second)
 
-	mu.Lock()
-	if len(bodies) != 1 || !strings.Contains(bodies[0], "Herdr rejected Codex integration") {
-		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", bodies)
+	if posts := chat.postsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "Herdr rejected Codex integration") {
+		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", posts)
 	}
-	mu.Unlock()
 	if got := starts.Load(); got != 1 {
 		t.Errorf("agent start calls = %d, want exactly 1", got)
 	}

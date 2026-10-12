@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
@@ -54,7 +55,9 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	s, err := New(Config{StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
-		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}}})
+		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
+		// Not the real ~/.claude.json, which could add an extra-usage notice.
+		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {
 		t.Fatal(err)
 	}
