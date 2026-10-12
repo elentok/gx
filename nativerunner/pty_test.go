@@ -3,6 +3,7 @@ package nativerunner_test
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,11 @@ func newPty(t *testing.T) *nativerunner.Pty {
 	t.Setenv(holderEnv, "1")
 	t.Setenv(agentfake.TUIEnv, "1")
 	t.Cleanup(func() { killAgents(root) })
+	return ptyOn(root, exe)
+}
+
+// ptyOn returns a fresh pty runner over root, as after a server restart.
+func ptyOn(root, exe string) *nativerunner.Pty {
 	return &nativerunner.Pty{
 		Root:         root,
 		Holder:       []string{exe},
@@ -42,8 +48,9 @@ func newPty(t *testing.T) *nativerunner.Pty {
 
 func TestPty_Conformance(t *testing.T) {
 	runnertest.Run(t, func(t *testing.T) runnertest.Harness {
+		p := newPty(t)
 		return runnertest.Harness{
-			Runner: newPty(t),
+			Runner: p,
 			FinishTurn: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFinish})
 			},
@@ -56,11 +63,22 @@ func TestPty_Conformance(t *testing.T) {
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
 			},
+			Restart: func(t *testing.T) agentrunner.Runner {
+				r := ptyOn(p.Root, p.Claude)
+				entries, err := os.ReadDir(p.Root)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, e := range entries {
+					if _, v, err := r.Reattach(e.Name()); err != nil || v != nativerunner.VerdictLive {
+						t.Fatalf("Reattach(%s) = %v, %v; want live", e.Name(), v, err)
+					}
+				}
+				return r
+			},
 			Skip: map[string]string{
-				"BlockedThenAnswer":   "pty answer lands in ticket 30",
-				"AnswerNotBlocked":    "pty answer lands in ticket 30",
-				"RestartThenFind":     "pty reattach lands in ticket 26",
-				"TurnSurvivesRestart": "pty reattach lands in ticket 26",
+				"BlockedThenAnswer": "pty answer lands in ticket 30",
+				"AnswerNotBlocked":  "pty answer lands in ticket 30",
 			},
 		}
 	})
@@ -244,4 +262,72 @@ func TestPty_CleanupRemovesStaleHolderSock(t *testing.T) {
 	if _, err := os.Stat(sock); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("holder.sock after Cleanup: %v; want gone", err)
 	}
+}
+
+// An upgrade must never park a live pty run: a holder that predates the
+// version field and every optional op is still adopted.
+func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
+	p := &nativerunner.Pty{Root: shortTempDir(t), BackgroundTasks: func(agentrunner.Session) bool { return false }}
+	dir := filepath.Join(p.Root, "e-01")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	self, ok, err := nativerunner.PS.Lookup(os.Getpid())
+	if err != nil || !ok {
+		t.Fatalf("lookup self: %v", err)
+	}
+	meta, err := json.Marshal(nativerunner.Meta{
+		Runner: "pty", Label: "e-01", Epic: "e", SessionID: "sid",
+		HolderPID: os.Getpid(), HolderPIDStart: self.Start,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	serveOldHolder(t, filepath.Join(dir, nativerunner.HolderSocketFile), map[string]any{
+		"ping":   map[string]any{"pid": os.Getpid()},
+		"status": map[string]any{"claude": nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, "turn": 3},
+	})
+
+	s, verdict, err := p.Reattach("e-01")
+	if err != nil || verdict != nativerunner.VerdictLive {
+		t.Fatalf("Reattach = %v, %v; want live", verdict, err)
+	}
+	if got, ok, _ := p.Find("e-01"); !ok || got != s {
+		t.Errorf("Find = %+v, %v; want %+v", got, ok, s)
+	}
+	st, err := p.Status(s)
+	if err != nil || st.State != agentrunner.StateIdle || st.Turn != 3 || st.SessionID != "sid" {
+		t.Errorf("Status = %+v, %v; want idle at turn 3 of sid", st, err)
+	}
+}
+
+// serveOldHolder answers holder.sock ops from resps and every other op as
+// unsupported, like a holder from an older gx.
+func serveOldHolder(t *testing.T, sock string, resps map[string]any) {
+	t.Helper()
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			var req struct{ Op string }
+			if json.NewDecoder(conn).Decode(&req) == nil {
+				resp, ok := resps[req.Op]
+				if !ok {
+					resp = map[string]any{"error": "unsupported op " + req.Op}
+				}
+				_ = json.NewEncoder(conn).Encode(resp)
+			}
+			conn.Close()
+		}
+	}()
 }

@@ -188,6 +188,56 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 	}
 }
 
+// Reattach adopts the pty agent a previous server launched under label. The
+// holder kept claude's state and Turn, so nothing is replayed. Only core ops
+// are used, so a holder from an older gx is adopted too.
+func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if ss, ok := p.sessions[label]; ok {
+		return ss.session, VerdictLive, nil
+	}
+	dir := filepath.Join(p.Root, label)
+	meta, err := readMeta(dir)
+	if err != nil {
+		return agentrunner.Session{}, 0, err
+	}
+	holder, err := DialHolder(dir)
+	if err != nil {
+		return agentrunner.Session{}, VerdictDied, nil
+	}
+	ss := &ptySession{
+		session:   agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
+		epic:      meta.Epic,
+		holder:    holder,
+		holderPID: meta.HolderPID,
+		claudePID: meta.PID,
+		exited:    make(chan struct{}),
+	}
+	go p.watchExit(ss, meta)
+	if p.sessions == nil {
+		p.sessions = map[string]*ptySession{}
+	}
+	p.sessions[label] = ss
+	return ss.session, VerdictLive, nil
+}
+
+// watchExit closes ss.exited once an adopted holder is gone. It isn't the
+// server's child, so there is no Wait to block on.
+func (p *Pty) watchExit(ss *ptySession, meta Meta) {
+	procs := orPS(p.Procs)
+	ticker := time.NewTicker(p.pollInterval())
+	defer ticker.Stop()
+	for range ticker.C {
+		// A failed lookup is retried rather than taken as an exit.
+		proc, ok, err := procs.Lookup(meta.HolderPID)
+		if err == nil && (!ok || proc.Start != meta.HolderPIDStart) {
+			close(ss.exited)
+			return
+		}
+	}
+}
+
 // startupScrollback is how many scrolled-off rows a startup screen rule
 // reads besides the visible screen.
 const startupScrollback = 50
