@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -155,6 +156,57 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
 	if !strings.Contains(claude.Cmdline, "--disallowedTools AskUserQuestion") {
 		t.Errorf("claude cmdline %q does not disallow AskUserQuestion", claude.Cmdline)
+	}
+}
+
+func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionExit, Code: 3})
+	_, err = p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second)
+	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "claude exited (code 3)") {
+		t.Fatalf("Wait = %v; want session died with code 3", err)
+	}
+}
+
+func TestPty_HolderCrashIsSessionDied(t *testing.T) {
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	data, err := os.ReadFile(filepath.Join(p.Root, "e-01", nativerunner.MetaFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta nativerunner.Meta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Kill(meta.HolderPID, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	for _, verb := range []struct {
+		name string
+		call func() error
+	}{
+		{"Status", func() error { _, err := p.Status(s); return err }},
+		{"Prompt", func() error { return p.Prompt(s, "hi") }},
+	} {
+		deadline := time.Now().Add(5 * time.Second)
+		err := verb.call()
+		for err == nil && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+			err = verb.call()
+		}
+		if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "holder") {
+			t.Errorf("%s = %v; want session died naming the holder", verb.name, err)
+		}
 	}
 }
 

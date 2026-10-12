@@ -304,6 +304,19 @@ func (p *Pty) live(s agentrunner.Session) (*ptySession, error) {
 	return ss, nil
 }
 
+// died maps a failed holder call to ErrSessionDied: claude's exit code when
+// the holder saved one, so claude exited, else the holder failure itself.
+func (p *Pty) died(ss *ptySession, err error) error {
+	if err == nil {
+		return nil
+	}
+	code, rerr := os.ReadFile(filepath.Join(p.Root, ss.session.Label, ExitCodeFile))
+	if rerr == nil {
+		return agentrunner.SessionDied(fmt.Sprintf("claude exited (code %s)", strings.TrimSpace(string(code))))
+	}
+	return agentrunner.SessionDied(fmt.Sprintf("holder failed: %v", err))
+}
+
 // Status maps claude's pid status file, as the holder last read it.
 func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	ss, err := p.live(s)
@@ -312,7 +325,7 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	}
 	claude, turn, err := ss.holder.Status()
 	if err != nil {
-		return agentrunner.Status{}, err
+		return agentrunner.Status{}, p.died(ss, err)
 	}
 	st := agentrunner.Status{State: agentrunner.StateWorking, Turn: turn, SessionID: ss.session.SessionID}
 	if claude == nil {
@@ -414,7 +427,7 @@ func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 	}
 	_, turn, err := ss.holder.Status()
 	if err != nil {
-		return err
+		return p.died(ss, err)
 	}
 	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
 	err = claudeui.PromptWithNudge(pr, text, time.Time{}, time.Now)
@@ -434,12 +447,12 @@ type ptyPrompter struct {
 
 func (pr *ptyPrompter) Submit(text string) error {
 	if err := pr.ss.holder.SendKeys(text); err != nil {
-		return err
+		return pr.p.died(pr.ss, err)
 	}
 	return pr.SendEnter()
 }
 
-func (pr *ptyPrompter) SendEnter() error { return pr.ss.holder.SendKeys("\r") }
+func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
 
 // WaitStart caps timeout at PromptGrace, which is how a test keeps the
 // nudge rounds short.
@@ -447,15 +460,18 @@ func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
 	deadline := time.Now().Add(min(timeout, pr.p.promptGrace()))
 	for {
 		_, turn, err := pr.ss.holder.Status()
-		if err != nil || turn > pr.turn {
-			return err == nil, err
+		if err != nil {
+			return false, pr.p.died(pr.ss, err)
+		}
+		if turn > pr.turn {
+			return true, nil
 		}
 		if time.Now().After(deadline) {
 			return false, nil
 		}
 		select {
 		case <-pr.ss.exited:
-			return false, fmt.Errorf("%w: holder exited", agentrunner.ErrNotDelivered)
+			return false, pr.p.died(pr.ss, errors.New("holder exited"))
 		case <-time.After(pr.p.pollInterval()):
 		}
 	}
@@ -463,7 +479,7 @@ func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
 
 func (pr *ptyPrompter) Screen() (string, error) {
 	rows, _, err := pr.ss.holder.Screen(0)
-	return strings.Join(rows, "\n"), err
+	return strings.Join(rows, "\n"), pr.p.died(pr.ss, err)
 }
 
 // Interrupt presses Esc, which ends claude's turn and keeps the session, so
@@ -473,7 +489,7 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	if err != nil {
 		return err
 	}
-	return ss.holder.SendKeys("\x1b")
+	return p.died(ss, ss.holder.SendKeys("\x1b"))
 }
 
 // RateLimit never reports a limit: phase 2 has no pty rate-limit rule.
