@@ -227,16 +227,17 @@ type Server struct {
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 	rewatch     func()            // set by keepFresh when the watch is active
 
-	chat        *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
-	registry    *runRegistry
-	savedRuns   []trackedRun // handles the previous server left; consumed by reclaimRuns
-	refused     refusals
-	lands       landGuard
-	verdicts    verdictLog
-	nudges      nudgeLimiter
-	unavailable unavailableNotes
-	kick        chan struct{}  // wakes keepClaiming
-	settling    sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
+	chat         *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
+	registry     *runRegistry
+	savedRuns    []trackedRun // handles the previous server left; consumed by reclaimRuns
+	refused      refusals
+	lands        landGuard
+	verdicts     verdictLog
+	nudges       nudgeLimiter
+	unavailable  unavailableNotes
+	trunkMissing missingTrunks
+	kick         chan struct{}  // wakes keepClaiming
+	settling     sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.

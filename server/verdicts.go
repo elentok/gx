@@ -66,6 +66,10 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		ex.Verdict = VerdictNotQueued
 		return ex
 	}
+	if reason, missing := s.trunkMissing.get(addr.Project); missing {
+		ex.Verdict, ex.Reason = VerdictTrunkMissing, reason
+		return ex
+	}
 	// Every full cap is named, not just the first one hit.
 	var full []string
 	if n, limit := s.registry.countRoot(root), s.perRootLimit(); n >= limit {
@@ -133,6 +137,11 @@ type loadResult struct {
 func (s *Server) explainQueued(addr tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (Explanation, error) {
 	epics, err := epicsOf(addr.Project)
 	if err != nil {
+		// An unreadable project.json also fails the load; the Queue tab still
+		// says why the project stopped.
+		if reason, missing := s.trunkMissing.get(addr.Project); missing {
+			return Explanation{Address: addr.String(), Verdict: VerdictTrunkMissing, Reason: reason}, nil
+		}
 		return Explanation{}, err
 	}
 	return s.explainIn(epics, addr)

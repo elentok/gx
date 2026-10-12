@@ -172,6 +172,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	defer ticker.Stop()
 	for {
 		s.checkProjects()
+		s.checkTrunks()
 		s.claimNext()
 		s.publishVerdictChanges()
 		select {
@@ -260,6 +261,9 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		return false, nil
 	}
 	if _, missing := s.unavailablePath(addr.Project); missing {
+		return false, nil
+	}
+	if _, missing := s.trunkMissing.get(addr.Project); missing {
 		return false, nil
 	}
 	projectDir, repo, err := s.projectOf(addr.Project)
