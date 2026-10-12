@@ -67,6 +67,7 @@ type Model struct {
 	help help.Model
 
 	branchDiverged bool
+	trunkProblem   string // last trunk resolver error shown as a warning
 
 	amendConfirm amend.Model
 	bump         bump.Model

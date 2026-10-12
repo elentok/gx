@@ -42,12 +42,12 @@ func (m Model) cmdReloadFocusSubject(subject string) tea.Cmd {
 		if err != nil {
 			return reloadMsg{err: err}
 		}
-		classes, branchDiverged := fetchBranchHistoryClasses(root, startRef)
+		classes, branchDiverged, trunkErr := fetchBranchHistoryClasses(root, startRef)
 		rows := make([]row, 0, len(entries)+1)
 		rows = append(rows, row{kind: rowPseudoStatus, detail: statusDetail})
 		for _, entry := range entries {
 			rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
 		}
-		return reloadMsg{rows: rows, branchDiverged: branchDiverged, focusSubject: subject}
+		return reloadMsg{rows: rows, branchDiverged: branchDiverged, trunkErr: trunkErr, focusSubject: subject}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/imagediff"
@@ -32,6 +33,7 @@ type Model struct {
 	focusDiff    bool
 	bodyExpanded bool
 	details      git.CommitDetails
+	trunk        string // empty while unresolved, so no badge is coloured as trunk
 	headerOffset int
 	pushState    ui.PushState
 	err          error
@@ -165,6 +167,8 @@ func (m Model) WithContainerFocus(focused bool) Model {
 }
 
 func (m *Model) reload() {
+	// A trunk error only drops the trunk colour; the log and status views warn.
+	m.trunk, _ = tickets.TrunkFor(m.worktreeRoot)
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.files = nil

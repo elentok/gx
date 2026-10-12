@@ -62,7 +62,7 @@ func (m Model) View() tea.View {
 func (m Model) headerLines() []string {
 	subjectLine := m.subjectLine()
 	metaLine := m.metaLine()
-	badges := decorationBadgeParts(m.details.Decorations, m.compiledHideRefs, m.compiledRefRules)
+	badges := decorationBadgeParts(m.details.Decorations, m.compiledHideRefs, m.compiledRefRules, m.trunk)
 	lines := append([]string{subjectLine}, metaLineWithBadges(metaLine, badges, max(1, m.width-2))...)
 	if m.bodyExpanded {
 		body := m.commitMessageBody()
@@ -386,13 +386,13 @@ func (m Model) diffSearchCounterText() string {
 }
 
 func renderBadges(decorations []git.RefDecoration) string {
-	return strings.Join(decorationBadgeParts(decorations, nil, nil), " ")
+	return strings.Join(decorationBadgeParts(decorations, nil, nil, ""), " ")
 }
 
 // decorationBadgeParts filters out hidden refs and sorts decorations the same
 // way ui/log does (important-refs rules first, in rule order), so the tags
 // shown here appear in the same order as the log view's rows.
-func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Regexp, rules []ui.CompiledRefRule) []string {
+func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Regexp, rules []ui.CompiledRefRule, trunk string) []string {
 	if len(decorations) == 0 {
 		return nil
 	}
@@ -405,17 +405,17 @@ func decorationBadgeParts(decorations []git.RefDecoration, hideRefs []*regexp.Re
 	sorted := ui.SortDecorations(visible, rules)
 	parts := make([]string, 0, len(sorted))
 	for _, decoration := range sorted {
-		parts = append(parts, ui.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration)))
+		parts = append(parts, ui.RenderBadgeText(decoration.Name, badgeColorForDecoration(decoration, trunk)))
 	}
 	return parts
 }
 
-func badgeColorForDecoration(decoration git.RefDecoration) color.Color {
+func badgeColorForDecoration(decoration git.RefDecoration, trunk string) color.Color {
 	switch decoration.Kind {
 	case git.RefDecorationTag:
 		return ui.ColorBlue
 	case git.RefDecorationRemoteBranch, git.RefDecorationLocalBranch:
-		if isMainOrMasterRef(decoration.Name) {
+		if isTrunkRef(decoration, trunk) {
 			return ui.ColorYellow
 		}
 		return ui.ColorMauve
@@ -424,12 +424,17 @@ func badgeColorForDecoration(decoration git.RefDecoration) color.Color {
 	}
 }
 
-func isMainOrMasterRef(name string) bool {
-	name = strings.TrimSpace(name)
-	if idx := strings.LastIndex(name, "/"); idx >= 0 {
-		name = name[idx+1:]
+// isTrunkRef strips only the remote name from a remote branch, so a trunk
+// with a slash ("release/v2") still matches and "feature/main" never does.
+func isTrunkRef(decoration git.RefDecoration, trunk string) bool {
+	if trunk == "" {
+		return false
 	}
-	return name == "main" || name == "master"
+	name := strings.TrimSpace(decoration.Name)
+	if decoration.Kind == git.RefDecorationRemoteBranch {
+		_, name, _ = strings.Cut(name, "/")
+	}
+	return name == trunk
 }
 
 func (m Model) footerView() string {

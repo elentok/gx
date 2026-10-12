@@ -10,22 +10,26 @@ import (
 	"github.com/elentok/gx/ui/tree"
 )
 
-func TestIsMainOrMasterRef(t *testing.T) {
+func TestBadgeColorFollowsTrunk(t *testing.T) {
+	local, remote := git.RefDecorationLocalBranch, git.RefDecorationRemoteBranch
 	cases := []struct {
-		in   string
-		want bool
+		kind  git.RefDecorationKind
+		name  string
+		trunk string
+		want  bool
 	}{
-		{"main", true},
-		{"master", true},
-		{"origin/main", true},
-		{"origin/master", true},
-		{"feature/foo", false},
-		{"", false},
-		{"  main  ", true},
+		{local, "develop", "develop", true},
+		{remote, "origin/develop", "develop", true},
+		{remote, "origin/release/v2", "release/v2", true},
+		{local, "main", "develop", false},
+		{remote, "origin/master", "develop", false},
+		{local, "feature/develop", "develop", false},
+		{local, "main", "", false},
 	}
 	for _, c := range cases {
-		if got := isMainOrMasterRef(c.in); got != c.want {
-			t.Errorf("isMainOrMasterRef(%q) = %v, want %v", c.in, got, c.want)
+		got := badgeColorForDecoration(git.RefDecoration{Kind: c.kind, Name: c.name}, c.trunk) == ui.ColorYellow
+		if got != c.want {
+			t.Errorf("%s with trunk %q coloured as trunk = %v, want %v", c.name, c.trunk, got, c.want)
 		}
 	}
 }
@@ -43,7 +47,7 @@ func TestBadgeColorForDecoration(t *testing.T) {
 	}
 	for _, c := range cases {
 		d := git.RefDecoration{Kind: c.kind, Name: c.name}
-		_ = badgeColorForDecoration(d) // just ensure no panic
+		_ = badgeColorForDecoration(d, "main") // just ensure no panic
 	}
 }
 

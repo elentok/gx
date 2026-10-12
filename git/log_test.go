@@ -91,14 +91,14 @@ func TestCommitsBehindMain(t *testing.T) {
 	}
 }
 
-func TestBranchHistorySinceMain_NoUpstreamMarksLocalCommits(t *testing.T) {
+func TestBranchHistorySinceTrunk_NoUpstreamMarksLocalCommits(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
 
-	history, err := git.BranchHistorySinceMain(*repo, "feature", "")
+	history, err := git.BranchHistorySinceTrunk(*repo, "feature", "")
 	if err != nil {
-		t.Fatalf("BranchHistorySinceMain: %v", err)
+		t.Fatalf("BranchHistorySinceTrunk: %v", err)
 	}
 	if len(history) != 1 {
 		t.Fatalf("got %d commits, want 1", len(history))
@@ -111,7 +111,7 @@ func TestBranchHistorySinceMain_NoUpstreamMarksLocalCommits(t *testing.T) {
 	}
 }
 
-func TestBranchHistorySinceMain_UsesRemoteMainNotLocalMain(t *testing.T) {
+func TestBranchHistorySinceTrunk_UsesRemoteMainNotLocalMain(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
@@ -123,9 +123,9 @@ func TestBranchHistorySinceMain_UsesRemoteMainNotLocalMain(t *testing.T) {
 	testutil.WriteFile(t, mainDir, "local-main-only.txt", "not pushed\n")
 	testutil.CommitAll(t, mainDir, "local main only")
 
-	history, err := git.BranchHistorySinceMain(*repo, "feature", "")
+	history, err := git.BranchHistorySinceTrunk(*repo, "feature", "")
 	if err != nil {
-		t.Fatalf("BranchHistorySinceMain: %v", err)
+		t.Fatalf("BranchHistorySinceTrunk: %v", err)
 	}
 	if len(history) != 1 {
 		t.Fatalf("got %d commits, want 1", len(history))
@@ -135,7 +135,36 @@ func TestBranchHistorySinceMain_UsesRemoteMainNotLocalMain(t *testing.T) {
 	}
 }
 
-func TestBranchHistorySinceMain_DivergedIncludesRemoteOnly(t *testing.T) {
+func TestTrunkBaseRef(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	mustGit(t, repoDir, "branch", "develop", "main")
+
+	cases := map[string]string{"main": "origin/main", "develop": "develop", "nope": "", "": ""}
+	for trunk, want := range cases {
+		if got := git.TrunkBaseRef(repoDir, trunk); got != want {
+			t.Errorf("TrunkBaseRef(%q) = %q, want %q", trunk, got, want)
+		}
+	}
+}
+
+func TestBranchHistorySinceTrunk_UsesConfiguredTrunk(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
+	mustGit(t, repoDir, "branch", "develop", "feature")
+	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "develop"
+
+	history, err := git.BranchHistorySinceTrunk(*repo, "feature", "")
+	if err != nil {
+		t.Fatalf("BranchHistorySinceTrunk: %v", err)
+	}
+	if len(history) != 0 {
+		t.Fatalf("got %d commits since develop, want 0", len(history))
+	}
+}
+
+func TestBranchHistorySinceTrunk_DivergedIncludesRemoteOnly(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
@@ -157,9 +186,9 @@ func TestBranchHistorySinceMain_DivergedIncludesRemoteOnly(t *testing.T) {
 	testutil.WriteFile(t, featureDir, "local2.txt", "local again\n")
 	testutil.CommitAll(t, featureDir, "local again")
 
-	history, err := git.BranchHistorySinceMain(*repo, "feature", "origin/feature")
+	history, err := git.BranchHistorySinceTrunk(*repo, "feature", "origin/feature")
 	if err != nil {
-		t.Fatalf("BranchHistorySinceMain: %v", err)
+		t.Fatalf("BranchHistorySinceTrunk: %v", err)
 	}
 	if len(history) < 3 {
 		t.Fatalf("got %d commits, want at least 3", len(history))

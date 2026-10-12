@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -15,6 +16,7 @@ import (
 type reloadMsg struct {
 	rows           []row
 	branchDiverged bool
+	trunkErr       error
 	err            error
 	focusSubject   string // if set, cursor is moved to first matching commit
 }
@@ -73,55 +75,56 @@ func (m Model) cmdReload() tea.Cmd {
 		if err != nil {
 			return reloadMsg{err: err}
 		}
-		classes, branchDiverged := fetchBranchHistoryClasses(worktreeRoot, startRef)
+		classes, branchDiverged, trunkErr := fetchBranchHistoryClasses(worktreeRoot, startRef)
 		rows := make([]row, 0, len(entries)+1)
 		rows = append(rows, row{kind: rowPseudoStatus, detail: statusDetail})
 		for _, entry := range entries {
 			rows = append(rows, row{kind: rowCommit, commit: entry, class: classes[entry.FullHash]})
 		}
-		return reloadMsg{rows: rows, branchDiverged: branchDiverged}
+		return reloadMsg{rows: rows, branchDiverged: branchDiverged, trunkErr: trunkErr}
 	}
 }
 
-func fetchBranchHistoryClasses(worktreeRoot, startRef string) (map[string]git.BranchHistoryClass, bool) {
+func fetchBranchHistoryClasses(worktreeRoot, startRef string) (classes map[string]git.BranchHistoryClass, branchDiverged bool, trunkErr error) {
 	var branch string
 	if startRef == "HEAD" {
 		b, err := git.CurrentBranch(worktreeRoot)
 		if err != nil {
-			return nil, false
+			return nil, false, nil
 		}
 		branch = normalizedRef(b)
 		if branch == "HEAD" {
-			return nil, false
+			return nil, false, nil
 		}
 	} else if git.IsLocalBranch(worktreeRoot, startRef) {
 		branch = startRef
 	} else {
-		return nil, false
+		return nil, false, nil
 	}
 
-	branchDiverged := false
+	branchDiverged = false
 	if upstream := git.UpstreamBranch(worktreeRoot, branch); upstream != "" {
 		if sync, err := git.BranchSyncStatusAgainstRef(worktreeRoot, branch, upstream); err == nil {
 			branchDiverged = sync.Name == git.StatusDiverged
 		}
 	}
 
-	repo, err := git.FindRepo(worktreeRoot)
-	if err != nil {
-		return nil, branchDiverged
+	// Trunk is resolved on every reload, so a project.json edit applies at once.
+	repo, trunkErr := tickets.OpenRepo(worktreeRoot)
+	if repo == nil || trunkErr != nil {
+		return nil, branchDiverged, trunkErr
 	}
 
-	history, err := git.BranchHistorySinceMain(*repo, branch, git.UpstreamBranch(worktreeRoot, branch))
+	history, err := git.BranchHistorySinceTrunk(*repo, branch, git.UpstreamBranch(worktreeRoot, branch))
 	if err != nil {
-		return nil, branchDiverged
+		return nil, branchDiverged, trunkErr
 	}
 
-	classes := make(map[string]git.BranchHistoryClass, len(history))
+	classes = make(map[string]git.BranchHistoryClass, len(history))
 	for _, commit := range history {
 		classes[commit.FullHash] = commit.Class
 	}
-	return classes, branchDiverged
+	return classes, branchDiverged, trunkErr
 }
 
 type gotoPRMsg struct {

@@ -202,10 +202,10 @@ func commitsBetween(repo Repo, fromRef, toRef string) ([]Commit, error) {
 	return commitsFromRange(repo.Root, mergeBase, toRef)
 }
 
-// BranchHistorySinceMain returns branch history since the repo's remote
-// mainline ref (for example origin/main or origin/master) when available.
-func BranchHistorySinceMain(repo Repo, branch, upstreamRef string) ([]BranchHistoryCommit, error) {
-	baseRef := DefaultMainRemoteRef(repo.Root)
+// BranchHistorySinceTrunk returns branch history since repo.Trunk's base ref
+// (see TrunkBaseRef); none when trunk is unset or has no ref.
+func BranchHistorySinceTrunk(repo Repo, branch, upstreamRef string) ([]BranchHistoryCommit, error) {
+	baseRef := TrunkBaseRef(repo.Root, repo.Trunk)
 	if strings.TrimSpace(baseRef) == "" {
 		return nil, nil
 	}

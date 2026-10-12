@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/status/diffarea"
@@ -54,7 +55,10 @@ func (m Model) confirmAccept() (Model, tea.Cmd) {
 	case confirmRebase:
 		titleTarget := strings.TrimSpace(m.confirmRemote)
 		if titleTarget == "" {
-			titleTarget = detectRebaseTarget(m.worktreeRoot)
+			var err error
+			if titleTarget, err = detectRebaseTarget(m.worktreeRoot); err != nil {
+				return m, notify.Warning(err.Error())
+			}
 		}
 		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, m.confirmBranch)
 		m.openRunning("Rebase on "+titleTarget, runner)
@@ -121,7 +125,10 @@ func (m *Model) prepareRebaseConfirm() error {
 	if branch == "" || branch == "HEAD" {
 		return fmt.Errorf("cannot rebase: detached HEAD")
 	}
-	target := detectRebaseTarget(m.worktreeRoot)
+	target, err := detectRebaseTarget(m.worktreeRoot)
+	if err != nil {
+		return err
+	}
 	m.openConfirm(
 		fmt.Sprintf("Rebase branch %s on %s?", branch, target),
 		nil,
@@ -132,16 +139,14 @@ func (m *Model) prepareRebaseConfirm() error {
 	return nil
 }
 
-func detectRebaseTarget(root string) string {
-	repo, err := git.FindRepo(root)
+// detectRebaseTarget resolves trunk on every call, so a project.json edit
+// applies at once. A missing trunk is an error, never a guessed branch.
+func detectRebaseTarget(root string) (string, error) {
+	repo, err := tickets.OpenRepo(root)
 	if err != nil {
-		return "origin/main"
+		return "", err
 	}
-	main := strings.TrimSpace(repo.Trunk)
-	if main == "" {
-		main = "main"
-	}
-	return "origin/" + main
+	return "origin/" + repo.Trunk, nil
 }
 
 func (m *Model) openAmendConfirm() error {

@@ -77,21 +77,18 @@ func BranchSyncStatusAgainstRef(repoRoot, localRef, remoteRef string) (SyncStatu
 	return syncBetween(repoRoot, localRef, remoteRef)
 }
 
-// DefaultMainRemoteRef returns the best remote mainline ref for repoRoot.
-// It prefers origin/<default-branch>, then falls back to origin/main/master if present.
-func DefaultMainRemoteRef(repoRoot string) string {
-	defaultBranch := RemoteDefaultBranch(repoRoot)
-	candidates := []string{defaultBranch, "main", "master"}
-	seen := map[string]bool{}
-	for _, branch := range candidates {
-		branch = strings.TrimSpace(branch)
-		if branch == "" || seen[branch] {
-			continue
-		}
-		seen[branch] = true
-		if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + branch}) != "" {
-			return "origin/" + branch
-		}
+// TrunkBaseRef returns origin/<trunk> when it exists, else the local trunk,
+// else "" (also for an empty trunk). It never guesses another branch.
+func TrunkBaseRef(repoRoot, trunk string) string {
+	trunk = strings.TrimSpace(trunk)
+	if trunk == "" {
+		return ""
+	}
+	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/remotes/origin/" + trunk}) != "" {
+		return "origin/" + trunk
+	}
+	if runAllowFail(repoRoot, []string{"rev-parse", "--verify", "refs/heads/" + trunk}) != "" {
+		return trunk
 	}
 	return ""
 }

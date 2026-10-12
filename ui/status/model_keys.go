@@ -1,7 +1,10 @@
 package status
 
 import (
+	"errors"
+
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/diffview"
 	"github.com/elentok/gx/ui/keys"
@@ -178,6 +181,9 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		return m, nil
 	case bindingRebase:
 		if err := m.prepareRebaseConfirm(); err != nil {
+			if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
+				return m, notify.Warning(err.Error())
+			}
 			m.showGitError(err)
 			return m, nil
 		}

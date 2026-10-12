@@ -255,6 +255,15 @@ func (m Model) handleReload(msg reloadMsg) (tea.Model, tea.Cmd) {
 		m.refreshing = false
 		refreshCmds = []tea.Cmd{notify.Close("refresh"), notify.Success("refreshed")}
 	}
+	// Warn once per distinct problem, not on every reload.
+	trunkProblem := ""
+	if msg.trunkErr != nil {
+		trunkProblem = msg.trunkErr.Error()
+	}
+	if trunkProblem != "" && trunkProblem != m.trunkProblem {
+		refreshCmds = append(refreshCmds, notify.Warning(trunkProblem))
+	}
+	m.trunkProblem = trunkProblem
 	isInitialLoad := m.listPanel.Rows() == nil
 	m.err = nil
 	rows := msg.rows

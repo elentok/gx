@@ -25,7 +25,7 @@ The current `gx status` startup path does all of the following synchronously:
   - `UpstreamBranch`
   - `BranchSyncStatusAgainstRef`
 - branch history for the status-side `Commits` frame
-  - `BranchHistorySinceMain`
+  - `BranchHistorySinceTrunk`
 - status scan
   - `ListStageFiles`
 - initial diff load for the selected file

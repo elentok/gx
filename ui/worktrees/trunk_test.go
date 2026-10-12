@@ -1,7 +1,6 @@
 package worktrees
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,12 +20,6 @@ type trunkFixture struct {
 func newTrunkFixture(t *testing.T, trunk string) trunkFixture {
 	t.Helper()
 	repoDir := testutil.TempRepo(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", "")
-	projectDir := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
-	testutil.Mkdir(t, projectDir)
-
 	wtDir := t.TempDir()
 	for _, name := range []string{"develop", "feature"} {
 		path := filepath.Join(wtDir, name)
@@ -39,9 +32,7 @@ func newTrunkFixture(t *testing.T, trunk string) trunkFixture {
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	f := trunkFixture{repo: *repo, projectDir: projectDir}
-	f.setTrunk(t, trunk)
-	return f
+	return trunkFixture{repo: *repo, projectDir: testutil.RegisterProject(t, repo.Root, trunk)}
 }
 
 func (f trunkFixture) setTrunk(t *testing.T, trunk string) {

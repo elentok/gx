@@ -143,7 +143,10 @@ func (r *stageActionRunner) runRebase() stageActionResult {
 	}
 	target := strings.TrimSpace(r.remote)
 	if target == "" {
-		target = detectRebaseTarget(r.root)
+		if target, err = detectRebaseTarget(r.root); err != nil {
+			res.err = err
+			return res
+		}
 	}
 	fetchRemote := "origin"
 	if i := strings.Index(target, "/"); i > 0 {
