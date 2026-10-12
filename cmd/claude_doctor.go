@@ -45,7 +45,7 @@ whose dependency did not pass is skipped. Never checks herdr.`,
 			return runClaudeDoctor(d, opts, src, fixtureVersion)
 		},
 	}
-	cmd.Flags().StringVar(&opts.runner, "runner", "headless", "runner to check: headless|pty")
+	cmd.Flags().StringVar(&opts.runner, "runner", "", "runner to check: headless|pty (default: pty if config agent-runner is pty, else headless)")
 	cmd.Flags().BoolVar(&opts.json, "json", false, "print results as a JSON array of {runner,name,mode,status,detail}")
 	cmd.Flags().StringVar(&opts.record, "record", "", "save each canned session's raw events to this directory, in test-fixture format")
 	return cmd
@@ -100,7 +100,27 @@ func liveTurn() ([]json.RawMessage, error) {
 	return events, nil
 }
 
+// defaultDoctorRunner maps the config agent-runner to the runner doctor
+// checks, plus the header explaining it. auto would need a herdr probe to
+// resolve, and doctor never checks herdr, so everything but pty is headless.
+func defaultDoctorRunner(agentRunner string) (runner, header string) {
+	switch agentRunner {
+	case "pty", "headless":
+		return agentRunner, fmt.Sprintf("runner: %s (agent-runner %s)", agentRunner, agentRunner)
+	default:
+		return "headless", fmt.Sprintf("runner: headless (agent-runner %s; doctor never checks herdr)", agentRunner)
+	}
+}
+
 func runClaudeDoctor(d deps, opts claudeDoctorOptions, src claudedoctor.Source, fixtureVersion string) error {
+	var runnerHeader string
+	if opts.runner == "" {
+		cfg, err := d.loadConfig()
+		if err != nil {
+			return err
+		}
+		opts.runner, runnerHeader = defaultDoctorRunner(cfg.AgentRunner)
+	}
 	if opts.runner != "headless" && opts.runner != "pty" {
 		return fmt.Errorf("unknown --runner %q (want headless or pty)", opts.runner)
 	}
@@ -124,6 +144,9 @@ func runClaudeDoctor(d deps, opts claudeDoctorOptions, src claudedoctor.Source, 
 		}
 		fmt.Fprintln(d.stdout, string(data))
 	} else {
+		if runnerHeader != "" {
+			fmt.Fprintln(d.stdout, runnerHeader)
+		}
 		version := src.ClaudeVersion
 		if version == "" {
 			version = "unknown"

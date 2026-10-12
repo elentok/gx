@@ -7,8 +7,70 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/claudedoctor"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 )
+
+func configWithAgentRunner(agentRunner string) func() (config.Config, error) {
+	return func() (config.Config, error) {
+		return config.Config{AgentRunner: agentRunner}, nil
+	}
+}
+
+func TestRunClaudeDoctor_DefaultRunnerFollowsConfig(t *testing.T) {
+	t.Parallel()
+	table := []claudedoctor.Check{
+		{Runner: "headless", Name: "h", Mode: claudedoctor.Fixture, Run: func(claudedoctor.Input) (string, bool) { return "", true }},
+		{Runner: "pty", Name: "p", Mode: claudedoctor.Fixture, Run: func(claudedoctor.Input) (string, bool) { return "", true }},
+	}
+	cases := []struct {
+		agentRunner, wantRunner, wantHeader string
+	}{
+		{"pty", "pty", "runner: pty (agent-runner pty)"},
+		{"headless", "headless", "runner: headless (agent-runner headless)"},
+		{"herdr", "headless", "runner: headless (agent-runner herdr; doctor never checks herdr)"},
+		{"auto", "headless", "runner: headless (agent-runner auto; doctor never checks herdr)"},
+	}
+	for _, tc := range cases {
+		out := &strings.Builder{}
+		d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner(tc.agentRunner)}
+		if err := runClaudeDoctor(d, claudeDoctorOptions{table: table}, fixtureDoctorSource(t), ""); err != nil {
+			t.Fatalf("agent-runner %s: %v", tc.agentRunner, err)
+		}
+		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+		if lines[0] != tc.wantHeader {
+			t.Errorf("agent-runner %s: header = %q, want %q", tc.agentRunner, lines[0], tc.wantHeader)
+		}
+		wantName := tc.wantRunner[:1]
+		if last := lines[len(lines)-1]; !strings.HasPrefix(last, "PASS "+wantName+" ") {
+			t.Errorf("agent-runner %s: ran %q, want check %q", tc.agentRunner, last, wantName)
+		}
+	}
+}
+
+func TestRunClaudeDoctor_ExplicitRunnerHasNoRunnerHeader(t *testing.T) {
+	t.Parallel()
+	out := &strings.Builder{}
+	d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner("pty")}
+	if err := runClaudeDoctor(d, claudeDoctorOptions{runner: "headless", table: claudedoctor.Table[:1]}, fixtureDoctorSource(t), ""); err != nil {
+		t.Fatalf("runClaudeDoctor: %v", err)
+	}
+	if strings.Contains(out.String(), "runner:") {
+		t.Errorf("output = %q, want no runner header", out.String())
+	}
+}
+
+func TestRunClaudeDoctor_DefaultedRunnerJSONIsUnchanged(t *testing.T) {
+	t.Parallel()
+	out := &strings.Builder{}
+	d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner("pty")}
+	if err := runClaudeDoctor(d, claudeDoctorOptions{json: true}, fixtureDoctorSource(t), ""); err != nil {
+		t.Fatalf("runClaudeDoctor: %v", err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "[]" {
+		t.Errorf("output = %q, want []", got)
+	}
+}
 
 func fixtureDoctorSource(t *testing.T) claudedoctor.Source {
 	t.Helper()
