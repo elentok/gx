@@ -91,6 +91,7 @@ type TicketOpts struct {
 	Type      string // default "implement"
 	Parent    string
 	BlockedBy []string
+	Base      string
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -118,6 +119,9 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 	}
 	if len(opts.BlockedBy) > 0 {
 		fm += "blocked_by: [\"" + strings.Join(opts.BlockedBy, "\", \"") + "\"]\n"
+	}
+	if opts.Base != "" {
+		fm += "base: " + opts.Base + "\n"
 	}
 	fm += "---\n\n# " + slug + "\n"
 	if err := os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644); err != nil {
@@ -279,6 +283,13 @@ func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, ty
 func SetProjectRepo(t *testing.T, store, project, repo string) {
 	t.Helper()
 	writeProjectRepo(t, store, project, repo, `,"auto-ff-merge":true`)
+}
+
+// SetProjectTrunk is SetProjectRepo with project.json's trunk set. Trunk is
+// read live, so it may also run mid-run.
+func SetProjectTrunk(t *testing.T, store, project, repo, trunk string) {
+	t.Helper()
+	writeProjectRepo(t, store, project, repo, `,"auto-ff-merge":true,"trunk":"`+trunk+`"`)
 }
 
 // SetProjectRepoNoAutoMerge is SetProjectRepo without the auto-ff-merge opt-in.

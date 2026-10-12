@@ -12,7 +12,7 @@ func TestRetargetIfLanded(t *testing.T) {
 		want   string
 	}{
 		"unlanded blocker keeps its branch":   {want: "blocker"},
-		"landed blocker retargets to default": {landed: true, want: "main"},
+		"landed blocker retargets to trunk":   {landed: true, want: "main"},
 		"unresolvable branch is not landed":   {landed: true, err: errors.New("bad ref"), want: "blocker"},
 	}
 	for name, tc := range tests {

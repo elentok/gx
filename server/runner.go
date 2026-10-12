@@ -420,7 +420,7 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	ref, err = s.rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
+	ref, _, err = s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -463,25 +463,54 @@ func (s *Server) autoFFMerge(project string) bool {
 	return pf.AutoFFMergeEnabled()
 }
 
-// rootBaseRef is the branch a root's feature branch starts from and lands back onto.
-func (s *Server) rootBaseRef(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (string, error) {
-	ref, err := tickets.DeriveRootBase(project, epics, epic, t, s.landingOnLanded(project))
+// rootRefs is where a root's feature branch starts (base: the claim base and
+// the commitless ref) and where it lands (target). Trunk is read on every
+// call, so a landing uses the trunk current then; nothing records it at claim.
+// An explicit base: moves only the start; a derived stacked root also lands
+// on its blocker's branch until that branch reaches trunk.
+func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (base, target string, err error) {
+	dir, err := s.projectDir(project)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	def := git.RemoteDefaultBranch(repo)
-	if ref == "" {
-		return def, nil
+	trunk, err := tickets.Trunk(dir, repo)
+	if err != nil {
+		return "", "", err
 	}
-	return retargetIfLanded(ref, def, func(a, d string) (bool, error) { return git.IsAncestor(repo, a, d) }), nil
+	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.landingOnLanded(project))
+	if err != nil {
+		return "", "", err
+	}
+	switch {
+	case derived == "":
+		return trunk, trunk, nil
+	case explicitBase(epics, epic, t):
+		return derived, trunk, nil
+	}
+	ref := retargetIfLanded(derived, trunk, func(a, d string) (bool, error) { return git.IsAncestor(repo, a, d) })
+	return ref, ref, nil
+}
+
+// explicitBase reports whether t's base comes from a base: field (the
+// ticket's or its epic's) rather than from its blockers.
+func explicitBase(epics []tickets.Epic, epic string, t tickets.Ticket) bool {
+	if t.Base != "" {
+		return true
+	}
+	for _, e := range epics {
+		if e.Name == epic {
+			return e.Base != ""
+		}
+	}
+	return false
 }
 
 // retargetIfLanded is derived, never stored: once the blocker's branch is
-// reachable from the default branch the dependent targets the default again.
+// reachable from trunk the dependent targets trunk again.
 // An unresolvable branch counts as not landed; never retarget on a guess.
-func retargetIfLanded(ref, def string, isAncestor func(ancestor, descendant string) (bool, error)) string {
-	if landed, err := isAncestor(ref, def); err == nil && landed {
-		return def
+func retargetIfLanded(ref, trunk string, isAncestor func(ancestor, descendant string) (bool, error)) string {
+	if landed, err := isAncestor(ref, trunk); err == nil && landed {
+		return trunk
 	}
 	return ref
 }
@@ -492,14 +521,8 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 	if ref, ok := investigateRef(repo, addr, t, epics); ok && t.Type == string(schema.TypeInvestigate) {
 		return ref, nil
 	}
-	ref, err := s.rootBaseRef(addr.Project, epics, addr.Epic, t, repo)
-	if err != nil {
-		return "", err
-	}
-	if ref == "" {
-		ref = "HEAD"
-	}
-	return ref, nil
+	ref, _, err := s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
+	return ref, err
 }
 
 // prepareAndLaunch gives the ticket somewhere to run, then launches the agent
@@ -723,7 +746,7 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	if !s.autoFFMerge(project) {
 		return fmt.Sprintf("auto-ff-merge is off for %s; run gx-merge %s", project, one.Epic), nil
 	}
-	target, err := s.rootBaseRef(project, epics, one.Epic, one.Ticket, repoDir)
+	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repoDir)
 	if err != nil {
 		return "", err
 	}
