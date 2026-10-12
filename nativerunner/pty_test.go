@@ -42,6 +42,9 @@ func TestPty_Conformance(t *testing.T) {
 	runnertest.Run(t, func(t *testing.T) runnertest.Harness {
 		return runnertest.Harness{
 			Runner: newPty(t),
+			Block: func(t *testing.T, s agentrunner.Session, reason string) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: reason})
+			},
 			Skip: map[string]string{
 				"PromptStartsTurn":             "pty prompt lands in ticket 23",
 				"PromptNotDelivered":           "pty prompt lands in ticket 23",
@@ -51,12 +54,59 @@ func TestPty_Conformance(t *testing.T) {
 				"FinishWaitsForBackgroundTask": "pty background tasks land in ticket 24",
 				"BlockedThenAnswer":            "pty answer lands in ticket 30",
 				"AnswerNotBlocked":             "pty answer lands in ticket 30",
-				"RateLimit":                    "pty rate limit lands in ticket 22",
 				"RestartThenFind":              "pty reattach lands in ticket 26",
 				"TurnSurvivesRestart":          "pty reattach lands in ticket 26",
 			},
 		}
 	})
+}
+
+// ptyControl sends c to the TUI fake behind s.
+func ptyControl(t *testing.T, s agentrunner.Session, c agentfake.Control) {
+	t.Helper()
+	if err := agentfake.SendTUIControl(os.Getenv("HOME"), s.SessionID, c); err != nil {
+		t.Fatalf("control %s: %v", c.Action, err)
+	}
+}
+
+func TestPty_StartAnswersTrustDialog(t *testing.T) {
+	p := newPty(t)
+	t.Setenv(agentfake.TUITrustEnv, "1")
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	if st, err := p.Status(s); err != nil || st.State != agentrunner.StateIdle {
+		t.Errorf("Status = %+v, %v; want idle", st, err)
+	}
+}
+
+func TestPty_StartWithoutPidFileFailsWithScreen(t *testing.T) {
+	p := newPty(t)
+	p.StartTimeout = 500 * time.Millisecond
+	t.Setenv(agentfake.TUINoPidFileEnv, "1")
+	_, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "Welcome to Claude Code") {
+		t.Fatalf("Start = %v; want ErrMissingCapability with the screen", err)
+	}
+	if _, ok, _ := p.Find("e-01"); ok {
+		t.Error("failed Start left a session behind")
+	}
+}
+
+func TestPty_BlockedReasonIsWaitingFor(t *testing.T) {
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "approve Bash"})
+	st, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second)
+	if err != nil || st.BlockedReason != "approve Bash" {
+		t.Fatalf("Wait = %+v, %v; want blocked on approve Bash", st, err)
+	}
 }
 
 func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {

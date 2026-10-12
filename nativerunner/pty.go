@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 )
 
 // ptyRunnerName is the Runner value a pty agent records in meta.json.
@@ -149,6 +150,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 	if err := RecordLaunch(procs, dir, &meta); err != nil {
 		return err
 	}
+	trusted := false
 	for {
 		claude, _, err := ss.holder.Status()
 		if err != nil {
@@ -157,10 +159,51 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 		if claude != nil && claude.Status == ClaudeIdle {
 			return nil
 		}
+		if claude == nil && !trusted {
+			// The trust dialog shows before claude writes its pid file, so
+			// no holder rule can see it; Enter picks "Yes, I trust".
+			text, err := p.startupScreen(ss)
+			if err != nil {
+				return err
+			}
+			if claudeui.ClassifyStartup(text) == claudeui.StartupTrust {
+				if err := ss.holder.SendKeys("\r"); err != nil {
+					return err
+				}
+				trusted = true
+			}
+		}
 		if err := p.launchTick(ss, deadline, "claude never turned idle"); err != nil {
-			return err
+			if claude != nil || !time.Now().After(deadline) {
+				return err
+			}
+			return p.noPidFileErr(ss)
 		}
 	}
+}
+
+// startupScrollback is how many scrolled-off rows a startup screen rule
+// reads besides the visible screen.
+const startupScrollback = 50
+
+func (p *Pty) startupScreen(ss *ptySession) (string, error) {
+	rows, scrolled, err := ss.holder.Screen(startupScrollback)
+	if err != nil {
+		return "", err
+	}
+	return claudeui.ScreenText(scrolled, rows), nil
+}
+
+// noPidFileErr reports a claude that never wrote its pid status file: either
+// it is too old to write one, or it sits on a screen gx can't answer, which
+// the error carries for the doctor hint.
+func (p *Pty) noPidFileErr(ss *ptySession) error {
+	text, err := p.startupScreen(ss)
+	if err != nil {
+		text = fmt.Sprintf("(unreadable: %v)", err)
+	}
+	return fmt.Errorf("%w: no pid status file within %v; screen: %s",
+		agentrunner.ErrMissingCapability, p.startTimeout(), text)
 }
 
 // launchTick sleeps one poll, failing with what once the holder exited or
@@ -367,11 +410,10 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	return fmt.Errorf("%w: interrupt", errPtyNotYet)
 }
 
+// RateLimit never reports a limit: phase 2 has no pty rate-limit rule.
 func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
-	if _, err := p.live(s); err != nil {
-		return time.Time{}, false, err
-	}
-	return time.Time{}, false, fmt.Errorf("%w: rate limit", errPtyNotYet)
+	_, err := p.live(s)
+	return time.Time{}, false, err
 }
 
 func (p *Pty) Answer(s agentrunner.Session, _ agentrunner.Answer) error {

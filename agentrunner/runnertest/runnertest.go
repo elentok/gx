@@ -21,6 +21,7 @@ type Harness struct {
 	// Block makes the agent behind s wait on a prompt gx did not send.
 	Block func(t *testing.T, s agentrunner.Session, reason string)
 	// RateLimit makes the agent behind s report a limit that resets at resetAt.
+	// Leave it nil for a runner that never reports one.
 	RateLimit func(t *testing.T, s agentrunner.Session, resetAt time.Time)
 	// Stall makes the agent behind s never start a turn for later prompts.
 	Stall func(t *testing.T, s agentrunner.Session)
@@ -56,6 +57,7 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"StopIsIdempotent", stopIsIdempotent},
 		{"FindAndList", findAndList},
 		{"StoppedSessionNotFound", stoppedSessionNotFound},
+		{"Blocked", blocked},
 		{"BlockedThenAnswer", blockedThenAnswer},
 		{"AnswerNotBlocked", answerNotBlocked},
 		{"RateLimit", rateLimit},
@@ -288,9 +290,14 @@ func stoppedSessionNotFound(t *testing.T, h Harness) {
 	}
 }
 
-func blockedThenAnswer(t *testing.T, h Harness) {
-	s := start(t, h.Runner, "e-01", "e")
-	prompt(t, h.Runner, s, "do it")
+// blocked covers BlockedThenAnswer's blocked half without a prompt, for a
+// runner that can't prompt or answer yet.
+func blocked(t *testing.T, h Harness) {
+	waitBlocked(t, h, start(t, h.Runner, "e-01", "e"))
+}
+
+func waitBlocked(t *testing.T, h Harness, s agentrunner.Session) {
+	t.Helper()
 	h.Block(t, s, "allow Bash?")
 	st, err := h.Runner.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, waitTimeout)
 	if err != nil {
@@ -299,6 +306,12 @@ func blockedThenAnswer(t *testing.T, h Harness) {
 	if st.BlockedReason == "" {
 		t.Fatalf("blocked status = %+v, want a reason", st)
 	}
+}
+
+func blockedThenAnswer(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	prompt(t, h.Runner, s, "do it")
+	waitBlocked(t, h, s)
 	if err := h.Runner.Prompt(s, "more"); !errors.Is(err, agentrunner.ErrNotReady) {
 		t.Fatalf("Prompt while blocked err = %v, want ErrNotReady", err)
 	}
@@ -322,6 +335,9 @@ func rateLimit(t *testing.T, h Harness) {
 	s := start(t, h.Runner, "e-01", "e")
 	if _, limited, err := h.Runner.RateLimit(s); err != nil || limited {
 		t.Fatalf("RateLimit on fresh agent = %v, %v; want not limited", limited, err)
+	}
+	if h.RateLimit == nil {
+		return
 	}
 	resetAt := time.Now().Add(2 * time.Hour).Truncate(time.Minute)
 	h.RateLimit(t, s, resetAt)
