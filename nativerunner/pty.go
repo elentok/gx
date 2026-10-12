@@ -191,6 +191,9 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 // Reattach adopts the pty agent a previous server launched under label. The
 // holder kept claude's state and Turn, so nothing is replayed. Only core ops
 // are used, so a holder from an older gx is adopted too.
+//
+// A dead pty agent is always VerdictDied, never VerdictFinished: interactive
+// claude stays alive after its turn, so it never exits as a normal finish.
 func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -202,6 +205,14 @@ func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
 	if err != nil {
 		return agentrunner.Session{}, 0, err
 	}
+	live, err := ptyAlive(orPS(p.Procs), meta)
+	if err != nil {
+		return agentrunner.Session{}, 0, err
+	}
+	if !live {
+		return agentrunner.Session{}, VerdictDied, nil
+	}
+	// A holder whose socket stays silent can't be driven, so it counts as dead.
 	holder, err := DialHolder(dir)
 	if err != nil {
 		return agentrunner.Session{}, VerdictDied, nil

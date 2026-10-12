@@ -267,27 +267,9 @@ func TestPty_CleanupRemovesStaleHolderSock(t *testing.T) {
 // An upgrade must never park a live pty run: a holder that predates the
 // version field and every optional op is still adopted.
 func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
-	p := &nativerunner.Pty{Root: shortTempDir(t), BackgroundTasks: func(agentrunner.Session) bool { return false }}
-	dir := filepath.Join(p.Root, "e-01")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	self, ok, err := nativerunner.PS.Lookup(os.Getpid())
-	if err != nil || !ok {
-		t.Fatalf("lookup self: %v", err)
-	}
-	meta, err := json.Marshal(nativerunner.Meta{
-		Runner: "pty", Label: "e-01", Epic: "e", SessionID: "sid",
-		HolderPID: os.Getpid(), HolderPIDStart: self.Start,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	serveOldHolder(t, filepath.Join(dir, nativerunner.HolderSocketFile), map[string]any{
-		"ping":   map[string]any{"pid": os.Getpid()},
+	p, dir := preparePtyAgent(t, ptyAgentProcs())
+	serveOldHolder(t, dir, map[string]any{
+		"ping":   map[string]any{"pid": agentPID},
 		"status": map[string]any{"claude": nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, "turn": 3},
 	})
 
@@ -299,16 +281,103 @@ func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
 		t.Errorf("Find = %+v, %v; want %+v", got, ok, s)
 	}
 	st, err := p.Status(s)
-	if err != nil || st.State != agentrunner.StateIdle || st.Turn != 3 || st.SessionID != "sid" {
-		t.Errorf("Status = %+v, %v; want idle at turn 3 of sid", st, err)
+	if err != nil || st.State != agentrunner.StateIdle || st.Turn != 3 || st.SessionID != agentSID {
+		t.Errorf("Status = %+v, %v; want idle at turn 3 of %s", st, err, agentSID)
 	}
 }
 
-// serveOldHolder answers holder.sock ops from resps and every other op as
-// unsupported, like a holder from an older gx.
-func serveOldHolder(t *testing.T, sock string, resps map[string]any) {
+// Interactive claude stays alive after its turn, so any pty agent found dead
+// died, even one whose last turn ended.
+func TestPty_ReattachDeadAgentDied(t *testing.T) {
+	reused := nativerunner.Process{Start: "Tue Oct  7 09:00:00 2026", Cmdline: "claude --session-id " + agentSID}
+	tests := []struct {
+		name   string
+		procs  func(*fakeProcs)
+		silent bool
+	}{
+		{name: "holder gone", procs: func(f *fakeProcs) { f.kill(holderPID) }},
+		{name: "claude gone", procs: func(f *fakeProcs) { f.kill(agentPID) }},
+		{name: "holder pid reused", procs: func(f *fakeProcs) { f.procs[holderPID] = reused }},
+		{name: "claude pid reused", procs: func(f *fakeProcs) { f.procs[agentPID] = reused }},
+		{name: "holder lacks session id", procs: func(f *fakeProcs) {
+			f.procs[holderPID] = nativerunner.Process{Start: holderStart, Cmdline: "vim notes.md"}
+		}},
+		{name: "socket silent", silent: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			procs := ptyAgentProcs()
+			if tt.procs != nil {
+				tt.procs(procs)
+			}
+			p, dir := preparePtyAgent(t, procs)
+			if err := os.WriteFile(filepath.Join(dir, nativerunner.ExitCodeFile), []byte("0\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if tt.silent {
+				serveOldHolder(t, dir, nil)
+			} else {
+				serveOldHolder(t, dir, map[string]any{"ping": map[string]any{"pid": agentPID}})
+			}
+
+			_, verdict, err := p.Reattach("e-01")
+			if err != nil || verdict != nativerunner.VerdictDied {
+				t.Fatalf("Reattach = %v, %v; want died", verdict, err)
+			}
+			if _, found, _ := p.Find("e-01"); found {
+				t.Error("a dead agent was adopted")
+			}
+		})
+	}
+}
+
+const (
+	holderPID   = agentPID + 1
+	holderStart = "Mon Oct  6 09:59:59 2026"
+)
+
+// ptyAgentProcs is a process table where the holder and claude both still run.
+func ptyAgentProcs() *fakeProcs {
+	procs := agentProcs()
+	procs.procs[holderPID] = nativerunner.Process{
+		Start:   holderStart,
+		Cmdline: "gx agent-holder --session-id " + agentSID + " -- claude --session-id " + agentSID,
+	}
+	return procs
+}
+
+// preparePtyAgent writes a pty agent directory as a previous server left it
+// and returns a fresh runner over it.
+func preparePtyAgent(t *testing.T, procs *fakeProcs) (*nativerunner.Pty, string) {
 	t.Helper()
-	ln, err := net.Listen("unix", sock)
+	p := &nativerunner.Pty{
+		Root:            shortTempDir(t),
+		Procs:           procs,
+		BackgroundTasks: func(agentrunner.Session) bool { return false },
+	}
+	dir := filepath.Join(p.Root, "e-01")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta, err := json.Marshal(nativerunner.Meta{
+		Runner: "pty", Label: "e-01", Epic: "e", SessionID: agentSID,
+		PID: agentPID, PIDStart: agentStart, HolderPID: holderPID, HolderPIDStart: holderStart,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p, dir
+}
+
+// serveOldHolder answers dir's holder.sock ops from resps and every other op
+// as unsupported, like a holder from an older gx. With nil resps it hangs up
+// without answering, like a stuck holder.
+func serveOldHolder(t *testing.T, dir string, resps map[string]any) {
+	t.Helper()
+	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +389,7 @@ func serveOldHolder(t *testing.T, sock string, resps map[string]any) {
 				return
 			}
 			var req struct{ Op string }
-			if json.NewDecoder(conn).Decode(&req) == nil {
+			if json.NewDecoder(conn).Decode(&req) == nil && resps != nil {
 				resp, ok := resps[req.Op]
 				if !ok {
 					resp = map[string]any{"error": "unsupported op " + req.Op}

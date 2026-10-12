@@ -86,12 +86,26 @@ func (h *Headless) alive(meta Meta) (bool, error) {
 // started when meta says, and still carries the session id. A pid the OS
 // reused for another process fails the start-time or cmdline check.
 func headlessAlive(procs ProcessTable, meta Meta) (bool, error) {
-	proc, ok, err := procs.Lookup(meta.PID)
+	return pidAlive(procs, meta.PID, meta.PIDStart, meta.SessionID)
+}
+
+// ptyAlive reports whether both the holder and its claude still run, each
+// checked like headlessAlive. Losing either one leaves no usable agent.
+func ptyAlive(procs ProcessTable, meta Meta) (bool, error) {
+	live, err := pidAlive(procs, meta.HolderPID, meta.HolderPIDStart, meta.SessionID)
+	if err != nil || !live {
+		return false, err
+	}
+	return headlessAlive(procs, meta)
+}
+
+func pidAlive(procs ProcessTable, pid int, start, sessionID string) (bool, error) {
+	proc, ok, err := procs.Lookup(pid)
 	if err != nil || !ok {
 		return false, err
 	}
-	return meta.PIDStart != "" && proc.Start == meta.PIDStart &&
-		strings.Contains(proc.Cmdline, meta.SessionID), nil
+	return start != "" && proc.Start == start &&
+		strings.Contains(proc.Cmdline, sessionID), nil
 }
 
 // watchExit closes ss.exited once an adopted claude is gone. It isn't the
