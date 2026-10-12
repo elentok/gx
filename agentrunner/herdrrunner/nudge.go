@@ -1,12 +1,12 @@
 package herdrrunner
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -34,7 +34,7 @@ const (
 // agent is slow to start, a bare nudge might still land" apart from "this
 // pane genuinely never received anything and retyping the same text into it
 // again won't help either," and retry against a fresh pane instead.
-var ErrStuckSubmission = errors.New("submission never reached the pane")
+var ErrStuckSubmission = claudeui.ErrStuckSubmission
 
 // PromptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait/AgentRead
 // to submit opts.Text while working around a submission that never actually
