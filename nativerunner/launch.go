@@ -19,13 +19,17 @@ const MetaFile = "meta.json"
 
 // Meta is what meta.json records about a launched agent.
 type Meta struct {
-	Runner    string `json:"runner"`
-	PID       int    `json:"pid"`
-	PIDStart  string `json:"pid_start"`
-	SessionID string `json:"session_id"`
-	Label     string `json:"label"`
-	Epic      string `json:"epic"`
-	Cwd       string `json:"cwd"`
+	Runner string `json:"runner"`
+	// PID is the agent's own pid, claude on every runner.
+	PID      int    `json:"pid"`
+	PIDStart string `json:"pid_start"`
+	// HolderPID is the pty holder that owns claude's terminal (pty only).
+	HolderPID      int    `json:"holder_pid,omitempty"`
+	HolderPIDStart string `json:"holder_pid_start,omitempty"`
+	SessionID      string `json:"session_id"`
+	Label          string `json:"label"`
+	Epic           string `json:"epic"`
+	Cwd            string `json:"cwd"`
 	// Offset is where this session's events begin in out.jsonl, always at a
 	// line boundary. Earlier lines belong to a previous run in the same dir.
 	Offset int64 `json:"offset"`

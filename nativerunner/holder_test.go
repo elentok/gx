@@ -25,6 +25,8 @@ const (
 func testHolder() {
 	args := os.Args[1:]
 	dir := args[slices.Index(args, "--dir")+1]
+	// The child may be this binary too, as the TUI fake.
+	_ = os.Unsetenv(holderEnv)
 	if err := nativerunner.RunHolder(dir, args[slices.Index(args, "--")+1:]); err != nil {
 		os.Exit(1)
 	}

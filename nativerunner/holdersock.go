@@ -58,9 +58,11 @@ type holderRequest struct {
 }
 
 type holderResponse struct {
-	Error      string   `json:"error,omitempty"`
-	Version    int      `json:"version,omitempty"`
-	Ops        []string `json:"ops,omitempty"`
+	Error   string   `json:"error,omitempty"`
+	Version int      `json:"version,omitempty"`
+	Ops     []string `json:"ops,omitempty"`
+	// Pid is the child's pid, reported by ping.
+	Pid        int      `json:"pid,omitempty"`
 	Screen     []string `json:"screen,omitempty"`
 	Scrollback []string `json:"scrollback,omitempty"`
 	// Claude is nil until claude's pid status file first appears.
@@ -110,7 +112,7 @@ func (h *holderServer) handle(conn net.Conn) {
 func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	switch req.Op {
 	case opPing:
-		return holderResponse{Version: HolderProtocolVersion, Ops: h.ops}, nil
+		return holderResponse{Version: HolderProtocolVersion, Ops: h.ops, Pid: h.proc.Pid}, nil
 	case opStatus:
 		claude, turn := h.pid.state()
 		return holderResponse{Claude: claude, Turn: turn}, nil
@@ -176,6 +178,7 @@ type HolderClient struct {
 	sock    string
 	version int
 	ops     []string
+	pid     int
 }
 
 // DialHolder pings the holder serving dir's holder.sock.
@@ -185,12 +188,15 @@ func DialHolder(dir string) (*HolderClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.version, c.ops = resp.Version, resp.Ops
+	c.version, c.ops, c.pid = resp.Version, resp.Ops, resp.Pid
 	return c, nil
 }
 
 // Version is the protocol version the holder reported.
 func (c *HolderClient) Version() int { return c.version }
+
+// ChildPID is the pid of the agent the holder runs.
+func (c *HolderClient) ChildPID() int { return c.pid }
 
 // Supports reports whether the holder serves the optional op. Callers check
 // it before an optional op and fall back to the core ops, or refuse just that

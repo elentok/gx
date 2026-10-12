@@ -40,6 +40,9 @@ func TestMain(m *testing.M) {
 		testHolder()
 		return
 	}
+	if os.Getenv(agentfake.TUIEnv) == "1" {
+		agentfake.TUIClaude()
+	}
 	if os.Getenv(agentfake.ClaudeEnv) == "1" {
 		agentfake.Claude()
 	}

@@ -99,8 +99,13 @@ func killAgents(root string) {
 			continue
 		}
 		var meta nativerunner.Meta
-		if json.Unmarshal(data, &meta) == nil && meta.PID > 0 {
-			_ = syscall.Kill(-meta.PID, syscall.SIGKILL)
+		if json.Unmarshal(data, &meta) != nil {
+			continue
+		}
+		for _, pid := range []int{meta.PID, meta.HolderPID} {
+			if pid > 0 {
+				_ = syscall.Kill(-pid, syscall.SIGKILL)
+			}
 		}
 	}
 }
