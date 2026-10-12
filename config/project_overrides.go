@@ -11,6 +11,7 @@ import (
 // project, the rest override config.json. A nested map whitelists the sub-keys
 // of an object key; nil means the key is a leaf or free-form below.
 var projectKeys = map[string]map[string]bool{
+	"$schema":         nil,
 	"name":            nil,
 	"repo":            nil,
 	"vcs":             nil,

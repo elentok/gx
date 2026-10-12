@@ -314,6 +314,15 @@ Example config:
 }
 ```
 
+A project's `project.json` (in the ticket store) has its own schema. gx writes it into every
+project.json it creates or rewrites:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/elentok/gx/main/docs/project-schema.json"
+}
+```
+
 ## Key bindings
 
 | Key            | Action                                                                                  |

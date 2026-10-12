@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/elentok/gx/main/docs/project-schema.json",
+  "title": "gx project",
+  "description": "A project's project.json in the ticket store. name and repo identify the project; the other keys override config.json for this project only.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "description": "Project name, used in ticket addresses (<project>:<epic>/<id>)."
+    },
+    "repo": {
+      "type": "string",
+      "description": "Absolute path of the project's repo (or workspace, for a vcs: none project)."
+    },
+    "vcs": {
+      "type": "string",
+      "enum": ["none"],
+      "description": "\"none\" for a project without a git repo. Absent means git."
+    },
+    "trunk": {
+      "type": "string",
+      "description": "Trunk branch of the project's repo."
+    },
+    "landing": {
+      "type": "string",
+      "enum": ["on-landed", "on-done"],
+      "default": "on-landed",
+      "description": "When a blocker releases its dependents. on-landed: once it has landed on trunk. on-done: once it is done, before it lands; dependents base on the blocker's branch. Default: on-landed."
+    },
+    "auto-ff-merge": {
+      "type": "boolean",
+      "default": false,
+      "description": "Let the server fast-forward a finished epic onto its target. Default: false."
+    },
+    "max-agents": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum live agents for this project. Absent means no per-project cap."
+    },
+    "agents": {
+      "$ref": "config-schema.json#/properties/agents"
+    },
+    "skills": {
+      "$ref": "config-schema.json#/properties/skills"
+    },
+    "notifications": {
+      "$ref": "config-schema.json#/properties/notifications",
+      "description": "Replaces the whole global notifications block for this project."
+    },
+    "evolve": {
+      "type": "boolean",
+      "description": "false opts this project out of evolve. Absent or true follows the global evolve mode."
+    },
+    "execution-queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max-agents-per-epic": {
+          "$ref": "config-schema.json#/properties/execution-queue/properties/max-agents-per-epic"
+        }
+      }
+    }
+  }
+}

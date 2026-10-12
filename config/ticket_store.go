@@ -34,29 +34,33 @@ func DefaultTicketStoreConfig() TicketStoreConfig {
 	return cfg
 }
 
+const ProjectSchemaURL = "https://raw.githubusercontent.com/elentok/gx/main/docs/project-schema.json"
+
 // ProjectFile is a project's project.json. Pointer fields so an absent key
-// stays distinguishable from an empty value.
+// stays distinguishable from an empty value; omitempty so an absent key is
+// written absent, not as a null the schema rejects.
 type ProjectFile struct {
-	Name *string `json:"name"`
-	Repo *string `json:"repo"`
+	Schema *string `json:"$schema,omitempty"`
+	Name   *string `json:"name,omitempty"`
+	Repo   *string `json:"repo,omitempty"`
 	// VCS is "none" for a repo-less project (the built-in scratch project).
-	VCS *string `json:"vcs"`
+	VCS *string `json:"vcs,omitempty"`
 
 	// The rest are the whitelisted overrides layered over config.json; see
 	// project_overrides.go.
-	Trunk         *string              `json:"trunk"`
-	Landing       *string              `json:"landing"`
-	AutoFFMerge   *bool                `json:"auto-ff-merge"`
-	MaxAgents     *int                 `json:"max-agents"`
-	Agents        *AgentsConfig        `json:"agents"`
-	Skills        *SkillsConfig        `json:"skills"`
-	Notifications *NotificationsConfig `json:"notifications"`
+	Trunk         *string              `json:"trunk,omitempty"`
+	Landing       *string              `json:"landing,omitempty"`
+	AutoFFMerge   *bool                `json:"auto-ff-merge,omitempty"`
+	MaxAgents     *int                 `json:"max-agents,omitempty"`
+	Agents        *AgentsConfig        `json:"agents,omitempty"`
+	Skills        *SkillsConfig        `json:"skills,omitempty"`
+	Notifications *NotificationsConfig `json:"notifications,omitempty"`
 	// Evolve false opts the project out of evolve; absent or true follows the
 	// global mode.
-	Evolve         *bool `json:"evolve"`
+	Evolve         *bool `json:"evolve,omitempty"`
 	ExecutionQueue *struct {
-		MaxAgentsPerEpic *int `json:"max-agents-per-epic"`
-	} `json:"execution-queue"`
+		MaxAgentsPerEpic *int `json:"max-agents-per-epic,omitempty"`
+	} `json:"execution-queue,omitempty"`
 }
 
 // LandingOnLanded is the landing policy where a blocker releases its dependents

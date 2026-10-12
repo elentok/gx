@@ -266,7 +266,10 @@ func ensureProjectFile(projectDir, name, repo string) error {
 }
 
 // WriteProjectFile writes <projectDir>/project.json, creating the directory.
+// Every write stamps $schema, so existing files gain it on their next rewrite.
 func WriteProjectFile(projectDir string, pf config.ProjectFile) error {
+	schema := config.ProjectSchemaURL
+	pf.Schema = &schema
 	data, err := json.MarshalIndent(pf, "", "  ")
 	if err != nil {
 		return err

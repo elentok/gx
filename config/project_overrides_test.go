@@ -34,6 +34,7 @@ func TestReadProjectFile_RejectsNonWhitelistedKeysByName(t *testing.T) {
 
 func TestReadProjectFile_AcceptsWhitelist(t *testing.T) {
 	dir := writeProjectJSON(t, `{
+		"$schema": "s",
 		"name": "p", "repo": "/r", "vcs": "none", "trunk": "main", "landing": "pr",
 		"auto-ff-merge": true, "max-agents": 2,
 		"agents": {"claude": {"model": "m"}},
