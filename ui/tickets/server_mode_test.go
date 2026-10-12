@@ -435,6 +435,32 @@ func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	return updated.(Model)
 }
 
+func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
+	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "needs-repair"} {
+		m := newServerModel(t).WithServer(fakeServerAPI{})
+		m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: status},
+			// Keeps the epic open: a fully done epic starts collapsed.
+			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+		}})
+		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+		m = selectTicketRow(t, updated.(Model))
+		updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+		m = updated.(Model)
+		if !m.actionsMenu.IsOpen {
+			t.Errorf("status %s: menu closed, want open", status)
+		}
+		if cmd != nil {
+			t.Errorf("status %s: m issued %+v, want no toast", status, cmd())
+		}
+
+		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+		if updated.(Model).actionsMenu.IsOpen {
+			t.Errorf("status %s: menu still open after esc", status)
+		}
+	}
+}
+
 // Seam D: Answer in pane targets the tab from the iterations read, and Resume
 // issues unpark.
 func TestServerMode_AnswerInPaneAndResume(t *testing.T) {

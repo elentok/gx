@@ -62,8 +62,8 @@ const actionAnswer = "answer"
 // WaitingForChildren (own work already done), none of which have a live or
 // stalled session worth investigating. Whitelisting also fails closed for
 // any status added to the enum later, instead of showing the badge by
-// default. handleSuggestedActionsKey/handleQueueSuggestedActionsKey toast
-// "no suggested actions" rather than opening an empty menu.
+// default. The menu still opens on an empty list; only the row badge
+// (ticketHasSuggestedActions) depends on it being non-empty.
 //
 // native (the ticket's agent runs on a native runner) swaps Answer in pane
 // for Watch agent. herdrDown (ui.Settings.HerdrUnavailable) drops the

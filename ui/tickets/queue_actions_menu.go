@@ -9,8 +9,7 @@ import (
 )
 
 // handleQueueSuggestedActionsKey applies the "m" keymap: opens the
-// suggested-actions menu for the selected row, or toasts when its status has
-// none. The Queue tab is otherwise read-only for selection (ticket 08); this
+// suggested-actions menu for the selected row, whatever its status. The Queue tab is otherwise read-only for selection (ticket 08); this
 // is a deliberate, narrow exception for this one action.
 func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedQueueRow()
@@ -19,9 +18,6 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	}
 	status := r.epic.RenderedStatus(r.ticket)
 	items := suggestedActionItems(status, r.ticket, ticketPaneLive(status, r.epic.Name, r.ticket.DisplayNumber()), false, m.settings.HerdrUnavailable)
-	if len(items) == 0 {
-		return m, notify.Info("no suggested actions for this ticket")
-	}
 	prompt := fmt.Sprintf("Suggested actions for %q:", r.ticket.Title)
 	m.actionsMenu = m.actionsMenu.Open(r.ticket.Path, r.epic.Name, r.ticket.DisplayNumber(), prompt, items)
 	return m, nil

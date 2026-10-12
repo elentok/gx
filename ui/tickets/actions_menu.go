@@ -53,6 +53,16 @@ type actionsMenuResult struct {
 // Update drives the open menu's navigation/cancel/accept handling, mirroring
 // confirm.Model.Update. handled reports whether msg was consumed at all.
 func (m actionsMenuModel) Update(msg tea.KeyPressMsg) (actionsMenuModel, actionsMenuResult, bool) {
+	// The menu opens on every row, so it can be empty, and UpdateMenu
+	// ignores every key on an empty list — including the cancel keys.
+	if len(m.state.Items) == 0 {
+		switch msg.String() {
+		case "esc", "q":
+			m.IsOpen = false
+			return m, actionsMenuResult{Done: true}, true
+		}
+		return m, actionsMenuResult{}, false
+	}
 	next, decided, accepted, handled := components.UpdateMenu(msg, m.state)
 	if !handled {
 		return m, actionsMenuResult{}, false
@@ -101,8 +111,7 @@ func cmdApplySuggestedAction(path, action string, onSuccess func() tea.Msg) tea.
 }
 
 // handleSuggestedActionsKey applies the "m" keymap: opens the suggested-
-// actions menu for the selected ticket row, or toasts when its status has
-// none (see suggestedActionItems).
+// actions menu for the selected ticket row, whatever its status.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok || r.isEpic() {
@@ -118,9 +127,6 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	paneLive = paneLive && status == tickets.StatusNeedsAnswer
 	native := status == tickets.StatusNeedsAnswer && hasNativeAgent(ticket.Path)
 	items := suggestedActionItems(status, ticket, paneLive, native, m.settings.HerdrUnavailable)
-	if len(items) == 0 {
-		return m, notify.Info("no suggested actions for this ticket")
-	}
 	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
 	m.actionsMenu = m.actionsMenu.Open(ticket.Path, epicName, ticket.DisplayNumber(), prompt, items)
 	return m, nil
