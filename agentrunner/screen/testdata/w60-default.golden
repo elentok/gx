@@ -1,0 +1,34 @@
+-- scrollback
+ Claude CodClaude█Code v2.1.296
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   ~/…/evidence/02-vt/claude-run/w60-default/cwd
+
+
+❯ Write exactly one paragraph of about 90 words about
+  lighthouses. Use no line breaks, no markdown, no lists.
+  This instruction sentence is padded so the prompt itself
+  is long enough to wrap: alpha bravo charlie delta echo
+  foxtrot golf hotel india juliet kilo lima mike.
+
+⏺ Lighthouses have guided sailors for thousands of years.
+-- screen
+  Their bright beams warn ships about rocks, shoals, and
+  dangerous coastlines. Early towers burned wood or coal,
+  while later lenses threw light many miles across the
+  water. Today most are automated, controlled by computers
+  and monitored from distant stations. Many have become
+  museums or tourist attractions, drawing visitors who climb
+  the spiral stairs for the view. Though fewer are needed
+  for navigation now, they remain symbols of safety,
+  patience, and human determination against the sea.
+
+✻ Cooked for 7s · done 6:52 PM
+
+────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────
+  Press Ctrl-C again to exit
+
+Resume this session with:
+claude --resume 1d05b921-fd0f-4a24-b41e-3ce90c16c7f0
+
