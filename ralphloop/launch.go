@@ -302,7 +302,7 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 			if errors.Is(err, agentrunner.ErrLabelTaken) {
 				kind = events.AgentNameTaken
 			}
-			err = fmt.Errorf("starting %s: %w", opts.Label, err)
+			err = withDoctorHint(fmt.Errorf("starting %s: %w", opts.Label, err))
 			onFail(attempt, kind, err)
 			return launched{}, &launchFailure{Kind: kind, Err: err}
 		}
@@ -315,7 +315,7 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 		}
 		err = r.Prompt(s, prompt)
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
-			return launched{Session: s, Baseline: status.Turn}, err
+			return launched{Session: s, Baseline: status.Turn}, withDoctorHint(err)
 		}
 		err = fmt.Errorf("sending initial prompt: %w", err)
 		onFail(attempt, events.AgentPromptStalled, err)
@@ -326,6 +326,15 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 			return launched{}, &launchFailure{Kind: events.AgentPromptStalled, Err: err}
 		}
 	}
+}
+
+// withDoctorHint points a missing-capability error at the command that
+// diagnoses it; any other error, nil included, passes through unchanged.
+func withDoctorHint(err error) error {
+	if errors.Is(err, agentrunner.ErrMissingCapability) {
+		return fmt.Errorf("%w (run `gx claude doctor`)", err)
+	}
+	return err
 }
 
 // StartAndPrompt is startAndPrompt for callers outside the loop (the server's

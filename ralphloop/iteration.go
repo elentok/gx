@@ -109,9 +109,6 @@ func runIteration(d Deps, p iterationParams) error {
 	case errors.Is(err, errBlockedPaneParked):
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)
-		if errors.Is(err, agentrunner.ErrMissingCapability) {
-			err = fmt.Errorf("%w (run `gx claude doctor`)", err)
-		}
 		p.logLaunchFailed(label, 1, events.IterationError, err)
 		return &launchFailure{Kind: events.IterationError, Err: err}
 	case l.Adopted:

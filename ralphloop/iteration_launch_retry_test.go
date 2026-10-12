@@ -161,6 +161,39 @@ func TestRunIteration_MissingCapability_ParksWithDoctorHint(t *testing.T) {
 	}
 }
 
+func TestRunIteration_MissingCapabilityOnStart_ParksWithDoctorHint(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketStatus(t, scratchDir, "needs-repair")
+	failed := launchFailedEvents(t, scratchDir)
+	if len(failed) != 1 {
+		t.Fatalf("launch-failed events = %+v, want one", failed)
+	}
+	for _, want := range []string{"pid_status_v1", "gx claude doctor"} {
+		if !strings.Contains(failed[0].Reason, want) {
+			t.Errorf("reason %q lacks %q", failed[0].Reason, want)
+		}
+	}
+}
+
+func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
+
+	_, err := StartAndPrompt(r, agentrunner.StartOptions{Label: launchLabel}, "/go")
+
+	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "gx claude doctor") {
+		t.Errorf("StartAndPrompt = %v, want ErrMissingCapability with the doctor hint", err)
+	}
+}
+
 func TestRunIteration_OtherPromptError_ParksWithoutRetry(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
