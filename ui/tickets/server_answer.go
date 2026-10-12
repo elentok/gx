@@ -55,8 +55,8 @@ func ticketFile(store, address string) (string, error) {
 
 // serverAnswerActionCmd dispatches the "m" menu's server-mode entries. Resume
 // is the server's unpark; Answer… edits the file directly and pings the server
-// before resuming; Answer in pane focuses the iteration tab the iterations
-// read names. ok is false for any other action.
+// before resuming; Watch opens a live native agent's log, else focuses the
+// iteration tab the iterations read names. ok is false for any other action.
 func (m Model) serverAnswerActionCmd(result actionsMenuResult) (tea.Cmd, bool) {
 	address := result.Path
 	switch result.Action {
@@ -68,9 +68,10 @@ func (m Model) serverAnswerActionCmd(result actionsMenuResult) (tea.Cmd, bool) {
 			return notify.Error("answer: " + err.Error()), true
 		}
 		return cmdAnswerThen(m.worktreeRoot, m.settings, path, m.cmdServerResumeAnswered(address)), true
-	case actionWatchAgent:
-		return cmdWatchAgent(address), true
-	case actionAnswerInPane:
+	case actionWatch:
+		if nativeAgentLive(address) {
+			return cmdWatchAgent(address), true
+		}
 		return m.cmdServerFocusPane(address), true
 	}
 	return nil, false
@@ -91,7 +92,7 @@ func (m Model) cmdServerFocusPane(address string) tea.Cmd {
 	return func() tea.Msg {
 		it, live := m.serverIteration(address)
 		if !live || it.Tab == "" {
-			return notify.Warning("the ticket's pane is gone, reopen the menu to answer in the editor")()
+			return notify.Warning("the agent is no longer live")()
 		}
 		if err := focusIterationTab(it.Tab); err != nil {
 			return notify.Error("focus pane: " + err.Error())()

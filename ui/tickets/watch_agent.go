@@ -19,18 +19,18 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// actionWatchAgent opens the Watch agent modal on a native runner's log. It
-// replaces "Answer in pane": a native agent has no pane to focus. Dispatched
-// like actionAnswerInPane (see serverAnswerActionCmd).
-const actionWatchAgent = "watch-agent"
+// actionWatch looks at a live agent, per runner: a native agent's log in the
+// Watch modal, a herdr agent's pane by jumping to it. Handled by
+// handleActionsMenuKey/handleQueueActionsMenuKey, never applySuggestedAction.
+const actionWatch = "watch"
 
 // maxWatchLines bounds the modal to the log's tail so a long run can't stall
 // the Update goroutine.
 const maxWatchLines = 2000
 
 // nativeAgentLog is a package-level seam so tests can fake the agent log. It
-// locates only native agents (no herdr lookup): a ticket without one is not
-// watchable here and keeps its herdr "Answer in pane".
+// locates only native agents (no herdr lookup): a ticket without one is
+// watched through its herdr pane instead.
 var nativeAgentLog = func(ctx context.Context, address string) (agentlog.Log, error) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
@@ -43,13 +43,14 @@ var nativeAgentLog = func(ctx context.Context, address string) (agentlog.Log, er
 	return agentlog.Locator{StateDir: stateDir}.AgentLog(ctx, a)
 }
 
-// hasNativeAgent reports whether address runs on a native runner.
-func hasNativeAgent(address string) bool {
-	_, err := nativeAgentLog(context.Background(), address)
-	return err == nil
+// nativeAgentLive reports whether address's agent runs on a native runner and
+// its process is still alive.
+func nativeAgentLive(address string) bool {
+	log, err := nativeAgentLog(context.Background(), address)
+	return err == nil && !log.Pruned && log.Ended != nil && !log.Ended()
 }
 
-// watchLoadedMsg carries the rendered log a Watch agent action read.
+// watchLoadedMsg carries the rendered log a Watch action read.
 type watchLoadedMsg struct {
 	title string
 	lines []string

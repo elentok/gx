@@ -144,7 +144,7 @@ exactly as before.
 **Choose the ending by status first, then completeness.**
 
 - `needs-answer` → never land or reset. Route to answer-then-unpark: the human answers in
-  `## Needs Answer` (`m` menu → "Answer…", or "Answer in pane" if the pane is live), then
+  `## Needs Answer` (`m` menu → "Answer…", or "Watch" to jump to a live pane), then
   `gx server tickets unpark <project:epic/NN>` (or `m` → "Resume (I answered)").
 - `claimed` / `needs-repair` (`land` also accepts `done`; `reset` needs `--force` for `done`):
   - Complete → `gx server tickets land <project:epic/NN> --json`. Commits already landed with a

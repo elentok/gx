@@ -40,55 +40,41 @@ const investigateSkill = "gx-investigate"
 // and unclearable from the Tickets tab.
 const actionUnmuteReopen = "unmute-reopen"
 
-// actionAnswerInPane focuses the parked ticket's still-live iteration tab;
-// answering there lets the existing auto-unpark clear the park. Handled by
-// handleActionsMenuKey/handleQueueActionsMenuKey (it needs the epic name and
-// ticket id), never applySuggestedAction.
-const actionAnswerInPane = "answer-in-pane"
-
-// actionAnswer opens $EDITOR at the ticket's "## Needs Answer" heading, for a
-// park whose pane is gone. Dispatched like actionAnswerInPane (see cmdAnswer).
+// actionAnswer opens $EDITOR at the ticket's "## Needs Answer" heading.
+// Handled by handleActionsMenuKey/handleQueueActionsMenuKey (see cmdAnswer),
+// never applySuggestedAction.
 const actionAnswer = "answer"
 
 // suggestedActionItems returns ticket's suggested-action menu items, given
-// its rendered status. The answer items and
-// resume-answered only apply to needs-answer, paneLive picking between
-// "Answer in pane" and "Answer…" (the badge in the row lists pass false: it
-// only needs to know the list is non-empty, and a herdr lookup per rendered
-// row would be wasteful); investigate is whitelisted to the statuses that signal an
+// its rendered status. The answer items only apply to needs-answer;
+// investigate is whitelisted to the statuses that signal an
 // actual problem (needs-answer, needs-repair, error) rather than excluding
 // the healthy ones — Open/Claimed/Done are healthy, but so are Blocked
 // (waiting on a dependency), Draft (not yet offered to an agent) and
 // WaitingForChildren (own work already done), none of which have a live or
 // stalled session worth investigating. Whitelisting also fails closed for
 // any status added to the enum later, instead of showing the badge by
-// default.
+// default. herdrDown (ui.Settings.HerdrUnavailable) drops Investigate, whose
+// launch opens a herdr tab.
 //
-// native (the ticket's agent runs on a native runner) swaps Answer in pane
-// for Watch agent. herdrDown (ui.Settings.HerdrUnavailable) drops the
-// herdr-only items: Investigate, whose launch opens a herdr tab, and Answer
-// in pane.
-//
-// Transcript closes every list; it is not a status action, so it never
-// counts toward the badge.
-func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, native, herdrDown bool) []components.MenuItem {
-	return append(statusActionItems(status, ticket, paneLive, native, herdrDown),
-		components.MenuItem{Label: "Transcript", Value: actionTranscript})
+// Watch and Transcript close every list; they are not status actions, so
+// they never count toward the badge (whose per-row liveness lookups would be
+// wasteful). Watch is listed only while the agent is live: nativeLive for a
+// native runner, paneLive for a herdr pane, which herdrDown hides.
+func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, nativeLive, herdrDown bool) []components.MenuItem {
+	items := statusActionItems(status, ticket, herdrDown)
+	if nativeLive || (paneLive && !herdrDown) {
+		items = append(items, components.MenuItem{Label: "Watch", Value: actionWatch})
+	}
+	return append(items, components.MenuItem{Label: "Transcript", Value: actionTranscript})
 }
 
-func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, native, herdrDown bool) []components.MenuItem {
+func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) []components.MenuItem {
 	var items []components.MenuItem
 	if status == tickets.StatusNeedsAnswer {
-		if native {
-			items = append(items,
-				components.MenuItem{Label: "Watch agent", Value: actionWatchAgent},
-				components.MenuItem{Label: "Answer…", Value: actionAnswer})
-		} else if paneLive && !herdrDown {
-			items = append(items, components.MenuItem{Label: "Answer in pane", Value: actionAnswerInPane})
-		} else {
-			items = append(items, components.MenuItem{Label: "Answer…", Value: actionAnswer})
-		}
-		items = append(items, components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
+		items = append(items,
+			components.MenuItem{Label: "Answer…", Value: actionAnswer},
+			components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
 	}
 	if !herdrDown && (status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError) {
 		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
@@ -102,7 +88,7 @@ func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, pan
 // ticketHasSuggestedActions reports whether ticket's row should carry the
 // "m" suggested-actions badge (ui.IconSet.SuggestedAction).
 func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) bool {
-	return len(statusActionItems(status, ticket, false, false, herdrDown)) > 0
+	return len(statusActionItems(status, ticket, herdrDown)) > 0
 }
 
 // applySuggestedAction performs action's write against the ticket at path.

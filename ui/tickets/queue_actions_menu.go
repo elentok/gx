@@ -17,7 +17,10 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
 	status := r.epic.RenderedStatus(r.ticket)
-	items := suggestedActionItems(status, r.ticket, ticketPaneLive(status, r.epic.Name, r.ticket.DisplayNumber()), false, m.settings.HerdrUnavailable)
+	// A queue row's Path is its file, not an address, so only a herdr pane
+	// can make it watchable.
+	paneLive := !m.settings.HerdrUnavailable && ticketPaneLive(r.epic.Name, r.ticket.DisplayNumber())
+	items := suggestedActionItems(status, r.ticket, paneLive, false, m.settings.HerdrUnavailable)
 	prompt := fmt.Sprintf("Suggested actions for %q:", r.ticket.Title)
 	m.actionsMenu = m.actionsMenu.Open(r.ticket.Path, r.epic.Name, r.ticket.DisplayNumber(), prompt, items)
 	return m, nil

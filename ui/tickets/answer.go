@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
@@ -28,13 +27,10 @@ var findIterationTab = func(epicName, identifier string) (herdr.Tab, bool) {
 	return tab, found && err == nil
 }
 
-// ticketPaneLive reports whether a parked ticket's iteration pane still
-// exists, which decides between "Answer in pane" and "Answer…". Only called
-// when the menu opens, never per rendered row.
-func ticketPaneLive(status tickets.RenderedStatus, epicName, identifier string) bool {
-	if status != tickets.StatusNeedsAnswer {
-		return false
-	}
+// ticketPaneLive reports whether a ticket's iteration pane still exists,
+// which gates "Watch". Only called when the menu opens, never per rendered
+// row.
+func ticketPaneLive(epicName, identifier string) bool {
 	_, live := findIterationTab(epicName, identifier)
 	return live
 }
@@ -113,23 +109,23 @@ func handleAnswerEditorFinished(c confirm.Model, msg answerEditorFinishedMsg, on
 	}), nil
 }
 
-// answerActionCmd dispatches the two answer menu items, which need more than
-// a path (like actionInvestigate); ok is false for any other action.
+// answerActionCmd dispatches Answer… and Watch, which need more than a path
+// (like actionInvestigate); ok is false for any other action.
 func answerActionCmd(worktreeRoot string, settings ui.Settings, result actionsMenuResult) (tea.Cmd, bool) {
 	switch result.Action {
 	case actionAnswer:
 		return cmdAnswer(worktreeRoot, settings, result.Path), true
-	case actionAnswerInPane:
-		return cmdFocusAnswerPane(result.EpicName, result.TicketID), true
+	case actionWatch:
+		return cmdFocusPane(result.EpicName, result.TicketID), true
 	}
 	return nil, false
 }
 
-func cmdFocusAnswerPane(epicName, identifier string) tea.Cmd {
+func cmdFocusPane(epicName, identifier string) tea.Cmd {
 	return func() tea.Msg {
 		tab, live := findIterationTab(epicName, identifier)
 		if !live {
-			return notify.Warning("the ticket's pane is gone, reopen the menu to answer in the editor")()
+			return notify.Warning("the agent is no longer live")()
 		}
 		if _, err := herdr.TabFocus(tab.TabID); err != nil {
 			return notify.Error("focus pane: " + err.Error())()

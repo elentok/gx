@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
@@ -461,21 +462,26 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 	}
 }
 
-// Seam D: Answer in pane targets the tab from the iterations read, and Resume
-// issues unpark.
-func TestServerMode_AnswerInPaneAndResume(t *testing.T) {
+// Seam D: on herdr, Watch jumps to the tab from the iterations read, and
+// Resume issues unpark.
+func TestServerMode_WatchJumpsToPaneAndResume(t *testing.T) {
 	var focused []string
 	defer func(prev func(string) error) { focusIterationTab = prev }(focusIterationTab)
 	focusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
+	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 
 	var calls []string
 	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
 	m := openAnswerMenu(t, api)
-	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswerInPane, actionResumeAnswered, actionInvestigate, actionTranscript}; !slices.Equal(got, want) {
+	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswer, actionResumeAnswered, actionInvestigate, actionWatch, actionTranscript}; !slices.Equal(got, want) {
 		t.Fatalf("menu = %v, want %v", got, want)
 	}
 
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	updated := tea.Model(m)
+	for range 3 {
+		updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	updated, cmd := updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	cmd()
 	if !slices.Equal(focused, []string{"t1"}) {
 		t.Fatalf("focused = %v", focused)

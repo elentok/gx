@@ -113,10 +113,9 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
 	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
-	_, paneLive := m.serverIteration(ticket.Path)
-	paneLive = paneLive && status == tickets.StatusNeedsAnswer
-	native := status == tickets.StatusNeedsAnswer && hasNativeAgent(ticket.Path)
-	items := suggestedActionItems(status, ticket, paneLive, native, m.settings.HerdrUnavailable)
+	it, live := m.serverIteration(ticket.Path)
+	paneLive := live && it.Tab != ""
+	items := suggestedActionItems(status, ticket, paneLive, nativeAgentLive(ticket.Path), m.settings.HerdrUnavailable)
 	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
 	m.actionsMenu = m.actionsMenu.Open(ticket.Path, epicName, ticket.DisplayNumber(), prompt, items)
 	return m, nil
