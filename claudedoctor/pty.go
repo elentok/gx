@@ -36,7 +36,13 @@ func checkHolderSurvivesKickstart(Input) (string, bool) {
 
 	start := fmt.Sprintf(`%s %q agent-holder --session-id doctor --dir %q -- sleep 600 </dev/null >/dev/null 2>&1`,
 		setsid, exe, dir)
-	pid, err := kickstartJob(dir, start)
+	return holderSurvives(dir, func() (int, error) { return kickstartJob(dir, start) })
+}
+
+// holderSurvives runs kickstart, which starts a holder serving dir and
+// kickstarts its launchd job, then checks dir's holder.sock still answers.
+func holderSurvives(dir string, kickstart func() (int, error)) (string, bool) {
+	pid, err := kickstart()
 	if pid > 0 {
 		defer syscall.Kill(pid, syscall.SIGKILL)
 	}

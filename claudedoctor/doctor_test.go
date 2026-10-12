@@ -3,11 +3,14 @@ package claudedoctor
 import (
 	"encoding/json"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/nativerunner"
 )
 
 func pass(Input) (string, bool) { return "ok", true }
@@ -109,6 +112,61 @@ func TestCheckTrustScreen_FailsOnBrokenFrame(t *testing.T) {
 	}
 	if _, ok := checkTrustScreen(Input{}); ok {
 		t.Error("no frames must fail")
+	}
+}
+
+// fakeHolder answers every holder.sock request in dir with an empty response.
+func fakeHolder(t *testing.T, dir string) {
+	t.Helper()
+	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			var req struct{ Op string }
+			if json.NewDecoder(conn).Decode(&req) == nil {
+				_ = json.NewEncoder(conn).Encode(struct{}{})
+			}
+			conn.Close()
+		}
+	}()
+}
+
+func TestHolderSurvives(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		survives bool
+	}{{"holder answers", true}, {"holder gone", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Short dir: socket paths are length-capped.
+			dir, err := os.MkdirTemp("", "gxd")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.RemoveAll(dir) })
+			detail, ok := holderSurvives(dir, func() (int, error) {
+				if tc.survives {
+					fakeHolder(t, dir)
+				}
+				return 0, nil
+			})
+			if ok != tc.survives {
+				t.Errorf("holderSurvives = %v (%s), want %v", ok, detail, tc.survives)
+			}
+		})
+	}
+}
+
+func TestHolderSurvives_FailsWhenKickstartFails(t *testing.T) {
+	detail, ok := holderSurvives(t.TempDir(), func() (int, error) { return 0, errors.New("launchctl not found") })
+	if ok || detail != "launchctl not found" {
+		t.Errorf("holderSurvives = %v, %q", ok, detail)
 	}
 }
 
