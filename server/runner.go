@@ -596,6 +596,15 @@ func (s *Server) settleRun(rc runContext, err error) {
 			return
 		}
 		defer s.lands.end()
+		if !mode.commitless && s.parkIfTrunkMissing(one.ScratchDir, addr, one.Ticket.Path) {
+			// The work waits on its iteration branch; a live tab would make the
+			// recovery land need --ignore-live-tab.
+			if serr := deps.Runner.Stop(run.Session); serr != nil {
+				s.log.Warn("stop agent", "ticket", ticketAddr, "err", serr)
+			}
+			s.events.publish(EventIterationParked, ticketAddr)
+			return
+		}
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
@@ -638,15 +647,8 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 	if !s.chat.Enabled() || isOneOffTicket(ticketPath) {
 		return
 	}
-	e, ok := s.freshEpic(addr.Project, addr.Epic)
-	if !ok {
-		return
-	}
-	for _, t := range e.Tickets {
-		if t.Identifier == addr.ID {
-			s.chat.TicketDone(addr.Project, s.chatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
-			return
-		}
+	if e, t, ok := s.freshTicket(addr); ok {
+		s.chat.TicketDone(addr.Project, s.chatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
 	}
 }
 

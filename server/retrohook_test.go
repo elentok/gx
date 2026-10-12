@@ -187,7 +187,8 @@ func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
 		}
 		commitWork(t, p, id)
 		if id == "02" {
-			f.git(t, "branch", "-m", "main", "trunk") // the land target vanishes
+			// An untracked file the fast-forward would overwrite fails the land.
+			testutil.WriteFile(t, f.repo, "02.txt", "untracked")
 		}
 	}, withEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -196,5 +197,8 @@ func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
+	}
+	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
+		t.Errorf("the land succeeded: main contains the feature branch")
 	}
 }

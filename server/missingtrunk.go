@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -83,13 +84,34 @@ func (s *Server) checkTrunks() {
 			}
 			continue
 		}
-		if s.trunkMissing.set(addr.Project, reason) {
-			s.log.Warn("trunk missing", "project", addr.Project, "reason", reason)
-			s.events.publishEvent(Event{Type: EventTrunkMissing, Address: addr.Project, Level: EventLevelWarning, Message: reason})
-			s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + addr.Project + ": trunk missing",
-				Detail: reason + "; its tickets will not be claimed until it is fixed"})
-		}
+		s.enterTrunkMissing(addr.Project, reason)
 	}
+}
+
+// enterTrunkMissing puts project in Missing trunk, announcing only the entry.
+func (s *Server) enterTrunkMissing(project, reason string) {
+	if !s.trunkMissing.set(project, reason) {
+		return
+	}
+	s.log.Warn("trunk missing", "project", project, "reason", reason)
+	s.events.publishEvent(Event{Type: EventTrunkMissing, Address: project, Level: EventLevelWarning, Message: reason})
+	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
+		Detail: reason + "; its tickets will not be claimed until it is fixed"})
+}
+
+// parkIfTrunkMissing resolves trunk again before a ticket lands: with it
+// missing nothing lands anywhere, the ticket parks for a person to fix the
+// branch and run `gx server tickets land`, and the project stops claiming.
+func (s *Server) parkIfTrunkMissing(scratchDir string, addr tickets.Address, ticketPath string) bool {
+	reason, missing := s.trunkProblem(addr.Project)
+	if !missing {
+		return false
+	}
+	s.enterTrunkMissing(addr.Project, reason)
+	if err := s.parkTicket(scratchDir, addr, ticketPath, events.TrunkMissing, reason); err != nil {
+		s.log.Warn("park trunk missing", "ticket", addr.String(), "err", err)
+	}
+	return true
 }
 
 // trunkProblem reports why project's trunk can't be used, if it can't. A

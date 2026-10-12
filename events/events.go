@@ -115,6 +115,8 @@ const (
 	// StrandedCommits is a commitless ticket that committed on its detached
 	// worktree anyway; the worktree stays until a person lands or drops them.
 	StrandedCommits Kind = "stranded-commits"
+	// TrunkMissing is a landing whose project's trunk could not be resolved.
+	TrunkMissing Kind = "trunk-missing"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -132,6 +134,7 @@ var kinds = map[Kind]bool{
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
 	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
+	TrunkMissing: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

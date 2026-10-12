@@ -144,6 +144,55 @@ func (s *Server) repairLand(req RepairRequest) (RepairResult, error) {
 	return repairOK(res)
 }
 
+// ReasonTrunkMissing refuses a land into a queued root whose project's trunk
+// is missing: the root could not land after it.
+const ReasonTrunkMissing = "trunk-missing"
+
+// landInQueue is the server's land. A ticket of a queued root may be the
+// one a landing parked (trunk-missing, say), so once it lands the root
+// completes as if its iteration had settled. A direct land has no queue.
+func (s *Server) landInQueue(req RepairRequest) (RepairResult, error) {
+	addr, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
+	if err != nil || !s.rootQueued(rootOf(addr)) {
+		return s.repairLand(req)
+	}
+	if reason, missing := s.trunkProblem(addr.Project); missing {
+		return repairRefusal(&repair.RefusalError{Reason: ReasonTrunkMissing, Message: reason}), nil
+	}
+	res, err := s.repairLand(req)
+	if err != nil || res.Refused {
+		return res, err
+	}
+	if _, t, ok := s.freshTicket(addr); ok && s.lands.begin() {
+		defer s.lands.end()
+		s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
+	}
+	return res, nil
+}
+
+func (s *Server) rootQueued(root rootRef) bool {
+	for _, it := range s.queued.list() {
+		if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
+			return true
+		}
+	}
+	return false
+}
+
+// freshTicket loads addr's ticket, and its epic, straight from disk.
+func (s *Server) freshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket, bool) {
+	e, ok := s.freshEpic(addr.Project, addr.Epic)
+	if !ok {
+		return tickets.Epic{}, tickets.Ticket{}, false
+	}
+	for _, t := range e.Tickets {
+		if t.Identifier == addr.ID {
+			return e, t, true
+		}
+	}
+	return tickets.Epic{}, tickets.Ticket{}, false
+}
+
 func (s *Server) repairReset(req RepairRequest) (RepairResult, error) {
 	epicPath, id, cwd, err := s.epicTarget(req, true)
 	if err != nil {
