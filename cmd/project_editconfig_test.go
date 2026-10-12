@@ -176,6 +176,55 @@ func TestProjectEditConfig_UnregisteredRepoNeverCreatesProjectJSON(t *testing.T)
 	}
 }
 
+// newInFlightEnv gives proj a repo on trunk main and four roots: one with a
+// claimed ticket and a claimed child, one with an unlanded feature branch, one
+// whose branch is on main, and one never started.
+func newInFlightEnv(t *testing.T, saved string) *editConfigEnv {
+	t.Helper()
+	repo := testutil.TempRepo(t)
+	e := newEditConfigEnv(t, false, "", strings.ReplaceAll(saved, "REPO", repo))
+	testutil.WriteFile(t, filepath.Dir(e.live), config.ProjectFileName, `{"name": "proj", "repo": "`+repo+`", "trunk": "main"}`)
+	testutil.MustGitExported(t, repo, "branch", "landed")
+	testutil.MustGitExported(t, repo, "switch", "-qc", "unlanded")
+	testutil.MustGitExported(t, repo, "commit", "-q", "--allow-empty", "-m", "wip")
+	testutil.MustGitExported(t, repo, "switch", "-q", "main")
+	roots := map[string]string{
+		"claimed":  "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# a\n",
+		"unlanded": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# a\n",
+		"landed":   "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# a\n",
+		"idle":     "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# a\n",
+	}
+	for epic, body := range roots {
+		dir := filepath.Join(e.store, "proj", epic)
+		testutil.EnsureEpicTicketMD(t, dir)
+		testutil.Mkdir(t, filepath.Join(dir, "issues"))
+		testutil.WriteFile(t, filepath.Join(dir, "issues"), "01-a.md", body)
+	}
+	testutil.WriteFile(t, filepath.Join(e.store, "proj", "claimed", "issues"), "01a-child.md",
+		"---\nid: 01a\nparent: \"01\"\nstatus: claimed\ntype: implement\n---\n# child\n")
+	return e
+}
+
+func TestProjectEditConfig_TrunkChangeWarnsRootsInFlight(t *testing.T) {
+	e := newInFlightEnv(t, `{"name": "proj", "repo": "REPO", "trunk": "develop"}`)
+	if err := runProjectEditConfig(e.d, "proj"); err != nil {
+		t.Fatal(err)
+	}
+	if want := "2 tickets in flight will land on develop\n"; !strings.HasSuffix(e.out.String(), want) {
+		t.Errorf("out = %q, want suffix %q", e.out.String(), want)
+	}
+}
+
+func TestProjectEditConfig_UnchangedTrunkNoWarning(t *testing.T) {
+	e := newInFlightEnv(t, `{"name": "proj", "repo": "REPO", "trunk": "main", "landing": "on-done"}`)
+	if err := runProjectEditConfig(e.d, "proj"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(e.out.String(), "in flight") {
+		t.Errorf("warned without a trunk change: %q", e.out.String())
+	}
+}
+
 func TestProjectEditConfig_CwdProject(t *testing.T) {
 	e := newEditConfigEnv(t, false, "", `{"name": "proj", "repo": "REPO", "trunk": "develop"}`)
 	repo := testutil.TempRepo(t)

@@ -9,11 +9,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
 )
 
@@ -104,8 +106,65 @@ func runProjectEditConfig(d deps, name string) error {
 			return err
 		}
 		fmt.Fprintf(d.stdout, "saved %s\n", livePath)
+		warnTrunkChange(d.stdout, dir, orig, edited)
 		return nil
 	}
+}
+
+// warnTrunkChange prints how many roots in flight a trunk change moves. Both
+// files already passed validation, so their parse errors are ignored.
+func warnTrunkChange(out io.Writer, dir string, orig, edited []byte) {
+	before, _ := config.ParseProjectFile(orig)
+	after, _ := config.ParseProjectFile(edited)
+	repo := ""
+	if before.Repo != nil {
+		repo = *before.Repo
+	}
+	oldTrunk, newTrunk := effectiveTrunk(before, repo), effectiveTrunk(after, repo)
+	if oldTrunk == newTrunk {
+		return
+	}
+	epics, _ := tickets.Load(dir)
+	fmt.Fprintf(out, "%d tickets in flight will land on %s\n", rootsInFlight(epics, repo, oldTrunk), newTrunk)
+}
+
+// effectiveTrunk mirrors tickets.Trunk without its existence check, so
+// setting trunk to the detected default is not a change.
+func effectiveTrunk(pf config.ProjectFile, repo string) string {
+	if pf.Trunk != nil && *pf.Trunk != "" {
+		return *pf.Trunk
+	}
+	if repo == "" {
+		return ""
+	}
+	return git.RemoteDefaultBranch(repo)
+}
+
+// rootsInFlight counts roots, never their children: a root is in flight while
+// any of its tickets is claimed or its feature branch has not reached trunk.
+// An unresolvable trunk counts the branch as not landed.
+func rootsInFlight(epics []tickets.Epic, repo, trunk string) int {
+	n := 0
+	for _, e := range epics {
+		if e.Status == string(schema.StatusCancelled) {
+			continue
+		}
+		claimed := slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
+			return t.Status == string(schema.StatusClaimed)
+		})
+		if claimed || (repo != "" && branchUnlanded(repo, e.Name, trunk)) {
+			n++
+		}
+	}
+	return n
+}
+
+func branchUnlanded(repo, branch, trunk string) bool {
+	if _, err := git.RevParse(repo, "refs/heads/"+branch); err != nil {
+		return false
+	}
+	landed, err := git.IsAncestor(repo, "refs/heads/"+branch, trunk)
+	return err != nil || !landed
 }
 
 // projectDirFor resolves a bare project name, or with none the cwd's project.
