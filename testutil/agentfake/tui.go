@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -127,6 +128,13 @@ func runTUIClaude() (int, error) {
 	opts, err := parseTUIArgs(os.Args[1:])
 	if err != nil {
 		return 0, err
+	}
+	// Claude reads its terminal raw; a cooked one would hold a lone Esc
+	// until the next Enter.
+	if term.IsTerminal(os.Stdin.Fd()) {
+		if _, err := term.MakeRaw(os.Stdin.Fd()); err != nil {
+			return 0, err
+		}
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -244,6 +252,10 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := t.submit(); err != nil {
 				return 0, err
 			}
+		case ev.key == escKey:
+			if err := t.interrupt(); err != nil {
+				return 0, err
+			}
 		default:
 			if !t.opts.trust {
 				t.typed.WriteByte(ev.key)
@@ -278,6 +290,17 @@ func (t *tui) submit() error {
 		return t.setStatus(StatusBusy, "")
 	}
 	return nil
+}
+
+const escKey = 0x1b
+
+// interrupt is Esc: it ends a running turn and keeps the session.
+func (t *tui) interrupt() error {
+	t.typed.Reset()
+	if t.pid.Status != StatusBusy {
+		return nil
+	}
+	return t.setStatus(StatusIdle, "")
 }
 
 func (t *tui) handleControl(c Control) error {

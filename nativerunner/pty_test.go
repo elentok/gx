@@ -52,14 +52,14 @@ func TestPty_Conformance(t *testing.T) {
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
 			},
+			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
+			},
 			Skip: map[string]string{
-				"InterruptKeepsSession":        "pty interrupt lands in ticket 24",
-				"CompactAfterInterrupt":        "pty interrupt and compact land in ticket 24",
-				"FinishWaitsForBackgroundTask": "pty background tasks land in ticket 24",
-				"BlockedThenAnswer":            "pty answer lands in ticket 30",
-				"AnswerNotBlocked":             "pty answer lands in ticket 30",
-				"RestartThenFind":              "pty reattach lands in ticket 26",
-				"TurnSurvivesRestart":          "pty reattach lands in ticket 26",
+				"BlockedThenAnswer":   "pty answer lands in ticket 30",
+				"AnswerNotBlocked":    "pty answer lands in ticket 30",
+				"RestartThenFind":     "pty reattach lands in ticket 26",
+				"TurnSurvivesRestart": "pty reattach lands in ticket 26",
 			},
 		}
 	})

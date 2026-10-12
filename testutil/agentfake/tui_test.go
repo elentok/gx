@@ -206,6 +206,19 @@ func TestTUIClaude_StallLeavesPromptsUnstarted(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_EscEndsTheTurn(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("hello")
+	f.waitStatus(StatusBusy, "")
+	if _, err := io.WriteString(f.stdin, "\x1b"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("again")
+	f.waitScreen("> again")
+}
+
 func TestTUIClaude_ExitControlExitsWithCode(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")
