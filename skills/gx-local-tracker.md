@@ -257,8 +257,9 @@ that drives it.
 ## Follow-ups
 
 A **follow-up** is a diagnosis or an idea filed for a person to plan, not schedulable work. This
-section is the one place the format lives; gx-evolve, gx-resolve-follow-ups, gx-investigate and
-gx-to-tickets link here rather than restating it.
+section is the one place the format lives; gx-follow-up, gx-evolve and gx-resolve-follow-ups link
+here rather than restating it. The filing procedure lives in the
+[gx-follow-up](gx-follow-up/SKILL.md) skill.
 
 - **A follow-ups epic** is an epic named `follow-ups`. Its archive is `follow-ups-archived`. There
   is no `type: follow-up`: `type` picks the skill, and "follow-up" is only where a ticket lives.
@@ -273,13 +274,12 @@ gx-to-tickets link here rather than restating it.
   - `## Evidence` — log lines, ticket ids, commits. Required for a bug, optional for an idea.
   - `## Suggested fix`
   - `## Open questions` — optional.
-- **Filing**: only through `gx tickets follow-up add <project:epic> --body -`, never a plain `add`.
-  The body's frontmatter carries `category: bug|idea`. The verb refuses, with nothing written and
+- **Filing**: follow the [gx-follow-up](gx-follow-up/SKILL.md) skill; it is the procedure. It files
+  only through `gx tickets follow-up add <project:epic> --body -`, never a plain `add`. The body's frontmatter carries `category: bug|idea`. The verb refuses, with nothing written and
   a code naming the gap, when `category` or a required section is missing, when the body asks for a
   status or type other than `draft`/`research`, or when the target is not a follow-ups epic.
-- **Seen again**: when a follow-up already exists for the same problem, don't file a duplicate.
-  Append an entry to its `## Evidence` (`gx tickets section <addr> Evidence -`, content = the
-  existing text plus the new entry) naming the new source and date.
+- **Seen again**: never file a duplicate; see the dedupe step of
+  [gx-follow-up](gx-follow-up/SKILL.md).
 - **Server recovery follow-ups** (filed from investigate reports) use the same format:
   `category: bug`, Source / Problem / Evidence / Suggested fix, and the same "seen again" entry for a
   repeat. gx-resolve-follow-ups and `gx evolve export` then see one shape.

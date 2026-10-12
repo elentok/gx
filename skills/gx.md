@@ -63,6 +63,8 @@ for it — e.g. a code-review ticket that needs to spin up follow-up tickets can
 `gx-to-tickets` itself, and `gx-bump` invokes `gx-changelog` as a sub-agent, which a flagged skill
 would block. `gx-investigate` likewise carries no flag: a bug report should
 reflexively pull in ralph-loop's log/state inventory without a human having to name the skill.
+`gx-follow-up` carries no flag either: filing a follow-up is a cheap, safe write that a person often
+asks for in passing, and other skills must be able to call it.
 
 Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
 `/name` invocation, never launched by the model on its own. That's already at least as restrictive as
@@ -154,6 +156,8 @@ skills/
   gx-resolve-follow-ups/
     SKILL.md
   gx-design/
+    SKILL.md
+  gx-follow-up/
     SKILL.md
 ```
 

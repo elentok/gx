@@ -40,6 +40,7 @@ var requiredFiles = []string{
 	"gx-evolve/SKILL.md",
 	"gx-resolve-follow-ups/SKILL.md",
 	"gx-design/SKILL.md",
+	"gx-follow-up/SKILL.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -141,8 +142,9 @@ func parseFrontmatter(t *testing.T, raw string) skillFrontmatter {
 // value, per gx.md's "Invocation policy" section: gx-implement is
 // explicit-invoke only (claiming/implementing a ticket should never trigger
 // on the model's own reading of a conversation); gx-to-tickets, gx-tdd,
-// gx-resolving-merge-conflicts, gx-investigate, and gx-changelog are left
-// model-invocable (gx-bump invokes gx-changelog as a sub-agent).
+// gx-resolving-merge-conflicts, gx-investigate, gx-changelog, and gx-follow-up
+// are left model-invocable (gx-bump invokes gx-changelog as a sub-agent;
+// other skills call gx-follow-up).
 var wantInvocationPolicy = map[string]bool{
 	"gx-to-tickets":                false,
 	"gx-tdd":                       false,
@@ -158,6 +160,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-evolve":                    true,
 	"gx-resolve-follow-ups":        true,
 	"gx-design":                    true,
+	"gx-follow-up":                 false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
@@ -289,6 +292,22 @@ func TestResolveFollowUpsUsesMovedAddress(t *testing.T) {
 			strings.Contains(line, "section <addr> Question") {
 			t.Errorf("post-move step uses the pre-move address: %q", line)
 		}
+	}
+}
+
+// TestFollowUpTriggersAndNeverAsksUnattended pins what lets the model reach
+// for gx-follow-up (the trigger phrases) and what keeps an unattended caller
+// from stalling on a question nobody can answer.
+func TestFollowUpTriggersAndNeverAsksUnattended(t *testing.T) {
+	raw := readFile(t, "gx-follow-up/SKILL.md")
+	desc := parseFrontmatter(t, raw).Description
+	for _, phrase := range []string{"create a follow-up", "file a follow-up", "add a follow-up"} {
+		if !strings.Contains(desc, phrase) {
+			t.Errorf("description must name trigger phrase %q: %q", phrase, desc)
+		}
+	}
+	if !strings.Contains(raw, "Unattended, it never asks.") {
+		t.Error("skill must state it never asks when unattended")
 	}
 }
 
