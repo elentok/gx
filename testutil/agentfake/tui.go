@@ -76,6 +76,12 @@ func TUIControlPath(home, sessionID string) string {
 	return filepath.Join(home, ".claude", "agentfake", sessionID+".ctl")
 }
 
+// TUIInputPath logs every key the TUI fake running sessionID under home read
+// off its terminal.
+func TUIInputPath(home, sessionID string) string {
+	return filepath.Join(home, ".claude", "agentfake", sessionID+".in")
+}
+
 // SendTUIControl writes c to the side channel of the TUI fake running
 // sessionID under home, waiting for the fake to create it.
 func SendTUIControl(home, sessionID string, c Control) error {
@@ -164,6 +170,11 @@ func runTUIClaude() (int, error) {
 		return 0, err
 	}
 	defer ctl.Close()
+	in, err := os.Create(TUIInputPath(home, opts.sessionID))
+	if err != nil {
+		return 0, err
+	}
+	defer in.Close()
 
 	now := time.Now()
 	t := &tui{
@@ -182,7 +193,7 @@ func runTUIClaude() (int, error) {
 			Entrypoint: "cli",
 		},
 	}
-	return t.run(os.Stdin, ctl)
+	return t.run(io.TeeReader(os.Stdin, in), ctl)
 }
 
 type tui struct {
@@ -308,10 +319,15 @@ func (t *tui) startSession() error {
 	return t.setStatus(StatusIdle, "")
 }
 
+// submit is Enter. A stalled fake leaves the text unsent in the input box.
 func (t *tui) submit() error {
+	if t.stalled {
+		t.draw()
+		return nil
+	}
 	text := t.typed.String()
 	t.typed.Reset()
-	if t.stalled || (text == "" && t.pid.Status != StatusWaiting) {
+	if text == "" && t.pid.Status != StatusWaiting {
 		return nil
 	}
 	switch t.pid.Status {
@@ -443,7 +459,7 @@ func (t *tui) draw() {
 		title = workingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
 	default:
-		rows = []string{"✻ Welcome to Claude Code", "", "> "}
+		rows = []string{"✻ Welcome to Claude Code", "", "> " + t.typed.String()}
 	}
 	fmt.Fprint(t.out, "\x1b[2J\x1b[H"+title+strings.Join(rows, "\r\n"))
 }

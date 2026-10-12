@@ -36,7 +36,7 @@ type Pty struct {
 	// StartTimeout bounds Start's wait for claude to turn idle.
 	StartTimeout time.Duration
 	// PromptGrace bounds each wait of Prompt for Turn to move; defaults to
-	// claudeui.NudgeGrace.
+	// claudeui.DefaultNudgeCaps.Grace.
 	PromptGrace time.Duration
 	// StopGrace is how long Stop waits for the holder to exit before it
 	// kills it.
@@ -525,7 +525,10 @@ func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 		return fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, claude.WaitingFor)
 	}
 	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
-	err = claudeui.PromptWithNudge(pr, text, time.Time{}, time.Now)
+	// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
+	// would hold a stuck prompt for minutes before the loop hears of it.
+	caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
+	err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now)
 	if errors.Is(err, claudeui.ErrStuckSubmission) || errors.Is(err, claudeui.ErrStartTimeout) {
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
@@ -549,10 +552,8 @@ func (pr *ptyPrompter) Submit(text string) error {
 
 func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
 
-// WaitStart caps timeout at PromptGrace, which is how a test keeps the
-// nudge rounds short.
 func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
-	deadline := time.Now().Add(min(timeout, pr.p.promptGrace()))
+	deadline := time.Now().Add(timeout)
 	for {
 		_, turn, err := pr.ss.holder.Status()
 		if err != nil {
@@ -702,7 +703,7 @@ func (p *Pty) pollInterval() time.Duration {
 
 func (p *Pty) promptGrace() time.Duration {
 	if p.PromptGrace <= 0 {
-		return claudeui.NudgeGrace
+		return claudeui.DefaultNudgeCaps.Grace
 	}
 	return p.PromptGrace
 }

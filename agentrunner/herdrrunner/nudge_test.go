@@ -17,7 +17,7 @@ import (
 // pollTimeoutErr matches IsPollTimeout's "timed out" substring check.
 var pollTimeoutErr = errors.New("timed out waiting for state")
 
-var graceMs = int(claudeui.NudgeGrace / time.Millisecond)
+var graceMs = int(claudeui.DefaultNudgeCaps.Grace / time.Millisecond)
 
 // fixedNow returns a clock that never advances, for tests where elapsed
 // time isn't under test.
@@ -197,8 +197,8 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 	if promptCalls != 1 {
 		t.Errorf("promptCalls = %d, want 1 (only the initial submission)", promptCalls)
 	}
-	if sendKeysCalls != claudeui.MaxNudges || waitCalls != claudeui.MaxNudges {
-		t.Errorf("sendKeysCalls=%d waitCalls=%d, want both = claudeui.MaxNudges (%d)", sendKeysCalls, waitCalls, claudeui.MaxNudges)
+	if sendKeysCalls != claudeui.DefaultNudgeCaps.Nudges || waitCalls != claudeui.DefaultNudgeCaps.Nudges {
+		t.Errorf("sendKeysCalls=%d waitCalls=%d, want both = claudeui.DefaultNudgeCaps.Nudges (%d)", sendKeysCalls, waitCalls, claudeui.DefaultNudgeCaps.Nudges)
 	}
 }
 
@@ -236,10 +236,10 @@ func TestPromptWithNudge_UnchangedPane_ExhaustsRetypes_ReturnsStuckSubmission(t 
 	if !errors.Is(err, claudeui.ErrStuckSubmission) || !errors.Is(err, pollTimeoutErr) {
 		t.Fatalf("PromptWithNudge() error = %v, want it to wrap ErrStuckSubmission and herdr's poll error", err)
 	}
-	// 1 initial submit + claudeui.MaxRetypes retypes, then it gives up rather
-	// than spending the rest of claudeui.MaxNudges on pointless Enter nudges.
-	if promptCalls != 1+claudeui.MaxRetypes {
-		t.Errorf("promptCalls = %d, want %d (1 initial + claudeui.MaxRetypes retypes)", promptCalls, 1+claudeui.MaxRetypes)
+	// 1 initial submit + claudeui.DefaultNudgeCaps.Retypes retypes, then it gives up rather
+	// than spending the rest of claudeui.DefaultNudgeCaps.Nudges on pointless Enter nudges.
+	if promptCalls != 1+claudeui.DefaultNudgeCaps.Retypes {
+		t.Errorf("promptCalls = %d, want %d (1 initial + claudeui.DefaultNudgeCaps.Retypes retypes)", promptCalls, 1+claudeui.DefaultNudgeCaps.Retypes)
 	}
 	if sendKeysCalls != 0 {
 		t.Errorf("sendKeysCalls = %d, want 0", sendKeysCalls)

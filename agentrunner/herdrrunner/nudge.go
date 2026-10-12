@@ -41,7 +41,7 @@ func promptWithNudge(
 			p.startUntil = append([]string{"working"}, p.startUntil...)
 		}
 
-		if err := claudeui.PromptWithNudge(p, opts.Text, deadline, now); err != nil {
+		if err := claudeui.PromptWithNudge(p, opts.Text, claudeui.DefaultNudgeCaps, deadline, now); err != nil {
 			return p.agent, p.wrapErr(err)
 		}
 		if slices.Contains(opts.Until, p.agent.AgentStatus) {

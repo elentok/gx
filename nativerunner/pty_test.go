@@ -233,6 +233,27 @@ func TestPty_StartWithoutPidFileFailsWithScreen(t *testing.T) {
 	}
 }
 
+func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+
+	if err := p.Prompt(s, "do it"); !errors.Is(err, agentrunner.ErrNotDelivered) {
+		t.Fatalf("Prompt = %v; want ErrNotDelivered", err)
+	}
+	in, err := os.ReadFile(agentfake.TUIInputPath(os.Getenv("HOME"), s.SessionID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "do it\r" + "\r" + "do it\r"; string(in) != want {
+		t.Errorf("keys typed = %q; want submit, one nudge, one retype: %q", in, want)
+	}
+}
+
 func TestPty_BlockedReasonIsWaitingFor(t *testing.T) {
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
