@@ -45,8 +45,10 @@ func (s *Server) keepPruned(ctx context.Context) {
 	}
 }
 
-// pruneAgentLogs removes expired logs of every project whose runner keeps
-// them. A parked ticket's logs stay: a person may still need them.
+// pruneAgentLogs removes expired logs of every project's agent directories,
+// whatever runner is configured: the headless runner walks the agents root and
+// prunes each directory by the runner its meta.json names. A parked ticket's
+// logs stay: a person may still need them.
 func (s *Server) pruneAgentLogs(now time.Time) {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
@@ -55,7 +57,7 @@ func (s *Server) pruneAgentLogs(now time.Time) {
 	}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
-		p, ok := s.runnerFor(project).(logPruner)
+		p, ok := s.runnerNamed(string(agentrunner.ChoiceHeadless), project).(logPruner)
 		if !ok {
 			continue
 		}
