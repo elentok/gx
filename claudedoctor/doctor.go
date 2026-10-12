@@ -39,7 +39,10 @@ type Check struct {
 	// Session names the canned session whose recording Run reads; "" for none.
 	Session   string
 	DependsOn []string
-	Run       func(Input) (detail string, ok bool)
+	// SkipReason, when set, always skips the check with this detail: a row
+	// gx knows it cannot verify yet, kept in the table so it stays visible.
+	SkipReason string
+	Run        func(Input) (detail string, ok bool)
 }
 
 // Recording is what one canned session produced: headless stream-json
@@ -78,7 +81,7 @@ var ErrNoLiveSession = errors.New("no live driver for this session")
 // Table is the doctor's check list, in run order.
 var Table = append([]Check{
 	{Runner: "headless", Name: "claude-version", Mode: Fixture, Run: checkClaudeVersion},
-}, headlessChecks...)
+}, append(headlessChecks, ptyChecks...)...)
 
 // Run runs runner's checks from table in order. A check whose dependency did
 // not pass is skipped rather than run.
@@ -99,6 +102,10 @@ func Run(table []Check, runner string, src Source) []Result {
 
 func runCheck(c Check, src Source, status map[string]Status, sessions map[string]Recording) Result {
 	r := Result{Runner: c.Runner, Name: c.Name, Mode: c.Mode}
+	if c.SkipReason != "" {
+		r.Status, r.Detail = Skip, c.SkipReason
+		return r
+	}
 	for _, dep := range c.DependsOn {
 		if status[dep] != Pass {
 			r.Status, r.Detail = Skip, "needs "+dep

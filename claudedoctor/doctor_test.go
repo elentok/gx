@@ -56,6 +56,68 @@ func TestHeadlessChecks_FixtureChecksPassAndLiveChecksSkip(t *testing.T) {
 	}
 }
 
+func TestPtyChecks_OnFixtures(t *testing.T) {
+	t.Parallel()
+	src, err := FixtureSource()
+	if err != nil {
+		t.Fatalf("FixtureSource: %v", err)
+	}
+	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "rate-limit-screen": Skip}
+	got := map[string]Result{}
+	for _, r := range Run(Table, "pty", src) {
+		got[r.Name] = r
+	}
+	for name, status := range want {
+		if got[name].Status != status {
+			t.Errorf("%s: %+v, want %s", name, got[name], status)
+		}
+	}
+	if d := got["rate-limit-screen"].Detail; d != "banner never captured" {
+		t.Errorf("rate-limit-screen detail = %q", d)
+	}
+}
+
+func TestCheckPidStatus_FailsOnBrokenSnapshot(t *testing.T) {
+	t.Parallel()
+	cases := map[string][]string{
+		"no snapshots":               nil,
+		"not json":                   {`{"status":`},
+		"waiting without waitingFor": {`{"status":"idle"}`, `{"status":"waiting"}`},
+		"waitingFor while idle":      {`{"status":"idle","waitingFor":"permission prompt"}`, `{"status":"waiting","waitingFor":"input needed"}`},
+		"never waiting":              {`{"status":"busy"}`, `{"status":"idle"}`},
+		"no status":                  {`{"pid":1}`},
+	}
+	for name, lines := range cases {
+		var snaps []json.RawMessage
+		for _, l := range lines {
+			snaps = append(snaps, json.RawMessage(l))
+		}
+		if detail, ok := checkPidStatus(Input{Recording: Recording{Snapshots: snaps}}); ok {
+			t.Errorf("%s: passed (%s)", name, detail)
+		}
+	}
+}
+
+func TestCheckTrustScreen_FailsOnBrokenFrame(t *testing.T) {
+	t.Parallel()
+	frames := []string{"Quick safety check: Is this a project you created or one you trust?\n ❯ No, exit"}
+	if _, ok := checkTrustScreen(Input{Recording: Recording{Frames: frames}}); ok {
+		t.Error("a frame missing the trust option must fail")
+	}
+	if _, ok := checkTrustScreen(Input{}); ok {
+		t.Error("no frames must fail")
+	}
+}
+
+func TestRun_SkipReasonSkipsEvenLive(t *testing.T) {
+	t.Parallel()
+	table := []Check{{Runner: "pty", Name: "s", Mode: Fixture, SkipReason: "not yet", Run: pass}}
+	got := Run(table, "pty", Source{Live: true})
+	if got[0].Status != Skip || got[0].Detail != "not yet" {
+		t.Errorf("result = %+v, want SKIP not yet", got[0])
+	}
+}
+
 func TestCheckPermission_CountsRequiresAction(t *testing.T) {
 	t.Parallel()
 	src, _ := FixtureSource()

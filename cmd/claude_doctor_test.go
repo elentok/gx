@@ -64,7 +64,8 @@ func TestRunClaudeDoctor_DefaultedRunnerJSONIsUnchanged(t *testing.T) {
 	t.Parallel()
 	out := &strings.Builder{}
 	d := deps{stdout: out, stderr: &strings.Builder{}, loadConfig: configWithAgentRunner("pty")}
-	if err := runClaudeDoctor(d, claudeDoctorOptions{json: true}, fixtureDoctorSource(t), ""); err != nil {
+	opts := claudeDoctorOptions{json: true, table: claudedoctor.Table[:1]}
+	if err := runClaudeDoctor(d, opts, fixtureDoctorSource(t), ""); err != nil {
 		t.Fatalf("runClaudeDoctor: %v", err)
 	}
 	if got := strings.TrimSpace(out.String()); got != "[]" {
@@ -148,7 +149,8 @@ func TestRunClaudeDoctor_JSONIsEmptyArrayForRunnerWithoutChecks(t *testing.T) {
 	out := &strings.Builder{}
 	d := deps{stdout: out, stderr: &strings.Builder{}}
 
-	if err := runClaudeDoctor(d, claudeDoctorOptions{runner: "pty", json: true}, fixtureDoctorSource(t), ""); err != nil {
+	opts := claudeDoctorOptions{runner: "pty", json: true, table: claudedoctor.Table[:1]}
+	if err := runClaudeDoctor(d, opts, fixtureDoctorSource(t), ""); err != nil {
 		t.Fatalf("runClaudeDoctor: %v", err)
 	}
 	if got := strings.TrimSpace(out.String()); got != "[]" {
