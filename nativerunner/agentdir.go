@@ -89,6 +89,9 @@ func (d Dir) Log() string { return filepath.Join(d.Path, d.l.logs[0]) }
 // instead of Log.
 func (d Dir) ReadsTranscript() bool { return d.l.readsTranscript }
 
+// PTY reports whether a pty runner owns the directory.
+func (d Dir) PTY() bool { return d.Meta.Runner == ptyRunnerName }
+
 // Pruned reports whether Prune already removed the logs.
 func (d Dir) Pruned() bool { return d.l.pruned(d.Path) }
 

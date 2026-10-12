@@ -34,6 +34,9 @@ type Log struct {
 	// claude transcript, which claude keeps on its own schedule.
 	Pruned     bool
 	Transcript string
+	// PtyDir is a pty agent's directory, which holds its holder.sock,
+	// screen.txt and raw.log. Empty for any other agent.
+	PtyDir string
 }
 
 // HerdrIteration is what Locator needs from a live herdr iteration.
@@ -60,9 +63,13 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 	d, err := nativerunner.OpenDir(path)
 	switch {
 	case err == nil:
+		var ptyDir string
+		if d.PTY() {
+			ptyDir = path
+		}
 		if d.Pruned() {
 			p, _ := transcript.Path(d.Meta.Cwd, d.Meta.SessionID)
-			return Log{Pruned: true, Transcript: p}, nil
+			return Log{Pruned: true, Transcript: p, PtyDir: ptyDir}, nil
 		}
 		ended := func() bool {
 			d, err := nativerunner.OpenDir(path)
@@ -77,7 +84,7 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			if err != nil {
 				return Log{}, err
 			}
-			return Log{Path: p, Ended: ended}, nil
+			return Log{Path: p, Ended: ended, PtyDir: ptyDir}, nil
 		}
 		return Log{Path: d.Log(), Offset: d.Meta.Offset, Ended: ended}, nil
 	case !errors.Is(err, agentrunner.ErrNotFound):

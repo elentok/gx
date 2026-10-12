@@ -3,6 +3,9 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentlog"
+	"github.com/elentok/gx/nativerunner"
 )
 
 func readLines(t *testing.T, path string) []string {
@@ -133,6 +137,111 @@ func TestAgentsWatch_FollowStreamsUntilEnd(t *testing.T) {
 	}
 	assertLines(t, strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n"),
 		[]string{"[result] error: error_during_execution", "[result] late"})
+}
+
+// ptyAgentDir is a pty agent directory holding files, short enough for a
+// unix socket path.
+func ptyAgentDir(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "gxw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// serveFakeHolder answers ping and screen on dir's holder.sock.
+func serveFakeHolder(t *testing.T, dir string, rows []string) {
+	t.Helper()
+	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ln.Close() })
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			var req struct{ Op string }
+			if json.NewDecoder(conn).Decode(&req) == nil {
+				resp := map[string]any{"version": 1, "pid": 42}
+				if req.Op == "screen" {
+					resp = map[string]any{"screen": rows}
+				}
+				_ = json.NewEncoder(conn).Encode(resp)
+			}
+			conn.Close()
+		}
+	}()
+}
+
+func TestAgentsScreen_Live(t *testing.T) {
+	dir := ptyAgentDir(t, map[string]string{nativerunner.ScreenFile: "stale\n"})
+	serveFakeHolder(t, dir, []string{"live row 1", "live row 2"})
+	var out bytes.Buffer
+	if err := runAgentsScreen(agentlog.Log{PtyDir: dir}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "live row 1\nlive row 2\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestAgentsScreen_Saved(t *testing.T) {
+	dir := ptyAgentDir(t, map[string]string{nativerunner.ScreenFile: "saved row\n"})
+	var out bytes.Buffer
+	if err := runAgentsScreen(agentlog.Log{PtyDir: dir}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := out.String(), "saved row\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestAgentsScreen_NoScreen(t *testing.T) {
+	dir := ptyAgentDir(t, nil)
+	err := runAgentsScreen(agentlog.Log{PtyDir: dir}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "no saved screen") {
+		t.Errorf("err = %v, want no saved screen", err)
+	}
+}
+
+func TestAgentsRaw(t *testing.T) {
+	raw := "\x1b[2J\x1b[Hhello\r\n"
+	dir := ptyAgentDir(t, map[string]string{nativerunner.RawLogFile: raw})
+	for _, tc := range []struct {
+		width int
+		warns bool
+	}{{0, false}, {nativerunner.HolderCols, false}, {80, true}} {
+		var out, warn bytes.Buffer
+		if err := runAgentsRaw(agentlog.Log{PtyDir: dir}, &out, &warn, tc.width); err != nil {
+			t.Fatal(err)
+		}
+		if out.String() != raw {
+			t.Errorf("width %d: got %q, want %q", tc.width, out.String(), raw)
+		}
+		if got := strings.Contains(warn.String(), "80 columns"); got != tc.warns {
+			t.Errorf("width %d: warning %q, want warns=%v", tc.width, warn.String(), tc.warns)
+		}
+	}
+}
+
+func TestAgentsScreenRaw_NotPTY(t *testing.T) {
+	headless := agentLogFixture(t)
+	if err := runAgentsScreen(headless, &bytes.Buffer{}); !errors.Is(err, errNotPTY) {
+		t.Errorf("screen err = %v, want errNotPTY", err)
+	}
+	if err := runAgentsRaw(headless, &bytes.Buffer{}, &bytes.Buffer{}, 0); !errors.Is(err, errNotPTY) {
+		t.Errorf("raw err = %v, want errNotPTY", err)
+	}
 }
 
 func TestAgentsWatch_Pruned(t *testing.T) {

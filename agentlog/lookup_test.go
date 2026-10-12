@@ -77,7 +77,7 @@ func TestAgentLog_LiveNative(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l.Path != filepath.Join(dir, nativerunner.OutFile) || l.Offset != 17 || l.Pruned {
+	if l.Path != filepath.Join(dir, nativerunner.OutFile) || l.Offset != 17 || l.Pruned || l.PtyDir != "" {
 		t.Errorf("got %+v", l)
 	}
 	if l.Ended() {
@@ -115,7 +115,7 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	stateDir := t.TempDir()
-	writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	dir := writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
 	procs := fakeProcs{
 		41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session},
 		42: liveProcs[42],
@@ -124,7 +124,7 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := transcript.PathIn(home, "/work/tree", session); l.Path != want || l.Offset != 0 || l.Pruned {
+	if want := transcript.PathIn(home, "/work/tree", session); l.Path != want || l.Offset != 0 || l.Pruned || l.PtyDir != dir {
 		t.Errorf("got %+v, want transcript %s from offset 0", l, want)
 	}
 	if l.Ended() {
@@ -140,12 +140,12 @@ func TestAgentLog_PtyPruned(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	stateDir := t.TempDir()
-	writeRunnerDir(t, stateDir, "pty", "")
+	dir := writeRunnerDir(t, stateDir, "pty", "")
 	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := transcript.PathIn(home, "/work/tree", session); !l.Pruned || l.Transcript != want {
+	if want := transcript.PathIn(home, "/work/tree", session); !l.Pruned || l.Transcript != want || l.PtyDir != dir {
 		t.Errorf("got %+v, want pruned with transcript %s", l, want)
 	}
 }
