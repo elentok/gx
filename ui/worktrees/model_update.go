@@ -260,18 +260,10 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		switch msg.opLabel {
 		case "rebase":
-			for _, w := range m.worktrees {
-				if w.Branch != "" {
-					cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
-				}
-			}
+			cmds = append(cmds, m.cmdsLoadBaseStatus()...)
 		case "pull":
-			if wt := m.cursorWorktree(); wt != nil && wt.Branch == m.repo.Trunk {
-				for _, w := range m.worktrees {
-					if w.Branch != "" {
-						cmds = append(cmds, cmdLoadBaseStatus(m.repo, w.Branch))
-					}
-				}
+			if wt := m.cursorWorktree(); wt != nil && m.isTrunk(wt.Branch) {
+				cmds = append(cmds, m.cmdsLoadBaseStatus()...)
 			}
 		}
 		return m, tea.Batch(cmds...)
@@ -393,6 +385,10 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if cursor := m.table.Cursor(); cursor >= 0 && cursor < len(m.worktrees) {
 			selectedPath = m.worktrees[cursor].Path
 		}
+		if msg.trunk != m.repo.Trunk {
+			m.baseStatus = make(map[string]*bool)
+		}
+		m.repo.Trunk, m.trunkErr = msg.trunk, msg.trunkErr
 		m.worktrees = sortedWorktrees(msg.worktrees, m.repo.Trunk)
 		m.dirties = make(map[string]dirtyState)
 		m = m.resized()
@@ -415,10 +411,10 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		for _, wt := range m.worktrees {
 			if wt.Branch != "" {
 				cmds = append(cmds, cmdLoadSyncStatus(m.repo, wt.Branch))
-				cmds = append(cmds, cmdLoadBaseStatus(m.repo, wt.Branch))
 			}
 			cmds = append(cmds, cmdLoadDirtyStatus(wt))
 		}
+		cmds = append(cmds, m.cmdsLoadBaseStatus()...)
 		if len(m.worktrees) > 0 {
 			if firstLoad {
 				m.previewLoading = true
@@ -459,6 +455,8 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			m.previewHeadCommit = msg.headCommit
 			m.previewAheadCommits = msg.aheadCommits
 			m.previewBehindCommits = msg.behindCommits
+			m.previewTrunkAhead = msg.trunkAhead
+			m.previewTrunkBehind = msg.trunkBehind
 			m.previewChanges = msg.changes
 			m.previewLoading = false
 			m.viewport.SetContent(m.previewContent())

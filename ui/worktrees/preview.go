@@ -1,6 +1,7 @@
 package worktrees
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/elentok/gx/git"
@@ -10,7 +11,17 @@ import (
 	humanize "github.com/dustin/go-humanize"
 )
 
-func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Commit, aheadCommits, behindCommits []git.Commit, rebasedOnTrunk *bool, isTrunk bool, changes []git.Change, spinnerView string, useNerdFontIcons bool) string {
+// previewBase is the selected worktree's standing against trunk.
+type previewBase struct {
+	trunk   string // empty when unresolved
+	problem string // shown in place of the Base section while trunk is empty
+	isTrunk bool
+	rebased *bool // nil while loading
+	ahead   int
+	behind  int
+}
+
+func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Commit, aheadCommits, behindCommits []git.Commit, base previewBase, changes []git.Change, spinnerView string, useNerdFontIcons bool) string {
 	if wt == nil {
 		return ui.StyleDim.Render("  no worktree selected")
 	}
@@ -41,17 +52,22 @@ func renderPreviewContent(wt *git.Worktree, upstream string, headCommit git.Comm
 	}
 	b.WriteString("\n")
 
-	if !isTrunk {
+	if !base.isTrunk {
 		b.WriteString("\n")
 		b.WriteString(ui.StyleBold.Render(ic.baseTitle))
 		b.WriteString("\n\n")
 		switch {
-		case rebasedOnTrunk == nil:
+		case base.trunk == "":
+			b.WriteString(ui.StyleStatusBehind.Render("  "+base.problem) + "\n")
+		case base.rebased == nil:
 			b.WriteString(ui.StyleDim.Render("  loading…") + "\n")
-		case *rebasedOnTrunk:
-			b.WriteString(ui.StyleStatusSynced.Render("  "+ic.checkmark+" rebased on main") + "\n")
+		case *base.rebased:
+			b.WriteString(ui.StyleStatusSynced.Render("  "+ic.checkmark+" rebased on "+base.trunk) + "\n")
 		default:
-			b.WriteString(ui.StyleStatusDiverged.Render("  "+ic.x+" needs rebase on main") + "\n")
+			b.WriteString(ui.StyleStatusDiverged.Render("  "+ic.x+" needs rebase on "+base.trunk) + "\n")
+		}
+		if base.trunk != "" {
+			b.WriteString(ui.StyleDim.Render(fmt.Sprintf("  %d ahead, %d behind %s", base.ahead, base.behind, base.trunk)) + "\n")
 		}
 	}
 

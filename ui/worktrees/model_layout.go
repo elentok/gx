@@ -112,11 +112,10 @@ func (m Model) previewContent() string {
 		w := m.worktrees[cursor]
 		wt = &w
 	}
-	var rebasedOnTrunk *bool
-	var isTrunk bool
+	base := previewBase{trunk: m.repo.Trunk, problem: m.trunkProblem(), ahead: m.previewTrunkAhead, behind: m.previewTrunkBehind}
 	if wt != nil {
-		rebasedOnTrunk = m.baseStatus[wt.Branch]
-		isTrunk = wt.Branch == m.repo.Trunk
+		base.rebased = m.baseStatus[wt.Branch]
+		base.isTrunk = m.isTrunk(wt.Branch)
 	}
 	spinnerView := ""
 	if m.previewLoading {
@@ -128,8 +127,7 @@ func (m Model) previewContent() string {
 		m.previewHeadCommit,
 		m.previewAheadCommits,
 		m.previewBehindCommits,
-		rebasedOnTrunk,
-		isTrunk,
+		base,
 		m.previewChanges,
 		spinnerView,
 		m.settings.UseNerdFontIcons,

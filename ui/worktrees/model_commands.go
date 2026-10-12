@@ -2,14 +2,18 @@ package worktrees
 
 import (
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 
 	tea "charm.land/bubbletea/v2"
 )
 
+// cmdLoadWorktrees also resolves trunk again, so a project.json edit shows up
+// on the next reload.
 func cmdLoadWorktrees(repo git.Repo) tea.Cmd {
 	return func() tea.Msg {
 		wts, err := git.ListWorktrees(repo)
-		return worktreesLoadedMsg{worktrees: wts, err: err}
+		trunk, trunkErr := tickets.TrunkFor(repo.Root)
+		return worktreesLoadedMsg{worktrees: wts, err: err, trunk: trunk, trunkErr: trunkErr}
 	}
 }
 
@@ -52,6 +56,11 @@ func cmdLoadPreviewData(repo git.Repo, wt git.Worktree) tea.Cmd {
 			aheadCommits, _ = git.CommitsBetween(repo, upstream, wt.Branch)
 			behindCommits, _ = git.CommitsBetween(repo, wt.Branch, upstream)
 		}
+		var trunkAhead, trunkBehind []git.Commit
+		if repo.Trunk != "" && wt.Branch != "" && wt.Branch != repo.Trunk {
+			trunkAhead, _ = git.CommitsBetween(repo, repo.Trunk, wt.Branch)
+			trunkBehind, _ = git.CommitsBetween(repo, wt.Branch, repo.Trunk)
+		}
 		headCommit, _ := git.HeadCommit(wt.Path, "HEAD")
 		changes, _ := git.UncommittedChanges(wt.Path)
 		return previewDataMsg{
@@ -60,6 +69,8 @@ func cmdLoadPreviewData(repo git.Repo, wt git.Worktree) tea.Cmd {
 			headCommit:    headCommit,
 			aheadCommits:  aheadCommits,
 			behindCommits: behindCommits,
+			trunkAhead:    len(trunkAhead),
+			trunkBehind:   len(trunkBehind),
 			changes:       changes,
 		}
 	}

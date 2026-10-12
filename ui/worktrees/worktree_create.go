@@ -69,6 +69,9 @@ func (m Model) handleNewKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		prevMode := m.mode
 		m.mode = modeNormal
+		if m.repo.Trunk == "" {
+			return m.showError("cannot create worktree: " + m.trunkProblem()), nil
+		}
 		if prevMode == modeNewAndOpen {
 			return m, cmdNewWorktreeAndOpen(m.repo, newName)
 		}

@@ -7,6 +7,8 @@ type pruneRemotesMsg struct{ err error }
 type worktreesLoadedMsg struct {
 	worktrees []git.Worktree
 	err       error
+	trunk     string // empty when trunkErr is set
+	trunkErr  error
 }
 
 type syncStatusMsg struct {
@@ -25,6 +27,8 @@ type previewDataMsg struct {
 	headCommit    git.Commit
 	aheadCommits  []git.Commit
 	behindCommits []git.Commit
+	trunkAhead    int
+	trunkBehind   int
 	changes       []git.Change
 }
 

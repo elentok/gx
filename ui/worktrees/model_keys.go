@@ -171,7 +171,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m.showError("cannot rebase: worktree is in detached HEAD state"), nil
 		}
 		if m.repo.Trunk == "" {
-			return m.showError("cannot rebase: no main branch detected"), nil
+			return m.showError("cannot rebase: " + m.trunkProblem()), nil
 		}
 		if wt.Branch == m.repo.Trunk {
 			return m.showError("cannot rebase: already on " + m.repo.Trunk), nil

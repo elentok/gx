@@ -15,6 +15,7 @@ import (
 	"charm.land/bubbles/v2/table"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 )
 
 type mode int
@@ -53,6 +54,7 @@ type dirtyState struct {
 // Model is the BubbleTea model for the worktrees page.
 type Model struct {
 	repo               git.Repo
+	trunkErr           error  // set when repo.Trunk could not be resolved on the last reload
 	activeWorktreePath string // path of the worktree the user launched from
 	settings           ui.Settings
 
@@ -69,6 +71,8 @@ type Model struct {
 	previewHeadCommit    git.Commit
 	previewAheadCommits  []git.Commit
 	previewBehindCommits []git.Commit
+	previewTrunkAhead    int
+	previewTrunkBehind   int
 	previewChanges       []git.Change
 	previewLoading       bool
 
@@ -157,6 +161,36 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		search:             search.NewModel(),
 		spinner:            sp,
 	}
+}
+
+// isTrunk is false for every branch while trunk is unresolved, so a detached
+// worktree (empty branch) never matches an empty trunk.
+func (m Model) isTrunk(branch string) bool {
+	return m.repo.Trunk != "" && branch == m.repo.Trunk
+}
+
+// trunkProblem is the shared resolver error shown in place of trunk-dependent
+// parts while trunk is unresolved.
+func (m Model) trunkProblem() string {
+	if m.trunkErr != nil {
+		return m.trunkErr.Error()
+	}
+	return "trunk not resolved"
+}
+
+// cmdsLoadBaseStatus reloads every worktree's Base column; none while trunk is
+// unresolved.
+func (m Model) cmdsLoadBaseStatus() []tea.Cmd {
+	if m.repo.Trunk == "" {
+		return nil
+	}
+	var cmds []tea.Cmd
+	for _, wt := range m.worktrees {
+		if wt.Branch != "" {
+			cmds = append(cmds, cmdLoadBaseStatus(m.repo, wt.Branch))
+		}
+	}
+	return cmds
 }
 
 func dirtyStateFromChanges(changes []git.Change) dirtyState {

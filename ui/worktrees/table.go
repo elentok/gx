@@ -172,7 +172,7 @@ func (m Model) buildRows() []table.Row {
 	for i, wt := range m.worktrees {
 		isCursorRow := i == m.table.Cursor()
 		isTagged := m.selectedWorktrees[wt.Name]
-		isMain := wt.Branch == m.repo.Trunk
+		isMain := m.isTrunk(wt.Branch)
 		selCell := ""
 		if isTagged {
 			selCell = styleSelected.Render(ic.checkmark)
@@ -185,7 +185,7 @@ func (m Model) buildRows() []table.Row {
 			selCell,
 			nameCol,
 			dirtyCell(m.dirties[wt.Path], ic, isCursorRow),
-			baseCell(m.baseStatus[wt.Branch], ic, wt.Branch == m.repo.Trunk, isCursorRow),
+			baseCell(m.baseStatus[wt.Branch], ic, isMain, isCursorRow),
 			statusCell(m.statuses[wt.Branch], ic, isCursorRow, m.settings.UseNerdFontIcons),
 		}
 	}
