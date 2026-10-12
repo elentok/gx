@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/elentok/gx/agentlog"
 )
 
@@ -33,6 +35,32 @@ func TestWatchAgent_RendersLogInModal(t *testing.T) {
 	modal := watchModal{}.Open(loaded, 120, 40)
 	if view := modal.View(); !strings.Contains(view, "hello from the agent") {
 		t.Errorf("modal missing the rendered log:\n%s", view)
+	}
+}
+
+func TestWatchAgent_HeadlessRefreshShowsNewLines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.jsonl")
+	if err := os.WriteFile(path, []byte(watchLogLine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fakeNativeLog(t, agentlog.Log{Path: path}, nil)
+
+	modal := watchModal{}.Open(cmdWatchAgent("gx:epic/01")().(watchLoadedMsg), 120, 40)
+	if view := modal.View(); !strings.Contains(view, "hello from the agent") {
+		t.Fatalf("modal missing the rendered log:\n%s", view)
+	}
+
+	later := strings.Replace(watchLogLine, "hello from the agent", "a newer line", 1)
+	if err := os.WriteFile(path, []byte(watchLogLine+later), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	modal, cmd := modal.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	if cmd == nil {
+		t.Fatal("r returned no refresh command")
+	}
+	modal = modal.Open(cmd().(watchLoadedMsg), 120, 40)
+	if view := modal.View(); !strings.Contains(view, "a newer line") {
+		t.Errorf("refreshed modal missing the new line:\n%s", view)
 	}
 }
 

@@ -57,15 +57,19 @@ type watchLoadedMsg struct {
 	// step, when set, loads the content delta away (`[` -1, `]` +1), or
 	// returns nil past an end.
 	step func(delta int) tea.Cmd
+	// refresh, when set, rereads the content for `r`: a snapshot, not a live
+	// tail.
+	refresh tea.Cmd
 }
 
 // watchModal is the open Watch agent modal: a scrollable view of the agent's
 // rendered log, opened at the newest line.
 type watchModal struct {
-	open  bool
-	title string
-	step  func(delta int) tea.Cmd
-	vp    viewport.Model
+	open    bool
+	title   string
+	step    func(delta int) tea.Cmd
+	refresh tea.Cmd
+	vp      viewport.Model
 }
 
 func (w watchModal) Open(msg watchLoadedMsg, width, height int) watchModal {
@@ -73,7 +77,7 @@ func (w watchModal) Open(msg watchLoadedMsg, width, height int) watchModal {
 	vp := viewport.New(viewport.WithWidth(watchContentWidth(width)), viewport.WithHeight(vpH))
 	vp.SetContent(strings.Join(msg.lines, "\n"))
 	vp.GotoBottom()
-	return watchModal{open: true, title: msg.title, step: msg.step, vp: vp}
+	return watchModal{open: true, title: msg.title, step: msg.step, refresh: msg.refresh, vp: vp}
 }
 
 // watchContentWidth is the modal's content width on a width-wide screen.
@@ -94,6 +98,8 @@ func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
 			return w, w.step(-1)
 		}
 		return w, w.step(1)
+	case "r":
+		return w, w.refresh
 	}
 	var cmd tea.Cmd
 	w.vp, cmd = w.vp.Update(msg)
@@ -105,13 +111,17 @@ func (w watchModal) View() string {
 	if w.step != nil {
 		hint = ui.JoinStatus(hint, ui.RenderInlineBindings(key.NewBinding(key.WithHelp("[/]", "session"))))
 	}
+	if w.refresh != nil {
+		hint = ui.JoinStatus(hint, ui.RenderInlineBindings(key.NewBinding(key.WithHelp("r", "refresh"))))
+	}
 	return components.RenderOutputModal(w.title, w.vp.View(), hint, ui.ColorBorder, ui.ColorGreen, ui.ColorGray, w.vp.Width())
 }
 
 // cmdWatchAgent reads address's native log and renders it with the same
 // renderer as `gx server agents watch`.
 func cmdWatchAgent(address string) tea.Cmd {
-	return func() tea.Msg {
+	var cmd tea.Cmd
+	cmd = func() tea.Msg {
 		log, err := nativeAgentLog(context.Background(), address)
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
@@ -120,8 +130,9 @@ func cmdWatchAgent(address string) tea.Cmd {
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}
-		return watchLoadedMsg{title: "Agent " + address, lines: lines}
+		return watchLoadedMsg{title: "Agent " + address, lines: lines, refresh: cmd}
 	}
+	return cmd
 }
 
 // renderedLog is the last maxWatchLines rendered lines of log.
