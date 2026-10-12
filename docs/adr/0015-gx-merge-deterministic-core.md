@@ -10,3 +10,7 @@ hands off to `gx-resolving-merge-conflicts` on conflicts, then re-invokes `gx me
 merge. This keeps the Go command judgment-free (never leaves the repo mid-rebase) and gives
 `gx-cleanup`'s existing ff-only-merge step the same command to call instead of duplicating the
 resolve-and-attempt logic inline.
+
+**Amendment (configurable trunk):** the ff-only merge runs in the target's worktree, else in the
+repo root when its HEAD is the target, else as a direct `update-ref` of the target after an
+ancestor check. It never fast-forwards a branch other than the target.

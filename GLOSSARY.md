@@ -235,7 +235,7 @@ tickets. Only top-level tickets are directories (entry file `ticket.md`); everyt
 flat file in its `issues/`, linked by `parent`. _Avoid_: node (Go identifiers only), job.
 
 **Epic** — a top-level ticket with children: a hand-authored set of dependent tickets. Its
-`ticket.md` carries `status`, `blocked_by`, `base:` and timing in frontmatter; the body is optional
+`ticket.md` carries `status`, `blocked_by` and timing in frontmatter; the body is optional
 (a plan, or a link to a spec). A forked ticket that has children is still just a ticket.
 
 **Map epic** — an epic whose body is a wayfinder map and whose tickets are decisions a person
@@ -318,6 +318,16 @@ the branch it lands on. Only `base:` is declared (a branch or a ticket address);
 derived (a child's is its parent's branch, a top-level ticket's is trunk) and is none for a
 commitless ticket. The resolved base is recorded at claim as read-only `resolved_base`. `gx merge`
 takes `target`, not `base`.
+
+**Trunk** — the branch a project's top-level tickets land on: `main`, `develop`, a release branch.
+Set per project; detected from the repo when unset. A top-level ticket's **Target** is trunk.
+_Avoid_: target branch, main branch, master.
+
+**Missing trunk** — a project whose **Trunk** names no local branch, whether set or detected. gx
+never falls back to another branch: the server claims nothing for the project until the branch
+exists, then carries on by itself. A ticket whose landing finds trunk missing is **Parked**.
+_Avoid_: held, paused or blocked project (**Paused** is the whole-queue toggle; blocked is a
+ticket's `blocked_by` edges).
 
 **Fix ticket** — a ticket a code-review ticket opens to repair what the review found. Its `parent`
 is the code-review ticket, so it sits in that ticket's fork subtree.
@@ -490,13 +500,13 @@ Triggered by Esc, gated behind an "Abort push?" confirm modal (default No) to gu
 accidental keypress; if the command completes while that confirm is showing, completion wins and the
 abort becomes a no-op.
 
-## Merge onto Main
+## Merge onto Trunk
 
-**`gx merge <branch>`** — the deterministic core of merging a branch/worktree onto the repo's
-detected main branch. Resolves `<branch>` (a literal branch name, or a worktree-dir name looked up
-via `git.Worktree`) and the base branch, then attempts `git merge --ff-only`. Never rebases and
-never leaves the repo mid-operation — on non-fast-forward it reports `needs_rebase` plus the
-resolved `branch`/`base`/`worktree_path` and stops. See ADR 0015.
+**`gx merge <branch>`** — the deterministic core of merging a branch/worktree onto the project's
+**Trunk**; it never merges onto another branch. Resolves `<branch>` (a literal branch name, or a
+worktree-dir name looked up via `git.Worktree`) and trunk, then attempts `git merge --ff-only`. Never
+rebases and never leaves the repo mid-operation — on non-fast-forward it reports `needs_rebase` plus
+the resolved `branch`/`target`/`worktree_path` and stops. See ADR 0015.
 
 **`gx-merge`** (the skill) — owns the judgment half: on `needs_rebase`, runs `git rebase <base>`
 against the target's worktree (or the bare branch if `worktree_path` is empty), invoking
