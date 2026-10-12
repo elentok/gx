@@ -1,4 +1,4 @@
-package herdrrunner
+package claudeui
 
 import (
 	"slices"
@@ -8,12 +8,12 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// ClaudeBackgroundTasks returns a Runner.BackgroundTasks probe that reads the
+// BackgroundTasks returns a Runner.BackgroundTasks probe that reads the
 // Claude transcript under home. It finds the transcript by session id rather
 // than cwd, so it also works for sessions recovered by Find or List. A Codex
 // session has no such transcript, so it never gates. A read error counts as
 // no task running, as in ralph-loop's own gate.
-func ClaudeBackgroundTasks(home string, now func() time.Time) func(agentrunner.Session) bool {
+func BackgroundTasks(home string, now func() time.Time) func(agentrunner.Session) bool {
 	return func(s agentrunner.Session) bool {
 		if s.SessionID == "" {
 			return false

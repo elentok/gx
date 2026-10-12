@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
 )
@@ -46,7 +47,7 @@ var _ agentrunner.HealthChecker = (*Runner)(nil)
 func New() *Runner {
 	r := &Runner{started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
 	if home, err := os.UserHomeDir(); err == nil {
-		r.BackgroundTasks = ClaudeBackgroundTasks(home, time.Now)
+		r.BackgroundTasks = claudeui.BackgroundTasks(home, time.Now)
 	}
 	return r
 }
@@ -278,11 +279,11 @@ func (r *Runner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	if err != nil {
 		return time.Time{}, false, mapNotFound(err)
 	}
-	token, limited := DetectRateLimit(text)
+	token, limited := claudeui.DetectRateLimit(text)
 	if !limited {
 		return time.Time{}, false, nil
 	}
-	if d, ok := SecondsUntilReset(token, now); ok {
+	if d, ok := claudeui.SecondsUntilReset(token, now); ok {
 		return now.Add(d), true, nil
 	}
 	return time.Time{}, true, nil

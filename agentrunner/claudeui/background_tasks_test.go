@@ -1,4 +1,4 @@
-package herdrrunner_test
+package claudeui_test
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -20,7 +20,7 @@ func notification(taskID string, at time.Time) string {
 	return `{"isSidechain":false,"timestamp":"` + at.Format(time.RFC3339Nano) + `","message":{"content":"<task-id>` + taskID + `</task-id>"}}`
 }
 
-func TestClaudeBackgroundTasks(t *testing.T) {
+func TestBackgroundTasks(t *testing.T) {
 	now := time.Date(2026, 8, 12, 18, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name  string
@@ -45,7 +45,7 @@ func TestClaudeBackgroundTasks(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			probe := herdrrunner.ClaudeBackgroundTasks(home, func() time.Time { return now })
+			probe := claudeui.BackgroundTasks(home, func() time.Time { return now })
 			if got := probe(agentrunner.Session{Label: "a", SessionID: "sess-1"}); got != tt.want {
 				t.Fatalf("probe = %v, want %v", got, tt.want)
 			}
@@ -55,7 +55,7 @@ func TestClaudeBackgroundTasks(t *testing.T) {
 
 // A session with no agent session id yet (or a Codex one, which has no
 // Claude transcript) must not match some other session's transcript.
-func TestClaudeBackgroundTasks_NoSessionID(t *testing.T) {
+func TestBackgroundTasks_NoSessionID(t *testing.T) {
 	home := t.TempDir()
 	path := transcript.PathIn(home, "/work/repo", "sess-1")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -64,7 +64,7 @@ func TestClaudeBackgroundTasks_NoSessionID(t *testing.T) {
 	if err := os.WriteFile(path, []byte(startMarker("task-1", time.Now())+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if herdrrunner.ClaudeBackgroundTasks(home, time.Now)(agentrunner.Session{Label: "a"}) {
+	if claudeui.BackgroundTasks(home, time.Now)(agentrunner.Session{Label: "a"}) {
 		t.Fatal("probe = true for a session without a session id")
 	}
 }
