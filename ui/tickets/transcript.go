@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -25,19 +26,29 @@ var lookupSession = func(agentDir, id string) (sessionlookup.Session, error) {
 	return sessionlookup.Lookup(sessionlookup.DefaultRoots(), agentDir, id)
 }
 
-// cmdTranscript renders the latest of file's session_ids as markdown. The
-// ticket is re-read so a session claimed since the last refresh shows.
+// cmdTranscript renders the latest of file's session_ids as markdown.
 // address ("" or unparseable skips it) locates the native agent dir.
 func cmdTranscript(file, address string, width int) tea.Cmd {
+	return cmdTranscriptAt(file, address, width, -1)
+}
+
+// cmdTranscriptAt renders file's session_ids[index], the latest when index is
+// out of range. The ticket is re-read on every step so a session claimed
+// since the last refresh shows.
+func cmdTranscriptAt(file, address string, width, index int) tea.Cmd {
 	return func() tea.Msg {
 		t, err := schema.ParseTicket(file)
 		if err != nil {
 			return notify.Error("transcript: " + err.Error())()
 		}
-		if len(t.SessionIDs) == 0 {
+		n := len(t.SessionIDs)
+		if n == 0 {
 			return notify.Info("no sessions for this ticket")()
 		}
-		id := t.SessionIDs[len(t.SessionIDs)-1]
+		if index < 0 || index >= n {
+			index = n - 1
+		}
+		id := t.SessionIDs[index]
 		s, err := lookupSession(nativeAgentDir(address), id)
 		if err != nil {
 			return notify.Error("transcript: " + err.Error())()
@@ -46,7 +57,15 @@ func cmdTranscript(file, address string, width int) tea.Cmd {
 			return notify.Warning("no transcript found for session " + id)()
 		}
 		md := renderTicketMarkdown(s.Markdown, watchContentWidth(width))
-		return watchLoadedMsg{title: "Transcript " + id, lines: strings.Split(md, "\n")}
+		step := func(delta int) tea.Cmd {
+			next := index + delta
+			if next < 0 || next >= n {
+				return nil
+			}
+			return cmdTranscriptAt(file, address, width, next)
+		}
+		title := fmt.Sprintf("Transcript %s · session %d/%d", id, index+1, n)
+		return watchLoadedMsg{title: title, lines: strings.Split(md, "\n"), step: step}
 	}
 }
 

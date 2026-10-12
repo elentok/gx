@@ -30,7 +30,7 @@ func TestWatchAgent_RendersLogInModal(t *testing.T) {
 	if !ok {
 		t.Fatal("expected watchLoadedMsg")
 	}
-	modal := watchModal{}.Open(loaded.title, loaded.lines, 120, 40)
+	modal := watchModal{}.Open(loaded, 120, 40)
 	if view := modal.View(); !strings.Contains(view, "hello from the agent") {
 		t.Errorf("modal missing the rendered log:\n%s", view)
 	}

@@ -200,7 +200,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg, func() tea.Msg { return queueActionAppliedMsg{} })
 		return m, cmd
 	case watchLoadedMsg:
-		m.watch = m.watch.Open(msg.title, msg.lines, m.width, m.height)
+		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, nil
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {

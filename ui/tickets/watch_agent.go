@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 
@@ -52,6 +53,9 @@ func hasNativeAgent(address string) bool {
 type watchLoadedMsg struct {
 	title string
 	lines []string
+	// step, when set, loads the content delta away (`[` -1, `]` +1), or
+	// returns nil past an end.
+	step func(delta int) tea.Cmd
 }
 
 // watchModal is the open Watch agent modal: a scrollable view of the agent's
@@ -59,15 +63,16 @@ type watchLoadedMsg struct {
 type watchModal struct {
 	open  bool
 	title string
+	step  func(delta int) tea.Cmd
 	vp    viewport.Model
 }
 
-func (w watchModal) Open(title string, lines []string, width, height int) watchModal {
+func (w watchModal) Open(msg watchLoadedMsg, width, height int) watchModal {
 	vpH := max(height-10, 3)
 	vp := viewport.New(viewport.WithWidth(watchContentWidth(width)), viewport.WithHeight(vpH))
-	vp.SetContent(strings.Join(lines, "\n"))
+	vp.SetContent(strings.Join(msg.lines, "\n"))
 	vp.GotoBottom()
-	return watchModal{open: true, title: title, vp: vp}
+	return watchModal{open: true, title: msg.title, step: msg.step, vp: vp}
 }
 
 // watchContentWidth is the modal's content width on a width-wide screen.
@@ -80,6 +85,14 @@ func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
 	case "esc", "enter", "q":
 		w.open = false
 		return w, nil
+	case "[", "]":
+		if w.step == nil {
+			return w, nil
+		}
+		if msg.String() == "[" {
+			return w, w.step(-1)
+		}
+		return w, w.step(1)
 	}
 	var cmd tea.Cmd
 	w.vp, cmd = w.vp.Update(msg)
@@ -87,7 +100,11 @@ func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
 }
 
 func (w watchModal) View() string {
-	return components.RenderOutputModal(w.title, w.vp.View(), ui.HintDismiss(), ui.ColorBorder, ui.ColorGreen, ui.ColorGray, w.vp.Width())
+	hint := ui.HintDismiss()
+	if w.step != nil {
+		hint = ui.JoinStatus(hint, ui.RenderInlineBindings(key.NewBinding(key.WithHelp("[/]", "session"))))
+	}
+	return components.RenderOutputModal(w.title, w.vp.View(), hint, ui.ColorBorder, ui.ColorGreen, ui.ColorGray, w.vp.Width())
 }
 
 // cmdWatchAgent reads address's native log and renders it with the same

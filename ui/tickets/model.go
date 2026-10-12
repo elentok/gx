@@ -261,7 +261,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleCheckAddConfirmed(msg)
 
 	case watchLoadedMsg:
-		m.watch = m.watch.Open(msg.title, msg.lines, m.width, m.height)
+		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, nil
 
 	case tea.KeyPressMsg:
