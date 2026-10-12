@@ -79,18 +79,16 @@ Zero approved findings is a valid result. Don't pad.
 
 ## 6. File the approved findings
 
-For each approved finding, check the consultant's match against the follow-ups it was shown:
+Hand each approved finding to the [gx-follow-up](../gx-follow-up/SKILL.md) skill, **unattended**,
+with:
 
-- **No match** → file it: `gx tickets follow-up add <project:epic> --body -`, in the format from the
-  tracker's Follow-ups section. `## Source` names this epic, the ticket addresses, the session ids
-  and `gx-evolve`.
-- **Matches an open ticket carrying a `category`** → don't file a duplicate. Append a "seen again in
-  `<epic>`" entry, with the date and the new evidence, to its `## Evidence`
-  (`gx tickets section <addr> Evidence -`, content = existing text plus the entry).
-- **Matches an archived `fixed` ticket** → file it as a regression: a new follow-up whose `##
-  Source` and `## Evidence` cite the archived address.
-- **Matches any other archived ticket** (`obsolete`, `duplicate`, `not-worth-it`) → reject it, and
-  record the archived address as the reason.
+- the finding, its evidence and suggested fix; Source names this epic, the ticket addresses, the
+  session ids and `gx-evolve`;
+- the consultant's target as the target project, and its `category`;
+- the consultant's match: `match: <addr>`, or `match: none`.
+
+The skill decides the outcome (file, seen again, regression or drop) and prints the addresses step
+7 records.
 
 ## 7. Record in your own ticket
 
@@ -102,8 +100,8 @@ sections. No repo file.
 - **Flag table** — the step 2 table.
 - **Raw findings** — the subagent reports, verbatim, per ticket.
 - **Consultant triage** — verbatim from step 5.
-- **Final disposition** — per finding: which follow-up it became, which it was appended to, or why
-  it was rejected.
+- **Final disposition** — per finding: which follow-up it became, which it was appended to, which
+  archived ticket it was dropped against, or why it was rejected.
 
 ## 8. Close out
 
