@@ -35,7 +35,7 @@ func setupDotBareForCmd(t *testing.T) (outerDir string) {
 		t.Fatalf("UpdateRemotes: %v", err)
 	}
 
-	branch := repo.Trunk
+	branch := git.RemoteDefaultBranch(repo.Root)
 	wtPath := filepath.Join(outerDir, branch)
 	if err := git.AddWorktreeFromRemote(*repo, wtPath, branch, "origin/"+branch); err != nil {
 		t.Fatalf("AddWorktreeFromRemote: %v", err)
@@ -335,7 +335,7 @@ func TestDoctor_HealthyTrunkReportsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	registerWithTrunk(t, repo.Root, repo.Trunk)
+	registerWithTrunk(t, repo.Root, "main")
 
 	var stdout bytes.Buffer
 	d := deps{

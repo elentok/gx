@@ -187,14 +187,14 @@ func TestScratchRoot_standardRepoLinkedWorktree(t *testing.T) {
 	}
 }
 
-func TestDetectTrunk(t *testing.T) {
+func TestFindRepo_LeavesTrunkEmpty(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempBareRepo(t)
 	repo, err := git.FindRepo(dir)
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	if repo.Trunk != "main" {
-		t.Errorf("Trunk = %q, want %q", repo.Trunk, "main")
+	if repo.Trunk != "" {
+		t.Errorf("Trunk = %q, want empty", repo.Trunk)
 	}
 }

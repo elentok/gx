@@ -53,6 +53,7 @@ func setupDotBareRepo(t *testing.T) (outerDir string, repo git.Repo) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 	repo = *r
+	repo.Trunk = "main"
 
 	// Populate remote tracking refs so fetch-config checks pass.
 	if _, err := git.UpdateRemotes(repo); err != nil {
@@ -229,7 +230,7 @@ func TestCheckRepo_NoIssuesForStandardRepoWithWorktree(t *testing.T) {
 	}
 
 	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
-	if err := git.AddWorktree(*repo, "feature", newPath, repo.Trunk); err != nil {
+	if err := git.AddWorktree(*repo, "feature", newPath, "main"); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 
@@ -251,7 +252,7 @@ func TestCheckRepo_DetectsAndFixesMissingWorktreesExclude(t *testing.T) {
 	}
 
 	newPath := filepath.Join(repo.LinkedWorktreeDir(), "feature")
-	if err := git.AddWorktree(*repo, "feature", newPath, repo.Trunk); err != nil {
+	if err := git.AddWorktree(*repo, "feature", newPath, "main"); err != nil {
 		t.Fatalf("AddWorktree: %v", err)
 	}
 

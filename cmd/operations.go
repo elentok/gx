@@ -46,10 +46,9 @@ func runCloneWT(args []string, d deps) error {
 		return fmt.Errorf("clone succeeded but could not open repo: %w", err)
 	}
 
-	branch := repo.Trunk
-	if branch == "" {
-		return fmt.Errorf("unable to determine default branch for %s", outerDir)
-	}
+	// No project registers a fresh clone yet, so its default branch is the
+	// only trunk there is.
+	branch := git.RemoteDefaultBranch(repo.Root)
 
 	wtPath := filepath.Join(repo.LinkedWorktreeDir(), branch)
 	if err := git.AddWorktreeFromRemote(*repo, wtPath, branch, "origin/"+branch); err != nil {

@@ -50,7 +50,7 @@ func TestCloneBare_dotBareLayout(t *testing.T) {
 		t.Errorf("LinkedWorktreeDir = %q, want %q", repo.LinkedWorktreeDir(), outerDir)
 	}
 
-	trunk := repo.Trunk
+	trunk := git.RemoteDefaultBranch(repo.Root)
 	if trunk != "main" && trunk != "master" {
 		t.Fatalf("unexpected default branch: %q", trunk)
 	}

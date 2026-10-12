@@ -1,6 +1,7 @@
 package git
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -11,8 +12,13 @@ type Repo struct {
 	Root        string
 	WorktreeDir string // directory where linked worktrees live; if empty, defaults to Root
 	IsBare      bool
-	Trunk       string // "main" or "master"
+	// Trunk is set only by tickets.OpenRepo; FindRepo leaves it empty, and
+	// helpers that compare against it refuse an empty one.
+	Trunk string
 }
+
+// ErrTrunkNotResolved is returned by helpers that need Repo.Trunk when it is empty.
+var ErrTrunkNotResolved = errors.New("trunk not resolved")
 
 // LinkedWorktreeDir returns the directory where linked worktrees are created.
 // For normal bare repos this is the same as Root; for .bare repos it is the
@@ -80,7 +86,7 @@ func IdentifyDir(dir string) (*DirInfo, error) {
 	}
 
 	return &DirInfo{
-		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, Trunk: detectTrunk(repoRoot)},
+		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true},
 		IsRepoRoot:     repoRoot == dir || worktreeDir == dir,
 		IsWorktreeRoot: false,
 	}, nil
@@ -112,7 +118,7 @@ func identifyWorktree(dir string) (*DirInfo, error) {
 		root := filepath.Dir(commonDir)
 		worktreeDir := filepath.Join(root, ".worktrees")
 		info := &DirInfo{
-			Repo:           Repo{Root: root, WorktreeDir: worktreeDir, IsBare: false, Trunk: detectTrunk(root)},
+			Repo:           Repo{Root: root, WorktreeDir: worktreeDir, IsBare: false},
 			IsRepoRoot:     root == dir,
 			IsWorktreeRoot: topLevel == dir,
 		}
@@ -132,16 +138,11 @@ func identifyWorktree(dir string) (*DirInfo, error) {
 	}
 
 	return &DirInfo{
-		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true, Trunk: detectTrunk(repoRoot)},
+		Repo:           Repo{Root: repoRoot, WorktreeDir: worktreeDir, IsBare: true},
 		WorktreeRoot:   topLevel,
 		IsRepoRoot:     repoRoot == dir,
 		IsWorktreeRoot: topLevel == dir,
 	}, nil
-}
-
-// detectTrunk returns "main" or "master" depending on what exists in the repo.
-func detectTrunk(repoRoot string) string {
-	return RemoteDefaultBranch(repoRoot)
 }
 
 // RemoteDefaultBranch returns the repository's default branch using origin/HEAD

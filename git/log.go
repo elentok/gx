@@ -56,12 +56,18 @@ type LogEntry struct {
 // CommitsSinceMain returns commits on branch that are not reachable from the
 // repo's local main branch, ordered newest first.
 func CommitsSinceMain(repo Repo, branch string) ([]Commit, error) {
+	if repo.Trunk == "" {
+		return nil, ErrTrunkNotResolved
+	}
 	return commitsBetween(repo, repo.Trunk, branch)
 }
 
 // CommitsBehindMain returns commits on main that are not reachable from branch,
 // ordered newest first.
 func CommitsBehindMain(repo Repo, branch string) ([]Commit, error) {
+	if repo.Trunk == "" {
+		return nil, ErrTrunkNotResolved
+	}
 	return commitsBetween(repo, branch, repo.Trunk)
 }
 
@@ -203,8 +209,11 @@ func commitsBetween(repo Repo, fromRef, toRef string) ([]Commit, error) {
 }
 
 // BranchHistorySinceTrunk returns branch history since repo.Trunk's base ref
-// (see TrunkBaseRef); none when trunk is unset or has no ref.
+// (see TrunkBaseRef); none when trunk has no ref.
 func BranchHistorySinceTrunk(repo Repo, branch, upstreamRef string) ([]BranchHistoryCommit, error) {
+	if repo.Trunk == "" {
+		return nil, ErrTrunkNotResolved
+	}
 	baseRef := TrunkBaseRef(repo.Root, repo.Trunk)
 	if strings.TrimSpace(baseRef) == "" {
 		return nil, nil

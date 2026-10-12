@@ -24,6 +24,9 @@ type MergeOutcome struct {
 // directly: merging in the root would advance whatever branch it has checked
 // out instead.
 func MergeBranchInto(repo Repo, worktrees []Worktree, branch, target string) (MergeOutcome, error) {
+	if target == "" {
+		return MergeOutcome{}, ErrTrunkNotResolved
+	}
 	targetSHA, err := RevParse(repo.Root, "refs/heads/"+target)
 	if errors.Is(err, ErrRefNotFound) {
 		return MergeOutcome{}, fmt.Errorf("target branch %q does not exist", target)

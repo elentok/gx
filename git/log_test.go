@@ -14,6 +14,7 @@ func TestCommitsSinceMain_hasCommits(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 
 	commits, err := git.CommitsSinceMain(*repo, "feature")
 	if err != nil {
@@ -37,6 +38,7 @@ func TestCommitsSinceMain_noCommits(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepo(t)
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 
 	commits, err := git.CommitsSinceMain(*repo, "main")
 	if err != nil {
@@ -52,6 +54,7 @@ func TestCommitsSinceMain_multipleCommits(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	wtDir := filepath.Join(repoDir, "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 
 	// Add a second commit to the feature branch
 	testutil.WriteFile(t, wtDir, "extra.txt", "extra")
@@ -70,6 +73,7 @@ func TestCommitsBehindMain(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 	repo, _ := git.FindRepo(dir)
+	repo.Trunk = "main"
 
 	mustGit(t, dir, "checkout", "-b", "feature")
 	testutil.WriteFile(t, dir, "feature.txt", "feature")
@@ -95,6 +99,7 @@ func TestBranchHistorySinceTrunk_NoUpstreamMarksLocalCommits(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 
 	history, err := git.BranchHistorySinceTrunk(*repo, "feature", "")
 	if err != nil {
@@ -115,6 +120,7 @@ func TestBranchHistorySinceTrunk_UsesRemoteMainNotLocalMain(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 	mainDir := filepath.Join(repoDir, "main")
 	mustGit(t, repoDir, "worktree", "add", mainDir, "main")
 	mustGit(t, mainDir, "config", "user.email", "test@test.com")
@@ -153,6 +159,7 @@ func TestBranchHistorySinceTrunk_UsesConfiguredTrunk(t *testing.T) {
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	mustGit(t, repoDir, "branch", "develop", "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 	repo.Trunk = "develop"
 
 	history, err := git.BranchHistorySinceTrunk(*repo, "feature", "")
@@ -168,6 +175,7 @@ func TestBranchHistorySinceTrunk_DivergedIncludesRemoteOnly(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 	featureDir := filepath.Join(repoDir, "feature")
 
 	testutil.PushBranchWithUpstream(t, featureDir, "origin", "feature")
@@ -249,6 +257,7 @@ func TestCommitsBetween_ReturnsNewCommits(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature")
 	repo, _ := git.FindRepo(repoDir)
+	repo.Trunk = "main"
 
 	commits, err := git.CommitsBetween(*repo, "main", "feature")
 	if err != nil {

@@ -15,7 +15,7 @@ func TestIsCommitMergedToTrunk_merged(t *testing.T) {
 
 	hash := headHash(t, repoDir)
 
-	merged, err := git.IsCommitMergedToTrunk(repoDir, hash)
+	merged, err := git.IsCommitMergedToTrunk(repoDir, "main", hash)
 	if err != nil {
 		t.Fatalf("IsCommitMergedToTrunk: %v", err)
 	}
@@ -35,7 +35,7 @@ func TestIsCommitMergedToTrunk_unmerged(t *testing.T) {
 
 	hash := headHash(t, repoDir)
 
-	merged, err := git.IsCommitMergedToTrunk(repoDir, hash)
+	merged, err := git.IsCommitMergedToTrunk(repoDir, "main", hash)
 	if err != nil {
 		t.Fatalf("IsCommitMergedToTrunk: %v", err)
 	}

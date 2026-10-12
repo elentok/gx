@@ -4,7 +4,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -36,17 +35,17 @@ func realDevRepoScanWithEpics(t *testing.T) (map[string]WorktreeScan, []tickets.
 	if err != nil {
 		t.Fatalf("os.Getwd: %v", err)
 	}
-	info, err := git.IdentifyDir(cwd)
+	repo, err := tickets.OpenRepo(cwd)
 	if err != nil {
-		t.Skipf("not inside a git repo: %v", err)
+		t.Skipf("opening this repo: %v", err)
 	}
 
-	epics, err := tickets.Load(info.Repo.ScratchRoot())
+	epics, err := tickets.Load(repo.ScratchRoot())
 	if err != nil {
 		t.Skipf("loading .scratch epics: %v", err)
 	}
 
-	scans, err := scanWorktrees(info.Repo, epics)
+	scans, err := scanWorktrees(*repo, epics)
 	if err != nil {
 		t.Fatalf("scanWorktrees: %v", err)
 	}

@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/elentok/gx/git"
@@ -106,16 +107,28 @@ func TestParseBranchLine_local(t *testing.T) {
 	}
 }
 
-func TestIsRebasedOnTrunk_NoTrunk(t *testing.T) {
+func TestTrunkHelpers_RefuseEmptyTrunk(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 	repo := git.Repo{Root: dir}
-	ok, err := git.IsRebasedOnTrunk(repo, "main")
-	if err != nil {
-		t.Fatalf("IsRebasedOnTrunk: %v", err)
+	calls := map[string]func() error{
+		"IsRebasedOnTrunk":  func() error { _, err := git.IsRebasedOnTrunk(repo, "main"); return err },
+		"CommitsSinceMain":  func() error { _, err := git.CommitsSinceMain(repo, "main"); return err },
+		"CommitsBehindMain": func() error { _, err := git.CommitsBehindMain(repo, "main"); return err },
+		"BranchHistorySinceTrunk": func() error {
+			_, err := git.BranchHistorySinceTrunk(repo, "main", "")
+			return err
+		},
+		"IsCommitMergedToTrunk": func() error { _, err := git.IsCommitMergedToTrunk(dir, "", "HEAD"); return err },
+		"MergeBranchInto":       func() error { _, err := git.MergeBranchInto(repo, nil, "main", ""); return err },
 	}
-	if !ok {
-		t.Error("expected true when Trunk is empty")
+	for name, call := range calls {
+		if err := call(); !errors.Is(err, git.ErrTrunkNotResolved) {
+			t.Errorf("%s: err = %v, want %v", name, err, git.ErrTrunkNotResolved)
+		}
+	}
+	if got := git.ErrTrunkNotResolved.Error(); got != "trunk not resolved" {
+		t.Errorf("message = %q", got)
 	}
 }
 
