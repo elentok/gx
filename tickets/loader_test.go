@@ -86,6 +86,36 @@ func TestLoad_DiscoversEpicsAndTickets(t *testing.T) {
 	}
 }
 
+func TestLoad_TitleComesFromHeading(t *testing.T) {
+	cases := []struct {
+		name, body, want string
+	}{
+		{"acronym", "# OS notifier package\n", "OS notifier package"},
+		{"em dash id prefix", "# 07 — TUI watch modal\n", "TUI watch modal"},
+		{"hyphen id prefix", "# 07 - TUI watch modal\n", "TUI watch modal"},
+		{"id only falls back to slug", "# 07\n", "Os notifier"},
+		{"empty heading falls back to slug", "#  \nBody.\n", "Os notifier"},
+		{"no heading falls back to slug", "Body.\n", "Os notifier"},
+		{"code fence comment is not a heading", "```sh\n# run it\n```\n", "Os notifier"},
+		{"id-like word is kept", "# 07b split ticket\n", "07b split ticket"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, "my-epic", "issues", "07-os-notifier.md"),
+				"---\nid: \"07\"\nstatus: open\ntype: implement\n---\n\n"+tc.body)
+
+			epics, err := Load(dir)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got := epics[0].Tickets[0].Title; got != tc.want {
+				t.Errorf("Title = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestLoad_MirrorsMutes(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-ticket.md"),

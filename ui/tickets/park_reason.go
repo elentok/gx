@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui"
 )
 
 // parkReasonMaxRunes caps the ellipsized subtext parkReason returns, rather
@@ -75,6 +76,14 @@ func firstContentLineAfterHeading(body, heading string) string {
 // a full markdown parser, matches the modest "markers stripped" ask.
 func stripMarkdownMarkers(line string) string {
 	return strings.TrimSpace(markdownMarkerPattern.ReplaceAllString(line, ""))
+}
+
+// rowTitle is a list row's "<num> <title>". The title is a ticket's whole `#`
+// heading, which can be long; capping it here (same reasoning as
+// parkReasonMaxRunes) keeps the row's suffix and metrics visible instead of
+// losing them to the panel's own clip.
+func rowTitle(icons ui.IconSet, t tickets.Ticket) string {
+	return t.DisplayNumber() + " " + ellipsize(t.Title, parkReasonMaxRunes, icons.Ellipsis)
 }
 
 // ellipsize caps text to maxRunes runes, appending ellipsisIcon when

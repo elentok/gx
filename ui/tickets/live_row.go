@@ -122,7 +122,7 @@ func appendBlockedBySuffix(line, suffix string) string {
 // column vs. the Queue tab's bare indent), so a live row's indent matches its
 // tab's non-live rows rather than a value hardcoded here.
 func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, live liveTicketState, prefix string) (base, suffix string, ok bool) {
-	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	title := rowTitle(icons, t)
 
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseNeedsRepair:

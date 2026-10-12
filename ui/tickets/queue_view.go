@@ -226,7 +226,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		dimStyle, dimmed = statusDoneStyle, true
 	}
 
-	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	title := rowTitle(m.icons(), t)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}

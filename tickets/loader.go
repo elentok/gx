@@ -86,6 +86,9 @@ func loadEpic(scratchDir, name string) Epic {
 		ticket.Parent = idToStringPtr(parsed.Parent)
 		ticket.Status = string(parsed.Status)
 		ticket.Body = schema.ParseBody(string(raw))
+		if heading := headingTitle(ticket.Body, identifier); heading != "" {
+			ticket.Title = heading
+		}
 		ticket.ActualContextWindow = parsed.ActualContextWindow
 		ticket.ExpectedContextWindow = parsed.ExpectedContextWindow
 		ticket.ElapsedTime = parsed.ElapsedTime
@@ -126,6 +129,34 @@ func parseTicketFilename(filename string) (number int, identifier, title string,
 	}
 	identifier = m[1] + m[2]
 	return number, identifier, humanizeSlug(m[3]), true
+}
+
+// headingTitle returns body's first `# ` heading, without a leading
+// "<identifier> — " prefix. It returns "" when there is no heading or the
+// heading is only the identifier, so the caller keeps the slug title — the
+// slug is lowercase and loses acronyms ("Os notifier"), the heading doesn't.
+// Lines inside code fences are skipped: a shell comment is not a heading.
+func headingTitle(body, identifier string) string {
+	inFence := false
+	for line := range strings.Lines(body) {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || !strings.HasPrefix(line, "# ") {
+			continue
+		}
+		heading := strings.TrimSpace(line[2:])
+		if rest, ok := strings.CutPrefix(heading, identifier); ok {
+			rest = strings.TrimSpace(rest)
+			if trimmed := strings.TrimLeft(rest, "—–-:"); trimmed != rest || rest == "" {
+				heading = strings.TrimSpace(trimmed)
+			}
+		}
+		return heading
+	}
+	return ""
 }
 
 func humanizeSlug(slug string) string {

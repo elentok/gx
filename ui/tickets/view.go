@@ -182,7 +182,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	searchDim := m.search.HasQuery() && !matched
 	doneDim := status.Terminal()
 
-	title := fmt.Sprintf("%s %s", t.DisplayNumber(), t.Title)
+	title := rowTitle(m.icons(), t)
 	if t.ShowsCommitlessSuffix() {
 		title += " (commitless)"
 	}
