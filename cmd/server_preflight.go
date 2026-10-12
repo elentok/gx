@@ -56,7 +56,7 @@ const fallbackProject = "_default"
 
 // serverRunner is the runner the server launches through, plus runnerFor, which
 // builds any runner by name for a project. Each (runner, project) pair is built
-// once and kept, because a headless runner's live sessions are in memory and
+// once and kept, because a native runner's live sessions are in memory and
 // its agent dirs are per project; runnerFor is nil for a runner it cannot build.
 // The returned runner answers host health and projects runnerFor never sees, so
 // it is built for a fallback project.
@@ -77,6 +77,8 @@ func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, 
 			r = herdrrunner.New()
 		case agentrunner.ChoiceHeadless:
 			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project)}
+		case agentrunner.ChoicePTY:
+			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project)}
 		default:
 			return nil
 		}

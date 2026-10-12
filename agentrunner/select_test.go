@@ -50,8 +50,8 @@ func TestSelect(t *testing.T) {
 		{name: "herdr down does not fall back", setting: "herdr", onPath: both, wantErr: "herdr is unavailable"},
 		{name: "headless", setting: "headless", onPath: both, herdrUp: true, want: agentrunner.ChoiceHeadless},
 		{name: "headless without claude", setting: "headless", onPath: []string{"herdr"}, wantErr: "needs claude on PATH"},
-		{name: "pty is rejected", setting: "pty", onPath: both, wantErr: "pty is not supported"},
-		{name: "pty is rejected without claude", setting: "pty", wantErr: "pty is not supported"},
+		{name: "pty", setting: "pty", onPath: both, herdrUp: true, want: agentrunner.ChoicePTY},
+		{name: "pty without claude", setting: "pty", onPath: []string{"herdr"}, herdrUp: true, wantErr: "needs claude on PATH"},
 		{name: "bad value", setting: "tmux", onPath: both, herdrUp: true, wantErr: `invalid agent-runner "tmux"`},
 	}
 	for _, tt := range tests {

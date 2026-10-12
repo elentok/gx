@@ -12,11 +12,9 @@ const (
 	ChoiceAuto     Choice = "auto"
 	ChoiceHerdr    Choice = "herdr"
 	ChoiceHeadless Choice = "headless"
+	// ChoicePTY is only ever an explicit choice: auto never picks it.
+	ChoicePTY Choice = "pty"
 )
-
-// choicePTY is recognised only to be rejected: no runner honors it, and the
-// server would otherwise run it headless.
-const choicePTY Choice = "pty"
 
 // HerdrPingTimeout bounds how long auto waits for herdr before it falls back
 // to headless.
@@ -29,7 +27,7 @@ type Probe struct {
 	PingHerdr func(timeout time.Duration) error
 }
 
-// Select resolves setting to the runner to use. pty is rejected. An explicit
+// Select resolves setting to the runner to use. An explicit
 // herdr with herdr down is an error, not a fallback.
 func Select(setting string, p Probe) (Choice, error) {
 	if err := ValidateSetting(setting); err != nil {
@@ -58,12 +56,10 @@ func Select(setting string, p Probe) (Choice, error) {
 // the machine.
 func ValidateSetting(setting string) error {
 	switch Choice(setting) {
-	case "", ChoiceAuto, ChoiceHerdr, ChoiceHeadless:
+	case "", ChoiceAuto, ChoiceHerdr, ChoiceHeadless, ChoicePTY:
 		return nil
-	case choicePTY:
-		return fmt.Errorf("agent-runner pty is not supported: want auto, herdr or headless")
 	default:
-		return fmt.Errorf("invalid agent-runner %q: want auto, herdr or headless", setting)
+		return fmt.Errorf("invalid agent-runner %q: want auto, herdr, headless or pty", setting)
 	}
 }
 

@@ -109,7 +109,7 @@ func TestConfigReload_RefusesInvalidAndMissingFiles(t *testing.T) {
 	if res := reload(t, h); res.Reason != server.ReasonInvalidConfig || res.Message == "" {
 		t.Errorf("bad json = %+v, want %s with the parse error", res, server.ReasonInvalidConfig)
 	}
-	servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 5}, "agent-runner": "pty"})
+	servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 5}, "agent-runner": "tmux"})
 	if res := reload(t, h); res.Reason != server.ReasonInvalidConfig {
 		t.Errorf("bad agent-runner = %+v, want %s", res, server.ReasonInvalidConfig)
 	}

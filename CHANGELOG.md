@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed `agent-runner: pty` from rejected to accepted: the server runs interactive claude in a pty per project. `auto` still never picks pty.
+
 ## v0.32.7 - 2026-10-12
 
 - Added the `gx-follow-up` skill: the one route for filing a follow-up. It picks the project, checks existing follow-ups (and their archive) for duplicates, fills the sections and files it. `gx-investigate`, `gx-to-tickets`, `gx-evolve` and `gx-code-review` now file their follow-ups through it.

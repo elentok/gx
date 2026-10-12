@@ -80,6 +80,24 @@ func TestServerRunner_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing
 	}
 }
 
+func TestServerRunner_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
+	state := t.TempDir()
+	r, runnerFor := serverRunner(agentrunner.ChoicePTY, state)
+	if r.Name() != "pty" {
+		t.Errorf("default runner Name = %q, want pty", r.Name())
+	}
+	p, ok := runnerFor("pty", "proj").(*nativerunner.Pty)
+	if !ok {
+		t.Fatalf("runnerFor(pty, proj) = %T, want *Pty", runnerFor("pty", "proj"))
+	}
+	if want := nativerunner.AgentsRoot(state, "proj"); p.Root != want {
+		t.Errorf("Root = %q, want %q", p.Root, want)
+	}
+	if runnerFor("pty", "proj") != agentrunner.Runner(p) {
+		t.Error("a project must keep one Pty: its live sessions are in memory")
+	}
+}
+
 func TestServerRunner_BuildsAnyRunnerPerPairLazily(t *testing.T) {
 	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, t.TempDir())
 	herdrA := runnerFor("herdr", "a")
