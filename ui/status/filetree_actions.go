@@ -127,7 +127,7 @@ func (m *Model) prepareRebaseConfirm() error {
 	}
 	target, err := detectRebaseTarget(m.worktreeRoot)
 	if err != nil {
-		return err
+		return rebaseTargetError{err}
 	}
 	m.openConfirm(
 		fmt.Sprintf("Rebase branch %s on %s?", branch, target),
@@ -139,6 +139,12 @@ func (m *Model) prepareRebaseConfirm() error {
 	return nil
 }
 
+// rebaseTargetError marks a trunk-resolution failure, which the status view
+// shows as a warning rather than a git error.
+type rebaseTargetError struct{ error }
+
+func (e rebaseTargetError) Unwrap() error { return e.error }
+
 // detectRebaseTarget resolves trunk on every call, so a project.json edit
 // applies at once. A missing trunk is an error, never a guessed branch.
 func detectRebaseTarget(root string) (string, error) {
@@ -146,7 +152,7 @@ func detectRebaseTarget(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "origin/" + repo.Trunk, nil
+	return git.TrunkBaseRef(repo.Root, repo.Trunk), nil
 }
 
 func (m *Model) openAmendConfirm() error {

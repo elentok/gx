@@ -148,11 +148,7 @@ func (r *stageActionRunner) runRebase() stageActionResult {
 			return res
 		}
 	}
-	fetchRemote := "origin"
-	if i := strings.Index(target, "/"); i > 0 {
-		fetchRemote = strings.TrimSpace(target[:i])
-	}
-	if err := r.execGit("fetch", fetchRemote); err != nil {
+	if err := r.fetchFor(target); err != nil {
 		res.err = err
 		if stashed {
 			res.promptPopStash = true
@@ -173,6 +169,19 @@ func (r *stageActionRunner) runRebase() stageActionResult {
 		}
 	}
 	return res
+}
+
+// fetchFor fetches the remote a remote-tracking target lives on. A local
+// trunk (no origin/<trunk>) needs no fetch, and its name may contain a slash.
+func (r *stageActionRunner) fetchFor(target string) error {
+	if git.RefExists(r.root, "refs/heads/"+target) {
+		return nil
+	}
+	fetchRemote := "origin"
+	if i := strings.Index(target, "/"); i > 0 {
+		fetchRemote = strings.TrimSpace(target[:i])
+	}
+	return r.execGit("fetch", fetchRemote)
 }
 
 func (r *stageActionRunner) execGit(args ...string) error {
