@@ -57,8 +57,21 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    every finding is checked, continue to step 7 in the same run.
 7. **No `<epic>-impl` epic** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended
    spec, publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
-   hand-resolved decisions, and implementation tickets belong to ralph-loop.
-8. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab.
+   hand-resolved decisions, and implementation tickets belong to ralph-loop. Continue to step 8 in
+   the same run.
+8. **No `<epic>-impl` branch** (`git rev-parse --verify refs/heads/<epic>-impl` fails) → commit the
+   design docs into the feature branch, so that implementation agents see them in their worktrees.
+   The server adopts a branch that already exists, so creating it here is safe.
+   - Start the branch from trunk (the repo's default branch). If `<epic>-impl` sets `base:` or is
+     blocked by another epic, stop and ask which branch to start from.
+   - Create it in a temporary worktree: `git worktree add -b <epic>-impl <tmp-dir> <trunk>`.
+   - Copy in `docs/specs/<epic>.md`, the ADRs this epic added under `docs/adr/`, and only this
+     epic's `GLOSSARY.md` hunks. If the checkout has other uncommitted edits in those files, leave
+     them out; ask when a hunk's owner is unclear.
+   - Commit as `<epic>: Add spec, ADRs and glossary terms`, then `git worktree remove <tmp-dir>`.
+   - Remove the committed changes from the original checkout: delete the new files, and reverse
+     only the committed `GLOSSARY.md` hunks. Leave every other edit in place.
+9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab.
 
 ## Design-review rubric (step 5)
 
@@ -74,6 +87,11 @@ Review the spec against the map it came from and its own template, not in the ab
 
 Start a fresh session between runs (`/clear` in Claude, `/new` in Codex). The run that just ended
 is not the place for the next one, except where a step says to continue.
+
+Steps 4–8 can also chain. After step 4, 5 or 6 finishes, run `gx agent context-window`. If it
+reports under **50K** tokens used, go back to "Detecting the next step" in the same session instead
+of stopping. If it reports 50K or more, or the command errors, stop as usual. Never chain out of
+steps 1–3: map runs stay one per session.
 
 End with one line, naming the phase, not a step number:
 
