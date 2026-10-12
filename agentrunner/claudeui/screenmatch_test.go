@@ -59,6 +59,34 @@ func TestClassifyStartup(t *testing.T) {
 	}
 }
 
+func TestTrustKey(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "trust-w160.screen.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := string(b)
+	onYes := strings.NewReplacer("❯ No, exit", "  No, exit", "  Yes, I trust", "❯ Yes, I trust").Replace(recorded)
+	if onYes == recorded {
+		t.Fatal("fixture no longer has the cursor on No, exit")
+	}
+	cases := []struct {
+		name string
+		rows string
+		want string
+	}{
+		{"recorded dialog, cursor on No, exit", recorded, "\x1b[B"},
+		{"cursor moved to the trust option", onYes, "\r"},
+		{"no cursor drawn yet", "Quick safety check", "\x1b[B"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := TrustKey(strings.Split(c.rows, "\n")); got != c.want {
+				t.Errorf("TrustKey = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 func TestMatches(t *testing.T) {
 	const proceed = "Do you want to proceed?"
 	cases := []struct {

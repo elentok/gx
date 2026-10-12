@@ -36,11 +36,12 @@ type Meta struct {
 }
 
 // LaunchEnv drops only the vars that make claude think it is nested inside
-// another claude session, which would stop it saving its transcript.
+// another claude session, which would stop it saving its transcript and its
+// pid status file.
 func LaunchEnv(base, extra []string) []string {
 	env := slices.DeleteFunc(slices.Clone(base), func(kv string) bool {
 		name, _, _ := strings.Cut(kv, "=")
-		return name == "CLAUDECODE" || name == "CLAUDE_CODE_ENTRYPOINT"
+		return name == "CLAUDECODE" || name == "CLAUDE_CODE_ENTRYPOINT" || name == "CLAUDE_CODE_CHILD_SESSION"
 	})
 	env = append(env, "DISABLE_AUTOUPDATER=1")
 	return append(env, extra...)

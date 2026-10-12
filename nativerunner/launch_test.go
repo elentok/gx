@@ -10,6 +10,7 @@ func TestLaunchEnv_StripsNestedClaudeVarsAndDisablesAutoupdater(t *testing.T) {
 		"PATH=/bin",
 		"CLAUDECODE=1",
 		"CLAUDE_CODE_ENTRYPOINT=cli",
+		"CLAUDE_CODE_CHILD_SESSION=1",
 		"CLAUDE_CONFIG_DIR=/cfg",
 		"CLAUDECODE_EXTRA=keep",
 	}

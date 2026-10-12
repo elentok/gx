@@ -26,8 +26,12 @@ const TUIEnv = "GX_AGENTFAKE_TUI"
 // because they act before the fake's first status write, before a test could
 // send anything.
 const (
-	// TUITrustEnv, set to "1", shows the trust dialog until Enter.
+	// TUITrustEnv, set to "1", shows the trust dialog as claude does: "No,
+	// exit" selected first, arrows move the cursor, Enter picks.
 	TUITrustEnv = "GX_AGENTFAKE_TUI_TRUST"
+	// TUITrustDropKeyEnv, set to "1", drops the first key at the trust
+	// dialog, as claude does with one typed before it reads input.
+	TUITrustDropKeyEnv = "GX_AGENTFAKE_TUI_TRUST_DROP_KEY"
 	// TUINoPidFileEnv, set to "1", never writes the pid status file.
 	TUINoPidFileEnv = "GX_AGENTFAKE_TUI_NO_PID_FILE"
 )
@@ -100,6 +104,7 @@ func TUIClaude() {
 type tuiOptions struct {
 	sessionID string
 	trust     bool
+	dropKey   bool
 	noPidFile bool
 }
 
@@ -120,6 +125,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	return tuiOptions{
 		sessionID: *sessionID,
 		trust:     os.Getenv(TUITrustEnv) == "1",
+		dropKey:   os.Getenv(TUITrustDropKeyEnv) == "1",
 		noPidFile: os.Getenv(TUINoPidFileEnv) == "1",
 	}, nil
 }
@@ -186,8 +192,12 @@ type tui struct {
 	transcript string
 	pid        PidFile
 	stalled    bool
-	typed      strings.Builder
-	prompt     string
+	// trustYes is whether the trust dialog's cursor is on "Yes"; arrow
+	// collects an arrow key's escape sequence.
+	trustYes bool
+	arrow    []byte
+	typed    strings.Builder
+	prompt   string
 }
 
 // tuiEvent is one key from the terminal, one control, or the end of input.
@@ -242,13 +252,11 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := t.handleControl(*ev.control); err != nil {
 				return 0, err
 			}
-		case ev.key == '\r' || ev.key == '\n':
-			if t.opts.trust {
-				if err := t.startSession(); err != nil {
-					return 0, err
-				}
-				continue
+		case t.opts.trust:
+			if quit, err := t.trustKey(ev.key); quit || err != nil {
+				return 1, err
 			}
+		case ev.key == '\r' || ev.key == '\n':
 			if err := t.submit(); err != nil {
 				return 0, err
 			}
@@ -257,12 +265,37 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 				return 0, err
 			}
 		default:
-			if !t.opts.trust {
-				t.typed.WriteByte(ev.key)
-			}
+			t.typed.WriteByte(ev.key)
 		}
 	}
 	return 0, nil
+}
+
+// trustKey takes one key at the trust dialog and reports whether it picked
+// "No, exit". Arrow keys toggle between the two options.
+func (t *tui) trustKey(key byte) (bool, error) {
+	if t.opts.dropKey {
+		t.opts.dropKey = false
+		return false, nil
+	}
+	if key == escKey || len(t.arrow) > 0 {
+		t.arrow = append(t.arrow, key)
+		if len(t.arrow) == len("\x1b[B") {
+			if s := string(t.arrow); s == "\x1b[A" || s == "\x1b[B" {
+				t.trustYes = !t.trustYes
+				t.draw()
+			}
+			t.arrow = nil
+		}
+		return false, nil
+	}
+	if key != '\r' && key != '\n' {
+		return false, nil
+	}
+	if !t.trustYes {
+		return true, nil
+	}
+	return false, t.startSession()
 }
 
 // startSession writes the pid file, first without a status, as claude does
@@ -393,12 +426,11 @@ func (t *tui) draw() {
 	var rows []string
 	switch {
 	case t.opts.trust:
-		rows = []string{
-			"Quick safety check: Is this a project you created or one you trust?",
-			"",
-			"❯ 1. Yes, I trust this folder",
-			"  2. No, exit",
+		no, yes := "❯ No, exit", "  Yes, I trust this folder"
+		if t.trustYes {
+			no, yes = "  No, exit", "❯ Yes, I trust this folder"
 		}
+		rows = []string{"Quick safety check: Is this a project you created or one you trust?", "", no, yes}
 	case t.pid.Status == StatusWaiting:
 		rows = []string{
 			"> " + t.prompt,

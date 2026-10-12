@@ -239,8 +239,17 @@ func TestTUIClaude_TrustDialogBeforePidFile(t *testing.T) {
 	if f.pidFile() != nil {
 		t.Fatal("pid file written before the trust dialog was answered")
 	}
-	f.typeLine("")
+	f.typeLine("\x1b[B")
 	f.waitStatus(StatusIdle, "")
+}
+
+func TestTUIClaude_TrustDialogEnterOnNoExits(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs, TUITrustEnv+"=1")
+	f.waitScreen("❯ No, exit")
+	f.typeLine("")
+	if code := f.waitExit(); code != 1 {
+		t.Fatalf("exit code = %d, want 1", code)
+	}
 }
 
 func TestTUIClaude_NoPidFile(t *testing.T) {

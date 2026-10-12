@@ -30,7 +30,24 @@ func Matches(text, anchor string) bool {
 // both keeps a prompt that merely quotes one from passing for the dialog.
 var trustAnchors = []string{
 	"Quick safety check: Is this a project you created or one you trust?",
-	"Yes, I trust this folder",
+	trustYes,
+}
+
+const trustYes = "Yes, I trust this folder"
+
+// TrustKey is the key that moves the trust dialog in rows toward trusting:
+// Enter once the ❯ cursor is on the trust option, else Down. Claude selects
+// "No, exit" first, so a bare Enter would quit it.
+func TrustKey(rows []string) string {
+	for _, row := range rows {
+		if strings.Contains(row, "❯") {
+			if Matches(Normalize(row), trustYes) {
+				return "\r"
+			}
+			break
+		}
+	}
+	return "\x1b[B"
 }
 
 // Startup is what a screen shows before claude writes its session pid file.

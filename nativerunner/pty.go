@@ -156,7 +156,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 	if err := RecordLaunch(procs, dir, &meta); err != nil {
 		return err
 	}
-	trusted := false
+	var nextTrustKey time.Time
 	for {
 		claude, _, err := ss.holder.Status()
 		if err != nil {
@@ -165,27 +165,47 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 		if claude != nil && claude.Status == ClaudeIdle {
 			return nil
 		}
-		if claude == nil && !trusted {
+		if claude == nil && !time.Now().Before(nextTrustKey) {
 			// The trust dialog shows before claude writes its pid file, so
-			// no holder rule can see it; Enter picks "Yes, I trust".
-			text, err := p.startupScreen(ss)
+			// no holder rule can see it. Claude drops a key typed before it
+			// reads input, so keys repeat while the dialog stays up.
+			rows, scrolled, err := ss.holder.Screen(startupScrollback)
 			if err != nil {
 				return err
 			}
-			if claudeui.ClassifyStartup(text) == claudeui.StartupTrust {
-				if err := ss.holder.SendKeys("\r"); err != nil {
+			if claudeui.ClassifyStartup(claudeui.ScreenText(scrolled, rows)) == claudeui.StartupTrust {
+				if err := ss.holder.SendKeys(claudeui.TrustKey(rows)); err != nil {
 					return err
 				}
-				trusted = true
+				nextTrustKey = time.Now().Add(trustKeyRepeat)
 			}
 		}
-		if err := p.launchTick(ss, deadline, "claude never turned idle"); err != nil {
-			if claude != nil || !time.Now().After(deadline) {
-				return err
+		select {
+		case <-ss.exited:
+			return p.holderExitedErr(dir)
+		case <-time.After(p.pollInterval()):
+		}
+		if time.Now().After(deadline) {
+			if claude == nil {
+				return p.noPidFileErr(ss)
 			}
-			return p.noPidFileErr(ss)
+			return fmt.Errorf("pty start: claude never turned idle within %v", p.startTimeout())
 		}
 	}
+}
+
+// trustKeyRepeat spaces trust dialog keys so claude redraws the cursor
+// before the next key is chosen from the screen.
+const trustKeyRepeat = 500 * time.Millisecond
+
+// holderExitedErr reports a holder gone before claude turned idle, with
+// claude's exit code when the holder saved one.
+func (p *Pty) holderExitedErr(dir string) error {
+	code, err := os.ReadFile(filepath.Join(dir, ExitCodeFile))
+	if err != nil {
+		return errors.New("pty start: holder exited before claude turned idle")
+	}
+	return fmt.Errorf("pty start: claude exited (code %s) before it turned idle", strings.TrimSpace(string(code)))
 }
 
 // Reattach adopts the pty agent a previous server launched under label. The

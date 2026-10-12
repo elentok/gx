@@ -184,15 +184,39 @@ func TestPty_DenyReasonIdleTimeoutIsSessionDied(t *testing.T) {
 }
 
 func TestPty_StartAnswersTrustDialog(t *testing.T) {
-	p := newPty(t)
-	t.Setenv(agentfake.TUITrustEnv, "1")
-	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
-	if err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct {
+		name    string
+		dropKey string
+	}{
+		{"first key read", ""},
+		{"first key dropped", "1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newPty(t)
+			t.Setenv(agentfake.TUITrustEnv, "1")
+			t.Setenv(agentfake.TUITrustDropKeyEnv, tc.dropKey)
+			s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer p.Stop(s)
+			if st, err := p.Status(s); err != nil || st.State != agentrunner.StateIdle {
+				t.Errorf("Status = %+v, %v; want idle", st, err)
+			}
+		})
 	}
-	defer p.Stop(s)
-	if st, err := p.Status(s); err != nil || st.State != agentrunner.StateIdle {
-		t.Errorf("Status = %+v, %v; want idle", st, err)
+}
+
+func TestPty_StartFailsFastWhenClaudeExits(t *testing.T) {
+	p := newPty(t)
+	p.Claude = "false"
+	began := time.Now()
+	_, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err == nil || errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "exited") {
+		t.Fatalf("Start = %v; want a claude or holder exit, not a missing pid file", err)
+	}
+	if elapsed := time.Since(began); elapsed > p.StartTimeout/2 {
+		t.Errorf("Start took %v; want it to fail before the start deadline", elapsed)
 	}
 }
 
