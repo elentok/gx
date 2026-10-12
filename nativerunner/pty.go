@@ -214,11 +214,12 @@ func (p *Pty) holderExitedErr(dir string) error {
 //
 // A dead pty agent is always VerdictDied, never VerdictFinished: interactive
 // claude stays alive after its turn, so it never exits as a normal finish.
+//
+// The ps lookup and holder dial run unlocked, since they can take seconds and
+// would block every other session's calls.
 func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if ss, ok := p.sessions[label]; ok {
-		return ss.session, VerdictLive, nil
+	if s, ok, _ := p.Find(label); ok {
+		return s, VerdictLive, nil
 	}
 	dir := filepath.Join(p.Root, label)
 	meta, err := readMeta(dir)
@@ -244,6 +245,12 @@ func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
 		holderPID: meta.HolderPID,
 		claudePID: meta.PID,
 		exited:    make(chan struct{}),
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// A concurrent Reattach of label may have adopted it meanwhile.
+	if other, ok := p.sessions[label]; ok {
+		return other.session, VerdictLive, nil
 	}
 	go p.watchExit(ss, meta)
 	if p.sessions == nil {

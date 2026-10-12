@@ -3,10 +3,12 @@ package nativerunner_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -419,6 +421,59 @@ func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
 	st, err := p.Status(s)
 	if err != nil || st.State != agentrunner.StateIdle || st.Turn != 3 || st.SessionID != agentSID {
 		t.Errorf("Status = %+v, %v; want idle at turn 3 of %s", st, err, agentSID)
+	}
+}
+
+// gatedProcs holds its first lookup until release closes.
+type gatedProcs struct {
+	*fakeProcs
+	once    sync.Once
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (g *gatedProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
+	g.once.Do(func() {
+		close(g.entered)
+		<-g.release
+	})
+	return g.fakeProcs.Lookup(pid)
+}
+
+// Reattach's ps lookup and holder dial can be slow, so they must not block
+// calls for the runner's other sessions.
+func TestPty_ReattachDoesNotBlockOtherCalls(t *testing.T) {
+	procs := &gatedProcs{fakeProcs: ptyAgentProcs(), entered: make(chan struct{}), release: make(chan struct{})}
+	p, dir := preparePtyAgent(t, procs.fakeProcs)
+	p.Procs = procs
+	serveOldHolder(t, dir, map[string]any{"ping": map[string]any{"pid": agentPID}})
+
+	done := make(chan error, 1)
+	go func() {
+		_, verdict, err := p.Reattach("e-01")
+		if err == nil && verdict != nativerunner.VerdictLive {
+			err = fmt.Errorf("verdict %v; want live", verdict)
+		}
+		done <- err
+	}()
+	<-procs.entered
+
+	found := make(chan struct{})
+	go func() {
+		_, _, _ = p.Find("e-02")
+		close(found)
+	}()
+	select {
+	case <-found:
+	case <-time.After(2 * time.Second):
+		t.Error("Find blocked while Reattach was in progress")
+	}
+	close(procs.release)
+	if err := <-done; err != nil {
+		t.Fatalf("Reattach = %v", err)
+	}
+	if _, ok, _ := p.Find("e-01"); !ok {
+		t.Error("Reattach did not adopt e-01")
 	}
 }
 
