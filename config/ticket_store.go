@@ -71,12 +71,13 @@ const LandingOnLanded = "on-landed"
 // once it is done, before it lands; they base on the blocker's branch.
 const LandingOnDone = "on-done"
 
-// LandingPolicy is the project's landing policy; absent or empty means the default.
+// LandingPolicy is the project's landing policy; absent, empty or unknown
+// means the default.
 func (pf ProjectFile) LandingPolicy() string {
-	if pf.Landing == nil || *pf.Landing == "" {
-		return LandingOnLanded
+	if pf.Landing != nil && *pf.Landing == LandingOnDone {
+		return LandingOnDone
 	}
-	return *pf.Landing
+	return LandingOnLanded
 }
 
 // AutoFFMergeEnabled reports whether the project opted in to the server
@@ -103,7 +104,9 @@ func ReadProjectFile(projectDir string) (ProjectFile, error) {
 	return pf, nil
 }
 
-// ParseProjectFile is the project.json loader: key whitelist, types, enums.
+// ParseProjectFile is the project.json loader: key whitelist and types only.
+// Unknown enum values load and fall back to defaults, so one typo cannot make
+// a project — or a store scan over every project — unreadable.
 func ParseProjectFile(data []byte) (ProjectFile, error) {
 	var pf ProjectFile
 	if err := checkProjectKeys(data); err != nil {
@@ -112,11 +115,16 @@ func ParseProjectFile(data []byte) (ProjectFile, error) {
 	if err := json.Unmarshal(data, &pf); err != nil {
 		return pf, fmt.Errorf("parse: %w", err)
 	}
+	return pf, nil
+}
+
+// ValidateProjectFile is the stricter check a person's edit must pass.
+func ValidateProjectFile(pf ProjectFile) error {
 	if pf.VCS != nil && *pf.VCS != VCSNone {
-		return pf, fmt.Errorf("vcs: %q is not allowed (want %q or absent)", *pf.VCS, VCSNone)
+		return fmt.Errorf("vcs: %q is not allowed (want %q or absent)", *pf.VCS, VCSNone)
 	}
 	if pf.Landing != nil && *pf.Landing != "" && *pf.Landing != LandingOnLanded && *pf.Landing != LandingOnDone {
-		return pf, fmt.Errorf("landing: %q is not allowed (want %q or %q)", *pf.Landing, LandingOnLanded, LandingOnDone)
+		return fmt.Errorf("landing: %q is not allowed (want %q or %q)", *pf.Landing, LandingOnLanded, LandingOnDone)
 	}
-	return pf, nil
+	return nil
 }

@@ -47,16 +47,39 @@ func TestReadProjectFile_AcceptsWhitelist(t *testing.T) {
 	}
 }
 
-func TestParseProjectFile_RejectsBadEnumsAndTypes(t *testing.T) {
+func TestParseProjectFile_RejectsBadTypes(t *testing.T) {
+	if _, err := ParseProjectFile([]byte(`{"max-agents": "two"}`)); err == nil || !strings.Contains(err.Error(), "max-agents") {
+		t.Errorf("want error naming max-agents, got %v", err)
+	}
+}
+
+func TestReadProjectFile_UnknownEnumsLoadWithDefaults(t *testing.T) {
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{"landing": "bogus", "vcs": "hg"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := pf.LandingPolicy(); got != LandingOnLanded {
+		t.Errorf("landing = %q, want default %q", got, LandingOnLanded)
+	}
+}
+
+func TestValidateProjectFile_RejectsBadEnums(t *testing.T) {
 	cases := map[string]string{
-		"landing":    `{"landing": "pr"}`,
-		"vcs":        `{"vcs": "hg"}`,
-		"max-agents": `{"max-agents": "two"}`,
+		"landing": `{"landing": "pr"}`,
+		"vcs":     `{"vcs": "hg"}`,
 	}
 	for key, body := range cases {
-		if _, err := ParseProjectFile([]byte(body)); err == nil || !strings.Contains(err.Error(), key) {
+		pf, err := ParseProjectFile([]byte(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ValidateProjectFile(pf); err == nil || !strings.Contains(err.Error(), key) {
 			t.Errorf("%s: want error naming it, got %v", key, err)
 		}
+	}
+	pf, _ := ParseProjectFile([]byte(`{"vcs": "none", "landing": "on-done"}`))
+	if err := ValidateProjectFile(pf); err != nil {
+		t.Errorf("valid enums rejected: %v", err)
 	}
 }
 

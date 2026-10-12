@@ -3,11 +3,9 @@ package cmd
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -187,24 +185,19 @@ func projectDirFor(d deps, name string) (string, error) {
 	return tickets.ProjectDir(cfg.TicketStore.Path, repo.Root)
 }
 
-// validateProjectConfig accepts only what the server's loader accepts, plus a
-// well-formed trunk. Whether the trunk branch exists is not checked: it may be
-// set before the branch is created.
+// validateProjectConfig accepts what the server's loader accepts, with known
+// enum values and a well-formed trunk. An empty trunk means unset. Whether the
+// trunk branch exists is not checked: it may be set before the branch is created.
 func validateProjectConfig(data []byte) error {
 	pf, err := config.ParseProjectFile(data)
 	if err != nil {
 		return err
 	}
-	if pf.Trunk == nil {
-		return nil
+	if err := config.ValidateProjectFile(pf); err != nil {
+		return err
 	}
-	out, err := exec.Command("git", "check-ref-format", "--branch", *pf.Trunk).CombinedOutput()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return fmt.Errorf("trunk: %q is not a valid branch name", *pf.Trunk)
-		}
-		return fmt.Errorf("git check-ref-format: %w: %s", err, out)
+	if pf.Trunk != nil && *pf.Trunk != "" && !git.ValidBranchName(*pf.Trunk) {
+		return fmt.Errorf("trunk: %q is not a valid branch name", *pf.Trunk)
 	}
 	return nil
 }

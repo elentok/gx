@@ -82,6 +82,17 @@ func TestProjectEditConfig_ValidEditWritten(t *testing.T) {
 	}
 }
 
+func TestProjectEditConfig_EmptyTrunkSaves(t *testing.T) {
+	saved := `{"name": "proj", "trunk": ""}`
+	e := newEditConfigEnv(t, false, "", saved)
+	if err := runProjectEditConfig(e.d, "proj"); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.liveBody(t); got != saved {
+		t.Errorf("live = %s, want %s", got, saved)
+	}
+}
+
 func TestProjectEditConfig_NoChanges(t *testing.T) {
 	e := newEditConfigEnv(t, false, "", editConfigOrig)
 	if err := runProjectEditConfig(e.d, "proj"); err != nil {
@@ -96,8 +107,9 @@ func TestProjectEditConfig_InvalidSaveLoops(t *testing.T) {
 	invalid := map[string]string{
 		"key":   `{"name": "proj", "bogus": 1}`,
 		"type":  `{"name": "proj", "max-agents": "two"}`,
-		"enum":  `{"name": "proj", "landing": "pr"}`,
-		"trunk": `{"name": "proj", "trunk": "bad branch.."}`,
+		"landing": `{"name": "proj", "landing": "pr"}`,
+		"vcs":     `{"name": "proj", "vcs": "hg"}`,
+		"trunk":   `{"name": "proj", "trunk": "bad branch.."}`,
 	}
 	for kind, bad := range invalid {
 		t.Run(kind+"/yes", func(t *testing.T) {
