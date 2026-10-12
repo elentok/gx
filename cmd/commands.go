@@ -242,7 +242,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	var showJSON bool
 	showCmd := &cobra.Command{
 		Use:   "show <addr>",
-		Short: "print a ticket by address (project:epic/06, epic/06 or 06)",
+		Short: "print a ticket (project:epic/06, epic/06 or 06) or an epic and its tickets (project:epic or epic)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cwd, err := d.getwd()

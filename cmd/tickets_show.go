@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,10 +40,74 @@ func currentEpic(cwd string) string {
 // tickets.AddressError carrying a stable code.
 func runTicketsShow(cwd, addr string, jsonOut bool, w io.Writer) error {
 	a, t, err := findTicket(cwd, addr)
+	var addrErr *tickets.AddressError
+	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
+		if project, epic, ok := parseEpicArg(addr); ok {
+			if jsonOut {
+				return errors.New("--json is not supported for an epic address")
+			}
+			return showEpic(cwd, project, epic, w)
+		}
+	}
 	if err != nil {
 		return err
 	}
 	return printTicket(a, t, jsonOut, w)
+}
+
+// parseEpicArg accepts "project:epic", or a bare epic slug, which leaves
+// project empty for the cwd project to fill in.
+func parseEpicArg(s string) (project, epic string, ok bool) {
+	if project, epic, ok := tickets.ParseEpicAddress(s); ok {
+		return project, epic, true
+	}
+	if s == "" || strings.ContainsAny(s, ":/ \t\n") {
+		return "", "", false
+	}
+	return "", s, true
+}
+
+// showEpic prints the epic's ticket.md verbatim, then one line per ticket.
+func showEpic(cwd, project, name string, w io.Writer) error {
+	var root string
+	var err error
+	if project == "" {
+		root, err = ticketRoot(cwd)
+		project = tickets.ProjectName(root)
+	} else {
+		root, err = projectRoot(cwd, project)
+	}
+	if err != nil {
+		return err
+	}
+	path, err := tickets.EpicTicketMDPath(root, project, name)
+	if err != nil {
+		return err
+	}
+	entry, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	epics, err := tickets.Load(root)
+	if err != nil {
+		return err
+	}
+	var out strings.Builder
+	fmt.Fprintf(&out, "%s:%s\npath: %s\n%s", project, name, path, entry)
+	if len(entry) > 0 && entry[len(entry)-1] != '\n' {
+		out.WriteString("\n")
+	}
+	out.WriteString("\ntickets:\n")
+	for _, epic := range epics {
+		if epic.Name != name {
+			continue
+		}
+		for _, t := range epic.Tickets {
+			fmt.Fprintf(&out, "%s  %s  %s\n", t.Identifier, t.Status, t.Title)
+		}
+	}
+	_, err = io.WriteString(w, out.String())
+	return err
 }
 
 func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer) error {

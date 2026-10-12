@@ -66,6 +66,28 @@ func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_EpicAddressPrintsEntryAndTickets(t *testing.T) {
+	repo, project := setupShowProject(t)
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-second.md",
+		"---\nid: \"07\"\nstatus: done\ntype: implement\n---\n\n# 07 — Second\n")
+	entry, err := os.ReadFile(filepath.Join(project, "epic", "ticket.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, addr := range []string{"mine:epic", "epic"} {
+		out, err := runIn(t, repo, "tickets", "show", addr)
+		if err != nil {
+			t.Fatalf("show %s: %v", addr, err)
+		}
+		want := "mine:epic\npath: " + filepath.Join(project, "epic", "ticket.md") + "\n" + string(entry) +
+			"\ntickets:\n06  open  Hello\n07  done  Second\n"
+		if out != want {
+			t.Errorf("show %s printed\n%s\nwant\n%s", addr, out, want)
+		}
+	}
+}
+
 func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
 	repo, _ := setupShowProject(t)
 
@@ -74,7 +96,9 @@ func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
 		"mine:nope/06":  tickets.CodeUnknownEpic,
 		"other:epic/06": tickets.CodeUnknownProject,
 		"06":            tickets.CodeEpicRequired,
-		"garbage":       tickets.CodeMalformedAddress,
+		"mine:nope":     tickets.CodeUnknownEpic,
+		"nope":          tickets.CodeUnknownEpic,
+		"a/b/c":         tickets.CodeMalformedAddress,
 	} {
 		out, err := runIn(t, repo, "tickets", "show", addr)
 		var ae *tickets.AddressError
