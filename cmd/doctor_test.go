@@ -289,3 +289,64 @@ func TestDoctor_Fix_SkipsWhenDeclined(t *testing.T) {
 		t.Errorf("expected 'Skipped' in output, got: %q", stdout.String())
 	}
 }
+
+func TestDoctor_ReportsMissingTrunkWithoutFixing(t *testing.T) {
+	outerDir := setupDotBareForCmd(t)
+	repo, err := git.FindRepo(outerDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registerWithTrunk(t, repo.Root, "develop")
+	projectFile := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p", "project.json")
+	before, err := os.ReadFile(projectFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdout:       &stdout,
+		stderr:       bytes.NewBuffer(nil),
+		getwd:        func() (string, error) { return outerDir, nil },
+		confirmForce: func(string) (bool, error) { t.Fatal("trunk check must not offer a fix"); return false, nil },
+	}
+	if err := execute([]string{"doctor", "--fix"}, d); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+
+	out := stdout.String()
+	if want := `project "p": trunk "develop" from project.json is not a local branch`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want it to contain %q", out, want)
+	}
+	if !strings.Contains(out, "No automatic fix available") {
+		t.Errorf("output = %q, want no automatic fix", out)
+	}
+	if after, _ := os.ReadFile(projectFile); !bytes.Equal(after, before) {
+		t.Errorf("project.json changed: %s", after)
+	}
+	if git.RefExists(repo.Root, "refs/heads/develop") {
+		t.Error("doctor created the develop branch")
+	}
+}
+
+func TestDoctor_HealthyTrunkReportsNothing(t *testing.T) {
+	outerDir := setupDotBareForCmd(t)
+	repo, err := git.FindRepo(outerDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registerWithTrunk(t, repo.Root, repo.Trunk)
+
+	var stdout bytes.Buffer
+	d := deps{
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return outerDir, nil },
+	}
+	if err := execute([]string{"doctor"}, d); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "No issues found") {
+		t.Errorf("output = %q, want 'No issues found'", stdout.String())
+	}
+}

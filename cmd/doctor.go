@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
 
@@ -51,8 +53,8 @@ func runDoctor(args []string, d deps) error {
 		return err
 	}
 
-	repo, err := git.FindRepo(cwd)
-	if err != nil {
+	repo, findErr := git.FindRepo(cwd)
+	if findErr != nil {
 		// FindRepo can fail when the outer .git file is itself broken.
 		// Fall back to checking whether cwd contains a .bare directory.
 		repo, err = findRepoWithFallback(cwd)
@@ -64,6 +66,13 @@ func runDoctor(args []string, d deps) error {
 	issues, err := git.CheckRepo(*repo)
 	if err != nil {
 		return err
+	}
+	// A broken repo can't resolve its project, so the trunk check would only
+	// repeat the repair issue above.
+	if findErr == nil {
+		if issue := checkTrunk(cwd, repo.Root); issue != nil {
+			issues = append(issues, *issue)
+		}
 	}
 
 	printDoctorRuntime(d.stdout, getenv)
@@ -154,6 +163,22 @@ func runDoctorBlockedFormCheck(target string, d deps) error {
 	}
 
 	fmt.Fprintln(d.stdout, "PASS: herdr matched live_blocked_form.")
+	return nil
+}
+
+// checkTrunk reports a missing trunk or unreadable project.json for cwd's
+// project. It never offers a fix: picking a branch is the owner's call.
+func checkTrunk(cwd, repoRoot string) *git.Issue {
+	projectDir, err := tickets.RootFor(cwd)
+	if errors.Is(err, tickets.ErrNoProject) {
+		return nil
+	}
+	if err == nil {
+		_, err = tickets.Trunk(projectDir, repoRoot)
+	}
+	if err != nil {
+		return &git.Issue{Description: err.Error()}
+	}
 	return nil
 }
 
