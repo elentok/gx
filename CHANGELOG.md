@@ -1,15 +1,20 @@
 # Changelog
 
-## Unreleased
+## v0.32.7 - 2026-10-12
 
+- Added the `gx-follow-up` skill: the one route for filing a follow-up. It picks the project, checks existing follow-ups (and their archive) for duplicates, fills the sections and files it. `gx-investigate`, `gx-to-tickets`, `gx-evolve` and `gx-code-review` now file their follow-ups through it.
+- Added epic addresses to `gx tickets show`: `gx tickets show <epic>` or `<project>:<epic>` prints the epic's `ticket.md` and one line per ticket. `--json` is not supported for an epic.
 - Added config reload without a server restart:
   - `gx server reload-config` reloads `config.json` into the running server. A broken file is refused and the live settings stay as they were.
   - The server also reloads `config.json` on its own whenever it is saved. Turn this off with `server.watch-config: false`.
   - Each reload shows an OS banner (through `terminal-notifier` on macOS when it is installed) and a TUI toast at its level: success, warning or error.
   - Startup-only keys (`ticket-store.path`, `server.tcp-listen`, `agent-runner`) still need a restart; a reload warns about them.
-  - A reload that sets the hard budget limit at or below today's spend waits 60 seconds before stopping agents. Raising the limit or running `gx budget increase` cancels the stop.
+  - A reload that sets the hard budget limit at or below today's spend waits 60 seconds before stopping agents. Raising the limit, `gx budget increase` or `gx budget override` cancels the stop.
 - Added `gx server config-status` (`GET /v1/config/status`): the last reload's result, startup-only changes waiting for a restart and any hard-limit countdown. `gx server status` shows the same as a Config block.
+- Added yanking from epic rows in the Tickets tab: `yy` copies the epic name and `yf` copies its `ticket.md` path. `ee` now also opens a server-mode epic's `ticket.md`.
+- Added ticket-id matching to Tickets and Queue search.
 - Changed `gx server status` to work with a broken `config.json`: it prints the config error at the top instead of failing.
+- Fixed `yf` on a server-mode ticket copying its address instead of its file path.
 
 ## v0.32.6 - 2026-10-11
 
