@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.32.9 - 2026-10-12
+
+- Changed `gx tickets close --done` to `--sweep` (`--done` stays as a hidden alias). The sweep now also moves cancelled follow-ups into the archive, keeps their status, and adds a Resolution with the original address when one is missing.
+- Changed ticket titles to come from the body's first `#` heading, minus any id prefix (with or without a separator or leading zeros), so acronyms keep their case. The title falls back to the slug when the heading is missing or id-only. Long titles are capped in list rows.
+- Added `docs/project-schema.json`. gx now writes `$schema` into every `project.json` it saves, and leaves out unset keys instead of writing `null`.
+- Changed `gx-bump` to draft the changelog in the background while the tests run, and to commit and bump without a review pause.
+- Fixed launch skipping claude's trust dialog when a crashed claude's old pid status file was read under a reused pid. Status files older than the spawn are ignored.
+- Fixed a pty agent reattach holding the runner lock.
+- Fixed the holder status reporting claude as exited only after the output drain. It now reports the exit first.
+- Fixed the TUI blocking while it checks a native agent's liveness for the `m` menu and Watch. The check now runs off the UI loop.
+- Fixed an actions menu opening for a row the user has already left.
+
 ## v0.32.8 - 2026-10-12
 
 - Changed `agent-runner: pty` from rejected to accepted: the server runs interactive claude in a pty per project. `auto` still never picks pty.
