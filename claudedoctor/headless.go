@@ -2,6 +2,7 @@ package claudedoctor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -260,42 +261,60 @@ func checkSurvivesLauncherExit(Input) (string, bool) {
 	return fmt.Sprintf("claude %d outlived its launcher", pid), true
 }
 
-// checkSurvivesKickstart submits a throwaway launchd job that starts claude
-// detached, then `launchctl kickstart -k`s it: that kills the job's process
-// group, which a Setsid'd claude must not be in.
-func checkSurvivesKickstart(Input) (string, bool) {
+// setsid runs the command after it in a new session; launchd jobs have no
+// setsid(1).
+const setsid = `/usr/bin/perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV'`
+
+// kickstartJob submits a throwaway launchd job whose shell backgrounds the
+// start command, then `launchctl kickstart -k`s it: that kills the job's
+// process group, which a setsid'd process must not be in. It returns the
+// started pid once kickstart has had time to land; the caller kills it.
+func kickstartJob(dir, start string) (int, error) {
 	if _, err := exec.LookPath("launchctl"); err != nil {
-		return "launchctl not found", false
+		return 0, errors.New("launchctl not found")
 	}
+	label := fmt.Sprintf("gx.doctor.%d", os.Getpid())
+	target := fmt.Sprintf("gui/%d/%s", os.Getuid(), label)
+	pidFile := filepath.Join(dir, "pid")
+	script := fmt.Sprintf(`%s & echo $! > %q; sleep 600`, start, pidFile)
+	if out, err := exec.Command("launchctl", "submit", "-l", label, "--", "sh", "-c", script).CombinedOutput(); err != nil {
+		return 0, fmt.Errorf("launchctl submit: %v: %s", err, out)
+	}
+	defer exec.Command("launchctl", "remove", label).Run()
+
+	pid, err := readPid(pidFile)
+	if err != nil {
+		return 0, err
+	}
+	if out, err := exec.Command("launchctl", "kickstart", "-k", target).CombinedOutput(); err != nil {
+		return pid, fmt.Errorf("launchctl kickstart: %v: %s", err, out)
+	}
+	time.Sleep(2 * time.Second)
+	return pid, nil
+}
+
+// checkSurvivesKickstart starts claude detached from a launchd job that is
+// then kickstarted.
+func checkSurvivesKickstart(Input) (string, bool) {
 	dir, err := os.MkdirTemp("", "gx-doctor-")
 	if err != nil {
 		return err.Error(), false
 	}
 	defer os.RemoveAll(dir)
 
-	label := fmt.Sprintf("gx.doctor.%d", os.Getpid())
-	target := fmt.Sprintf("gui/%d/%s", os.Getuid(), label)
 	fifo := filepath.Join(dir, "in")
 	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
 		return err.Error(), false
 	}
-	pidFile := filepath.Join(dir, "pid")
-	script := fmt.Sprintf(`exec 3<>%q; /usr/bin/perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' claude -p --input-format stream-json --output-format stream-json --verbose <&3 >%q 2>&1 & echo $! > %q; sleep 600`,
-		fifo, filepath.Join(dir, "out"), pidFile)
-	if out, err := exec.Command("launchctl", "submit", "-l", label, "--", "sh", "-c", script).CombinedOutput(); err != nil {
-		return fmt.Sprintf("launchctl submit: %v: %s", err, out), false
+	start := fmt.Sprintf(`exec 3<>%q; %s claude -p --input-format stream-json --output-format stream-json --verbose <&3 >%q 2>&1`,
+		fifo, setsid, filepath.Join(dir, "out"))
+	pid, err := kickstartJob(dir, start)
+	if pid > 0 {
+		defer syscall.Kill(pid, syscall.SIGKILL)
 	}
-	defer exec.Command("launchctl", "remove", label).Run()
-
-	pid, err := readPid(pidFile)
 	if err != nil {
 		return err.Error(), false
 	}
-	defer syscall.Kill(pid, syscall.SIGKILL)
-	if out, err := exec.Command("launchctl", "kickstart", "-k", target).CombinedOutput(); err != nil {
-		return fmt.Sprintf("launchctl kickstart: %v: %s", err, out), false
-	}
-	time.Sleep(2 * time.Second)
 	if !alive(pid) {
 		return fmt.Sprintf("claude %d died on kickstart -k", pid), false
 	}

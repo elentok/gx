@@ -2,7 +2,9 @@ package claudedoctor
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"syscall"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
@@ -14,6 +16,42 @@ var ptyChecks = []Check{
 	// No recorded session has hit a rate limit, so there is no banner to
 	// write a screen rule against; PTY RateLimit reports nothing until then.
 	{Runner: "pty", Name: "rate-limit-screen", Mode: Fixture, SkipReason: "banner never captured"},
+	{Runner: "pty", Name: "holder-survives-kickstart", Mode: Live, Run: checkHolderSurvivesKickstart},
+}
+
+// checkHolderSurvivesKickstart starts `gx agent-holder` detached from a
+// launchd job that is then kickstarted; holder.sock must still answer. The
+// holder runs sleep, not claude: only the holder's survival is in question.
+func checkHolderSurvivesKickstart(Input) (string, bool) {
+	exe, err := os.Executable()
+	if err != nil {
+		return err.Error(), false
+	}
+	// Short dir: holder.sock lives in it and socket paths are length-capped.
+	dir, err := os.MkdirTemp("", "gxd")
+	if err != nil {
+		return err.Error(), false
+	}
+	defer os.RemoveAll(dir)
+
+	start := fmt.Sprintf(`%s %q agent-holder --session-id doctor --dir %q -- sleep 600 </dev/null >/dev/null 2>&1`,
+		setsid, exe, dir)
+	pid, err := kickstartJob(dir, start)
+	if pid > 0 {
+		defer syscall.Kill(pid, syscall.SIGKILL)
+	}
+	if err != nil {
+		return err.Error(), false
+	}
+	c, err := nativerunner.DialHolder(dir)
+	if err != nil {
+		return fmt.Sprintf("holder %d after kickstart -k: %v", pid, err), false
+	}
+	defer c.Stop()
+	if _, _, err := c.Status(); err != nil {
+		return fmt.Sprintf("holder %d status after kickstart -k: %v", pid, err), false
+	}
+	return fmt.Sprintf("holder %d survived kickstart -k and answers status", pid), true
 }
 
 // checkPidStatus reads the pid status file snapshots the PTY runner relies

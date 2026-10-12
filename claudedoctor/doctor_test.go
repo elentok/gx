@@ -62,7 +62,7 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FixtureSource: %v", err)
 	}
-	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "rate-limit-screen": Skip}
+	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "rate-limit-screen": Skip, "holder-survives-kickstart": Skip}
 	got := map[string]Result{}
 	for _, r := range Run(Table, "pty", src) {
 		got[r.Name] = r
@@ -74,6 +74,9 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	}
 	if d := got["rate-limit-screen"].Detail; d != "banner never captured" {
 		t.Errorf("rate-limit-screen detail = %q", d)
+	}
+	if d := got["holder-survives-kickstart"].Detail; d != "live only" {
+		t.Errorf("holder-survives-kickstart detail = %q", d)
 	}
 }
 
