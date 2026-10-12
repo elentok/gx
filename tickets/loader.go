@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
@@ -148,15 +150,28 @@ func headingTitle(body, identifier string) string {
 			continue
 		}
 		heading := strings.TrimSpace(line[2:])
-		if rest, ok := strings.CutPrefix(heading, identifier); ok {
-			rest = strings.TrimSpace(rest)
-			if trimmed := strings.TrimLeft(rest, "—–-:"); trimmed != rest || rest == "" {
-				heading = strings.TrimSpace(trimmed)
-			}
+		if rest, ok := cutIDPrefix(heading, identifier); ok {
+			heading = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(rest), "—–-:"))
 		}
 		return heading
 	}
 	return ""
+}
+
+// cutIDPrefix cuts identifier off the start of heading, ignoring leading
+// zeros on either side ("1 — X" on ticket 01). It only cuts at a word
+// boundary, so "07b split" on ticket 07 is not an id prefix.
+func cutIDPrefix(heading, identifier string) (rest string, ok bool) {
+	core := strings.TrimLeft(identifier, "0")
+	if core == "" {
+		return "", false
+	}
+	rest, ok = strings.CutPrefix(strings.TrimLeft(heading, "0"), core)
+	if !ok || rest == "" {
+		return rest, ok
+	}
+	r, _ := utf8.DecodeRuneInString(rest)
+	return rest, unicode.IsSpace(r) || strings.ContainsRune("—–-:", r)
 }
 
 func humanizeSlug(slug string) string {
