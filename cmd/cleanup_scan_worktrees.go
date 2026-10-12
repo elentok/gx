@@ -129,7 +129,7 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 		scan.Kind = "other"
 	}
 
-	merged, err := git.IsCommitMergedToTrunk(repo.Root, branch)
+	merged, err := mergedToTrunk(repo, branch)
 	if err != nil {
 		return WorktreeScan{}, err
 	}
@@ -170,7 +170,7 @@ func parseIterationBranch(branch string) (epic, ticketID string, ok bool) {
 }
 
 // iterationLanded reports whether branch's commits are already cherry-picked
-// into the epic's feature branch (epicName), or already reachable from main
+// into the epic's feature branch (epicName), or already reachable from trunk
 // — either way there's nothing left to land. Checked as an ancestor first
 // (the common case where the branch was never diverged/rebased away), then
 // via patch-id equivalence (git cherry), since CherryPickRange produces
@@ -197,7 +197,13 @@ func iterationLanded(repo git.Repo, branch, epicName string) (bool, error) {
 		}
 	}
 
-	return git.IsCommitMergedToTrunk(repo.Root, branch)
+	return mergedToTrunk(repo, branch)
+}
+
+// mergedToTrunk checks against repo.Trunk as OpenRepo resolved it, not
+// git.IsCommitMergedToTrunk, which re-detects the repo's default branch.
+func mergedToTrunk(repo git.Repo, ref string) (bool, error) {
+	return git.IsAncestor(repo.Root, ref, repo.Trunk)
 }
 
 // isActiveWork reports whether branch has a commit within worktreeActiveWindow,

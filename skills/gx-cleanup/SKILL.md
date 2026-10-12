@@ -31,11 +31,17 @@ Run:
 gx cleanup scan --json
 ```
 
+If it fails (e.g. trunk is missing or `project.json` is unreadable), report the error and stop —
+take no action at all, since every "landed?" check depends on trunk.
+
+Trunk is `project.json`'s `trunk`, else the repo's detected default. The `merged_to_main` fields
+below are checked against trunk despite their name.
+
 The result has three parts:
 
 - **`epics`** — one entry per non-`.archive` directory under the ticket store root (`gx tickets root`): `all_done`,
   `merged_to_main`, `has_code_review_ticket`, `code_review_done`.
-- **`worktrees`** — one entry per local branch other than the main branch: `kind`
+- **`worktrees`** — one entry per local branch other than trunk: `kind`
   (`"iteration"` | `"feature"` | `"other"`), `active` (recent commit or uncommitted changes —
   never propose an action against this one), `epic`/`ticket_id`/`ticket_done`/`landed` (iteration
   branches only), `merged_to_main` (feature/other branches only), and `recommendation`
@@ -71,9 +77,9 @@ unrecommended), dispatch one investigation sub-agent per item — independent it
 parallel. Give each sub-agent:
 
 - the item's scan fields from Step 1
-- for a case-2.2 epic: the diff between the epic's feature branch and the main branch
+- for a case-2.2 epic: the diff between the epic's feature branch and trunk
 - for a branch: the diff between the branch and its landing target — the epic's feature branch
-  for `kind == "iteration"`, the main branch for `kind == "feature"`/`"other"` — plus its last
+  for `kind == "iteration"`, trunk for `kind == "feature"`/`"other"` — plus its last
   commit's age
 - any related ticket/run-log state under `<root>/<epic>/` (`gx tickets root` for `<root>`; see
   gx-investigate's "Where state lives" section for `run-log.jsonl`'s shape)
@@ -89,7 +95,7 @@ answer — if a sub-agent returns one, send it back once telling it to commit to
 
 **Guardrail — these sub-agents are read-only against shared git state.** They must never run a
 command that moves HEAD or a branch ref in a worktree they didn't create themselves — no
-`git reset`, `git checkout <branch>`, `git switch`, `git branch -D/-f`, etc. against `main` or any
+`git reset`, `git checkout <branch>`, `git switch`, `git branch -D/-f`, etc. against trunk or any
 other shared/pre-existing worktree. Say so explicitly in every investigation prompt. For "does this
 apply cleanly" checks (cherry-pick/merge dry-runs), use `git merge-tree` — it computes the result
 without touching any working tree or HEAD, so there's nothing to leave dirty or forget to undo. If
@@ -156,10 +162,10 @@ conversation/context, not a detached sub-agent — with the epic's branch, and f
 written, with one addition: when it reaches its own "pause for review" step, call `gx notify` with
 a short summary of the epic and what's pending review before pausing.
 
-- `gx-merge` reports `"merged"` in its Step 1: the epic is merged — record it as done and move to
-  the next epic.
+- `gx-merge` reports `"merged"` in its Step 1: the epic is merged onto the result's `target` —
+  record it as done (naming `target`) and move to the next epic.
 - `gx-merge` aborts (a plain command error in its Step 1, or failed checks in its Step 4): leave
-  main untouched, record the failure (with any check output) for the end-of-run summary, and move
+  trunk untouched, record the failure (with any check output) for the end-of-run summary, and move
   on to the next epic. Do not attempt to fix unrelated failures or force the merge through.
 
 Never push to a remote at any point in this step — pushing stays an explicit, separate action for

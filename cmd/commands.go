@@ -418,7 +418,7 @@ func newMergeCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "merge <branch>",
-		Short: "fast-forward-only merge a branch/worktree onto main (deterministic core)",
+		Short: "fast-forward-only merge a branch/worktree onto trunk (deterministic core)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cwd, err := d.getwd()

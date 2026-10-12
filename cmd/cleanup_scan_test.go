@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // storeProjectFor isolates the ticket store and registers repoDir as a project
@@ -239,5 +241,54 @@ func TestExecute_CleanupScan_NotAGitRepo(t *testing.T) {
 	err := execute([]string{"cleanup", "scan"}, d)
 	if err == nil {
 		t.Fatal("expected error when cwd is outside a git repo, got nil")
+	}
+}
+
+func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	registerWithTrunk(t, dir, "develop")
+	testutil.MustGitExported(t, dir, "checkout", "-b", "develop")
+	commitFile(t, dir, "landed.txt", "x")
+	testutil.MustGitExported(t, dir, "branch", "landed-on-develop")
+	testutil.MustGitExported(t, dir, "checkout", "main")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }}
+	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+		t.Fatalf("cleanup scan: %v", err)
+	}
+	var result CleanupScanResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v\noutput: %s", err, stdout.String())
+	}
+
+	byBranch := map[string]WorktreeScan{}
+	for _, ws := range result.Worktrees {
+		byBranch[ws.Branch] = ws
+	}
+	if _, ok := byBranch["develop"]; ok {
+		t.Errorf("trunk develop listed in worktree scan: %+v", result.Worktrees)
+	}
+	if !byBranch["landed-on-develop"].MergedToTrunk {
+		t.Errorf("landed-on-develop not merged to trunk: %+v", byBranch["landed-on-develop"])
+	}
+	if _, ok := byBranch["main"]; !ok {
+		t.Errorf("main (not trunk) missing from worktree scan: %+v", result.Worktrees)
+	}
+}
+
+func TestExecute_CleanupScan_MissingTrunkStopsBeforeReporting(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	registerWithTrunk(t, dir, "develop")
+
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }}
+	err := execute([]string{"cleanup", "scan", "--json"}, d)
+	var missing *tickets.ErrTrunkMissing
+	if !errors.As(err, &missing) {
+		t.Fatalf("err = %v, want ErrTrunkMissing", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want nothing a cleanup could act on", stdout.String())
 	}
 }

@@ -69,7 +69,13 @@ func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
-	repo := info.Repo
+	// A "landed?" check against an unresolved trunk can't be trusted, so
+	// stop before reporting anything the gx-cleanup skill would delete on.
+	openRepo, err := tickets.OpenRepo(cwd)
+	if err != nil {
+		return err
+	}
+	repo := *openRepo
 
 	root, err := ticketRoot(cwd)
 	if err != nil {
@@ -140,7 +146,7 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 		}
 	}
 	if branchExists {
-		merged, err := git.IsCommitMergedToTrunk(repo.Root, epic.Name)
+		merged, err := mergedToTrunk(repo, epic.Name)
 		if err != nil {
 			return EpicScan{}, err
 		}

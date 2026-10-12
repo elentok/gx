@@ -3,11 +3,14 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // mergeTestRepo creates a plain bare repo with a linked worktree for main
@@ -142,7 +145,100 @@ func TestRunMerge_TextOutput(t *testing.T) {
 	if err := runMerge(mainDir, "feature", false, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
-	if got := stdout.String(); got != "merged\n" {
-		t.Errorf("text output = %q, want %q", got, "merged\n")
+	if got, want := stdout.String(), "merged onto main\n"; got != want {
+		t.Errorf("text output = %q, want %q", got, want)
+	}
+}
+
+func revParse(t *testing.T, dir, ref string) string {
+	t.Helper()
+	sha, err := git.RevParse(dir, ref)
+	if err != nil {
+		t.Fatalf("rev-parse %s: %v", ref, err)
+	}
+	return sha
+}
+
+// registerWithTrunk isolates the ticket store and registers repoDir as a
+// project whose project.json sets trunk. Not parallel-safe (sets env).
+func registerWithTrunk(t *testing.T, repoDir, trunk string) {
+	t.Helper()
+	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
+	testutil.WriteFile(t, projectDir, "project.json",
+		`{"name":"p","repo":"`+repoDir+`","trunk":"`+trunk+`"}`)
+}
+
+func TestRunMerge_LandsOnConfiguredTrunk(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	testutil.MustGitExported(t, mainDir, "branch", "develop")
+	registerWithTrunk(t, repoDir, "develop")
+	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	mainBefore := revParse(t, mainDir, "main")
+
+	var stdout bytes.Buffer
+	if err := runMerge(mainDir, "feature", true, &stdout); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+
+	if got, want := decodeMergeResult(t, &stdout), (MergeResult{Status: "merged", Target: "develop"}); got != want {
+		t.Errorf("result = %+v, want %+v", got, want)
+	}
+	if got, want := revParse(t, mainDir, "develop"),
+		revParse(t, mainDir, "feature"); got != want {
+		t.Errorf("develop = %s, want feature tip %s", got, want)
+	}
+	if got := revParse(t, mainDir, "main"); got != mainBefore {
+		t.Errorf("main moved from %s to %s", mainBefore, got)
+	}
+}
+
+func TestRunMerge_TextOutputNamesConfiguredTrunk(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	testutil.MustGitExported(t, mainDir, "branch", "develop")
+	registerWithTrunk(t, repoDir, "develop")
+	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	commitFile(t, mainDir, "main-only.txt", "x")
+	testutil.MustGitExported(t, mainDir, "branch", "-f", "develop", "main")
+
+	var stdout bytes.Buffer
+	if err := runMerge(mainDir, "feature", false, &stdout); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+	if got := stdout.String(); !strings.HasPrefix(got, "needs rebase: feature onto develop\n") {
+		t.Errorf("text output = %q, want needs rebase onto develop", got)
+	}
+}
+
+func TestRunMerge_UnregisteredRepoUsesDetectedDefault(t *testing.T) {
+	isolateTicketStore(t)
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+
+	var stdout bytes.Buffer
+	if err := runMerge(mainDir, "feature", true, &stdout); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+	if got, want := decodeMergeResult(t, &stdout), (MergeResult{Status: "merged", Target: "main"}); got != want {
+		t.Errorf("result = %+v, want %+v", got, want)
+	}
+}
+
+func TestRunMerge_MissingTrunkFailsWithSharedError(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	registerWithTrunk(t, repoDir, "develop")
+	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+	mainBefore := revParse(t, mainDir, "main")
+
+	var stdout bytes.Buffer
+	err := runMerge(mainDir, "feature", true, &stdout)
+	var missing *tickets.ErrTrunkMissing
+	if !errors.As(err, &missing) || missing.Trunk != "develop" {
+		t.Fatalf("err = %v, want ErrTrunkMissing for develop", err)
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("stdout = %q, want nothing", stdout.String())
+	}
+	if got := revParse(t, mainDir, "main"); got != mainBefore {
+		t.Errorf("main moved from %s to %s", mainBefore, got)
 	}
 }

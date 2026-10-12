@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets"
 )
 
 // MergeResult is the `gx merge <branch> --json` payload.
@@ -18,30 +19,31 @@ type MergeResult struct {
 
 // runMerge is the deterministic core of `gx merge <branch>` (see ADR 0015):
 // it resolves branchArg to a real branch name, attempts a fast-forward-only
-// merge of it into the repo's main branch inside main's own worktree — never
-// cwd's current branch — and reports the outcome to w. It never rebases,
-// never pushes, and stops without further mutation on a non-fast-forward
-// refusal.
+// merge of it into the repo's trunk — never cwd's current branch — and reports
+// the outcome to w. It never rebases, never pushes, and stops without further
+// mutation on a non-fast-forward refusal.
 func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
-	info, err := git.IdentifyDir(cwd)
-	if err != nil {
+	repo, err := tickets.OpenRepo(cwd)
+	if repo == nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
-	repo := info.Repo
+	if err != nil {
+		return err
+	}
 
-	worktrees, err := git.ListWorktrees(repo)
+	worktrees, err := git.ListWorktrees(*repo)
 	if err != nil {
 		return err
 	}
 
 	branch := resolveMergeBranch(branchArg, worktrees)
 
-	outcome, err := git.MergeBranchInto(repo, worktrees, branch, repo.Trunk)
+	outcome, err := git.MergeBranchInto(*repo, worktrees, branch, repo.Trunk)
 	if err != nil {
 		return err
 	}
 
-	result := MergeResult{Status: "merged"}
+	result := MergeResult{Status: "merged", Target: repo.Trunk}
 	if !outcome.Merged {
 		result = MergeResult{
 			Status:       "needs_rebase",
@@ -83,7 +85,7 @@ func printMergeJSON(w io.Writer, result MergeResult) error {
 func printMergeText(w io.Writer, result MergeResult) {
 	switch result.Status {
 	case "merged":
-		fmt.Fprintln(w, "merged")
+		fmt.Fprintf(w, "merged onto %s\n", result.Target)
 	case "needs_rebase":
 		fmt.Fprintf(w, "needs rebase: %s onto %s\n", result.Branch, result.Target)
 		if result.WorktreePath != "" {

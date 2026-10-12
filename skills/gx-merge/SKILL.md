@@ -1,7 +1,7 @@
 ---
 name: gx-merge
 description:
-  Merge a branch/worktree onto the repo's main branch. Tries gx's deterministic
+  Merge a branch/worktree onto the repo's trunk. Tries gx's deterministic
   ff-only merge, and on non-fast-forward, rebases, resolves conflicts, pauses
   for review, runs the repo's checks, then retries the merge.
 disable-model-invocation: true
@@ -9,10 +9,12 @@ disable-model-invocation: true
 
 # gx Merge
 
-Owns the judgment half of merging a branch onto the repo's detected main
-branch — `gx merge <branch>` (see ADR 0015) handles the deterministic half
-(resolve the branch, attempt `git merge --ff-only`) and stops the moment it
-needs a decision only a human/agent should make.
+Owns the judgment half of merging a branch onto the repo's trunk
+(`project.json`'s `trunk`, else the detected default) — `gx merge <branch>`
+(see ADR 0015) handles the deterministic half (resolve trunk and the branch,
+attempt `git merge --ff-only`) and stops the moment it needs a decision only a
+human/agent should make. Always read the branch it merged onto from `target`;
+never assume "main".
 
 ## Step 1: attempt the deterministic merge
 
@@ -24,10 +26,10 @@ gx merge <branch> --json
 
 Branch it three ways on `status`:
 
-- **`"merged"`** — done. Report it and stop.
+- **`"merged"`** — done. Report it (`target` names the branch it landed on) and stop.
 - **`"needs_rebase"`** — continue to Step 2.
-- anything else (a plain command error) — report the error and stop. Do
-  nothing further; main is untouched.
+- anything else (a plain command error, e.g. trunk is missing) — report the
+  error and stop. Do nothing further; trunk is untouched.
 
 ## Step 2: rebase
 
@@ -39,11 +41,11 @@ requires a working tree, so this step only runs when one is checked out for
   continue below.
 - **`worktree_path` is empty** — no worktree is checked out for `branch`, and
   none may be created or checked out to run the rebase in: doing so risks
-  landing the rebase in main's own worktree, checking `branch` out there and
-  leaving main's checkout off main (violating ADR 0015's guarantee that this
+  landing the rebase in trunk's own worktree, checking `branch` out there and
+  leaving trunk's checkout off trunk (violating ADR 0015's guarantee that this
   flow never touches a worktree's current branch out from under it). Stop
   here, report that `<branch>` has no worktree so `gx-merge` can't rebase it,
-  and leave main untouched. This case is currently unsupported — the caller
+  and leave trunk untouched. This case is currently unsupported — the caller
   (e.g. `gx-cleanup`) needs to check out the branch in its own worktree first.
 
 If the rebase reports conflicts, invoke the
@@ -63,7 +65,7 @@ Discover and run this repo's automated checks (typecheck, then tests, then
 format) the same way `gx-resolving-merge-conflicts` does in its own
 "automated checks" step — don't hardcode a specific check command here.
 
-- **Checks fail**: abort. Leave main untouched, report the failure (with
+- **Checks fail**: abort. Leave trunk untouched, report the failure (with
   output) and stop. Do not attempt to fix unrelated failures or force the
   merge through.
 - **Checks pass**: continue to Step 5.
