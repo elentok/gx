@@ -7,11 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/herdr"
 )
 
+// These cover the herdr wiring; the nudge/retype decisions themselves are
+// tested in claudeui.
+
 // pollTimeoutErr matches IsPollTimeout's "timed out" substring check.
 var pollTimeoutErr = errors.New("timed out waiting for state")
+
+var graceMs = int(claudeui.NudgeGrace / time.Millisecond)
 
 // fixedNow returns a clock that never advances, for tests where elapsed
 // time isn't under test.
@@ -47,23 +53,13 @@ func changingRead() func(target string, opts herdr.AgentReadOptions) (string, er
 	}
 }
 
-// stableRead returns a read stub that always returns the same fixed text,
-// simulating a pane that never changes at all — the "text never reached the
-// pane" shape PromptWithNudge should recover from by resubmitting in full,
-// not by nudging with Enter.
-func stableRead(text string) func(target string, opts herdr.AgentReadOptions) (string, error) {
-	return func(target string, opts herdr.AgentReadOptions) (string, error) {
-		return text, nil
-	}
-}
-
 func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 	t.Parallel()
 	var promptCalls, sendKeysCalls, waitCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptCalls++
-		if opts.TimeoutMs != PromptNudgeGraceMs {
-			t.Errorf("prompt TimeoutMs = %d, want %d", opts.TimeoutMs, PromptNudgeGraceMs)
+		if opts.TimeoutMs != graceMs {
+			t.Errorf("prompt TimeoutMs = %d, want %d", opts.TimeoutMs, graceMs)
 		}
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
@@ -76,7 +72,7 @@ func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -114,7 +110,7 @@ func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
 
 	// The pane's text changed since the initial submit (changingRead), so
 	// this reads as "typed but not submitted" and should nudge, not retype.
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -153,7 +149,7 @@ exit status 1
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
 
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -186,7 +182,7 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 		return herdr.Agent{}, pollTimeoutErr
 	}
 
-	_, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -195,59 +191,14 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 	if !IsPollTimeout(err) {
 		t.Fatalf("PromptWithNudge() error = %v, want a poll-timeout error", err)
 	}
-	if errors.Is(err, ErrStuckSubmission) {
+	if errors.Is(err, claudeui.ErrStuckSubmission) {
 		t.Errorf("PromptWithNudge() error = %v, want a plain poll-timeout error, not ErrStuckSubmission (the pane kept changing)", err)
 	}
 	if promptCalls != 1 {
 		t.Errorf("promptCalls = %d, want 1 (only the initial submission)", promptCalls)
 	}
-	if sendKeysCalls != PromptMaxNudges || waitCalls != PromptMaxNudges {
-		t.Errorf("sendKeysCalls=%d waitCalls=%d, want both = PromptMaxNudges (%d)", sendKeysCalls, waitCalls, PromptMaxNudges)
-	}
-}
-
-func TestPromptWithNudge_UnchangedPane_RetypesFullTextInsteadOfNudging(t *testing.T) {
-	t.Parallel()
-	var promptTexts []string
-	var sendKeysCalls int
-	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		promptTexts = append(promptTexts, opts.Text)
-		if len(promptTexts) <= 2 {
-			return herdr.Agent{}, pollTimeoutErr
-		}
-		return herdr.Agent{AgentStatus: "working"}, nil
-	}
-	sendKeys := func(target string, keys ...string) error {
-		sendKeysCalls++
-		return nil
-	}
-	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		t.Fatal("wait should not be called: the pane never changed, so it should retype instead of nudging")
-		return herdr.Agent{}, nil
-	}
-
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, stableRead("empty pane"), fixedNow())(herdr.AgentPromptOptions{
-		Target: "pane-1",
-		Text:   "hello",
-		Wait:   true,
-		Until:  []string{"working"},
-	})
-	if err != nil {
-		t.Fatalf("PromptWithNudge() error = %v, want the 3rd retype to succeed", err)
-	}
-	if agent.AgentStatus != "working" {
-		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "working")
-	}
-	if len(promptTexts) != 3 {
-		t.Fatalf("prompt called %d times, want 3 (1 initial submit + 2 retypes)", len(promptTexts))
-	}
-	for i, text := range promptTexts {
-		if text != "hello" {
-			t.Errorf("promptTexts[%d] = %q, want %q (retype resubmits the full text)", i, text, "hello")
-		}
-	}
-	if sendKeysCalls != 0 {
-		t.Errorf("sendKeysCalls = %d, want 0 (an unchanged pane should never get a bare-Enter nudge)", sendKeysCalls)
+	if sendKeysCalls != claudeui.MaxNudges || waitCalls != claudeui.MaxNudges {
+		t.Errorf("sendKeysCalls=%d waitCalls=%d, want both = claudeui.MaxNudges (%d)", sendKeysCalls, waitCalls, claudeui.MaxNudges)
 	}
 }
 
@@ -256,7 +207,16 @@ func TestPromptWithNudge_UnchangedPane_ExhaustsRetypes_ReturnsStuckSubmission(t 
 	var promptCalls, sendKeysCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptCalls++
+		if opts.Text != "hello" || opts.Target != "pane-1" {
+			t.Errorf("prompt Target=%q Text=%q, want pane-1/hello (a retype resubmits the full text)", opts.Target, opts.Text)
+		}
 		return herdr.Agent{}, pollTimeoutErr
+	}
+	read := func(target string, opts herdr.AgentReadOptions) (string, error) {
+		if target != "pane-1" || opts.Source != "recent-unwrapped" {
+			t.Errorf("read(%q, %+v), want pane-1 with Source=recent-unwrapped", target, opts)
+		}
+		return "empty pane", nil
 	}
 	sendKeys := func(target string, keys ...string) error {
 		sendKeysCalls++
@@ -267,103 +227,22 @@ func TestPromptWithNudge_UnchangedPane_ExhaustsRetypes_ReturnsStuckSubmission(t 
 		return herdr.Agent{}, nil
 	}
 
-	_, err := PromptWithNudge(prompt, sendKeys, wait, stableRead("empty pane"), fixedNow())(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(prompt, sendKeys, wait, read, fixedNow())(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
 		Until:  []string{"working"},
 	})
-	if !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want it to wrap ErrStuckSubmission", err)
+	if !errors.Is(err, claudeui.ErrStuckSubmission) || !errors.Is(err, pollTimeoutErr) {
+		t.Fatalf("PromptWithNudge() error = %v, want it to wrap ErrStuckSubmission and herdr's poll error", err)
 	}
-	// 1 initial submit + PromptMaxRetypes retypes, then it gives up rather
-	// than spending the rest of PromptMaxNudges on pointless Enter nudges.
-	if promptCalls != 1+PromptMaxRetypes {
-		t.Errorf("promptCalls = %d, want %d (1 initial + PromptMaxRetypes retypes)", promptCalls, 1+PromptMaxRetypes)
+	// 1 initial submit + claudeui.MaxRetypes retypes, then it gives up rather
+	// than spending the rest of claudeui.MaxNudges on pointless Enter nudges.
+	if promptCalls != 1+claudeui.MaxRetypes {
+		t.Errorf("promptCalls = %d, want %d (1 initial + claudeui.MaxRetypes retypes)", promptCalls, 1+claudeui.MaxRetypes)
 	}
 	if sendKeysCalls != 0 {
 		t.Errorf("sendKeysCalls = %d, want 0", sendKeysCalls)
-	}
-}
-
-func TestPromptWithNudge_UnchangedThenChanged_RetypesOnceThenNudges(t *testing.T) {
-	t.Parallel()
-	reads := []string{"empty pane", "empty pane", "hello_"} // unchanged once, then the retype's text lands
-	readIdx := 0
-	read := func(target string, opts herdr.AgentReadOptions) (string, error) {
-		out := reads[readIdx]
-		if readIdx < len(reads)-1 {
-			readIdx++
-		}
-		return out, nil
-	}
-
-	var promptCalls, sendKeysCalls, waitCalls int
-	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		promptCalls++
-		return herdr.Agent{}, pollTimeoutErr
-	}
-	sendKeys := func(target string, keys ...string) error {
-		sendKeysCalls++
-		return nil
-	}
-	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		waitCalls++
-		return herdr.Agent{AgentStatus: "working"}, nil
-	}
-
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, read, fixedNow())(herdr.AgentPromptOptions{
-		Target: "pane-1",
-		Text:   "hello",
-		Wait:   true,
-		Until:  []string{"working"},
-	})
-	if err != nil {
-		t.Fatalf("PromptWithNudge() error = %v", err)
-	}
-	if agent.AgentStatus != "working" {
-		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "working")
-	}
-	if promptCalls != 2 {
-		t.Errorf("promptCalls = %d, want 2 (1 initial submit + 1 retype)", promptCalls)
-	}
-	if sendKeysCalls != 1 || waitCalls != 1 {
-		t.Errorf("sendKeysCalls=%d waitCalls=%d, want both 1 (the retype's text landing should be nudged, not retyped again)", sendKeysCalls, waitCalls)
-	}
-}
-
-func TestPromptWithNudge_ReadFails_FallsBackToBareEnterNudge(t *testing.T) {
-	t.Parallel()
-	readErr := errors.New("pane not found")
-	var sendKeysCalls int
-	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		return herdr.Agent{}, pollTimeoutErr
-	}
-	sendKeys := func(target string, keys ...string) error {
-		sendKeysCalls++
-		return nil
-	}
-	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		return herdr.Agent{AgentStatus: "working"}, nil
-	}
-	read := func(target string, opts herdr.AgentReadOptions) (string, error) {
-		return "", readErr
-	}
-
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, read, fixedNow())(herdr.AgentPromptOptions{
-		Target: "pane-1",
-		Text:   "hello",
-		Wait:   true,
-		Until:  []string{"working"},
-	})
-	if err != nil {
-		t.Fatalf("PromptWithNudge() error = %v", err)
-	}
-	if agent.AgentStatus != "working" {
-		t.Errorf("agent.AgentStatus = %q, want %q", agent.AgentStatus, "working")
-	}
-	if sendKeysCalls != 1 {
-		t.Errorf("sendKeysCalls = %d, want 1 (a read failure should fall back to the older nudge behavior, not be treated as proof of a stuck pane)", sendKeysCalls)
 	}
 }
 
@@ -386,7 +265,7 @@ func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "hello",
 		Wait:      true,
@@ -411,8 +290,8 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 	var completionWaitCalls int
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		promptCalls++
-		if opts.TimeoutMs != PromptNudgeGraceMs {
-			t.Errorf("prompt TimeoutMs = %d, want the short grace window %d, not the caller's completion timeout", opts.TimeoutMs, PromptNudgeGraceMs)
+		if opts.TimeoutMs != graceMs {
+			t.Errorf("prompt TimeoutMs = %d, want the short grace window %d, not the caller's completion timeout", opts.TimeoutMs, graceMs)
 		}
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
@@ -426,7 +305,7 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -450,36 +329,6 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 	}
 	if len(completionWaitOpts.Until) != 2 || completionWaitOpts.Until[0] != "idle" || completionWaitOpts.Until[1] != "done" {
 		t.Errorf("completion wait Until = %v, want [idle done]", completionWaitOpts.Until)
-	}
-}
-
-func TestPromptWithNudge_SendKeysFails_ReturnsErrorImmediately(t *testing.T) {
-	t.Parallel()
-	sendKeysErr := errors.New("pane not found")
-	var waitCalls int
-
-	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		return herdr.Agent{}, pollTimeoutErr
-	}
-	sendKeys := func(target string, keys ...string) error {
-		return sendKeysErr
-	}
-	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) {
-		waitCalls++
-		return herdr.Agent{}, nil
-	}
-
-	_, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
-		Target: "pane-1",
-		Text:   "hello",
-		Wait:   true,
-		Until:  []string{"working"},
-	})
-	if err == nil || !errors.Is(err, sendKeysErr) {
-		t.Fatalf("PromptWithNudge() error = %v, want it to wrap %v", err, sendKeysErr)
-	}
-	if waitCalls != 0 {
-		t.Errorf("waitCalls = %d, want 0 (should not wait after a failed nudge)", waitCalls)
 	}
 }
 
@@ -508,7 +357,7 @@ func TestPromptWithNudge_SlowStart_CompletionGetsRemainingBudget(t *testing.T) {
 	// 3s elapses between the deadline being captured and the first
 	// start/nudge attempt (simulating a slow submit); the clock holds
 	// steady after that.
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), stepNow(3_000*time.Millisecond))(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), stepNow(3_000*time.Millisecond))(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -552,7 +401,7 @@ func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutW
 
 	// 1s elapses before the start attempt, then a further 5s before the
 	// completion-budget check, exhausting the caller's 5s deadline.
-	_, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), stepNow(1_000*time.Millisecond, 5_000*time.Millisecond))(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), stepNow(1_000*time.Millisecond, 5_000*time.Millisecond))(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -570,8 +419,8 @@ func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutW
 func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *testing.T) {
 	t.Parallel()
 	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
-		if opts.TimeoutMs != PromptNudgeGraceMs {
-			t.Errorf("prompt TimeoutMs = %d, want the bounded grace window %d even with no caller deadline", opts.TimeoutMs, PromptNudgeGraceMs)
+		if opts.TimeoutMs != graceMs {
+			t.Errorf("prompt TimeoutMs = %d, want the bounded grace window %d even with no caller deadline", opts.TimeoutMs, graceMs)
 		}
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
@@ -586,7 +435,7 @@ func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *test
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := PromptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow())(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,

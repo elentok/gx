@@ -1,6 +1,7 @@
 package herdrrunner
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -10,66 +11,14 @@ import (
 	"github.com/elentok/gx/herdr"
 )
 
-// PromptNudgeGraceMs bounds each of PromptWithNudge's submit/re-wait attempts.
-// PromptMaxNudges caps how many bare-Enter nudges it sends before giving up
-// and returning the underlying poll-timeout error. PromptMaxRetypes caps how
-// many times it falls back to resubmitting opts.Text in full (see
-// ErrStuckSubmission's doc comment) before giving up early instead of
-// spending the rest of PromptMaxNudges on nudges that can't help either.
-//
-// A tighter grace window was too short for a cold-started agent to reach
-// "working" under concurrent load — observed live as a hard failure quoting
-// the literal `--timeout` this constant produces, even with plenty of budget
-// left on the caller's own overall deadline (budgetMs caps every individual
-// attempt to this constant regardless of that deadline).
-const (
-	PromptNudgeGraceMs = 45_000
-	PromptMaxNudges    = 3
-	PromptMaxRetypes   = 2
-)
-
-// ErrStuckSubmission is PromptWithNudge's sentinel for a pane that shows no
-// change at all across PromptMaxRetypes full resubmissions of opts.Text —
-// distinct from the underlying poll-timeout error so a caller can tell "the
-// agent is slow to start, a bare nudge might still land" apart from "this
-// pane genuinely never received anything and retyping the same text into it
-// again won't help either," and retry against a fresh pane instead.
-var ErrStuckSubmission = claudeui.ErrStuckSubmission
-
-// PromptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait/AgentRead
-// to submit opts.Text while working around a submission that never actually
-// gets typed into the pane (observed in production: the text only appears
-// once something else, like an operator's own keypress, nudges herdr's
-// terminal-state detection).
-//
-// It first detects *start*, not completion: it submits with a short grace
-// timeout, waiting for either "working" or any of the caller's own Until
-// states (a completion so fast it's observed before "working" ever is). If
-// neither is observed in that window, it reads the pane's current text and
-// compares it against the snapshot taken before the previous attempt: if the
-// pane changed at all (the common case — the text landed but wasn't
-// submitted), it sends a bare Enter keypress and re-waits. If the pane shows
-// no change whatsoever (the text never reached it in the first place, so
-// Enter alone has nothing to submit), it resubmits opts.Text in full instead
-// — up to PromptMaxRetypes times — rather than nudging blind. Retrying either
-// way is capped by PromptMaxNudges total attempts, and an unchanged pane
-// that's already exhausted PromptMaxRetypes retypes gives up immediately with
-// ErrStuckSubmission rather than spending its remaining nudge budget on Enter
-// keypresses that can't do anything either.
-//
-// Once "working" is observed, start/nudge handling is done: this enters a
-// completion phase that only waits (never nudges or resubmits) for one of
-// opts.Until's caller-requested final states. Both phases are billed against
-// a single deadline computed from opts.TimeoutMs at entry — the grace window
-// each start/nudge attempt gets shrinks as that budget is spent, and
-// completion is handed whatever's left, so a slow completion — e.g.
-// "/compact", which can take minutes — gets the remainder of the caller's own
-// timeout instead of the fixed grace window, and an already-expired deadline
-// is reported as a timeout instead of silently becoming an unbounded wait.
-// opts.TimeoutMs <= 0 means no deadline at all: start/nudge attempts still
-// use the fixed grace window (bounded), but completion then waits with no
-// timeout (unlimited).
-func PromptWithNudge(
+// promptWithNudge wraps herdr's AgentPrompt/AgentSendKeys/AgentWait/AgentRead
+// in claudeui.PromptWithNudge. It first waits for the turn to start (either
+// "working" or one of opts.Until, for a completion so fast "working" is never
+// seen), then waits, without nudging, for opts.Until. Both phases share one
+// deadline from opts.TimeoutMs, so a slow completion like "/compact" gets
+// what's left of it rather than the grace window. opts.TimeoutMs <= 0 means
+// no deadline: start waits stay bounded, completion waits unbounded.
+func promptWithNudge(
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
@@ -81,104 +30,101 @@ func PromptWithNudge(
 			return prompt(opts)
 		}
 
-		startUntil := opts.Until
-		if !slices.Contains(startUntil, "working") {
-			startUntil = append([]string{"working"}, startUntil...)
-		}
-
-		hasDeadline := opts.TimeoutMs > 0
 		var deadline time.Time
-		if hasDeadline {
+		if opts.TimeoutMs > 0 {
 			deadline = now().Add(time.Duration(opts.TimeoutMs) * time.Millisecond)
 		}
 
-		// budgetMs returns the timeout for the next start/nudge attempt,
-		// the fixed grace window capped to what remains of the caller's
-		// deadline. ok is false once that deadline has already passed.
-		budgetMs := func() (ms int, ok bool) {
-			if !hasDeadline {
-				return PromptNudgeGraceMs, true
-			}
-			remaining := deadline.Sub(now())
-			if remaining <= 0 {
-				return 0, false
-			}
-			if remaining > PromptNudgeGraceMs*time.Millisecond {
-				return PromptNudgeGraceMs, true
-			}
-			return max(1, int(remaining/time.Millisecond)), true
+		p := &herdrPrompter{opts: opts, prompt: prompt, sendKeys: sendKeys, wait: wait, read: read}
+		p.startUntil = opts.Until
+		if !slices.Contains(p.startUntil, "working") {
+			p.startUntil = append([]string{"working"}, p.startUntil...)
 		}
 
-		graceMs, ok := budgetMs()
-		if !ok {
-			return herdr.Agent{}, fmt.Errorf("timed out waiting for agent to start: overall deadline exceeded")
+		if err := claudeui.PromptWithNudge(p, opts.Text, deadline, now); err != nil {
+			return p.agent, p.wrapErr(err)
 		}
-		submit := opts
-		submit.Until = startUntil
-		submit.TimeoutMs = graceMs
-
-		// snapshot is best-effort: a read error is treated the same as "the
-		// pane changed" (unchanged stays false below), since there's no
-		// evidence to declare it stuck — falling back to the older,
-		// safer bare-Enter-nudge behavior rather than resubmitting blind.
-		snapshot, _ := read(opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped"})
-
-		agent, err := prompt(submit)
-		retypes := 0
-		for attempt := 0; IsPollTimeout(err) && attempt < PromptMaxNudges; attempt++ {
-			graceMs, ok := budgetMs()
-			if !ok {
-				break
-			}
-
-			after, readErr := read(opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped"})
-			unchanged := readErr == nil && after == snapshot
-			snapshot = after
-
-			if unchanged {
-				if retypes >= PromptMaxRetypes {
-					return herdr.Agent{}, fmt.Errorf("%w after %d retries: %w", ErrStuckSubmission, retypes, err)
-				}
-				retypes++
-				resubmit := opts
-				resubmit.Until = startUntil
-				resubmit.TimeoutMs = graceMs
-				agent, err = prompt(resubmit)
-				continue
-			}
-
-			if nudgeErr := sendKeys(opts.Target, "enter"); nudgeErr != nil {
-				return herdr.Agent{}, fmt.Errorf("nudging stuck submission: %w", nudgeErr)
-			}
-			agent, err = wait(herdr.AgentWaitOptions{
-				Target:    opts.Target,
-				Until:     startUntil,
-				TimeoutMs: graceMs,
-			})
-		}
-		if err != nil {
-			return agent, err
-		}
-
-		if slices.Contains(opts.Until, agent.AgentStatus) {
-			return agent, nil
+		if slices.Contains(opts.Until, p.agent.AgentStatus) {
+			return p.agent, nil
 		}
 
 		completionTimeoutMs := 0
-		if hasDeadline {
+		if !deadline.IsZero() {
 			remaining := deadline.Sub(now())
 			if remaining <= 0 {
-				return agent, fmt.Errorf("timed out waiting for completion: overall deadline exceeded")
+				return p.agent, fmt.Errorf("timed out waiting for completion: overall deadline exceeded")
 			}
-			completionTimeoutMs = max(1, int(remaining/time.Millisecond))
+			completionTimeoutMs = toMs(remaining)
 		}
-
-		return wait(herdr.AgentWaitOptions{
-			Target:    opts.Target,
-			Until:     opts.Until,
-			TimeoutMs: completionTimeoutMs,
-		})
+		return wait(herdr.AgentWaitOptions{Target: opts.Target, Until: opts.Until, TimeoutMs: completionTimeoutMs})
 	}
+}
+
+// herdrPrompter is claudeui.Prompter over herdr. herdr types and waits in one
+// AgentPrompt call, so Submit only marks the text pending and the next
+// WaitStart sends it.
+type herdrPrompter struct {
+	opts       herdr.AgentPromptOptions
+	startUntil []string
+	prompt     func(herdr.AgentPromptOptions) (herdr.Agent, error)
+	sendKeys   func(target string, keys ...string) error
+	wait       func(herdr.AgentWaitOptions) (herdr.Agent, error)
+	read       func(target string, opts herdr.AgentReadOptions) (string, error)
+
+	pending bool
+	agent   herdr.Agent
+	pollErr error
+}
+
+func (p *herdrPrompter) Submit(text string) error {
+	p.opts.Text = text
+	p.pending = true
+	return nil
+}
+
+func (p *herdrPrompter) SendEnter() error {
+	return p.sendKeys(p.opts.Target, "enter")
+}
+
+func (p *herdrPrompter) WaitStart(timeout time.Duration) (bool, error) {
+	var err error
+	if p.pending {
+		p.pending = false
+		submit := p.opts
+		submit.Until = p.startUntil
+		submit.TimeoutMs = toMs(timeout)
+		p.agent, err = p.prompt(submit)
+	} else {
+		p.agent, err = p.wait(herdr.AgentWaitOptions{Target: p.opts.Target, Until: p.startUntil, TimeoutMs: toMs(timeout)})
+	}
+	if IsPollTimeout(err) {
+		p.pollErr = err
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func (p *herdrPrompter) Screen() (string, error) {
+	return p.read(p.opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped"})
+}
+
+// wrapErr keeps herdr's own poll-timeout text on a give-up, so callers still
+// see why the last wait failed.
+func (p *herdrPrompter) wrapErr(err error) error {
+	if p.pollErr == nil {
+		return err
+	}
+	if errors.Is(err, claudeui.ErrStartTimeout) {
+		return p.pollErr
+	}
+	if errors.Is(err, claudeui.ErrStuckSubmission) {
+		return fmt.Errorf("%w: %w", err, p.pollErr)
+	}
+	return err
+}
+
+func toMs(d time.Duration) int {
+	return max(1, int(d/time.Millisecond))
 }
 
 // IsPollTimeout reports whether err looks like a transient herdr wait
