@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
+	"golang.org/x/sys/unix"
 )
 
 // The test binary doubles as the holder and as a launcher that starts the
@@ -80,7 +81,7 @@ func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
 	if !strings.Contains(proc.Cmdline, sessionID) {
 		t.Errorf("holder cmdline %q lacks the session id", proc.Cmdline)
 	}
-	if sid, err := syscall.Getsid(pid); err != nil || sid != pid {
+	if sid, err := unix.Getsid(pid); err != nil || sid != pid {
 		t.Errorf("holder session = %d, %v; want its own session %d", sid, err, pid)
 	}
 	if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil {
