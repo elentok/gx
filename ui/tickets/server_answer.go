@@ -69,10 +69,14 @@ func (m Model) serverAnswerActionCmd(result actionsMenuResult) (tea.Cmd, bool) {
 		}
 		return cmdAnswerThen(m.worktreeRoot, m.settings, path, m.cmdServerResumeAnswered(address)), true
 	case actionWatch:
-		if nativeAgentLive(address) {
-			return cmdWatchAgent(address), true
-		}
-		return m.cmdServerFocusPane(address), true
+		// Liveness shells out to ps, so it is resolved inside the Cmd.
+		watch, focus := cmdWatchAgent(address), m.cmdServerFocusPane(address)
+		return func() tea.Msg {
+			if nativeAgentLive(address) {
+				return watch()
+			}
+			return focus()
+		}, true
 	}
 	return nil, false
 }

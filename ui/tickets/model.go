@@ -264,6 +264,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, nil
 
+	case actionsMenuReadyMsg:
+		m.actionsMenu = m.actionsMenu.Open(msg.path, msg.epicName, msg.ticketID, msg.prompt, msg.items)
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd

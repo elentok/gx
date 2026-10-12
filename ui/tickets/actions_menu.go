@@ -100,8 +100,16 @@ func cmdApplySuggestedAction(path, action string, onSuccess func() tea.Msg) tea.
 	}
 }
 
+// actionsMenuReadyMsg carries a suggested-actions menu whose agent liveness
+// was resolved off the Update goroutine.
+type actionsMenuReadyMsg struct {
+	path, epicName, ticketID, prompt string
+	items                            []components.MenuItem
+}
+
 // handleSuggestedActionsKey applies the "m" keymap: opens the suggested-
-// actions menu for the selected ticket row, whatever its status.
+// actions menu for the selected ticket row, whatever its status. Liveness
+// shells out to ps, so the menu opens once a Cmd has resolved it.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	if !ok || r.isEpic() {
@@ -113,12 +121,14 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
 	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
-	it, live := m.serverIteration(ticket.Path)
-	paneLive := live && it.Tab != ""
-	items := suggestedActionItems(status, ticket, paneLive, nativeAgentLive(ticket.Path), m.settings.HerdrUnavailable)
 	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
-	m.actionsMenu = m.actionsMenu.Open(ticket.Path, epicName, ticket.DisplayNumber(), prompt, items)
-	return m, nil
+	herdrUnavailable := m.settings.HerdrUnavailable
+	return m, func() tea.Msg {
+		it, live := m.serverIteration(ticket.Path)
+		paneLive := live && it.Tab != ""
+		items := suggestedActionItems(status, ticket, paneLive, nativeAgentLive(ticket.Path), herdrUnavailable)
+		return actionsMenuReadyMsg{path: ticket.Path, epicName: epicName, ticketID: ticket.DisplayNumber(), prompt: prompt, items: items}
+	}
 }
 
 // handleActionsMenuKey drives the open suggested-actions menu.

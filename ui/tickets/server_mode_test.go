@@ -431,8 +431,17 @@ func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 		{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = selectTicketRow(t, updated.(Model))
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	return pressMenuKey(t, selectTicketRow(t, updated.(Model)))
+}
+
+// pressMenuKey presses "m" and feeds back the menu its cmd resolves.
+func pressMenuKey(t *testing.T, m Model) Model {
+	t.Helper()
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if cmd == nil {
+		t.Fatal("m issued no cmd")
+	}
+	updated, _ = updated.(Model).Update(cmd())
 	return updated.(Model)
 }
 
@@ -445,14 +454,9 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 		}})
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-		m = selectTicketRow(t, updated.(Model))
-		updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-		m = updated.(Model)
+		m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
 		if !m.actionsMenu.IsOpen {
 			t.Errorf("status %s: menu closed, want open", status)
-		}
-		if cmd != nil {
-			t.Errorf("status %s: m issued %+v, want no toast", status, cmd())
 		}
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
@@ -487,8 +491,7 @@ func TestServerMode_WatchJumpsToPaneAndResume(t *testing.T) {
 		t.Fatalf("focused = %v", focused)
 	}
 
-	m = updated.(Model)
-	m, _ = func() (Model, tea.Cmd) { u, c := m.handleSuggestedActionsKey(); return u.(Model), c }()
+	m = pressMenuKey(t, updated.(Model))
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	updated, cmd = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if msg, ok := cmd().(serverWriteMsg); !ok || msg.verb != serverVerbUnpark {

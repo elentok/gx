@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/agentlog"
+	"github.com/elentok/gx/server"
 )
 
 const watchLogLine = `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello from the agent"}]}}` + "\n"
@@ -115,6 +116,51 @@ func TestWatch_NativeLive_OpensLogNotPane(t *testing.T) {
 	}
 	if _, ok := cmd().(watchLoadedMsg); !ok {
 		t.Error("expected the native log modal")
+	}
+}
+
+// failOnNativeLog fails the test if anything resolves native liveness before
+// the returned undo runs, i.e. on the Update goroutine.
+func failOnNativeLog(t *testing.T) (undo func()) {
+	t.Helper()
+	prev := nativeAgentLog
+	nativeAgentLog = func(context.Context, string) (agentlog.Log, error) {
+		t.Error("native liveness resolved on the Update goroutine")
+		return agentlog.Log{}, agentlog.ErrNoAgent
+	}
+	return func() { nativeAgentLog = prev }
+}
+
+func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
+	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
+	undo := failOnNativeLog(t)
+	cmd, ok := Model{serverAPI: fakeServerAPI{}}.serverAnswerActionCmd(actionsMenuResult{Action: actionWatch, Path: "gx:epic/01"})
+	undo()
+	if !ok || cmd == nil {
+		t.Fatal("Watch not dispatched")
+	}
+	cmd()
+}
+
+func TestMenuKey_ResolvesLivenessInCmd(t *testing.T) {
+	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
+	m := newServerModel(t).WithServer(fakeServerAPI{})
+	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "claimed"}}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = selectTicketRow(t, updated.(Model))
+
+	undo := failOnNativeLog(t)
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	undo()
+	if updated.(Model).actionsMenu.IsOpen {
+		t.Fatal("menu opened before liveness resolved")
+	}
+	if cmd == nil {
+		t.Fatal("m issued no cmd")
+	}
+	updated, _ = updated.(Model).Update(cmd())
+	if !updated.(Model).actionsMenu.IsOpen {
+		t.Error("menu closed after liveness resolved, want open")
 	}
 }
 
