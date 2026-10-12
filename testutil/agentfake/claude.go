@@ -37,6 +37,10 @@ type Control struct {
 	Action   string `json:"action"`
 	ResetsAt int64  `json:"resets_at,omitempty"`
 	Running  bool   `json:"running,omitempty"`
+	// WaitingFor is the dialog an ActionBlock shows on the TUI fake.
+	WaitingFor string `json:"waiting_for,omitempty"`
+	// Code is the TUI fake's ActionExit exit code.
+	Code int `json:"code,omitempty"`
 }
 
 const controlType = "agentfake_control"
