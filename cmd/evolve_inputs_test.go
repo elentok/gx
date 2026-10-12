@@ -144,7 +144,7 @@ func TestEvolveInputs_WritesDigests(t *testing.T) {
 	put(".claude/projects/p/s1/subagents/agent-a.jsonl", turn("sub-s1"))
 	put(".claude/projects/p/res-1.jsonl", turn("resolved"))
 	label, _, _ := ralphloop.IterationIdentity("epic", "02", "")
-	put("state/agents/proj/"+label+"/meta.json", `{"session_id":"s2","label":"`+label+`"}`)
+	put("state/agents/proj/"+label+"/meta.json", `{"runner":"headless","session_id":"s2","label":"`+label+`"}`)
 	put("state/agents/proj/"+label+"/out.jsonl", turn("native-s2"))
 	put("codex/sessions/2026/rollout-s3.jsonl",
 		`{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"codex-s3"}]}}`+"\n"+

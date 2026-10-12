@@ -37,7 +37,7 @@ func writeAgentDir(t *testing.T, stateDir string, withLog bool) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	meta, _ := json.Marshal(nativerunner.Meta{PID: 42, PIDStart: "t0", SessionID: session, Label: label, Cwd: "/work/tree", Offset: 17})
+	meta, _ := json.Marshal(nativerunner.Meta{Runner: "headless", PID: 42, PIDStart: "t0", SessionID: session, Label: label, Cwd: "/work/tree", Offset: 17})
 	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), meta, 0o600); err != nil {
 		t.Fatal(err)
 	}
