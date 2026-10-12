@@ -21,18 +21,23 @@ const routedLabel = "epic-a-iter-01"
 // the ticket path.
 func liveUnderOther(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, renamedFake, string) {
 	t.Helper()
-	own := newRenamedFake("a", nativerunner.VerdictLive)
+	return liveUnder(t, newRenamedFake("a", nativerunner.VerdictLive), opts...)
+}
+
+// liveUnder is liveUnderOther with the run's runner given as own.
+func liveUnder(t *testing.T, own renamedFake, opts ...func(*server.Config)) (*servertest.Harness, renamedFake, string) {
+	t.Helper()
 	own.IDs = func(string) (string, string) { return "p1", "sess" }
 	own.PromptState = agentrunner.StateWorking
 	if _, err := own.Start(agentrunner.StartOptions{Label: routedLabel, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 		t.Fatal(err)
 	}
 	own.SetState(routedLabel, agentrunner.StateWorking, "")
-	h, ticketPath := restartUnder(t, "a", newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{"a": own}, opts...)
+	h, ticketPath := restartUnder(t, own.name, newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.name: own}, opts...)
 	deadline := time.Now().Add(10 * time.Second)
-	for !slices.ContainsFunc(h.Server.Runs(), func(r server.Run) bool { return r.Runner == "a" }) {
+	for !slices.ContainsFunc(h.Server.Runs(), func(r server.Run) bool { return r.Runner == own.name }) {
 		if time.Now().After(deadline) {
-			t.Fatalf("run not reclaimed under a: %+v", h.Server.Runs())
+			t.Fatalf("run not reclaimed under %s: %+v", own.name, h.Server.Runs())
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

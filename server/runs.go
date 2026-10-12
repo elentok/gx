@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"github.com/elentok/gx/events"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -317,6 +319,24 @@ func (s *Server) reclaimRuns() {
 		}
 	}
 	s.savedRuns = nil
+}
+
+// logDrainingRunners logs one line per runner other than the configured one
+// that still hosts live runs; those runs drain on it while new launches don't.
+func (s *Server) logDrainingRunners() {
+	counts := map[string]int{}
+	for _, t := range s.registry.list() {
+		name := t.Runner
+		if name == "" {
+			name = runnerHerdr
+		}
+		if name != s.cfg.Runner.Name() {
+			counts[name]++
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(counts)) {
+		s.log.Info(fmt.Sprintf("%d runs still on %s", counts[name], name), "runner", name, "runs", counts[name])
+	}
 }
 
 // errHandleMismatch marks a persisted handle whose pane, agent or worktree is gone.
