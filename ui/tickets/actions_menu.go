@@ -123,12 +123,34 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
 	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
 	herdrUnavailable := m.settings.HerdrUnavailable
+	m.actionsMenuPending = ticket.Path
 	return m, func() tea.Msg {
 		it, live := m.serverIteration(ticket.Path)
 		paneLive := live && it.Tab != ""
 		items := suggestedActionItems(status, ticket, paneLive, nativeAgentLive(ticket.Path), herdrUnavailable)
 		return actionsMenuReadyMsg{path: ticket.Path, epicName: epicName, ticketID: ticket.DisplayNumber(), prompt: prompt, items: items}
 	}
+}
+
+// handleActionsMenuReady opens the menu only for the request still pending:
+// the user may have moved on, or opened another overlay, while ps ran.
+func (m Model) handleActionsMenuReady(msg actionsMenuReadyMsg) Model {
+	pending := m.actionsMenuPending
+	m.actionsMenuPending = ""
+	if pending != msg.path || m.selectedTicketPath() != msg.path || m.ModalOpen() {
+		return m
+	}
+	m.actionsMenu = m.actionsMenu.Open(msg.path, msg.epicName, msg.ticketID, msg.prompt, msg.items)
+	return m
+}
+
+// selectedTicketPath is the selected ticket row's path, or "" off a ticket.
+func (m Model) selectedTicketPath() string {
+	r, ok := m.selectedRow()
+	if !ok || r.isEpic() {
+		return ""
+	}
+	return m.epicAt(r).Tickets[r.ticketIdx].Path
 }
 
 // handleActionsMenuKey drives the open suggested-actions menu.

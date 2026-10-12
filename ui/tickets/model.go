@@ -123,6 +123,9 @@ type Model struct {
 	// actions_menu.go/suggested_actions.go): built fresh from the selected
 	// row's rendered status each time "m" opens it.
 	actionsMenu actionsMenuModel
+	// actionsMenuPending is the ticket path "m" is resolving the menu for;
+	// Esc or moving the selection forgets it, so a late result is dropped.
+	actionsMenuPending string
 
 	// watch backs the Watch agent modal (watch_agent.go).
 	watch watchModal
@@ -203,6 +206,9 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
+	if nm.selectedTicketPath() != m.selectedTicketPath() {
+		nm.actionsMenuPending = ""
+	}
 	nm.syncPreviewViewport()
 	return nm, cmd
 }
@@ -265,8 +271,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case actionsMenuReadyMsg:
-		m.actionsMenu = m.actionsMenu.Open(msg.path, msg.epicName, msg.ticketID, msg.prompt, msg.items)
-		return m, nil
+		return m.handleActionsMenuReady(msg), nil
 
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
@@ -287,6 +292,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
+		}
+		if msg.String() == "esc" {
+			m.actionsMenuPending = ""
 		}
 		return m.handleKey(msg)
 
