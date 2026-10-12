@@ -2,7 +2,6 @@ package nativerunner
 
 import (
 	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,27 +21,12 @@ import (
 // runnerName is the Runner value recorded in meta.json.
 const runnerName = "headless"
 
-// Agent directory layout, shared with reattach.
+// Headless agent directory layout, shared with reattach.
 const (
-	MetaFile  = "meta.json"
 	StdinFile = "stdin"
 	OutFile   = "out.jsonl"
 	ErrFile   = "stderr.log"
 )
-
-// Meta is what meta.json records about a launched agent.
-type Meta struct {
-	Runner    string `json:"runner"`
-	PID       int    `json:"pid"`
-	PIDStart  string `json:"pid_start"`
-	SessionID string `json:"session_id"`
-	Label     string `json:"label"`
-	Epic      string `json:"epic"`
-	Cwd       string `json:"cwd"`
-	// Offset is where this session's events begin in out.jsonl, always at a
-	// line boundary. Earlier lines belong to a previous run in the same dir.
-	Offset int64 `json:"offset"`
-}
 
 // Headless runs claude as `claude -p` speaking stream-json, detached in its
 // own session so it outlives the server.
@@ -98,7 +82,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 	defer h.release(opts.Label)
 
 	dir := filepath.Join(h.Root, opts.Label)
-	sessionID, err := newUUID()
+	sessionID, err := NewUUID()
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
@@ -125,7 +109,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 	}
 	pid := cmd.Process.Pid
 	meta := Meta{Runner: runnerName, PID: pid, SessionID: sessionID, Label: opts.Label, Epic: opts.Epic, Cwd: opts.Cwd, Offset: offset}
-	if err := h.recordLaunch(dir, &meta); err != nil {
+	if err := RecordLaunch(h.procs(), dir, &meta); err != nil {
 		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		_ = cmd.Wait()
 		return agentrunner.Session{}, err
@@ -227,28 +211,14 @@ func (h *Headless) spawn(opts agentrunner.StartOptions, sessionID string, f agen
 	}
 	cmd := exec.Command(claude, launchArgs(sessionID, opts.Args)...)
 	cmd.Dir = opts.Cwd
-	cmd.Env = launchEnv(os.Environ(), opts.Env)
+	cmd.Env = LaunchEnv(os.Environ(), opts.Env)
 	cmd.Stdin = f.stdin
 	cmd.Stdout = f.out
 	cmd.Stderr = f.stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	if err := cmd.Start(); err != nil {
+	if err := StartDetached(cmd); err != nil {
 		return nil, err
 	}
 	return cmd, nil
-}
-
-// recordLaunch confirms claude is still alive and writes meta.json.
-func (h *Headless) recordLaunch(dir string, meta *Meta) error {
-	proc, ok, err := h.procs().Lookup(meta.PID)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("claude (pid %d) exited during launch", meta.PID)
-	}
-	meta.PIDStart = proc.Start
-	return writeMeta(dir, *meta)
 }
 
 func newSession(label, epic, sessionID string, pid int, stdin *os.File) *headlessSession {
@@ -274,12 +244,7 @@ func (h *Headless) follow(ss *headlessSession, out string, offset int64) {
 	h.sessions[ss.session.Label] = ss
 }
 
-func (h *Headless) procs() ProcessTable {
-	if h.Procs == nil {
-		return psTable{}
-	}
-	return h.Procs
-}
+func (h *Headless) procs() ProcessTable { return orPS(h.Procs) }
 
 // lineBoundary returns the end of out, first ending a partial last line left
 // by an earlier run so it can't merge with this session's first event.
@@ -309,35 +274,6 @@ func launchArgs(sessionID string, extra []string) []string {
 		"--permission-mode", "auto",
 		"--permission-prompt-tool", "stdio",
 	}, extra...)
-}
-
-// launchEnv drops only the vars that make claude think it is nested inside
-// another claude session, which would stop it saving its transcript.
-func launchEnv(base, extra []string) []string {
-	env := slices.DeleteFunc(slices.Clone(base), func(kv string) bool {
-		name, _, _ := strings.Cut(kv, "=")
-		return name == "CLAUDECODE" || name == "CLAUDE_CODE_ENTRYPOINT"
-	})
-	env = append(env, "DISABLE_AUTOUPDATER=1")
-	return append(env, extra...)
-}
-
-func writeMeta(dir string, m Meta) error {
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(dir, MetaFile), append(data, '\n'), 0o644)
-}
-
-func newUUID() (string, error) {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return "", err
-	}
-	b[6] = b[6]&0x0f | 0x40
-	b[8] = b[8]&0x3f | 0x80
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:]), nil
 }
 
 // tail follows out.jsonl from offset and folds each complete line into the
@@ -437,7 +373,7 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 	case agentrunner.StateDone:
 		return agentrunner.ErrNotDelivered
 	}
-	uuid, err := newUUID()
+	uuid, err := NewUUID()
 	if err != nil {
 		return err
 	}
@@ -614,7 +550,7 @@ func (h *Headless) Interrupt(s agentrunner.Session) error {
 }
 
 func (ss *headlessSession) interrupt() error {
-	id, err := newUUID()
+	id, err := NewUUID()
 	if err != nil {
 		return err
 	}

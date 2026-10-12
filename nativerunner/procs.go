@@ -22,6 +22,14 @@ type ProcessTable interface {
 	Lookup(pid int) (Process, bool, error)
 }
 
+// orPS returns p, or the real process table when p is nil.
+func orPS(p ProcessTable) ProcessTable {
+	if p == nil {
+		return psTable{}
+	}
+	return p
+}
+
 // psTable reads the process table with ps, which works the same on macOS and
 // Linux and needs no cgo.
 type psTable struct{}
