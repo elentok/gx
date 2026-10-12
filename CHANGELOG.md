@@ -1,8 +1,25 @@
 # Changelog
 
-## Unreleased
+## v0.32.8 - 2026-10-12
 
 - Changed `agent-runner: pty` from rejected to accepted: the server runs interactive claude in a pty per project. `auto` still never picks pty.
+  - A hidden `gx agent-holder` process holds each pty agent. It keeps a raw log and a screen, and serves status, prompts, interrupts and answers over `holder.sock`.
+  - Start answers claude's trust dialog from the screen. It moves the cursor to "Yes, I trust this folder" if needed and repeats while the dialog stays up. A start with no claude pid file before the deadline fails.
+  - Permission prompts are answered with Enter (allow) or Esc (deny). A deny sends a reason once claude is idle. Allowing a non-permission dialog is refused as `invalid-decision`.
+  - After a server restart a live pty agent is reattached. A dead one is reported as died and its ticket parks needs-repair.
+  - A pty prompt is nudged once and retyped once, then reported as not delivered.
+- Added PTY rows to `gx doctor`: claude pid status, trust dialog, rate limit, and a check that the holder survives a kickstart. Doctor now defaults its runner from the config's `agent-runner`, carries frames and status snapshots in its input and `--record`, and is named as the next step when a start fails for a missing capability.
+- Added Transcript to the `m` menu: it shows the ticket's latest session, opened at the bottom. `[` and `]` step between sessions. A ticket with no sessions shows a toast.
+- Changed the `m` menu to open on every ticket row, whatever its status. Esc/q close it even when it is empty.
+- Changed Watch, which replaces "Answer in pane" and "Watch agent":
+  - It is listed only while the agent is live. On herdr it jumps to the pane.
+  - It shows a pty agent's holder screen and raw log.
+  - `r` refreshes the headless snapshot.
+- Changed agent verbs, the budget kill, reclaim, wait and finish to go through each run's own runner, not the configured one. A run whose runner is unavailable at reclaim parks needs-repair and names the runner. Runs still draining on other runners are logged at start.
+- Changed agent-dir prune, inspect and cleanup to follow the runner in each dir's `meta.json`. Every agent dir is pruned whatever runner is configured. A dir with an unknown runner is left alone.
+- Fixed a herdr run reclaimed under a headless server being finished through headless and left unwatched.
+- Fixed claude skipping its pid status file when gx runs inside a claude session: `CLAUDE_CODE_CHILD_SESSION` is dropped from the launch environment.
+- Added `github.com/charmbracelet/x/vt` (pinned by pseudo-version) as the pty screen emulator. Replay fixtures of recorded claude output gate future pin bumps.
 
 ## v0.32.7 - 2026-10-12
 
