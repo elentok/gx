@@ -40,7 +40,7 @@ func launchHolder() {
 }
 
 func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
-	dir := t.TempDir()
+	dir := shortTempDir(t)
 	stop := filepath.Join(dir, "stop")
 	const sessionID = "11111111-2222-4333-8444-555555555555"
 	child := `printf 'hello\n'; while [ ! -e "$1" ]; do sleep 0.05; done; printf 'bye\n'; exit 3`
@@ -97,7 +97,7 @@ func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
 }
 
 func TestHolder_PTYIsWide(t *testing.T) {
-	dir := t.TempDir()
+	dir := shortTempDir(t)
 	if err := nativerunner.RunHolder(dir, []string{"stty", "size"}); err != nil {
 		t.Fatal(err)
 	}

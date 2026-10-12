@@ -3,6 +3,7 @@ package nativerunner
 import (
 	"errors"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,6 +64,14 @@ func RunHolder(dir string, argv []string) error {
 		_ = tty.Close()
 		return err
 	}
+	ln, err := net.Listen("unix", filepath.Join(dir, HolderSocketFile))
+	if err != nil {
+		_ = tty.Close()
+		return err
+	}
+	// Closing the listener removes holder.sock, so no stale socket outlives
+	// the holder.
+	defer ln.Close()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
@@ -70,6 +79,8 @@ func RunHolder(dir string, argv []string) error {
 		_ = tty.Close()
 		return err
 	}
+	srv := &holderServer{scr: scr, ptmx: ptmx, proc: cmd.Process, ops: holderOptionalOps, exited: make(chan struct{})}
+	go srv.serve(ln)
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
@@ -77,6 +88,7 @@ func RunHolder(dir string, argv []string) error {
 	}()
 
 	waitErr := cmd.Wait()
+	close(srv.exited)
 	// The holder keeps its own tty fd open until now: on macOS the child's
 	// last output is dropped once every tty fd is closed, so it is read out
 	// of the pty before the holder lets go.
