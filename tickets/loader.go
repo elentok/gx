@@ -100,6 +100,7 @@ func loadEpic(scratchDir, name string) Epic {
 		ticket.Category = string(parsed.Category)
 		ticket.ExportedAt = parsed.ExportedAt
 		ticket.Notify = parsed.Notify
+		ticket.Manual = parsed.Manual
 		ticket.NoRecover = parsed.NoRecover
 		ticket.Unique = parsed.Unique
 		ticket.ParkKind = parsed.ParkKind

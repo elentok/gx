@@ -685,14 +685,14 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 	if !s.chat.Enabled() || isOneOffTicket(ticketPath) {
 		return
 	}
-	if e, t, ok := s.freshTicket(addr); ok {
+	if e, t, ok := s.freshTicket(addr); ok && !IsOneOffEpic(e) {
 		s.chat.TicketDone(addr.Project, s.chatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
 	}
 }
 
 // completeRootIfDone lands the root's feature branch once every ticket in its
-// epic is done, then dequeues it. A branch that needs a rebase parks the root
-// instead: a person runs gx-merge. With the project's auto-ff-merge off the
+// epic is done, then dequeues it. A branch that needs a rebase gets a merge
+// ticket instead, or parks the root at the cap. With the project's auto-ff-merge off the
 // branch is left alone: the root is dequeued as complete and a person runs gx-merge.
 // completed_at marks the epic's final outcome: with auto-ff-merge on that is
 // the land or the park, not all-done. An epic with nothing to land is merged
@@ -735,7 +735,13 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 	case s.nothingToLand(project, epics, one, repo):
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 	case s.autoFFMerge(project):
-		if reason, kind := s.landRoot(project, epics, one, repo); reason != "" {
+		reason, kind := s.landRoot(project, epics, one, repo)
+		// A non-ff below the cap is not an outcome: the merge ticket makes the
+		// epic not all-done, so the root stays queued and its finish lands again.
+		if reason != "" && kind == "" && s.forkMergeTicket(root, e, target) {
+			return
+		}
+		if reason != "" {
 			s.stampEpic(root, e.Path, "completed_at")
 			s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: string(kind), Level: EventLevelWarning, Message: reason})
 			s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
@@ -747,7 +753,7 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 			if kind == "" {
 				s.notifyEpicOutcome(project, dir, one, e, false)
 			}
-			s.submitRetro(root, dir, e, one.Ticket.Path)
+			s.submitRetro(root, dir, e)
 			return
 		}
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
@@ -755,7 +761,7 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 		s.stampEpic(root, e.Path, "completed_at")
 		merged = false
 	}
-	s.submitRetro(root, dir, e, one.Ticket.Path)
+	s.submitRetro(root, dir, e)
 	removed, err := s.queued.removeRoot(root)
 	if err != nil {
 		s.log.Warn("dequeue completed root", "root", root, "err", err)
@@ -771,7 +777,8 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
 func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
-	if !s.chat.Enabled() || isOneOffTicket(one.Ticket.Path) {
+	// The epic, not one: a one-off's merge ticket is not its one-off file.
+	if !s.chat.Enabled() || IsOneOffEpic(e) {
 		return
 	}
 	elapsed, cost := ralphloop.EpicTotals(e)
@@ -784,8 +791,8 @@ func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 // the epic's final outcome, where completed_at is stamped: the land, a root
 // park, or all-done with auto-ff-merge off. A refused submit is logged, never an error:
 // the dedupe key refuses a second live retro of the same epic.
-func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ticketPath string) {
-	if e.IsMap || isOneOffTicket(ticketPath) || !e.EvolvedAt.IsZero() {
+func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic) {
+	if e.IsMap || IsOneOffEpic(e) || !e.EvolvedAt.IsZero() {
 		return
 	}
 	pf, err := config.ReadProjectFile(projectDir)
@@ -871,7 +878,7 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	if err != nil {
 		return landFailed(err)
 	}
-	needsRebase := fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", one.Epic, target)
+	needsRebase := fmt.Sprintf("needs rebase: %s onto %s; run gx server epics merge %s:%s", one.Epic, target, project, one.Epic)
 	out, err := s.mergeInto(info.Repo, worktrees, one.Epic, target)
 	if err != nil {
 		// Trunk moved outside the server between git's ff check and the ff:

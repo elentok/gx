@@ -90,6 +90,10 @@ func TestTrunk_EditedBetweenClaimAndLandingLandsOnTheNewTrunk(t *testing.T) {
 func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
 	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
+		// Past the cap, the non-ff parks the root rather than forking a merge ticket.
+		for _, mid := range []string{"02", "03"} {
+			servertest.WriteTicketWith(t, f.store, "proj", schedEpic, mid, "t", servertest.TicketOpts{Type: "merge", Status: "done"})
+		}
 		f.git(t, "checkout", "-q", "-b", "next", "develop")
 		testutil.WriteFile(t, f.repo, "next.txt", "next")
 		testutil.CommitAll(t, f.repo, "next moves on")

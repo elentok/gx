@@ -86,7 +86,7 @@ func TestEpicNotice_AutoFFMergeOffSendsNotMerged(t *testing.T) {
 
 func TestEpicNotice_NeedsRebaseParkSendsNotMerged(t *testing.T) {
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")

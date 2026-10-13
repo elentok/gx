@@ -75,7 +75,7 @@ func TestLandRoot_OpenCodeReviewTicketHoldsTheMergeUntilItIsDone(t *testing.T) {
 }
 
 func TestLandRoot_NeedsRebaseParksTheRootWithoutRebasing(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")
@@ -176,7 +176,7 @@ func TestLandRoot_NothingToLandStampsBothRegardlessOfAutoFFMerge(t *testing.T) {
 }
 
 func TestLandRoot_StampsOnlyCompletedAtWhenTheLandParks(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")

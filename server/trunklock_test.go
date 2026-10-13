@@ -18,11 +18,13 @@ import (
 
 func TestTrunkLock_TwoEpicsFinishingTogetherLandOneAndParkTheOtherAsNonFF(t *testing.T) {
 	const other = "other"
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
 		epic, _, _ := strings.Cut(strings.TrimPrefix(p.Address, "proj:"), "/")
 		commitWork(t, p, epic+"-"+id)
 	})
-	servertest.WriteTicketWith(t, f.store, "proj", other, "01", "t", servertest.TicketOpts{})
+	for id, opts := range atMergeCap(map[string]servertest.TicketOpts{"01": {}}) {
+		servertest.WriteTicketWith(t, f.store, "proj", other, id, "t", opts)
+	}
 	f.h.Server.Rescan()
 	var inFlight, overlapped atomic.Int32
 	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
@@ -107,7 +109,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 }
 
 func TestTrunkLock_TrunkMovedBeforeTheFFParksNeedsRebaseNotLandFailed(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 	})
 	f.h.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
@@ -119,7 +121,7 @@ func TestTrunkLock_TrunkMovedBeforeTheFFParksNeedsRebaseNotLandFailed(t *testing
 
 	ev := f.parkRoot(t)
 
-	if ev.Kind != "" || ev.Message != "needs rebase: "+schedEpic+" onto main; run gx-merge" {
+	if ev.Kind != "" || ev.Message != "needs rebase: "+schedEpic+" onto main; run gx server epics merge proj:"+schedEpic {
 		t.Errorf("park = kind %q, reason %q, want a needs-rebase park", ev.Kind, ev.Message)
 	}
 	f.assertRootQueued(t)

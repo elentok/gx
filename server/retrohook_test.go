@@ -139,7 +139,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 }
 
 func TestRetroHook_SubmitsWhenTheLandNeedsARebase(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, "evolve-") {
 			return
 		}

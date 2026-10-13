@@ -72,6 +72,9 @@ type Ticket struct {
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool
 
+	// Manual mirrors schema.Ticket.Manual.
+	Manual bool
+
 	// NoRecover mirrors schema.Ticket.NoRecover.
 	NoRecover bool
 

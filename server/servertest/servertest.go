@@ -92,6 +92,7 @@ type TicketOpts struct {
 	Parent    string
 	BlockedBy []string
 	Base      string
+	Status    string // default "open"
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -113,7 +114,10 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 	if opts.Type == "" {
 		opts.Type = "implement"
 	}
-	fm := "---\nid: \"" + id + "\"\nstatus: open\ntype: " + opts.Type + "\n"
+	if opts.Status == "" {
+		opts.Status = "open"
+	}
+	fm := "---\nid: \"" + id + "\"\nstatus: " + opts.Status + "\ntype: " + opts.Type + "\n"
 	if opts.Parent != "" {
 		fm += "parent: \"" + opts.Parent + "\"\n"
 	}
