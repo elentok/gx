@@ -43,23 +43,23 @@ func hasManualMergeTicket(e tickets.Epic) bool {
 }
 
 // forkMergeTicket forks a merge ticket into e for its non-ff onto target and
-// reports whether it did. At the cap, or when the write fails, it forks none
-// and the caller parks the root.
-func (s *Server) forkMergeTicket(root rootRef, e tickets.Epic, target string) bool {
-	if mergeTicketsThisRun(e) >= maxMergeTickets {
-		return false
+// returns its id. At the cap, or when the write fails, it forks none and the
+// caller parks the root. A manual ticket, the manual trigger's, skips the cap.
+func (s *Server) forkMergeTicket(root rootRef, e tickets.Epic, target string, manual bool) string {
+	if !manual && mergeTicketsThisRun(e) >= maxMergeTickets {
+		return ""
 	}
 	_, id, err := writeNewTicket(e.Path, "", "merge", func(id string) (schema.Ticket, string) {
-		tk := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeMerge}
+		tk := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeMerge, Manual: manual}
 		body := fmt.Sprintf("\n# %s — Merge %s onto %s\n\n## What to build\n\nRebase %s onto %s so it can fast-forward. The server lands it once this ticket is done.\n",
 			id, root.Epic, target, root.Epic, target)
 		return tk, body
 	})
 	if err != nil {
 		s.log.Warn("fork merge ticket", "root", root, "err", err)
-		return false
+		return ""
 	}
-	s.log.Info("merge ticket forked", "root", root, "ticket", id)
+	s.log.Info("merge ticket forked", "root", root, "ticket", id, "manual", manual)
 	s.events.publish(EventQueueChanged, root.String())
-	return true
+	return id
 }

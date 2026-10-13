@@ -262,6 +262,12 @@ func (c *Client) TicketRelaunch(ctx context.Context, address string) (server.Que
 	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address})
 }
 
+// EpicMerge triggers a manual merge of an epic address: a direct land
+// (Merged) or a forked merge ticket (MergeTicket).
+func (c *Client) EpicMerge(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/epics/merge", server.QueueRequest{Address: address})
+}
+
 // TicketNudge types text into the live pane of a ticket's iteration.
 func (c *Client) TicketNudge(ctx context.Context, address, text string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/nudge", server.QueueRequest{Address: address, Text: text})

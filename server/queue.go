@@ -32,6 +32,10 @@ const (
 	ReasonBadPosition      = "bad-position"
 	ReasonTicketLive       = "ticket-live"
 	ReasonMapEpic          = "map-epic"
+	ReasonAlreadyMerged    = "already-merged"
+	ReasonMergePending     = "merge-pending"
+	ReasonNotComplete      = "not-complete"
+	ReasonBranchMissing    = "branch-missing"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.
@@ -48,8 +52,12 @@ type QueueResult struct {
 	Mode string `json:"mode,omitempty"`
 	// ExtraUsage is the warning an enqueue carries while the account
 	// auto-purchases extra usage.
-	ExtraUsage bool   `json:"extra_usage,omitempty"`
-	Refused    bool   `json:"refused,omitempty"`
+	ExtraUsage bool `json:"extra_usage,omitempty"`
+	// Merged and MergeTicket are an epic merge's outcome: a direct land, or
+	// the address of the merge ticket it forked.
+	Merged      bool   `json:"merged,omitempty"`
+	MergeTicket string `json:"merge_ticket,omitempty"`
+	Refused     bool   `json:"refused,omitempty"`
 	Reason     string `json:"reason,omitempty"`
 	Message    string `json:"message,omitempty"`
 }

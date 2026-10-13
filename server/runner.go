@@ -722,9 +722,15 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 // result. An epic already merged does no git work: its notice goes out only
 // with the dequeue, so a double land sends one.
 func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
-	project := root.Project
-	_, target, _ := s.rootRefs(project, epics, one.Epic, one.Ticket, repo)
+	_, target, _ := s.rootRefs(root.Project, epics, one.Epic, one.Ticket, repo)
 	defer s.trunkLocks.lock(repo, target)()
+	s.landEpic(root, one, dir, repo, epics, e, target, false)
+}
+
+// landEpic is completeEpic under target's trunk lock. force lands with
+// auto-ff-merge off: the manual trigger's direct land.
+func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic, target string, force bool) {
+	project := root.Project
 	fresh := tickets.LoadEpicTicketMD(e.Path)
 	already := !fresh.MergedAt.IsZero()
 	merged := true
@@ -735,11 +741,11 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 		}
 	case s.nothingToLand(project, epics, one, repo):
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
-	case s.autoFFMerge(project) || hasManualMergeTicket(e):
+	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
 		reason, kind := s.landRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish lands again.
-		if reason != "" && kind == "" && s.forkMergeTicket(root, e, target) {
+		if reason != "" && kind == "" && s.forkMergeTicket(root, e, target, false) != "" {
 			return
 		}
 		if reason != "" {
