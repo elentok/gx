@@ -2,9 +2,14 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 )
@@ -44,7 +49,11 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 	}
 
 	result := MergeResult{Status: "merged", Target: repo.Trunk}
-	if !outcome.Merged {
+	if outcome.Merged {
+		if err := stampMergedEpic(repo.Root, branch); err != nil {
+			return fmt.Errorf("merged %s onto %s, but stamping merged_at failed: %w", branch, repo.Trunk, err)
+		}
+	} else {
 		result = MergeResult{
 			Status:       "needs_rebase",
 			Branch:       outcome.Branch,
@@ -58,6 +67,32 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 	}
 	printMergeText(w, result)
 	return nil
+}
+
+// stampMergedEpic stamps merged_at on the epic whose feature branch is
+// branch (an epic's branch is named after its directory). A branch of no
+// epic, or a repo no project registers, stamps nothing. completed_at is left
+// alone: it records the epic's outcome, not its land.
+func stampMergedEpic(repoRoot, branch string) error {
+	if branch == "" || filepath.Base(branch) != branch {
+		return nil
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	projectDir, err := tickets.ProjectDir(cfg.TicketStore.Path, repoRoot)
+	if errors.Is(err, tickets.ErrNoProject) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	epicPath := filepath.Join(projectDir, branch)
+	if _, err := os.Stat(filepath.Join(epicPath, "ticket.md")); err != nil {
+		return nil
+	}
+	return tickets.StampEpicMerged(epicPath, time.Now().UTC())
 }
 
 // resolveMergeBranch follows the existing worktree listing when arg matches a

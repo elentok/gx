@@ -66,13 +66,15 @@ An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
 never scheduled by the server.
 
 ` + "`tickets set project:epic`" + ` writes an epic's kind (map, loop), status (draft, open) and
-provisional_destination; completed_at, evolved_at, evolve_skipped and evolve_ticket are
-refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
+provisional_destination; completed_at, merged_at, evolved_at, evolve_skipped and
+evolve_ticket are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
 
-An epic's ticket.md also holds epic-level timing. Both fields are gx-managed, not
-settable via ` + "`tickets set`" + `, and unset until ralph-loop stamps them.
+An epic's ticket.md also holds epic-level timing. These fields are gx-managed, not
+settable via ` + "`tickets set`" + `, and unset until gx stamps them.
   started_at (RFC3339 timestamp) — when work on the epic began
   completed_at (RFC3339 timestamp) — when the epic's last ticket landed
+  merged_at (RFC3339 timestamp) — when the epic's branch landed on its target
+    (stamped by the server or ` + "`gx merge`" + `); a merged epic is one with merged_at set
 
 Evolve fields (optional, validated):
   evolved_at (RFC3339 timestamp), evolve_skipped (bool), evolve_ticket (address),

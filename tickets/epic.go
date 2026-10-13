@@ -45,6 +45,9 @@ type Epic struct {
 	// it doesn't set the field.
 	StartedAt   time.Time
 	CompletedAt time.Time
+	// MergedAt is when the epic's branch landed on its target; a Merged epic
+	// is one with it set.
+	MergedAt time.Time
 
 	// The evolve fields come from ticket.md's frontmatter; zero when unset.
 	EvolvedAt              time.Time

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
@@ -166,6 +168,88 @@ func registerWithTrunk(t *testing.T, repoDir, trunk string) {
 	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
 	testutil.WriteFile(t, projectDir, "project.json",
 		`{"name":"p","repo":"`+repoDir+`","trunk":"`+trunk+`"}`)
+}
+
+// mergeEpicSetup registers repoDir as a project holding epic e, whose
+// ticket.md carries completedAt when non-empty. Not parallel-safe (sets env).
+func mergeEpicSetup(t *testing.T, repoDir, completedAt string) (ticketMD string) {
+	t.Helper()
+	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
+	fm := "status: open\n"
+	if completedAt != "" {
+		fm += "completed_at: " + completedAt + "\n"
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, "e"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, filepath.Join(projectDir, "e"), "ticket.md", "---\n"+fm+"---\n\n# E\n")
+	return filepath.Join(projectDir, "e", "ticket.md")
+}
+
+func TestRunMerge_EpicBranchStampsMergedAtOnly(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"e": "e"})
+	ticketMD := mergeEpicSetup(t, repoDir, "")
+	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
+
+	if err := runMerge(mainDir, "e", true, &bytes.Buffer{}); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+
+	epic := tickets.LoadEpicTicketMD(filepath.Dir(ticketMD))
+	if epic.MergedAt.IsZero() {
+		t.Error("merged_at not stamped")
+	}
+	if !epic.CompletedAt.IsZero() {
+		t.Errorf("completed_at = %v, want unstamped", epic.CompletedAt)
+	}
+}
+
+func TestRunMerge_EpicBranchKeepsExistingCompletedAt(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"e": "e"})
+	ticketMD := mergeEpicSetup(t, repoDir, "2026-01-02T03:04:05Z")
+	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
+
+	if err := runMerge(mainDir, "e", true, &bytes.Buffer{}); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+
+	epic := tickets.LoadEpicTicketMD(filepath.Dir(ticketMD))
+	if epic.MergedAt.IsZero() {
+		t.Error("merged_at not stamped")
+	}
+	if want := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC); !epic.CompletedAt.Equal(want) {
+		t.Errorf("completed_at = %v, want %v", epic.CompletedAt, want)
+	}
+}
+
+func TestRunMerge_NeedsRebaseLeavesEpicUnmerged(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"e": "e"})
+	ticketMD := mergeEpicSetup(t, repoDir, "")
+	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
+	commitFile(t, mainDir, "main-only.txt", "diverge")
+
+	if err := runMerge(mainDir, "e", true, &bytes.Buffer{}); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+
+	if epic := tickets.LoadEpicTicketMD(filepath.Dir(ticketMD)); !epic.MergedAt.IsZero() {
+		t.Errorf("merged_at = %v, want unstamped", epic.MergedAt)
+	}
+}
+
+func TestRunMerge_NonEpicBranchStampsNothing(t *testing.T) {
+	repoDir, mainDir := mergeTestRepo(t, map[string]string{"feature": "feature"})
+	ticketMD := mergeEpicSetup(t, repoDir, "")
+	before, _ := os.ReadFile(ticketMD)
+	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
+
+	if err := runMerge(mainDir, "feature", true, &bytes.Buffer{}); err != nil {
+		t.Fatalf("runMerge: %v", err)
+	}
+
+	if after, _ := os.ReadFile(ticketMD); string(after) != string(before) {
+		t.Errorf("ticket.md changed:\n%s", after)
+	}
 }
 
 func TestRunMerge_LandsOnConfiguredTrunk(t *testing.T) {

@@ -26,7 +26,7 @@ type EpicFields struct {
 }
 
 // EpicServerStamped are the epic fields only the server writes.
-var EpicServerStamped = []string{"completed_at", "evolved_at", "evolve_skipped", "evolve_ticket"}
+var EpicServerStamped = []string{"completed_at", "merged_at", "evolved_at", "evolve_skipped", "evolve_ticket"}
 
 const epicSettableList = "kind, status, provisional_destination"
 

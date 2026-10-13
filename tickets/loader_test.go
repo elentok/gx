@@ -343,6 +343,27 @@ func TestLoad_TicketMDFrontmatterSuppliesEpicFields(t *testing.T) {
 	}
 }
 
+func TestLoad_MergedAtRoundTrips(t *testing.T) {
+	dir := t.TempDir()
+	epicPath := filepath.Join(dir, "e")
+	writeFile(t, filepath.Join(epicPath, "ticket.md"), "---\nstatus: open\n---\n# E\n")
+	merged := time.Date(2026, 1, 3, 3, 4, 5, 0, time.UTC)
+	if err := StampEpicMerged(epicPath, merged); err != nil {
+		t.Fatalf("StampEpicMerged: %v", err)
+	}
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 1 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	if !epics[0].MergedAt.Equal(merged) {
+		t.Errorf("MergedAt = %v, want %v", epics[0].MergedAt, merged)
+	}
+	if !epics[0].CompletedAt.IsZero() {
+		t.Errorf("CompletedAt = %v, want zero", epics[0].CompletedAt)
+	}
+}
+
 func TestLoad_TicketMDKindMapMakesAMapEpic(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "map-epic", "ticket.md"),

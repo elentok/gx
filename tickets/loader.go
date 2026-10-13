@@ -190,6 +190,7 @@ type ticketMDYAML struct {
 	Base        string     `yaml:"base"`
 	StartedAt   *time.Time `yaml:"started_at"`
 	CompletedAt *time.Time `yaml:"completed_at"`
+	MergedAt    *time.Time `yaml:"merged_at"`
 }
 
 // WriteEpicTicketMD writes a minimal ticket.md for the epic at epicPath, with
@@ -239,6 +240,9 @@ func loadEpicTicketMD(epic *Epic) {
 	}
 	if wire.CompletedAt != nil {
 		epic.CompletedAt = *wire.CompletedAt
+	}
+	if wire.MergedAt != nil {
+		epic.MergedAt = *wire.MergedAt
 	}
 	loadEpicEvolveFields(epic, fm)
 }
@@ -294,6 +298,12 @@ func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
 // recorded once, at genuine completion.
 func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
 	return StampEpicFields(filepath.Join(scratchDir, epicName), map[string]any{"completed_at": now})
+}
+
+// StampEpicMerged writes merged_at into epicPath's ticket.md frontmatter,
+// once: a merged_at already on disk is left alone.
+func StampEpicMerged(epicPath string, now time.Time) error {
+	return StampEpicFields(epicPath, map[string]any{"merged_at": now})
 }
 
 // StampEpicFields sets each key in fields on the epic's ticket.md frontmatter
