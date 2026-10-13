@@ -26,6 +26,8 @@ type Event struct {
 	// outcome, such as config-reloaded.
 	Level   string `json:"level,omitempty"`
 	Message string `json:"message,omitempty"`
+	// Kind (an events.Kind) tells root-parked causes apart.
+	Kind string `json:"kind,omitempty"`
 }
 
 const (

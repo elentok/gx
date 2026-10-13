@@ -170,30 +170,22 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	}
 }
 
-// A land error is not the epic's final outcome: the retro waits for the land or a park.
-func TestRetroHook_NothingWhenTheLandErrors(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{
-		"01": {},
-		"02": {BlockedBy: []string{"01"}},
-	}, func(f *schedFixture, p servertest.Prompt, id string) {
+// A land error parks the root, and that park is the epic's final outcome.
+func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, "evolve-") {
 			return
 		}
 		commitWork(t, p, id)
-		if id == "02" {
-			// An untracked file the fast-forward would overwrite fails the land.
-			testutil.WriteFile(t, f.repo, "02.txt", "untracked")
-		}
+		// An untracked file the fast-forward would overwrite fails the land.
+		testutil.WriteFile(t, f.repo, "01.txt", "untracked")
 	}, withEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationFailed, "proj:"+schedEpic)
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
 
-	if got, err := filepath.Glob(filepath.Join(f.store, "proj", "evolve-"+schedEpic+"-*")); err != nil || len(got) != 0 {
-		t.Errorf("retros = %v (%v), want none", got, err)
-	}
-	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
-		t.Errorf("the land succeeded: main contains the feature branch")
+	if got := f.retrosAfter(t); len(got) != 1 {
+		t.Errorf("retros = %v, want one", got)
 	}
 }

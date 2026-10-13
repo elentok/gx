@@ -693,20 +693,16 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		case s.nothingToLand(project, epics, one, repo):
 			s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		case s.autoFFMerge(project):
-			if reason, rebase, err := s.landRoot(project, epics, one, repo); err != nil {
-				s.log.Warn("land root", "root", root, "err", err)
-				s.events.publish(EventIterationFailed, root.String())
-				return
-			} else if reason != "" {
+			if reason, kind := s.landRoot(project, epics, one, repo); reason != "" {
 				s.stampEpic(root, e.Path, "completed_at")
-				s.events.publish(EventRootParked, root.String())
-				s.log.Warn("root parked", "root", root, "reason", reason)
+				s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: string(kind), Level: EventLevelWarning, Message: reason})
+				s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
 				if s.chat.Enabled() {
 					s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
 				}
-				// Only a needs-rebase park is the epic's outcome; any other
-				// park waits on a person's fix and then lands.
-				if rebase {
+				// Only a needs-rebase park, the one without a kind, is the
+				// epic's outcome; any other park waits on a person's fix and then lands.
+				if kind == "" {
 					s.notifyEpicOutcome(project, dir, one, e, false)
 				}
 				s.submitRetro(root, dir, e, one.Ticket.Path)
@@ -741,8 +737,7 @@ func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIterati
 
 // submitRetro files the evolve one-off for a completed loop epic. It runs at
 // the epic's final outcome, where completed_at is stamped: the land, a root
-// park, or all-done with auto-ff-merge off. A land error is not an outcome.
-// A refused submit is logged, never an error:
+// park, or all-done with auto-ff-merge off. A refused submit is logged, never an error:
 // the dedupe key refuses a second live retro of the same epic.
 func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ticketPath string) {
 	if e.IsMap || isOneOffTicket(ticketPath) || !e.EvolvedAt.IsZero() {
@@ -807,34 +802,62 @@ func (s *Server) nothingToLand(project string, epics []tickets.Epic, one ralphlo
 }
 
 // landRoot fast-forwards the root's target to its feature branch through the
-// merge core. A non-empty reason means the root must park, not land; rebase
-// says the park is a needs-rebase one.
-func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, rebase bool, err error) {
+// merge core. A non-empty reason means the root must park, not land; kind
+// names the park's cause, empty for a needs-rebase one. Every error parks the
+// root: one left all-done in the queue looks stuck.
+func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, kind events.Kind) {
+	landFailed := func(err error) (string, events.Kind) {
+		return fmt.Sprintf("land failed: %v; fix it, then run gx server epics merge %s:%s", err, project, one.Epic), events.LandError
+	}
 	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repoDir)
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing lands; the project stops claiming until a person fixes trunk.
 		s.enterTrunkMissing(project, err.Error())
-		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, one.Epic), false, nil
+		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, one.Epic), events.TrunkMissing
 	}
 	if err != nil {
-		return "", false, err
+		return landFailed(err)
 	}
 	info, err := git.IdentifyDir(repoDir)
 	if err != nil {
-		return "", false, err
+		return landFailed(err)
 	}
 	worktrees, err := git.ListWorktrees(info.Repo)
 	if err != nil {
-		return "", false, err
+		return landFailed(err)
 	}
 	out, err := git.MergeBranchInto(info.Repo, worktrees, one.Epic, target)
 	if err != nil {
-		return "", false, err
+		// No pre-check: git decides whether local changes block the land, and
+		// only a refused land looks at them.
+		if dir := git.CheckoutDirForBranch(info.Repo, worktrees, target); dir != "" {
+			if changes, cerr := git.UncommittedChanges(dir); cerr == nil && len(changes) > 0 {
+				return fmt.Sprintf("trunk dirty: %s checked out at %s has local changes in %s; commit or discard them, then run gx server epics merge %s:%s",
+					target, dir, changedFiles(changes), project, one.Epic), events.DirtyTrunk
+			}
+		}
+		return landFailed(err)
 	}
 	if out.Merged {
-		return "", false, nil
+		return "", ""
 	}
-	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), true, nil
+	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), ""
+}
+
+// maxReasonFiles caps the files a dirty-trunk reason lists.
+const maxReasonFiles = 5
+
+// changedFiles lists the changes' paths, the first maxReasonFiles then "+N more".
+func changedFiles(changes []git.Change) string {
+	paths := make([]string, 0, min(len(changes), maxReasonFiles))
+	for _, c := range changes[:min(len(changes), maxReasonFiles)] {
+		paths = append(paths, c.Path)
+	}
+	list := strings.Join(paths, ", ")
+	if extra := len(changes) - maxReasonFiles; extra > 0 {
+		list += fmt.Sprintf(" +%d more", extra)
+	}
+	return list
 }
 
 func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string {

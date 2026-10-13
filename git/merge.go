@@ -36,7 +36,7 @@ func MergeBranchInto(repo Repo, worktrees []Worktree, branch, target string) (Me
 	}
 
 	var ok bool
-	if dir := checkoutDirForBranch(repo, worktrees, target); dir != "" {
+	if dir := CheckoutDirForBranch(repo, worktrees, target); dir != "" {
 		ok, err = MergeFastForward(dir, branch)
 	} else {
 		ok, err = fastForwardRef(repo.Root, target, targetSHA, branch)
@@ -50,9 +50,9 @@ func MergeBranchInto(repo Repo, worktrees []Worktree, branch, target string) (Me
 	return MergeOutcome{Branch: branch, Target: target, WorktreePath: WorktreePathForBranch(branch, worktrees)}, nil
 }
 
-// checkoutDirForBranch returns the working tree that has branch checked out:
+// CheckoutDirForBranch returns the working tree that has branch checked out:
 // a linked worktree, else a non-bare root whose HEAD is branch, else "".
-func checkoutDirForBranch(repo Repo, worktrees []Worktree, branch string) string {
+func CheckoutDirForBranch(repo Repo, worktrees []Worktree, branch string) string {
 	if dir := WorktreePathForBranch(branch, worktrees); dir != "" {
 		return dir
 	}

@@ -117,6 +117,11 @@ const (
 	StrandedCommits Kind = "stranded-commits"
 	// TrunkMissing is a landing whose project's trunk could not be resolved.
 	TrunkMissing Kind = "trunk-missing"
+	// DirtyTrunk is a root land git refused because trunk's checkout has
+	// local changes.
+	DirtyTrunk Kind = "dirty-trunk"
+	// LandError is a root land that failed for any reason no other kind names.
+	LandError Kind = "land-error"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -134,7 +139,7 @@ var kinds = map[Kind]bool{
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
 	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
-	TrunkMissing: true,
+	TrunkMissing: true, DirtyTrunk: true, LandError: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes
