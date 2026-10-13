@@ -18,7 +18,7 @@ const actionMerge = "merge"
 var mergeMenuItem = components.MenuItem{Label: "merge", Value: actionMerge}
 
 // cmdEpicMerge asks the server to merge epic ("project:epic") and toasts the
-// outcome: a direct land, the forked merge ticket, or the refusal.
+// outcome: a direct land, the forked merge ticket, a park, or the refusal.
 func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := api.EpicMerge(context.Background(), epic)
@@ -27,6 +27,8 @@ func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 			return notify.Error("merge " + epic + ": " + err.Error())()
 		case res.Refused:
 			return notify.Error("merge refused: " + res.Message)()
+		case res.Parked:
+			return notify.Error("merge parked: " + res.Message)()
 		case res.MergeTicket != "":
 			return notify.Success("merge ticket " + res.MergeTicket + " forked")()
 		}

@@ -92,6 +92,8 @@ func TestEpicMerge_QueueTabOffersMergeOnParkedRootOnly(t *testing.T) {
 	}{
 		{"parked root merges", "done", server.QueueResult{Merged: true}, "gx:alpha merged"},
 		{"parked root refused", "done", server.QueueResult{Refused: true, Message: "trunk is dirty"}, "trunk is dirty"},
+		{"parked root parks again", "done", server.QueueResult{Parked: true, ParkKind: "conflict", Message: "merge conflict in a.go"}, "merge conflict in a.go"},
+		{"race-forked merge ticket", "done", server.QueueResult{MergeTicket: "gx:alpha/03"}, "merge ticket gx:alpha/03 forked"},
 		{"unfinished epic", "open", server.QueueResult{}, ""},
 	} {
 		var calls []string
@@ -117,6 +119,9 @@ func TestEpicMerge_QueueTabOffersMergeOnParkedRootOnly(t *testing.T) {
 		}
 		if !strings.Contains(toast.Message, tc.want) {
 			t.Errorf("%s: toast = %q, want %q", tc.name, toast.Message, tc.want)
+		}
+		if tc.res.Parked && (toast.Kind != notify.KindError || strings.Contains(toast.Message, "merged")) {
+			t.Errorf("%s: toast = %+v, want an error toast that never says merged", tc.name, toast)
 		}
 	}
 }

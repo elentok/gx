@@ -499,6 +499,13 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
+	if res.Parked {
+		kind := res.ParkKind
+		if kind == "" {
+			kind = "needs-rebase"
+		}
+		return fmt.Errorf("parked (%s): %s", kind, res.Message)
+	}
 	if res.Merged {
 		_, err := fmt.Fprintln(w, "merged")
 		return err
