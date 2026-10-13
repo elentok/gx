@@ -324,6 +324,9 @@ func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
 		BlockedBy:  info.BlockedBy,
 		Status:     info.Status,
 
+		ExternalBlockers: info.ExternalBlockers,
+		WidenedBlockers:  info.WidenedBlockers,
+
 		ActualContextWindow:   info.ActualContextWindow,
 		ExpectedContextWindow: info.ExpectedContextWindow,
 		ElapsedTime:           info.ElapsedTime,

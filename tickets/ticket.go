@@ -4,6 +4,7 @@
 package tickets
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -116,6 +117,15 @@ type Ticket struct {
 	// resolved as a whole epic ("epic2/b" → "epic2") to that epic, set by
 	// ResolveCrossEpic.
 	WidenedBlockers map[string]string
+}
+
+// BlockerLabel is how a blocked_by token reads to a person: a widened one
+// names the epic it waits on, e.g. "epic2 (via epic2/b)".
+func (t Ticket) BlockerLabel(ref string) string {
+	if epic, ok := t.WidenedBlockers[ref]; ok {
+		return fmt.Sprintf("%s (via %s)", epic, ref)
+	}
+	return ref
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets

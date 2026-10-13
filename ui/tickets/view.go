@@ -289,5 +289,8 @@ func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.Rendere
 	if len(unresolved) > 3 {
 		return fmt.Sprintf("(blocked by %d tickets)", len(unresolved))
 	}
+	for i, ref := range unresolved {
+		unresolved[i] = t.BlockerLabel(ref)
+	}
 	return fmt.Sprintf("(blocked by %s)", strings.Join(unresolved, ", "))
 }

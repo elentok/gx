@@ -154,6 +154,42 @@ func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T)
 	}
 }
 
+func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "done"},
+		{Address: "gx:alpha/02", Title: "Merge alpha", Status: "claimed", Type: "merge", ClaimedAt: time.Now()},
+	}}, []server.QueueItem{{Address: "gx:alpha/02"}})
+
+	live := m.live["gx:alpha"]["02"]
+	if !live.running || live.phase != livePhaseMerging {
+		t.Errorf("live[02] = %+v, want running and merging", live)
+	}
+	_, suffix, _ := renderLiveTicketRow(m.icons(), m.implementSpinner, m.epics[0].Tickets[1], live, "")
+	if suffix != "(merging...)" {
+		t.Errorf("suffix = %q, want %q", suffix, "(merging...)")
+	}
+	if got := m.queueHeaderTitle(); !strings.HasPrefix(got, "Queue · 1 of 2 done · ") {
+		t.Errorf("queueHeaderTitle() = %q, want the merge ticket counted: \"Queue · 1 of 2 done · ...\"", got)
+	}
+}
+
+func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "Widened", Status: "open", BlockedBy: []string{"epic2/b"},
+			ExternalBlockers: []string{"epic2/b"}, WidenedBlockers: map[string]string{"epic2/b": "epic2"}},
+		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", BlockedBy: []string{"epic3"},
+			ExternalBlockers: []string{"epic3"}},
+	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
+
+	epic := m.epics[0]
+	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
+		tk := epic.Tickets[i]
+		if got := blockedBySuffix(epic, tk, epic.RenderedStatus(tk)); got != want {
+			t.Errorf("blockedBySuffix(%s) = %q, want %q", tk.Identifier, got, want)
+		}
+	}
+}
+
 func TestQueueServerMode_ClaimedWithoutServerRunIsNotImplementing(t *testing.T) {
 	m, _ := loadedServerQueueWith(t, "claimed", time.Time{}, false)
 

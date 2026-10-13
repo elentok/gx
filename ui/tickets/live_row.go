@@ -64,6 +64,7 @@ const (
 	livePhaseResolvingConflicts
 	livePhaseCompacting
 	livePhaseFinishingUp
+	livePhaseMerging
 )
 
 // suffix returns p's row-suffix text, e.g. "(implementing...)".
@@ -77,6 +78,8 @@ func (p livePhase) suffix() string {
 		return "(compacting...)"
 	case livePhaseFinishingUp:
 		return "(telling the agent to finish up...)"
+	case livePhaseMerging:
+		return "(merging...)"
 	default:
 		return "(implementing...)"
 	}
@@ -96,6 +99,8 @@ func (p livePhase) color() color.Color {
 		return ui.ColorYellow
 	case livePhaseFinishingUp:
 		return ui.ColorOrange
+	case livePhaseMerging:
+		return ui.ColorMauve
 	default:
 		return ui.ColorBlue
 	}

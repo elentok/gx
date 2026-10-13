@@ -21,6 +21,10 @@ type TicketInfo struct {
 	Status    string   `json:"status"`
 	Type      string   `json:"type"`
 	BlockedBy []string `json:"blocked_by,omitempty"`
+	// ExternalBlockers and WidenedBlockers carry the cross-epic resolution
+	// (see tickets.Ticket), which a client can't redo from one scope's tickets.
+	ExternalBlockers []string          `json:"external_blockers,omitempty"`
+	WidenedBlockers  map[string]string `json:"widened_blockers,omitempty"`
 	// Parent is the address of the ticket this one was forked from.
 	Parent string `json:"parent,omitempty"`
 	// File is the ticket's markdown path, for clients that edit content or
@@ -174,6 +178,9 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		Type:      t.Type,
 		BlockedBy: t.BlockedBy,
 		File:      t.Path,
+
+		ExternalBlockers: t.ExternalBlockers,
+		WidenedBlockers:  t.WidenedBlockers,
 
 		ActualContextWindow:   t.ActualContextWindow,
 		ExpectedContextWindow: t.ExpectedContextWindow,

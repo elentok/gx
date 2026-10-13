@@ -108,7 +108,11 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 			if live[epic.Name] == nil {
 				live[epic.Name] = map[string]liveTicketState{}
 			}
-			live[epic.Name][t.Identifier] = liveTicketState{running: true, phase: livePhaseImplementing, startedAt: seen}
+			phase := livePhaseImplementing
+			if t.Type == string(schema.TypeMerge) {
+				phase = livePhaseMerging
+			}
+			live[epic.Name][t.Identifier] = liveTicketState{running: true, phase: phase, startedAt: seen}
 			running[epic.Name] = true
 		}
 		markConflictResolution(epic, live[epic.Name])

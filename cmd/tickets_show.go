@@ -133,10 +133,7 @@ func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer)
 		// JSON keeps the file's tokens; only the text form shows the widening.
 		shown := make([]string, len(blocked))
 		for i, ref := range blocked {
-			shown[i] = ref
-			if epic, ok := t.WidenedBlockers[ref]; ok {
-				shown[i] = fmt.Sprintf("%s (via %s)", epic, ref)
-			}
+			shown[i] = t.BlockerLabel(ref)
 		}
 		fmt.Fprintf(w, "blocked_by: %s\n", strings.Join(shown, ", "))
 	}
