@@ -339,7 +339,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 }
 
 // TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh is ticket 01's
-// regression: expanding "Closed epics" used to snap shut again on the very
+// regression: expanding "Complete epics (unmerged)" used to snap shut again on the very
 // next auto-refresh poll, because expanding deleted the collapse-map entry
 // instead of recording an explicit choice, so the section's collapsed-by-
 // default policy re-asserted itself. Assert it survives more than one tick.
@@ -353,12 +353,12 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed")
 	}
 
-	setCollapsedSection(&m, sectionClosed, false)
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	setCollapsedSection(&m, sectionComplete, false)
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section expanded after manual toggle")
 	}
 	// done-epic itself still defaults to collapsed once the section is
@@ -371,7 +371,7 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 		updated, _ = m.Update(msg)
 		m = updated.(Model)
 
-		if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+		if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 			t.Fatalf("refresh %d: expected Closed section to stay expanded, got collapsed", i+1)
 		}
 		if !strings.Contains(m.View().Content, "Only ticket") {
@@ -391,7 +391,7 @@ func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// A zero-ticket epic is never closed (splitEpicIndexesBySection), so it
+	// A zero-ticket epic is never AllDone (epicSection), so it
 	// lands in the never-collapsed-by-default Open section and must not
 	// start dimmed/collapsed itself either.
 	if m.isCollapsed(findEpic(t, m, "empty-epic")) {
@@ -399,41 +399,88 @@ func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
 	}
 }
 
-func TestNewModel_SplitsOpenAndClosedEpicSections(t *testing.T) {
+func TestNewModel_GroupsEpicsIntoSectionsInOrder(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "done-epic", "01-first-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	testutil.Mkdir(t, filepath.Join(root, ".scratch", "empty-epic", "issues"))
+	testutil.EnsureEpicTicketMD(t, filepath.Join(root, ".scratch", "empty-epic"))
+	writeMap(t, root, "open-map", "")
+	writeTicket(t, root, "open-map", "01-only-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "complete-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	writeMergedEpic(t, root, "merged-epic")
+	writeTicket(t, root, "merged-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	writeMap(t, root, "complete-map", "")
+	writeTicket(t, root, "complete-map", "01-only-ticket.md", "Status: done\n\nBody.\n")
+	writeArchivedTicket(t, root, "archived-epic", "01-only-ticket.md", "Status: done\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 60})
 	m = updated.(Model)
 
-	// The Closed section starts collapsed by default; expand it so
-	// done-epic renders for the order check below.
-	setCollapsedSection(&m, sectionClosed, false)
+	content := ansi.Strip(m.View().Content)
+	want := []string{
+		"Open epics (2)", "empty-epic", "open-epic",
+		"Open maps (1)", "open-map",
+		"Complete epics (unmerged) (1)",
+		"Merged epics (1)",
+		"Complete maps (1)",
+		"Archived epics (1)",
+	}
+	assertInOrder(t, content, want)
+	if strings.Contains(content, "Closed epics") {
+		t.Fatalf("expected no 'Closed epics' section, got:\n%s", content)
+	}
 
-	content := m.View().Content
-	if !strings.Contains(content, "Open epics (1)") {
-		t.Fatalf("expected 'Open epics (1)' header, got:\n%s", content)
+	// The complete sections start collapsed; each expands and collapses again.
+	for _, c := range []struct {
+		section sidebarSection
+		epic    string
+	}{
+		{sectionComplete, "complete-epic"},
+		{sectionMerged, "merged-epic"},
+		{sectionCompleteMaps, "complete-map"},
+	} {
+		if strings.Contains(content, c.epic) {
+			t.Fatalf("expected %s hidden under its collapsed section, got:\n%s", c.epic, content)
+		}
+		setCollapsedSection(&m, c.section, false)
+		if !strings.Contains(ansi.Strip(m.View().Content), c.epic) {
+			t.Fatalf("expected %s visible once its section expands, got:\n%s", c.epic, m.View().Content)
+		}
+		setCollapsedSection(&m, c.section, true)
+		if strings.Contains(ansi.Strip(m.View().Content), c.epic) {
+			t.Fatalf("expected %s hidden once its section collapses again", c.epic)
+		}
 	}
-	if !strings.Contains(content, "Closed epics (1)") {
-		t.Fatalf("expected 'Closed epics (1)' header, got:\n%s", content)
+}
+
+// assertInOrder fails unless every needle appears in content, each after the
+// previous one.
+func assertInOrder(t *testing.T, content string, needles []string) {
+	t.Helper()
+	pos := 0
+	for _, needle := range needles {
+		i := strings.Index(content[pos:], needle)
+		if i < 0 {
+			t.Fatalf("expected %q after offset %d, got:\n%s", needle, pos, content)
+		}
+		pos += i + len(needle)
 	}
-	openIdx := strings.Index(content, "open-epic")
-	closedIdx := strings.Index(content, "done-epic")
-	openHeaderIdx := strings.Index(content, "Open epics (1)")
-	closedHeaderIdx := strings.Index(content, "Closed epics (1)")
-	if !(openHeaderIdx < openIdx && openIdx < closedHeaderIdx && closedHeaderIdx < closedIdx) {
-		t.Fatalf("expected order [open header, open-epic, closed header, done-epic], got:\n%s", content)
-	}
+}
+
+func writeMergedEpic(t *testing.T, root, epic string) {
+	t.Helper()
+	epicDir := filepath.Join(root, ".scratch", epic)
+	testutil.Mkdir(t, epicDir)
+	testutil.WriteFile(t, epicDir, "ticket.md", "---\nstatus: open\nmerged_at: 2026-01-02T00:00:00Z\n---\n")
 }
 
 // TestNewModel_SectionHeadersMatchTreeRowShape covers ticket 02's redesign:
 // section headers drop the old "── … ──" border in favor of the same
 // expand-glyph-led shape epic/ticket rows use, with no state icon on either
-// header — "Closed epics" matches "Open epics" — and the blank spacer row
+// header — "Complete epics" matches "Open epics" — and the blank spacer row
 // that used to sit between the two sections is gone.
 func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	t.Parallel()
@@ -445,7 +492,7 @@ func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	setCollapsedSection(&m, sectionClosed, false)
+	setCollapsedSection(&m, sectionComplete, false)
 
 	rawContent := m.View().Content
 	content := ansi.Strip(rawContent)
@@ -462,27 +509,27 @@ func TestNewModel_SectionHeadersMatchTreeRowShape(t *testing.T) {
 		t.Fatalf("expected 'Open epics' row to show no icon, got: %q", openPrefix)
 	}
 
-	closedPrefix := prefixBefore(t, content, "Closed epics (1)")
+	closedPrefix := prefixBefore(t, content, "Complete epics (unmerged) (1)")
 	if !strings.Contains(closedPrefix, icons.TriangleExpanded) {
-		t.Fatalf("expected 'Closed epics' row to lead with the expand glyph, got: %q", closedPrefix)
+		t.Fatalf("expected 'Complete epics (unmerged)' row to lead with the expand glyph, got: %q", closedPrefix)
 	}
 	if strings.Contains(closedPrefix, icons.TicketDone) {
-		t.Fatalf("expected 'Closed epics' row to show no icon, got: %q", closedPrefix)
+		t.Fatalf("expected 'Complete epics (unmerged)' row to show no icon, got: %q", closedPrefix)
 	}
 
 	lines := strings.Split(content, "\n")
 	closedHeaderLine := -1
 	for i, line := range lines {
-		if strings.Contains(line, "Closed epics (1)") {
+		if strings.Contains(line, "Complete epics (unmerged) (1)") {
 			closedHeaderLine = i
 			break
 		}
 	}
 	if closedHeaderLine <= 0 {
-		t.Fatalf("expected to find the 'Closed epics' header past line 0, got:\n%s", content)
+		t.Fatalf("expected to find the 'Complete epics (unmerged)' header past line 0, got:\n%s", content)
 	}
 	if strings.TrimSpace(lines[closedHeaderLine-1]) == "" {
-		t.Fatalf("expected no blank spacer row directly above the 'Closed epics' header, got:\n%s", content)
+		t.Fatalf("expected no blank spacer row directly above the 'Complete epics (unmerged)' header, got:\n%s", content)
 	}
 }
 
@@ -504,7 +551,7 @@ func prefixBefore(t *testing.T, content, needle string) string {
 	return found[0]
 }
 
-func TestNewModel_EmptySectionShowsMutedPlaceholder(t *testing.T) {
+func TestNewModel_HidesEmptySections(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "open-epic", "01-only-ticket.md", "Status: open\n\nBody.\n")
@@ -514,13 +561,14 @@ func TestNewModel_EmptySectionShowsMutedPlaceholder(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// The Closed section starts collapsed by default; expand it so its
-	// empty-section placeholder renders.
-	setCollapsedSection(&m, sectionClosed, false)
-
-	content := m.View().Content
-	if !strings.Contains(content, "Closed epics (0)") || !strings.Contains(content, "no closed epics") {
-		t.Fatalf("expected empty Closed epics section placeholder, got:\n%s", content)
+	content := ansi.Strip(m.View().Content)
+	if !strings.Contains(content, "Open epics (1)") {
+		t.Fatalf("expected 'Open epics (1)' header, got:\n%s", content)
+	}
+	for _, label := range []string{"Open maps", "Complete epics", "Merged epics", "Complete maps", "Archived epics"} {
+		if strings.Contains(content, label) {
+			t.Fatalf("expected empty %q section hidden, got:\n%s", label, content)
+		}
 	}
 }
 
@@ -874,7 +922,7 @@ func TestModel_TCOnFullyDoneEpicHidesAllTicketsButKeepsEpicRow(t *testing.T) {
 	// The Closed section starts collapsed by default; expand it (and the
 	// epic itself, which has no default of its own) so its ticket row would
 	// normally be visible.
-	setCollapsedSection(&m, sectionClosed, false)
+	setCollapsedSection(&m, sectionComplete, false)
 	setCollapsedEpic(&m, indexOfEpic(t, m, "done-epic"), false)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 't', Text: "t"})
@@ -1157,25 +1205,6 @@ func TestModel_ArchivedSectionShowsCountWithoutLoading(t *testing.T) {
 	}
 }
 
-// TestModel_ArchivedSectionZeroCountRendersEmptyPlaceholder covers the
-// count-0 branch: an expanded Archived section with nothing archived renders
-// the shared nodeEmpty placeholder convention, same as an empty Open/Closed
-// section.
-func TestModel_ArchivedSectionZeroCountRendersEmptyPlaceholder(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-open-ticket.md", "Status: open\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	setCollapsedSection(&m, sectionArchived, false)
-
-	body := strings.Join(m.sidebarBody(20, 80), "\n")
-	if !strings.Contains(body, "no archived epics") {
-		t.Fatalf("expected empty-archive placeholder, got:\n%s", body)
-	}
-}
-
 // TestModel_ExpandArchivedSectionLoadsAndPopulatesCollapsedByDefault drives
 // the full lazy-load path: pressing "l" (expand) on the Archived header with
 // a non-zero count returns a load command; running it through Update
@@ -1241,6 +1270,7 @@ func TestModel_FailedArchivedLoadRendersInlineErrorAndStaysExpandedThenRetries(t
 	m.archivedEpicCount = 1 // bypass the count-0 short-circuit; CountArchivedEpics itself tolerates the file fine
 	m = deliverLoad(t, m)
 	m.archivedEpicCount = 1
+	m.clampSelected() // rebuild so the now non-empty Archived section shows
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 

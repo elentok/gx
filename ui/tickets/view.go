@@ -72,11 +72,7 @@ var (
 // epics into this one grouping, each epic row labeled with its worktree
 // (renderEpicRow).
 func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
-	idxs := make([]int, len(m.epics))
-	for i := range m.epics {
-		idxs[i] = i
-	}
-	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+	groups := groupEpicIndexesBySection(m.epics)
 
 	entries := m.sidebarTree.Entries()
 	idxByID := make(map[string]int, len(entries))
@@ -96,23 +92,11 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 				if m.sidebarTree.CollapsedIDs()[entry.ID] {
 					glyph = m.icons().TriangleCollapsed
 				}
-				label, n := "Open epics", len(openIdxs)
-				switch entry.Value.section {
-				case sectionClosed:
-					label, n = "Closed epics", len(closedIdxs)
-				case sectionArchived:
-					label, n = "Archived epics", m.archivedEpicCount
+				n := len(groups[entry.Value.section])
+				if entry.Value.section == sectionArchived {
+					n = m.archivedEpicCount
 				}
-				return fmt.Sprintf("%s %s", glyph, sectionHeaderStyle.Render(fmt.Sprintf("%s (%d)", label, n)))
-			case nodeEmpty:
-				label := "open epics"
-				switch entry.Value.section {
-				case sectionClosed:
-					label = "closed epics"
-				case sectionArchived:
-					label = "archived epics"
-				}
-				return ui.StyleMuted.Render("no " + label)
+				return fmt.Sprintf("%s %s", glyph, sectionHeaderStyle.Render(fmt.Sprintf("%s (%d)", sectionLabel(entry.Value.section), n)))
 			case nodeLoading:
 				return ui.StyleDim.Render("loading…")
 			case nodeLoadError:
@@ -125,6 +109,23 @@ func (m Model) sidebarRenderOpts(width int) tree.RenderOpts[sidebarNode] {
 				return m.renderTicketRow(m.epicAt(r), r, idxByID[entry.ID])[0]
 			}
 		},
+	}
+}
+
+func sectionLabel(section sidebarSection) string {
+	switch section {
+	case sectionOpen:
+		return "Open epics"
+	case sectionOpenMaps:
+		return "Open maps"
+	case sectionComplete:
+		return "Complete epics (unmerged)"
+	case sectionMerged:
+		return "Merged epics"
+	case sectionCompleteMaps:
+		return "Complete maps"
+	default:
+		return "Archived epics"
 	}
 }
 

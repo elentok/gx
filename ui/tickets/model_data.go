@@ -17,7 +17,7 @@ import (
 const noParentTicket = -1
 
 // sidebarNodeKind distinguishes the three row kinds the sidebar tree can
-// hold: a section header ("Open epics"/"Closed epics"), an epic, or a
+// hold: a section header ("Open epics", "Merged epics", …), an epic, or a
 // ticket. tree.Model[T] itself has no notion of a heterogeneous node — this
 // sum type plus idFn/childrenFn is what makes one tree.Model[sidebarNode]
 // stand in for what used to be two hand-flattened levels (epics, then each
@@ -28,20 +28,60 @@ const (
 	nodeSection sidebarNodeKind = iota
 	nodeEpic
 	nodeTicket
-	nodeEmpty     // "no open/closed/archived epics" placeholder, child of a nodeSection with zero epics
 	nodeLoading   // "loading…" placeholder, child of the Archived section while its lazy load is in flight
 	nodeLoadError // inline error placeholder, child of the Archived section after a failed lazy load
 )
 
-// sidebarSection is which of the three section-header roots a sidebarNode
-// belongs under.
+// sidebarSection is which section-header root a sidebarNode belongs under.
+// Declaration order is the sidebar's render order.
 type sidebarSection int
 
 const (
 	sectionOpen sidebarSection = iota
-	sectionClosed
+	sectionOpenMaps
+	sectionComplete
+	sectionMerged
+	sectionCompleteMaps
 	sectionArchived
+	sectionCount
 )
+
+// sectionCollapsedByDefault marks the sections holding finished work: they
+// start collapsed so what still needs landing stays on screen.
+var sectionCollapsedByDefault = map[sidebarSection]bool{
+	sectionComplete:     true,
+	sectionMerged:       true,
+	sectionCompleteMaps: true,
+	sectionArchived:     true,
+}
+
+// epicSection classifies an active (non-archived) epic. A zero-ticket epic is
+// never AllDone, so it stays open.
+func epicSection(epic tickets.Epic) sidebarSection {
+	switch {
+	case epic.IsMap && epic.AllDone():
+		return sectionCompleteMaps
+	case epic.IsMap:
+		return sectionOpenMaps
+	case !epic.AllDone():
+		return sectionOpen
+	case !epic.MergedAt.IsZero():
+		return sectionMerged
+	default:
+		return sectionComplete
+	}
+}
+
+// groupEpicIndexesBySection buckets m.epics' indexes by epicSection,
+// preserving input order within each section.
+func groupEpicIndexesBySection(epics []tickets.Epic) map[sidebarSection][]int {
+	groups := make(map[sidebarSection][]int, sectionCount)
+	for i, epic := range epics {
+		s := epicSection(epic)
+		groups[s] = append(groups[s], i)
+	}
+	return groups
+}
 
 // sidebarNode is ui/tree.Model[sidebarNode]'s value type. ticketIdx is -1 for
 // nodeSection/nodeEpic. archived marks a node sourced from m.archivedEpics
@@ -108,17 +148,13 @@ func (m Model) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
 }
 
 // buildSidebarEntries flattens m.epics into the sidebar's full tree.Entry
-// list: two nodeSection roots ("Open epics"/"Closed epics", per
-// splitEpicIndexesBySection), each epic's root tickets beneath its nodeEpic
-// entry, and each ticket's nested children (epicTicketTree.childrenOf)
-// beneath its nodeTicket entry. Called on every epicsLoadedMsg/hideDone
-// toggle/collapse mutation via clampSelected.
+// list: one nodeSection root per non-empty section (per epicSection), each
+// epic's root tickets beneath its nodeEpic entry, and each ticket's nested
+// children (epicTicketTree.childrenOf) beneath its nodeTicket entry. Called
+// on every epicsLoadedMsg/hideDone toggle/collapse mutation via
+// clampSelected.
 func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
-	idxs := make([]int, len(m.epics))
-	for i := range m.epics {
-		idxs[i] = i
-	}
-	openIdxs, closedIdxs := splitEpicIndexesBySection(m.epics, idxs)
+	groups := groupEpicIndexesBySection(m.epics)
 
 	epicTreesOpen := make(map[int]epicTicketTree, len(m.epics))
 	epicTreesArchived := make(map[int]epicTicketTree, len(m.archivedEpics))
@@ -136,18 +172,18 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 		return t
 	}
 
-	roots := []sidebarNode{
-		{kind: nodeSection, section: sectionOpen, ticketIdx: -1},
-		{kind: nodeSection, section: sectionClosed, ticketIdx: -1},
-		{kind: nodeSection, section: sectionArchived, ticketIdx: -1},
+	var roots []sidebarNode
+	for s := range sectionCount {
+		if len(groups[s]) == 0 && (s != sectionArchived || m.archivedEpicCount == 0) {
+			continue
+		}
+		roots = append(roots, sidebarNode{kind: nodeSection, section: s, ticketIdx: -1})
 	}
 
 	idFn := func(n sidebarNode) string {
 		switch n.kind {
 		case nodeSection:
 			return sidebarSectionID(n.section)
-		case nodeEmpty:
-			return sidebarSectionID(n.section) + ":empty"
 		case nodeLoading:
 			return sidebarSectionID(n.section) + ":loading"
 		case nodeLoadError:
@@ -165,19 +201,13 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 			if n.section == sectionArchived {
 				return m.archivedSectionChildren()
 			}
-			order := openIdxs
-			if n.section == sectionClosed {
-				order = closedIdxs
-			}
-			if len(order) == 0 {
-				return []sidebarNode{{kind: nodeEmpty, section: n.section, ticketIdx: -1}}
-			}
+			order := groups[n.section]
 			children := make([]sidebarNode, len(order))
 			for i, epicIdx := range order {
 				children[i] = sidebarNode{kind: nodeEpic, epicIdx: epicIdx, ticketIdx: -1}
 			}
 			return children
-		case nodeEmpty, nodeLoading, nodeLoadError:
+		case nodeLoading, nodeLoadError:
 			return nil
 		case nodeEpic:
 			roots := epicTree(n.archived, n.epicIdx).roots
@@ -206,15 +236,10 @@ func (m Model) buildSidebarEntries() []tree.Entry[sidebarNode] {
 }
 
 // archivedSectionChildren computes the Archived section header's synthetic
-// children: the shared nodeEmpty placeholder when the up-front count is
-// zero (so an empty archive renders identically to an empty Open/Closed
-// section, never as a bare non-expandable row), otherwise a loading/error
-// placeholder or the real archived-epic rows depending on m.archivedLazy's
-// current state.
+// children: a loading/error placeholder or the real archived-epic rows
+// depending on m.archivedLazy's current state. The section itself is hidden
+// while the up-front count is zero.
 func (m Model) archivedSectionChildren() []sidebarNode {
-	if m.archivedEpicCount == 0 {
-		return []sidebarNode{{kind: nodeEmpty, section: sectionArchived, ticketIdx: -1}}
-	}
 	switch m.archivedLazy.State() {
 	case tree.LazyLoaded:
 		children := make([]sidebarNode, len(m.archivedEpics))
@@ -327,53 +352,41 @@ func nearestVisibleAncestor(epic tickets.Epic, idx int, visible map[int]bool, by
 	return noParentTicket
 }
 
-// splitEpicIndexesBySection splits idxs (indexes into epics) into the "Open
-// epics" and "Closed epics" sections shown in the sidebar (mirroring the
-// PRs tab's Actionable/Non-actionable split): an epic is closed once every
-// one of its tickets is done (Epic.AllDone) — a zero-ticket epic is never
-// closed, same rule the default-collapse behavior already uses. Order
-// within each group follows idxs' input order.
-func splitEpicIndexesBySection(epics []tickets.Epic, idxs []int) (open, closed []int) {
-	for _, i := range idxs {
-		if epics[i].AllDone() {
-			closed = append(closed, i)
-		} else {
-			open = append(open, i)
-		}
-	}
-	return open, closed
-}
-
 func (m Model) isCollapsed(epic tickets.Epic) bool {
 	return m.sidebarTree.CollapsedIDs()[epic.Path]
 }
 
 // sidebarSectionID is the tree.Entry ID for a section's nodeSection root row
-// — the single source of truth idFn and closedEpicDefaults both share
-// for "section:open"/"section:closed"/"section:archived".
+// — the single source of truth idFn and closedEpicDefaults both share.
 func sidebarSectionID(section sidebarSection) string {
 	switch section {
 	case sectionOpen:
 		return "section:open"
-	case sectionClosed:
-		return "section:closed"
+	case sectionOpenMaps:
+		return "section:open-maps"
+	case sectionComplete:
+		return "section:complete"
+	case sectionMerged:
+		return "section:merged"
+	case sectionCompleteMaps:
+		return "section:complete-maps"
 	default:
 		return "section:archived"
 	}
 }
 
 // closedEpicDefaults is the sidebar's declared-default collapse policy: the
-// "Closed epics" section starts collapsed, and every closed epic's own row
-// (splitEpicIndexesBySection's AllDone rule) starts collapsed too — so
-// expanding the section doesn't dump every closed epic's full ticket list
-// on screen at once. An open epic gets no entry (defaults to expanded).
-// Declared fresh from epics every call — never mutated or persisted — so an
-// epic that reopens (a ticket moves back off done) simply stops appearing
-// here on the very next call, with nothing to un-seed.
+// sectionCollapsedByDefault sections start collapsed, and every all-done
+// epic's own row starts collapsed too — so expanding a section doesn't dump
+// every finished epic's full ticket list on screen at once. An open epic gets
+// no entry (defaults to expanded). Declared fresh from epics every call —
+// never mutated or persisted — so an epic that reopens (a ticket moves back
+// off done) simply stops appearing here on the very next call, with nothing
+// to un-seed.
 func closedEpicDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) map[string]bool {
-	defaults := map[string]bool{
-		sidebarSectionID(sectionClosed):   true,
-		sidebarSectionID(sectionArchived): true,
+	defaults := map[string]bool{}
+	for s := range sectionCollapsedByDefault {
+		defaults[sidebarSectionID(s)] = true
 	}
 	for _, epic := range epics {
 		if epic.AllDone() {
@@ -432,11 +445,7 @@ func searchExpandOverrides(epics []tickets.Epic, query string) map[string]bool {
 		if ticketMatched {
 			overrides[epic.Path] = false
 		}
-		section := sectionOpen
-		if epic.AllDone() {
-			section = sectionClosed
-		}
-		overrides[sidebarSectionID(section)] = false
+		overrides[sidebarSectionID(epicSection(epic))] = false
 	}
 	return overrides
 }

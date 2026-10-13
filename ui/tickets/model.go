@@ -151,7 +151,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 	km := newTicketsManager()
 	sidebarTree := tree.NewModel[sidebarNode]()
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
-		return n.kind != nodeEmpty && n.kind != nodeLoading && n.kind != nodeLoadError
+		return n.kind != nodeLoading && n.kind != nodeLoadError
 	})
 	scratchDir := scratchDirFor(worktreeRoot)
 	archivedLazy := tree.NewLazySection(0, func() ([]tickets.Epic, error) {
@@ -356,14 +356,11 @@ func (m Model) sidebarViewportHeight() int {
 }
 
 // sidebarBody renders the sidebar panel's body lines. m.sidebarTree.Entries()
-// is only ever empty before the first epicsLoadedMsg arrives (the root list
-// is 2 fixed section entries regardless of len(m.epics), once clampSelected
-// has run at least once), so RenderOpts.EmptyLine covers
-// the pre-load "loading…" state on its own. It cannot reproduce the
-// zero-epics-after-load "no .scratch/ directory found" message though — that
-// would otherwise render as two real, empty section headers plus their
-// nodeEmpty placeholders, a different visual — so that state keeps its own
-// short-circuit ahead of the RenderLines call. That short-circuit only
+// is empty before the first epicsLoadedMsg arrives, and also after a load
+// with no epics at all (empty sections are hidden), so RenderOpts.EmptyLine
+// covers the pre-load "loading…" state and the zero-epics-after-load
+// "no .scratch/ directory found" message keeps its own short-circuit ahead
+// of the RenderLines call. That short-circuit only
 // applies when there's truly nothing to show: a non-zero archivedEpicCount
 // means the Archived section (ticket 04) still has something to render, so
 // an empty active `.scratch/` alone must not suppress the whole tree.

@@ -158,7 +158,7 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	// The epic itself also defaults to collapsed (ticket 02), but that's
 	// moot here since it's nested inside the collapsed Closed section root
 	// and stays unreachable until the section expands regardless.
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 
@@ -168,7 +168,7 @@ func TestSearch_MatchesTicketInsideCollapsedClosedEpic(t *testing.T) {
 	if m.search.MatchesCount() != 1 {
 		t.Fatalf("expected one match for ticket inside collapsed epic, got %d", m.search.MatchesCount())
 	}
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected matching ticket's Closed section to auto-expand")
 	}
 
@@ -216,7 +216,7 @@ func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.
 	// below exercise the explicit-beats-search-override path, not just the
 	// declared default.
 	setCollapsedEpic(&m, closedEpicIdx, true)
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 	if !m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
@@ -229,7 +229,7 @@ func TestSearch_MatchExpandsClosedSectionButNotManuallyCollapsedEpic(t *testing.
 	if m.search.MatchesCount() != 0 {
 		t.Fatalf("expected no visible matches for a ticket inside a manually-collapsed epic, got %d", m.search.MatchesCount())
 	}
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to auto-expand")
 	}
 	if !m.sidebarTree.CollapsedIDs()[m.epics[closedEpicIdx].Path] {
@@ -248,7 +248,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected Closed section to start collapsed by default")
 	}
 
@@ -258,7 +258,7 @@ func TestSearch_NoMatchLeavesCollapseStateUnchanged(t *testing.T) {
 	if m.search.MatchesCount() != 0 {
 		t.Fatalf("expected zero matches, got %d", m.search.MatchesCount())
 	}
-	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if !m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected non-matching search to leave collapse state unchanged")
 	}
 }
@@ -394,7 +394,7 @@ func TestSearch_EpicMatchExpandsClosedSectionButNotTheEpic(t *testing.T) {
 	if m.search.MatchesCount() != 1 {
 		t.Fatalf("expected the closed epic row to match, got %d", m.search.MatchesCount())
 	}
-	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionClosed)] {
+	if m.sidebarTree.CollapsedIDs()[sidebarSectionID(sectionComplete)] {
 		t.Fatalf("expected the Closed section to auto-expand for an epic match")
 	}
 	closed := m.epics[0]
