@@ -18,6 +18,17 @@ import (
 // the branch the agent's worktree was on and trunk's tip while it worked.
 func startCommitsOneOff(t *testing.T, noAutoMerge bool, cfgOpts ...func(*server.Config)) (evs <-chan server.Event, addr, repo string, seen *oneOffSeen) {
 	t.Helper()
+	seen = &oneOffSeen{}
+	evs, addr, repo = startCommitsOneOffWith(t, noAutoMerge, func(p servertest.Prompt, _, repo string) {
+		seen.record(gitOut(t, p.Cwd, "branch", "--show-current"), gitOut(t, repo, "rev-parse", "main"))
+		commitWork(t, p, "work")
+	}, cfgOpts...)
+	return evs, addr, repo, seen
+}
+
+// startCommitsOneOffWith is startCommitsOneOff whose agent runs turn.
+func startCommitsOneOffWith(t *testing.T, noAutoMerge bool, turn func(p servertest.Prompt, store, repo string), cfgOpts ...func(*server.Config)) (evs <-chan server.Event, addr, repo string) {
+	t.Helper()
 	store := t.TempDir()
 	repo = testutil.TempRepo(t)
 	testutil.Mkdir(t, filepath.Join(store, "proj"))
@@ -32,11 +43,7 @@ func startCommitsOneOff(t *testing.T, noAutoMerge bool, cfgOpts ...func(*server.
 			o(c)
 		}
 	})
-	seen = &oneOffSeen{}
-	h.RegisterLaunch(func(p servertest.Prompt) {
-		seen.record(gitOut(t, p.Cwd, "branch", "--show-current"), gitOut(t, repo, "rev-parse", "main"))
-		commitWork(t, p, "work")
-	})
+	h.RegisterLaunch(func(p servertest.Prompt) { turn(p, store, repo) })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
 	snap, err := h.Client.Snapshot(ctx)
@@ -50,7 +57,7 @@ func startCommitsOneOff(t *testing.T, noAutoMerge bool, cfgOpts ...func(*server.
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
-	return evs, res.Address, repo, seen
+	return evs, res.Address, repo
 }
 
 type oneOffSeen struct {

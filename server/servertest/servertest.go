@@ -220,6 +220,7 @@ func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
 		mu.Unlock()
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
+		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
 		agent(Prompt{Address: addr, Cwd: cwd, Text: text})
 		return reply(pane), herdrfake.Identities{}, nil
 	})

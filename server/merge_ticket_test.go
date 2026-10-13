@@ -49,11 +49,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 		if report == "" {
 			return
 		}
-		path := f.ticketFile(t, "01")
-		body := strings.Replace(readFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+report+"\n", 1)
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Error(err)
-		}
+		reportIteration(t, f.ticketFile(t, "01"), report)
 	})
 	gitOut(t, f.repo, "branch", schedEpic)
 	// Landing the epic is not this ticket's concern.
@@ -62,6 +58,15 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 		mu.Lock()
 		defer mu.Unlock()
 		return append([]mergeTurn(nil), seen...)
+	}
+}
+
+// reportIteration is the agent writing iteration_status onto its claimed ticket.
+func reportIteration(t *testing.T, path, status string) {
+	t.Helper()
+	body := strings.Replace(readFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+status+"\n", 1)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Error(err)
 	}
 }
 
