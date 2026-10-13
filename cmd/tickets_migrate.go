@@ -55,21 +55,62 @@ func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, dryRun bool, w i
 // changed, per file, to w. tickets.Migrate validates the whole computed
 // result — every ticket's frontmatter plus every epic's parent graph —
 // before writing anything, so a result that would be invalid leaves every
-// file untouched and this returns that validation error unchanged.
+// file untouched and this returns that validation error unchanged. It then
+// backfills merged_at on already-landed epics (see tickets.BackfillMergedAt).
 func runTicketsMigrate(scratchRoot string, w io.Writer) error {
 	result, err := tickets.Migrate(scratchRoot)
 	if err != nil {
 		return err
 	}
+	backfilled, err := tickets.BackfillMergedAt(scratchRoot, epicLandedUnder(scratchRoot))
+	changes := append(result.Changes, backfilled...)
 
-	if len(result.Changes) == 0 {
+	if len(changes) == 0 && err == nil {
 		fmt.Fprintln(w, "no changes")
 		return nil
 	}
 
-	for _, change := range result.Changes {
+	for _, change := range changes {
 		fmt.Fprintf(w, "%s: %s\n", change.Path, strings.Join(change.Notes, ", "))
 	}
-	fmt.Fprintf(w, "%d file(s) changed\n", len(result.Changes))
-	return nil
+	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
+	return err
+}
+
+// epicLandedUnder reports whether an epic of the tracker root's repo has
+// landed: its branch is gone, or is an ancestor of its target (its base,
+// else trunk). The repo is resolved on first use, so a root with nothing to
+// backfill never needs one.
+func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
+	var repoRoot, trunk string
+	return func(e tickets.Epic) (bool, error) {
+		if repoRoot == "" {
+			var err error
+			if repoRoot, trunk, err = trackerRepo(root); err != nil {
+				return false, fmt.Errorf("backfilling merged_at: %w", err)
+			}
+		}
+		if !git.RefExists(repoRoot, "refs/heads/"+e.Name) {
+			return true, nil
+		}
+		target := e.Base
+		if target == "" {
+			target = trunk
+		}
+		return git.IsAncestor(repoRoot, e.Name, target)
+	}
+}
+
+// trackerRepo is the repo and trunk of a tracker root: project.json's repo
+// for a ticket-store project, else the repo holding an old .scratch tree.
+func trackerRepo(root string) (repoRoot, trunk string, err error) {
+	if pf, err := config.ReadProjectFile(root); err == nil && pf.Repo != nil && *pf.Repo != "" {
+		trunk, err := tickets.Trunk(root, *pf.Repo)
+		return *pf.Repo, trunk, err
+	}
+	repo, err := tickets.OpenRepo(root)
+	if err != nil {
+		return "", "", err
+	}
+	return repo.Root, repo.Trunk, nil
 }
