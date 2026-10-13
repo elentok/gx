@@ -323,6 +323,10 @@ takes `target`, not `base`.
 Set per project; detected from the repo when unset. A top-level ticket's **Target** is trunk.
 _Avoid_: target branch, main branch, master.
 
+**Dirty trunk** — a **Trunk** checked out in a worktree whose local changes make git refuse a land.
+Changes the land doesn't touch don't count. gx never discards them: the epic waits for a person.
+_Avoid_: unclean trunk, trunk conflict (a conflict is between branches, not with a checkout).
+
 **Missing trunk** — a project whose **Trunk** names no local branch, whether set or detected. gx
 never falls back to another branch: the server claims nothing for the project until the branch
 exists, then carries on by itself. A ticket whose landing finds trunk missing is **Parked**.
@@ -372,12 +376,17 @@ into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.
 
 ## Ticket Dependencies
 
-**Blocker** — a ticket named in another ticket's `blocked_by` list.
+**Blocker** — a ticket, or a whole epic, named in another ticket's `blocked_by` list. A ticket in
+another epic that needs commits is *widened*: it blocks as its whole epic, because its code can't be
+used before that epic lands. Only a commitless ticket in another epic blocks on its own.
 
-**Blocking** — a blocker is *blocking* until its own work is `done` **and** every ticket in its fork
-subtree is likewise no longer blocking. This is the only question `blocked_by` resolution asks, and
-it is the reason a ticket's own `done` is not enough to release its dependents. _Avoid_: Resolved,
-satisfied, fully-done.
+**Blocking** — a ticket blocker is *blocking* until its own work is `done` **and** every ticket in
+its fork subtree is likewise no longer blocking. This is the only question `blocked_by` resolution
+asks, and it is the reason a ticket's own `done` is not enough to release its dependents. A
+whole-epic blocker is blocking until every ticket in it is done and the epic is a **Merged epic**
+(`on-landed` policy) or a complete epic (`on-done` policy). With auto-merge on, an epic is complete
+only once it has merged, so both policies wait for the merge. _Avoid_: Resolved, satisfied,
+fully-done.
 
 **Frontier** — the tickets an epic could hand to an agent right now: status `open`, with no blocker
 still blocking.
@@ -510,10 +519,23 @@ the resolved `branch`/`target`/`worktree_path` and stops. See ADR 0015.
 
 **`gx-merge`** (the skill) — owns the judgment half: on `needs_rebase`, runs `git rebase <base>`
 against the target's worktree (or the bare branch if `worktree_path` is empty), invoking
-[gx-resolving-merge-conflicts](skills/gx-resolving-merge-conflicts/SKILL.md) on conflicts, pausing
-to show the rebased diff, running this repo's checks, then re-calling `gx merge` for the final
-ff-only merge. `gx-cleanup`'s ff-only-merge step calls into this same skill rather than duplicating
-the flow.
+[gx-resolving-merge-conflicts](skills/gx-resolving-merge-conflicts/SKILL.md) on conflicts, running
+this repo's checks, then re-calling `gx merge` for the final ff-only merge. It runs with no prompts
+and stops on a command error, a missing worktree or failed checks. `gx-cleanup`'s ff-only-merge step
+calls into this same skill rather than duplicating the flow.
+
+**Merge ticket** (`type: merge`) — a system-generated ticket in a finished epic whose only job is to
+get the epic onto its target with `gx-merge`, when the server's fast-forward landing isn't possible.
+_Avoid_: land ticket, rebase ticket.
+
+**Complete epic** — an epic whose tickets are all done or cancelled. Its branch may not have landed
+yet; once it has, the epic is also a **Merged epic**. A map epic can be complete but never merged,
+since it has no branch.
+_Avoid_: closed epic, finished epic.
+
+**Merged epic** — an epic whose branch has landed on its target. Distinct from a complete epic,
+whose tickets are all done but whose branch may not have landed yet.
+_Avoid_: landed epic, closed epic.
 
 ## Launching External Programs
 
