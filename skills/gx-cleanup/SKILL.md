@@ -159,12 +159,11 @@ and move on to the next.
 
 For each merge-candidate epic, invoke the [gx-merge](../gx-merge/SKILL.md) skill inline — same
 conversation/context, not a detached sub-agent — with the epic's branch, and follow its steps as
-written, with one addition: when it reaches its own "pause for review" step, call `gx notify` with
-a short summary of the epic and what's pending review before pausing.
+written.
 
 - `gx-merge` reports `"merged"` in its Step 1: the epic is merged onto the result's `target` —
   record it as done (naming `target`) and move to the next epic.
-- `gx-merge` aborts (a plain command error in its Step 1, or failed checks in its Step 4): leave
+- `gx-merge` aborts (a plain command error in its Step 1, or failed checks in its Step 3): leave
   trunk untouched, record the failure (with any check output) for the end-of-run summary, and move
   on to the next epic. Do not attempt to fix unrelated failures or force the merge through.
 
@@ -172,4 +171,4 @@ Never push to a remote at any point in this step — pushing stays an explicit, 
 the user.
 
 Once every queued epic has been processed, report an end-of-run summary: which epics merged
-cleanly, which needed a rebase (and merged after review), and which were aborted and why.
+cleanly, which needed a rebase (and merged after it), and which were aborted and why.

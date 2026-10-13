@@ -2,8 +2,9 @@
 name: gx-merge
 description:
   Merge a branch/worktree onto the repo's trunk. Tries gx's deterministic
-  ff-only merge, and on non-fast-forward, rebases, resolves conflicts, pauses
-  for review, runs the repo's checks, then retries the merge.
+  ff-only merge, and on non-fast-forward, rebases, resolves conflicts, runs
+  the repo's checks, then retries the merge. It never pauses for
+  confirmation.
 disable-model-invocation: true
 ---
 
@@ -15,6 +16,9 @@ Owns the judgment half of merging a branch onto the repo's trunk
 attempt `git merge --ff-only`) and stops the moment it needs a decision only a
 human/agent should make. Always read the branch it merged onto from `target`;
 never assume "main".
+
+Run every step without asking the person anything. Each stop condition below
+reports and ends the run; none waits for a reply.
 
 ## Step 1: attempt the deterministic merge
 
@@ -53,13 +57,10 @@ If the rebase reports conflicts, invoke the
 skill **inline** — same conversation/context, not a detached sub-agent,
 matching `gx-cleanup`'s Step 7 convention for this same step.
 
-## Step 3: pause for review
+## Step 3: run checks
 
-Once the rebase is clean (conflicts resolved or none arose), **pause and show
-the rebased diff** (the rebased branch vs `target`) before doing anything
-further. Do not proceed to checks or the merge until it's been reviewed.
-
-## Step 4: run checks
+Once the rebase is clean (conflicts resolved or none arose), go straight to
+the checks. Don't pause to show the rebased diff.
 
 Discover and run this repo's automated checks (typecheck, then tests, then
 format) the same way `gx-resolving-merge-conflicts` does in its own
@@ -68,9 +69,9 @@ format) the same way `gx-resolving-merge-conflicts` does in its own
 - **Checks fail**: abort. Leave trunk untouched, report the failure (with
   output) and stop. Do not attempt to fix unrelated failures or force the
   merge through.
-- **Checks pass**: continue to Step 5.
+- **Checks pass**: continue to Step 4.
 
-## Step 5: final merge
+## Step 4: final merge
 
 Re-invoke `gx merge <branch>` (the original arg, not the resolved
 `target`/`branch` pair) for the final ff-only merge now that the rebase brought
