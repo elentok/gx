@@ -52,6 +52,10 @@ func TestDeriveRootBase_OnLandedIsAlwaysTrunk(t *testing.T) {
 	if err != nil || got != "" {
 		t.Errorf("got (%q, %v), want trunk", got, err)
 	}
+	e[1].BlockedBy = []string{"a"}
+	if got, err := DeriveRootBase("p", e, "b", e[1].Tickets[0], true); err != nil || got != "" {
+		t.Errorf("whole-epic blocker: got (%q, %v), want trunk", got, err)
+	}
 	e[1].Base = "release/1.0"
 	if got, _ := DeriveRootBase("p", e, "b", e[1].Tickets[0], true); got != "release/1.0" {
 		t.Errorf("explicit base lost: %q", got)
@@ -92,6 +96,32 @@ func TestDeriveRootBase(t *testing.T) {
 			e[1].BlockedBy, e[1].Base = nil, "a/01"
 			return e
 		}(), want: ""},
+		"whole-epic blocker gives its branch": {epics: func() []Epic {
+			e := baseEpics("done")
+			e[1].BlockedBy = []string{"a"}
+			return e
+		}(), want: "a"},
+		"whole-epic blocker on the ticket gives its branch": {epics: func() []Epic {
+			e := baseEpics("open")
+			e[1].BlockedBy, e[1].Tickets[0].BlockedBy = nil, []string{"p:a"}
+			return e
+		}(), want: "a"},
+		"widened blocker gives its branch": {epics: func() []Epic {
+			e := baseEpics("cancelled")
+			e[0].Tickets = append(e[0].Tickets, Ticket{Number: 2, Identifier: "02", Status: "open"})
+			return e
+		}(), want: "a"},
+		"commitless-only epic gives trunk": {epics: func() []Epic {
+			e := baseEpics("open")
+			e[0].Tickets[0].Commitless = true
+			e[1].BlockedBy = []string{"a"}
+			return e
+		}(), want: ""},
+		"whole-epic and ticket blockers are ambiguous": {epics: func() []Epic {
+			e := append(baseEpics("open"), Epic{Name: "c", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open"}}})
+			e[1].BlockedBy = []string{"a", "c/01"}
+			return e
+		}(), wantErr: true},
 		"raw branch base": {epics: func() []Epic {
 			e := baseEpics("open")
 			e[1].Base = "release/1.0"
