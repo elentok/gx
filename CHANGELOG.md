@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.32.10 - 2026-10-13
+
+- Added a configurable trunk. gx reads `trunk` from `project.json` on every use, never caches it, and falls back to the repo's detected default branch. It never guesses `main`/`master`. When trunk can't be used, every command reports the same error with a hint to fix it, for example `git branch <trunk> origin/<trunk>` when only the remote branch exists.
+  - Added `gx project edit-config`. It opens `project.json` in `$EDITOR` and checks the result: the `vcs`/`landing` values and that trunk is a valid branch name (trunk may be left empty). It asks you to edit again after an invalid save on a TTY, refuses to overwrite a change made in the meantime, and warns about roots still in flight when trunk changes.
+  - The server starts tickets from the root's base and lands them on the root's target, with trunk read again at landing. An explicit `base:` moves only the start point.
+  - Added the Missing trunk state. When a project with queued roots has a missing trunk or an unreadable `project.json`, the server stops claiming its tickets. It logs one event and one chat notice when the project enters and leaves the state, and shows the reason in the Queue tab. The state clears by itself once the branch exists.
+  - A root landing onto a missing trunk parks `needs-repair` with park kind `trunk-missing`, and the agent stops. The land verb refuses until trunk exists. A stacked root that lands on its blocker's branch no longer needs trunk.
+  - `gx merge` merges onto the trunk and reports it as the target in text and JSON. `gx cleanup` checks "landed?" against the trunk and fails with the shared error when trunk can't be found.
+  - `gx doctor` reports a missing trunk (no automatic fix) and no longer guesses a trunk when the repo has no project.
+  - The worktrees, log, status and commit views follow the trunk. With a missing trunk, the worktrees view shows the error instead of the Base section and blocks rebase and new-worktree. The status view rebases onto `origin/<trunk>` and warns instead of falling back to `origin/main`.
+- Changed the `project.json` loader to stop failing on an unknown `landing`/`vcs` value. It falls back to the default, so one typo no longer breaks the ticket store scan.
+- Changed the `gx-design` skill to commit the spec, ADRs and glossary terms into the `<epic>-impl` feature branch after publishing tickets. Its late steps (spec, review, tickets) now chain in one session while under 50K tokens of context.
+- Fixed a merge into a target branch that isn't checked out anywhere. It moved the root's checked-out branch instead. gx now fast-forwards the target ref directly, and refuses when the target branch is missing.
+
 ## v0.32.9 - 2026-10-12
 
 - Changed `gx tickets close --done` to `--sweep` (`--done` stays as a hidden alias). The sweep now also moves cancelled follow-ups into the archive, keeps their status, and adds a Resolution with the original address when one is missing.
