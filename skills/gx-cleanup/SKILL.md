@@ -35,7 +35,9 @@ If it fails (e.g. trunk is missing or `project.json` is unreadable), report the 
 take no action at all, since every "landed?" check depends on trunk.
 
 Trunk is `project.json`'s `trunk`, else the repo's detected default. The `merged_to_main` fields
-below are checked against trunk despite their name.
+below are checked against trunk despite their name. An epic's `merged_to_main` reads its
+`merged_at` stamp first and falls back to branch ancestry only when unstamped, so a merged epic
+whose branch is already deleted still reads as merged — archive it, never offer it for merging.
 
 The result has three parts:
 

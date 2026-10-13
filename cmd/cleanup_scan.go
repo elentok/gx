@@ -134,6 +134,11 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 		}
 	}
 
+	// merged_at outlives the branch, which may be deleted once landed.
+	if !epic.MergedAt.IsZero() {
+		scan.MergedToTrunk = true
+		return scan, nil
+	}
 	branches, err := git.ListBranches(repo)
 	if err != nil {
 		return EpicScan{}, err

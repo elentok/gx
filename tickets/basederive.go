@@ -18,20 +18,29 @@ import (
 // dependents only once it has landed, so a derived base is always trunk; only
 // an explicit base: can point elsewhere. Under on-done the blocker's branch is
 // the base even once the blocker is done.
+//
+// A blocker epic with merged_at has landed whatever its branch says, so it is
+// never the base: its branch may already be deleted. Branch ancestry (see the
+// server's retargetIfLanded) stays the fallback for an unstamped epic.
 func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLanded bool) (string, error) {
 	g := newProjectGraph(project, epics)
 	var e Epic
+	merged := map[string]bool{}
 	for _, c := range epics {
 		if c.Name == epic {
 			e = c
 		}
+		merged[c.Name] = !c.MergedAt.IsZero()
 	}
 	if base := cmp.Or(t.Base, e.Base); base != "" {
 		key, err := g.resolve(epic, base)
 		if err != nil {
 			return base, nil
 		}
-		return unlandedBranch(g, key), nil
+		if b := unlandedBranch(g, key); !merged[b] {
+			return b, nil
+		}
+		return "", nil
 	}
 	if onLanded {
 		return "", nil
@@ -44,7 +53,7 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLande
 		}
 		// on-done: a done blocker is released but its branch has not reached
 		// trunk, so the dependent still bases on that branch.
-		if b := key[:strings.Index(key, "/")]; !slices.Contains(branches, b) {
+		if b := key[:strings.Index(key, "/")]; !merged[b] && !slices.Contains(branches, b) {
 			branches = append(branches, b)
 		}
 	}

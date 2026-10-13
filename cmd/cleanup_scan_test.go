@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -59,6 +60,12 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	// epic-open-no-review: has an open ticket and no code-review ticket at all.
 	writeCleanupScanTicket(t, project, "epic-open-no-review", "01-work.md", "01", "open", "implement")
 
+	// epic-stamped-branch-deleted: merged_at stamped, branch already gone.
+	writeCleanupScanTicket(t, project, "epic-stamped-branch-deleted", "01-work.md", "01", "done", "implement")
+	if err := tickets.StampEpicMerged(filepath.Join(project, "epic-stamped-branch-deleted"), time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+
 	var stdout bytes.Buffer
 	d := deps{
 		stdout: &stdout,
@@ -99,6 +106,10 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 		HasCodeReviewTicket: false, CodeReviewDone: false,
 	}); got != want {
 		t.Errorf("epic-open-no-review = %+v, want %+v", got, want)
+	}
+
+	if got := byName["epic-stamped-branch-deleted"]; !got.AllDone || !got.MergedToTrunk {
+		t.Errorf("epic-stamped-branch-deleted = %+v, want done and merged", got)
 	}
 }
 

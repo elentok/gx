@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -71,6 +72,30 @@ func TestRootRefs(t *testing.T) {
 			}
 			e := tc.epics[len(tc.epics)-1]
 			base, target, err := s.rootRefs("proj", tc.epics, e.Name, e.Tickets[0], repo)
+			if err != nil || base != tc.wantBase || target != tc.wantLand {
+				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantLand)
+			}
+		})
+	}
+}
+
+func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
+	s, repo := rootRefsFixture(t)
+	runGit(t, repo, "branch", "-m", "a", "c")
+	blocker := tickets.Epic{Name: "a", MergedAt: time.Now(), Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
+	other := tickets.Epic{Name: "c", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
+	for name, tc := range map[string]struct {
+		dependent          tickets.Ticket
+		epics              []tickets.Epic
+		wantBase, wantLand string
+	}{
+		"derived from a merged blocker":   {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01"}}, []tickets.Epic{blocker}, "develop", "develop"},
+		"explicit base on merged blocker": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", Base: "a/01"}, []tickets.Epic{blocker}, "develop", "develop"},
+		"merged blocker is not ambiguous": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01", "c/01"}}, []tickets.Epic{blocker, other}, "c", "c"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dependent := tickets.Epic{Name: "b", Tickets: []tickets.Ticket{tc.dependent}}
+			base, target, err := s.rootRefs("proj", append(tc.epics, dependent), "b", tc.dependent, repo)
 			if err != nil || base != tc.wantBase || target != tc.wantLand {
 				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantLand)
 			}
