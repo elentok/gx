@@ -4,8 +4,8 @@ description:
   Merge a branch/worktree onto the repo's trunk. Tries gx's deterministic
   ff-only merge, and on non-fast-forward, rebases, resolves conflicts, runs
   the repo's checks (one fixer pass, flaky-test triage), then retries the
-  merge. With `--ticket <addr>` it runs as a merge ticket and leaves the ff to
-  the server. It never pauses for confirmation.
+  merge. With `--ticket <addr>` it runs as a merge ticket, never runs
+  `gx merge`, and leaves the ff to the server. It never pauses for confirmation.
 disable-model-invocation: true
 ---
 
@@ -28,9 +28,10 @@ reports and ends the run; none waits for a reply.
 - **Ticket** — `/gx-merge --ticket <addr>`, launched by the server for a
   `type: merge` ticket. The branch is the epic named in the address
   (`<project>:<epic>/<id>` → `<epic>`); don't look for it anywhere else. Same
-  steps, but Step 5 is replaced by reporting `finished`: the server does the
-  ff. Never edit the ticket's `status`; report through `--iteration-status`
-  only.
+  steps, but Step 1 is an ancestry check instead of `gx merge`, and Step 5 is
+  reporting `finished`. Ticket mode never runs `gx merge`: the server owns
+  trunk, so it does the ff under its own per-trunk lock and dirty-trunk check.
+  Never edit the ticket's `status`; report through `--iteration-status` only.
 
 ## Stopping
 
@@ -52,6 +53,8 @@ this flow — pushing stays an explicit, separate action for the user.
 
 ## Step 1: attempt the deterministic merge
 
+### Manual
+
 Run:
 
 ```
@@ -60,18 +63,33 @@ gx merge <branch> --json
 
 Branch it three ways on `status`:
 
-- **`"merged"`** — done. Manual: report it (`target` names the branch it
-  landed on) and stop. Ticket: the epic is on trunk already; report
-  `finished` (Step 5).
+- **`"merged"`** — done. Report it (`target` names the branch it landed on)
+  and stop.
 - **`"needs_rebase"`** — continue to Step 2.
 - anything else (a plain command error, e.g. trunk is missing) — **stop:
   `gx merge failed: <error>`**.
 
+### Ticket
+
+Don't run `gx merge`. Instead:
+
+1. Read `target` from the ticket: `gx tickets show <addr>`. Its title reads
+   `Merge <branch> onto <target>`. If no target is there, **stop: `merge
+   ticket names no target`**.
+2. `worktree_path` is the current worktree (`git rev-parse --show-toplevel`);
+   the server launches the agent in the feature worktree.
+3. Run `git merge-base --is-ancestor <target> <branch>`:
+   - **exit 0** — the branch already holds `target`, so the server can ff it.
+     Go to Step 5.
+   - **exit 1** — continue to Step 2.
+   - anything else (e.g. an unknown ref) — **stop: `ancestry check failed:
+     <error>`**.
+
 ## Step 2: check the worktree
 
-The result carries `branch`, `target`, and `worktree_path`. `git rebase`
-requires a working tree, so the rest of the flow only runs when one is checked
-out for `branch`:
+Manual: the result carries `branch`, `target`, and `worktree_path`. Ticket:
+Step 1 set them. `git rebase` requires a working tree, so the rest of the flow
+only runs when one is checked out for `branch`:
 
 - **`worktree_path` is empty** — no worktree is checked out for `branch`, and
   none may be created or checked out to run the rebase in: doing so risks
@@ -81,7 +99,8 @@ out for `branch`:
   `<branch> has no worktree, so gx-merge can't rebase it`.** The caller (e.g.
   `gx-cleanup`) needs to check out the branch in its own worktree first. In
   ticket mode the server recreates the feature worktree before launch, so
-  this should not happen there.
+  this should not happen there; if the current worktree is not on `branch`
+  (`git branch --show-current`), stop with the same reason.
 - **`git status --porcelain` in `worktree_path` is non-empty** — **stop:
   `feature worktree <worktree_path> is dirty: <files>`**. Never commit,
   stash or discard someone else's changes.
