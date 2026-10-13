@@ -30,7 +30,7 @@ func TestFlagDanglingBlockers_RendersErrorWithValidateMessage(t *testing.T) {
 
 func crossEpics() []Epic {
 	return []Epic{
-		{Name: "a", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open"}}},
+		{Name: "a", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", Commitless: true}}},
 		{Name: "b", BlockedBy: []string{"a/01"}, Tickets: []Ticket{
 			{Number: 1, Identifier: "01", Status: "open"},
 			{Number: 2, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
@@ -88,7 +88,7 @@ func TestLoadResolved_ResolvesCrossEpicBlockerButFailsClosedOnUnresolved(t *test
 			t.Fatal(err)
 		}
 	}
-	write("a", "01-x.md", "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n")
+	write("a", "01-x.md", "---\nid: \"01\"\nstatus: done\ntype: research\n---\n")
 	write("b", "01-y.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by: [a/01]\n---\n")
 	write("b", "02-z.md", "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [a/09]\n---\n")
 

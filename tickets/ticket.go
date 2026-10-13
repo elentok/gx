@@ -111,6 +111,11 @@ type Ticket struct {
 	// ExternalBlockers are the qualified refs (the ticket's own and its epic's)
 	// still unresolved, set by ResolveCrossEpic.
 	ExternalBlockers []string
+
+	// WidenedBlockers maps each of the ticket's own blocked_by tokens that
+	// resolved as a whole epic ("epic2/b" → "epic2") to that epic, set by
+	// ResolveCrossEpic.
+	WidenedBlockers map[string]string
 }
 
 // DisplayNumber returns the filename's complete ticket identifier. Tickets

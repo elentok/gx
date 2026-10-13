@@ -33,7 +33,7 @@ func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 		return a, tickets.Ticket{}, err
 	}
 
-	epics, err := tickets.Load(root)
+	epics, err := tickets.LoadResolved(a.Project, root)
 	if err != nil {
 		return a, tickets.Ticket{}, err
 	}

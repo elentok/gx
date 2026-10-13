@@ -58,7 +58,7 @@ func setupMoveProject(t *testing.T) moveFixture {
 	testutil.WriteFile(t, src, "06a-parent.md", "---\nid: \"06a\"\nstatus: open\ntype: implement\nparent: \"05\"\n---\n\n# 06a\n")
 	testutil.WriteFile(t, src, "07-fork.md", "---\nid: \"07\"\nstatus: open\ntype: implement\n---\n\n# 07\n")
 	testutil.WriteFile(t, src, "07a-child.md", "---\nid: \"07a\"\nstatus: open\ntype: implement\nparent: \"07\"\n---\n\n# 07a\n")
-	testutil.WriteFile(t, dst, "01-one.md", "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# 01\n")
+	testutil.WriteFile(t, dst, "01-one.md", "---\nid: \"01\"\nstatus: open\ntype: research\n---\n\n# 01\n")
 	testutil.WriteFile(t, dst, "02-two.md", "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n\n# 02\n")
 	return moveFixture{repo: repo, project: project}
 }
@@ -263,8 +263,8 @@ func addInboundFixtures(t *testing.T, f moveFixture) {
 	testutil.WriteFile(t, far, "ticket.md", "---\nstatus: open\nblocked_by:\n  - src/01\n---\n\n# far\n")
 	testutil.WriteFile(t, filepath.Join(far, "issues"), "01-q.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - mine:src/01\n---\n\n# 01\n")
 	testutil.WriteFile(t, filepath.Join(far, "issues"), "02-done.md", "---\nid: \"02\"\nstatus: done\ntype: implement\nblocked_by:\n  - src/01\n---\n\n# 02\n")
-	testutil.WriteFile(t, filepath.Join(f.project, "dst", "issues"), "04-in.md", "---\nid: \"04\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/01\n  - src/02\n---\n\n# 04\n")
-	testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "08-note.md", "---\nid: \"08\"\nstatus: open\ntype: implement\n---\n\n# 08\n\nsee src/01 and src/010 for context\n")
+	testutil.WriteFile(t, filepath.Join(f.project, "dst", "issues"), "04-in.md", "---\nid: \"04\"\nstatus: open\ntype: implement\nblocked_by:\n  - src/01\n  - src/08\n---\n\n# 04\n")
+	testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "08-note.md", "---\nid: \"08\"\nstatus: open\ntype: research\n---\n\n# 08\n\nsee src/01 and src/010 for context\n")
 }
 
 func TestExecute_TicketsMove_RewritesInboundRefsAndWarnsOnProse(t *testing.T) {
@@ -281,7 +281,7 @@ func TestExecute_TicketsMove_RewritesInboundRefsAndWarnsOnProse(t *testing.T) {
 		want       []schema.TicketID
 	}{
 		{"bare in source epic", filepath.Join(f.project, "src", "issues", "02-second.md"), []schema.TicketID{"dst/05"}},
-		{"inside target epic", filepath.Join(f.project, "dst", "issues", "04-in.md"), []schema.TicketID{"05", "src/02"}},
+		{"inside target epic", filepath.Join(f.project, "dst", "issues", "04-in.md"), []schema.TicketID{"05", "src/08"}},
 		{"project-qualified", filepath.Join(f.project, "far", "issues", "01-q.md"), []schema.TicketID{"dst/05"}},
 		{"terminal ticket", filepath.Join(f.project, "far", "issues", "02-done.md"), []schema.TicketID{"dst/05"}},
 	} {

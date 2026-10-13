@@ -66,6 +66,27 @@ func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_RendersWidenedBlocker(t *testing.T) {
+	repo, project := setupShowProject(t)
+	other := filepath.Join(project, "other", "issues")
+	if err := os.MkdirAll(other, 0755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "other"))
+	testutil.WriteFile(t, other, "01-code.md", "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n\n# 01 — Code\n")
+	testutil.WriteFile(t, other, "02-notes.md", "---\nid: \"02\"\nstatus: open\ntype: research\n---\n\n# 02 — Notes\n")
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-dep.md",
+		"---\nid: \"07\"\nstatus: open\ntype: implement\nblocked_by: [06, other/01, other/02]\n---\n\n# 07 — Dep\n")
+
+	out, err := runIn(t, repo, "tickets", "show", "mine:epic/07")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "blocked_by: 06, other (via other/01), other/02\n") {
+		t.Errorf("show printed %q", out)
+	}
+}
+
 func TestExecute_TicketsShow_EpicAddressPrintsEntryAndTickets(t *testing.T) {
 	repo, project := setupShowProject(t)
 	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "07-second.md",

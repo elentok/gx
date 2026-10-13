@@ -71,7 +71,7 @@ func TestExecute_TicketsValidate_CrossEpicCycleReportsEveryEdge(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected a cycle error, got nil")
 	}
-	if want := `blocked_by "b/01" closes a cycle: 01 → b/01 → c/01 → 01`; !strings.Contains(err.Error(), want) {
+	if want := `blocked_by "b/01" (widened to epic "b") closes a cycle: 01 → b → b/01 → c/01 → 01`; !strings.Contains(err.Error(), want) {
 		t.Errorf("error = %q, want it to contain %q", err, want)
 	}
 }

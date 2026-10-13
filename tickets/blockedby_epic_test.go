@@ -82,8 +82,8 @@ func TestResolveBlocker_TokenSyntax(t *testing.T) {
 		"p:a":    "a",
 		"p:12":   "12",
 		"01":     "d/1",
-		"a/01":   "a/1",
-		"p:a/01": "a/1",
+		"a/01":   "a", // commitful, so widened
+		"p:a/01": "a",
 	} {
 		if got, err := g.resolveBlocker("d", ref); err != nil || got != want {
 			t.Errorf("%q: got (%q, %v), want %q", ref, got, err, want)
@@ -132,6 +132,80 @@ func TestValidateRefs_WholeEpicCycleNamesTheEpic(t *testing.T) {
 	errs := ValidateRefs("p", epics)
 	if len(errs) == 0 || !strings.Contains(errors.Join(errs...).Error(), "01 → a → a/01 → 01") {
 		t.Errorf("errs = %v, want a cycle through the whole epic a", errs)
+	}
+}
+
+// widenedProject is epic "d" whose ticket waits on "a/01"; epic "a" also
+// holds an open "02".
+func widenedProject(commitless bool, merged bool) []Epic {
+	a := Epic{Name: "a", Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done", Commitless: commitless},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}
+	if merged {
+		a.CompletedAt, a.MergedAt = time.Now(), time.Now()
+	}
+	return []Epic{a, {Name: "d", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01"}}}}}
+}
+
+func TestResolveCrossEpic_CommitfulTicketWidensToItsEpic(t *testing.T) {
+	d := ResolveCrossEpic("p", EpicRelease{}, widenedProject(false, false))[1]
+	if got := d.RenderedStatus(d.Tickets[0]); got != StatusBlocked {
+		t.Errorf("commitful a/01 done, a/02 open: got %v, want blocked", got)
+	}
+	if got := d.Tickets[0].WidenedBlockers; got["a/01"] != "a" {
+		t.Errorf("WidenedBlockers = %v, want a/01 → a", got)
+	}
+
+	epics := widenedProject(false, false)
+	epics[0].Tickets[1].Status = "done"
+	d = ResolveCrossEpic("p", EpicRelease{}, epics)[1]
+	if got := d.RenderedStatus(d.Tickets[0]); got != StatusBlocked {
+		t.Errorf("whole epic done but unstamped: got %v, want blocked", got)
+	}
+
+	epics = widenedProject(false, true)
+	epics[0].Tickets[1].Status = "done"
+	d = ResolveCrossEpic("p", EpicRelease{}, epics)[1]
+	if got := d.RenderedStatus(d.Tickets[0]); got != StatusOpen {
+		t.Errorf("whole epic done and merged: got %v, want open", got)
+	}
+}
+
+func TestResolveCrossEpic_CommitlessTicketNarrowsBack(t *testing.T) {
+	d := ResolveCrossEpic("p", EpicRelease{}, widenedProject(true, false))[1]
+	if got := d.RenderedStatus(d.Tickets[0]); got != StatusOpen {
+		t.Errorf("commitless a/01 done: got %v, want open", got)
+	}
+	if got := d.Tickets[0].WidenedBlockers; got != nil {
+		t.Errorf("WidenedBlockers = %v, want none", got)
+	}
+}
+
+func TestValidateRefs_WidenedOnlyCycleNamesTheToken(t *testing.T) {
+	// Ticket-level there is no cycle: a/01 → d/02, d/01 → a/01. Widened,
+	// a/01 waits on all of d, d/01 included.
+	epics := []Epic{
+		{Name: "a", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"d/02"}}}},
+		{Name: "d", Tickets: []Ticket{
+			{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01"}},
+			{Number: 2, Identifier: "02", Status: "open"},
+		}},
+	}
+	msg := errors.Join(ValidateRefs("p", epics)...).Error()
+	if !strings.Contains(msg, `blocked_by "d/02" (widened to epic "d") closes a cycle`) {
+		t.Errorf("errs = %s, want the widened d/02 token named", msg)
+	}
+
+	a := ResolveCrossEpic("p", EpicRelease{}, epics)[0]
+	if got := a.RenderedStatus(a.Tickets[0]); got != StatusError || !strings.Contains(a.Tickets[0].BlockedByErr, "widened") {
+		t.Errorf("loader: status %v, BlockedByErr %q, want error with the cycle", got, a.Tickets[0].BlockedByErr)
+	}
+
+	epics[1].Tickets[1].Commitless = true
+	epics[0].Tickets[0].Commitless = true
+	if errs := ValidateRefs("p", epics); len(errs) != 0 {
+		t.Errorf("both targets commitless: errs = %v, want none", errs)
 	}
 }
 

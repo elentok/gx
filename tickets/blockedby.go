@@ -52,7 +52,8 @@ func qualifiedRefs(refs []string) []string {
 // blocked_by refs and its epic's are all resolved; children never copy an
 // ancestor's blocked_by, the epic's refs are applied here instead. Unresolved
 // cross-epic refs land in Ticket.ExternalBlockers (rendering the ticket
-// blocked); bad refs set BlockedByErr (rendering it error). release decides
+// blocked); bad refs and wait cycles set BlockedByErr (rendering it error),
+// the same check ValidateRefs runs. release decides
 // when a whole-epic ref is resolved.
 func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic {
 	g := newProjectGraph(project, epics)
@@ -63,8 +64,11 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 		e.Tickets = slices.Clone(e.Tickets)
 		for j := range e.Tickets {
 			t := &e.Tickets[j]
-			t.BlockedByErr, t.ExternalBlockers = "", nil
+			t.BlockedByErr, t.ExternalBlockers, t.WidenedBlockers = "", nil, nil
 			errs := g.checkBlockedBy(e.Name, *t)
+			if !t.IsTerminal() {
+				errs = append(errs, g.cycleErrors(e.Name, *t)...)
+			}
 			for _, ref := range qualifiedRefs(e.BlockedBy) {
 				if _, err := g.resolveBlocker(e.Name, ref); err != nil {
 					errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
@@ -73,6 +77,14 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 			if len(errs) > 0 {
 				t.BlockedByErr = errors.Join(errs...).Error()
 				continue
+			}
+			for _, ref := range qualifiedRefs(t.BlockedBy) {
+				if key, _ := g.resolveBlocker(e.Name, ref); widened(ref, key) {
+					if t.WidenedBlockers == nil {
+						t.WidenedBlockers = map[string]string{}
+					}
+					t.WidenedBlockers[ref] = key
+				}
 			}
 			for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
 				if key, _ := g.resolveBlocker(e.Name, ref); g.blocking(key) {

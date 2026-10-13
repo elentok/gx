@@ -126,10 +126,15 @@ func (g *projectGraph) resolve(epic, ref string) (string, error) {
 
 // resolveBlocker is resolve widened to blocked_by's whole-epic tokens: a
 // token that is not in ticket-id form names an epic ("epic" or
-// "project:epic"), keyed by its bare name.
+// "project:epic"), keyed by its bare name. A ticket in another epic that has
+// commits widens to that whole epic (see widen).
 func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
 	if strings.Contains(ref, "/") || ticketIDRe.MatchString(ref) {
-		return g.resolve(epic, ref)
+		key, err := g.resolve(epic, ref)
+		if err != nil {
+			return "", err
+		}
+		return g.widen(epic, key), nil
 	}
 	project, name := g.project, ref
 	if p, e, ok := ParseEpicAddress(ref); ok {
@@ -146,6 +151,23 @@ func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
 		return "", &AddressError{CodeBlockedByMapEpic, fmt.Sprintf("%q names a map epic, which never lands", ref)}
 	}
 	return name, nil
+}
+
+// widen turns a ticket key in another epic into that epic's key unless the
+// ticket is commitless: its code only reaches this epic once its epic lands.
+// The file keeps the ticket token, so it narrows back if the ticket turns
+// commitless. A map epic never lands, so its tickets stay tickets.
+func (g *projectGraph) widen(epic, key string) string {
+	target := key[:strings.Index(key, "/")]
+	if target == epic || g.tickets[key].Commitless || g.epics[target].IsMap {
+		return key
+	}
+	return target
+}
+
+// widened reports whether ref resolved to blocker only by widening.
+func widened(ref, blocker string) bool {
+	return strings.Contains(ref, "/") && isEpicKey(blocker)
 }
 
 // expand is the ticket nodes a blocker key stands for: a whole epic's every
@@ -218,8 +240,12 @@ func (g *projectGraph) cycleErrors(epic string, t Ticket) []error {
 				chain = append(chain, target)
 			}
 			chain = append(chain, back...)
-			errs = append(errs, fmt.Errorf("ticket %s: blocked_by %q closes a cycle: %s",
-				t.DisplayNumber(), ref, g.renderChain(chain, epic)))
+			token := fmt.Sprintf("%q", ref)
+			if widened(ref, blocker) {
+				token += fmt.Sprintf(" (widened to epic %q)", blocker)
+			}
+			errs = append(errs, fmt.Errorf("ticket %s: blocked_by %s closes a cycle: %s",
+				t.DisplayNumber(), token, g.renderChain(chain, epic)))
 			break
 		}
 	}
