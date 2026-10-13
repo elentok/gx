@@ -17,7 +17,7 @@ import (
 
 // trunkDeletedMidRun is a one-ticket epic whose trunk develop is deleted while
 // the agent works. It returns develop's tip and a count of chat text sent.
-func trunkDeletedMidRun(t *testing.T, cfgOpts ...func(*server.Config)) (f *schedFixture, develop string, chatCount func(string) int) {
+func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop string, chatCount func(string) int) {
 	t.Helper()
 	var mu sync.Mutex
 	var sent strings.Builder
@@ -33,20 +33,24 @@ func trunkDeletedMidRun(t *testing.T, cfgOpts ...func(*server.Config)) (f *sched
 		defer mu.Unlock()
 		return strings.Count(sent.String(), s)
 	}
-	cfgOpts = append(cfgOpts, func(c *server.Config) {
+	chatCfg := func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
-	})
+	}
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "-D", "develop")
-	}, cfgOpts...)
+	}, chatCfg)
 	f.git(t, "branch", "develop")
-	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
+	if autoMerge {
+		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
+	} else {
+		servertest.SetProjectTrunkNoAutoMerge(t, f.store, "proj", f.repo, "develop")
+	}
 	return f, f.rev(t, "develop"), chatCount
 }
 
 func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T) {
-	f, develop, chatCount := trunkDeletedMidRun(t)
+	f, develop, chatCount := trunkDeletedMidRun(t, true)
 	f.runEpic(t, server.EventRootParked)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
@@ -66,7 +70,7 @@ func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T)
 }
 
 func TestTrunkMissingAtLanding_AutoMergeOffIsNotParked(t *testing.T) {
-	f, _, _ := trunkDeletedMidRun(t, func(c *server.Config) { c.AutoMergeEpic = false })
+	f, _, _ := trunkDeletedMidRun(t, false)
 	f.runEpic(t, server.EventRootCompleted)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {

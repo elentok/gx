@@ -56,9 +56,6 @@ type Handshake struct {
 // them through an atomic snapshot (Server.settings), never from Config.
 type Settings struct {
 	TabEnv []string // KEY=VALUE entries set on each iteration tab
-	// AutoMergeEpic merges a finished epic's branch into its target; off leaves
-	// the merge to gx-merge.
-	AutoMergeEpic bool
 	// Evolve is the global evolve mode (config.Evolve*); empty means off.
 	Evolve string
 
@@ -106,7 +103,6 @@ type Settings struct {
 func SettingsFromConfig(cfg config.Config) Settings {
 	return Settings{
 		TabEnv:              cfg.Server.TabEnv,
-		AutoMergeEpic:       cfg.Server.AutoMergeEpic,
 		Evolve:              cfg.Evolve,
 		LogRetention:        cfg.Server.LogRetention,
 		BudgetSoftLimit:     cfg.Budget.SoftLimit,

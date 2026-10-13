@@ -45,13 +45,6 @@ func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 	}, opts...)
 }
 
-func TestRetroHook_SubmitsWhenAutoMergeIsOff(t *testing.T) {
-	f := retroFixture(t, withEvolve(config.EvolveContributor), func(c *server.Config) { c.AutoMergeEpic = false })
-	if got := f.completeEpic(t); len(got) != 1 {
-		t.Errorf("retros = %v, want one", got)
-	}
-}
-
 func TestRetroHook_SubmitsAfterTheEpicLands(t *testing.T) {
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	if got := f.completeEpic(t); len(got) != 1 {
@@ -170,7 +163,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)

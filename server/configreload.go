@@ -157,7 +157,6 @@ func changedKeys(old, next Settings) []string {
 		{"budget.soft-limit", old.BudgetSoftLimit, next.BudgetSoftLimit},
 		{"budget.hard-limit", old.BudgetHardLimit, next.BudgetHardLimit},
 		{"server.tab-env", old.TabEnv, next.TabEnv},
-		{"server.auto-merge-epic", old.AutoMergeEpic, next.AutoMergeEpic},
 		{"server.log-retention", old.LogRetention, next.LogRetention},
 		{"server.watch-config", old.WatchConfig, next.WatchConfig},
 		{"evolve", old.Evolve, next.Evolve},

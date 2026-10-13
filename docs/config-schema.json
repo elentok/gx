@@ -234,11 +234,6 @@
           "items": { "type": "string", "pattern": "^[^=]+=" },
           "default": []
         },
-        "auto-merge-epic": {
-          "type": "boolean",
-          "default": false,
-          "description": "Merge an epic's branch into its target once every ticket is done. Off by default: a person runs gx-merge."
-        },
         "watch-config": {
           "type": "boolean",
           "default": true,

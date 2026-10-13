@@ -88,11 +88,11 @@ func TestOneOffCommits_RunsOnAnIterationBranchAndLandsThroughThePolicy(t *testin
 	}
 }
 
-func TestOneOffCommits_AutoFFOffParksTheRootAndLeavesTrunkAlone(t *testing.T) {
+func TestOneOffCommits_AutoFFOffCompletesTheRootAndLeavesTrunkAlone(t *testing.T) {
 	evs, _, repo, seen := startCommitsOneOff(t, true)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
 
 	_, trunkWhileRunning := seen.get()
 	if got := gitOut(t, repo, "rev-parse", "main"); got != trunkWhileRunning {

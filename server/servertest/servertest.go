@@ -292,6 +292,12 @@ func SetProjectTrunk(t *testing.T, store, project, repo, trunk string) {
 	writeProjectRepo(t, store, project, repo, `,"auto-ff-merge":true,"trunk":"`+trunk+`"`)
 }
 
+// SetProjectTrunkNoAutoMerge is SetProjectTrunk without the auto-ff-merge opt-in.
+func SetProjectTrunkNoAutoMerge(t *testing.T, store, project, repo, trunk string) {
+	t.Helper()
+	writeProjectRepo(t, store, project, repo, `,"trunk":"`+trunk+`"`)
+}
+
 // SetProjectRepoNoAutoMerge is SetProjectRepo without the auto-ff-merge opt-in.
 func SetProjectRepoNoAutoMerge(t *testing.T, store, project, repo string) {
 	t.Helper()
@@ -369,8 +375,6 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	herdrfake.StartState(t, h.Herdr)
 
 	h.cfg = server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
-	// The product default is off; most tests exercise the landing.
-	h.cfg.AutoMergeEpic = true
 	// Every land pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }

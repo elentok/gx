@@ -649,8 +649,8 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 
 // completeRootIfDone lands the root's feature branch once every ticket in its
 // epic is done, then dequeues it. A branch that needs a rebase parks the root
-// instead: a person runs gx-merge. With AutoMergeEpic off the branch is left
-// alone: the root is dequeued as complete and a person runs gx-merge.
+// instead: a person runs gx-merge. With the project's auto-ff-merge off the
+// branch is left alone: the root is dequeued as complete and a person runs gx-merge.
 func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 	project := root.Project
 	dir, repo, err := s.projectOf(project)
@@ -672,7 +672,7 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		if err := tickets.StampEpicFields(e.Path, map[string]any{"completed_at": time.Now().UTC()}); err != nil {
 			s.log.Warn("stamp epic completed_at", "root", root, "err", err)
 		}
-		if s.settings.Load().AutoMergeEpic {
+		if s.autoFFMerge(project) {
 			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
 				s.log.Warn("land root", "root", root, "err", err)
 				s.events.publish(EventIterationFailed, root.String())
@@ -744,9 +744,6 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ti
 // landRoot fast-forwards the root's target to its feature branch through the
 // merge core. A non-empty reason means the root must park, not land.
 func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, err error) {
-	if !s.autoFFMerge(project) {
-		return fmt.Sprintf("auto-ff-merge is off for %s; run gx-merge %s", project, one.Epic), nil
-	}
 	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repoDir)
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing lands; the project stops claiming until a person fixes trunk.

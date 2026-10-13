@@ -974,20 +974,6 @@ func TestLoadServerTCPListen(t *testing.T) {
 	}
 }
 
-func TestLoadServerAutoMergeEpic(t *testing.T) {
-	for body, want := range map[string]bool{`{}`: false, `{"server":{"auto-merge-epic":true}}`: true, `{"server":{"auto-merge-epic":false}}`: false} {
-		tmp := t.TempDir()
-		prev := userConfigDirFn
-		userConfigDirFn = func() (string, error) { return tmp, nil }
-		t.Cleanup(func() { userConfigDirFn = prev })
-		writeBudgetConfig(t, tmp, body)
-		cfg, err := Load()
-		if err != nil || cfg.Server.AutoMergeEpic != want {
-			t.Errorf("%s: AutoMergeEpic = %v (err %v), want %v", body, cfg.Server.AutoMergeEpic, err, want)
-		}
-	}
-}
-
 func TestParseServerWatchConfig(t *testing.T) {
 	for body, want := range map[string]bool{`{}`: true, `{"server":{}}`: true, `{"server":{"watch-config":false}}`: false, `{"server":{"watch-config":true}}`: true} {
 		cfg, err := Parse([]byte(body))

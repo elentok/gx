@@ -99,9 +99,6 @@ type ServerConfig struct {
 	// TabEnv is KEY=VALUE entries set on every iteration tab's shell, for
 	// overriding what the user's shell rc would otherwise decide (e.g. PATH).
 	TabEnv []string `json:"tab-env"`
-	// AutoMergeEpic merges an epic's branch into its target once every ticket
-	// is done. Off by default: a person runs gx-merge.
-	AutoMergeEpic bool `json:"auto-merge-epic"`
 	// LogRetention is how long a headless agent's logs outlive its last
 	// activity. Zero means the runner's default.
 	LogRetention time.Duration `json:"-"`
@@ -217,11 +214,10 @@ func Parse(data []byte) (Config, error) {
 			PushRemote     *string `json:"push-remote"`
 		} `json:"ticket-store"`
 		Server *struct {
-			TCPListen     *bool    `json:"tcp-listen"`
-			TabEnv        []string `json:"tab-env"`
-			AutoMergeEpic *bool    `json:"auto-merge-epic"`
-			LogRetention  *string  `json:"log-retention"`
-			WatchConfig   *bool    `json:"watch-config"`
+			TCPListen    *bool    `json:"tcp-listen"`
+			TabEnv       []string `json:"tab-env"`
+			LogRetention *string  `json:"log-retention"`
+			WatchConfig  *bool    `json:"watch-config"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
 		Evolve            *string `json:"evolve"`
@@ -336,9 +332,6 @@ func Parse(data []byte) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.TCPListen != nil {
 		cfg.Server.TCPListen = *raw.Server.TCPListen
-	}
-	if raw.Server != nil && raw.Server.AutoMergeEpic != nil {
-		cfg.Server.AutoMergeEpic = *raw.Server.AutoMergeEpic
 	}
 	if raw.Server != nil && raw.Server.WatchConfig != nil {
 		cfg.Server.WatchConfig = *raw.Server.WatchConfig
