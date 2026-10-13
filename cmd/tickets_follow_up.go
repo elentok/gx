@@ -58,7 +58,7 @@ func runTicketsFollowUpAdd(epicPath, body string, jsonOut bool, w io.Writer) err
 
 	fm.Status = string(schema.StatusDraft)
 	fm.Type = string(schema.TypeResearch)
-	path, err := createTicket(epicPath, "", followUpSlug(text), &text, fm)
+	path, _, err := createTicket(epicPath, "", followUpSlug(text), &text, fm)
 	if err != nil {
 		return err
 	}

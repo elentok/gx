@@ -3,10 +3,12 @@ package tickets
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // CheckBlockedBy is the one verdict on t's bare blocked_by refs, shared by
@@ -94,6 +96,62 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 		}
 	}
 	return out
+}
+
+// CheckBlockedByWrite is the check `tickets add` and `tickets set --blocked-by`
+// run before writing st to path (<project>/<epic>/issues/<file>.md, new or
+// existing): st's refs must resolve project-wide and close no wait cycle on
+// the widened graph. Only st's own faults refuse, so a project already broken
+// elsewhere stays writable. On success it returns one notice per ref that
+// widens to its whole epic. A path outside that layout has no project, so
+// nothing is checked.
+func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
+	issuesDir := filepath.Dir(path)
+	number, identifier, _, ok := parseTicketFilename(filepath.Base(path))
+	if filepath.Base(issuesDir) != "issues" || !ok {
+		return nil, nil
+	}
+	epicDir := filepath.Dir(issuesDir)
+	root := filepath.Dir(epicDir)
+	epics, err := Load(root)
+	if err != nil {
+		return nil, err
+	}
+	t := Ticket{
+		Number:     number,
+		Identifier: identifier,
+		Path:       path,
+		BlockedBy:  idsToStrings(st.BlockedBy),
+		Parent:     idToStringPtr(st.Parent),
+		Status:     string(st.Status),
+		Commitless: st.IsCommitless(),
+	}
+	epic := filepath.Base(epicDir)
+	post := slices.Clone(epics)
+	for i := range post {
+		if post[i].Name != epic {
+			continue
+		}
+		post[i].Tickets = slices.DeleteFunc(slices.Clone(post[i].Tickets), func(o Ticket) bool {
+			return ticketKey(o) == ticketKey(t)
+		})
+		post[i].Tickets = append(post[i].Tickets, t)
+	}
+	g := newProjectGraph(ProjectName(root), post)
+	errs := g.checkBlockedBy(epic, t)
+	if !t.IsTerminal() {
+		errs = append(errs, g.cycleErrors(epic, t)...)
+	}
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+	var notices []string
+	for _, ref := range t.BlockedBy {
+		if key, _ := g.resolveBlocker(epic, ref); widened(ref, key) {
+			notices = append(notices, fmt.Sprintf("`%s` needs commits; waiting for all of `%s`", ref, key))
+		}
+	}
+	return notices, nil
 }
 
 // LoadResolved is Load plus ResolveCrossEpic: the project's epics (dir holds

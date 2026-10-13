@@ -27,7 +27,7 @@ import (
 // with a real name instead of a placeholder the caller has to remember to
 // rename.
 func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
-	path, err := createTicket(epicPath, parent, slug, nil, addFrontmatter{})
+	path, _, err := createTicket(epicPath, parent, slug, nil, addFrontmatter{})
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w, std
 		}
 		parent = fm.Parent
 	}
-	path, err := createTicket(epicPath, parent, slug, &text, fm)
+	path, notices, err := createTicket(epicPath, parent, slug, &text, fm)
 	if err != nil {
 		return err
 	}
@@ -67,9 +67,7 @@ func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w, std
 			fmt.Fprintf(stderr, "warning: body says id %q; the allocated id wins: %s\n", fm.ID, got)
 		}
 	}
-	if err != nil {
-		return err
-	}
+	printNotices(stderr, notices)
 	pingServer(path)
 	return printTicketRef(path, jsonOut, w)
 }
@@ -119,35 +117,36 @@ func bodyFrontmatter(body string) (addFrontmatter, string, error) {
 }
 
 // createTicket allocates the next id under the epic lock and writes the new
-// ticket file, returning its path. A nil body writes the empty draft stub; a
-// non-nil body writes an open ticket carrying it, with fm's fields applied.
-func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter) (string, error) {
+// ticket file, returning its path and tickets.CheckBlockedByWrite's notices. A
+// nil body writes the empty draft stub; a non-nil body writes an open ticket
+// carrying it, with fm's fields applied.
+func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter) (string, []string, error) {
 	if slug == "" {
-		return "", errors.New("slug is required")
+		return "", nil, errors.New("slug is required")
 	}
 
 	epicPath = filepath.Clean(epicPath)
 	// Checked before anything is created, so a refusal leaves no epic behind.
 	if filepath.Base(epicPath) == followUpsEpic && fm.Category == "" {
-		return "", &tickets.AddressError{Code: tickets.CodeCategoryRequired, Msg: "a ticket filed into " + followUpsEpic + " needs a category (bug or idea)"}
+		return "", nil, &tickets.AddressError{Code: tickets.CodeCategoryRequired, Msg: "a ticket filed into " + followUpsEpic + " needs a category (bug or idea)"}
 	}
 	// Also repairs an existing epic directory that has no ticket.md.
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if err := tickets.WriteEpicTicketMD(epicPath, schema.StatusOpen); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer unlock()
 
 	id, err := tickets.NextTicketID(*epic, parent)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	path := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-%s.md", id, slug))
@@ -180,22 +179,37 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 		t.Category = schema.Category(fm.Category)
 	}
 
+	notices, err := tickets.CheckBlockedByWrite(path, t)
+	if err != nil {
+		return "", nil, fmt.Errorf("rejecting blocked_by: %w", err)
+	}
+
 	out, err := schema.MarshalTicket(t, text)
 	if err != nil {
-		return "", fmt.Errorf("marshaling ticket: %w", err)
+		return "", nil, fmt.Errorf("marshaling ticket: %w", err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if err := os.WriteFile(path, out, 0644); err != nil {
-		return "", fmt.Errorf("writing ticket %s: %w", path, err)
+		return "", nil, fmt.Errorf("writing ticket %s: %w", path, err)
 	}
 
 	if _, err := schema.ParseTicket(path); err != nil {
-		return "", fmt.Errorf("ticket %s failed validation: %w", path, err)
+		return "", nil, fmt.Errorf("ticket %s failed validation: %w", path, err)
 	}
-	return path, nil
+	return path, notices, nil
+}
+
+// printNotices writes each of a write's informational notices to w, if any.
+func printNotices(w io.Writer, notices []string) {
+	if w == nil {
+		return
+	}
+	for _, n := range notices {
+		fmt.Fprintln(w, n)
+	}
 }
 
 // projectEpicRe matches `project:epic`, the cross-project spelling of an epic.

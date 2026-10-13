@@ -30,7 +30,7 @@ Settable fields:
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03. A bare ID names a ticket in
     this epic; epic/06 (or project:epic/06 for this project) names one in another epic of the
     project. To wait on another epic's work, block on it this way — never park the ticket as a
-    stand-in. Another project's prefix and cross-epic cycles are rejected by validate.
+    stand-in. Dangling refs, another project's prefix and cycles are refused before writing.
   parent (ticket ID, --parent): the ticket this one was produced from. Must name an
     existing ticket in the same epic, and may not point into this ticket's own fork
     subtree (that would make the fork graph cyclic) — both are rejected.
@@ -307,6 +307,19 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 		}
 	}
 
+	var notices []string
+	if c.Flags().Changed("blocked-by") {
+		current, err := schema.ParseTicket(path)
+		if err != nil {
+			return err
+		}
+		blockedBy, _ := c.Flags().GetString("blocked-by")
+		current.BlockedBy = parseCSVIDs(blockedBy)
+		if notices, err = tickets.CheckBlockedByWrite(path, current); err != nil {
+			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketLabel(path), blockedBy, err)
+		}
+	}
+
 	var changed []string
 
 	err := schema.UpdateTicket(path, func(t *schema.Ticket) {
@@ -331,6 +344,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 	if err != nil {
 		return err
 	}
+	printNotices(stderr, notices)
 
 	pingServer(path)
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
