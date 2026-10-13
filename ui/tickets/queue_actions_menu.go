@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -21,6 +22,9 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	// can make it watchable.
 	paneLive := !m.settings.HerdrUnavailable && ticketPaneLive(r.epic.Name, r.ticket.DisplayNumber())
 	items := suggestedActionItems(status, r.ticket, paneLive, false, m.settings.HerdrUnavailable)
+	if m.serverAPI != nil && isParkedRoot(r.epic, m.checked) {
+		items = append([]components.MenuItem{mergeMenuItem}, items...)
+	}
 	prompt := fmt.Sprintf("Suggested actions for %q:", r.ticket.Title)
 	m.actionsMenu = m.actionsMenu.Open(r.ticket.Path, r.epic.Name, r.ticket.DisplayNumber(), prompt, items)
 	return m, nil
@@ -36,6 +40,9 @@ func (m QueueModel) handleQueueActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, t
 	m.actionsMenu = next
 	if !result.Done || !result.Accepted {
 		return m, nil
+	}
+	if result.Action == actionMerge {
+		return m, cmdEpicMerge(m.serverAPI, result.EpicName)
 	}
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)

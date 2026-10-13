@@ -28,6 +28,7 @@ type fakeServerAPI struct {
 	replaced   *[]server.QueueItem
 	replaceRes server.QueueResult
 	removeRes  server.QueueResult
+	mergeRes   server.QueueResult
 	budget     server.BudgetStatus
 	iterations []server.IterationInfo
 	// snap and queue are what Snapshot and QueueItems return.
@@ -103,6 +104,11 @@ func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string) (server
 func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (server.QueueResult, error) {
 	f.record("approve " + address)
 	return server.QueueResult{}, nil
+}
+
+func (f fakeServerAPI) EpicMerge(_ context.Context, address string) (server.QueueResult, error) {
+	f.record("merge " + address)
+	return f.mergeRes, nil
 }
 
 func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {

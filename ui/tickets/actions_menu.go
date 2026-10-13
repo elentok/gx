@@ -112,6 +112,12 @@ type actionsMenuReadyMsg struct {
 // shells out to ps, so the menu opens once a Cmd has resolved it.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
+	if ok && r.isEpic() && m.serverAPI != nil && !r.archived && epicSection(m.epicAt(r)) == sectionComplete {
+		epic := m.epicAt(r)
+		prompt := fmt.Sprintf("Suggested actions for %q:", epic.Name)
+		m.actionsMenu = m.actionsMenu.Open(epic.Path, epic.Name, "", prompt, []components.MenuItem{mergeMenuItem})
+		return m, nil
+	}
 	if !ok || r.isEpic() {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
@@ -162,6 +168,9 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	m.actionsMenu = next
 	if !result.Done || !result.Accepted {
 		return m, nil
+	}
+	if result.Action == actionMerge {
+		return m, cmdEpicMerge(m.serverAPI, result.EpicName)
 	}
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)

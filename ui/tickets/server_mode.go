@@ -38,6 +38,7 @@ type ServerAPI interface {
 	TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error)
 	TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error)
 	TicketApprove(ctx context.Context, address string) (server.QueueResult, error)
+	EpicMerge(ctx context.Context, address string) (server.QueueResult, error)
 	Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error)
 	Iterations(ctx context.Context) ([]server.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
