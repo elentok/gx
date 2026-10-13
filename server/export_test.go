@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
@@ -64,6 +65,11 @@ func (s *Server) ParkAs(address string, kind events.Kind, reason string) error {
 
 // SetCostOf swaps how an iteration's cost is read.
 func (s *Server) SetCostOf(f func(IterationInfo) (float64, bool)) { s.costOf = f }
+
+// SetMergeInto swaps the merge core a root land calls.
+func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
+	s.mergeInto = f
+}
 
 // Rescan rescans the store now, as a ping or the watch would.
 func (s *Server) Rescan() { s.rescan() }

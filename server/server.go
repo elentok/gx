@@ -21,6 +21,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -228,6 +229,8 @@ type Server struct {
 	savedRuns    []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused      refusals
 	lands        landGuard
+	trunkLocks   trunkLocks
+	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 	verdicts     verdictLog
 	nudges       nudgeLimiter
 	unavailable  unavailableNotes
@@ -342,12 +345,13 @@ func New(cfg Config) (*Server, error) {
 		registry:  registry,
 		savedRuns: savedRuns,
 
-		queued: queued,
-		pause:  pause,
-		ledger: ledger,
-		costOf: iterationCost,
-		events: events,
-		kick:   make(chan struct{}, 1),
+		queued:    queued,
+		pause:     pause,
+		ledger:    ledger,
+		costOf:    iterationCost,
+		mergeInto: git.MergeBranchInto,
+		events:    events,
+		kick:      make(chan struct{}, 1),
 	}
 	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()

@@ -134,6 +134,30 @@ func (g *landGuard) closeAndWait(timeout time.Duration) bool {
 	}
 }
 
+// trunkLocks serializes root lands per repo and trunk. Unserialized, two
+// lands into one trunk race on git's own locks and the second fails instead
+// of seeing a clean non-ff.
+type trunkLocks struct {
+	mu    sync.Mutex
+	locks map[string]*sync.Mutex
+}
+
+func (l *trunkLocks) lock(repo, trunk string) (unlock func()) {
+	l.mu.Lock()
+	key := repo + "\x00" + trunk
+	m := l.locks[key]
+	if m == nil {
+		if l.locks == nil {
+			l.locks = map[string]*sync.Mutex{}
+		}
+		m = &sync.Mutex{}
+		l.locks[key] = m
+	}
+	l.mu.Unlock()
+	m.Lock()
+	return m.Unlock
+}
+
 // goSettle runs f, a finishRun, settleRun or recoverFrom, on its own
 // goroutine. Each writes to the ticket store and may outlive Serve's stop.
 func (s *Server) goSettle(f func()) {
@@ -685,43 +709,63 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		return
 	}
 	for _, e := range epics {
-		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
-			continue
+		if filepath.Base(e.Path) == one.Epic && ralphloop.AllDone(e) {
+			s.completeEpic(root, one, dir, repo, epics, e)
 		}
-		merged := true
-		switch {
-		case s.nothingToLand(project, epics, one, repo):
-			s.stampEpic(root, e.Path, "merged_at", "completed_at")
-		case s.autoFFMerge(project):
-			if reason, kind := s.landRoot(project, epics, one, repo); reason != "" {
-				s.stampEpic(root, e.Path, "completed_at")
-				s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: string(kind), Level: EventLevelWarning, Message: reason})
-				s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
-				if s.chat.Enabled() {
-					s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
-				}
-				// Only a needs-rebase park, the one without a kind, is the
-				// epic's outcome; any other park waits on a person's fix and then lands.
-				if kind == "" {
-					s.notifyEpicOutcome(project, dir, one, e, false)
-				}
-				s.submitRetro(root, dir, e, one.Ticket.Path)
-				return
-			}
-			s.stampEpic(root, e.Path, "merged_at", "completed_at")
-		default:
-			s.stampEpic(root, e.Path, "completed_at")
-			merged = false
-		}
-		s.submitRetro(root, dir, e, one.Ticket.Path)
-		if removed, err := s.queued.removeRoot(root); err != nil {
-			s.log.Warn("dequeue completed root", "root", root, "err", err)
-		} else if removed {
-			s.events.publish(EventQueueChanged, root.String())
-		}
-		s.events.publish(EventRootCompleted, root.String())
-		s.notifyEpicOutcome(project, dir, one, e, merged)
 	}
+}
+
+// completeEpic is completeRootIfDone for the all-done epic e. The whole land
+// holds its trunk's lock, so a second land into that trunk sees the first one's
+// result. An epic already merged does no git work: its notice goes out only
+// with the dequeue, so a double land sends one.
+func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
+	project := root.Project
+	_, target, _ := s.rootRefs(project, epics, one.Epic, one.Ticket, repo)
+	defer s.trunkLocks.lock(repo, target)()
+	fresh := tickets.LoadEpicTicketMD(e.Path)
+	already := !fresh.MergedAt.IsZero()
+	merged := true
+	switch {
+	case already:
+		if fresh.CompletedAt.IsZero() {
+			s.stampEpic(root, e.Path, "completed_at")
+		}
+	case s.nothingToLand(project, epics, one, repo):
+		s.stampEpic(root, e.Path, "merged_at", "completed_at")
+	case s.autoFFMerge(project):
+		if reason, kind := s.landRoot(project, epics, one, repo); reason != "" {
+			s.stampEpic(root, e.Path, "completed_at")
+			s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: string(kind), Level: EventLevelWarning, Message: reason})
+			s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
+			if s.chat.Enabled() {
+				s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
+			}
+			// Only a needs-rebase park, the one without a kind, is the
+			// epic's outcome; any other park waits on a person's fix and then lands.
+			if kind == "" {
+				s.notifyEpicOutcome(project, dir, one, e, false)
+			}
+			s.submitRetro(root, dir, e, one.Ticket.Path)
+			return
+		}
+		s.stampEpic(root, e.Path, "merged_at", "completed_at")
+	default:
+		s.stampEpic(root, e.Path, "completed_at")
+		merged = false
+	}
+	s.submitRetro(root, dir, e, one.Ticket.Path)
+	removed, err := s.queued.removeRoot(root)
+	if err != nil {
+		s.log.Warn("dequeue completed root", "root", root, "err", err)
+	} else if removed {
+		s.events.publish(EventQueueChanged, root.String())
+	}
+	if already && !removed {
+		return
+	}
+	s.events.publish(EventRootCompleted, root.String())
+	s.notifyEpicOutcome(project, dir, one, e, merged)
 }
 
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
@@ -826,8 +870,14 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	if err != nil {
 		return landFailed(err)
 	}
-	out, err := git.MergeBranchInto(info.Repo, worktrees, one.Epic, target)
+	needsRebase := fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", one.Epic, target)
+	out, err := s.mergeInto(info.Repo, worktrees, one.Epic, target)
 	if err != nil {
+		// Trunk moved outside the server between git's ff check and the ff:
+		// that is a non-ff, not a failed land.
+		if ancestor, aerr := git.IsAncestor(info.Repo.Root, "refs/heads/"+target, one.Epic); aerr == nil && !ancestor {
+			return needsRebase, ""
+		}
 		// No pre-check: git decides whether local changes block the land, and
 		// only a refused land looks at them.
 		if dir := git.CheckoutDirForBranch(info.Repo, worktrees, target); dir != "" {
@@ -841,7 +891,7 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	if out.Merged {
 		return "", ""
 	}
-	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), ""
+	return needsRebase, ""
 }
 
 // maxReasonFiles caps the files a dirty-trunk reason lists.
