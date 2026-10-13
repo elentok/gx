@@ -50,13 +50,12 @@ var routeVerbs = map[string]string{
 	"POST /v1/agents/prompt":     "server agents prompt",
 	"POST /v1/agents/interrupt":  "server agents interrupt",
 	"POST /v1/agents/answer":     "server agents answer",
+	"POST /v1/epics/merge":       "server epics merge",
 }
 
 // plannedRoutes are routes whose CLI verb a queued ticket builds: the server op
 // lands first. The verb's ticket moves its entry into routeVerbs.
-var plannedRoutes = map[string]bool{
-	"POST /v1/epics/merge": true, // gx server epics merge: auto-merge-impl/19
-}
+var plannedRoutes = map[string]bool{}
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {
 	t.Parallel()

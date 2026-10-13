@@ -499,6 +499,14 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
+	if res.Merged {
+		_, err := fmt.Fprintln(w, "merged")
+		return err
+	}
+	if res.MergeTicket != "" {
+		_, err := fmt.Fprintln(w, res.MergeTicket)
+		return err
+	}
 	for i, it := range res.Queue {
 		if _, err := fmt.Fprintf(w, "%d\t%s\t%s\n", i+1, it.Address, it.Agent); err != nil {
 			return err
