@@ -47,6 +47,7 @@ func TestTicket_ShowsCommitlessSuffix(t *testing.T) {
 		{"code-review, commitless", "code-review", true, false},
 		{"grilling, commitless", "grilling", true, false},
 		{"conflict-resolution, commitless", "conflict-resolution", true, false},
+		{"merge, commitless", "merge", true, false},
 	}
 
 	for _, c := range cases {

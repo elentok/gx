@@ -189,6 +189,27 @@ func TestParseTicket_CommitlessRoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseTicket_ManualMergeRoundTrip(t *testing.T) {
+	content := "---\nid: \"05\"\nstatus: open\ntype: merge\nmanual: true\n---\nbody\n"
+	path := writeTemp(t, "05-merge.md", content)
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Type != TypeMerge || !got.Manual {
+		t.Fatalf("ParseTicket() Type = %q, Manual = %v, want merge, true", got.Type, got.Manual)
+	}
+
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if !strings.Contains(string(marshaled), "manual: true") {
+		t.Errorf("marshaled ticket = %q, want manual: true written back", string(marshaled))
+	}
+}
+
 func TestParseTicket_RoundTrip_SessionIDs(t *testing.T) {
 	orig := Ticket{
 		ID:         "04b",

@@ -8,11 +8,14 @@ import (
 )
 
 // iterationMode is where a ticket runs and how its iteration ends: on the epic's
-// feature branch, or commitless (a prompt ticket, or anything in the scratch
-// project, which has no VCS). Decided once per ticket, so launch, finish and
-// resume cannot disagree.
+// feature branch, commitless (a prompt ticket, or anything in the scratch
+// project, which has no VCS), or in the feature worktree itself (a merge
+// ticket). Decided once per ticket, so launch, finish and resume cannot disagree.
 type iterationMode struct {
 	commitless bool
+	// feature runs in the epic's feature worktree with no iteration branch, and
+	// ends like a commitless ticket on a kept directory: only the agent stops.
+	feature bool
 	// scratchDir is set only for scratch-project tickets.
 	scratchDir string
 	// ref is the detached worktree's start for a commitless ticket in a real
@@ -22,6 +25,9 @@ type iterationMode struct {
 
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	typ := schema.TicketType(t.Type)
+	if typ == schema.TypeMerge {
+		return iterationMode{feature: true}
+	}
 	m := iterationMode{commitless: addr.Project == ScratchProject || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve}
 	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
@@ -44,21 +50,24 @@ func (s *Server) investigatesWithoutVCS(addr tickets.Address, t tickets.Ticket) 
 }
 
 func (m iterationMode) prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
-	if m.commitless {
+	switch {
+	case m.feature:
+		return ralphloop.PrepareFeature(d, o)
+	case m.commitless:
 		return ralphloop.PrepareCommitless(d, o, m.scratchDir, m.ref)
 	}
 	return ralphloop.PrepareIteration(d, o)
 }
 
 func (m iterationMode) discard(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree) error {
-	if m.commitless {
+	if m.commitless || m.feature {
 		return ralphloop.DiscardCommitless(d, o, w)
 	}
 	return ralphloop.DiscardIteration(d, o, w)
 }
 
 func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
-	if m.commitless {
+	if m.commitless || m.feature {
 		return ralphloop.FinishCommitless(d, o, w, pane)
 	}
 	return ralphloop.FinishIteration(d, o, w, pane)
@@ -66,7 +75,10 @@ func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralp
 
 // resume rebuilds the worktree; base is the persisted base of a feature-branch run.
 func (m iterationMode) resume(d ralphloop.Deps, o ralphloop.OneIteration, base string) (ralphloop.IterationWorktree, error) {
-	if m.commitless {
+	switch {
+	case m.feature:
+		return ralphloop.ResumeFeature(d, o)
+	case m.commitless:
 		return ralphloop.ResumeCommitless(d, o, m.scratchDir)
 	}
 	return ralphloop.ResumeIteration(d, o, base)

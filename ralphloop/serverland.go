@@ -51,8 +51,9 @@ type IterationWorktree struct {
 	base            string
 	featureWorktree string
 	worktreeDir     string
-	// keep marks a plain directory (a commitless scratch one-off) that is not a
-	// git worktree and so is never removed when the ticket ends.
+	// keep marks a directory the ticket does not own (a commitless scratch
+	// one-off's, or the feature worktree a merge ticket runs in), so it is never
+	// removed when the ticket ends.
 	keep bool
 }
 

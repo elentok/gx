@@ -109,6 +109,9 @@ const (
 	// TypeEvolve is a commitless, top-level-only run of gx-evolve over an epic's
 	// retros; it is never forked from another ticket.
 	TypeEvolve TicketType = "evolve"
+	// TypeMerge rebases an epic's feature branch onto its target, in the feature
+	// worktree itself; the commits it makes land with the epic, not as its own.
+	TypeMerge TicketType = "merge"
 )
 
 var validTypes = map[TicketType]bool{
@@ -121,6 +124,7 @@ var validTypes = map[TicketType]bool{
 	TypePrompt:             true,
 	TypeInvestigate:        true,
 	TypeEvolve:             true,
+	TypeMerge:              true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -235,6 +239,8 @@ type Ticket struct {
 	// Notify asks the server to send the ticket's ## Result to chat when it
 	// lands; parks notify regardless. Set by a one-off submit's --notify.
 	Notify bool
+	// Manual marks a merge ticket the manual trigger forked.
+	Manual bool
 	// NoRecover is `recover: false` in the frontmatter: the server's recovery
 	// never acts on this ticket. Stored inverted so the zero value recovers.
 	NoRecover bool
@@ -289,7 +295,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
