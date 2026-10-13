@@ -75,7 +75,8 @@ type Deps struct {
 	// IsAncestor reports whether ancestor is reachable from descendant, used
 	// by startup reconciliation to confirm a done ticket's recorded landed
 	// commit (Event.SHA) is still on the feature branch.
-	IsAncestor func(dir, ancestor, descendant string) (bool, error)
+	IsAncestor       func(dir, ancestor, descendant string) (bool, error)
+	RebaseInProgress func(dir string) (bool, error)
 	// PatchesApplied reports whether a done ticket's iteration commits
 	// (base..branch) are already patch-equivalent to commits on the feature
 	// branch, used by startup reconciliation as a fallback when IsAncestor
@@ -224,7 +225,8 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		CherryPickInProgress: git.CherryPickInProgress,
 		AbortCherryPick:      git.AbortCherryPick,
 		IsAncestor:           git.IsAncestor,
-		PatchesApplied:       git.PatchesApplied,
+		RebaseInProgress:     git.RebaseInProgress,
+		PatchesApplied:     git.PatchesApplied,
 		AppendTrailers:       git.AppendTrailers,
 		TrailerMap:           git.TrailerMap,
 		WorktreeExists:       worktreeExists,

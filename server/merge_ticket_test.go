@@ -27,6 +27,13 @@ type mergeTurn struct {
 // branch exists. report is the iteration status the agent writes on turn n.
 func newMergeFixture(t *testing.T, report func(n int) string) (f *schedFixture, turns func() []mergeTurn) {
 	t.Helper()
+	return newMergeFixtureWith(t, func(_ *schedFixture, _ string, n int) string { return report(n) })
+}
+
+// newMergeFixtureWith is newMergeFixture whose agent also works in its cwd on
+// turn n before reporting; an empty report writes none.
+func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n int) string) (f *schedFixture, turns func() []mergeTurn) {
+	t.Helper()
 	var mu sync.Mutex
 	var seen []mergeTurn
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, func(f *schedFixture, p servertest.Prompt, _ string) {
@@ -38,8 +45,12 @@ func newMergeFixture(t *testing.T, report func(n int) string) (f *schedFixture, 
 		})
 		n := len(seen)
 		mu.Unlock()
+		report := turn(f, p.Cwd, n)
+		if report == "" {
+			return
+		}
 		path := f.ticketFile(t, "01")
-		body := strings.Replace(readFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+report(n)+"\n", 1)
+		body := strings.Replace(readFile(t, path), "status: claimed\n", "status: claimed\niteration_status: "+report+"\n", 1)
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			t.Error(err)
 		}

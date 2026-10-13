@@ -503,6 +503,20 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 	return ref, ref, nil
 }
 
+// landTarget is the target of the root epic addr's ticket t belongs to.
+func (s *Server) landTarget(addr tickets.Address, t tickets.Ticket) (string, error) {
+	dir, repo, err := s.projectOf(addr.Project)
+	if err != nil {
+		return "", err
+	}
+	epics, err := tickets.LoadResolved(addr.Project, dir)
+	if err != nil {
+		return "", err
+	}
+	_, target, err := s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
+	return target, err
+}
+
 // explicitBase reports whether t's base comes from a base: field (the
 // ticket's or its epic's) rather than from its blockers.
 func explicitBase(epics []tickets.Epic, epic string, t tickets.Ticket) bool {

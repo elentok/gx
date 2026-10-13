@@ -261,20 +261,20 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 	var mu sync.Mutex
 	cost := 0.0
-	testBudgetKillParksBudgetKilled(t, func() float64 { mu.Lock(); defer mu.Unlock(); cost += 3; return cost })
+	testBudgetKillParksBudgetKilled(t, func() float64 { mu.Lock(); defer mu.Unlock(); cost += 3; return cost }, servertest.TicketOpts{})
 }
 
 // An agent that goes quiet on the ctrl+c is parked budget-killed too, not
 // left to its own finish (which would park it zero-commit, a kind recovery
 // relaunches past the hard limit).
 func TestBudget_HardLimitParksAQuietRunBudgetKilledToo(t *testing.T) {
-	testBudgetKillParksBudgetKilled(t, func() float64 { return 6 })
+	testBudgetKillParksBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{})
 }
 
-func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64) {
+func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64, ticket servertest.TicketOpts) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", ticket)
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {

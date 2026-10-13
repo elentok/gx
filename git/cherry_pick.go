@@ -241,3 +241,23 @@ func CherryPickInProgress(dir string) (bool, error) {
 	}
 	return false, nil
 }
+
+// RebaseInProgress reports whether dir's worktree is stopped mid-rebase, by
+// either rebase backend.
+func RebaseInProgress(dir string) (bool, error) {
+	gitDir, _, err := run(dir, []string{"rev-parse", "--git-dir"})
+	if err != nil {
+		return false, err
+	}
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(dir, gitDir)
+	}
+	for _, state := range []string{"rebase-merge", "rebase-apply"} {
+		if _, err := os.Stat(filepath.Join(gitDir, state)); err == nil {
+			return true, nil
+		} else if !os.IsNotExist(err) {
+			return false, err
+		}
+	}
+	return false, nil
+}

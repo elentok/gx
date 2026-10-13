@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -16,6 +18,9 @@ type iterationMode struct {
 	// feature runs in the epic's feature worktree with no iteration branch, and
 	// ends like a commitless ticket on a kept directory: only the agent stops.
 	feature bool
+	// target is where a feature-mode epic lands, resolved at finish so the check
+	// sees the trunk current then.
+	target func() (string, error)
 	// scratchDir is set only for scratch-project tickets.
 	scratchDir string
 	// ref is the detached worktree's start for a commitless ticket in a real
@@ -26,7 +31,7 @@ type iterationMode struct {
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	typ := schema.TicketType(t.Type)
 	if typ == schema.TypeMerge {
-		return iterationMode{feature: true}
+		return iterationMode{feature: true, target: func() (string, error) { return s.landTarget(addr, t) }}
 	}
 	m := iterationMode{commitless: addr.Project == ScratchProject || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve}
 	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {
@@ -67,7 +72,14 @@ func (m iterationMode) discard(d ralphloop.Deps, o ralphloop.OneIteration, w ral
 }
 
 func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralphloop.IterationWorktree, pane string) (ralphloop.FinishOutcome, error) {
-	if m.commitless || m.feature {
+	switch {
+	case m.feature:
+		target, err := m.target()
+		if err != nil {
+			return ralphloop.FinishOutcome{}, fmt.Errorf("resolving merge target: %w", err)
+		}
+		return ralphloop.FinishMerge(d, o, w, pane, target)
+	case m.commitless:
 		return ralphloop.FinishCommitless(d, o, w, pane)
 	}
 	return ralphloop.FinishIteration(d, o, w, pane)
