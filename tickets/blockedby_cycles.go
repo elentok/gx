@@ -183,17 +183,37 @@ func (g *projectGraph) expand(key string) []string {
 	return keys
 }
 
+// waitTargets is what waiting on blocker means in the wait graph: its expanded
+// tickets and, for a whole epic, the epic's own node, which waits on that
+// epic's blocked_by. The node is what makes an empty epic part of a cycle.
+func (g *projectGraph) waitTargets(blocker string) []string {
+	targets := g.expand(blocker)
+	if isEpicKey(blocker) {
+		targets = append(targets, blocker)
+	}
+	return targets
+}
+
 // buildWait fills g.wait. A ref to Y makes t wait on Y and on Y's whole fork
 // subtree (see Blocking), and every fork child waits on its parent (see
 // parentDone), so the wait graph is: blocked_by edges expanded over the named
 // ticket's subtree (or a whole epic's tickets), plus child→parent edges. That
 // is what makes A↔B, a ticket blocked by its own ancestor, and one blocked by
-// its own descendant all deadlocks. Unresolvable refs are skipped;
-// checkBlockedBy reports those.
+// its own descendant all deadlocks. An epic's own blocked_by hangs off its
+// epic node, which every ticket of the epic waits on. Unresolvable refs are
+// skipped; checkBlockedBy and epicBlockedByErrors report those.
 func (g *projectGraph) buildWait(epics []Epic) {
 	for _, e := range epics {
+		for _, ref := range e.BlockedBy {
+			if blocker, err := g.resolveBlocker(e.Name, ref); err == nil && crossEpicRef(ref) {
+				g.wait[e.Name] = append(g.wait[e.Name], g.waitTargets(blocker)...)
+			}
+		}
 		for _, t := range e.Tickets {
 			key := nodeKey(e.Name, t)
+			if len(g.wait[e.Name]) > 0 {
+				g.wait[key] = append(g.wait[key], e.Name)
+			}
 			if t.Parent != nil {
 				if parent, err := g.resolve(e.Name, *t.Parent); err == nil {
 					g.wait[key] = append(g.wait[key], parent)
@@ -201,7 +221,7 @@ func (g *projectGraph) buildWait(epics []Epic) {
 			}
 			for _, ref := range t.BlockedBy {
 				if blocker, err := g.resolveBlocker(e.Name, ref); err == nil {
-					g.wait[key] = append(g.wait[key], g.expand(blocker)...)
+					g.wait[key] = append(g.wait[key], g.waitTargets(blocker)...)
 				}
 			}
 		}
@@ -230,26 +250,59 @@ func (g *projectGraph) cycleErrors(epic string, t Ticket) []error {
 		if err != nil {
 			continue
 		}
-		for _, target := range g.expand(blocker) {
-			back := shortestPath(g.wait, target, self)
-			if back == nil {
-				continue
-			}
-			chain := []string{self, blocker}
-			if isEpicKey(blocker) {
-				chain = append(chain, target)
-			}
-			chain = append(chain, back...)
-			token := fmt.Sprintf("%q", ref)
-			if widened(ref, blocker) {
-				token += fmt.Sprintf(" (widened to epic %q)", blocker)
-			}
+		if chain := g.cycleThrough(self, blocker); chain != nil {
 			errs = append(errs, fmt.Errorf("ticket %s: blocked_by %s closes a cycle: %s",
-				t.DisplayNumber(), token, g.renderChain(chain, epic)))
-			break
+				t.DisplayNumber(), cycleToken(ref, blocker), g.renderChain(chain, epic)))
 		}
 	}
 	return errs
+}
+
+// epicBlockedByErrors is the one verdict on epic e's own blocked_by: each ref
+// must resolve as a ticket's would, name another epic's work, and close no
+// wait cycle.
+func (g *projectGraph) epicBlockedByErrors(e Epic) []error {
+	var errs []error
+	for _, ref := range e.BlockedBy {
+		blocker, err := g.resolveBlocker(e.Name, ref)
+		if err == nil && !crossEpicRef(ref) {
+			err = fmt.Errorf("%q names a ticket of this epic", ref)
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
+			continue
+		}
+		if chain := g.cycleThrough(e.Name, blocker); chain != nil {
+			errs = append(errs, fmt.Errorf("epic %s: blocked_by %s closes a cycle: %s",
+				e.Name, cycleToken(ref, blocker), g.renderChain(chain, e.Name)))
+		}
+	}
+	return errs
+}
+
+// cycleThrough returns the wait chain from self through blocker back to self,
+// or nil when waiting on blocker closes no cycle.
+func (g *projectGraph) cycleThrough(self, blocker string) []string {
+	for _, target := range g.waitTargets(blocker) {
+		back := shortestPath(g.wait, target, self)
+		if back == nil {
+			continue
+		}
+		chain := []string{self, blocker}
+		if isEpicKey(blocker) && target != blocker {
+			chain = append(chain, target)
+		}
+		return append(chain, back...)
+	}
+	return nil
+}
+
+func cycleToken(ref, blocker string) string {
+	token := fmt.Sprintf("%q", ref)
+	if widened(ref, blocker) {
+		token += fmt.Sprintf(" (widened to epic %q)", blocker)
+	}
+	return token
 }
 
 // subtree is root followed by every fork descendant.

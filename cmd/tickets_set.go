@@ -65,8 +65,9 @@ Epic frontmatter fields:
 An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
 never scheduled by the server.
 
-` + "`tickets set project:epic`" + ` writes an epic's kind (map, loop), status (draft, open) and
-provisional_destination; completed_at, merged_at, evolved_at, evolve_skipped and
+` + "`tickets set project:epic`" + ` (or ` + "`tickets epic set`" + `) writes an epic's kind (map, loop), status
+(draft, open), provisional_destination and blocked_by (whole-epic tokens such as other or
+project:other: the whole epic waits on them, checked like a ticket's); completed_at, merged_at, evolved_at, evolve_skipped and
 evolve_ticket are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
 
 An epic's ticket.md also holds epic-level timing. These fields are gx-managed, not
@@ -165,12 +166,27 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		update.ProvisionalDestination = &b
 		changed = append(changed, "provisional_destination="+v)
 	}
+	var notices []string
+	if c.Flags().Changed("blocked-by") {
+		v, _ := c.Flags().GetString("blocked-by")
+		refs := []string{}
+		if v != "" {
+			refs = strings.Split(v, ",")
+		}
+		var err error
+		if notices, err = tickets.CheckEpicBlockedByWrite(path, refs); err != nil {
+			return fmt.Errorf("%s: rejecting --blocked-by %s: %w", ticketLabel(path), v, err)
+		}
+		update.BlockedBy = &refs
+		changed = append(changed, "blocked_by="+v)
+	}
 	if len(changed) == 0 {
-		return fmt.Errorf("%s: an epic takes --kind, --status and --provisional-destination", ticketLabel(path))
+		return fmt.Errorf("%s: an epic takes --kind, --status, --provisional-destination and --blocked-by", ticketLabel(path))
 	}
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
 		return fmt.Errorf("%s: %w", ticketLabel(path), err)
 	}
+	printNotices(c.ErrOrStderr(), notices)
 
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
 		return writeStamped(w, struct {

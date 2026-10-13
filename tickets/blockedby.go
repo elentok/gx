@@ -64,6 +64,7 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 	for i := range out {
 		e := &out[i]
 		e.Tickets = slices.Clone(e.Tickets)
+		epicErrs := g.epicBlockedByErrors(*e)
 		for j := range e.Tickets {
 			t := &e.Tickets[j]
 			t.BlockedByErr, t.ExternalBlockers, t.WidenedBlockers = "", nil, nil
@@ -71,11 +72,7 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 			if !t.IsTerminal() {
 				errs = append(errs, g.cycleErrors(e.Name, *t)...)
 			}
-			for _, ref := range qualifiedRefs(e.BlockedBy) {
-				if _, err := g.resolveBlocker(e.Name, ref); err != nil {
-					errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
-				}
-			}
+			errs = append(errs, epicErrs...)
 			if len(errs) > 0 {
 				t.BlockedByErr = errors.Join(errs...).Error()
 				continue
@@ -145,13 +142,43 @@ func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
+	return g.widenNotices(epic, t.BlockedBy), nil
+}
+
+// CheckEpicBlockedByWrite is CheckBlockedByWrite for an epic's own
+// blocked_by: refs is what `tickets epic set --blocked-by` would write to the
+// epic ticket.md at ticketMD (<project>/<epic>/ticket.md).
+func CheckEpicBlockedByWrite(ticketMD string, refs []string) ([]string, error) {
+	epicDir := filepath.Dir(ticketMD)
+	root := filepath.Dir(epicDir)
+	epics, err := Load(root)
+	if err != nil {
+		return nil, err
+	}
+	name := filepath.Base(epicDir)
+	post := slices.Clone(epics)
+	i := slices.IndexFunc(post, func(e Epic) bool { return e.Name == name })
+	if i < 0 {
+		return nil, &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q", name)}
+	}
+	post[i].BlockedBy = refs
+	g := newProjectGraph(ProjectName(root), post)
+	if errs := g.epicBlockedByErrors(post[i]); len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+	return g.widenNotices(name, refs), nil
+}
+
+// widenNotices is one notice per ref, written in epic, that widens to its
+// whole epic.
+func (g *projectGraph) widenNotices(epic string, refs []string) []string {
 	var notices []string
-	for _, ref := range t.BlockedBy {
+	for _, ref := range refs {
 		if key, _ := g.resolveBlocker(epic, ref); widened(ref, key) {
 			notices = append(notices, fmt.Sprintf("`%s` needs commits; waiting for all of `%s`", ref, key))
 		}
 	}
-	return notices, nil
+	return notices
 }
 
 // LoadResolved is Load plus ResolveCrossEpic: the project's epics (dir holds

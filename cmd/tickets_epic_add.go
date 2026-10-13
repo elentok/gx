@@ -79,6 +79,38 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 	addCmd.Flags().StringVar(&kind, "kind", "", "map or loop (required unless the body's frontmatter sets it)")
 	addCmd.Flags().StringVar(&status, "status", "", "draft or open (default draft)")
 	addCmd.Flags().StringVar(&body, "body", "", "epic body, or - to read it from stdin; its frontmatter may set kind, status, provisional_destination")
-	epicCmd.AddCommand(addCmd)
+	epicCmd.AddCommand(addCmd, newTicketsEpicSetCmd(d))
 	return epicCmd
+}
+
+// newTicketsEpicSetCmd is `tickets set project:epic` under the epic group;
+// --blocked-by takes whole-epic tokens ("other" or "project:other") and runs
+// the same project-wide check as a ticket's, writing nothing on failure.
+func newTicketsEpicSetCmd(d deps) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "set <project:epic>",
+		Short: "validated writes to an epic's ticket.md (kind, status, provisional_destination, blocked_by)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cwd, err := d.getwd()
+			if err != nil {
+				return err
+			}
+			projectDir, project, name, err := resolveEpicTarget(cwd, args[0])
+			if err != nil {
+				return err
+			}
+			path, err := tickets.EpicTicketMDPath(projectDir, project, name)
+			if err != nil {
+				return err
+			}
+			return runEpicSet(c, path, c.OutOrStdout(), d.getwd)
+		},
+	}
+	cmd.Flags().String("kind", "", "set kind (map or loop)")
+	cmd.Flags().String("status", "", "set status (draft or open)")
+	cmd.Flags().String("provisional-destination", "", "set provisional_destination (true/false)")
+	cmd.Flags().String("blocked-by", "", "set blocked_by (comma-separated whole-epic tokens, e.g. other or project:other)")
+	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
+	return cmd
 }

@@ -32,6 +32,8 @@ type EpicUpdate struct {
 	Kind                   *string
 	Status                 *string
 	ProvisionalDestination *bool
+	// BlockedBy is written as given; check it first with CheckEpicBlockedByWrite.
+	BlockedBy *[]string
 }
 
 // UpdateEpicFields applies u to the frontmatter of the epic ticket.md at
@@ -66,7 +68,12 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 			}
 		}
 		if u.ProvisionalDestination != nil {
-			return setMappingValue(mapping, "provisional_destination", *u.ProvisionalDestination)
+			if err := setMappingValue(mapping, "provisional_destination", *u.ProvisionalDestination); err != nil {
+				return err
+			}
+		}
+		if u.BlockedBy != nil {
+			return setMappingValue(mapping, "blocked_by", *u.BlockedBy)
 		}
 		return nil
 	})

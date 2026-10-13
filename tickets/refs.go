@@ -86,17 +86,13 @@ func RewriteRefsInFile(path string, fn func(ref string) string) (bool, error) {
 
 // ValidateRefs is ValidateProject's cross-ticket half, run on epics already in
 // memory (all of project): every epic's and every live ticket's blocked_by
-// ref must resolve, and no ticket's refs may close a wait cycle. Done and
+// ref must resolve, and none may close a wait cycle. Done and
 // cancelled tickets are skipped, as in ValidateProject.
 func ValidateRefs(project string, epics []Epic) []error {
 	g := newProjectGraph(project, epics)
 	var errs []error
 	for _, e := range epics {
-		for _, ref := range e.BlockedBy {
-			if _, err := g.resolveBlocker(e.Name, ref); err != nil {
-				errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
-			}
-		}
+		errs = append(errs, g.epicBlockedByErrors(e)...)
 		for _, t := range e.Tickets {
 			if t.IsTerminal() {
 				continue

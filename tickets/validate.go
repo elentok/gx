@@ -17,8 +17,9 @@ func isVCSNone(projectDir string) bool {
 // ValidateProject loads every epic under projectDir and reports each ticket's
 // problems at once: its own frontmatter (every ticket, so archived history is
 // still well-formed) plus the cross-ticket checks — parent edge, blocked_by
-// refs and wait cycles. Done and cancelled tickets skip the cross-ticket
-// checks only: their blockers may legitimately be gone.
+// refs and wait cycles — and each epic's own blocked_by. Done and cancelled
+// tickets skip the cross-ticket checks only: their blockers may legitimately
+// be gone.
 func ValidateProject(projectDir string) error {
 	epics, err := Load(projectDir)
 	if err != nil {
@@ -33,6 +34,9 @@ func ValidateProject(projectDir string) error {
 		}
 		for _, msg := range epic.FrontmatterErrs {
 			errs = append(errs, fmt.Errorf("%s: %s", filepath.Join(epic.Path, "ticket.md"), msg))
+		}
+		for _, err := range graph.epicBlockedByErrors(epic) {
+			errs = append(errs, fmt.Errorf("%s: %w", filepath.Join(epic.Path, "ticket.md"), err))
 		}
 		for _, t := range epic.Tickets {
 			if _, err := schema.ParseTicket(t.Path); err != nil {
