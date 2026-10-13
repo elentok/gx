@@ -3,8 +3,9 @@ name: gx-merge
 description:
   Merge a branch/worktree onto the repo's trunk. Tries gx's deterministic
   ff-only merge, and on non-fast-forward, rebases, resolves conflicts, runs
-  the repo's checks, then retries the merge. It never pauses for
-  confirmation.
+  the repo's checks (one fixer pass, flaky-test triage), then retries the
+  merge. With `--ticket <addr>` it runs as a merge ticket and leaves the ff to
+  the server. It never pauses for confirmation.
 disable-model-invocation: true
 ---
 
@@ -20,6 +21,35 @@ never assume "main".
 Run every step without asking the person anything. Each stop condition below
 reports and ends the run; none waits for a reply.
 
+## Modes
+
+- **Manual** — `/gx-merge <branch>`. Runs Steps 1–5, including the final
+  `gx merge`.
+- **Ticket** — `/gx-merge --ticket <addr>`, launched by the server for a
+  `type: merge` ticket. The branch is the epic named in the address
+  (`<project>:<epic>/<id>` → `<epic>`); don't look for it anywhere else. Same
+  steps, but Step 5 is replaced by reporting `finished`: the server does the
+  ff. Never edit the ticket's `status`; report through `--iteration-status`
+  only.
+
+## Stopping
+
+Every stop below says **stop: `<reason>`**. How to stop depends on the mode:
+
+- **Manual** — report the reason (with any output it names) and end the run.
+- **Ticket** — follow [gx-local-tracker.md](../gx-local-tracker.md)'s
+  announce-and-stop rule:
+  1. `gx tickets section <addr> "Needs Answer" -` — open with the reason as a
+     one-line summary, then the detail (check output, file list) and what a
+     person can do about it.
+  2. `gx tickets section <addr> Handoff -` — the state of the feature
+     worktree (rebase aborted, or rebased branch kept and at which commit),
+     any fixer commit, and any follow-ups already filed.
+  3. `gx tickets set <addr> --iteration-status needs-answer`, then exit.
+
+Leave trunk untouched at every stop. Never push to a remote at any point in
+this flow — pushing stays an explicit, separate action for the user.
+
 ## Step 1: attempt the deterministic merge
 
 Run:
@@ -30,52 +60,114 @@ gx merge <branch> --json
 
 Branch it three ways on `status`:
 
-- **`"merged"`** — done. Report it (`target` names the branch it landed on) and stop.
+- **`"merged"`** — done. Manual: report it (`target` names the branch it
+  landed on) and stop. Ticket: the epic is on trunk already; report
+  `finished` (Step 5).
 - **`"needs_rebase"`** — continue to Step 2.
-- anything else (a plain command error, e.g. trunk is missing) — report the
-  error and stop. Do nothing further; trunk is untouched.
+- anything else (a plain command error, e.g. trunk is missing) — **stop:
+  `gx merge failed: <error>`**.
 
-## Step 2: rebase
+## Step 2: check the worktree
 
 The result carries `branch`, `target`, and `worktree_path`. `git rebase`
-requires a working tree, so this step only runs when one is checked out for
-`branch`:
+requires a working tree, so the rest of the flow only runs when one is checked
+out for `branch`:
 
-- **`worktree_path` is non-empty** — run `git rebase <target>` there, then
-  continue below.
 - **`worktree_path` is empty** — no worktree is checked out for `branch`, and
   none may be created or checked out to run the rebase in: doing so risks
   landing the rebase in trunk's own worktree, checking `branch` out there and
   leaving trunk's checkout off trunk (violating ADR 0015's guarantee that this
-  flow never touches a worktree's current branch out from under it). Stop
-  here, report that `<branch>` has no worktree so `gx-merge` can't rebase it,
-  and leave trunk untouched. This case is currently unsupported — the caller
-  (e.g. `gx-cleanup`) needs to check out the branch in its own worktree first.
+  flow never touches a worktree's current branch out from under it). **Stop:
+  `<branch> has no worktree, so gx-merge can't rebase it`.** The caller (e.g.
+  `gx-cleanup`) needs to check out the branch in its own worktree first. In
+  ticket mode the server recreates the feature worktree before launch, so
+  this should not happen there.
+- **`git status --porcelain` in `worktree_path` is non-empty** — **stop:
+  `feature worktree <worktree_path> is dirty: <files>`**. Never commit,
+  stash or discard someone else's changes.
+- Otherwise continue.
 
-If the rebase reports conflicts, invoke the
+## Step 3: rebase
+
+Run `git rebase <target>` in `worktree_path`.
+
+If it reports conflicts, resolve them **inline** with the
 [gx-resolving-merge-conflicts](../gx-resolving-merge-conflicts/SKILL.md)
-skill **inline** — same conversation/context, not a detached sub-agent,
-matching `gx-cleanup`'s Step 7 convention for this same step.
+skill — same conversation/context, not a detached sub-agent, matching
+`gx-cleanup`'s Step 7 convention for this same step. Two overrides:
 
-## Step 3: run checks
+- Skip its checks step; Step 4 below runs them once the rebase is done.
+- When a hunk can't be resolved without inventing behaviour, don't force it:
+  note the conflicting files (`git diff --name-only --diff-filter=U`), run
+  `git rebase --abort` **first** so the worktree is clean on the pre-rebase
+  branch, then **stop: `unresolvable rebase conflict in <files>`**.
 
-Once the rebase is clean (conflicts resolved or none arose), go straight to
-the checks. Don't pause to show the rebased diff.
+## Step 4: run checks
 
-Discover and run this repo's automated checks (typecheck, then tests, then
-format) the same way `gx-resolving-merge-conflicts` does in its own
-"automated checks" step — don't hardcode a specific check command here.
+Once the rebase is clean, go straight to the checks. Don't pause to show the
+rebased diff.
 
-- **Checks fail**: abort. Leave trunk untouched, report the failure (with
-  output) and stop. Do not attempt to fix unrelated failures or force the
-  merge through.
-- **Checks pass**: continue to Step 4.
+Discover this repo's automated checks the same way
+`gx-resolving-merge-conflicts` does — don't hardcode a check command here —
+and run them in order: typecheck, tests, lint/format. Each failure kind has
+its own path; all paths run in both modes.
 
-## Step 4: final merge
+### Typecheck or lint failure: one fixer
 
-Re-invoke `gx merge <branch>` (the original arg, not the resolved
-`target`/`branch` pair) for the final ff-only merge now that the rebase brought
-it up to date. Report the outcome.
+The first time typecheck or lint/format fails in this run, launch **one**
+fixer subagent in `worktree_path` with the failing output. It fixes only what
+the output names, without changing behaviour, and commits on the rebased
+branch with the subject
+`<branch>: Fix typecheck/lint after rebase onto <target>`. The commit lands
+with the branch, so a merge ticket stays commitless.
 
-Never push to a remote at any point in this flow — pushing stays an explicit,
-separate action for the user.
+Then rerun **all** checks from the start. The fixer runs once per run: if
+typecheck or lint/format fails again, **stop: `checks still fail after the
+fixer: <check>`** with the output. Keep the rebased branch and the fixer
+commit.
+
+### Test failure: flaky-test triage
+
+Launch a triage subagent in `worktree_path` with the failing tests and their
+output. For each failing test it:
+
+1. Reruns **only that test** 3 times (e.g. Go: `go test -count=1 -run
+   '^TestName$' ./pkg`).
+2. Lists the branch's diff: `git diff --name-only <target>...HEAD`.
+3. Calls it **flaky** only if it passed at least once **and** the diff touches
+   neither the test file nor any non-test file in the test's package (Go: the
+   test's directory). Anything else — failed all 3 times, the diff touches
+   that code, or unsure — is **the branch's fault**.
+4. For a branch-fault test only: runs it on `<target>` in a temporary
+   detached worktree (`git worktree add --detach <tmp> <target>`, removed
+   after), and says whether it **fails on trunk too**.
+
+It returns one verdict per test, with the rerun results and the diff evidence.
+
+- **Any branch-fault test** — keep the rebased branch and **stop: `tests
+  fail after rebase onto <target>: <tests>`** with the check output. If any
+  of them fails on trunk too, the reason says so: `… (fails on trunk too)`.
+- **All flaky** — continue with the remaining checks. File one follow-up per
+  flaky test through [gx-follow-up](../gx-follow-up/SKILL.md) (it dedupes):
+  the finding is the test, its rerun results and output; Source names the
+  branch and, in ticket mode, `<addr>`; pass `unattended` and `category: bug`.
+  Note the address it returns for each.
+
+### All checks pass
+
+Continue to Step 5.
+
+## Step 5: finish
+
+- **Manual** — re-invoke `gx merge <branch>` (the original arg, not the
+  resolved `target`/`branch` pair) for the final ff-only merge now that the
+  rebase brought it up to date. Report the outcome and any flaky-test
+  follow-ups.
+- **Ticket** — skip `gx merge`. If any flaky-test follow-ups were filed, list
+  their addresses with `gx tickets section <addr> Resolution -`. Then run
+  `gx tickets set <addr> --iteration-status finished`; the server checks the
+  rebase finished and `<target>` is an ancestor of the branch, then does the
+  ff.
+
+Finish with zero background shells: read and stop (TaskStop) any that are
+still open before reporting.
