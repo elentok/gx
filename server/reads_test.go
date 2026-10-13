@@ -190,3 +190,23 @@ func TestSnapshot_CarriesCategoryAndExportedAt(t *testing.T) {
 		t.Errorf("tickets = %+v, want category and exported_at", snap.Tickets)
 	}
 }
+
+func TestSnapshot_CarriesTheEpicsMergedAt(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
+	epicMD := filepath.Join(store, "proj", "epic-a", "ticket.md")
+	if err := os.WriteFile(epicMD, []byte("---\nmerged_at: 2026-10-11T09:30:00Z\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2026, 10, 11, 9, 30, 0, 0, time.UTC)
+	if len(snap.Tickets) != 2 || !snap.Tickets[0].EpicMergedAt.Equal(want) || !snap.Tickets[1].EpicMergedAt.IsZero() {
+		t.Errorf("tickets = %+v, want epic-a's merged_at on its ticket only", snap.Tickets)
+	}
+}

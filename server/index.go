@@ -47,6 +47,11 @@ type TicketInfo struct {
 	Category   string    `json:"category,omitempty"`
 	ExportedAt time.Time `json:"exported_at,omitzero"`
 
+	// EpicMergedAt is the ticket's epic's merged_at. It rides on every ticket
+	// rather than in a separate epic list so a stamp reaches clients through
+	// the same ticket-changed events as any other edit.
+	EpicMergedAt time.Time `json:"epic_merged_at,omitzero"`
+
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.
 	sum string
@@ -105,7 +110,9 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 		loaded[dir] = epics
 		for _, e := range epics {
 			for _, t := range e.Tickets {
-				list = append(list, ticketInfo(project, filepath.Base(e.Path), t))
+				info := ticketInfo(project, filepath.Base(e.Path), t)
+				info.EpicMergedAt = e.MergedAt
+				list = append(list, info)
 			}
 		}
 	}

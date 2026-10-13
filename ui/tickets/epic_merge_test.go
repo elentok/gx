@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -80,6 +81,25 @@ func TestEpicMerge_TicketsTabOffersMergeOnCompleteUnmergedEpicOnly(t *testing.T)
 	}
 	if !strings.Contains(toast.Message, "gx:alpha/02") {
 		t.Errorf("toast = %q, want the forked merge ticket", toast.Message)
+	}
+}
+
+func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithNoMergeItem(t *testing.T) {
+	api := fakeServerAPI{calls: &[]string{}}
+	m := withState(newServerModel(t).WithServer(api), server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "Done", Status: "done", EpicMergedAt: time.Now()},
+	}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	if got := epicSection(m.epics[0]); got != sectionMerged {
+		t.Fatalf("section = %v, want sectionMerged", got)
+	}
+	setCollapsedSection(&m, sectionMerged, false)
+
+	selectEpicRow(t, &m, "gx:alpha")
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if menuHasMerge(updated.(Model).actionsMenu) {
+		t.Error("merge offered on a merged epic")
 	}
 }
 
