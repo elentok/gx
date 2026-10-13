@@ -82,12 +82,24 @@ func TestServerChat_ParkShowsTheEpicCounts(t *testing.T) {
 func TestServerChat_EpicCompleteNamesTheProjectAndTheTotals(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
-	c.EpicComplete("alpha", nil, "e", EpicCounts{Done: 7, Total: 7}, 3600, 12.5)
+	c.EpicComplete("alpha", nil, "e", EpicCounts{Done: 7, Total: 7}, 3600, 12.5, true)
 	c.Close()
 
 	g := globalReqs()
-	if len(g) != 1 || !strings.Contains(g[0].Text, "epic complete") || !strings.Contains(g[0].Text, "alpha") || !strings.Contains(g[0].Text, "7 done") {
-		t.Errorf("got %+v, want an 'epic complete' message for alpha", g)
+	if len(g) != 1 || !strings.Contains(g[0].Text, "\U0001f389 *epic merged*") || !strings.Contains(g[0].Text, "alpha") || !strings.Contains(g[0].Text, "7 done") {
+		t.Errorf("got %+v, want an 'epic merged' message for alpha", g)
+	}
+}
+
+func TestServerChat_EpicCompleteNotMergedSaysSo(t *testing.T) {
+	global, globalReqs := fakeSlackServer(t, 200)
+	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
+	c.EpicComplete("alpha", nil, "e", EpicCounts{Done: 7, Total: 7}, 3600, 12.5, false)
+	c.Close()
+
+	g := globalReqs()
+	if len(g) != 1 || !strings.Contains(g[0].Text, "✅ *epic complete (not merged)*") || strings.Contains(g[0].Text, "epic merged") {
+		t.Errorf("got %+v, want an 'epic complete (not merged)' message", g)
 	}
 }
 

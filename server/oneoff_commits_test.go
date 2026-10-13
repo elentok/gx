@@ -16,7 +16,7 @@ import (
 // startCommitsOneOff submits a --commits one-off against a real repo whose
 // agent commits one file, and returns the stream, address and repo. seen is
 // the branch the agent's worktree was on and trunk's tip while it worked.
-func startCommitsOneOff(t *testing.T, noAutoMerge bool) (evs <-chan server.Event, addr, repo string, seen *oneOffSeen) {
+func startCommitsOneOff(t *testing.T, noAutoMerge bool, cfgOpts ...func(*server.Config)) (evs <-chan server.Event, addr, repo string, seen *oneOffSeen) {
 	t.Helper()
 	store := t.TempDir()
 	repo = testutil.TempRepo(t)
@@ -28,6 +28,9 @@ func startCommitsOneOff(t *testing.T, noAutoMerge bool) (evs <-chan server.Event
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
+		for _, o := range cfgOpts {
+			o(c)
+		}
 	})
 	seen = &oneOffSeen{}
 	h.RegisterLaunch(func(p servertest.Prompt) {

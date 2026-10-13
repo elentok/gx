@@ -187,13 +187,18 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 }
 
 // EpicComplete tells the project's destinations that every ticket of epic
-// landed and the epic's branch went onto its target.
-func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts EpicCounts, elapsedSeconds int, totalCost float64) {
+// landed: "epic merged" when its branch went onto its target, "epic complete
+// (not merged)" otherwise, so chat never claims a land that did not happen.
+func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts EpicCounts, elapsedSeconds int, totalCost float64, merged bool) {
 	if c == nil {
 		return
 	}
+	glyph, title := "✅", "epic complete (not merged)"
+	if merged {
+		glyph, title = "\U0001f389", "epic merged"
+	}
 	for _, s := range c.projectSinks(override) {
-		body := s.style.epicCompleteText(project+"/"+epic, counts, counts.Done, elapsedSeconds, totalCost)
+		body := s.style.epicOutcomeText(glyph, title, project+"/"+epic, counts, counts.Done, elapsedSeconds, totalCost)
 		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindEpicComplete, epicSource(project+"/"+epic), "")
 	}
 }

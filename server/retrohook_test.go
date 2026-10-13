@@ -170,7 +170,8 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	}
 }
 
-func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
+// A land error is not the epic's final outcome: the retro waits for the land or a park.
+func TestRetroHook_NothingWhenTheLandErrors(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},
 		"02": {BlockedBy: []string{"01"}},
@@ -186,10 +187,11 @@ func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
 	}, withEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	f.queueEpic(ctx, t, "01")
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventIterationFailed, "proj:"+schedEpic)
 
-	if got := f.retrosAfter(t); len(got) != 1 {
-		t.Errorf("retros = %v, want one", got)
+	if got, err := filepath.Glob(filepath.Join(f.store, "proj", "evolve-"+schedEpic+"-*")); err != nil || len(got) != 0 {
+		t.Errorf("retros = %v (%v), want none", got, err)
 	}
 	if out := f.git(t, "branch", "--contains", schedEpic, "--list", "main"); strings.TrimSpace(out) != "" {
 		t.Errorf("the land succeeded: main contains the feature branch")

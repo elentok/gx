@@ -688,14 +688,14 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
 			continue
 		}
+		merged := true
 		switch {
 		case s.nothingToLand(project, epics, one, repo):
 			s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		case s.autoFFMerge(project):
-			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
+			if reason, rebase, err := s.landRoot(project, epics, one, repo); err != nil {
 				s.log.Warn("land root", "root", root, "err", err)
 				s.events.publish(EventIterationFailed, root.String())
-				s.submitRetro(root, dir, e, one.Ticket.Path)
 				return
 			} else if reason != "" {
 				s.stampEpic(root, e.Path, "completed_at")
@@ -704,12 +704,18 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 				if s.chat.Enabled() {
 					s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
 				}
+				// Only a needs-rebase park is the epic's outcome; any other
+				// park waits on a person's fix and then lands.
+				if rebase {
+					s.notifyEpicOutcome(project, dir, one, e, false)
+				}
 				s.submitRetro(root, dir, e, one.Ticket.Path)
 				return
 			}
 			s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		default:
 			s.stampEpic(root, e.Path, "completed_at")
+			merged = false
 		}
 		s.submitRetro(root, dir, e, one.Ticket.Path)
 		if removed, err := s.queued.removeRoot(root); err != nil {
@@ -718,18 +724,25 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 			s.events.publish(EventQueueChanged, root.String())
 		}
 		s.events.publish(EventRootCompleted, root.String())
-		if s.chat.Enabled() {
-			elapsed, cost := ralphloop.EpicTotals(e)
-			counts := ralphloop.CountsOf(e)
-			counts.Recovered = recoveredCount(dir, one.Epic)
-			s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, counts, elapsed, cost)
-		}
+		s.notifyEpicOutcome(project, dir, one, e, merged)
 	}
 }
 
-// submitRetro files the evolve one-off for a completed loop epic. It runs once
-// the epic is done, whatever the land attempt's outcome: a parked or failed
-// land is part of the evidence. A refused submit is logged, never an error:
+// notifyEpicOutcome sends the epic-level notice. A one-off skips it.
+func (s *Server) notifyEpicOutcome(project, dir string, one ralphloop.OneIteration, e tickets.Epic, merged bool) {
+	if !s.chat.Enabled() || isOneOffTicket(one.Ticket.Path) {
+		return
+	}
+	elapsed, cost := ralphloop.EpicTotals(e)
+	counts := ralphloop.CountsOf(e)
+	counts.Recovered = recoveredCount(dir, one.Epic)
+	s.chat.EpicComplete(project, s.chatOverride(project), one.Epic, counts, elapsed, cost, merged)
+}
+
+// submitRetro files the evolve one-off for a completed loop epic. It runs at
+// the epic's final outcome, where completed_at is stamped: the land, a root
+// park, or all-done with auto-ff-merge off. A land error is not an outcome.
+// A refused submit is logged, never an error:
 // the dedupe key refuses a second live retro of the same epic.
 func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ticketPath string) {
 	if e.IsMap || isOneOffTicket(ticketPath) || !e.EvolvedAt.IsZero() {
@@ -794,33 +807,34 @@ func (s *Server) nothingToLand(project string, epics []tickets.Epic, one ralphlo
 }
 
 // landRoot fast-forwards the root's target to its feature branch through the
-// merge core. A non-empty reason means the root must park, not land.
-func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, err error) {
+// merge core. A non-empty reason means the root must park, not land; rebase
+// says the park is a needs-rebase one.
+func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, rebase bool, err error) {
 	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repoDir)
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing lands; the project stops claiming until a person fixes trunk.
 		s.enterTrunkMissing(project, err.Error())
-		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, one.Epic), nil
+		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, one.Epic), false, nil
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	info, err := git.IdentifyDir(repoDir)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	worktrees, err := git.ListWorktrees(info.Repo)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	out, err := git.MergeBranchInto(info.Repo, worktrees, one.Epic, target)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if out.Merged {
-		return "", nil
+		return "", false, nil
 	}
-	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), nil
+	return fmt.Sprintf("needs rebase: %s onto %s; run gx-merge", out.Branch, out.Target), true, nil
 }
 
 func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string {

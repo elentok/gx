@@ -1,16 +1,9 @@
 package server_test
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -19,23 +12,7 @@ import (
 // the agent works. It returns develop's tip and a count of chat text sent.
 func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop string, chatCount func(string) int) {
 	t.Helper()
-	var mu sync.Mutex
-	var sent strings.Builder
-	chat := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
-		mu.Lock()
-		sent.Write(b)
-		mu.Unlock()
-	}))
-	t.Cleanup(chat.Close)
-	chatCount = func(s string) int {
-		mu.Lock()
-		defer mu.Unlock()
-		return strings.Count(sent.String(), s)
-	}
-	chatCfg := func(c *server.Config) {
-		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
-	}
+	chatCfg, chatCount := chatRecorder(t)
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "-D", "develop")
@@ -62,9 +39,7 @@ func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T)
 	if got := f.rev(t, "main"); got != develop {
 		t.Errorf("main moved to %s", got)
 	}
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && chatCount("trunk-missing: project") == 0; time.Sleep(50 * time.Millisecond) {
-	}
-	if chatCount("trunk-missing: project") == 0 {
+	if waitForChat(chatCount, "trunk-missing: project") == 0 {
 		t.Errorf("no root park with reason trunk-missing reached chat")
 	}
 }

@@ -186,11 +186,16 @@ func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) chatmarku
 //	{completed} ticket(s) landed in {elapsed} · {totalCost}
 //	[gx] {epic}
 func (s mrkdwnStyle) epicCompleteText(epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
+	return s.epicOutcomeText("\U0001f389", "epic complete", epicName, counts, completed, elapsedSeconds, totalCost)
+}
+
+// epicOutcomeText is the epic-level summary under glyph and title.
+func (s mrkdwnStyle) epicOutcomeText(glyph, title, epicName string, counts EpicCounts, completed int, elapsedSeconds int, totalCost float64) chatmarkup.Text {
 	detail := fmt.Sprintf("%d ticket(s) landed in %s · %s", completed, formatDuration(elapsedSeconds), tickets.FormatCost(totalCost))
 	if counts.Recovered > 0 {
 		detail += fmt.Sprintf(" · %d recovered automatically", counts.Recovered)
 	}
-	return s.chatStyle.Message("\U0001f389", "epic complete", RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
+	return s.chatStyle.Message(glyph, title, RenderCountsLine(counts), detail, s.identityLine(epicName, ""))
 }
 
 // epicFailedText renders the "epic failed" notification — the second of the
