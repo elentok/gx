@@ -155,8 +155,12 @@ func TestEpicMerge_DirtyTrunkParksTheRootAndLeavesItQueued(t *testing.T) {
 	testutil.WriteFile(t, f.repo, "01.txt", "local")
 
 	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
-	if err != nil || res.Merged || res.Refused {
-		t.Fatalf("merge = %+v, %v, want an unmerged go", res, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMergeParked(t, res, events.DirtyTrunk)
+	if !strings.Contains(res.Message, "01.txt") {
+		t.Errorf("message = %q, want the blocking file", res.Message)
 	}
 	ev := servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "proj:"+schedEpic)
 	if ev.Kind != string(events.DirtyTrunk) {
@@ -164,6 +168,83 @@ func TestEpicMerge_DirtyTrunkParksTheRootAndLeavesItQueued(t *testing.T) {
 	}
 	f.assertRootQueued(t)
 	f.assertStamps(t, false)
+}
+
+func TestEpicMerge_LandErrorReturnsALandErrorPark(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	// A stale index lock fails the land without any local change.
+	testutil.WriteFile(t, filepath.Join(f.repo, ".git"), "index.lock", "")
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMergeParked(t, res, events.LandError)
+	if !strings.HasPrefix(res.Message, "land failed: ") {
+		t.Errorf("message = %q, want a land failure", res.Message)
+	}
+	f.assertRootQueued(t)
+	f.assertStamps(t, false)
+}
+
+// assertMergeParked checks the merge returned a park of kind with a message.
+func assertMergeParked(t *testing.T, res server.QueueResult, kind events.Kind) {
+	t.Helper()
+	if !res.Parked || res.Merged || res.Refused || res.MergeTicket != "" || res.ParkKind != string(kind) || res.Message == "" {
+		t.Errorf("merge = %+v, want a %s park with a message", res, kind)
+	}
+}
+
+// raceTrunk makes the completed epic fast-forward, then moves main inside the
+// land, after the merge's ancestry check.
+func raceTrunk(t *testing.T, f *forkFixture) {
+	t.Helper()
+	gitOut(t, f.featureWorktree(t), "rebase", "-q", "main")
+	var lands atomic.Int32
+	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+		if lands.Add(1) == 1 {
+			moveMain(t, f.repo, "race")
+		}
+		return git.MergeBranchInto(repo, wts, branch, target)
+	})
+}
+
+func TestEpicMerge_TrunkMovingDuringTheLandForksANormalTicket(t *testing.T) {
+	f := newForkFixture(t, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := completedUnmerged(ctx, t, f.schedFixture)
+	raceTrunk(t, f)
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil || res.Refused || res.Merged || res.Parked || res.MergeTicket != "proj:"+schedEpic+"/02" {
+		t.Fatalf("merge = %+v, %v, want merge ticket 02", res, err)
+	}
+	if body := readFile(t, f.ticketFile(t, "02")); strings.Contains(body, "manual:") {
+		t.Errorf("race-forked ticket is manual:\n%s", body)
+	}
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+}
+
+func TestEpicMerge_TrunkMovingDuringTheLandAtTheCapParks(t *testing.T) {
+	f := newForkFixtureWith(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f.schedFixture)
+	raceTrunk(t, f)
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertMergeParked(t, res, "")
+	if files := f.mergeTicketFiles(t); len(files) != 0 {
+		t.Errorf("forked merge tickets = %v, want none past the cap", files)
+	}
+	f.assertRootQueued(t)
 }
 
 // assertManualTicket checks the merge returned the one manual merge ticket.

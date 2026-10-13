@@ -64,8 +64,7 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	if ff, err := git.IsAncestor(repo, target, branch); err != nil {
 		return QueueResult{}, err
 	} else if ff {
-		s.landEpic(root, one, dir, repo, epics, e, target, true)
-		return QueueResult{Merged: !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero()}, nil
+		return s.landEpic(root, one, dir, repo, epics, e, target, true), nil
 	}
 	id := s.forkMergeTicket(root, e, target, true)
 	if id == "" {

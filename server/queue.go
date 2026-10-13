@@ -53,13 +53,16 @@ type QueueResult struct {
 	// ExtraUsage is the warning an enqueue carries while the account
 	// auto-purchases extra usage.
 	ExtraUsage bool `json:"extra_usage,omitempty"`
-	// Merged and MergeTicket are an epic merge's outcome: a direct land, or
-	// the address of the merge ticket it forked.
+	// Merged, MergeTicket and Parked are an epic merge's outcome: a direct
+	// land, the address of the merge ticket it forked, or a park of the root
+	// with ParkKind (empty for a needs-rebase park) and Message.
 	Merged      bool   `json:"merged,omitempty"`
 	MergeTicket string `json:"merge_ticket,omitempty"`
+	Parked      bool   `json:"parked,omitempty"`
+	ParkKind    string `json:"park_kind,omitempty"`
 	Refused     bool   `json:"refused,omitempty"`
-	Reason     string `json:"reason,omitempty"`
-	Message    string `json:"message,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Message     string `json:"message,omitempty"`
 }
 
 func refusal(reason, msg string) QueueResult {

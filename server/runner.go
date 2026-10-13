@@ -727,9 +727,10 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 	s.landEpic(root, one, dir, repo, epics, e, target, false)
 }
 
-// landEpic is completeEpic under target's trunk lock. force lands with
-// auto-ff-merge off: the manual trigger's direct land.
-func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic, target string, force bool) {
+// landEpic is completeEpic under target's trunk lock, returning the epic merge
+// outcome it reached. force lands with auto-ff-merge off: the manual trigger's
+// direct land.
+func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic, target string, force bool) QueueResult {
 	project := root.Project
 	fresh := tickets.LoadEpicTicketMD(e.Path)
 	already := !fresh.MergedAt.IsZero()
@@ -745,8 +746,11 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo st
 		reason, kind := s.landRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish lands again.
-		if reason != "" && kind == "" && s.forkMergeTicket(root, e, target, false) != "" {
-			return
+		// The ticket is never manual, even under force: it counts against the cap.
+		if reason != "" && kind == "" {
+			if id := s.forkMergeTicket(root, e, target, false); id != "" {
+				return QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}
+			}
 		}
 		if reason != "" {
 			s.stampEpic(root, e.Path, "completed_at")
@@ -761,7 +765,7 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo st
 				s.notifyEpicOutcome(project, dir, one, e, false)
 			}
 			s.submitRetro(root, dir, e)
-			return
+			return QueueResult{Parked: true, ParkKind: string(kind), Message: reason}
 		}
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 	default:
@@ -776,10 +780,11 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo st
 		s.events.publish(EventQueueChanged, root.String())
 	}
 	if already && !removed {
-		return
+		return QueueResult{Merged: true}
 	}
 	s.events.publish(EventRootCompleted, root.String())
 	s.notifyEpicOutcome(project, dir, one, e, merged)
+	return QueueResult{Merged: merged}
 }
 
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
