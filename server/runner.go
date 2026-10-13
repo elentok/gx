@@ -655,6 +655,9 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 // epic is done, then dequeues it. A branch that needs a rebase parks the root
 // instead: a person runs gx-merge. With the project's auto-ff-merge off the
 // branch is left alone: the root is dequeued as complete and a person runs gx-merge.
+// completed_at marks the epic's final outcome: with auto-ff-merge on that is
+// the land or the park, not all-done. An epic with nothing to land is merged
+// as it stands, whatever auto-ff-merge says.
 func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 	project := root.Project
 	dir, repo, err := s.projectOf(project)
@@ -671,18 +674,17 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 		if filepath.Base(e.Path) != one.Epic || !ralphloop.AllDone(e) {
 			continue
 		}
-		// Stamped before the land attempt so a parked or failed land still
-		// leaves the epic completed for `gx evolve all`.
-		if err := tickets.StampEpicFields(e.Path, map[string]any{"completed_at": time.Now().UTC()}); err != nil {
-			s.log.Warn("stamp epic completed_at", "root", root, "err", err)
-		}
-		if s.autoFFMerge(project) {
+		switch {
+		case s.nothingToLand(project, epics, one, repo):
+			s.stampEpic(root, e.Path, "merged_at", "completed_at")
+		case s.autoFFMerge(project):
 			if reason, err := s.landRoot(project, epics, one, repo); err != nil {
 				s.log.Warn("land root", "root", root, "err", err)
 				s.events.publish(EventIterationFailed, root.String())
 				s.submitRetro(root, dir, e, one.Ticket.Path)
 				return
 			} else if reason != "" {
+				s.stampEpic(root, e.Path, "completed_at")
 				s.events.publish(EventRootParked, root.String())
 				s.log.Warn("root parked", "root", root, "reason", reason)
 				if s.chat.Enabled() {
@@ -691,6 +693,9 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 				s.submitRetro(root, dir, e, one.Ticket.Path)
 				return
 			}
+			s.stampEpic(root, e.Path, "merged_at", "completed_at")
+		default:
+			s.stampEpic(root, e.Path, "completed_at")
 		}
 		s.submitRetro(root, dir, e, one.Ticket.Path)
 		if removed, err := s.queued.removeRoot(root); err != nil {
@@ -743,6 +748,35 @@ func (s *Server) submitRetro(root rootRef, projectDir string, e tickets.Epic, ti
 	case res.Refused:
 		s.log.Info("retro hook: submit refused", "root", root, "reason", res.Reason, "message", res.Message)
 	}
+}
+
+// stampEpic stamps each of keys with now on the epic. A failed stamp is
+// logged, never fatal: the land it records has already happened.
+func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
+	now := time.Now().UTC()
+	fields := make(map[string]any, len(keys))
+	for _, k := range keys {
+		fields[k] = now
+	}
+	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
+		s.log.Warn("stamp epic", "root", root, "keys", keys, "err", err)
+	}
+}
+
+// nothingToLand reports whether the root's feature branch is missing or has no
+// commits ahead of its target. An error reading either means there may be
+// something to land: never call an epic merged on a guess.
+func (s *Server) nothingToLand(project string, epics []tickets.Epic, one ralphloop.OneIteration, repo string) bool {
+	branch := "refs/heads/" + one.Epic
+	if _, err := git.RevParse(repo, branch); err != nil {
+		return errors.Is(err, git.ErrRefNotFound)
+	}
+	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repo)
+	if err != nil {
+		return false
+	}
+	landed, err := git.IsAncestor(repo, branch, target)
+	return err == nil && landed
 }
 
 // landRoot fast-forwards the root's target to its feature branch through the

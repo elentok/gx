@@ -104,11 +104,15 @@ func (f *schedFixture) epicMD(t *testing.T) string {
 	return string(raw)
 }
 
-func (f *schedFixture) assertCompletedAtStamped(t *testing.T) {
+// assertStamps checks completed_at is stamped and merged_at is stamped only when wantMerged.
+func (f *schedFixture) assertStamps(t *testing.T, wantMerged bool) {
 	t.Helper()
 	md := f.epicMD(t)
 	if !strings.Contains(md, "completed_at:") {
 		t.Errorf("epic ticket.md has no completed_at:\n%s", md)
+	}
+	if got := strings.Contains(md, "merged_at:"); got != wantMerged {
+		t.Errorf("epic ticket.md has merged_at = %v, want %v:\n%s", got, wantMerged, md)
 	}
 	if !strings.Contains(md, "status:") {
 		t.Errorf("epic ticket.md lost its other keys:\n%s", md)
@@ -125,10 +129,10 @@ func TestLandRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
 
-	f.assertCompletedAtStamped(t)
+	f.assertStamps(t, false)
 }
 
-func TestLandRoot_StampsCompletedAtWhenTheEpicLands(t *testing.T) {
+func TestLandRoot_StampsMergedAtAndCompletedAtWhenTheEpicLands(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 	})
@@ -137,10 +141,41 @@ func TestLandRoot_StampsCompletedAtWhenTheEpicLands(t *testing.T) {
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
 
-	f.assertCompletedAtStamped(t)
+	f.assertStamps(t, true)
 }
 
-func TestLandRoot_StampsCompletedAtWhenTheLandParks(t *testing.T) {
+// finishCommitless is the agent's turn for a ticket that needs no commit.
+func (f *schedFixture) finishCommitless(t *testing.T, id string) {
+	t.Helper()
+	path := f.ticketFile(t, id)
+	body := strings.Replace(readFile(t, path), "---\n", "---\ncommitless: true\niteration_status: finished\n", 1)
+	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), body)
+}
+
+func TestLandRoot_NothingToLandStampsBothRegardlessOfAutoFFMerge(t *testing.T) {
+	for name, autoMerge := range map[string]bool{"on": true, "off": false} {
+		t.Run(name, func(t *testing.T) {
+			f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ servertest.Prompt, id string) {
+				f.finishCommitless(t, id)
+			})
+			if !autoMerge {
+				servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+			}
+			main := f.git(t, "rev-parse", "main")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			evs := f.queueEpic(ctx, t, "01")
+			servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+
+			f.assertStamps(t, true)
+			if got := f.git(t, "rev-parse", "main"); got != main {
+				t.Errorf("main moved to %s, want it untouched at %s", got, main)
+			}
+		})
+	}
+}
+
+func TestLandRoot_StampsOnlyCompletedAtWhenTheLandParks(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
@@ -151,5 +186,5 @@ func TestLandRoot_StampsCompletedAtWhenTheLandParks(t *testing.T) {
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
 
-	f.assertCompletedAtStamped(t)
+	f.assertStamps(t, false)
 }
