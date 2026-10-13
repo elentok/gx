@@ -231,6 +231,7 @@ type Server struct {
 	lands        landGuard
 	trunkLocks   trunkLocks
 	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
+	landedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts     verdictLog
 	nudges       nudgeLimiter
 	unavailable  unavailableNotes
@@ -345,13 +346,14 @@ func New(cfg Config) (*Server, error) {
 		registry:  registry,
 		savedRuns: savedRuns,
 
-		queued:    queued,
-		pause:     pause,
-		ledger:    ledger,
-		costOf:    iterationCost,
-		mergeInto: git.MergeBranchInto,
-		events:    events,
-		kick:      make(chan struct{}, 1),
+		queued:      queued,
+		pause:       pause,
+		ledger:      ledger,
+		costOf:      iterationCost,
+		mergeInto:   git.MergeBranchInto,
+		landedProbe: git.IsAncestor,
+		events:      events,
+		kick:        make(chan struct{}, 1),
 	}
 	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()

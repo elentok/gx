@@ -201,6 +201,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	for {
 		s.checkProjects()
 		s.checkTrunks()
+		s.stampHandLanded()
 		s.claimNext()
 		s.publishVerdictChanges()
 		select {

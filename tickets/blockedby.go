@@ -95,6 +95,27 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 	return out
 }
 
+// EpicsWaitedOn is the set of epics (by name) that some non-terminal ticket is
+// blocked on as a whole: a whole-epic ref or one widened to its epic, its own
+// or its epic's. Whether the blocker still blocks is not asked.
+func EpicsWaitedOn(project string, epics []Epic) map[string]bool {
+	g := newProjectGraph(project, epics)
+	waited := map[string]bool{}
+	for _, e := range epics {
+		for _, t := range e.Tickets {
+			if t.IsTerminal() {
+				continue
+			}
+			for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
+				if key, err := g.resolveBlocker(e.Name, ref); err == nil && isEpicKey(key) {
+					waited[key] = true
+				}
+			}
+		}
+	}
+	return waited
+}
+
 // CheckBlockedByWrite is the check `tickets add` and `tickets set --blocked-by`
 // run before writing st to path (<project>/<epic>/issues/<file>.md, new or
 // existing): st's refs must resolve project-wide and close no wait cycle on

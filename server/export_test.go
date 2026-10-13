@@ -71,6 +71,11 @@ func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (
 	s.mergeInto = f
 }
 
+// SetLandedProbe swaps the poll-time ancestry check.
+func (s *Server) SetLandedProbe(f func(repo, ancestor, descendant string) (bool, error)) {
+	s.landedProbe = f
+}
+
 // Rescan rescans the store now, as a ping or the watch would.
 func (s *Server) Rescan() { s.rescan() }
 
