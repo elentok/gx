@@ -1,0 +1,272 @@
+package server_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
+)
+
+// ticketFiles is every epic's ticket.md and ticket file in the store, by path.
+func ticketFiles(t *testing.T, store string) map[string]string {
+	t.Helper()
+	var paths []string
+	for _, pattern := range []string{"*/ticket.md", "*/issues/*.md"} {
+		m, err := filepath.Glob(filepath.Join(store, "proj", pattern))
+		if err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, m...)
+	}
+	files := map[string]string{}
+	for _, p := range paths {
+		files[p] = readFile(t, p)
+	}
+	return files
+}
+
+func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, servertest.Prompt, string) {
+		t.Error("a refused merge launched an agent")
+	})
+	done := servertest.TicketOpts{Status: "done"}
+	servertest.WriteTicketWith(t, f.store, "proj", "map-epic", "01", "t", done)
+	testutil.WriteFile(t, filepath.Join(f.store, "proj", "map-epic"), "ticket.md", "---\nkind: map\nstatus: open\n---\n# Map\n")
+	servertest.WriteTicketWith(t, f.store, "proj", "merged", "01", "t", done)
+	testutil.WriteFile(t, filepath.Join(f.store, "proj", "merged"), "ticket.md", "---\nstatus: done\nmerged_at: 2026-01-02T03:04:05Z\n---\n# Merged\n")
+	servertest.WriteTicketWith(t, f.store, "proj", "pending", "01", "t", done)
+	servertest.WriteTicketWith(t, f.store, "proj", "pending", "02", "merge", servertest.TicketOpts{Type: "merge"})
+	servertest.WriteTicketWith(t, f.store, "proj", "open", "01", "t", servertest.TicketOpts{})
+	for _, branch := range []string{"map-epic", "merged", "pending", "open"} {
+		gitOut(t, f.repo, "branch", branch)
+	}
+	f.h.Server.Rescan()
+	before := ticketFiles(t, f.store)
+
+	for addr, want := range map[string]string{
+		"proj:" + schedEpic + "/01": server.ReasonInvalidAddress,
+		"::":                        server.ReasonInvalidAddress,
+		"proj:nope":                 server.ReasonUnknownTicket,
+		"nope:" + schedEpic:         server.ReasonUnknownTicket,
+		"proj:map-epic":             server.ReasonMapEpic,
+		"proj:merged":               server.ReasonAlreadyMerged,
+		"proj:pending":              server.ReasonMergePending,
+		"proj:open":                 server.ReasonNotComplete,
+		"proj:" + schedEpic:         server.ReasonBranchMissing,
+	} {
+		res, err := f.h.Client.EpicMerge(context.Background(), addr)
+		if err != nil || !res.Refused || res.Reason != want {
+			t.Errorf("merge %s = %+v, %v, want refusal %s", addr, res, err, want)
+		}
+	}
+
+	if q, err := f.h.Client.QueueItems(context.Background()); err != nil || len(q) != 0 {
+		t.Errorf("queue = %+v, %v, want empty", q, err)
+	}
+	after := ticketFiles(t, f.store)
+	for path, body := range after {
+		if before[path] != body {
+			t.Errorf("%s written by a refused merge:\n%s", path, body)
+		}
+	}
+	if len(after) != len(before) {
+		t.Errorf("ticket files = %d, want %d", len(after), len(before))
+	}
+}
+
+// completedUnmerged runs the epic to its completion with auto-ff-merge off,
+// returning the event stream.
+func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-chan server.Event {
+	t.Helper()
+	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+	f.assertStamps(t, false)
+	if f.rootQueued(t) {
+		t.Fatal("root still queued after completing with auto-ff-merge off")
+	}
+	return evs
+}
+
+func newFFFixture(t *testing.T) *schedFixture {
+	t.Helper()
+	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+		commitWork(t, p, id)
+	})
+}
+
+func TestEpicMerge_FastForwardLandsDirectlyWithAutoFFMergeOff(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil || !res.Merged || res.Refused || res.MergeTicket != "" {
+		t.Fatalf("merge = %+v, %v, want a direct land", res, err)
+	}
+	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+		t.Errorf("main at %s, want the feature branch tip", got)
+	}
+	f.assertStamps(t, true)
+	if f.rootQueued(t) {
+		t.Error("root queued after the direct land")
+	}
+	if files := f.mergeTicketFiles(t); len(files) != 0 {
+		t.Errorf("merge tickets = %v, want none", files)
+	}
+}
+
+func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	wt := f.featureWorktree(t)
+	if _, err := os.Stat(wt); err != nil {
+		t.Fatalf("no feature worktree to remove: %v", err)
+	}
+	f.git(t, "worktree", "remove", "--force", wt)
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want a direct land", res, err)
+	}
+	if got := gitOut(t, wt, "branch", "--show-current"); got != schedEpic {
+		t.Errorf("recreated worktree on branch %q, want %q", got, schedEpic)
+	}
+}
+
+func TestEpicMerge_DirtyTrunkParksTheRootAndLeavesItQueued(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := completedUnmerged(ctx, t, f)
+	// An untracked file in main's checkout that the land would overwrite.
+	testutil.WriteFile(t, f.repo, "01.txt", "local")
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil || res.Merged || res.Refused {
+		t.Fatalf("merge = %+v, %v, want an unmerged go", res, err)
+	}
+	ev := servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "proj:"+schedEpic)
+	if ev.Kind != string(events.DirtyTrunk) {
+		t.Errorf("kind = %q, want %q (%s)", ev.Kind, events.DirtyTrunk, ev.Message)
+	}
+	f.assertRootQueued(t)
+	f.assertStamps(t, false)
+}
+
+// assertManualTicket checks the merge returned the one manual merge ticket.
+func (f *schedFixture) assertManualTicket(t *testing.T, res server.QueueResult, wantID string) {
+	t.Helper()
+	if res.Refused || res.Merged || res.MergeTicket != "proj:"+schedEpic+"/"+wantID {
+		t.Fatalf("merge = %+v, want merge ticket %s", res, wantID)
+	}
+	if body := readFile(t, f.ticketFile(t, wantID)); !strings.Contains(body, "manual: true") || !strings.Contains(body, "type: merge") {
+		t.Errorf("ticket %s is not a manual merge ticket:\n%s", wantID, body)
+	}
+}
+
+func TestEpicMerge_NonFFForksAManualTicketWhoseFinishLandsTheEpic(t *testing.T) {
+	f := newForkFixture(t, func(f *forkFixture, _ int) {
+		if !f.rootQueued(t) {
+			t.Error("root not re-queued while the manual ticket runs")
+		}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := completedUnmerged(ctx, t, f.schedFixture)
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.assertManualTicket(t, res, "02")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+
+	if got := f.merges.Load(); got != 1 {
+		t.Errorf("merge turns = %d, want 1", got)
+	}
+	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+		t.Errorf("main at %s, want the rebased feature branch tip", got)
+	}
+	f.assertStamps(t, true)
+	if f.rootQueued(t) {
+		t.Error("root still queued after the land")
+	}
+}
+
+func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillLands(t *testing.T) {
+	f := newForkFixture(t, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := completedUnmerged(ctx, t, f.schedFixture)
+	// Trunk moves once more before the manual ticket's land, so a retry follows it.
+	var lands atomic.Int32
+	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
+		if lands.Add(1) == 1 {
+			moveMain(t, f.repo, "manual-land")
+		}
+		return git.MergeBranchInto(repo, wts, branch, target)
+	})
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.assertManualTicket(t, res, "02")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+
+	if got := f.merges.Load(); got != 2 {
+		t.Errorf("merge turns = %d, want 2", got)
+	}
+	if body := readFile(t, f.ticketFile(t, "03")); strings.Contains(body, "manual:") {
+		t.Errorf("retry ticket is manual:\n%s", body)
+	}
+	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+		t.Errorf("main at %s, want the rebased feature branch tip", got)
+	}
+	f.assertStamps(t, true)
+}
+
+func TestEpicMerge_ManualTicketResetsTheCapAndUnparksTheRoot(t *testing.T) {
+	f := newForkFixtureWith(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), nil)
+	ev := f.parkRoot(t)
+	if ev.Kind != "" {
+		t.Fatalf("park kind = %q (%s), want a needs-rebase park", ev.Kind, ev.Message)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.subscribe(ctx, t)
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.assertManualTicket(t, res, "04")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+
+	if got := f.merges.Load(); got != 1 {
+		t.Errorf("merge turns = %d, want 1", got)
+	}
+	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
+		t.Errorf("main at %s, want the rebased feature branch tip", got)
+	}
+	f.assertStamps(t, true)
+	if f.rootQueued(t) {
+		t.Error("root still queued after the land")
+	}
+	if got := len(f.mergeTicketFiles(t)); got != 1 {
+		t.Errorf("forked merge tickets = %d, want only the manual one", got)
+	}
+}

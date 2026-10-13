@@ -18,14 +18,11 @@ import (
 // otherwise. A manual ticket resets the merge-ticket cap and lands the epic
 // whatever auto-ff-merge says.
 func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
-	a, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
-	if err != nil || a.ID != "" {
-		msg := req.Address + " is not an epic address"
-		if err != nil {
-			msg = err.Error()
-		}
-		return refusal(ReasonInvalidAddress, msg), nil
+	project, epic, ok := tickets.ParseEpicAddress(req.Address)
+	if !ok {
+		return refusal(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)"), nil
 	}
+	a := tickets.Address{Project: project, Epic: epic}
 	root := rootRef{Project: a.Project, Epic: a.Epic}
 	unknown := refusal(ReasonUnknownTicket, "no epic "+root.String())
 	dir, repo, err := s.projectOf(a.Project)

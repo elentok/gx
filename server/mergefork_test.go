@@ -63,8 +63,14 @@ type forkFixture struct {
 // newForkFixture builds a forkFixture whose merge ticket n runs merged(n) after its rebase.
 func newForkFixture(t *testing.T, merged func(f *forkFixture, n int)) *forkFixture {
 	t.Helper()
+	return newForkFixtureWith(t, map[string]servertest.TicketOpts{"01": {}}, merged)
+}
+
+// newForkFixtureWith is newForkFixture over the epic's tickets opts.
+func newForkFixtureWith(t *testing.T, opts map[string]servertest.TicketOpts, merged func(f *forkFixture, n int)) *forkFixture {
+	t.Helper()
 	ff := &forkFixture{}
-	ff.schedFixture = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	ff.schedFixture = newSchedFixture(t, opts, func(f *schedFixture, p servertest.Prompt, id string) {
 		switch {
 		case !strings.HasPrefix(p.Address, "proj:"+schedEpic+"/"):
 			ff.others.Add(1)
