@@ -206,10 +206,8 @@ func (e Epic) parentDone(t Ticket) bool {
 // block each other, since neither is included in the other's expansion.
 func (e Epic) effectiveBlockedBy(t Ticket) []string {
 	if t.Type != typeCodeReview {
-		// Qualified refs name another epic; ExternalBlockers carries them.
-		return slices.DeleteFunc(slices.Clone(t.BlockedBy), func(ref string) bool {
-			return strings.Contains(ref, "/")
-		})
+		// Cross-epic refs name another epic; ExternalBlockers carries them.
+		return slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
 	}
 	var tokens []string
 	for _, other := range e.Tickets {

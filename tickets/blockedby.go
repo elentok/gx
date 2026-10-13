@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/config"
 )
 
 // CheckBlockedBy is the one verdict on t's bare blocked_by refs, shared by
 // `gx tickets validate` and the loader so both report the same message: each
-// must name a ticket in e. A qualified ref ("epic/06") needs the whole project
-// to resolve, so it is left to ValidateProject. Every bad ref is reported at
-// once.
+// must name a ticket in e. A cross-epic ref ("epic/06" or a whole "epic")
+// needs the whole project to resolve, so it is left to ValidateProject. Every
+// bad ref is reported at once.
 func (e Epic) CheckBlockedBy(t Ticket) error {
-	t.BlockedBy = slices.DeleteFunc(slices.Clone(t.BlockedBy), func(ref string) bool {
-		return strings.Contains(ref, "/")
-	})
+	t.BlockedBy = slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
 	return errors.Join(newProjectGraph("", []Epic{e}).checkBlockedBy(e.Name, t)...)
 }
 
@@ -43,7 +43,7 @@ func (e *Epic) flagDanglingBlockers() {
 
 func qualifiedRefs(refs []string) []string {
 	return slices.DeleteFunc(slices.Clone(refs), func(ref string) bool {
-		return !strings.Contains(ref, "/")
+		return !crossEpicRef(ref)
 	})
 }
 
@@ -51,10 +51,12 @@ func qualifiedRefs(refs []string) []string {
 // ticket's blockers resolved project-wide. A ticket is runnable only if its own
 // blocked_by refs and its epic's are all resolved; children never copy an
 // ancestor's blocked_by, the epic's refs are applied here instead. Unresolved
-// qualified refs land in Ticket.ExternalBlockers (rendering the ticket
-// blocked); bad refs set BlockedByErr (rendering it error).
-func ResolveCrossEpic(project string, epics []Epic) []Epic {
+// cross-epic refs land in Ticket.ExternalBlockers (rendering the ticket
+// blocked); bad refs set BlockedByErr (rendering it error). release decides
+// when a whole-epic ref is resolved.
+func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic {
 	g := newProjectGraph(project, epics)
+	g.release = release
 	out := slices.Clone(epics)
 	for i := range out {
 		e := &out[i]
@@ -64,7 +66,7 @@ func ResolveCrossEpic(project string, epics []Epic) []Epic {
 			t.BlockedByErr, t.ExternalBlockers = "", nil
 			errs := g.checkBlockedBy(e.Name, *t)
 			for _, ref := range qualifiedRefs(e.BlockedBy) {
-				if _, err := g.resolve(e.Name, ref); err != nil {
+				if _, err := g.resolveBlocker(e.Name, ref); err != nil {
 					errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
 				}
 			}
@@ -73,7 +75,7 @@ func ResolveCrossEpic(project string, epics []Epic) []Epic {
 				continue
 			}
 			for _, ref := range append(qualifiedRefs(t.BlockedBy), qualifiedRefs(e.BlockedBy)...) {
-				if key, _ := g.resolve(e.Name, ref); g.blocking(key) {
+				if key, _ := g.resolveBlocker(e.Name, ref); g.blocking(key) {
 					t.ExternalBlockers = append(t.ExternalBlockers, ref)
 				}
 			}
@@ -91,5 +93,8 @@ func LoadResolved(project, dir string) ([]Epic, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ResolveCrossEpic(project, epics), nil
+	// An unreadable project.json falls back to the default policy, the
+	// strictest release rule, so a whole-epic blocker fails closed.
+	pf, _ := config.ReadProjectFile(dir)
+	return ResolveCrossEpic(project, EpicReleaseOf(pf), epics), nil
 }

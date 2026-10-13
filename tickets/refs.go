@@ -93,7 +93,7 @@ func ValidateRefs(project string, epics []Epic) []error {
 	var errs []error
 	for _, e := range epics {
 		for _, ref := range e.BlockedBy {
-			if _, err := g.resolve(e.Name, ref); err != nil {
+			if _, err := g.resolveBlocker(e.Name, ref); err != nil {
 				errs = append(errs, fmt.Errorf("epic %s: blocked_by %w", e.Name, err))
 			}
 		}

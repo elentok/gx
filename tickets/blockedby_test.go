@@ -40,7 +40,7 @@ func crossEpics() []Epic {
 }
 
 func TestResolveCrossEpic_BlocksUntilBlockerDone(t *testing.T) {
-	epics := ResolveCrossEpic("p", crossEpics())
+	epics := ResolveCrossEpic("p", EpicRelease{}, crossEpics())
 	for _, e := range epics[1:] {
 		if got := e.RenderedStatus(e.Tickets[0]); got != StatusBlocked {
 			t.Errorf("epic %s ticket 01 = %v, want blocked", e.Name, got)
@@ -49,7 +49,7 @@ func TestResolveCrossEpic_BlocksUntilBlockerDone(t *testing.T) {
 
 	done := crossEpics()
 	done[0].Tickets[0].Status = "done"
-	for _, e := range ResolveCrossEpic("p", done)[1:] {
+	for _, e := range ResolveCrossEpic("p", EpicRelease{}, done)[1:] {
 		if got := e.RenderedStatus(e.Tickets[0]); got != StatusOpen {
 			t.Errorf("epic %s ticket 01 = %v, want open once a/01 is done", e.Name, got)
 		}
@@ -59,7 +59,7 @@ func TestResolveCrossEpic_BlocksUntilBlockerDone(t *testing.T) {
 func TestResolveCrossEpic_BadRefIsError(t *testing.T) {
 	epics := crossEpics()
 	epics[2].Tickets[0].BlockedBy = []string{"a/09"}
-	c := ResolveCrossEpic("p", epics)[2]
+	c := ResolveCrossEpic("p", EpicRelease{}, epics)[2]
 	if got := c.RenderedStatus(c.Tickets[0]); got != StatusError {
 		t.Errorf("got %v, want error", got)
 	}
