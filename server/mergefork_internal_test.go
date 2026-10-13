@@ -6,6 +6,24 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+func TestHasManualMergeTicket_OnlyAManualMergeTicketCounts(t *testing.T) {
+	for name, tc := range map[string]struct {
+		ticket tickets.Ticket
+		want   bool
+	}{
+		"manual merge":     {tickets.Ticket{Type: "merge", Manual: true}, true},
+		"retry merge":      {tickets.Ticket{Type: "merge"}, false},
+		"manual non-merge": {tickets.Ticket{Type: "implement", Manual: true}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := tickets.Epic{Tickets: []tickets.Ticket{{Type: "implement"}, tc.ticket}}
+			if got := hasManualMergeTicket(e); got != tc.want {
+				t.Errorf("hasManualMergeTicket = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestMergeTicketsThisRun_CountsFromTheLatestManualOneByID(t *testing.T) {
 	merge := func(n int, manual bool) tickets.Ticket {
 		return tickets.Ticket{Number: n, Type: "merge", Manual: manual}

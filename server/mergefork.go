@@ -33,6 +33,15 @@ func mergeTicketsThisRun(e tickets.Epic) int {
 	return len(merges)
 }
 
+// hasManualMergeTicket reports whether e holds a merge ticket the manual
+// trigger forked. Unmerged, such an epic lands whatever auto-ff-merge says:
+// the rule reads the store, so a retry ticket finishing last still lands.
+func hasManualMergeTicket(e tickets.Epic) bool {
+	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
+		return t.Type == string(schema.TypeMerge) && t.Manual
+	})
+}
+
 // forkMergeTicket forks a merge ticket into e for its non-ff onto target and
 // reports whether it did. At the cap, or when the write fails, it forks none
 // and the caller parks the root.

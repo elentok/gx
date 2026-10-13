@@ -692,7 +692,8 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 
 // completeRootIfDone lands the root's feature branch once every ticket in its
 // epic is done, then dequeues it. A branch that needs a rebase gets a merge
-// ticket instead, or parks the root at the cap. With the project's auto-ff-merge off the
+// ticket instead, or parks the root at the cap. With the project's auto-ff-merge off,
+// and no manual merge ticket in the epic, the
 // branch is left alone: the root is dequeued as complete and a person runs gx-merge.
 // completed_at marks the epic's final outcome: with auto-ff-merge on that is
 // the land or the park, not all-done. An epic with nothing to land is merged
@@ -734,7 +735,7 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 		}
 	case s.nothingToLand(project, epics, one, repo):
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
-	case s.autoFFMerge(project):
+	case s.autoFFMerge(project) || hasManualMergeTicket(e):
 		reason, kind := s.landRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish lands again.
