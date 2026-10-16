@@ -11,6 +11,10 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
+// actionWatchSettle holds a status long enough for the Action's own watch,
+// which samples on a ticker, to see it.
+const actionWatchSettle = 200 * time.Millisecond
+
 // idleWithAction brings the session Idle and raises an Actionable carrying
 // action.
 func idleWithAction(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id, conv string, action ...string) {
@@ -42,6 +46,7 @@ func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 	waitForScreen(t, c, "first-step")
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	time.Sleep(actionWatchSettle)
 	if screenHas(t, c, "second-step") {
 		t.Fatal("second prompt sent while the first was working")
 	}
@@ -67,6 +72,41 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	time.Sleep(3 * timeout)
 	if screenHas(t, c, "second-step") {
 		t.Error("second prompt sent after the first never went working")
+	}
+}
+
+func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = 200 * time.Millisecond })
+	idleWithAction(ctx, t, h, evs, id, conv, "/clear", "/gx-design X")
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	waitForScreen(t, c, "/clear")
+	waitForScreen(t, c, "/gx-design X")
+}
+
+func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
+	const timeout = 200 * time.Millisecond
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
+	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	waitForScreen(t, c, "first-step")
+	report(t, conv, agentfake.Control{State: "working"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	time.Sleep(actionWatchSettle)
+	report(t, conv, agentfake.Control{State: "done"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	time.Sleep(3 * timeout)
+	if screenHas(t, c, "second-step") {
+		t.Error("second prompt sent after the first went blocked")
 	}
 }
 

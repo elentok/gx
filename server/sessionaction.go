@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
@@ -95,7 +96,7 @@ func (s *Server) sendAction(dir string, action []string) error {
 		if err := typeSessionPrompt(dir, prompt); err != nil {
 			return err
 		}
-		if err := run.waitForTurn(); err != nil {
+		if err := run.waitForTurn(strings.HasPrefix(prompt, "/")); err != nil {
 			return fmt.Errorf("step %d: %w", i, err)
 		}
 	}
@@ -116,8 +117,12 @@ func (r *actionRun) catchUp() error {
 	}
 }
 
-// waitForTurn waits for the session to go Working, then back to Idle.
-func (r *actionRun) waitForTurn() error {
+// waitForTurn waits for the session to go Working, then back to Idle. A slash
+// command may run locally in claude (`/clear`) and never show Working, so one
+// still Idle when the start timeout fires counts as finished; a real prompt
+// that never starts stops the rest. Blocked stops the rest rather than wait on
+// a person who may never come.
+func (r *actionRun) waitForTurn(slash bool) error {
 	started := time.After(r.started)
 	working := false
 	for {
@@ -125,14 +130,20 @@ func (r *actionRun) waitForTurn() error {
 		case <-r.s.sessionWatches.stop:
 			return errors.New("server stopping")
 		case <-started:
-			if !working {
-				return errors.New("prompt never went working")
+			if working {
+				continue
 			}
+			if slash && r.state == SessionIdle {
+				return nil
+			}
+			return errors.New("prompt never went working")
 		case msg, ok := <-r.msgs:
 			if err := r.apply(msg, ok); err != nil {
 				return err
 			}
 			switch {
+			case r.state == SessionBlocked:
+				return errors.New("session went blocked")
 			case r.state == SessionWorking:
 				working = true
 			case r.state == SessionIdle && working:

@@ -276,7 +276,9 @@ A new **Agents tab** in the gx TUI. `gx agents` opens the TUI on it.
     already shows its prompts. [T03, T06]
 99. As a user, I want the server to run an Action step by step, a step being finished once the
     session has gone Working and back to Idle, so that it finishes even if I close the TUI. A step
-    that sees no Working within ~10 s stops the rest. [T03, review]
+    that sees no Working within ~10 s stops the rest, unless it is a slash command (`/clear`) and the
+    session is still Idle, which counts as finished. A step that goes Blocked stops the rest.
+    [T03, review]
 100. As a user, I want an Action refused (and the session kept Actionable) when the session is not
      Idle, and the refusal shown as a footer message. [T03, T06]
 101. As a user, I want a step that finds the session not Idle to stop the rest of the Action. [T03]
@@ -513,7 +515,9 @@ matters. Avoid "agent kind", "needs attention" as a status name, "restart".
     paste) to that session or when its Action runs; the leader key, resize, scroll, copy mode,
     focus and viewing never clear it. May carry an Action (ordered prompts). [T03, review]
 - Action run: the server sends each prompt; a step is finished once the session has gone Working
-  and back to Idle; no Working within ~10 s stops the rest. Refused when not Idle (Actionable
+  and back to Idle; no Working within ~10 s stops the rest, except a prompt starting with `/` whose
+  session is still Idle then counts as finished (local slash commands like `/clear` never show
+  Working); a step that goes Blocked stops the rest. Refused when not Idle (Actionable
   kept); a step that finds the session not Idle stops the rest; running clears the Actionable.
   Prompts only. [T03, review]
 - `gx-design` and similar skills call `gx agent actionable` next to their final "Next:" line.
