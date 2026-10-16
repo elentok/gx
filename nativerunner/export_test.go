@@ -50,6 +50,11 @@ func SetHolderDenyTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { holderDenyTimeout = old })
 }
 
+const FrameInterval = frameInterval
+
+// ArmedFrameTimers is how many attach pacing timers are armed.
+func ArmedFrameTimers() int64 { return armedFrameTimers.Load() }
+
 // SendOversizedHeader writes the header of a message one byte over the
 // stream limit, which writeStreamMessage itself refuses to send.
 func SendOversizedHeader(a *HolderAttach) error {

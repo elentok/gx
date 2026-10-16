@@ -7,7 +7,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -106,10 +108,119 @@ func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 	}
 }
 
-func TestHolderAttach_NoOutputMeansNoFrames(t *testing.T) {
+// scriptHolder runs a holder whose child runs script with the holder's dir as
+// $1, and returns once the child printed "ready".
+func scriptHolder(t *testing.T, script string) (c *nativerunner.HolderClient, dir string) {
+	t.Helper()
+	dir = shortTempDir(t)
+	c, finished := startTestHolder(t, dir, settableHarness{w: &settableWatcher{}}, []string{"sh", "-c", script, "sh", dir})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+	waitFor(t, "child ready", func() bool {
+		rows, _, err := c.Screen(0)
+		return err == nil && strings.Contains(strings.Join(rows, "\n"), "ready")
+	})
+	return c, dir
+}
+
+func frameHas(f nativerunner.Frame, text string) bool {
+	return slices.ContainsFunc(f.Rows, func(r nativerunner.FrameRow) bool { return strings.Contains(r.ANSI, text) })
+}
+
+// waitGo makes a child wait for the test to touch $1/go.
+const waitGo = `while [ ! -e "$1/go" ]; do sleep 0.01; done; `
+
+func TestHolderAttach_BurstIsPacedThenStopsItsTimers(t *testing.T) {
+	c, dir := scriptHolder(t, `printf ready; `+waitGo+
+		`i=0; while [ $i -lt 100 ]; do printf '\r%d ' $i; sleep 0.002; i=$((i+1)); done; printf '\rdone '; exec sleep 60`)
+	a := attach(t, c)
+	nextAttach(t, a)
+	touch(t, filepath.Join(dir, "go"))
+
+	var first, last time.Time
+	frames := 0
+	for {
+		m := nextAttach(t, a)
+		last = time.Now()
+		if frames == 0 {
+			first = last
+		}
+		frames++
+		if frameHas(m.Frame, "done") {
+			break
+		}
+	}
+	span := last.Sub(first)
+	if span < 5*nativerunner.FrameInterval {
+		t.Fatalf("burst spanned %v; too short to show pacing", span)
+	}
+	if limit := int(span/nativerunner.FrameInterval) + 2; frames > limit {
+		t.Errorf("%d frames over %v; want at most %d", frames, span, limit)
+	}
+
+	waitFor(t, "pacing timers stopped", func() bool { return nativerunner.ArmedFrameTimers() == 0 })
+}
+
+func TestHolderAttach_KeyEchoSkipsThePacing(t *testing.T) {
+	c, _ := scriptHolder(t, `printf ready; exec cat`)
+	a := attach(t, c)
+	nextAttach(t, a)
+
+	const keys = 10
+	start := time.Now()
+	for i := range keys {
+		if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
+			t.Fatal(err)
+		}
+		for echo := "ready" + strings.Repeat("x", i+1); !frameHas(nextAttach(t, a).Frame, echo); {
+		}
+	}
+	// Paced at one frame per interval, each echo would wait out the interval
+	// since the frame before it.
+	if took := time.Since(start); took >= keys*nativerunner.FrameInterval {
+		t.Errorf("%d key echoes took %v; want each sooner than the frame interval", keys, took)
+	}
+}
+
+func TestHolderAttach_SlowClientRecoversWithAFullFrame(t *testing.T) {
+	// Redraws every row but the first, so only a full frame carries them all.
+	c, dir := scriptHolder(t, `printf ready; `+waitGo+
+		`i=0; while true; do line=$(printf '%0190d' $i); r=2; `+
+		`while [ $r -le 50 ]; do printf '\033[%d;1H%s' $r "$line"; r=$((r+1)); done; i=$((i+1)); sleep 0.005; done`)
+	slow, steady := attach(t, c), attach(t, c)
+	nextAttach(t, slow)
+	nextAttach(t, steady)
+	touch(t, filepath.Join(dir, "go"))
+	if m := nextAttach(t, slow); len(m.Frame.Rows) == nativerunner.HolderRows {
+		t.Fatalf("first frame of the redraw has all %d rows; want only the redrawn ones", len(m.Frame.Rows))
+	}
+
+	// slow stops reading long enough for its socket to fill; steady keeps up.
+	steadyFrames := 0
+	for start := time.Now(); time.Since(start) < 2*time.Second; steadyFrames++ {
+		nextAttach(t, steady)
+	}
+	if steadyFrames < 10 {
+		t.Errorf("steady attach got %d frames while the other stalled; want the holder unblocked", steadyFrames)
+	}
+
+	for i := 0; len(nextAttach(t, slow).Frame.Rows) != nativerunner.HolderRows; i++ {
+		if i > 100 {
+			t.Fatal("no full frame once the slow attach read again")
+		}
+	}
+}
+
+func TestHolderAttach_NoOutputMeansNoFramesNorTimers(t *testing.T) {
 	c, _, stop, _ := attachTestHolder(t)
 	a := attach(t, c)
 	nextAttach(t, a)
+	time.Sleep(5 * nativerunner.FrameInterval)
+	if n := nativerunner.ArmedFrameTimers(); n != 0 {
+		t.Errorf("%d pacing timers armed while idle; want none", n)
+	}
 	// The only message after the full frame is the exit.
 	touch(t, stop)
 	if m := nextAttach(t, a); m.Type != nativerunner.StreamExit {

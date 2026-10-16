@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
@@ -21,22 +24,49 @@ const OpAttach = "attach"
 // screen op's snapshot.
 var ErrAttachUnsupported = errors.New("holder does not support attach")
 
-// attachBuffer is how many frames an attach may fall behind before the holder
-// drops it.
-const attachBuffer = 64
+// An attach gets at most one frame per frameInterval, except within
+// keyEchoWindow of its own client's key, so typing echoes at once while a
+// burst of output still costs only a frame per display refresh.
+const (
+	frameInterval = 16 * time.Millisecond
+	keyEchoWindow = 32 * time.Millisecond
+)
+
+// armedFrameTimers counts the pacing timers armed across all attaches.
+var armedFrameTimers atomic.Int64
 
 // frameHub turns screen changes into frames for every attach. It runs on pty
-// output rather than a timer, so an idle child costs nothing.
+// output rather than a ticker, and arms a timer only to hold back output that
+// came too soon, so an idle child costs nothing.
 type frameHub struct {
 	scr *screen.Screen
 
 	mu     sync.Mutex
-	subs   map[chan Frame]struct{}
+	subs   map[*attachClient]struct{}
 	cursor screen.Cursor
 }
 
+// attachClient is one attach's pacing state, guarded by frameHub.mu.
+type attachClient struct {
+	// slot holds the latest frame the attach has yet to send. Only the hub
+	// fills it, so a slow client never blocks the hub, only misses frames.
+	slot chan Frame
+	// rows and moved are what changed since the last frame.
+	rows  map[int]struct{}
+	moved bool
+	// full means a frame was dropped, so the next one must carry every row.
+	full  bool
+	last  time.Time
+	keyed time.Time
+	timer *time.Timer
+}
+
+func (c *attachClient) pending() bool {
+	return len(c.rows) > 0 || c.moved || c.full
+}
+
 func newFrameHub(scr *screen.Screen) *frameHub {
-	return &frameHub{scr: scr, subs: map[chan Frame]struct{}{}}
+	return &frameHub{scr: scr, subs: map[*attachClient]struct{}{}}
 }
 
 // run flushes on each output signal until done closes.
@@ -51,31 +81,26 @@ func (f *frameHub) run(output <-chan struct{}, done <-chan struct{}) {
 	}
 }
 
-// subscribe returns a channel of the frames to come and the full frame they
-// build on. It flushes first, so rows dirty before the attach are not sent to
-// it again.
-func (f *frameHub) subscribe() (chan Frame, Frame) {
+// subscribe returns a client whose slot gets the frames to come and the full
+// frame they build on. It flushes first, so rows dirty before the attach are
+// not sent to it again.
+func (f *frameHub) subscribe() (*attachClient, Frame) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.flushLocked()
-	ch := make(chan Frame, attachBuffer)
-	f.subs[ch] = struct{}{}
-	rows := f.scr.StyledRows()
-	all := make([]int, len(rows))
-	for i := range all {
-		all[i] = i
-	}
-	return ch, newFrame(f.scr.Cursor(), rows, all)
+	c := &attachClient{slot: make(chan Frame, 1), rows: map[int]struct{}{}, last: time.Now()}
+	f.subs[c] = struct{}{}
+	return c, f.fullFrameLocked()
 }
 
-func (f *frameHub) unsubscribe(ch chan Frame) {
+func (f *frameHub) unsubscribe(c *attachClient) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	delete(f.subs, ch)
+	f.stopTimerLocked(c)
+	delete(f.subs, c)
 }
 
-// flush sends the dirty rows to every attach, closing the channel of one
-// that has fallen too far behind.
+// flush hands the dirty rows to every attach.
 func (f *frameHub) flush() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -88,18 +113,128 @@ func (f *frameHub) flushLocked() {
 	moved := cur != f.cursor
 	// Kept even with no attach, as the cursor a new attach's frame starts at.
 	f.cursor = cur
-	if len(f.subs) == 0 || len(dirty) == 0 && !moved {
+	if len(dirty) == 0 && !moved {
 		return
 	}
-	frame := newFrame(cur, f.scr.StyledRows(), dirty)
-	for ch := range f.subs {
-		select {
-		case ch <- frame:
-		default:
-			close(ch)
-			delete(f.subs, ch)
+	for c := range f.subs {
+		for _, i := range dirty {
+			c.rows[i] = struct{}{}
 		}
+		c.moved = c.moved || moved
+		f.paceLocked(c)
 	}
+}
+
+// keyed opens c's key echo window, sending what its timer holds back at once.
+func (f *frameHub) keyed(c *attachClient) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c.keyed = time.Now()
+	f.paceLocked(c)
+}
+
+// sent tells the hub c's slot is free, so the full frame owed for a drop goes
+// out without waiting for more output.
+func (f *frameHub) sent(c *attachClient) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.paceLocked(c)
+}
+
+// drain returns c's last frames, ignoring the pacing: the frame in its slot,
+// then any it is still owed.
+func (f *frameHub) drain(c *attachClient) []Frame {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stopTimerLocked(c)
+	var frames []Frame
+	select {
+	case frame := <-c.slot:
+		frames = append(frames, frame)
+	default:
+	}
+	if c.pending() {
+		frames = append(frames, f.takeFrameLocked(c))
+	}
+	return frames
+}
+
+// paceLocked puts c's pending changes in its slot now, or arms a timer for
+// when its pacing allows.
+func (f *frameHub) paceLocked(c *attachClient) {
+	if !c.pending() {
+		return
+	}
+	now := time.Now()
+	wait := c.last.Add(frameInterval).Sub(now)
+	if now.Sub(c.keyed) < keyEchoWindow {
+		wait = 0
+	}
+	if wait > 0 {
+		if c.timer == nil {
+			f.armTimerLocked(c, wait)
+		}
+		return
+	}
+	f.stopTimerLocked(c)
+	if len(c.slot) == cap(c.slot) {
+		clear(c.rows)
+		c.moved = false
+		c.full = true
+		return
+	}
+	c.slot <- f.takeFrameLocked(c)
+	c.last = now
+}
+
+func (f *frameHub) armTimerLocked(c *attachClient, wait time.Duration) {
+	armedFrameTimers.Add(1)
+	var t *time.Timer
+	t = time.AfterFunc(wait, func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		// A timer stopped too late to cancel still runs; it finds itself
+		// replaced.
+		if c.timer != t {
+			return
+		}
+		c.timer = nil
+		armedFrameTimers.Add(-1)
+		f.paceLocked(c)
+	})
+	c.timer = t
+}
+
+func (f *frameHub) stopTimerLocked(c *attachClient) {
+	if c.timer == nil {
+		return
+	}
+	c.timer.Stop()
+	c.timer = nil
+	armedFrameTimers.Add(-1)
+}
+
+// takeFrameLocked builds c's pending frame and marks it sent.
+func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
+	var frame Frame
+	if c.full {
+		frame = f.fullFrameLocked()
+	} else {
+		frame = newFrame(f.cursor, f.scr.StyledRows(), slices.Sorted(maps.Keys(c.rows)))
+	}
+	clear(c.rows)
+	c.moved = false
+	c.full = false
+	return frame
+}
+
+func (f *frameHub) fullFrameLocked() Frame {
+	rows := f.scr.StyledRows()
+	all := make([]int, len(rows))
+	for i := range all {
+		all[i] = i
+	}
+	return newFrame(f.cursor, rows, all)
 }
 
 func newFrame(cur screen.Cursor, rows []string, indexes []int) Frame {
@@ -131,8 +266,8 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 		defer h.streams.Done()
 	}
 	_ = conn.SetDeadline(time.Time{})
-	frames, full := h.frames.subscribe()
-	defer h.frames.unsubscribe(frames)
+	client, full := h.frames.subscribe()
+	defer h.frames.unsubscribe(client)
 	// Unknown client message types are skipped so newer clients keep working.
 	clientErr := make(chan error, 1)
 	go func() {
@@ -144,7 +279,9 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 		for {
 			typ, payload, err := readStreamMessage(in)
 			if err == nil && typ == StreamInput {
-				err = h.input(payload)
+				if err = h.input(payload); err == nil {
+					h.frames.keyed(client)
+				}
 			}
 			if err != nil {
 				clientErr <- err
@@ -161,18 +298,17 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 	}
 	for {
 		select {
-		case frame, ok := <-frames:
-			if !ok {
-				_ = send(StreamError, streamError{Message: "attach fell behind"})
-				return
-			}
+		case frame := <-client.slot:
 			if send(StreamFrame, frame) != nil {
 				return
 			}
+			h.frames.sent(client)
 		case <-h.finished:
 			// finish flushed the last output before closing finished.
-			if sendPending(frames, send) != nil {
-				return
+			for _, frame := range h.frames.drain(client) {
+				if send(StreamFrame, frame) != nil {
+					return
+				}
 			}
 			_ = send(StreamExit, streamExit{Code: h.exitCode})
 			return
@@ -202,23 +338,6 @@ func (h *holderServer) input(payload []byte) error {
 	}
 	h.inputs.notify()
 	return nil
-}
-
-// sendPending sends the frames already queued, without waiting for more.
-func sendPending(frames chan Frame, send func(StreamType, any) error) error {
-	for {
-		select {
-		case frame, ok := <-frames:
-			if !ok {
-				return errors.New("attach fell behind")
-			}
-			if err := send(StreamFrame, frame); err != nil {
-				return err
-			}
-		default:
-			return nil
-		}
-	}
 }
 
 // Attach opens the optional attach stream, or returns ErrAttachUnsupported
