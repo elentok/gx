@@ -203,7 +203,9 @@ func (w *PidWatcher) state() pidState {
 func (w *PidWatcher) Status() Status {
 	st := w.state()
 	s, ok := programStatus(st.program)
-	if !ok {
+	// OSC done ends the turn but can't say a background shell outlives it;
+	// only the pid file's shell state does.
+	if !ok || (st.program.State == "done" && st.seen && st.last.Status == ClaudeShell) {
 		s = pidFileStatus(st)
 	}
 	if st.rateLimit != nil && s.State != Blocked {
