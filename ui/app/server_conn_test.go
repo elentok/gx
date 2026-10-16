@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
+	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
@@ -23,6 +24,7 @@ import (
 // embedded (nil) API are not reached by these tests' messages.
 type fakeServerClient struct {
 	ticketsui.ServerAPI
+	agentsui.SessionClient
 	down     bool
 	readOnly bool
 	herdr    bool

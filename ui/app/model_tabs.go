@@ -2,6 +2,7 @@ package app
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -16,7 +17,7 @@ import (
 )
 
 func (m *Model) ensureLivePages() {
-	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue} {
+	for _, kind := range []nav.TabID{nav.TabWorktrees, nav.TabLog, nav.TabStatus, nav.TabStash, nav.TabPRs, nav.TabTickets, nav.TabQueue, nav.TabAgents} {
 		if _, ok := m.livePageByTab[kind]; !ok {
 			m.livePageByTab[kind] = livePage{}
 		}
@@ -231,6 +232,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		case "q":
 			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabQueue})
 			return next, cmd, true
+		case "a":
+			next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
+			return next, cmd, true
 		case "n":
 			next, cmd := m.openNotifyHistory()
 			return next, cmd, true
@@ -269,6 +273,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return next, cmd, true
 	case "7":
 		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabQueue})
+		return next, cmd, true
+	case "8":
+		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
 		return next, cmd, true
 	}
 	return m, nil, false
@@ -324,7 +331,17 @@ func (m Model) tabSpecs() []tabSpec {
 		{id: nav.TabPRs, label: "prs", active: activeTab == nav.TabPRs},
 		{id: nav.TabTickets, label: "tickets", active: activeTab == nav.TabTickets},
 		{id: nav.TabQueue, label: "queue", active: activeTab == nav.TabQueue},
+		{id: nav.TabAgents, label: m.agentsTabLabel(), active: activeTab == nav.TabAgents},
 	}
+}
+
+// agentsTabLabel carries the Actionable count so any tab shows that a session
+// needs the person.
+func (m Model) agentsTabLabel() string {
+	if n := m.stream.vm.ActionableCount(); n > 0 {
+		return "agents " + strconv.Itoa(n)
+	}
+	return "agents"
 }
 
 func renderTab(tab tabSpec) string {

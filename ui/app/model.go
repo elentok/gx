@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	agentsui "github.com/elentok/gx/ui/agents"
 	commitui "github.com/elentok/gx/ui/commit"
 	"github.com/elentok/gx/ui/keys"
 	logui "github.com/elentok/gx/ui/log"
@@ -124,6 +125,13 @@ func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
 	}
 	return qm
+}
+
+func (m Model) newAgentsModel() agentsui.Model {
+	if m.settings.Server == nil {
+		return agentsui.NewModel(nil)
+	}
+	return agentsui.NewModel(m.settings.Server.Client)
 }
 
 func (m Model) View() tea.View {
@@ -262,6 +270,11 @@ func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 		return historyEntry{
 			viewState: viewState,
 			model:     m.newQueueModel(viewState.WorktreeRoot, s),
+		}
+	case nav.TabAgents:
+		return historyEntry{
+			viewState: viewState,
+			model:     m.newAgentsModel(),
 		}
 	case nav.TabWorktrees:
 		fallthrough

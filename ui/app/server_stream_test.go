@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/nav"
@@ -209,7 +210,7 @@ func TestServerStream_ReadOnlyKeepsReading(t *testing.T) {
 }
 
 func TestServerStream_EventsAreReadWhateverTabIsOpen(t *testing.T) {
-	for _, tab := range []nav.TabID{nav.TabTickets, nav.TabQueue, nav.TabStatus} {
+	for _, tab := range []nav.TabID{nav.TabTickets, nav.TabQueue, nav.TabStatus, nav.TabAgents} {
 		t.Run(string(tab), func(t *testing.T) {
 			h, f := newStreamHarness(t)
 			h.probeUp()
@@ -232,7 +233,7 @@ func TestServerStream_EventsAreReadWhateverTabIsOpen(t *testing.T) {
 }
 
 func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
-	for _, tab := range []nav.TabID{nav.TabWorktrees, nav.TabTickets, nav.TabStatus} {
+	for _, tab := range []nav.TabID{nav.TabWorktrees, nav.TabTickets, nav.TabStatus, nav.TabAgents} {
 		t.Run(string(tab), func(t *testing.T) {
 			h, f := newStreamHarness(t)
 			h.probeUp()
@@ -250,6 +251,9 @@ func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
 			}
 			if got := h.m.stream.vm.ActionableCount(); got != 1 {
 				t.Errorf("ActionableCount = %d, want 1", got)
+			}
+			if got := ansi.Strip(h.m.tabsView()); !strings.Contains(got, "agents 1") {
+				t.Errorf("tabs = %q, want \"agents 1\"", got)
 			}
 		})
 	}

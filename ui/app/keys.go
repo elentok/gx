@@ -11,6 +11,8 @@ const (
 	BindingGotoStash     keys.BindingID = "app-goto-stash-tab"
 	BindingGotoPRs       keys.BindingID = "app-goto-prs-tab"
 	BindingGotoTickets   keys.BindingID = "app-goto-tickets-tab"
+	BindingGotoQueue     keys.BindingID = "app-goto-queue-tab"
+	BindingGotoAgents    keys.BindingID = "app-goto-agents-tab"
 	BindingNotifyHistory keys.BindingID = "app-notify-history"
 )
 
@@ -26,12 +28,16 @@ func Bindings() []keys.Binding {
 		{ID: BindingGotoStash, Seq: []string{"4"}, Categories: []string{"App"}, Title: "stash tab"},
 		{ID: BindingGotoPRs, Seq: []string{"5"}, Categories: []string{"App"}, Title: "PRs tab"},
 		{ID: BindingGotoTickets, Seq: []string{"6"}, Categories: []string{"App"}, Title: "tickets tab"},
+		{ID: BindingGotoQueue, Seq: []string{"7"}, Categories: []string{"App"}, Title: "queue tab"},
+		{ID: BindingGotoAgents, Seq: []string{"8"}, Categories: []string{"App"}, Title: "agents tab"},
 		{ID: BindingGotoWorktree, Seq: []string{"g", "w"}, Categories: []string{"App"}, Title: "worktrees tab"},
 		{ID: BindingGotoLog, Seq: []string{"g", "l"}, Categories: []string{"App"}, Title: "log tab"},
 		{ID: BindingGotoStatus, Seq: []string{"g", "s"}, Categories: []string{"App"}, Title: "status tab"},
 		{ID: BindingGotoStash, Seq: []string{"g", "S"}, Categories: []string{"App"}, Title: "stash tab"},
 		{ID: BindingGotoPRs, Seq: []string{"g", "p"}, Categories: []string{"App"}, Title: "PRs tab"},
 		{ID: BindingGotoTickets, Seq: []string{"g", "t"}, Categories: []string{"App"}, Title: "tickets tab"},
+		{ID: BindingGotoQueue, Seq: []string{"g", "q"}, Categories: []string{"App"}, Title: "queue tab"},
+		{ID: BindingGotoAgents, Seq: []string{"g", "a"}, Categories: []string{"App"}, Title: "agents tab"},
 		{ID: BindingNotifyHistory, Seq: []string{"g", "n"}, Categories: []string{"App"}, Title: "notification history"},
 	}
 }
@@ -49,6 +55,8 @@ func hintsForPrefix(prefix string) []keys.Binding {
 		{Seq: []string{"S"}, Title: "stash tab"},
 		{Seq: []string{"p"}, Title: "PRs tab"},
 		{Seq: []string{"t"}, Title: "tickets tab"},
+		{Seq: []string{"q"}, Title: "queue tab"},
+		{Seq: []string{"a"}, Title: "agents tab"},
 		{Seq: []string{"n"}, Title: "notification history"},
 	}
 }

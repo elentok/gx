@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/apiclient"
+	agentsui "github.com/elentok/gx/ui/agents"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
@@ -22,6 +23,7 @@ const serverProbeTimeout = 5 * time.Second
 // tabs use, plus the handshake that tells up from down.
 type ServerClient interface {
 	ticketsui.ServerAPI
+	agentsui.SessionClient
 	Negotiate(ctx context.Context, build string) (apiclient.Negotiation, error)
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
@@ -362,6 +363,19 @@ func TestNumberKeysSwitchTabsGlobally(t *testing.T) {
 	if m.navState.ActiveTab() != nav.TabQueue {
 		t.Fatalf("expected 7 to switch to queue, got %q", m.navState.ActiveTab())
 	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '8', Text: "8"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabAgents {
+		t.Fatalf("expected 8 to switch to agents, got %q", m.navState.ActiveTab())
+	}
+
+	// The Agents page starts in sidebar focus, so tab keys still reach the shell.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: '1', Text: "1"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabWorktrees {
+		t.Fatalf("expected 1 to leave agents for worktrees, got %q", m.navState.ActiveTab())
+	}
 }
 
 func TestGTMnemonicSwitchesToTicketsTab(t *testing.T) {
@@ -405,6 +419,45 @@ func TestGQMnemonicSwitchesToQueueTab(t *testing.T) {
 	m = updated.(Model)
 	if m.navState.ActiveTab() != nav.TabQueue {
 		t.Fatalf("expected gq to switch to queue, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestGAMnemonicSwitchesToAgentsTab(t *testing.T) {
+	t.Parallel()
+	m, _ := newAppModel(t)
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'g', Text: "g"})
+	m = updated.(Model)
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabAgents {
+		t.Fatalf("expected ga to switch to agents, got %q", m.navState.ActiveTab())
+	}
+}
+
+func TestAgentsTabLabelCountsActionableSessionsFromAnyTab(t *testing.T) {
+	t.Parallel()
+	m, _ := newAppModel(t)
+	m.stream.vm.Sessions = []server.SessionInfo{
+		{ID: "s1", Actionable: server.SessionActionable{Reason: "blocked"}},
+		{ID: "s2"},
+		{ID: "s3", Actionable: server.SessionActionable{Reason: "rate-limited"}},
+	}
+
+	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "agents 2") {
+		t.Fatalf("tabs = %q, want \"agents 2\"", got)
+	}
+}
+
+func TestAgentsTabLabelPlainWithNothingActionable(t *testing.T) {
+	t.Parallel()
+	m, _ := newAppModel(t)
+	m.stream.vm.Sessions = []server.SessionInfo{{ID: "s1"}}
+
+	for _, spec := range m.tabSpecs() {
+		if spec.id == nav.TabAgents && spec.label != "agents" {
+			t.Fatalf("agents tab label = %q, want plain %q", spec.label, "agents")
+		}
 	}
 }
 
@@ -833,6 +886,9 @@ func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 	}
 	if !strings.Contains(view, "go to top") {
 		t.Fatalf("expected child-level g chord hint in overlay")
+	}
+	if !strings.Contains(view, "agents tab") {
+		t.Fatalf("expected g a hint in overlay")
 	}
 }
 

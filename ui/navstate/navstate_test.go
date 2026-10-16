@@ -182,6 +182,12 @@ func TestResolveTabIDStashIsFirstClass(t *testing.T) {
 	}
 }
 
+func TestResolveTabIDAgentsIsFirstClass(t *testing.T) {
+	if got := navstate.ResolveTabID(nav.TabAgents); got != nav.TabAgents {
+		t.Fatalf("expected agents to resolve to itself, got %q", got)
+	}
+}
+
 func TestQueueTabUsesDefaultWorktree(t *testing.T) {
 	s := newState()
 	s.SetInitialTab(nav.ViewState{Tab: nav.TabLog, WorktreeRoot: defaultWT})
