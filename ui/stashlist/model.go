@@ -231,7 +231,7 @@ func (m Model) withSyncedDetailOrigin() (Model, tea.Cmd) {
 	col, row, visible := m.split.DetailOrigin()
 	visible = visible && !m.stashCreate.IsOpen && !m.help.IsOpen
 	var cmd tea.Cmd
-	m.commitDetail, cmd = m.commitDetail.WithScreenOrigin(col, row, visible)
+	m.commitDetail, cmd = m.commitDetail.WithScreenOrigin(col, ui.ChromeRows+row, visible)
 	return m, cmd
 }
 

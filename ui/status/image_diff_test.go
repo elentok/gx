@@ -212,3 +212,21 @@ func TestImageDiffEndToEndPlacesAfterSettle(t *testing.T) {
 		t.Fatalf("expected a placement transmit sequence to be written, got %q", spies.written)
 	}
 }
+
+func TestImageDiffPanelGeometryIncludesChromeRows(t *testing.T) {
+	t.Parallel()
+	repo := setupImageDiffRepo(t)
+	m, _ := newImageDiffTestModel(t, repo, DefaultSettings(), supportedCapability(), nil, nil)
+
+	diffX, diffY, _, _, ok := m.diffRect(m.height - 1)
+	if !ok {
+		t.Fatal("expected a diff rect")
+	}
+	col, row, _, _, ok := m.PanelGeometry()
+	if !ok {
+		t.Fatal("expected panel geometry")
+	}
+	if col != diffX+1 || row != ui.ChromeRows+diffY+1 {
+		t.Fatalf("image origin = (%d,%d), want (%d,%d)", col, row, diffX+1, ui.ChromeRows+diffY+1)
+	}
+}

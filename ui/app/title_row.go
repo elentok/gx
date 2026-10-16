@@ -8,9 +8,6 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
-// chromeRows is the title row plus the blank row under it; pages get the rest.
-const chromeRows = 2
-
 var (
 	titleBgStyle    = lipgloss.NewStyle().Background(ui.ColorDeepBg)
 	titleBrandStyle = titleBgStyle.Foreground(ui.ColorOverlay)

@@ -157,7 +157,7 @@ func (m Model) View() tea.View {
 		content = m.notifyHistory.View(content, m.width, m.height)
 	}
 	if stack := m.notify.View(); stack != "" {
-		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, chromeRows)
+		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, ui.ChromeRows)
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
@@ -165,7 +165,7 @@ func (m Model) View() tea.View {
 	v.ReportFocus = child.ReportFocus
 	if child.Cursor != nil {
 		cursor := *child.Cursor
-		cursor.Y += chromeRows
+		cursor.Y += ui.ChromeRows
 		v.Cursor = &cursor
 	}
 	v.OnMouse = child.OnMouse
@@ -308,7 +308,7 @@ func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 }
 
 func (m Model) childWindowSizeMsg() tea.WindowSizeMsg {
-	return tea.WindowSizeMsg{Width: m.width, Height: max(1, m.height-chromeRows)}
+	return tea.WindowSizeMsg{Width: m.width, Height: max(1, m.height-ui.ChromeRows)}
 }
 
 func (m Model) resizeCurrentCmd() tea.Cmd {

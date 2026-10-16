@@ -2,6 +2,7 @@ package app
 
 import (
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -161,21 +162,21 @@ func (m Model) handleBack(notifyCmd tea.Cmd) (Model, tea.Cmd) {
 // toPageMouse moves a mouse message into page coordinates; false means it hit
 // the chrome rows and stays with the app.
 func toPageMouse(msg tea.MouseMsg) (tea.Msg, bool) {
-	if msg.Mouse().Y < chromeRows {
+	if msg.Mouse().Y < ui.ChromeRows {
 		return nil, false
 	}
 	switch v := msg.(type) {
 	case tea.MouseClickMsg:
-		v.Y -= chromeRows
+		v.Y -= ui.ChromeRows
 		return v, true
 	case tea.MouseReleaseMsg:
-		v.Y -= chromeRows
+		v.Y -= ui.ChromeRows
 		return v, true
 	case tea.MouseMotionMsg:
-		v.Y -= chromeRows
+		v.Y -= ui.ChromeRows
 		return v, true
 	case tea.MouseWheelMsg:
-		v.Y -= chromeRows
+		v.Y -= ui.ChromeRows
 		return v, true
 	}
 	return msg, true

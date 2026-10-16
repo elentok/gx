@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 
@@ -187,12 +188,12 @@ func TestNotificationsStartBelowChrome(t *testing.T) {
 	m = updated.(Model)
 
 	lines := viewLines(m)
-	for _, line := range lines[:chromeRows] {
+	for _, line := range lines[:ui.ChromeRows] {
 		if strings.Contains(line, "hello there") {
 			t.Fatalf("notification covers the chrome rows: %q", line)
 		}
 	}
-	if !strings.Contains(strings.Join(lines[chromeRows:], "\n"), "hello there") {
+	if !strings.Contains(strings.Join(lines[ui.ChromeRows:], "\n"), "hello there") {
 		t.Fatal("notification not drawn")
 	}
 }

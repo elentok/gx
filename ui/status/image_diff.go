@@ -64,7 +64,7 @@ func (m Model) SelectedImageFile() (string, bool) {
 
 // PanelGeometry implements imagediff.SettleHost: it returns the diff panel's
 // currently active section's body area in absolute screen cells. Status owns the
-// whole screen, so these are already screen coordinates (origin (0,0)). This is
+// whole page, so only the app chrome above it offsets the rows. This is
 // only stable once layout has settled, which is why it's computed at place-time
 // rather than cached.
 func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, ok bool) {
@@ -88,7 +88,7 @@ func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, 
 
 	// The pane is rendered with a 1-cell border on every side; the body starts
 	// just inside it (see renderSectionPane / renderPanelWithBorderTitle).
-	return diffX + 1, paneY + 1, diffW - 2, paneH - 2, true
+	return diffX + 1, ui.ChromeRows + paneY + 1, diffW - 2, paneH - 2, true
 }
 
 // FetchBlobs implements imagediff.SettleHost: it fetches the selected file's
