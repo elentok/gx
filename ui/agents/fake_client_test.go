@@ -17,6 +17,8 @@ type fakeSessionClient struct {
 	result server.SessionResult
 	err    error
 
+	creates []server.CreateSessionRequest
+
 	reports     []server.FocusReport
 	focusResult server.SessionResult
 }
@@ -31,6 +33,9 @@ func (f *fakeSessionClient) record(call string) (server.SessionResult, error) {
 }
 
 func (f *fakeSessionClient) CreateSession(_ context.Context, req server.CreateSessionRequest) (server.SessionResult, error) {
+	f.mu.Lock()
+	f.creates = append(f.creates, req)
+	f.mu.Unlock()
 	return f.record("create " + req.Project)
 }
 

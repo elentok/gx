@@ -21,6 +21,7 @@ var digitTabs = []nav.TabID{
 // leaderBindings lists the leader actions for the which-key box and help.
 var leaderBindings = []keys.Binding{
 	{Seq: []string{"j"}, Title: "jump to session"},
+	{Seq: []string{"c"}, Title: "new session"},
 	{Seq: []string{"n"}, Title: "next session"},
 	{Seq: []string{"p"}, Title: "previous session"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
@@ -37,6 +38,7 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"enter"}, Title: "focus terminal"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
 	{Seq: []string{"/"}, Title: "jump to session"},
+	{Seq: []string{"c"}, Title: "new session"},
 	{Seq: []string{"b"}, Title: "toggle sidebar"},
 }
 
@@ -58,6 +60,8 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case m.jump != nil:
 		return m.updateJumpKey(msg)
+	case m.create != nil:
+		return m.updateCreateKey(msg)
 	case m.leaderPending:
 		m.leaderPending = false
 		if isLeader {
@@ -82,6 +86,8 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	case "j":
 		m.jump = &jumpPopup{}
 		return m, nil
+	case "c":
+		return m.openCreate()
 	case "n":
 		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
 	case "p":

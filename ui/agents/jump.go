@@ -78,14 +78,7 @@ func (m Model) updateJumpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.jump = nil
-		m.cursor = matches[j.cursor]
-		next, cmd := m.refresh()
-		m = next.(Model)
-		if m.attachTarget() != "" {
-			m.terminalFocused = true
-			m.resizeAttach()
-		}
-		return m, cmd
+		return m.selectAndFocus(matches[j.cursor])
 	case "backspace":
 		if r := []rune(j.query); len(r) > 0 {
 			j.query = string(r[:len(r)-1])

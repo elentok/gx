@@ -26,6 +26,7 @@ var (
 	keyFocusTerminal = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "focus terminal"))
 	keyAttention     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "next needing attention"))
 	keyJump          = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "jump to session"))
+	keyCreate        = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "new session"))
 )
 
 type pageActivatedMsg struct{}
@@ -50,7 +51,13 @@ type Model struct {
 	// leaderPending: the leader was pressed and the next key is its action.
 	leaderPending bool
 	// jump is nil while the jump popup is closed.
-	jump          *jumpPopup
+	jump *jumpPopup
+	// create is nil while the create form is closed.
+	create       *createForm
+	listProjects func() ([]formProject, error)
+	// pendingSelect is a just-created session to select and focus once a
+	// snapshot lists it.
+	pendingSelect string
 	help          help.Model
 	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
@@ -75,7 +82,7 @@ type Model struct {
 func NewModel(client SessionClient, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, now: time.Now,
+	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, now: time.Now, listProjects: listFormProjects,
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{client: client}
@@ -105,15 +112,16 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 			m = m.open()
 		}
 	}
-	next, cmd := m.refresh()
+	next, cmd := m.selectPending()
 	next.(Model).reportFocus()
 	return next, cmd
 }
 
 // InputFocused tells the shell the page swallows every key: in the terminal,
-// after the leader, in the jump popup and while typing a help filter.
+// after the leader, in the jump popup or create form and while typing a help
+// filter.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.jump != nil || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.jump != nil || m.create != nil || m.help.InputFocused()
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -162,6 +170,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateAttached(msg)
 	case attachStreamMsg:
 		return m.updateAttachStream(msg)
+	case formProjectsMsg:
+		return m.updateFormProjects(msg)
+	case sessionCreatedMsg:
+		return m.updateSessionCreated(msg)
 	case pageActivatedMsg:
 		// The spinner's tick chain died while the tab was hidden. Focus
 		// reports reach only the page on screen, and switching tabs takes
@@ -209,10 +221,24 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keyJump):
 		m.jump = &jumpPopup{}
 		return m, nil
+	case key.Matches(msg, keyCreate):
+		return m.openCreate()
 	default:
 		return m, nil
 	}
 	return m.refresh()
+}
+
+// selectAndFocus selects session i and focuses its terminal when it has one.
+func (m Model) selectAndFocus(i int) (tea.Model, tea.Cmd) {
+	m.cursor = i
+	next, cmd := m.refresh()
+	m = next.(Model)
+	if m.attachTarget() != "" {
+		m.terminalFocused = true
+		m.resizeAttach()
+	}
+	return m, cmd
 }
 
 // refresh starts what the newly shown sessions need: the spinner, the
@@ -276,6 +302,9 @@ func (m Model) render() string {
 	}
 	if m.jump != nil {
 		out = ui.OverlayCenter(out, m.renderJump(), m.width, m.height)
+	}
+	if m.create != nil {
+		out = ui.OverlayCenter(out, m.renderCreate(), m.width, m.height)
 	}
 	if m.leaderPending {
 		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], leaderBindings), m.width, m.height)
