@@ -321,7 +321,9 @@ func (m Model) resizeCurrentCmd() tea.Cmd {
 	if m.width <= 0 || m.height <= 0 {
 		return nil
 	}
-	size := m.childWindowSizeMsg()
+	// The terminal size, not the page size: Update reads every WindowSizeMsg as
+	// a terminal resize and takes the chrome off itself.
+	size := tea.WindowSizeMsg{Width: m.width, Height: m.height}
 	return func() tea.Msg {
 		return size
 	}
