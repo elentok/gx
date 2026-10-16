@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"image/color"
 	"strconv"
 	"strings"
 
@@ -115,14 +116,19 @@ func (m Model) renderSidebar() string {
 		lines[i] = r.text
 	}
 	active := !m.terminalFocused
-	titleColor := ui.ColorMauve
-	headerBg := ui.ColorSurface
-	if active {
-		titleColor, headerBg = ui.ColorOrange, ui.ColorSurface1
-	}
+	titleColor, headerBg := headerColors(active)
 	title := ui.RenderRowWithBackground(lipgloss.NewStyle().Foreground(titleColor).Bold(active).Render("Agents"), headerBg)
 	live := strconv.Itoa(liveCount(m.sessions)) + " live"
 	return ui.RenderPanel(ui.PanelOptionsFor(sidebarWidth, m.height, title, live, lines, active, titleColor, titleColor, true))
+}
+
+// headerColors are the title colour and header fill of a focused or
+// unfocused panel.
+func headerColors(active bool) (title, bg color.Color) {
+	if active {
+		return ui.ColorOrange, ui.ColorSurface1
+	}
+	return ui.ColorMauve, ui.ColorSurface
 }
 
 func (m Model) statusIcon(s server.SessionInfo, icons ui.IconSet) string {

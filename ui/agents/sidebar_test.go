@@ -76,21 +76,25 @@ func TestSidebar_Golden(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := sidebarModel(t, tc.nerd, fixtureSessions(), 70, 14)
 			m.terminalFocused = tc.terminalFocused
-			text := m.View().Content
-			golden := filepath.Join("testdata", name+".golden")
-			if *update {
-				if err := os.WriteFile(golden, []byte(text), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
-			want, err := os.ReadFile(golden)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if text != string(want) {
-				t.Errorf("render mismatch (run with -update to accept)\ngot:\n%s\nwant:\n%s", ansi.Strip(text), ansi.Strip(string(want)))
-			}
+			assertGolden(t, name, m.View().Content)
 		})
+	}
+}
+
+func assertGolden(t *testing.T, name, text string) {
+	t.Helper()
+	golden := filepath.Join("testdata", name+".golden")
+	if *update {
+		if err := os.WriteFile(golden, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != string(want) {
+		t.Errorf("render mismatch (run with -update to accept)\ngot:\n%s\nwant:\n%s", ansi.Strip(text), ansi.Strip(string(want)))
 	}
 }
 
@@ -132,7 +136,7 @@ func TestSidebar_SelectionFollowsTheSessionAcrossUpdates(t *testing.T) {
 func TestSidebar_BTogglesTheSidebar(t *testing.T) {
 	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
 	m = press(t, m, "b")
-	if strings.Contains(ansi.Strip(m.View().Content), "live") {
+	if strings.Contains(ansi.Strip(m.View().Content), "5 live") {
 		t.Fatal("sidebar still shown after b")
 	}
 	m = press(t, m, "b")

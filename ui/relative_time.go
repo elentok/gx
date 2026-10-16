@@ -21,7 +21,16 @@ func relativeTimeCompact(t time.Time, withAgo bool) string {
 	if t.IsZero() {
 		return ""
 	}
-	d := time.Since(t)
+	return durationCompact(time.Since(t), withAgo)
+}
+
+// DurationCompact formats a duration like RelativeTimeCompactShort, for
+// example "now", "12m" or "1wk 2d".
+func DurationCompact(d time.Duration) string {
+	return durationCompact(d, false)
+}
+
+func durationCompact(d time.Duration, withAgo bool) string {
 	if d < 0 {
 		d = -d
 	}

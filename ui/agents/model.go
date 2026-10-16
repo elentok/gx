@@ -1,13 +1,16 @@
 package agents
 
 import (
+	"path/filepath"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -42,13 +45,21 @@ type Model struct {
 	// must not read gx tab keys.
 	terminalFocused bool
 	width, height   int
+	// sessionsDir holds the sessions' state dirs; empty when unknown.
+	sessionsDir string
+	lastScreen  lastScreen
+	now         func() time.Time
 }
 
 // NewModel builds the tab; a nil client means there is no server to reach.
 func NewModel(client SessionClient, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	return Model{client: client, settings: settings, spinner: sp}
+	m := Model{client: client, settings: settings, spinner: sp, now: time.Now}
+	if data, err := config.DataDir(); err == nil {
+		m.sessionsDir = filepath.Join(data, "sessions")
+	}
+	return m
 }
 
 // WithServerState hands the tab the app shell's shared state and the link it
@@ -66,7 +77,7 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 			}
 		}
 	}
-	return m.startSpinner()
+	return m.refresh()
 }
 
 // InputFocused tells the shell the page swallows every key.
@@ -85,6 +96,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m.startSpinner()
+	case lastScreenMsg:
+		if msg.id == m.selectedID() {
+			m.lastScreen = lastScreen(msg)
+		}
+		return m, nil
 	case spinnerRestartMsg:
 		m.ticking = false
 		return m.startSpinner()
@@ -113,9 +129,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			return m, nil
 		}
-		return m.startSpinner()
+		return m.refresh()
 	}
 	return m, nil
+}
+
+// refresh starts what the newly shown sessions need: the spinner and the
+// selected Exited session's last screen.
+func (m Model) refresh() (tea.Model, tea.Cmd) {
+	next, spin := m.startSpinner()
+	return next, tea.Batch(spin, next.(Model).loadLastScreen())
 }
 
 // startSpinner starts the Working spinner's tick chain when a Working session
@@ -165,12 +188,14 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) renderMain(width int, lines []string) string {
-	title := "agents"
-	if id := m.selectedID(); id != "" {
-		title = displayName(m.sessions[m.cursor])
-	}
 	active := m.terminalFocused || !m.sidebarShown()
-	opts := ui.PanelOptionsFor(width, m.height, title, "", lines, active, ui.ColorText, ui.ColorOrange, false)
+	if lines != nil || m.selectedID() == "" {
+		return ui.RenderPanel(ui.PanelOptionsFor(width, m.height, "agents", "", lines, active, ui.ColorText, ui.ColorOrange, false))
+	}
+	s := m.sessions[m.cursor]
+	titleColor, headerBg := headerColors(active)
+	title := ui.RenderRowWithBackground(m.terminalTitle(s, lipgloss.NewStyle().Foreground(titleColor).Bold(active)), headerBg)
+	opts := ui.PanelOptionsFor(width, m.height, title, m.terminalRightTitle(s, width-2), m.terminalLines(s), active, titleColor, titleColor, false)
 	return ui.RenderPanel(opts)
 }
 
