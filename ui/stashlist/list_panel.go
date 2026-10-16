@@ -93,7 +93,7 @@ func (m listPanel) ScrollViewport(delta int) listPanel {
 }
 
 func (m listPanel) visibleH() int {
-	h := m.height - 3 // frame is height-1, minus top+bottom borders
+	h := m.height - 1 // minus the header row
 	if h < 1 {
 		return 1
 	}

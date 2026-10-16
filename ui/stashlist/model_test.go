@@ -1,14 +1,18 @@
 package stashlist
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/splitview"
 )
 
 func runModelInit(m Model) Model {
@@ -148,6 +152,44 @@ func TestViewFillsHeightWithoutHelpFooter(t *testing.T) {
 	}
 	if strings.Contains(content, "? help") {
 		t.Fatal("expected no ? help footer")
+	}
+}
+
+// withEntries fills the list with more stashes than any test height shows.
+func withEntries(m listPanel) listPanel {
+	m.loaded = true
+	m.entries = nil
+	for i := range 100 {
+		m.entries = append(m.entries, git.StashEntry{Ref: fmt.Sprintf("stash@{%d}", i), Message: "wip"})
+	}
+	return m
+}
+
+func lines(content string) []string { return strings.Split(content, "\n") }
+
+func TestUnsplitListPanelFillsHeight(t *testing.T) {
+	m := newReadyModel(t)
+	panel := send(withEntries(m.stashList), tea.WindowSizeMsg{Width: 120, Height: 30})
+
+	got := lines(panel.View().Content)
+	if len(got) != 30 {
+		t.Fatalf("rendered %d lines, want 30", len(got))
+	}
+	// Header row + 29 entry rows: the last row shows the 29th stash.
+	if last := ansi.Strip(got[29]); !strings.Contains(last, "stash@{28}") {
+		t.Fatalf("last line = %q, want stash@{28}", last)
+	}
+}
+
+func TestStackedSplitFillsHeight(t *testing.T) {
+	m := newReadyModel(t)
+	m = sendModel(m, tea.WindowSizeMsg{Width: ui.NarrowWidthThreshold, Height: 30})
+	if m.split.EffectiveOrientation() != splitview.Horizontal {
+		t.Fatal("expected stacked split at narrow width")
+	}
+
+	if got := lines(m.View().Content); len(got) != 30 {
+		t.Fatalf("rendered %d lines, want 30", len(got))
 	}
 }
 

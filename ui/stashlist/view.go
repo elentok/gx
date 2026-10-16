@@ -20,7 +20,7 @@ var (
 
 func (m listPanel) View() tea.View {
 	lines := m.visibleLines()
-	height := max(1, m.height-1)
+	height := max(1, m.height)
 	active := !m.inactive
 	accent := color.Color(nil)
 	if active {
