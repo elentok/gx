@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/nav"
 
 	"github.com/spf13/cobra"
 )
@@ -209,7 +210,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 		Short:   "open the tickets UI",
 		Args:    cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return d.runTickets()
+			return d.runTab(nav.TabTickets)
 		},
 	}
 	var validateAll bool

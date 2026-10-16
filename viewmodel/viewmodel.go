@@ -56,6 +56,8 @@ type State struct {
 	// Mode is the queue mode (server.ModeRunning, ModePaused or ModeDraining)
 	// from the last snapshot.
 	Mode string
+	// AFK is AFK mode from the last snapshot.
+	AFK bool
 	// Sessions is the interactive sessions, oldest first, as the last snapshot
 	// delivered them.
 	Sessions []server.SessionInfo
@@ -150,6 +152,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		Mode:             snap.Mode,
+		AFK:              snap.AFK,
 		Sessions:         slices.Clone(snap.Sessions),
 	}
 	for _, t := range next.Tickets {
@@ -191,6 +194,8 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 		return s, EffectNone
 	case server.EventHerdrAvailable:
 		s.HerdrUnavailable = false
+		return s, EffectNone
+	case server.EventSessionFocus:
 		return s, EffectNone
 	case server.EventQueueChanged:
 		return s, EffectResnapshot | EffectRefetchQueue

@@ -11,12 +11,15 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/spf13/cobra"
 )
 
-// newAgentsCmd is `gx agents`: the server's interactive sessions.
-func newAgentsCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs}
+// newAgentsCmd is `gx agents`: the server's interactive sessions. With no
+// subcommand it opens the TUI on the Agents tab.
+func newAgentsCmd(d deps) *cobra.Command {
+	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
 	cmd.AddCommand(newAgentsCreateCmd(), newAgentsListCmd(),
 		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
 		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession),

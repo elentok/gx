@@ -268,6 +268,41 @@ func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
 	}
 }
 
+func TestServerStream_SessionFocusShowsSessionInThisTUIOnly(t *testing.T) {
+	for _, tc := range []struct {
+		client string
+		want   nav.TabID
+	}{{agentsui.FocusClient, nav.TabAgents}, {"tui-other", nav.TabWorktrees}} {
+		t.Run(tc.client, func(t *testing.T) {
+			h, f := newStreamHarness(t)
+			f.mu.Lock()
+			f.sessions = []server.SessionInfo{
+				{ID: "s1", Name: "alpha", Status: server.SessionStatus{State: server.SessionIdle}},
+				{ID: "s2", Name: "beta", Status: server.SessionStatus{State: server.SessionIdle}},
+			}
+			f.mu.Unlock()
+			h.probeUp()
+
+			f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventSessionFocus, Address: "s2", Client: tc.client}
+			h.pump()
+
+			if got := h.m.navState.ActiveTab(); got != tc.want {
+				t.Fatalf("active tab = %s, want %s", got, tc.want)
+			}
+			if tc.want != nav.TabAgents {
+				return
+			}
+			agents := h.m.activePage().model.(agentsui.Model)
+			if !agents.InputFocused() {
+				t.Error("the session's terminal is not focused")
+			}
+			if got := ansi.Strip(agents.View().Content); !strings.Contains(got, "beta idle") {
+				t.Errorf("view does not show beta on screen:\n%s", got)
+			}
+		})
+	}
+}
+
 func TestServerStream_GapAndClosedStreamEachResnapshotOnce(t *testing.T) {
 	cases := map[string]func(s *fakeStream){
 		"gap":    func(s *fakeStream) { s.ch <- herdrEvent(15) },

@@ -6,7 +6,28 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui/nav"
 )
+
+func TestExecute_AgentsOpensTheAgentsTab(t *testing.T) {
+	t.Parallel()
+	var tabs []nav.TabID
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		runTab: func(tab nav.TabID) error {
+			tabs = append(tabs, tab)
+			return nil
+		},
+	}
+
+	if err := execute([]string{"agents"}, d); err != nil {
+		t.Fatalf("execute agents: %v", err)
+	}
+	if len(tabs) != 1 || tabs[0] != nav.TabAgents {
+		t.Fatalf("runTab got %v, want [agents]", tabs)
+	}
+}
 
 func TestExecute_PRsDispatchesToRunPRs(t *testing.T) {
 	t.Parallel()
@@ -64,7 +85,10 @@ func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTickets: func() error {
+		runTab: func(tab nav.TabID) error {
+			if tab != nav.TabTickets {
+				t.Errorf("tab = %s, want tickets", tab)
+			}
 			called++
 			return nil
 		},
@@ -74,7 +98,7 @@ func TestExecute_TicketsDispatchesToRunTickets(t *testing.T) {
 		t.Fatalf("execute tickets: %v", err)
 	}
 	if called != 1 {
-		t.Fatalf("runTickets called %d times, want 1", called)
+		t.Fatalf("runTab called %d times, want 1", called)
 	}
 }
 
@@ -84,7 +108,10 @@ func TestExecute_TicketsAliasTk(t *testing.T) {
 	d := deps{
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
-		runTickets: func() error {
+		runTab: func(tab nav.TabID) error {
+			if tab != nav.TabTickets {
+				t.Errorf("tab = %s, want tickets", tab)
+			}
 			called++
 			return nil
 		},
@@ -94,7 +121,7 @@ func TestExecute_TicketsAliasTk(t *testing.T) {
 		t.Fatalf("execute tk: %v", err)
 	}
 	if called != 1 {
-		t.Fatalf("runTickets called %d times, want 1", called)
+		t.Fatalf("runTab called %d times, want 1", called)
 	}
 }
 

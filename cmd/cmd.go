@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
+	"github.com/elentok/gx/ui/nav"
 
 	"github.com/spf13/cobra"
 )
@@ -36,7 +37,7 @@ type deps struct {
 	runShow              func(string) error
 	runStash             func() error
 	runPRs               func(allRepos bool) error
-	runTickets           func() error
+	runTab               func(nav.TabID) error
 	confirmForce         func(string) (bool, error)
 	choosePushDivergence func(io.Reader, io.Writer, *git.PushDivergence) (int, error)
 	initConfig           func() (string, error)
@@ -79,7 +80,7 @@ func defaultDeps() deps {
 		runShow:              runShow,
 		runStash:             runStash,
 		runPRs:               runPRs,
-		runTickets:           runTickets,
+		runTab:               runTab,
 		choosePushDivergence: choosePushDivergence,
 		initConfig:           config.Init,
 		loadConfig:           config.Load,
@@ -163,7 +164,7 @@ Run without a command to open the status UI.`,
 
 	root.AddCommand(
 		newAgentCmd(d),
-		newAgentsCmd(),
+		newAgentsCmd(d),
 		newClaudeCmd(d),
 		newWorktreesCmd(d),
 		newPushCmd(d),

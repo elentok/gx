@@ -265,7 +265,8 @@ func runPRs(allRepos bool) error {
 	return err
 }
 
-func runTickets() error {
+// runTab opens the TUI on tab (`gx tickets`, `gx agents`).
+func runTab(tab nav.TabID) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -276,7 +277,7 @@ func runTickets() error {
 		return err
 	}
 	if info.Repo.IsBare && info.WorktreeRoot == "" {
-		return fmt.Errorf("gx tickets must be run from a regular repo or linked worktree")
+		return fmt.Errorf("gx %s must be run from a regular repo or linked worktree", tab)
 	}
 
 	root, err := git.WorktreeRoot(cwd)
@@ -293,7 +294,7 @@ func runTickets() error {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: root},
+		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: root},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),

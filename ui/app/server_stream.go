@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	agentsui "github.com/elentok/gx/ui/agents"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
@@ -279,6 +280,11 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if toast, ok := viewmodel.ToastFor(msg.ev); ok && m.stream.vm.Seq > seqBefore {
 			cmds = append(cmds, toastCmd(toast))
 		}
+		if m.stream.vm.Seq > seqBefore && msg.ev.Type == server.EventSessionFocus && msg.ev.Client == agentsui.FocusClient {
+			var focus tea.Cmd
+			m, focus = m.focusSession(msg.ev.Address)
+			cmds = append(cmds, focus)
+		}
 		m, deliver := m.deliverServerState()
 		return m, tea.Batch(append(cmds, deliver)...), true
 
@@ -336,6 +342,18 @@ func (m Model) withServerState(model tea.Model) (tea.Model, tea.Cmd) {
 		return p.WithServerState(m.serverState(), m.serverConn.link())
 	}
 	return model, nil
+}
+
+// focusSession switches to the Agents tab with session id on screen, for a
+// banner click. The session is focused on the next state delivery.
+func (m Model) focusSession(id string) (Model, tea.Cmd) {
+	m, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
+	current := m.activePage()
+	if agents, ok := current.model.(agentsui.Model); ok {
+		current.model = agents.WithFocusSession(id)
+		m.setActivePage(current)
+	}
+	return m, cmd
 }
 
 // deliverServerState hands the current state to the active page only; hidden

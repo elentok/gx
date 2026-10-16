@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 	"slices"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -57,6 +58,15 @@ func (f *fakeSessionClient) MarkSessionRead(_ context.Context, id string) (serve
 
 func (f *fakeSessionClient) RunSessionAction(_ context.Context, id string) (server.SessionResult, error) {
 	return f.record("action " + id)
+}
+
+func (f *fakeSessionClient) SetAFK(_ context.Context, on *bool) (server.AFKResult, error) {
+	call := "afk toggle"
+	if on != nil {
+		call = "afk " + strconv.FormatBool(*on)
+	}
+	_, err := f.record(call)
+	return server.AFKResult{}, err
 }
 
 // ReportFocus records reports apart from calls: every update may send one.

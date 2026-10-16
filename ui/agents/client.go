@@ -16,4 +16,5 @@ type SessionClient interface {
 	MarkSessionRead(ctx context.Context, id string) (server.SessionResult, error)
 	RunSessionAction(ctx context.Context, id string) (server.SessionResult, error)
 	ReportFocus(ctx context.Context, req server.FocusReport) (server.SessionResult, error)
+	SetAFK(ctx context.Context, on *bool) (server.AFKResult, error)
 }

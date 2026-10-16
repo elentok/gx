@@ -31,6 +31,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"p"}, Title: "previous session"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
 	{Seq: []string{"b"}, Title: "toggle sidebar"},
+	{Seq: []string{"z"}, Title: "toggle AFK"},
 	{Seq: []string{"tab"}, Title: "switch focus"},
 	{Seq: []string{"1-8"}, Title: "switch gx tab"},
 	{Seq: []string{"q"}, Title: "leave tab"},
@@ -123,6 +124,8 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		m.cursor = m.nextNeedingAttention()
 	case "b":
 		m.hideSidebar = !m.hideSidebar
+	case "z":
+		return m, m.toggleAFKCmd()
 	case "tab":
 		m = m.toggleFocus()
 		return m, nil

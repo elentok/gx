@@ -119,6 +119,9 @@ func (m Model) renderSidebar() string {
 	titleColor, headerBg := headerColors(active)
 	title := ui.RenderRowWithBackground(lipgloss.NewStyle().Foreground(titleColor).Bold(active).Render("Agents"), headerBg)
 	live := strconv.Itoa(liveCount(m.sessions)) + " live"
+	if m.afk {
+		live = "AFK · " + live
+	}
 	return ui.RenderPanel(ui.PanelOptionsFor(sidebarWidth, m.height, title, live, lines, active, titleColor, titleColor, true))
 }
 

@@ -49,6 +49,7 @@ type Model struct {
 	// sessions is in sidebar order (see orderedSessions); cursor indexes it.
 	sessions    []server.SessionInfo
 	cursor      int
+	afk         bool
 	hideSidebar bool
 	spinner     spinner.Model
 	// ticking: a spinner tick chain is in flight, so another must not start.
@@ -63,8 +64,8 @@ type Model struct {
 	// create is nil while the create form is closed.
 	create       *createForm
 	listProjects func() ([]formProject, error)
-	// pendingSelect is a just-created session to select and focus once a
-	// snapshot lists it.
+	// pendingSelect is a just-created or banner-clicked session to select and
+	// focus once a snapshot lists it.
 	pendingSelect string
 	// confirm asks y/n before a Stop or Remove.
 	confirm confirm.Model
@@ -115,6 +116,7 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 	m.link = link
 	if st != nil {
 		m.loaded = true
+		m.afk = st.AFK
 		selected := m.selectedID()
 		m.sessions = orderedSessions(st.Sessions)
 		m.cursor = 0
@@ -182,6 +184,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastScreen = lastScreen(msg)
 		}
 		return m, nil
+	case afkMsg:
+		return m.updateAFK(msg)
 	case attachedMsg:
 		return m.updateAttached(msg)
 	case attachStreamMsg:
