@@ -370,6 +370,30 @@ func TestScreen_SendKeyFollowsCursorKeyMode(t *testing.T) {
 	}
 }
 
+func TestScreen_SendKeyTypesShiftedText(t *testing.T) {
+	cases := []struct {
+		name string
+		key  screen.Key
+		want string
+	}{
+		{"shift letter", screen.Key{Code: 'h', Text: "H", Mod: screen.ModShift}, "H"},
+		{"caps lock", screen.Key{Code: 'h', Text: "H", Mod: screen.ModCapsLock}, "H"},
+		{"alt shift letter", screen.Key{Code: 'h', Text: "H", Mod: screen.ModShift | screen.ModAlt}, "\x1bH"},
+		{"ctrl letter", screen.Key{Code: 'c', Mod: screen.ModCtrl}, "\x03"},
+		{"plain letter", screen.Key{Code: 'h', Text: "h"}, "h"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var out syncBuffer
+			s := screen.NewScreenWithReplies(10, 2, &out)
+			s.SendKey(c.key)
+			if got := written(t, s, &out); got != c.want {
+				t.Errorf("SendKey(%+v) wrote %q, want %q", c.key, got, c.want)
+			}
+		})
+	}
+}
+
 func TestTitle_Replay(t *testing.T) {
 	for _, r := range replays {
 		t.Run(r.name, func(t *testing.T) {

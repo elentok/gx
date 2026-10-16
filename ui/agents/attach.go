@@ -73,6 +73,7 @@ type attachment struct {
 	exited bool
 	err    error
 	rows   []string
+	cursor nativerunner.FrameCursor
 	// offset, scrollMax and newLines are the latest frame's scroll state.
 	offset, scrollMax, newLines int
 }
@@ -222,6 +223,7 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 	case nativerunner.StreamFrame:
 		f := msg.msg.Frame
 		a.rows = applyFrame(a.rows, f)
+		a.cursor = f.Cursor
 		a.offset, a.scrollMax, a.newLines = f.ScrollOffset, f.ScrollMax, f.NewLines
 	case nativerunner.StreamExit:
 		a.ended, a.exited = true, true

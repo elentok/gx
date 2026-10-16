@@ -40,6 +40,14 @@ const (
 	KeyRight = uv.KeyRight
 )
 
+// ModShift and friends name a Key's modifier bits.
+const (
+	ModShift    = uv.ModShift
+	ModAlt      = uv.ModAlt
+	ModCtrl     = uv.ModCtrl
+	ModCapsLock = uv.ModCapsLock
+)
+
 // Cursor is the cursor's position on the visible screen.
 type Cursor struct {
 	X, Y    int
@@ -294,6 +302,15 @@ func (s *Screen) StyledScrollback(i int) string {
 func (s *Screen) SendKey(k Key) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	k.Mod &^= uv.ModCapsLock | uv.ModNumLock | uv.ModScrollLock
+	// The emulator drops a key with any modifier but Alt, so text typed with
+	// Shift (h with Shift is "H") goes as its runes.
+	if k.Text != "" && k.Mod&^(uv.ModShift|uv.ModAlt) == 0 {
+		for _, r := range k.Text {
+			s.emu.SendKey(uv.KeyPressEvent{Code: r, Mod: k.Mod & uv.ModAlt})
+		}
+		return
+	}
 	s.emu.SendKey(uv.KeyPressEvent(k))
 }
 

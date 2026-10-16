@@ -329,6 +329,7 @@ func (m Model) selectedID() string {
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.ReportFocus = true
+	v.Cursor = m.terminalCursor()
 	return v
 }
 

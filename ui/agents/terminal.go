@@ -148,6 +148,26 @@ func (m Model) terminalLines(s server.SessionInfo) []string {
 	return lines
 }
 
+// terminalCursor is the attached session's cursor on the panel, shown only
+// while the terminal has focus, the live screen is on view and nothing covers
+// it.
+func (m Model) terminalCursor() *tea.Cursor {
+	a := m.attach
+	if !m.terminalFocused || !a.live() || a.offset > 0 || !a.cursor.Visible || m.copy != nil ||
+		m.jump != nil || m.create != nil || m.menuOpen || m.confirm.IsOpen || m.leaderPending || m.help.IsOpen ||
+		m.selectedID() != a.id {
+		return nil
+	}
+	if cols, rows := m.screenSize(); a.cursor.X >= cols || a.cursor.Y >= rows {
+		return nil
+	}
+	// Past the sidebar and seam and the panel's padding, below its header
+	// and the info lines.
+	x := m.width - m.mainWidth() + 1 + a.cursor.X
+	y := 1 + len(infoLines(m.sessions[m.cursor])) + a.cursor.Y
+	return tea.NewCursor(x, y)
+}
+
 // infoLines is the info row then a blank row, or none without an info row.
 func infoLines(s server.SessionInfo) []string {
 	if info := infoRow(s); info != "" {

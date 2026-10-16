@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -124,8 +125,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	defer ln.Close()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+	cmd.Env = terminalEnv(os.Environ())
 	if opts.GXSession != "" {
-		cmd.Env = append(os.Environ(), AgentSessionEnv+"="+opts.GXSession)
+		cmd.Env = append(cmd.Env, AgentSessionEnv+"="+opts.GXSession)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 	spawned := time.Now()
@@ -206,6 +208,16 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// ExitCode is -1 for a child killed by a signal.
 	code := strconv.Itoa(srv.exitCode)
 	return os.WriteFile(filepath.Join(dir, ExitCodeFile), []byte(code+"\n"), 0o644)
+}
+
+// terminalEnv is env with the TERM and COLORTERM of the holder's screen, the
+// child's terminal, in place of whatever the server had: launchd gives it no
+// TERM at all, and without one the child prints no colors.
+func terminalEnv(env []string) []string {
+	env = slices.DeleteFunc(slices.Clone(env), func(kv string) bool {
+		return strings.HasPrefix(kv, "TERM=") || strings.HasPrefix(kv, "COLORTERM=")
+	})
+	return append(env, "TERM=xterm-256color", "COLORTERM=truecolor")
 }
 
 // answerTrust types the trust dialog's key until the child is past starting

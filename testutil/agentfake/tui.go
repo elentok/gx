@@ -259,6 +259,8 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			}
 		default:
 			t.typed.WriteByte(ev.key)
+			// Echoed as claude does, the terminal's cursor after it.
+			t.draw()
 		}
 	}
 	return 0, nil
@@ -450,6 +452,17 @@ func (t *tui) writeBackgroundMarker(running bool) error {
 	return err
 }
 
+// colored wraps s in red when the terminal supports color. Like claude
+// (supports-color), it decides from TERM and COLORTERM alone, so a session
+// without them is colorless.
+func colored(s string) string {
+	term := os.Getenv("TERM")
+	if os.Getenv("COLORTERM") == "" && (term == "" || term == "dumb") {
+		return s
+	}
+	return "\x1b[31m" + s + "\x1b[0m"
+}
+
 // draw clears the terminal and redraws the screen for the current state.
 func (t *tui) draw() {
 	title := idleTitle
@@ -473,7 +486,7 @@ func (t *tui) draw() {
 		title = workingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
 	default:
-		rows = []string{"✻ Welcome to Claude Code", "", "> " + t.typed.String()}
+		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}
 	fmt.Fprint(t.out, "\x1b[2J\x1b[H"+title+strings.Join(rows, "\r\n"))
 }
