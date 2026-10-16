@@ -169,7 +169,8 @@ func (m Model) View() tea.View {
 	v.AltScreen = true
 	v.MouseMode = child.MouseMode
 	v.ReportFocus = child.ReportFocus
-	if child.Cursor != nil {
+	// The switcher has no cursor of its own; the page's would blink through it.
+	if child.Cursor != nil && !m.switcher.isOpen {
 		cursor := *child.Cursor
 		cursor.Y += ui.ChromeRows
 		v.Cursor = &cursor

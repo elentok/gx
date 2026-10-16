@@ -147,6 +147,40 @@ func TestSwitcher_EscAndCtrlOClose(t *testing.T) {
 	}
 }
 
+func TestSwitcher_CtrlCClosesAndForceQuits(t *testing.T) {
+	t.Parallel()
+	m, stub := openedSwitcher(t)
+
+	m, cmd := step(m, tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	if m.switcher.isOpen {
+		t.Fatal("ctrl+c should close the switcher")
+	}
+	if cmd == nil || !nav.IsForceQuit(cmd()) {
+		t.Fatal("ctrl+c should yield the force-quit command")
+	}
+	if len(stub.received) != 0 {
+		t.Fatalf("ctrl+c reached the page: %#v", stub.received)
+	}
+}
+
+func TestSwitcher_ViewShowsHintAndNoCursor(t *testing.T) {
+	t.Parallel()
+	m, stub := switcherApp(t)
+	stub.cursor = tea.NewCursor(1, 1)
+	if m.View().Cursor == nil {
+		t.Fatal("the page cursor should show while the switcher is closed")
+	}
+
+	m, _ = step(m, ctrlO)
+	v := m.View()
+	if v.Cursor != nil {
+		t.Fatalf("cursor = %+v, want none while the switcher is open", v.Cursor)
+	}
+	if !strings.Contains(ansi.Strip(v.Content), "enter select") {
+		t.Fatal("the switcher should show its key hint")
+	}
+}
+
 func TestSwitcher_TickStillReachesPage(t *testing.T) {
 	t.Parallel()
 	m, stub := openedSwitcher(t)
@@ -235,11 +269,10 @@ func TestSwitcher_MouseWhileOpen(t *testing.T) {
 	t.Parallel()
 	m, stub := openedSwitcher(t)
 
-	// Rows: header "git" at body line 0 of the list, then worktrees, log.
-	// The list starts below the frame's top border and the query line.
-	logRow := ui.ChromeRows + 2 + 2
+	// Rows: header "git" at list line 0, then worktrees, log.
+	logRow := ui.ChromeRows + switcherListTop + 2
 	m, _ = step(m, tea.MouseWheelMsg{X: switcherX + 3, Y: logRow, Button: tea.MouseWheelDown})
-	m, _ = step(m, tea.MouseClickMsg{X: switcherX + 3, Y: ui.ChromeRows + 2, Button: tea.MouseLeft})
+	m, _ = step(m, tea.MouseClickMsg{X: switcherX + 3, Y: ui.ChromeRows + switcherListTop, Button: tea.MouseLeft})
 	if !m.switcher.isOpen {
 		t.Fatal("wheel or a click on a group header should not close the switcher")
 	}

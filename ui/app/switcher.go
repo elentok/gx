@@ -18,9 +18,11 @@ type terminalFocuser interface{ TerminalFocused() bool }
 const (
 	switcherX     = 2
 	switcherWidth = 34
-	// switcherChrome is the frame's rows around the list: two borders and the
-	// query line.
-	switcherChrome = 3
+	// switcherListTop is the frame's rows above the list: the top border and
+	// the query line.
+	switcherListTop = 2
+	// switcherChrome is the frame's rows around the list, before the hint.
+	switcherChrome = switcherListTop + 1
 )
 
 var switcherPromptStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
@@ -56,17 +58,35 @@ func (m Model) switcherItems() []components.PickerItem {
 	return items
 }
 
-// switcherPicker is the picker sized to the rows left under the frame's top.
 func (m Model) switcherPicker() components.PickerState {
-	p := m.switcher.picker
-	p.Height = max(m.height-ui.ChromeRows-switcherChrome, 1)
+	p, _ := m.switcherLayout()
 	return p
 }
 
+// switcherLayout sizes the picker to the rows left under the frame's top and
+// wraps the hint to the frame. The hint, with the blank row the frame puts
+// above it, is dropped when it would leave the list no row.
+func (m Model) switcherLayout() (components.PickerState, string) {
+	p := m.switcher.picker
+	rows := m.height - ui.ChromeRows - switcherChrome
+	hint := lipgloss.NewStyle().Width(m.switcherInnerWidth()).Render(components.PickerHint)
+	if hintRows := lipgloss.Height(hint) + 1; rows-hintRows >= 1 {
+		rows -= hintRows
+	} else {
+		hint = ""
+	}
+	p.Height = max(rows, 1)
+	return p, hint
+}
+
 func (m Model) updateSwitcherKey(key tea.KeyPressMsg) (Model, tea.Cmd) {
-	if key.String() == "ctrl+o" {
+	switch key.String() {
+	case "ctrl+o":
 		m.switcher = switcher{}
 		return m, nil
+	case "ctrl+c":
+		m.switcher = switcher{}
+		return m, nav.ForceQuit()
 	}
 	picker, decided, accepted, _ := components.UpdatePicker(key, m.switcherPicker())
 	m.switcher.picker = picker
@@ -95,9 +115,8 @@ func (m Model) updateSwitcherMouse(msg tea.MouseMsg) (Model, tea.Cmd) {
 		m.switcher = switcher{}
 		return m, nil
 	}
-	// The list starts below the top border and the query line.
 	picker := m.switcherPicker()
-	i, ok := picker.HitRow(y - 2)
+	i, ok := picker.HitRow(y - switcherListTop)
 	if !ok {
 		return m, nil
 	}
@@ -113,17 +132,23 @@ func (m Model) switcherOuterWidth() int {
 	return switcherWidth
 }
 
+// switcherInnerWidth leaves out two border columns and one padding column
+// each side.
+func (m Model) switcherInnerWidth() int {
+	return max(m.switcherOuterWidth()-4, 1)
+}
+
 func (m Model) renderSwitcher() string {
-	picker := m.switcherPicker()
-	// Two border columns and one padding column each side.
-	innerW := max(m.switcherOuterWidth()-4, 1)
+	picker, hint := m.switcherLayout()
 	query := switcherPromptStyle.Render("›") + " " + picker.Filter
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         "go to",
-		Body:          query + "\n" + components.RenderPickerList(picker, innerW),
+		Body:          query + "\n" + components.RenderPickerList(picker, m.switcherInnerWidth()),
+		Hint:          hint,
 		Width:         m.switcherOuterWidth(),
 		BorderColor:   ui.ColorBorder,
 		TitleColor:    ui.ColorBlue,
+		HintColor:     ui.ColorSubtle,
 		TitleInBorder: true,
 	})
 }
