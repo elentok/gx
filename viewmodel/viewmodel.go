@@ -56,6 +56,20 @@ type State struct {
 	// Mode is the queue mode (server.ModeRunning, ModePaused or ModeDraining)
 	// from the last snapshot.
 	Mode string
+	// Sessions is the interactive sessions, oldest first, as the last snapshot
+	// delivered them.
+	Sessions []server.SessionInfo
+}
+
+// ActionableCount is how many sessions are Actionable.
+func (s State) ActionableCount() int {
+	n := 0
+	for _, se := range s.Sessions {
+		if se.Actionable.Reason != "" {
+			n++
+		}
+	}
+	return n
 }
 
 // Scope is which projects a view shows. It belongs to the view, not the
@@ -136,6 +150,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		Mode:             snap.Mode,
+		Sessions:         slices.Clone(snap.Sessions),
 	}
 	for _, t := range next.Tickets {
 		if it, ok := s.Iterations[t.Address]; ok && t.Status == statusClaimed {

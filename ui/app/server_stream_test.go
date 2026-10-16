@@ -28,6 +28,7 @@ type streamFake struct {
 	snapshots int
 	streams   []*fakeStream
 	mode      string
+	sessions  []server.SessionInfo
 	queue     []server.QueueItem
 	queueGets int
 }
@@ -45,7 +46,7 @@ func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
 	if f.snapErr != nil {
 		return server.Snapshot{}, f.snapErr
 	}
-	return server.Snapshot{Seq: f.seq, Tickets: f.tickets, Mode: f.mode}, nil
+	return server.Snapshot{Seq: f.seq, Tickets: f.tickets, Mode: f.mode, Sessions: f.sessions}, nil
 }
 
 func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
@@ -225,6 +226,30 @@ func TestServerStream_EventsAreReadWhateverTabIsOpen(t *testing.T) {
 			h.pump()
 			if h.m.stream.vm.HerdrUnavailable {
 				t.Errorf("event not applied after switching from %s", tab)
+			}
+		})
+	}
+}
+
+func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
+	for _, tab := range []nav.TabID{nav.TabWorktrees, nav.TabTickets, nav.TabStatus} {
+		t.Run(string(tab), func(t *testing.T) {
+			h, f := newStreamHarness(t)
+			h.probeUp()
+			h.switchTo(tab)
+
+			f.mu.Lock()
+			f.seq = 11
+			f.sessions = []server.SessionInfo{{ID: "s1", Actionable: server.SessionActionable{Reason: "blocked"}}}
+			f.mu.Unlock()
+			f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventSessionChanged, Address: "s1"}
+			h.pump()
+
+			if got := h.m.stream.vm.Sessions; len(got) != 1 || got[0].ID != "s1" {
+				t.Fatalf("sessions = %+v, want s1", got)
+			}
+			if got := h.m.stream.vm.ActionableCount(); got != 1 {
+				t.Errorf("ActionableCount = %d, want 1", got)
 			}
 		})
 	}

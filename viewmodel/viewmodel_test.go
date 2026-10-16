@@ -53,6 +53,7 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 		{server.EventLandRolledBack, resnap},
 		{server.EventTicketNudged, resnap},
 		{server.EventQueueChanged, resnap | viewmodel.EffectRefetchQueue},
+		{server.EventSessionChanged, resnap},
 		{server.EventHerdrUnavailable, viewmodel.EffectNone},
 		{server.EventHerdrAvailable, viewmodel.EffectNone},
 	}
@@ -66,6 +67,35 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 				t.Fatalf("seq = %d, event not applied", got.Seq)
 			}
 		})
+	}
+}
+
+func TestApplySnapshot_CarriesSessions(t *testing.T) {
+	sessions := []server.SessionInfo{{ID: "s1"}, {ID: "s2"}}
+	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 12, Sessions: sessions})
+	if len(s.Sessions) != 2 || s.Sessions[0].ID != "s1" || s.Sessions[1].ID != "s2" {
+		t.Fatalf("sessions = %+v, want s1, s2", s.Sessions)
+	}
+	sessions[0].ID = "mutated"
+	if s.Sessions[0].ID != "s1" {
+		t.Fatal("state shares the snapshot's sessions slice")
+	}
+	if s = s.ApplySnapshot(server.Snapshot{Seq: 13}); len(s.Sessions) != 0 {
+		t.Fatalf("sessions after empty snapshot = %+v, want none", s.Sessions)
+	}
+}
+
+func TestActionableCount(t *testing.T) {
+	s := viewmodel.State{}.ApplySnapshot(server.Snapshot{Sessions: []server.SessionInfo{
+		{ID: "a", Actionable: server.SessionActionable{Reason: "blocked"}},
+		{ID: "b"},
+		{ID: "c", Actionable: server.SessionActionable{Reason: "review"}},
+	}})
+	if got := s.ActionableCount(); got != 2 {
+		t.Fatalf("ActionableCount = %d, want 2", got)
+	}
+	if got := (viewmodel.State{}).ActionableCount(); got != 0 {
+		t.Fatalf("empty ActionableCount = %d, want 0", got)
 	}
 }
 
