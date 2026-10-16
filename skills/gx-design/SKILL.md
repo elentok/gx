@@ -3,7 +3,8 @@ name: gx-design
 description: >-
   Walk one epic through map, review and implement: chart and resolve a wayfinder map, draft and
   review a spec, then publish an `<epic>-impl` epic. Detects the next step from tracker state; run
-  `/gx-design <epic>`. Manual; depends on external skills.
+  `/gx-design <epic>`, or `/gx-design <epic/NN>` to resolve one map ticket. Manual; depends on
+  external skills.
 disable-model-invocation: true
 ---
 
@@ -11,7 +12,9 @@ disable-model-invocation: true
 
 `/gx-design <epic>` drives one epic from idea to a handed-off implementation epic. The tracker is
 always gx's local tracker, and the destination is always a spec: this skill never implements or
-touches code. `<epic>` is `<project:epic>`, or a bare epic slug in the current project. Read
+touches code. `<epic>` is `<project:epic>`, or a bare epic slug in the current project. A ticket
+address (`<project:epic/NN>`, or `<epic/NN>`) names the epic plus one map ticket to work: see step 3.
+Read
 [gx-local-tracker.md](../gx-local-tracker.md) for the ticket commands and the Map epics section;
 don't restate them here.
 
@@ -45,6 +48,10 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    change. Then rework them and stop.
 3. **Open tickets, or a non-empty `## Not yet specified`** → follow wayfinder's "Work through the
    map", resolving exactly **one** ticket. Never more per run: HITL tickets must stay interactive.
+   Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
+   open, or its `blocked_by` are not all closed, say so and stop. A ticket address only ever runs
+   this step: when step 1 or 2 matches first, run that step instead and name the ticket in the
+   "Next:" line.
 4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read `to-spec` and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies.
@@ -106,3 +113,14 @@ Examples:
 ✅ Map: the way is clear. Next: review — run /gx-design <epic> in a fresh session
 ✅ Review: findings resolved, spec amended, epic <epic>-impl created. Next: implement — launch it from the TUI Queue tab
 ```
+
+Right after printing that line, raise the session as Actionable with the same "Next:" text. When
+the next step is a prompt, add it as the Action, after the fresh-session command
+(`/clear` in Claude, `/new` in Codex):
+
+```
+gx agent actionable "<phase>: <what happened>. Next: <phase>" --send "/clear" --send "/gx-design <epic>"
+gx agent actionable "Review: <epic>-impl created. Next: implement — launch it from the TUI Queue tab"
+```
+
+Outside a gx session it prints a note and does nothing, so always call it.
