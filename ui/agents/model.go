@@ -373,7 +373,7 @@ func (m Model) render() string {
 		out = ui.OverlayCenter(out, m.confirm.View(m.width), m.width, m.height)
 	}
 	if m.leaderPending {
-		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], leaderBindings), m.width, m.height)
+		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], m.leaderBindings()), m.width, m.height)
 	}
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)

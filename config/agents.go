@@ -28,11 +28,14 @@ type AgentsConfig struct {
 
 	// LeaderKey lists the keys that start a leader sequence in the Agents tab.
 	// The file accepts one key string or a list.
-	LeaderKey     []string            `json:"leader-key"`
-	ResumeOnStart bool                `json:"resume-on-start"`
-	Banners       AgentsBannersConfig `json:"banners"`
-	Sounds        AgentsSoundsConfig  `json:"sounds"`
-	ClaudeArgs    []string            `json:"claude-args,omitempty"`
+	LeaderKey []string `json:"leader-key"`
+	// FocusSidebarKey lists the keys that leave the Agents terminal for the
+	// sidebar, read like LeaderKey.
+	FocusSidebarKey []string            `json:"focus-sidebar-key"`
+	ResumeOnStart   bool                `json:"resume-on-start"`
+	Banners         AgentsBannersConfig `json:"banners"`
+	Sounds          AgentsSoundsConfig  `json:"sounds"`
+	ClaudeArgs      []string            `json:"claude-args,omitempty"`
 }
 
 // AgentsBannersConfig switches interactive-session OS banners.
@@ -51,21 +54,26 @@ type AgentsSoundsConfig struct {
 // DefaultLeaderKey is the Agents tab leader key when none is configured.
 const DefaultLeaderKey = "ctrl+a"
 
+// DefaultFocusSidebarKey is the Agents tab focus-sidebar key when none is
+// configured.
+const DefaultFocusSidebarKey = "ctrl+q"
+
 // DefaultAgentsConfig returns the agents defaults.
 func DefaultAgentsConfig() AgentsConfig {
 	return AgentsConfig{
-		Claude:        AgentConfig{Model: defaultClaudeModel, Effort: defaultClaudeEffort},
-		Codex:         AgentConfig{Model: defaultCodexModel, Effort: defaultCodexEffort},
-		LeaderKey:     []string{DefaultLeaderKey},
-		ResumeOnStart: true,
-		Banners:       AgentsBannersConfig{Enabled: true},
-		Sounds:        AgentsSoundsConfig{Enabled: true},
+		Claude:          AgentConfig{Model: defaultClaudeModel, Effort: defaultClaudeEffort},
+		Codex:           AgentConfig{Model: defaultCodexModel, Effort: defaultCodexEffort},
+		LeaderKey:       []string{DefaultLeaderKey},
+		FocusSidebarKey: []string{DefaultFocusSidebarKey},
+		ResumeOnStart:   true,
+		Banners:         AgentsBannersConfig{Enabled: true},
+		Sounds:          AgentsSoundsConfig{Enabled: true},
 	}
 }
 
-// parseLeaderKey reads leader-key as one key or a list of keys. It returns
+// parseKeys reads a key setting as one key or a list of keys. It returns
 // false for anything else, or for a blank key, so the caller keeps the default.
-func parseLeaderKey(raw json.RawMessage) ([]string, bool) {
+func parseKeys(raw json.RawMessage) ([]string, bool) {
 	var one string
 	if json.Unmarshal(raw, &one) == nil {
 		raw, _ = json.Marshal([]string{one})

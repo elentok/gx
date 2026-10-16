@@ -204,9 +204,10 @@ func Parse(data []byte) (Config, error) {
 				Model  *string `json:"model"`
 				Effort *string `json:"effort"`
 			} `json:"codex"`
-			LeaderKey     json.RawMessage `json:"leader-key"`
-			ResumeOnStart *bool           `json:"resume-on-start"`
-			Banners       *struct {
+			LeaderKey       json.RawMessage `json:"leader-key"`
+			FocusSidebarKey json.RawMessage `json:"focus-sidebar-key"`
+			ResumeOnStart   *bool           `json:"resume-on-start"`
+			Banners         *struct {
 				Enabled *bool `json:"enabled"`
 			} `json:"banners"`
 			Sounds *struct {
@@ -328,8 +329,11 @@ func Parse(data []byte) (Config, error) {
 		if raw.Agents.Codex != nil {
 			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex.Model, raw.Agents.Codex.Effort)
 		}
-		if keys, ok := parseLeaderKey(raw.Agents.LeaderKey); ok {
+		if keys, ok := parseKeys(raw.Agents.LeaderKey); ok {
 			cfg.Agents.LeaderKey = keys
+		}
+		if keys, ok := parseKeys(raw.Agents.FocusSidebarKey); ok {
+			cfg.Agents.FocusSidebarKey = keys
 		}
 		if raw.Agents.ResumeOnStart != nil {
 			cfg.Agents.ResumeOnStart = *raw.Agents.ResumeOnStart

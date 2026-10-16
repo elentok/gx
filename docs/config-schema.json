@@ -399,6 +399,14 @@
           ],
           "default": "ctrl+a"
         },
+        "focus-sidebar-key": {
+          "description": "Key (or list of keys) that moves focus from the Agents terminal to the sidebar, showing the sidebar if hidden. The leader then this key sends it to the session. A malformed or blank value falls back to the default. Default: ctrl+q.",
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "default": "ctrl+q"
+        },
         "resume-on-start": {
           "type": "boolean",
           "description": "Resume the interactive sessions that were running when the server last stopped. Default: true.",

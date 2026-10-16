@@ -51,6 +51,29 @@ func TestParseAgentsSessionKeysSetValues(t *testing.T) {
 	}
 }
 
+func TestParseAgentsFocusSidebarKey(t *testing.T) {
+	cases := []struct {
+		name, agents string
+		want         []string
+	}{
+		{"default", `{}`, []string{"ctrl+q"}},
+		{"string", `{"focus-sidebar-key":"ctrl+g"}`, []string{"ctrl+g"}},
+		{"list", `{"focus-sidebar-key":["ctrl+g","f12"]}`, []string{"ctrl+g", "f12"}},
+		{"blank falls back", `{"focus-sidebar-key":""}`, []string{"ctrl+q"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := Parse([]byte(`{"agents":` + tc.agents + `}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(cfg.Agents.FocusSidebarKey, tc.want) {
+				t.Errorf("FocusSidebarKey = %v, want %v", cfg.Agents.FocusSidebarKey, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseAgentsLeaderKey(t *testing.T) {
 	cases := []struct {
 		name, raw string

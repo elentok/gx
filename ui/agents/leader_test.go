@@ -179,6 +179,66 @@ func TestLeader_TabMovesFocus(t *testing.T) {
 	}
 }
 
+var ctrlQ = tea.KeyPressMsg{Code: 'q', Mod: tea.ModCtrl}
+
+func TestTerminal_FocusSidebarKeyFocusesAndShowsTheSidebar(t *testing.T) {
+	m, a := focusedTerminal(t)
+	m.hideSidebar = true
+	m = update1(t, m, ctrlQ)
+	if m.terminalFocused || m.hideSidebar {
+		t.Fatalf("terminalFocused=%v hideSidebar=%v, want the sidebar shown and focused", m.terminalFocused, m.hideSidebar)
+	}
+	if len(a.keys) != 0 {
+		t.Fatalf("ctrl+q reached the session: %+v", a.keys)
+	}
+}
+
+func TestSidebar_FocusSidebarKeyDoesNothing(t *testing.T) {
+	m, _ := attachModel(t, &fakeHolders{attaches: map[string]*fakeAttach{}})
+	m = update1(t, m, ctrlQ)
+	if m.terminalFocused || m.hideSidebar {
+		t.Fatalf("terminalFocused=%v hideSidebar=%v, want the sidebar unchanged", m.terminalFocused, m.hideSidebar)
+	}
+}
+
+func TestLeader_FocusSidebarKeySendsItToTheSession(t *testing.T) {
+	m, a := focusedTerminal(t)
+	m, _ = leaderThen(t, m, ctrlQ)
+	if !m.terminalFocused {
+		t.Fatal("leader ctrl+q left the terminal")
+	}
+	if len(a.keys) != 1 || a.keys[0].Code != 'q' || a.keys[0].Mod != tea.ModCtrl {
+		t.Fatalf("sent %+v, want one ctrl+q", a.keys)
+	}
+}
+
+func TestTerminal_ConfiguredFocusSidebarKeyReplacesCtrlQ(t *testing.T) {
+	m, a := focusedTerminal(t)
+	m.settings.Agents.FocusSidebarKey = []string{"ctrl+b"}
+	m = update1(t, m, ctrlQ)
+	if !m.terminalFocused || len(a.keys) != 1 {
+		t.Fatalf("terminalFocused=%v sent=%+v, want ctrl+q sent to the session", m.terminalFocused, a.keys)
+	}
+	m = update1(t, m, ctrlB)
+	if m.terminalFocused {
+		t.Fatal("the configured key did not focus the sidebar")
+	}
+}
+
+func TestFocusSidebarKey_ListedInHelpAndWhichKeyBox(t *testing.T) {
+	m, _ := focusedTerminal(t)
+	m.settings.Agents.FocusSidebarKey = []string{"ctrl+g"}
+	m = update1(t, m, tea.WindowSizeMsg{Width: 100, Height: 40})
+	m = update1(t, m, ctrlA)
+	if view := plainView(m); !strings.Contains(view, "ctrl+g") {
+		t.Fatalf("which-key box does not name the focus-sidebar key:\n%s", view)
+	}
+	m = update1(t, m, letter("?"))
+	if view := plainView(m); !strings.Contains(view, "ctrl+g") || !strings.Contains(view, "focus sidebar") {
+		t.Fatalf("help does not list the focus-sidebar key:\n%s", view)
+	}
+}
+
 func TestLeader_DigitSwitchesTab(t *testing.T) {
 	m, _ := focusedTerminal(t)
 	_, cmd := leaderThen(t, m, letter("2"))

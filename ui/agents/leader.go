@@ -2,6 +2,7 @@ package agents
 
 import (
 	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -61,6 +62,25 @@ func (m Model) leaderKeys() []string {
 	return m.settings.Agents.LeaderKey
 }
 
+func (m Model) focusSidebarKeys() []string {
+	if len(m.settings.Agents.FocusSidebarKey) == 0 {
+		return []string{config.DefaultFocusSidebarKey}
+	}
+	return m.settings.Agents.FocusSidebarKey
+}
+
+// leaderBindings is leaderBindings with the focus-sidebar key named on the
+// switch-focus row, its one-key alternative.
+func (m Model) leaderBindings() []keys.Binding {
+	bs := slices.Clone(leaderBindings)
+	for i, b := range bs {
+		if b.Keys() == "tab" {
+			bs[i].Title += " (" + m.focusSidebarKeys()[0] + " to sidebar)"
+		}
+	}
+	return bs
+}
+
 // updateKey matches the leader before anything else, in either focus, so the
 // leader never reaches the session on its own.
 func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -83,13 +103,16 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateCopyKey(msg)
 	case m.leaderPending:
 		m.leaderPending = false
-		if isLeader {
+		if isLeader || slices.Contains(m.focusSidebarKeys(), msg.String()) {
 			m.sendKey(msg)
 			return m, nil
 		}
 		return m.runLeaderAction(msg.String())
 	case isLeader:
 		m.leaderPending = true
+		return m, nil
+	case m.terminalFocused && slices.Contains(m.focusSidebarKeys(), msg.String()):
+		m.terminalFocused, m.hideSidebar = false, false
 		return m, nil
 	case m.terminalFocused:
 		m.sendKey(msg)
@@ -136,7 +159,10 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m, nav.OpenSwitcher()
 	case "?":
 		m.help = help.NewModel([]help.KeySection{
-			help.NewKeySection("Leader ("+m.leaderKeys()[0]+" then)", leaderBindings...),
+			help.NewKeySection("Terminal", keys.Binding{
+				Seq: m.focusSidebarKeys()[:1], Display: strings.Join(m.focusSidebarKeys(), "/"), Title: "focus sidebar",
+			}),
+			help.NewKeySection("Leader ("+m.leaderKeys()[0]+" then)", m.leaderBindings()...),
 			help.NewKeySection("Sidebar", sidebarBindings...),
 		})
 		m.help.Open(m.width, m.height)
