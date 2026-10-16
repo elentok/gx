@@ -6,6 +6,7 @@
 package screen
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -325,7 +326,46 @@ func (s *Screen) SendKey(k Key) {
 	if k.Code == uv.KeyEnter && k.Mod&^uv.ModAlt == uv.ModShift {
 		k.Mod = uv.ModAlt
 	}
+	if seq, ok := modifiedNavSeq(k); ok {
+		s.emu.SendText(seq)
+		return
+	}
 	s.emu.SendKey(uv.KeyPressEvent(k))
+}
+
+// navFinals is the CSI final byte of the cursor keys, Home and End, and
+// navTildes the CSI number of the keys that end in "~".
+var (
+	navFinals = map[rune]byte{uv.KeyUp: 'A', uv.KeyDown: 'B', uv.KeyRight: 'C', uv.KeyLeft: 'D', uv.KeyHome: 'H', uv.KeyEnd: 'F'}
+	navTildes = map[rune]int{uv.KeyInsert: 2, uv.KeyDelete: 3, uv.KeyPgUp: 5, uv.KeyPgDown: 6}
+)
+
+// modifiedNavSeq encodes a navigation key with Shift, Alt or Ctrl the way
+// xterm does ("\x1b[1;3D" is Alt+Left). The emulator drops such keys with
+// Shift or Ctrl, and sends Alt as a leading ESC, which agents such as Claude
+// Code do not read as a word jump.
+func modifiedNavSeq(k Key) (string, bool) {
+	mods := k.Mod & (uv.ModShift | uv.ModAlt | uv.ModCtrl)
+	if mods == 0 {
+		return "", false
+	}
+	param := 1
+	if mods&uv.ModShift != 0 {
+		param++
+	}
+	if mods&uv.ModAlt != 0 {
+		param += 2
+	}
+	if mods&uv.ModCtrl != 0 {
+		param += 4
+	}
+	if final, ok := navFinals[k.Code]; ok {
+		return fmt.Sprintf("\x1b[1;%d%c", param, final), true
+	}
+	if n, ok := navTildes[k.Code]; ok {
+		return fmt.Sprintf("\x1b[%d;%d~", n, param), true
+	}
+	return "", false
 }
 
 func (s *Screen) setMouseMode(m ansi.Mode, on bool) {

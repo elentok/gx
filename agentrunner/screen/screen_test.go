@@ -383,6 +383,12 @@ func TestScreen_SendKeyTypesShiftedText(t *testing.T) {
 		{"plain letter", screen.Key{Code: 'h', Text: "h"}, "h"},
 		{"shift enter", screen.Key{Code: screen.KeyEnter, Mod: screen.ModShift}, "\x1b\r"},
 		{"plain enter", screen.Key{Code: screen.KeyEnter}, "\r"},
+		{"alt left", screen.Key{Code: screen.KeyLeft, Mod: screen.ModAlt}, "\x1b[1;3D"},
+		{"alt right", screen.Key{Code: screen.KeyRight, Mod: screen.ModAlt}, "\x1b[1;3C"},
+		{"ctrl left", screen.Key{Code: screen.KeyLeft, Mod: screen.ModCtrl}, "\x1b[1;5D"},
+		{"shift up", screen.Key{Code: screen.KeyUp, Mod: screen.ModShift}, "\x1b[1;2A"},
+		{"plain left", screen.Key{Code: screen.KeyLeft}, "\x1b[D"},
+		{"alt b", screen.Key{Code: 'b', Mod: screen.ModAlt}, "\x1bb"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
