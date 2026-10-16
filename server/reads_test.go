@@ -210,3 +210,22 @@ func TestSnapshot_CarriesTheEpicsMergedAt(t *testing.T) {
 		t.Errorf("tickets = %+v, want epic-a's merged_at on its ticket only", snap.Tickets)
 	}
 }
+
+func TestSnapshot_CarriesTheEpicsMapKind(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
+	epicMD := filepath.Join(store, "proj", "epic-a", "ticket.md")
+	if err := os.WriteFile(epicMD, []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Tickets) != 2 || !snap.Tickets[0].EpicIsMap || snap.Tickets[1].EpicIsMap {
+		t.Errorf("tickets = %+v, want epic-a's map kind on its ticket only", snap.Tickets)
+	}
+}

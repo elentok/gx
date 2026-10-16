@@ -303,6 +303,24 @@ func TestServerStream_SessionFocusShowsSessionInThisTUIOnly(t *testing.T) {
 	}
 }
 
+func TestStartSession_OpensThePrefilledCreateFormOnTheAgentsTab(t *testing.T) {
+	h, _ := newStreamHarness(t)
+	h.probeUp()
+
+	h.send(ticketsui.StartSessionMsg{Project: "gx", Name: "map/01", Prompt: "/gx-design gx:map/01", Ticket: "gx:map/01"})
+	h.pump()
+
+	if got := h.m.navState.ActiveTab(); got != nav.TabAgents {
+		t.Fatalf("active tab = %s, want %s", got, nav.TabAgents)
+	}
+	view := ansi.Strip(h.m.activePage().model.(agentsui.Model).View().Content)
+	for _, want := range []string{"New session", "map/01", "/gx-design gx:map/01", "gx:map/01"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view lacks %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestServerStream_GapAndClosedStreamEachResnapshotOnce(t *testing.T) {
 	cases := map[string]func(s *fakeStream){
 		"gap":    func(s *fakeStream) { s.ch <- herdrEvent(15) },

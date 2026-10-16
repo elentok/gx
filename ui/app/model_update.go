@@ -5,6 +5,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -54,6 +55,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Before any page routing: the stream is read whichever tab is open.
 	if next, cmd, ok := m.updateServerStream(msg); ok {
+		return next, tea.Batch(notifyCmd, cmd)
+	}
+
+	if req, ok := msg.(ticketsui.StartSessionMsg); ok {
+		next, cmd := m.startSession(req)
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 

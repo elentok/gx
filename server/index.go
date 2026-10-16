@@ -51,6 +51,9 @@ type TicketInfo struct {
 	// rather than in a separate epic list so a stamp reaches clients through
 	// the same ticket-changed events as any other edit.
 	EpicMergedAt time.Time `json:"epic_merged_at,omitzero"`
+	// EpicIsMap is set on a wayfinder map epic's tickets, riding along like
+	// EpicMergedAt.
+	EpicIsMap bool `json:"epic_is_map,omitempty"`
 
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.
@@ -118,6 +121,7 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 			for _, t := range e.Tickets {
 				info := ticketInfo(project, filepath.Base(e.Path), t)
 				info.EpicMergedAt = e.MergedAt
+				info.EpicIsMap = e.IsMap
 				list = append(list, info)
 			}
 		}

@@ -113,6 +113,13 @@ type actionsMenuReadyMsg struct {
 // shells out to ps, so the menu opens once a Cmd has resolved it.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
+	if ok && r.isEpic() && !r.archived && m.epicAt(r).IsMap {
+		epic := m.epicAt(r)
+		prompt := fmt.Sprintf("Suggested actions for %q:", epic.Name)
+		// Path carries the address startSessionCmd reads, as on a ticket row.
+		m.actionsMenu = m.actionsMenu.Open(epic.Name, epic.Name, "", prompt, []components.MenuItem{startSessionMenuItem})
+		return m, nil
+	}
 	if ok && r.isEpic() && m.serverAPI != nil && !r.archived && epicSection(m.epicAt(r)) == sectionComplete {
 		epic := m.epicAt(r)
 		prompt := fmt.Sprintf("Suggested actions for %q:", epic.Name)
@@ -130,11 +137,15 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
 	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
 	herdrUnavailable := m.settings.HerdrUnavailable
+	startSession := epic.IsMap && status == tickets.StatusOpen
 	m.actionsMenuPending = ticket.Path
 	return m, func() tea.Msg {
 		it, live := m.serverIteration(ticket.Path)
 		paneLive := live && it.Tab != ""
 		items := suggestedActionItems(status, ticket, paneLive, nativeAgentLive(ticket.Path), herdrUnavailable)
+		if startSession {
+			items = append([]components.MenuItem{startSessionMenuItem}, items...)
+		}
 		return actionsMenuReadyMsg{path: ticket.Path, epicName: epicName, ticketID: ticket.DisplayNumber(), prompt: prompt, items: items}
 	}
 }
@@ -172,6 +183,9 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if result.Action == actionMerge {
 		return m, cmdEpicMerge(m.serverAPI, result.EpicName)
+	}
+	if result.Action == actionStartSession {
+		return m, startSessionCmd(result.Path)
 	}
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)

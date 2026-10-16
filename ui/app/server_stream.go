@@ -356,6 +356,21 @@ func (m Model) focusSession(id string) (Model, tea.Cmd) {
 	return m, cmd
 }
 
+// startSession switches to the Agents tab with its create form open,
+// pre-filled from a Tickets-tab "Start session…".
+func (m Model) startSession(req ticketsui.StartSessionMsg) (Model, tea.Cmd) {
+	m, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
+	current := m.activePage()
+	agents, ok := current.model.(agentsui.Model)
+	if !ok {
+		return m, cmd
+	}
+	agents, open := agents.OpenCreateForm(agentsui.CreatePrefill{Project: req.Project, Name: req.Name, Prompt: req.Prompt, Ticket: req.Ticket})
+	current.model = agents
+	m.setActivePage(current)
+	return m, tea.Batch(cmd, open)
+}
+
 // deliverServerState hands the current state to the active page only; hidden
 // pages catch up when they are switched to (see applySwitch).
 func (m Model) deliverServerState() (Model, tea.Cmd) {
