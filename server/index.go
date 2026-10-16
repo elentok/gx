@@ -77,6 +77,9 @@ type Snapshot struct {
 	// Mode is ModeRunning, ModePaused or ModeDraining; filled in by the handler.
 	// Empty from a server that predates it.
 	Mode string `json:"mode,omitempty"`
+	// AFK is set while AFK mode sends session banners to chat too; filled in by
+	// the handler.
+	AFK bool `json:"afk,omitempty"`
 	// Sessions are the interactive sessions, oldest first; filled in by the
 	// handler.
 	Sessions []SessionInfo `json:"sessions"`

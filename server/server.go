@@ -237,6 +237,7 @@ type Server struct {
 
 	queued      *queueStore
 	pause       *pauseState
+	afk         *afkState
 	ledger      *budgetLedger
 	budgetNotes budgetNotes
 	hardGrace   hardGrace
@@ -327,6 +328,11 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, fmt.Errorf("load queue pause: %w", err)
 	}
+	afk, err := openAFK(cfg.StateDir)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("load afk mode: %w", err)
+	}
 	ledger, err := openLedger(cfg.StateDir, cfg.BudgetSoftLimit, cfg.BudgetHardLimit)
 	if err != nil {
 		lock.release()
@@ -388,6 +394,7 @@ func New(cfg Config) (*Server, error) {
 
 		queued:      queued,
 		pause:       pause,
+		afk:         afk,
 		ledger:      ledger,
 		costOf:      iterationCost,
 		mergeInto:   git.MergeBranchInto,
@@ -468,6 +475,7 @@ var routeTable = []struct {
 	{"POST /v1/sessions/actionable", (*Server).sessionActionableWrite},
 	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.runSessionAction)(w, r) }},
 	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumeSession)(w, r) }},
+	{"POST /v1/afk", (*Server).afkWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
@@ -516,6 +524,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Pending = s.pendingRows()
 	snap.Mode = s.pause.currentMode()
+	snap.AFK = s.afk.isOn()
 	sessions, err := s.listSessions()
 	if err != nil {
 		s.log.Warn("list sessions for snapshot", "err", err)

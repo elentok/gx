@@ -277,6 +277,22 @@ func (c *ServerChat) Notice(n ServerNotice) {
 	}
 }
 
+// notifyKindSessionAlert tags an interactive session's banner sent to chat in
+// AFK mode.
+const notifyKindSessionAlert = "session-alert"
+
+// SessionAlert sends an interactive session's banner, title and body as the
+// banner has them, to the project's destinations. The gate source is the
+// server's: a session has no ticket to write a mute onto.
+func (c *ServerChat) SessionAlert(project string, override *ServerChatConfig, title, body string) {
+	if c == nil {
+		return
+	}
+	for _, s := range c.projectSinks(override) {
+		s.send(s.style.chatStyle.Message("🔔", title, "", body, s.style.identityLine(project, "")), notifyKindSessionAlert, serverSource, "")
+	}
+}
+
 // Close flushes every queued batch, bounded by the transport timeout.
 func (c *ServerChat) Close() {
 	if c == nil {

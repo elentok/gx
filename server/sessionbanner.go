@@ -59,7 +59,8 @@ func (s *Server) fireBanner(id string) {
 	t := b.pending[id]
 	delete(b.pending, id)
 	b.mu.Unlock()
-	if s.sessionWatches.isStopped() || s.focus.onScreen(id) {
+	afk, onScreen := s.afk.isOn(), s.focus.onScreen(id)
+	if s.sessionWatches.isStopped() || (onScreen && !afk) {
 		return
 	}
 	_, m, res, err := s.sessionDir(id)
@@ -70,23 +71,32 @@ func (s *Server) fireBanner(id string) {
 	if quiet := info.Status.State == SessionWorking || info.Status.State == SessionStarting; quiet && m.Actionable.Reason == "" {
 		return
 	}
+	title, body := bannerTitle(info), t.reason
+	if body == "" {
+		body = sessionStatusText(info)
+	}
+	// AFK adds chat without the focus check; the banner and sound keep theirs.
+	if afk {
+		s.chat.SessionAlert(info.Project, s.chatOverride(info.Project), title, body)
+	}
+	if onScreen {
+		return
+	}
 	set := s.settings.Load()
 	if set.AgentsBanners {
-		s.sendSessionBanner(info, t.reason)
+		s.sendSessionBanner(info, title, body)
 	}
 	if set.AgentsSounds.Enabled {
 		go s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound)
 	}
 }
 
-func (s *Server) sendSessionBanner(info SessionInfo, reason string) {
-	body := reason
-	if body == "" {
-		body = sessionStatusText(info)
-	}
+func bannerTitle(info SessionInfo) string { return info.Project + " · " + info.Name }
+
+func (s *Server) sendSessionBanner(info SessionInfo, title, body string) {
 	term, connected := s.focus.clickTarget()
 	note := osnotify.Notification{
-		Title:    info.Project + " · " + info.Name,
+		Title:    title,
 		Body:     body,
 		Group:    "gx-agent-" + info.ID,
 		Activate: termBundleIDs[term],

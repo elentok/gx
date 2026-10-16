@@ -419,6 +419,13 @@ func (c *Client) Sessions(ctx context.Context) ([]server.SessionInfo, error) {
 	return l, err
 }
 
+// SetAFK sets AFK mode; a nil on toggles it.
+func (c *Client) SetAFK(ctx context.Context, on *bool) (server.AFKResult, error) {
+	var res server.AFKResult
+	err := c.post(ctx, "/v1/afk", server.AFKRequest{On: on}, &res)
+	return res, err
+}
+
 // BudgetOverride lifts the budget latches. A refusal is a result (Refused set),
 // not an error.
 func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error) {
