@@ -13,6 +13,13 @@ import (
 	"github.com/elentok/gx/nativerunner"
 )
 
+// resumeSpacing staggers a server start's auto-resumes.
+const resumeSpacing = 100 * time.Millisecond
+
+// resumeCrashWindow is how soon an auto-resumed child may exit and still
+// count as crashed, whatever its exit code.
+const resumeCrashWindow = 10 * time.Second
+
 // resumeSession runs the harness's Resume of an Exited session's newest
 // conversation in a new holder, in the same dir. The gx session carries on:
 // id, name, Unread, Actionable and Session ticket are kept.
@@ -26,29 +33,47 @@ func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
 	if meta.Status.State != SessionExited {
 		return sessionRefusal(ReasonSessionLive, fmt.Sprintf("session %s is live", req.ID)), nil
 	}
+	if res := resumeRefusal(meta); res.Refused {
+		return res, nil
+	}
+	if err := s.startResumedHolder(dir, &meta, time.Time{}); err != nil {
+		return SessionResult{}, err
+	}
+	info := meta.info()
+	return SessionResult{Session: &info}, nil
+}
+
+// resumeRefusal is why meta's session cannot be resumed, if it cannot.
+func resumeRefusal(meta sessionMeta) SessionResult {
 	if fi, err := os.Stat(meta.Dir); err != nil || !fi.IsDir() {
-		return sessionRefusal(ReasonSessionDirGone, "dir is gone"), nil
+		return sessionRefusal(ReasonSessionDirGone, "dir is gone")
 	}
 	h, err := harness.Lookup(agentrunner.Kind(meta.Harness))
 	if err != nil {
-		return sessionRefusal(ReasonSessionUnknownHarness, err.Error()), nil
+		return sessionRefusal(ReasonSessionUnknownHarness, err.Error())
 	}
 	if _, ok := h.Resume(meta.ConversationID, harness.LaunchOptions{}); !ok {
-		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness)), nil
+		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
 	}
+	return SessionResult{}
+}
+
+// startResumedHolder starts the session's next run on its saved
+// conversation and watches it; an exit before crashUntil is crashed. The
+// caller holds metaMu.
+func (s *Server) startResumedHolder(dir string, meta *sessionMeta, crashUntil time.Time) error {
 	if err := clearOldHolder(dir); err != nil {
-		return SessionResult{}, err
+		return err
 	}
 	meta.Run++
 	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = SessionStatus{}, time.Now(), "", false
-	if err := s.startSessionHolder(dir, &meta, 0, 0, true); err != nil {
-		return SessionResult{}, err
+	if err := s.startSessionHolder(dir, meta, 0, 0, true); err != nil {
+		return err
 	}
-	run := meta.Run
-	s.sessionWatches.start(func() { s.watchSession(dir, req.ID, run) })
-	s.events.publish(EventSessionChanged, req.ID)
-	info := meta.info()
-	return SessionResult{Session: &info}, nil
+	id, run := meta.ID, meta.Run
+	s.sessionWatches.start(func() { s.watchSession(dir, id, run, crashUntil) })
+	s.events.publish(EventSessionChanged, id)
+	return nil
 }
 
 // clearOldHolder waits for the old holder to stop serving, since closing its
@@ -72,4 +97,90 @@ func clearOldHolder(dir string) error {
 		}
 	}
 	return nil
+}
+
+// restoreSessions picks up every live session on server start. A live holder
+// is watched again; the watch's first status, diffed against the saved one,
+// raises any Unread missed while the server was down. A holder that left an
+// exit, or of a session the person stopped, ended its session. Any other dead
+// holder is auto-resumed once.
+func (s *Server) restoreSessions() {
+	list, err := s.listSessions()
+	if err != nil {
+		s.log.Warn("restore sessions", "err", err)
+		return
+	}
+	var dead []string
+	for _, info := range list {
+		if info.Status.State == SessionExited {
+			continue
+		}
+		dir := filepath.Join(s.cfg.SessionsDir, info.ID)
+		if _, err := nativerunner.DialHolder(dir); err == nil {
+			meta, err := readSessionMeta(dir)
+			if err != nil {
+				s.log.Warn("read session meta", "session", info.ID, "err", err)
+				continue
+			}
+			s.sessionWatches.start(func() { s.watchSession(dir, info.ID, meta.Run, time.Time{}) })
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil || info.Stopped {
+			exit := savedSessionExit(dir)
+			s.updateSessionMeta(dir, info.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) })
+			continue
+		}
+		dead = append(dead, info.ID)
+	}
+	s.sessionWatches.start(func() {
+		for i, id := range dead {
+			if i > 0 {
+				select {
+				case <-s.sessionWatches.stop:
+					return
+				case <-time.After(resumeSpacing):
+				}
+			}
+			s.autoResumeSession(id)
+		}
+	})
+}
+
+// autoResumeSession resumes a session whose holder died while it was live,
+// or ends it Exited crashed when auto-resume is off or cannot run. A session
+// that was Working comes back with a "resumed" Unread; gx types nothing.
+func (s *Server) autoResumeSession(id string) {
+	s.sessionWatches.metaMu.Lock()
+	defer s.sessionWatches.metaMu.Unlock()
+	dir, meta, res, err := s.sessionDir(id)
+	if res.Refused || err != nil {
+		s.log.Warn("auto-resume session", "session", id, "err", err, "refusal", res.Message)
+		return
+	}
+	if meta.Status.State == SessionExited || meta.Stopped {
+		return
+	}
+	reason := "auto-resume is off"
+	if s.settings.Load().AgentsResumeOnStart {
+		reason = resumeRefusal(meta).Message
+	}
+	if reason == "" {
+		ended := meta
+		if meta.Status.State == SessionWorking {
+			s.raiseUnread(&meta)
+			meta.Unread.Resumed = meta.Unread.Unread
+		}
+		err := s.startResumedHolder(dir, &meta, time.Now().Add(resumeCrashWindow))
+		if err == nil {
+			return
+		}
+		meta, reason = ended, err.Error()
+	}
+	s.log.Info("session not auto-resumed", "session", id, "reason", reason)
+	s.recordSessionExit(&meta, SessionExitCrashed)
+	if err := writeSessionMeta(dir, meta); err != nil {
+		s.log.Warn("save session meta", "session", id, "err", err)
+		return
+	}
+	s.events.publish(EventSessionChanged, id)
 }

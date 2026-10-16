@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"os"
@@ -174,19 +175,8 @@ func TestSessionStatus_ExitedCleanOrCrashed(t *testing.T) {
 
 func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
 	h, ctx, evs, id, _ := startFakeSession(t)
-	child := waitForHolder(t, filepath.Join(h.SessionsDir, id)).ChildPID()
-	out, err := exec.Command("ps", "-o", "ppid=", "-p", strconv.Itoa(child)).Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	holder, err := strconv.Atoi(strings.TrimSpace(string(out)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	child := killHolder(t, h, id)
 	t.Cleanup(func() { _ = syscall.Kill(-child, syscall.SIGKILL) })
-	if err := syscall.Kill(holder, syscall.SIGKILL); err != nil {
-		t.Fatal(err)
-	}
 	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
 	if got.Exit != server.SessionExitCrashed || !got.Unread.Unread {
 		t.Errorf("session = %+v, want exited crashed and unread", got)
@@ -476,7 +466,7 @@ func startFakeSessionWith(t *testing.T, req server.CreateSessionRequest, opts ..
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Project, req.Dir, req.Harness = "proj", t.TempDir(), string(agentfake.HarnessKind)
+	req.Project, req.Dir, req.Harness = "proj", t.TempDir(), cmp.Or(req.Harness, string(agentfake.HarnessKind))
 	res, err := h.Client.CreateSession(ctx, req)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
@@ -515,6 +505,25 @@ func readMeta(t *testing.T, h *servertest.Harness, id string) map[string]any {
 		t.Fatal(err)
 	}
 	return meta
+}
+
+// killHolder SIGKILLs the session's holder, leaving its child, and returns
+// the child's pid.
+func killHolder(t *testing.T, h *servertest.Harness, id string) int {
+	t.Helper()
+	child := waitForHolder(t, filepath.Join(h.SessionsDir, id)).ChildPID()
+	out, err := exec.Command("ps", "-o", "ppid=", "-p", strconv.Itoa(child)).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	holder, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Kill(holder, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	return child
 }
 
 func waitForHolder(t *testing.T, dir string) *nativerunner.HolderClient {

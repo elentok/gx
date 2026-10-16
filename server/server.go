@@ -586,6 +586,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 	s.recoverLands()
 	s.reclaimRuns()
+	s.restoreSessions()
 	s.logDrainingRunners()
 	s.pruneAgentLogs(time.Now())
 	s.scanParentDefects()

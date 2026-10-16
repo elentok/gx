@@ -316,7 +316,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if err := s.startSessionHolder(dir, &meta, req.Cols, req.Rows, false); err != nil {
 		return SessionResult{}, err
 	}
-	s.sessionWatches.start(func() { s.watchSession(dir, id, 0) })
+	s.sessionWatches.start(func() { s.watchSession(dir, id, 0, time.Time{}) })
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
@@ -578,12 +578,17 @@ func (w *sessionWatches) close() {
 // watchSession records the session's status and conversation id from its
 // holder's watch stream until the stream ends. A stream that ends without an
 // exit while the server is up means the holder died: Exited crashed, with no
-// retry.
-func (s *Server) watchSession(dir, id string, run int) {
+// retry. Any exit before crashUntil is crashed too.
+func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 	update := func(change func(*sessionMeta) bool) {
 		s.updateSessionMeta(dir, id, func(m *sessionMeta) bool { return m.Run == run && change(m) })
 	}
-	recordExit := func(exit string) { update(func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) }) }
+	recordExit := func(exit string) {
+		if time.Now().Before(crashUntil) {
+			exit = SessionExitCrashed
+		}
+		update(func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) })
+	}
 	stream, err := s.openSessionWatch(dir)
 	if err != nil {
 		if !s.sessionWatches.isStopped() {
