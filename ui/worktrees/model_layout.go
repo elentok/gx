@@ -64,16 +64,11 @@ func (m Model) previewRect() ui.Rect {
 	return ui.Rect{X: tableW + m.seamWidth(), Y: 0, W: previewW, H: tableH}
 }
 
-func (m Model) helpLineCount() int {
-	return 1
-}
-
 func (m Model) contentHeight() int {
-	h := m.height - m.helpLineCount()
-	if h < 4 {
+	if m.height < 4 {
 		return 4
 	}
-	return h
+	return m.height
 }
 
 func (m Model) resized() Model {

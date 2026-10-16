@@ -329,9 +329,8 @@ func TestPushWorktree(t *testing.T) {
 	waitForText(t, tm, "Push feature-a?", actionWait)
 	tm.Send(keyRune('y'))
 
-	// Status notifications now go through notify.NotifyMsg (not the status bar).
-	// Wait for the spinner to clear (? help appears) as a sign the push completed.
-	waitForText(t, tm, "? help", loadWait)
+	// Results go through notify.NotifyMsg, which this page alone doesn't render.
+	waitForText(t, tm, "Pushing feature-a…", loadWait)
 
 	quit(t, tm)
 }
@@ -386,9 +385,8 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 	tm.Send(keyCtrl('n'))
 	tm.Send(keySpecial(tea.KeyEnter))
 
-	// Status notifications now go through notify.NotifyMsg (not the status bar).
-	// Wait for the spinner to clear (? help appears) as a sign the force push completed.
-	waitForText(t, tm, "? help", loadWait)
+	// Results go through notify.NotifyMsg, which this page alone doesn't render.
+	waitForText(t, tm, "Force-pushing feature-a…", loadWait)
 
 	quit(t, tm)
 }

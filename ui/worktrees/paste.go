@@ -3,8 +3,12 @@ package worktrees
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui/help"
+	keymgr "github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -13,6 +17,29 @@ import (
 type pasteResultMsg struct {
 	n   int // number of files pasted
 	err error
+}
+
+// pasteModeBindings document paste mode's keys for help and the entry
+// notification; handlePasteModeKey matches keys directly because paste mode
+// swallows every other binding.
+var pasteModeBindings = []keymgr.Binding{
+	{ID: "paste", Seq: []string{"p"}, Title: "paste"},
+	{ID: "paste-cancel", Seq: []string{"esc"}, Title: "cancel"},
+}
+
+func pasteModeHelpSection() help.KeySection {
+	return help.NewKeySection("Paste mode", pasteModeBindings...)
+}
+
+// enterPasteMode holds cb as the clipboard and announces the paste keys once.
+func (m Model) enterPasteMode(cb clipboardState) (Model, tea.Cmd) {
+	m.clipboard = &cb
+	m.mode = modePaste
+	hints := make([]string, len(pasteModeBindings))
+	for i, b := range pasteModeBindings {
+		hints[i] = b.Keys() + " " + b.Title
+	}
+	return m, notify.Info(strings.Join(hints, " · "))
 }
 
 // handlePasteModeKey handles key events in paste mode (clipboard active, waiting for destination).

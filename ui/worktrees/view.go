@@ -149,46 +149,46 @@ func (m Model) normalView() string {
 		seam := ui.RenderSeamColumn(tableH, ui.SeamColor)
 		content = lipgloss.JoinHorizontal(lipgloss.Top, tableView, seam, previewView)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, content, m.statusBarView())
+	return content
 }
 
 // renderWorktreesPanel renders one panel (table or details) of the normal
 // view, following the frame-free pattern in ui/log/list_panel.go and
-// ui/status/view_chrome.go.
+// ui/status/view_chrome.go. The active panel (always the table) carries the
+// page's busy and paste state on its header's right side.
 func (m Model) renderWorktreesPanel(width, height int, title string, lines []string, active, sidebar bool) string {
 	accent := color.Color(nil)
 	if active {
 		accent = ui.ColorBlue
 	}
-	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, "", lines, active, ui.ColorBlue, accent, sidebar))
+	opts := ui.PanelOptionsFor(width, height, title, "", lines, active, ui.ColorBlue, accent, sidebar)
+	if active {
+		avail := width - 2*opts.PaddingX - ansi.StringWidth(title) - 1
+		opts.RightTitle = m.headerStatus(avail, opts.HeaderBackground)
+	}
+	return ui.RenderPanel(opts)
 }
 
-// statusBarView renders the 1-line bar at the bottom of the screen.
-func (m Model) statusBarView() string {
-	line := ""
-	switch m.mode {
-	case modeError:
-		line = ""
+// headerStatus renders the busy spinner or the paste chip, each followed by
+// its dim text, into avail cells. Paste mode wins over a running job. The
+// text gives way first; once it is gone, RenderPanel truncates the title, so
+// the spinner and the chip never drop.
+func (m Model) headerStatus(avail int, bg color.Color) string {
+	dim := ui.StyleDim.Background(bg)
+	var fixed, text string
+	switch {
+	case m.mode == modePaste && m.clipboard != nil:
+		fixed = ui.RenderBadge("PASTE", ui.BadgeVariantBlue, false, true)
+		text = fmt.Sprintf("%d files from %s", len(m.clipboard.files), m.clipboard.srcName)
+	case m.spinnerActive:
+		fixed = dim.Render(strings.TrimSpace(m.spinner.View()))
+		text = m.spinnerLabel
 	default:
-		if m.mode == modePaste && m.clipboard != nil {
-			prefix := ui.StyleDim.Render(fmt.Sprintf("  %d file(s) from %s", len(m.clipboard.files), m.clipboard.srcName))
-			pasteHints := strings.Join([]string{
-				ui.StyleTitle.Render("↑/k") + " " + ui.StyleHint.Render("up"),
-				ui.StyleTitle.Render("↓/j") + " " + ui.StyleHint.Render("down"),
-				ui.StyleTitle.Render("p") + " " + ui.StyleHint.Render("paste"),
-				ui.StyleTitle.Render("esc/q") + " " + ui.StyleHint.Render("cancel"),
-			}, ui.StyleHint.Render(" · "))
-			line = prefix + ui.StyleDim.Render("  ·  ") + pasteHints
-			break
-		}
-		if m.spinnerActive {
-			line = "  " + m.spinner.View() + " " + m.spinnerLabel
-			break
-		}
-		line = "  " + ui.StyleHint.Render("? help")
+		return ""
 	}
-	if m.width > 0 {
-		return ansi.Truncate(line, m.width, "…")
+	textW := avail - ansi.StringWidth(fixed) - 1
+	if textW < 1 {
+		return fixed
 	}
-	return line
+	return fixed + dim.Render(" "+ansi.Truncate(text, textW, "…"))
 }

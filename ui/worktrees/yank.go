@@ -54,15 +54,13 @@ func (m Model) handleYankKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		files := m.yankChecklist.Checked()
 		if len(files) > 0 {
-			m.clipboard = &clipboardState{
+			return m.enterPasteMode(clipboardState{
 				srcPath: m.yankSource.Path,
 				srcName: m.yankSource.Name,
 				files:   files,
-			}
-			m.mode = modePaste
-		} else {
-			m.mode = modeNormal
+			})
 		}
+		m.mode = modeNormal
 		return m, nil
 	}
 	m.yankChecklist = m.yankChecklist.Update(msg.String())

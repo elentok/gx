@@ -156,7 +156,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		loading:            true,
 		confirm:            confirm.New(),
 		pull:               pull.New(),
-		helpModel:          help.NewModel(help.BuildSections(km)),
+		helpModel:          help.NewModel(append(help.BuildSections(km), pasteModeHelpSection())),
 		keyManager:         km,
 		search:             search.NewModel(),
 		spinner:            sp,

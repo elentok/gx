@@ -47,8 +47,8 @@ func TestContentHeight_MinFour(t *testing.T) {
 func TestContentHeight_Normal(t *testing.T) {
 	t.Parallel()
 	m := Model{height: 30}
-	if h := m.contentHeight(); h != 29 {
-		t.Errorf("expected contentHeight=29 (30-1 helpLine), got %d", h)
+	if h := m.contentHeight(); h != 30 {
+		t.Errorf("expected contentHeight=30 (no footer row), got %d", h)
 	}
 }
 

@@ -1,37 +1,13 @@
 package worktrees
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 )
-
-func TestStatusBarViewShowsOnlyHelpPromptByDefault(t *testing.T) {
-	t.Parallel()
-	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, "")
-	m.ready = true
-
-	line := ansi.Strip(m.statusBarView())
-	if !strings.Contains(line, "? help") {
-		t.Fatalf("expected footer to contain ? help, got %q", line)
-	}
-	for _, unwanted := range []string{"up", "down", "new worktree", "delete", "rename"} {
-		if strings.Contains(line, unwanted) {
-			t.Fatalf("expected compact footer without inline help, got %q", line)
-		}
-	}
-}
 
 func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	t.Parallel()
