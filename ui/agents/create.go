@@ -110,9 +110,16 @@ func listFormProjects() ([]formProject, error) {
 	return out, nil
 }
 
-// openCreate opens the form on the project in focus: the selected session's.
+// WithCwdProject names the project of the repo gx was opened in.
+func (m Model) WithCwdProject(name string) Model {
+	m.cwdProject = name
+	return m
+}
+
+// openCreate opens the form on the project in focus: the selected session's,
+// else the cwd repo's; with neither the form falls back to the first project.
 func (m Model) openCreate() (Model, tea.Cmd) {
-	p := CreatePrefill{}
+	p := CreatePrefill{Project: m.cwdProject}
 	if m.cursor < len(m.sessions) {
 		p.Project = m.sessions[m.cursor].Project
 	}

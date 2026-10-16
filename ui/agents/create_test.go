@@ -100,6 +100,25 @@ func TestCreate_LeaderCOpensTheForm(t *testing.T) {
 	}
 }
 
+func TestCreate_WithNoSessionsDefaultsToTheCwdProject(t *testing.T) {
+	m := openedModel(t, &fakeSessionClient{}, "").WithCwdProject("gx")
+	m.listProjects = createProjects
+	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 30})
+	m.terminalFocused = false
+	m = step(t, m, letter("c"))
+	if m.create == nil || m.create.projects[m.create.project].Name != "gx" {
+		t.Fatalf("form = %+v, want one on the cwd project gx", m.create)
+	}
+}
+
+func TestCreate_SelectedSessionBeatsTheCwdProject(t *testing.T) {
+	m := createModel(t, &fakeSessionClient{}).WithCwdProject("web")
+	m = step(t, m, letter("c"))
+	if m.create == nil || m.create.projects[m.create.project].Name != "gx" {
+		t.Fatalf("form = %+v, want one on the selected session's project gx", m.create)
+	}
+}
+
 func TestCreate_DirPickerCountsSessionsPerDir(t *testing.T) {
 	m := step(t, createModel(t, &fakeSessionClient{}), letter("c"))
 	lines := strings.Split(ansi.Strip(m.renderCreate()), "\n")

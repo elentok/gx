@@ -64,6 +64,8 @@ type Model struct {
 	// create is nil while the create form is closed.
 	create       *createForm
 	listProjects func() ([]formProject, error)
+	// cwdProject is the cwd repo's project; empty outside a registered one.
+	cwdProject string
 	// pendingSelect is a just-created or banner-clicked session to select and
 	// focus once a snapshot lists it.
 	pendingSelect string
