@@ -63,6 +63,31 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 	}
 }
 
+func TestStartSession_CompletedMapEpicKeepsItsMergeAction(t *testing.T) {
+	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:done-map/01", Title: "Done", Status: "done", EpicIsMap: true},
+	}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	setCollapsedSection(&m, sectionCompleteMaps, false)
+	selectEpicRow(t, &m, "gx:done-map")
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	got := updated.(Model).actionsMenu
+	if want := []string{actionStartSession, actionMerge}; !slices.Equal(itemValues(got.state.Items), want) {
+		t.Errorf("items = %v, want %v", itemValues(got.state.Items), want)
+	}
+}
+
+func TestStartSession_HiddenWithoutAServer(t *testing.T) {
+	m := startSessionModel(t)
+	m.serverAPI = nil
+	selectEpicRow(t, &m, "gx:map")
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	if menuHasStartSession(updated.(Model).actionsMenu) {
+		t.Error("start session offered on a map epic with no server")
+	}
+}
+
 func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 	for _, tc := range []struct {
 		address string

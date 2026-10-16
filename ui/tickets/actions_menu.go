@@ -113,18 +113,23 @@ type actionsMenuReadyMsg struct {
 // shells out to ps, so the menu opens once a Cmd has resolved it.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
-	if ok && r.isEpic() && !r.archived && m.epicAt(r).IsMap {
+	// Epic actions are server-only: only server-mode epic names carry the
+	// "project:" prefix startSessionCmd and the merge need.
+	if ok && r.isEpic() && m.serverAPI != nil && !r.archived {
 		epic := m.epicAt(r)
-		prompt := fmt.Sprintf("Suggested actions for %q:", epic.Name)
-		// Path carries the address startSessionCmd reads, as on a ticket row.
-		m.actionsMenu = m.actionsMenu.Open(epic.Name, epic.Name, "", prompt, []components.MenuItem{startSessionMenuItem})
-		return m, nil
-	}
-	if ok && r.isEpic() && m.serverAPI != nil && !r.archived && epicSection(m.epicAt(r)) == sectionComplete {
-		epic := m.epicAt(r)
-		prompt := fmt.Sprintf("Suggested actions for %q:", epic.Name)
-		m.actionsMenu = m.actionsMenu.Open(epic.Path, epic.Name, "", prompt, []components.MenuItem{mergeMenuItem})
-		return m, nil
+		var items []components.MenuItem
+		if epic.IsMap {
+			items = append(items, startSessionMenuItem)
+		}
+		if epic.AllDone() && epic.MergedAt.IsZero() {
+			items = append(items, mergeMenuItem)
+		}
+		if len(items) > 0 {
+			prompt := fmt.Sprintf("Suggested actions for %q:", epic.Name)
+			// Path carries the address startSessionCmd reads, as on a ticket row.
+			m.actionsMenu = m.actionsMenu.Open(epic.Name, epic.Name, "", prompt, items)
+			return m, nil
+		}
 	}
 	if !ok || r.isEpic() {
 		return m, notify.Info("select a ticket to see its suggested actions")
