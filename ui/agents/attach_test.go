@@ -202,6 +202,22 @@ func TestAttach_FramesRenderInThePanel(t *testing.T) {
 	}
 }
 
+func TestAttach_FullFrameDropsRowsPastItsHeight(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	h.attaches["a"].frame("$ claude", "> hello", "> stale")
+	m, next = read(t, m, next)
+
+	h.attaches["a"].msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame,
+		Frame: nativerunner.Frame{Full: true, Rows: []nativerunner.FrameRow{{Index: 0, ANSI: "$ shrunk"}}}}
+	m, _ = read(t, m, next)
+	view := plainView(m)
+	if !strings.Contains(view, "$ shrunk") || strings.Contains(view, "> hello") || strings.Contains(view, "> stale") {
+		t.Fatalf("rows past the full frame's height stayed on screen:\n%s", view)
+	}
+}
+
 func TestAttach_TerminalFocusSendsEveryKeyToTheSession(t *testing.T) {
 	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
 	m, cmd := attachModel(t, h)

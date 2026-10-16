@@ -115,6 +115,9 @@ type streamExit struct {
 type Frame struct {
 	Cursor FrameCursor `json:"cursor"`
 	Rows   []FrameRow  `json:"rows"`
+	// Full marks a frame that carries every row of the view, so a client
+	// drops any rows it kept past them.
+	Full bool `json:"full,omitempty"`
 	// ScrollOffset is how many lines above the screen's top the view starts;
 	// ScrollMax, the scrollback's length, is the most it can be. Row i shows
 	// line ScrollMax-ScrollOffset+i, the line a LinePos names.

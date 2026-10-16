@@ -236,8 +236,12 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 	return m, readAttach(a)
 }
 
-// applyFrame returns rows with the frame's changed rows written over them.
+// applyFrame returns rows with the frame's changed rows written over them, or
+// just the frame's rows for a full frame.
 func applyFrame(rows []string, f nativerunner.Frame) []string {
+	if f.Full {
+		rows = nil
+	}
 	rows = slices.Clone(rows)
 	for _, r := range f.Rows {
 		if r.Index >= len(rows) {

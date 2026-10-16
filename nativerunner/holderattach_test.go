@@ -78,7 +78,7 @@ func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 
 	for i, a := range attaches {
 		m := nextAttach(t, a)
-		if m.Type != nativerunner.StreamFrame || len(m.Frame.Rows) != nativerunner.HolderRows {
+		if m.Type != nativerunner.StreamFrame || !m.Frame.Full || len(m.Frame.Rows) != nativerunner.HolderRows {
 			t.Fatalf("attach %d first message = type %d with %d rows; want a full frame of %d rows", i, m.Type, len(m.Frame.Rows), nativerunner.HolderRows)
 		}
 		if !strings.Contains(m.Frame.Rows[0].ANSI, "first") || !strings.Contains(m.Frame.Rows[1].ANSI, "second") {
@@ -92,7 +92,7 @@ func TestHolderAttach_FullFrameThenDirtyRowsThenExit(t *testing.T) {
 	touch(t, change)
 	for i, a := range attaches {
 		m := nextAttach(t, a)
-		if m.Type != nativerunner.StreamFrame || !slices.Equal(rowIndexes(m.Frame), []int{1}) {
+		if m.Type != nativerunner.StreamFrame || m.Frame.Full || !slices.Equal(rowIndexes(m.Frame), []int{1}) {
 			t.Fatalf("attach %d after the change = type %d rows %v; want a frame of row 1 only", i, m.Type, rowIndexes(m.Frame))
 		}
 		if got := m.Frame.Rows[0].ANSI; !strings.Contains(got, "\x1b[31mchanged") {

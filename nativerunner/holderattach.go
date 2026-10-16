@@ -325,16 +325,19 @@ func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 }
 
 func (f *frameHub) fullFrameLocked(c *attachClient) Frame {
+	var frame Frame
 	if c.offset > 0 {
-		return f.scrolledFrameLocked(c)
+		frame = f.scrolledFrameLocked(c)
+	} else {
+		rows := f.scr.StyledRows()
+		n := len(rows)
+		if c.height > 0 {
+			n = c.height
+		}
+		frame = c.frame(f.cursor, rows, allIndexes(n))
+		frame.ScrollMax = f.scr.ScrollbackLen()
 	}
-	rows := f.scr.StyledRows()
-	n := len(rows)
-	if c.height > 0 {
-		n = c.height
-	}
-	frame := c.frame(f.cursor, rows, allIndexes(n))
-	frame.ScrollMax = f.scr.ScrollbackLen()
+	frame.Full = true
 	return frame
 }
 
