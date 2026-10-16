@@ -125,8 +125,8 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "y", "enter":
-		cmd := m.copySelection()
-		return m.leaveCopyMode(), cmd
+		m.copySelection()
+		return m.leaveCopyMode(), nil
 	case "q":
 		return m.leaveCopyMode(), nil
 	case "esc":
@@ -155,8 +155,7 @@ func (m Model) scrollToCopyCursor() {
 		offset = a.scrollMax - (line - h + 1)
 	}
 	if offset = max(0, min(offset, a.scrollMax)); offset != a.offset {
-		a.offset = offset
-		_ = a.stream.Scroll(offset)
+		a.scroll(offset)
 	}
 }
 
@@ -176,15 +175,11 @@ func (c *copyMode) selection() (start, end nativerunner.LinePos) {
 
 // copySelection asks the holder for the selected text; its reply goes to
 // the clipboard in updateAttachStream. Without a selection nothing is copied.
-func (m Model) copySelection() tea.Cmd {
-	if !m.copy.selecting {
-		return nil
+func (m Model) copySelection() {
+	if m.copy.selecting {
+		start, end := m.copy.selection()
+		m.copy.a.write(func(s AttachStream) error { return s.Copy(start, end) })
 	}
-	start, end := m.copy.selection()
-	if err := m.copy.a.stream.Copy(start, end); err != nil {
-		return notify.Error("copy failed: " + err.Error())
-	}
-	return nil
 }
 
 func (m Model) leaveCopyMode() Model {

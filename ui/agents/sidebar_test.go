@@ -50,7 +50,15 @@ func sidebarModel(t *testing.T, nerd bool, sessions []server.SessionInfo, width,
 func update1(t *testing.T, m Model, msg tea.Msg) Model {
 	t.Helper()
 	next, _ := m.Update(msg)
-	return next.(Model)
+	return settle(next.(Model))
+}
+
+// settle waits until the attach's queued writes reached the holder.
+func settle(m Model) Model {
+	if a := m.attach; a != nil && a.w != nil {
+		a.w.pending.Wait()
+	}
+	return m
 }
 
 func press(t *testing.T, m Model, k string) Model {

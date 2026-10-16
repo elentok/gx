@@ -8,7 +8,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -30,12 +32,25 @@ type fakeAttach struct {
 	pastes []string
 	sizes  [][2]int
 	// log orders the keys and scrolls sent.
-	log    []string
+	log []string
+	// stall, when set, holds every key until it's closed: a holder that
+	// stopped reading.
+	stall chan struct{}
+	// keyErr fails every key write.
+	keyErr error
+
+	mu     sync.Mutex
 	closed bool
 }
 
 func newFakeAttach() *fakeAttach {
 	return &fakeAttach{msgs: make(chan nativerunner.AttachMessage, 16), done: make(chan struct{})}
+}
+
+func (f *fakeAttach) isClosed() bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.closed
 }
 
 func (f *fakeAttach) Next() (nativerunner.AttachMessage, error) {
@@ -48,6 +63,12 @@ func (f *fakeAttach) Next() (nativerunner.AttachMessage, error) {
 }
 
 func (f *fakeAttach) SendKey(k screen.Key) error {
+	if f.stall != nil {
+		<-f.stall
+	}
+	if f.keyErr != nil {
+		return f.keyErr
+	}
 	f.keys = append(f.keys, k)
 	f.log = append(f.log, "key:"+k.Text)
 	return nil
@@ -70,6 +91,8 @@ func (f *fakeAttach) Resize(cols, rows int) error {
 }
 
 func (f *fakeAttach) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if !f.closed {
 		f.closed = true
 		close(f.done)
@@ -203,6 +226,7 @@ func TestAttach_TerminalFocusSendsEveryKeyToTheSession(t *testing.T) {
 			t.Fatalf("%s returned a cmd in terminal focus", p.String())
 		}
 	}
+	m = settle(m)
 	if len(fa.keys) != len(presses) {
 		t.Fatalf("sent %d keys, want %d", len(fa.keys), len(presses))
 	}
@@ -234,7 +258,7 @@ func focusedAttach(t *testing.T) (Model, *fakeAttach) {
 func TestAttach_PasteOverTheLimitIsRefused(t *testing.T) {
 	m, fa := focusedAttach(t)
 	next, cmd := m.Update(tea.PasteMsg{Content: strings.Repeat("x", 2<<20)})
-	m = next.(Model)
+	m = settle(next.(Model))
 	if len(fa.pastes) != 0 {
 		t.Fatal("an oversized paste was sent")
 	}
@@ -260,14 +284,80 @@ func TestAttach_CtrlVPassesThroughAsAKey(t *testing.T) {
 	}
 }
 
-func TestAttach_TypingSendsThePanelSize(t *testing.T) {
+func TestAttach_TypingSendsNoResize(t *testing.T) {
 	m, fa := focusedAttach(t)
 	fa.sizes = nil
-	m = update1(t, m, tea.KeyPressMsg{Code: 'x', Text: "x"})
-	update1(t, m, tea.PasteMsg{Content: "y"})
+	m = pressKeys(t, m, letters("xyz")...)
+	update1(t, m, tea.PasteMsg{Content: "p"})
+	if len(fa.sizes) != 0 {
+		t.Fatalf("typing sent sizes %v, want none", fa.sizes)
+	}
+}
+
+func TestAttach_RefocusSendsTheSizeAgain(t *testing.T) {
+	m, fa := focusedAttach(t)
+	m = pressKeys(t, m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl}, tea.KeyPressMsg{Code: tea.KeyTab})
+	m = pressKeys(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	size := [2]int{80 - sidebarWidth - 1 - 2, 12 - 2}
 	if !slices.Equal(fa.sizes, [][2]int{size, size}) {
-		t.Fatalf("typing sent sizes %v, want the panel's inner size before each input", fa.sizes)
+		t.Fatalf("focusing twice sent sizes %v, want the size on each focus", fa.sizes)
+	}
+}
+
+func TestAttach_HidingTheSidebarWhileFocusedSendsTheNewSize(t *testing.T) {
+	m, fa := focusedAttach(t)
+	fa.sizes = nil
+	pressKeys(t, m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl}, letter("b"))
+	if !slices.Equal(fa.sizes, [][2]int{{80 - 2, 12 - 2}}) {
+		t.Fatalf("hiding the sidebar sent sizes %v, want the full width", fa.sizes)
+	}
+}
+
+func TestAttach_StalledHolderDoesNotBlockKeys(t *testing.T) {
+	m, fa := focusedAttach(t)
+	fa.stall = make(chan struct{})
+	done := make(chan Model)
+	go func() {
+		mm := m
+		for _, r := range "abc" {
+			next, _ := mm.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+			mm = next.(Model)
+		}
+		done <- mm
+	}()
+	select {
+	case m = <-done:
+	case <-time.After(time.Second):
+		t.Fatal("keys to a stalled holder blocked Update")
+	}
+	if !strings.Contains(plainView(m), "alpha") {
+		t.Fatal("the panel did not render while the holder stalled")
+	}
+
+	close(fa.stall)
+	m = update1(t, m, letter("d"))
+	if got := strings.Join(fa.log, ","); got != "key:a,key:b,key:c,key:d" {
+		t.Fatalf("keys after the stall = %s, want a,b,c,d in order", got)
+	}
+}
+
+func TestAttach_WriteErrorEndsTheAttach(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	fa := h.attaches["a"]
+	fa.keyErr = errors.New("broken pipe")
+	m = update1(t, m, letter("x"))
+	if !fa.isClosed() {
+		t.Fatal("a failed write left the stream open")
+	}
+	m, _ = read(t, m, next)
+	if !m.attach.ended {
+		t.Fatal("a failed write did not end the attach")
+	}
+	if view := plainView(m); !strings.Contains(view, "broken pipe") {
+		t.Fatalf("the write error is not shown:\n%s", view)
 	}
 }
 

@@ -113,7 +113,7 @@ func TestCopyMode_RendersTheSelection(t *testing.T) {
 	m = pressKeys(t, m, letters("V")...)
 	cols, _ := m.screenSize()
 	// The cursor, still on the third cell, splits the line's highlight.
-	selected := " bar.baz  qux" +strings.Repeat(" ", cols-len(copyRowsText[1]))
+	selected := " bar.baz  qux" + strings.Repeat(" ", cols-len(copyRowsText[1]))
 	if view := m.View().Content; !strings.Contains(view, styleCopySelection.Render(selected)) {
 		t.Fatalf("V selection not drawn over the whole line:\n%q", view)
 	}

@@ -28,7 +28,7 @@ func leaderThen(t *testing.T, m Model, k tea.KeyPressMsg) (Model, tea.Cmd) {
 		t.Fatal("the leader did not start leader mode")
 	}
 	next, cmd := m.Update(k)
-	return next.(Model), cmd
+	return settle(next.(Model)), cmd
 }
 
 func letter(k string) tea.KeyPressMsg { return tea.KeyPressMsg{Code: rune(k[0]), Text: k} }

@@ -161,6 +161,7 @@ func (m Model) Init() tea.Cmd { return nil }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
 	next.(Model).reportFocus()
+	next.(Model).syncAttachSize()
 	return next, cmd
 }
 
@@ -175,9 +176,6 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.help, _ = m.help.Update(msg)
-		if m.terminalFocused {
-			m.resizeAttach()
-		}
 		return m.startSpinner()
 	case lastScreenMsg:
 		if msg.id == m.selectedID() {
