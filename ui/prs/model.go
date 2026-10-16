@@ -4,7 +4,6 @@ package prs
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/help"
@@ -161,15 +160,14 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) buildMainContent() string {
-	panelHeight := max(1, m.height-1)
+	panelHeight := max(1, m.height)
 	subtitle := ""
 	if m.allRepos {
 		subtitle = "all repos"
 	}
-	panel := ui.RenderPanel(ui.PanelOptionsFor(
+	return ui.RenderPanel(ui.PanelOptionsFor(
 		m.width, panelHeight, "PRs", subtitle, m.visibleLines(), true, prsTitleColor, prsTitleColor, false,
 	))
-	return lipgloss.JoinVertical(lipgloss.Left, panel, prsFooter())
 }
 
 // viewportH returns how many content lines fit in the panel body, matching
@@ -177,7 +175,7 @@ func (m Model) buildMainContent() string {
 // padding rows in this panel) so the line-based scroll window lines up
 // exactly with what RenderPanel will display.
 func (m Model) viewportH() int {
-	panelHeight := max(1, m.height-1)
+	panelHeight := max(1, m.height)
 	return max(0, panelHeight-1)
 }
 
@@ -233,8 +231,4 @@ func (m Model) ensureSelectionVisible() Model {
 	maxOffset := max(0, total-viewportH)
 	m.scrollOffset = max(0, min(m.scrollOffset, maxOffset))
 	return m
-}
-
-func prsFooter() string {
-	return "  " + ui.StyleHint.Render("? help")
 }

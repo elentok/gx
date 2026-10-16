@@ -35,9 +35,7 @@ func (m Model) View() tea.View {
 	}
 
 	_, contentH := m.layoutHeights()
-	content := m.contentView(contentH)
-	footer := m.footerView()
-	out := lipgloss.JoinVertical(lipgloss.Left, content, footer)
+	out := m.contentView(contentH)
 	if prefix := m.keys.Prefix(); len(prefix) > 0 {
 		hints := ui.ChordBindingsFromHints(m.keys.ChordHints())
 		if len(hints) > 0 {
@@ -274,7 +272,7 @@ func (m Model) narrowPaneHeights(contentH int) (filesH, diffH int) {
 // image-diff overlay (model_mouse.go, image_diff.go) use bodyH as the row
 // offset where the content area begins.
 func (m Model) layoutHeights() (bodyH, contentH int) {
-	contentH = max(1, m.height-1) // reserve one line for footer
+	contentH = max(1, m.height)
 	return 0, contentH
 }
 
@@ -435,26 +433,6 @@ func isTrunkRef(decoration git.RefDecoration, trunk string) bool {
 		_, name, _ = strings.Cut(name, "/")
 	}
 	return name == trunk
-}
-
-func (m Model) footerView() string {
-	left := ""
-	right := ui.StyleHint.Render("? help")
-	if m.width <= 0 {
-		if left == "" {
-			return right
-		}
-		return left + "  " + right
-	}
-	rightW := ansi.StringWidth(right)
-	if left == "" {
-		return strings.Repeat(" ", m.width-rightW) + right
-	}
-	leftW := ansi.StringWidth(left)
-	if leftW+rightW+2 >= m.width {
-		return ansi.Truncate(left, m.width-rightW-2, "…") + "  " + right
-	}
-	return left + strings.Repeat(" ", m.width-leftW-rightW) + right
 }
 
 func (m Model) visibleFileLines(width, height int) []string {

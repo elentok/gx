@@ -129,7 +129,7 @@ func TestQFromListReturnsNavBack(t *testing.T) {
 	}
 }
 
-func TestWindowSizeLeavesFooterRowForTabs(t *testing.T) {
+func TestWindowSizeGivesStashListFullHeight(t *testing.T) {
 	m := newReadyModel(t)
 	m = sendModel(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
@@ -138,18 +138,16 @@ func TestWindowSizeLeavesFooterRowForTabs(t *testing.T) {
 	}
 }
 
-func TestViewAddsFooterRowForAppTabs(t *testing.T) {
+func TestViewFillsHeightWithoutHelpFooter(t *testing.T) {
 	m := newReadyModel(t)
 	m = sendModel(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 
-	lines := strings.Split(m.View().Content, "\n")
-	if len(lines) == 0 {
-		t.Fatal("expected rendered lines")
+	content := m.View().Content
+	if got := len(strings.Split(content, "\n")); got != 30 {
+		t.Fatalf("rendered %d lines, want 30", got)
 	}
-	// The footer row carries the "? help" hint and is where the app shell
-	// injects the tab bar.
-	if !strings.Contains(lines[len(lines)-1], "? help") {
-		t.Fatalf("expected footer row with ? help, got %q", lines[len(lines)-1])
+	if strings.Contains(content, "? help") {
+		t.Fatal("expected no ? help footer")
 	}
 }
 

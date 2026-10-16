@@ -295,10 +295,9 @@ func (m QueueModel) queuePreviewRect() ui.Rect {
 	return ui.Rect{X: x, Y: y, W: w, H: h}
 }
 
-// contentHeight returns the content height below the tab bar, mirroring
-// Model.contentHeight for the Queue tab's own layout.
+// contentHeight mirrors Model.contentHeight for the Queue tab's own layout.
 func (m QueueModel) contentHeight() int {
-	return max(m.height-1, 1)
+	return max(m.height, 1)
 }
 
 // previewRect returns the preview panel's absolute on-screen bounds,

@@ -150,7 +150,7 @@ func (m listPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // lineBudget returns how many screen lines are available for rows.
 func (m listPanel) lineBudget() int {
-	h := m.height - 3
+	h := m.height - 2
 	if h < 1 {
 		return 1
 	}
@@ -169,7 +169,7 @@ func (m listPanel) rowLineHeight(i int) int {
 // View renders the log list panel frame.
 func (m listPanel) View() tea.View {
 	lw := maxInt(20, m.width)
-	lh := maxInt(4, m.height-1)
+	lh := maxInt(4, m.height)
 	active := !m.inactive
 	accent := color.Color(nil)
 	if active {

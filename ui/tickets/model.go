@@ -503,16 +503,7 @@ func (m Model) normalView() string {
 	sidebarView := m.renderPanel(sidebarW, sidebarH, "Tickets", m.searchMatchStatus(), m.sidebarBody(sidebarViewportH, sidebarW-2), m.focus == focusSidebar, true)
 	previewView := m.renderPanel(previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, false)
 
-	body := m.joinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
-	return lipgloss.JoinVertical(lipgloss.Left, body, m.footerView())
-}
-
-// footerView reserves the plain keyhints line every other ui tab uses
-// (".ai/index.md": no keymaps on the statusbar, only "? help"), so the
-// app shell's tab bar has a dedicated row to merge into instead of
-// overwriting the panels' own bottom border row.
-func (m Model) footerView() string {
-	return "  " + ui.StyleHint.Render("? help")
+	return m.joinPanels(m.width, sidebarW, sidebarH, sidebarView, previewView)
 }
 
 func (m Model) renderPanel(width, height int, title, rightTitle string, lines []string, active, sidebar bool) string {
@@ -594,9 +585,5 @@ func (m Model) sidebarRect() (x, y, w, h int) {
 }
 
 func (m Model) contentHeight() int {
-	h := m.height - 1 // reserve the footer's keyhints line
-	if h < 4 {
-		return 4
-	}
-	return h
+	return max(m.height, 4)
 }

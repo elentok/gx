@@ -280,25 +280,18 @@ func (m Model) buildMainContent() string {
 	listOut := m.stashList.WithContainerFocus(m.isListActive()).WithSidebarMode(m.split.IsSplit()).View().Content
 
 	if !m.split.IsSplit() {
-		return lipgloss.JoinVertical(lipgloss.Left, listOut, stashFooter())
+		return listOut
 	}
 
 	detailContent := m.commitDetail.WithContainerFocus(m.split.IsDetailFocused()).View().Content
-	var body string
 	if m.split.EffectiveOrientation() == splitview.Vertical {
 		seam := ui.RenderSeamColumn(lh, ui.SeamColor)
-		body = lipgloss.JoinHorizontal(lipgloss.Top, listOut, seam, detailContent)
-	} else {
-		seam := ui.RenderSeamRow(lw, ui.SeamColor)
-		body = lipgloss.JoinVertical(lipgloss.Left, listOut, seam, detailContent)
+		return lipgloss.JoinHorizontal(lipgloss.Top, listOut, seam, detailContent)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, body, stashFooter())
+	seam := ui.RenderSeamRow(lw, ui.SeamColor)
+	return lipgloss.JoinVertical(lipgloss.Left, listOut, seam, detailContent)
 }
 
 func (m Model) isListActive() bool {
 	return !m.split.IsSplit() || m.split.IsListFocused()
-}
-
-func stashFooter() string {
-	return "  " + ui.StyleHint.Render("? help")
 }
