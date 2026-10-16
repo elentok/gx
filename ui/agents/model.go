@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/help"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -22,6 +23,7 @@ var (
 	keyUp            = key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k/↑", "previous session"))
 	keyToggleSidebar = key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "toggle sidebar"))
 	keyFocusTerminal = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "focus terminal"))
+	keyAttention     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "next needing attention"))
 )
 
 // spinnerRestartMsg re-arms the Working spinner: its tick chain dies while
@@ -45,7 +47,10 @@ type Model struct {
 	// terminalFocused: the embedded terminal takes every key, so the shell
 	// must not read gx tab keys.
 	terminalFocused bool
-	width, height   int
+	// leaderPending: the leader was pressed and the next key is its action.
+	leaderPending bool
+	help          help.Model
+	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
 	sessionsDir string
 	lastScreen  lastScreen
@@ -84,9 +89,10 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 	return m.refresh()
 }
 
-// InputFocused tells the shell the page swallows every key.
+// InputFocused tells the shell the page swallows every key: in the terminal,
+// after the leader, and while typing a help filter.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused
+	return m.terminalFocused || m.leaderPending || m.help.InputFocused()
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -106,6 +112,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.help, _ = m.help.Update(msg)
 		if m.terminalFocused {
 			m.resizeAttach()
 		}
@@ -139,29 +146,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case tea.KeyPressMsg:
-		if m.terminalFocused {
-			m.sendKey(msg)
-			return m, nil
-		}
-		switch {
-		case key.Matches(msg, keyFocusTerminal):
-			if m.attachTarget() != "" {
-				m.terminalFocused = true
-				m.resizeAttach()
-			}
-			return m, nil
-		case key.Matches(msg, keyDown):
-			m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
-		case key.Matches(msg, keyUp):
-			m.cursor = max(m.cursor-1, 0)
-		case key.Matches(msg, keyToggleSidebar):
-			m.hideSidebar = !m.hideSidebar
-		default:
-			return m, nil
-		}
-		return m.refresh()
+		return m.updateKey(msg)
 	}
 	return m, nil
+}
+
+func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, keyFocusTerminal):
+		if m.attachTarget() != "" {
+			m.terminalFocused = true
+			m.resizeAttach()
+		}
+		return m, nil
+	case key.Matches(msg, keyDown):
+		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
+	case key.Matches(msg, keyUp):
+		m.cursor = max(m.cursor-1, 0)
+	case key.Matches(msg, keyToggleSidebar):
+		m.hideSidebar = !m.hideSidebar
+	case key.Matches(msg, keyAttention):
+		m.cursor = m.nextNeedingAttention()
+	default:
+		return m, nil
+	}
+	return m.refresh()
 }
 
 // refresh starts what the newly shown sessions need: the spinner, the
@@ -210,11 +219,20 @@ func (m Model) View() tea.View {
 	if m.width <= 0 || m.height <= 0 {
 		return tea.NewView(strings.Join(lines, "\n"))
 	}
-	if !m.sidebarOnScreen() {
-		return tea.NewView(m.renderMain(m.width, lines))
+	var out string
+	if m.sidebarOnScreen() {
+		out = lipgloss.JoinHorizontal(lipgloss.Top,
+			m.renderSidebar(), ui.RenderSeamColumn(m.height, ui.SeamColor), m.renderMain(m.mainWidth(), lines))
+	} else {
+		out = m.renderMain(m.width, lines)
 	}
-	return tea.NewView(lipgloss.JoinHorizontal(lipgloss.Top,
-		m.renderSidebar(), ui.RenderSeamColumn(m.height, ui.SeamColor), m.renderMain(m.mainWidth(), lines)))
+	if m.leaderPending {
+		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], leaderBindings), m.width, m.height)
+	}
+	if m.help.IsOpen {
+		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
+	}
+	return tea.NewView(out)
 }
 
 func (m Model) sidebarOnScreen() bool {
