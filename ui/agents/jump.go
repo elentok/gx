@@ -90,7 +90,21 @@ func (m Model) updateJumpKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			j.cursor = 0
 		}
 	}
-	return m, nil
+	return m.startSpinner()
+}
+
+// jumpBodyHeight is the popup's room for match rows: the screen less the
+// border, query line, the gaps and the hint.
+func (m Model) jumpBodyHeight() int { return max(1, m.height-7) }
+
+// jumpOffset is the first match on screen, scrolled to keep the cursor shown.
+func (m Model) jumpOffset() int { return max(0, m.jump.cursor-m.jumpBodyHeight()+1) }
+
+// jumpShown is the matches on screen in the popup.
+func (m Model) jumpShown() []int {
+	matches := m.jumpMatches()
+	offset := min(m.jumpOffset(), len(matches))
+	return matches[offset:min(len(matches), offset+m.jumpBodyHeight())]
 }
 
 func (m Model) renderJump() string {
@@ -105,10 +119,8 @@ func (m Model) renderJump() string {
 	if len(matches) == 0 {
 		lines = append(lines, ui.StyleMuted.Render("  no matches"))
 	}
-	// Room for the border, query line, the gaps and the hint.
-	bodyH := max(1, m.height-7)
-	offset := max(0, m.jump.cursor-bodyH+1)
-	for n, i := range matches[offset:min(len(matches), offset+bodyH)] {
+	offset := m.jumpOffset()
+	for n, i := range m.jumpShown() {
 		row := m.jumpRow(m.sessions[i], innerW)
 		if offset+n == m.jump.cursor {
 			row = ui.RenderRowHighlight(row)

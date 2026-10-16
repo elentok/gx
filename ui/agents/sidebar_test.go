@@ -188,3 +188,34 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 		t.Fatal("tick scheduled for a Working session scrolled off screen")
 	}
 }
+
+func TestJump_SpinnerTicksForAWorkingSessionWithTheSidebarHidden(t *testing.T) {
+	working := []server.SessionInfo{{ID: "w", Name: "worker", Project: "gx", Status: server.SessionStatus{State: server.SessionWorking}}}
+	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m.sessionsDir = ""
+	m.hideSidebar = true
+	m = withState(t, m, &viewmodel.State{Sessions: working}, ticketsui.ServerLinkUp)
+	if m.ticking {
+		t.Fatal("ticking with the sidebar hidden and no popup")
+	}
+
+	next, tick := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	m = next.(Model)
+	if tick == nil {
+		t.Fatal("no tick scheduled with the popup showing a Working session")
+	}
+	next, cmd := m.Update(tick())
+	if cmd == nil {
+		t.Fatal("tick not re-armed while the popup shows a Working session")
+	}
+	m = next.(Model)
+
+	filtered := typeText(t, m, "zzz")
+	if _, cmd := filtered.Update(tick()); cmd != nil {
+		t.Fatal("tick re-armed with the Working session filtered out")
+	}
+	closed := update1(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if _, cmd := closed.Update(tick()); cmd != nil {
+		t.Fatal("tick re-armed after the popup closed")
+	}
+}

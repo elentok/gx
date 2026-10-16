@@ -75,18 +75,23 @@ func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) st
 	return title
 }
 
-// terminalRightTitle is project, dir and the time since the last status
-// change; it takes at most half the header so the title stays readable.
+// terminalRightTitle is the AFK mark, project, dir and the time since the
+// last status change; it takes at most half the header so the title stays
+// readable. Truncation cuts the project side, never the AFK mark.
 func (m Model) terminalRightTitle(s server.SessionInfo, width int) string {
+	afk := ""
+	if m.afk {
+		afk = " AFK ·"
+	}
 	// The leading space keeps a gap once the title is truncated against it.
 	right := " " + s.Project + "  " + shortDir(s.Dir)
 	if !s.StatusChangedAt.IsZero() {
 		right += "  for " + ui.DurationCompact(m.now().Sub(s.StatusChangedAt))
 	}
-	if w, limit := ansi.StringWidth(right), width/2; w > limit {
+	if w, limit := ansi.StringWidth(right), width/2-len(afk); w > limit {
 		right = ansi.TruncateLeft(right, w-limit+1, "…")
 	}
-	return right
+	return afk + right
 }
 
 func statusLabel(s server.SessionInfo) string {

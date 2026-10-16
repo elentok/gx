@@ -244,7 +244,7 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.cursor = m.nextNeedingAttention()
 	case key.Matches(msg, keyJump):
 		m.jump = &jumpPopup{}
-		return m, nil
+		return m.startSpinner()
 	case key.Matches(msg, keyCreate):
 		return m.openCreate()
 	case key.Matches(msg, keyStop):
@@ -294,11 +294,19 @@ func (m Model) startSpinner() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) workingVisible() bool {
-	if !m.sidebarShown() {
-		return false
+	var shown []int
+	if m.jump != nil {
+		shown = m.jumpShown()
 	}
-	for _, r := range m.visibleRows() {
-		if r.session >= 0 && m.sessions[r.session].Status.State == server.SessionWorking {
+	if m.sidebarShown() {
+		for _, r := range m.visibleRows() {
+			if r.session >= 0 {
+				shown = append(shown, r.session)
+			}
+		}
+	}
+	for _, i := range shown {
+		if m.sessions[i].Status.State == server.SessionWorking {
 			return true
 		}
 	}

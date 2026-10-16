@@ -31,3 +31,16 @@ func TestAFK_HeaderMarksAFK(t *testing.T) {
 		t.Fatalf("no AFK mark while on:\n%s", view)
 	}
 }
+
+func TestAFK_TerminalHeaderMarksAFKWithTheSidebarHidden(t *testing.T) {
+	m := actionModel(t, &fakeSessionClient{}, "live")
+	m.hideSidebar = true
+	if strings.Contains(plainView(m), "AFK") {
+		t.Fatalf("AFK shown while off:\n%s", plainView(m))
+	}
+	next, _ := m.WithServerState(&viewmodel.State{AFK: true, Sessions: actionSessions()}, m.link)
+	header, _, _ := strings.Cut(plainView(next.(Model)), "\n")
+	if !strings.Contains(header, "AFK") {
+		t.Fatalf("no AFK mark in the terminal header:\n%s", header)
+	}
+}

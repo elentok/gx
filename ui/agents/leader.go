@@ -103,7 +103,7 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	switch k {
 	case "j":
 		m.jump = &jumpPopup{}
-		return m, nil
+		return m.startSpinner()
 	case "c":
 		return m.openCreate()
 	case "x":
