@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
@@ -27,6 +28,9 @@ var (
 	keyAttention     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "next needing attention"))
 	keyJump          = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "jump to session"))
 	keyCreate        = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "new session"))
+	keyStop          = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "stop session"))
+	keyRemove        = key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "remove session"))
+	keyResume        = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resume session"))
 )
 
 type pageActivatedMsg struct{}
@@ -58,6 +62,8 @@ type Model struct {
 	// pendingSelect is a just-created session to select and focus once a
 	// snapshot lists it.
 	pendingSelect string
+	// confirm asks y/n before a Stop or Remove.
+	confirm       confirm.Model
 	help          help.Model
 	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
@@ -118,10 +124,10 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 }
 
 // InputFocused tells the shell the page swallows every key: in the terminal,
-// after the leader, in the jump popup or create form and while typing a help
-// filter.
+// after the leader, in the jump popup, create form or confirm and while typing
+// a help filter.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.jump != nil || m.create != nil || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.help.InputFocused()
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -174,6 +180,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateFormProjects(msg)
 	case sessionCreatedMsg:
 		return m.updateSessionCreated(msg)
+	case sessionActionMsg:
+		return m.updateSessionAction(msg)
 	case pageActivatedMsg:
 		// The spinner's tick chain died while the tab was hidden. Focus
 		// reports reach only the page on screen, and switching tabs takes
@@ -223,6 +231,12 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case key.Matches(msg, keyCreate):
 		return m.openCreate()
+	case key.Matches(msg, keyStop):
+		return m.stopSelected()
+	case key.Matches(msg, keyRemove):
+		return m.removeSelected()
+	case key.Matches(msg, keyResume):
+		return m.resumeSelected()
 	default:
 		return m, nil
 	}
@@ -305,6 +319,9 @@ func (m Model) render() string {
 	}
 	if m.create != nil {
 		out = ui.OverlayCenter(out, m.renderCreate(), m.width, m.height)
+	}
+	if m.confirm.IsOpen {
+		out = ui.OverlayCenter(out, m.confirm.View(m.width), m.width, m.height)
 	}
 	if m.leaderPending {
 		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], leaderBindings), m.width, m.height)

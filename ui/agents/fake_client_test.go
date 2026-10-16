@@ -47,6 +47,10 @@ func (f *fakeSessionClient) RemoveSession(_ context.Context, id string) (server.
 	return f.record("remove " + id)
 }
 
+func (f *fakeSessionClient) ResumeSession(_ context.Context, id string) (server.SessionResult, error) {
+	return f.record("resume " + id)
+}
+
 // ReportFocus records reports apart from calls: every update may send one.
 func (f *fakeSessionClient) ReportFocus(_ context.Context, req server.FocusReport) (server.SessionResult, error) {
 	f.mu.Lock()

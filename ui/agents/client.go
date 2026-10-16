@@ -12,5 +12,6 @@ type SessionClient interface {
 	CreateSession(ctx context.Context, req server.CreateSessionRequest) (server.SessionResult, error)
 	StopSession(ctx context.Context, id string) (server.SessionResult, error)
 	RemoveSession(ctx context.Context, id string) (server.SessionResult, error)
+	ResumeSession(ctx context.Context, id string) (server.SessionResult, error)
 	ReportFocus(ctx context.Context, req server.FocusReport) (server.SessionResult, error)
 }

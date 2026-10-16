@@ -22,6 +22,9 @@ var digitTabs = []nav.TabID{
 var leaderBindings = []keys.Binding{
 	{Seq: []string{"j"}, Title: "jump to session"},
 	{Seq: []string{"c"}, Title: "new session"},
+	{Seq: []string{"x"}, Title: "stop session"},
+	{Seq: []string{"X"}, Title: "remove session"},
+	{Seq: []string{"r"}, Title: "resume session"},
 	{Seq: []string{"n"}, Title: "next session"},
 	{Seq: []string{"p"}, Title: "previous session"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
@@ -39,6 +42,9 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"u"}, Title: "next needing attention"},
 	{Seq: []string{"/"}, Title: "jump to session"},
 	{Seq: []string{"c"}, Title: "new session"},
+	{Seq: []string{"x"}, Title: "stop session"},
+	{Seq: []string{"X"}, Title: "remove session"},
+	{Seq: []string{"r"}, Title: "resume session"},
 	{Seq: []string{"b"}, Title: "toggle sidebar"},
 }
 
@@ -62,6 +68,8 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateJumpKey(msg)
 	case m.create != nil:
 		return m.updateCreateKey(msg)
+	case m.confirm.IsOpen:
+		return m.updateConfirmKey(msg)
 	case m.leaderPending:
 		m.leaderPending = false
 		if isLeader {
@@ -88,6 +96,12 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "c":
 		return m.openCreate()
+	case "x":
+		return m.stopSelected()
+	case "X":
+		return m.removeSelected()
+	case "r":
+		return m.resumeSelected()
 	case "n":
 		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
 	case "p":
