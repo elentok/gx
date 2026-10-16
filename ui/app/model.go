@@ -63,6 +63,7 @@ type Model struct {
 	gate          *reloadgate.ReloadGate
 
 	serverConn ServerConn
+	about      *aboutState
 	stream     serverStream
 	store      storeWatch
 }
@@ -77,9 +78,10 @@ func New(repo git.Repo, settings Settings) Model {
 		notifyLog:     notifylog.New(),
 		notifyHistory: notifyhistory.New(),
 		gate:          reloadgate.New(),
+		about:         newAboutState(settings.Terminal),
 	}
 	if settings.Server == nil {
-		m.serverConn = ServerConn{State: ServerDown}
+		m.setServerConn(ServerConn{State: ServerDown})
 	}
 	if m.settings.InitialRoute.Tab == "" {
 		m.settings.InitialRoute = nav.ViewState{Tab: nav.TabWorktrees}

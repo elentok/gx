@@ -216,6 +216,34 @@ func TestHelpViewShowsVersionInBottomBorder(t *testing.T) {
 	}
 }
 
+// The About tests swap the package-level provider, so they don't run in parallel.
+func TestHelpAboutSectionRendersProviderLinesAtTop(t *testing.T) {
+	SetAboutProvider(func() []AboutLine {
+		return []AboutLine{{Label: "server", Value: "running"}, {Label: "pid", Value: "42"}}
+	})
+	t.Cleanup(func() { SetAboutProvider(nil) })
+
+	m := helpWithBindings()
+	lines := strings.Split(ansi.Strip(m.Viewport.View()), "\n")
+	if got := strings.TrimSpace(lines[0]); got != "About" {
+		t.Errorf("first line = %q, want About", got)
+	}
+	if got := strings.Join(strings.Fields(lines[1]), " "); got != "server running" {
+		t.Errorf("second line = %q, want server running", got)
+	}
+	if got := strings.Join(strings.Fields(lines[2]), " "); got != "pid 42" {
+		t.Errorf("third line = %q, want pid 42", got)
+	}
+}
+
+func TestHelpAboutSectionAbsentWithoutProvider(t *testing.T) {
+	SetAboutProvider(nil)
+	m := helpWithBindings()
+	if strings.Contains(ansi.Strip(m.Viewport.View()), "About") {
+		t.Error("About section rendered with no provider registered")
+	}
+}
+
 func TestHelpWindowSizeMsg(t *testing.T) {
 	m := NewModel(nil)
 	m.Open(120, 40)
