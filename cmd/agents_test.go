@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
@@ -81,6 +82,15 @@ func TestAgentActionable(t *testing.T) {
 	}
 	if err := runAgentActionable(ctx, noServer, &out, false, server.MarkActionableRequest{Reason: "x"}); err != nil || out.Len() == 0 {
 		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
+	}
+}
+
+func TestAgentActionable_NoServerInSession(t *testing.T) {
+	client := func() (*apiclient.Client, error) { return apiclient.New(filepath.Join(shortTempDir(t), "a.sock")), nil }
+	var out bytes.Buffer
+	req := server.MarkActionableRequest{ID: "s1", Reason: "x"}
+	if err := runAgentActionable(context.Background(), client, &out, false, req); err != nil {
+		t.Errorf("no server = %q, %v; want success", out.String(), err)
 	}
 }
 

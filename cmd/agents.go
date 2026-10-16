@@ -54,8 +54,8 @@ func newAgentActionableCmd() *cobra.Command {
 	return cmd
 }
 
-// runAgentActionable sends req, or, with no session id, prints a note and
-// succeeds, so skills can call it unconditionally.
+// runAgentActionable sends req, or, with no session id or no server, prints a
+// note and succeeds, so skills can call it unconditionally.
 func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.MarkActionableRequest) error {
 	if req.ID == "" {
 		_, err := fmt.Fprintf(w, "not in a gx session (%s unset); nothing marked\n", nativerunner.AgentSessionEnv)
@@ -66,6 +66,10 @@ func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, e
 		return err
 	}
 	res, err := cl.MarkSessionActionable(ctx, req)
+	if apiclient.IsNotRunning(err) {
+		_, err := fmt.Fprintln(w, "gx server not running; nothing marked")
+		return err
+	}
 	return printSessionResult(w, jsonOut, res, err)
 }
 
