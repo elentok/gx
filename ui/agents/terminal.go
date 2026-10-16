@@ -157,16 +157,20 @@ func infoRow(s server.SessionInfo) string {
 		}
 		return row
 	}
+	if d := statusDetail(s); d != "" {
+		return styleDetail.Render(d)
+	}
+	return ""
+}
+
+func statusDetail(s server.SessionInfo) string {
 	var parts []string
 	for _, p := range []string{s.Status.Kind, s.Status.Message} {
 		if p != "" {
 			parts = append(parts, p)
 		}
 	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return styleDetail.Render(strings.Join(parts, ": "))
+	return strings.Join(parts, ": ")
 }
 
 func shortDir(dir string) string {

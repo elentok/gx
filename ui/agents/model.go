@@ -24,6 +24,7 @@ var (
 	keyToggleSidebar = key.NewBinding(key.WithKeys("b"), key.WithHelp("b", "toggle sidebar"))
 	keyFocusTerminal = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "focus terminal"))
 	keyAttention     = key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "next needing attention"))
+	keyJump          = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "jump to session"))
 )
 
 // spinnerRestartMsg re-arms the Working spinner: its tick chain dies while
@@ -49,6 +50,8 @@ type Model struct {
 	terminalFocused bool
 	// leaderPending: the leader was pressed and the next key is its action.
 	leaderPending bool
+	// jump is nil while the jump popup is closed.
+	jump          *jumpPopup
 	help          help.Model
 	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
@@ -90,9 +93,9 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 }
 
 // InputFocused tells the shell the page swallows every key: in the terminal,
-// after the leader, and while typing a help filter.
+// after the leader, in the jump popup and while typing a help filter.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.jump != nil || m.help.InputFocused()
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -167,6 +170,9 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.hideSidebar = !m.hideSidebar
 	case key.Matches(msg, keyAttention):
 		m.cursor = m.nextNeedingAttention()
+	case key.Matches(msg, keyJump):
+		m.jump = &jumpPopup{}
+		return m, nil
 	default:
 		return m, nil
 	}
@@ -225,6 +231,9 @@ func (m Model) View() tea.View {
 			m.renderSidebar(), ui.RenderSeamColumn(m.height, ui.SeamColor), m.renderMain(m.mainWidth(), lines))
 	} else {
 		out = m.renderMain(m.width, lines)
+	}
+	if m.jump != nil {
+		out = ui.OverlayCenter(out, m.renderJump(), m.width, m.height)
 	}
 	if m.leaderPending {
 		out = ui.OverlayBottomRight(out, ui.RenderChordOverlay(m.leaderKeys()[0], leaderBindings), m.width, m.height)

@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
-	"github.com/elentok/gx/ui/notify"
 )
 
 // digitTabs is the shell's tab order, so leader 1-8 matches plain 1-8.
@@ -37,6 +36,7 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"k"}, Display: "k/↑", Title: "previous session"},
 	{Seq: []string{"enter"}, Title: "focus terminal"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
+	{Seq: []string{"/"}, Title: "jump to session"},
 	{Seq: []string{"b"}, Title: "toggle sidebar"},
 }
 
@@ -56,6 +56,8 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.help, cmd = m.help.Update(msg)
 		return m, cmd
+	case m.jump != nil:
+		return m.updateJumpKey(msg)
 	case m.leaderPending:
 		m.leaderPending = false
 		if isLeader {
@@ -78,7 +80,8 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	switch k {
 	case "j":
-		return m, notify.Info("jump popup not available yet")
+		m.jump = &jumpPopup{}
+		return m, nil
 	case "n":
 		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
 	case "p":
