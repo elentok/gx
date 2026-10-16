@@ -179,6 +179,7 @@ type recordingWatcher struct {
 
 func (w *recordingWatcher) Status() agentharness.Status { return agentharness.Status{} }
 func (w *recordingWatcher) ConversationID() string      { return "" }
+func (w *recordingWatcher) OnChange(func())             {}
 func (w *recordingWatcher) Program(r agentharness.ProgramReport) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

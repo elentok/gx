@@ -88,6 +88,36 @@ func TestHolderWatch_StreamsStatusConversationAndExit(t *testing.T) {
 	}
 }
 
+func TestHolderWatch_IdleStreamDoesNoPeriodicWork(t *testing.T) {
+	dir := shortTempDir(t)
+	w := &settableWatcher{}
+	c, finished := startTestHolder(t, dir, settableHarness{w: w}, []string{"sh", "-c", "sleep 30"})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+	watch, err := c.Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = watch.Close() })
+	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus {
+		t.Fatalf("first message = %+v, %v; want a status", m, err)
+	}
+
+	before := w.statusReads()
+	time.Sleep(500 * time.Millisecond)
+	if after := w.statusReads(); after != before {
+		t.Errorf("an idle watch read the status %d more times; want none", after-before)
+	}
+
+	working := agentharness.Status{State: agentharness.Working}
+	w.set(working, "")
+	if m, err := watch.Next(); err != nil || m.Status != working {
+		t.Errorf("after a change = %+v, %v; want %+v", m, err, working)
+	}
+}
+
 func TestHolderWatch_ClosesWithoutExitWhenHolderDies(t *testing.T) {
 	dir := shortTempDir(t)
 	launcher := exec.Command(os.Args[0], "--session-id", "s", "--dir", dir, "--", "sh", "-c", "sleep 30")
@@ -164,18 +194,38 @@ type settableWatcher struct {
 	mu             sync.Mutex
 	status         agentharness.Status
 	conversationID string
+	onChange       func()
+	// reads counts Status calls.
+	reads int
 }
 
 func (w *settableWatcher) set(s agentharness.Status, conversationID string) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.status, w.conversationID = s, conversationID
+	onChange := w.onChange
+	w.mu.Unlock()
+	if onChange != nil {
+		onChange()
+	}
+}
+
+func (w *settableWatcher) OnChange(f func()) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.onChange = f
 }
 
 func (w *settableWatcher) Status() agentharness.Status {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.reads++
 	return w.status
+}
+
+func (w *settableWatcher) statusReads() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.reads
 }
 
 func (w *settableWatcher) ConversationID() string {

@@ -201,7 +201,12 @@ func (p *program) control(c Control) error {
 	case ActionWrite:
 		fmt.Fprint(p.out, c.Output)
 	case ActionConversation:
-		return os.WriteFile(p.convPath, []byte(c.ConversationID), 0o644)
+		if err := os.WriteFile(p.convPath, []byte(c.ConversationID), 0o644); err != nil {
+			return err
+		}
+		// Claude redraws on /clear; the holder's watch wakes on that output.
+		// An SGR reset stands in for it without changing the screen.
+		fmt.Fprint(p.out, "\x1b[0m")
 	case ActionSize:
 		cols, rows, err := term.GetSize(os.Stdout.Fd())
 		if err != nil {

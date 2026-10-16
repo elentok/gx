@@ -49,9 +49,6 @@ var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach}
 
 const (
 	holderIOTimeout = 5 * time.Second
-	// holderWatchPoll is how often a watch stream checks the Watch, which has
-	// no change signal of its own.
-	holderWatchPoll = 100 * time.Millisecond
 	// holderStopGrace is how long stop waits for the child to exit on
 	// SIGTERM before it kills it.
 	holderStopGrace = 5 * time.Second
@@ -94,6 +91,9 @@ type holderServer struct {
 	frames  *frameHub
 	// inputs wakes the watch streams when a client types on an attach.
 	inputs signalHub
+	// changes wakes the watch streams when what they send may have changed:
+	// on the watcher's own changes and on output, which drives the rest.
+	changes signalHub
 	ops    []string
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
@@ -233,8 +233,9 @@ func (h *holderServer) watch(conn net.Conn) {
 	}
 	inputs := h.inputs.subscribe()
 	defer h.inputs.unsubscribe(inputs)
-	tick := time.NewTicker(holderWatchPoll)
-	defer tick.Stop()
+	// Subscribed before the first read, so no change slips in between.
+	changes := h.changes.subscribe()
+	defer h.changes.unsubscribe(changes)
 	var last *streamStatus
 	for {
 		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get())
@@ -254,7 +255,7 @@ func (h *holderServer) watch(conn net.Conn) {
 			if send(StreamInput, struct{}{}) != nil {
 				return
 			}
-		case <-tick.C:
+		case <-changes:
 		}
 	}
 }
@@ -292,6 +293,12 @@ func (s *signalHub) notify() {
 		default:
 		}
 	}
+}
+
+// Write notifies on each write, so the hub can follow the pty's output.
+func (s *signalHub) Write(p []byte) (int, error) {
+	s.notify()
+	return len(p), nil
 }
 
 // startStream counts a new stream unless the holder is finishing, when the

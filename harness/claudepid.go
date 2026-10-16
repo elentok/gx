@@ -90,6 +90,7 @@ type PidWatcher struct {
 	// lastLimit is when the newest rate limit applied was written: an older
 	// one, still the transcript's last word early in a turn, isn't news.
 	lastLimit time.Time
+	onChange  func()
 }
 
 type pidState struct {
@@ -151,6 +152,7 @@ func (w *PidWatcher) poll() {
 	}
 	s := f.PidStatus
 	w.mu.Lock()
+	changed := !w.live.seen || s != w.live.last || f.SessionID != w.live.conversationID
 	// last starts as ClaudeStarting, so a first read past starting still
 	// counts the change a poll missed.
 	if s.Status != w.live.last.Status {
@@ -161,7 +163,27 @@ func (w *PidWatcher) poll() {
 	}
 	w.live.seen, w.live.last, w.live.conversationID = true, s, f.SessionID
 	w.mu.Unlock()
+	if changed {
+		w.changed()
+	}
 	w.pollTranscript(f.SessionID)
+}
+
+func (w *PidWatcher) OnChange(f func()) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.onChange = f
+}
+
+// changed calls the OnChange func outside the lock, so it may read the
+// watcher.
+func (w *PidWatcher) changed() {
+	w.mu.Lock()
+	f := w.onChange
+	w.mu.Unlock()
+	if f != nil {
+		f()
+	}
 }
 
 // pollTranscript takes a rate limit written since the last one applied.
@@ -193,9 +215,13 @@ func (w *PidWatcher) pollTranscript(conversationID string) {
 		return
 	}
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	if e.Timestamp.After(w.lastLimit) {
+	limited := e.Timestamp.After(w.lastLimit)
+	if limited {
 		w.lastLimit, w.live.rateLimit = e.Timestamp, &e
+	}
+	w.mu.Unlock()
+	if limited {
+		w.changed()
 	}
 }
 
@@ -314,8 +340,9 @@ func (w *PidWatcher) Hold() {
 
 func (w *PidWatcher) Release() {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	w.held = nil
+	w.mu.Unlock()
+	w.changed()
 }
 
 // WaitLive waits up to timeout for the live status to meet cond and returns

@@ -51,6 +51,35 @@ func TestPidWatcher_IgnoresFileWithoutStartedAt(t *testing.T) {
 	}
 }
 
+func TestPidWatcher_OnChangeOnlyOnChange(t *testing.T) {
+	dir := t.TempDir()
+	spawned := time.Now()
+	w := newPidWatcher(dir, 4242, spawned)
+	changes := 0
+	w.OnChange(func() { changes++ })
+
+	w.poll()
+	if changes != 0 {
+		t.Fatalf("no file: %d changes, want 0", changes)
+	}
+	writePidFile(t, dir, spawned, `,"status":"busy"`)
+	w.poll()
+	w.poll()
+	if changes != 1 {
+		t.Fatalf("first status, polled twice: %d changes, want 1", changes)
+	}
+	writePidFile(t, dir, spawned, `,"status":"waiting","waitingFor":"permission prompt"`)
+	w.poll()
+	if changes != 2 {
+		t.Fatalf("new status: %d changes, want 2", changes)
+	}
+	w.Hold()
+	w.Release()
+	if changes != 3 {
+		t.Fatalf("release: %d changes, want 3", changes)
+	}
+}
+
 func TestPidWatcher_ReportsSessionStatus(t *testing.T) {
 	dir := t.TempDir()
 	spawned := time.Now()

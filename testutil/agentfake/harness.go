@@ -97,6 +97,10 @@ func (w *programWatcher) ConversationID() string {
 	return string(data)
 }
 
+// OnChange never calls f: the program writes output whenever its status or
+// conversation id changes.
+func (w *programWatcher) OnChange(func()) {}
+
 // Program ignores clear: the program sends it on exit, and Exited comes from
 // the process's death.
 func (w *programWatcher) Program(r harness.ProgramReport) {

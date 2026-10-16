@@ -160,6 +160,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		exited:   exited,
 		finished: make(chan struct{}),
 	}
+	watcher.OnChange(srv.changes.notify)
 	// Runs before ln.Close, so watch streams get their exit before the
 	// socket goes.
 	defer srv.finish()
@@ -172,7 +173,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
-		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, &programStatus{ptmx: ptmx, watcher: watcher}), ptmx)
+		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, &programStatus{ptmx: ptmx, watcher: watcher}, &srv.changes), ptmx)
 	}()
 
 	waitErr := cmd.Wait()

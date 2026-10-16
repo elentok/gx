@@ -58,6 +58,10 @@ type Watcher interface {
 	ConversationID() string
 	// Program takes each OSC 7501 report the child writes, in order.
 	Program(r ProgramReport)
+	// OnChange sets f, called after each change to Status or ConversationID
+	// the Watcher sees apart from the child's output, such as a file it
+	// follows. A change the output drives may skip it.
+	OnChange(f func())
 }
 
 // State is a Session status, less Exited: the server derives that from
