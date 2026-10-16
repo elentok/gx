@@ -68,7 +68,13 @@ func PathIn(home, cwd, sessionID string) string {
 // should surface, not silently resolve by picking one. A nil slice with a
 // nil error means no transcript matched.
 func FindByID(home, sessionID string) ([]string, error) {
-	matches, err := filepath.Glob(filepath.Join(home, ".claude", "projects", "*", sessionID+".jsonl"))
+	return FindByIDIn(filepath.Join(home, ".claude", "projects"), sessionID)
+}
+
+// FindByIDIn is FindByID under an explicit projects directory, for a claude
+// whose config dir isn't ~/.claude.
+func FindByIDIn(projectsDir, sessionID string) ([]string, error) {
+	matches, err := filepath.Glob(filepath.Join(projectsDir, "*", sessionID+".jsonl"))
 	if err != nil {
 		return nil, err
 	}

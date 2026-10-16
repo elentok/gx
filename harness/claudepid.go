@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/transcript"
 )
 
 // Claude pid status file values. No status yet means claude is starting.
@@ -54,17 +56,29 @@ func ClaudeSessionsDir() (string, error) {
 }
 
 // PidWatcher follows one claude's pid status file, counting its status
-// changes as turns, and its OSC 7501 reports. It is the claude harness's
-// Watcher.
+// changes as turns, its OSC 7501 reports and its transcript's rate limits. It
+// is the claude harness's Watcher.
 type PidWatcher struct {
-	path string
+	path        string
+	projectsDir string
 	// notBefore is the earliest startedAt, in Unix ms, of a file to trust.
 	notBefore int64
+	// startup reports a pre-session dialog on screen; nil sees none.
+	startup func() bool
+
+	// transcript is read only when its size changes; poll alone touches it.
+	transcript struct {
+		conversationID, path string
+		size                 int64
+	}
 
 	mu   sync.Mutex
 	live pidState
 	// held, while set, is what state reports in place of the live status.
 	held *pidState
+	// lastLimit is when the newest rate limit applied was written: an older
+	// one, still the transcript's last word early in a turn, isn't news.
+	lastLimit time.Time
 }
 
 type pidState struct {
@@ -74,6 +88,8 @@ type pidState struct {
 	turn           int
 	// program is the last OSC 7501 report, nil before one or after clear.
 	program *ProgramReport
+	// rateLimit is the transcript's rate limit, held until the next Working.
+	rateLimit *transcript.APIError
 }
 
 // pidStartSlack is how far before the spawn claude's startedAt may fall and
@@ -82,10 +98,12 @@ const pidStartSlack = 2 * time.Second
 
 // newPidWatcher ignores a file whose startedAt is before spawned: a claude
 // that crashed left it, and the OS has since reused its pid.
+// The transcripts are a sibling of sessionsDir, under the same config dir.
 func newPidWatcher(sessionsDir string, pid int, spawned time.Time) *PidWatcher {
 	return &PidWatcher{
-		path:      filepath.Join(sessionsDir, strconv.Itoa(pid)+".json"),
-		notBefore: spawned.Add(-pidStartSlack).UnixMilli(),
+		path:        filepath.Join(sessionsDir, strconv.Itoa(pid)+".json"),
+		projectsDir: filepath.Join(filepath.Dir(sessionsDir), "projects"),
+		notBefore:   spawned.Add(-pidStartSlack).UnixMilli(),
 	}
 }
 
@@ -120,13 +138,43 @@ func (w *PidWatcher) poll() {
 	}
 	s := f.PidStatus
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	// last starts as ClaudeStarting, so a first read past starting still
 	// counts the change a poll missed.
 	if s.Status != w.live.last.Status {
 		w.live.turn++
+		if s.Status == ClaudeBusy || s.Status == ClaudeShell {
+			w.live.rateLimit = nil
+		}
 	}
 	w.live.seen, w.live.last, w.live.conversationID = true, s, f.SessionID
+	w.mu.Unlock()
+	w.pollTranscript(f.SessionID)
+}
+
+// pollTranscript takes a rate limit written since the last one applied.
+func (w *PidWatcher) pollTranscript(conversationID string) {
+	t := &w.transcript
+	if conversationID != t.conversationID {
+		paths, err := transcript.FindByIDIn(w.projectsDir, conversationID)
+		if err != nil || len(paths) != 1 {
+			return
+		}
+		t.conversationID, t.path, t.size = conversationID, paths[0], -1
+	}
+	info, err := os.Stat(t.path)
+	if err != nil || info.Size() == t.size {
+		return
+	}
+	t.size = info.Size()
+	e, ok, err := transcript.LastAPIError(t.path)
+	if err != nil || !ok || !e.RateLimited() || e.Timestamp.UnixMilli() < w.notBefore {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if e.Timestamp.After(w.lastLimit) {
+		w.lastLimit, w.live.rateLimit = e.Timestamp, &e
+	}
 }
 
 // PidState returns the last status read, nil before the file first appears,
@@ -148,12 +196,26 @@ func (w *PidWatcher) state() pidState {
 	return w.live
 }
 
-// Status puts claude's last OSC 7501 report over its pid file.
+// Status puts claude's last OSC 7501 report over its pid file, over a rate
+// limit in its transcript, over a pre-session dialog on screen. The rate limit
+// still covers their Idle, and a Working from before it: claude ends the
+// limited turn as any other, and only the next Working clears the hold.
 func (w *PidWatcher) Status() Status {
 	st := w.state()
-	if s, ok := programStatus(st.program); ok {
-		return s
+	s, ok := programStatus(st.program)
+	if !ok {
+		s = pidFileStatus(st)
 	}
+	if st.rateLimit != nil && s.State != Blocked {
+		return Status{State: RateLimited, Message: st.rateLimit.Message}
+	}
+	if s.State == Starting && w.startup != nil && w.startup() {
+		return Status{State: Blocked, Blocked: BlockedDialog}
+	}
+	return s
+}
+
+func pidFileStatus(st pidState) Status {
 	if !st.seen {
 		return Status{State: Starting}
 	}
@@ -186,9 +248,12 @@ func (w *PidWatcher) Program(r ProgramReport) {
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if r.State == "clear" {
+	switch r.State {
+	case "clear":
 		w.live.program = nil
 		return
+	case "working":
+		w.live.rateLimit = nil
 	}
 	w.live.program = &r
 }

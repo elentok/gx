@@ -24,15 +24,22 @@ func claudeCommand(args, env []string) Command {
 	return Command{Name: "claude", Args: args, Env: LaunchEnv(os.Environ(), env)}
 }
 
-func (claudeHarness) Watch(pid int, spawned time.Time, stop <-chan struct{}) (Watcher, error) {
+func (h claudeHarness) Watch(pid int, spawned time.Time, scr Screen, stop <-chan struct{}) (Watcher, error) {
 	dir, err := ClaudeSessionsDir()
 	if err != nil {
 		return nil, err
 	}
 	w := newPidWatcher(dir, pid, spawned)
+	w.startup = func() bool {
+		return h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()).Dialog != NoDialog
+	}
 	go w.watch(stop)
 	return w, nil
 }
+
+// startupScrollback is how much scrolled-off text a pre-session dialog can
+// have: a narrow PTY wraps it past the visible rows.
+const startupScrollback = 50
 
 func (claudeHarness) StartupScreen(scrolled, rows []string) Startup {
 	if claudeui.ClassifyStartup(claudeui.ScreenText(scrolled, rows)) == claudeui.StartupTrust {

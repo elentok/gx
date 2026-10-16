@@ -110,7 +110,7 @@ func runHolder(dir string, h harness.Harness, gxSession string, argv []string) e
 		return err
 	}
 	exited := make(chan struct{})
-	watcher, err := h.Watch(cmd.Process.Pid, spawned, exited)
+	watcher, err := h.Watch(cmd.Process.Pid, spawned, scr, exited)
 	if err != nil {
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()

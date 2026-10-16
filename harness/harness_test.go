@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
 )
 
@@ -71,7 +73,7 @@ func TestClaudeWatch_ReadsPidFileUnderConfigDir(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	spawned := time.Now()
-	w, err := claude(t).Watch(4242, spawned, stop)
+	w, err := claude(t).Watch(4242, spawned, rowsScreen{"loading"}, stop)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,6 +90,53 @@ func TestClaudeWatch_ReadsPidFileUnderConfigDir(t *testing.T) {
 			t.Fatalf("Status = %+v, ConversationID = %q", w.Status(), w.ConversationID())
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// rowsScreen is a screen with nothing scrolled off.
+type rowsScreen []string
+
+func (s rowsScreen) Rows() []string              { return s }
+func (s rowsScreen) ScrollbackTail(int) []string { return nil }
+
+const claudeuiTestdata = "../agentrunner/claudeui/testdata"
+
+func TestClaudeWatch_PreSessionDialogAtAnyWidth(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(claudeuiTestdata, "trust-w60.raw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	narrow := screen.NewScreen(60, 30)
+	t.Cleanup(func() { _ = narrow.Close() })
+	if _, err := narrow.Write(raw); err != nil {
+		t.Fatal(err)
+	}
+	wide, err := os.ReadFile(filepath.Join(claudeuiTestdata, "trust-w160.screen.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		scr  harness.Screen
+		want harness.Status
+	}{
+		{"trust dialog at 60 cols", narrow, harness.Status{State: harness.Blocked, Blocked: harness.BlockedDialog}},
+		{"trust dialog at 160 cols", rowsScreen(strings.Split(string(wide), "\n")), harness.Status{State: harness.Blocked, Blocked: harness.BlockedDialog}},
+		{"no dialog", rowsScreen{"loading"}, harness.Status{State: harness.Starting}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+			stop := make(chan struct{})
+			defer close(stop)
+			w, err := claude(t).Watch(4242, time.Now(), c.scr, stop)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := w.Status(); got != c.want {
+				t.Fatalf("Status = %+v, want %+v", got, c.want)
+			}
+		})
 	}
 }
 

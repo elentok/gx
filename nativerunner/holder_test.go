@@ -166,7 +166,7 @@ type recordingHarness struct {
 	w *recordingWatcher
 }
 
-func (h recordingHarness) Watch(int, time.Time, <-chan struct{}) (agentharness.Watcher, error) {
+func (h recordingHarness) Watch(int, time.Time, agentharness.Screen, <-chan struct{}) (agentharness.Watcher, error) {
 	return h.w, nil
 }
 

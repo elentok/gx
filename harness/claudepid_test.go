@@ -144,6 +144,141 @@ func TestPidWatcher_ConversationIDFollowsPidFile(t *testing.T) {
 	}
 }
 
+// rateLimitWatcher is a watcher on conv-1, whose transcript is at the path
+// returned, under the config dir that holds the sessions dir.
+func rateLimitWatcher(t *testing.T, spawned time.Time) (w *PidWatcher, sessions, transcriptPath string) {
+	t.Helper()
+	cfg := t.TempDir()
+	sessions = filepath.Join(cfg, "sessions")
+	project := filepath.Join(cfg, "projects", "-repo")
+	for _, d := range []string{sessions, project} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return newPidWatcher(sessions, 4242, spawned), sessions, filepath.Join(project, "conv-1.jsonl")
+}
+
+func appendLine(t *testing.T, path, line string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func sessionLimitLine(at time.Time) string {
+	return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"isApiErrorMessage":true,"error":"rate_limit","apiErrorStatus":429,"message":{"content":[{"type":"text","text":"You've hit your session limit · resets 11pm"}]}}`, at.UTC().Format(time.RFC3339Nano))
+}
+
+func replyLine(at time.Time) string {
+	return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"content":[{"type":"text","text":"Done."}]}}`, at.UTC().Format(time.RFC3339Nano))
+}
+
+var rateLimited = Status{State: RateLimited, Message: "You've hit your session limit · resets 11pm"}
+
+func TestPidWatcher_RateLimitedHeldUntilNextWorking(t *testing.T) {
+	spawned := time.Now()
+	w, sessions, tr := rateLimitWatcher(t, spawned)
+	set := func(fields string) {
+		writePidFile(t, sessions, spawned, fields)
+		w.poll()
+	}
+	set(`,"status":"busy"`)
+	appendLine(t, tr, sessionLimitLine(spawned.Add(time.Second)))
+	set(`,"status":"idle"`)
+	if got := w.Status(); got != rateLimited {
+		t.Fatalf("after the limit: Status = %+v, want %+v", got, rateLimited)
+	}
+	set(`,"status":"idle"`)
+	if got := w.Status(); got != rateLimited {
+		t.Fatalf("still idle: Status = %+v, want held %+v", got, rateLimited)
+	}
+
+	set(`,"status":"busy"`)
+	if got := w.Status(); got.State != Working {
+		t.Fatalf("next turn: Status = %+v, want Working", got)
+	}
+	// The new turn's user line leaves the old limit the last assistant line.
+	appendLine(t, tr, `{"type":"user","message":{"content":"retry"}}`)
+	set(`,"status":"idle"`)
+	if got := w.Status(); got.State != Idle {
+		t.Fatalf("old limit raised again: Status = %+v, want Idle", got)
+	}
+
+	set(`,"status":"busy"`)
+	appendLine(t, tr, sessionLimitLine(spawned.Add(2*time.Second)))
+	set(`,"status":"idle"`)
+	if got := w.Status(); got != rateLimited {
+		t.Fatalf("a second limit: Status = %+v, want %+v", got, rateLimited)
+	}
+	feedOSC7501(w, "\x1b]7501;state=done:app=claude\a")
+	if got := w.Status(); got != rateLimited {
+		t.Fatalf("OSC done: Status = %+v, want held %+v", got, rateLimited)
+	}
+	feedOSC7501(w, "\x1b]7501;state=working:app=claude\a")
+	if got := w.Status(); got.State != Working {
+		t.Fatalf("OSC working: Status = %+v, want Working", got)
+	}
+	appendLine(t, tr, replyLine(spawned.Add(3*time.Second)))
+	feedOSC7501(w, "\x1b]7501;state=done:app=claude\a")
+	set(`,"status":"idle"`)
+	if got := w.Status(); got.State != Idle {
+		t.Fatalf("successful turn: Status = %+v, want Idle", got)
+	}
+}
+
+func TestPidWatcher_IgnoresRateLimitFromBeforeSpawn(t *testing.T) {
+	spawned := time.Now()
+	w, sessions, tr := rateLimitWatcher(t, spawned)
+	appendLine(t, tr, sessionLimitLine(spawned.Add(-time.Hour)))
+	writePidFile(t, sessions, spawned, `,"status":"idle"`)
+	w.poll()
+	if got := w.Status(); got.State != Idle {
+		t.Fatalf("resumed past an old limit: Status = %+v, want Idle", got)
+	}
+}
+
+func TestPidWatcher_Precedence(t *testing.T) {
+	dialog := func() bool { return true }
+	cases := []struct {
+		name    string
+		pid     string // "" leaves the pid file unwritten
+		limited bool
+		stream  string
+		want    Status
+	}{
+		{"dialog before the session", "", false, "", Status{State: Blocked, Blocked: BlockedDialog}},
+		{"pid file over a dialog", `,"status":"idle"`, false, "", Status{State: Idle}},
+		{"OSC 7501 over a dialog", "", false, "\x1b]7501;state=done:app=claude\a", Status{State: Idle}},
+		{"rate limit over a dialog", `,"status":"idle"`, true, "", rateLimited},
+		{"pid file Blocked over a rate limit", `,"status":"waiting","waitingFor":"permission prompt"`, true, "", Status{State: Blocked, Blocked: BlockedPermission, Message: "permission prompt"}},
+		{"OSC 7501 Blocked over a rate limit", `,"status":"idle"`, true, "\x1b]7501;state=blocked:app=claude:kind=question\a", Status{State: Blocked, Blocked: BlockedQuestion}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			spawned := time.Now()
+			w, sessions, tr := rateLimitWatcher(t, spawned)
+			w.startup = dialog
+			if c.limited {
+				appendLine(t, tr, sessionLimitLine(spawned.Add(time.Second)))
+			}
+			if c.pid != "" {
+				writePidFile(t, sessions, spawned, c.pid)
+				w.poll()
+			}
+			feedOSC7501(w, c.stream)
+			if got := w.Status(); got != c.want {
+				t.Errorf("Status = %+v, want %+v", got, c.want)
+			}
+		})
+	}
+}
+
 func TestPidWatcher_HoldFreezesStatus(t *testing.T) {
 	dir := t.TempDir()
 	spawned := time.Now()

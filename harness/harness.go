@@ -18,9 +18,9 @@ type Harness interface {
 	// Resume is the command for a saved conversation; ok is false when the
 	// harness can't resume.
 	Resume(conversationID string, opts LaunchOptions) (cmd Command, ok bool)
-	// Watch follows the session whose child is pid, spawned at spawned,
-	// until stop closes.
-	Watch(pid int, spawned time.Time, stop <-chan struct{}) (Watcher, error)
+	// Watch follows the session whose child is pid, spawned at spawned and
+	// shown on scr, until stop closes.
+	Watch(pid int, spawned time.Time, scr Screen, stop <-chan struct{}) (Watcher, error)
 	// StartupScreen classifies a pre-session screen: the scrolled-off tail
 	// and the visible rows.
 	StartupScreen(scrolled, rows []string) Startup
@@ -43,6 +43,12 @@ type Command struct {
 	Name string
 	Args []string
 	Env  []string
+}
+
+// Screen is the session's terminal as its host renders it.
+type Screen interface {
+	Rows() []string
+	ScrollbackTail(n int) []string
 }
 
 // Watcher reports what a Watch has seen so far.
