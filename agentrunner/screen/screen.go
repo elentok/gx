@@ -38,6 +38,7 @@ const (
 	KeyDown  = uv.KeyDown
 	KeyLeft  = uv.KeyLeft
 	KeyRight = uv.KeyRight
+	KeyEnter = uv.KeyEnter
 )
 
 // ModShift and friends name a Key's modifier bits.
@@ -314,6 +315,11 @@ func (s *Screen) SendKey(k Key) {
 			s.emu.SendKey(uv.KeyPressEvent{Code: r, Mod: k.Mod & uv.ModAlt})
 		}
 		return
+	}
+	// The emulator has no encoding for Shift+Enter, so it goes as Alt+Enter
+	// (ESC CR), which agents such as Claude Code read as a line break.
+	if k.Code == uv.KeyEnter && k.Mod&^uv.ModAlt == uv.ModShift {
+		k.Mod = uv.ModAlt
 	}
 	s.emu.SendKey(uv.KeyPressEvent(k))
 }
