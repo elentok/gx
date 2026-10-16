@@ -40,7 +40,9 @@ func (m Model) renderPanelWithBorderTitle(width, height int, title, rightTitle s
 	if active || highlightMoved {
 		accent = titleColor
 	}
-	return ui.RenderPanel(ui.PanelOptionsFor(width, height, title, rightTitle, lines, active || highlightMoved, titleColor, accent, false))
+	opts := ui.PanelOptionsFor(width, height, title, rightTitle, lines, active || highlightMoved, titleColor, accent, false)
+	opts.RightTitleStyled = true
+	return ui.RenderPanel(opts)
 }
 
 type filetreePaneIcons struct {

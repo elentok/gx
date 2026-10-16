@@ -1,16 +1,15 @@
 package status
 
 import (
-	"fmt"
-
 	"github.com/elentok/gx/ui/diffview"
+	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/keys"
 )
 
-func (m Model) helpSectionLabel() string {
-	if m.focus == focusFiletree {
-		return "filetree"
-	}
-	return fmt.Sprintf("diff:%s:%s", m.navModeLabel(), m.renderModeLabel())
+// diffHeaderHelpSection explains the diff panel header's indicators, which
+// aren't key bindings so BuildSections can't derive them.
+func diffHeaderHelpSection() help.KeySection {
+	return help.NewKeySection("Diff header", keys.Binding{Display: "±N", Title: "context lines around each change"})
 }
 
 func (m Model) navModeLabel() string {

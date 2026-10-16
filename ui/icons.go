@@ -26,18 +26,20 @@ type IconSet struct {
 	Ahead             string
 	Behind            string
 	Search            string
-	Partial           string
-	Staged            string
-	Warning           string
-	Info              string
-	Dot               string
-	Ellipsis          string
-	CIRunning         string
-	Commented         string
-	Comment           string
-	MarkerReady       string
-	MarkerBlocked     string
-	MarkerWaiting     string
+	// Wrap is empty without nerd fonts: the word "wrap" stands on its own.
+	Wrap          string
+	Partial       string
+	Staged        string
+	Warning       string
+	Info          string
+	Dot           string
+	Ellipsis      string
+	CIRunning     string
+	Commented     string
+	Comment       string
+	MarkerReady   string
+	MarkerBlocked string
+	MarkerWaiting string
 
 	// CheckboxChecked/CheckboxUnchecked render the tickets tab's execution-
 	// queue selection marker (ticket 04) on epic/ticket rows.
@@ -162,6 +164,7 @@ func Icons(useNerdFont bool) IconSet {
 		Ahead:             "",
 		Behind:            "",
 		Search:            "󰍉",
+		Wrap:              "󰖶",
 		Partial:           "",
 		Staged:            "",
 		Warning:           "",

@@ -462,11 +462,6 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	m.height = 40
 	m.focus = focusFiletree
 
-	line := m.helpLine()
-	if !strings.Contains(line, "? help") || strings.Contains(line, "j/k") {
-		t.Fatalf("expected compact status help line, got %q", line)
-	}
-
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '?', Text: "?"})
 	m = updated.(Model)
 	if !m.help.IsOpen {
@@ -483,63 +478,6 @@ func TestHelpOverlayToggleAndCompactStatusBar(t *testing.T) {
 	m = updated.(Model)
 	if m.help.IsOpen {
 		t.Fatalf("expected help overlay to close on esc")
-	}
-}
-
-func TestHelpLineRightAlignsHint(t *testing.T) {
-	t.Setenv("TMUX", "")
-	t.Setenv("KITTY_WINDOW_ID", "")
-	m := newTestModelDefault(testutil.TempRepo(t))
-	m.ready = true
-	m.width = 48
-	m.focus = focusFiletree
-
-	line := m.helpLine()
-	plain := ansi.Strip(line)
-
-	if ansi.StringWidth(plain) != m.width {
-		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
-	}
-	if !strings.HasSuffix(plain, "· filetree · ? help") {
-		t.Fatalf("expected hint right-aligned at end, got %q", plain)
-	}
-}
-
-func TestHelpLineTruncatesBareHintWithEllipsis(t *testing.T) {
-	t.Setenv("TMUX", "")
-	t.Setenv("KITTY_WINDOW_ID", "")
-	m := newTestModelDefault(testutil.TempRepo(t))
-	m.ready = true
-	m.width = 12
-	m.focus = focusFiletree
-
-	line := m.helpLine()
-	plain := ansi.Strip(line)
-
-	if ansi.StringWidth(plain) != m.width {
-		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
-	}
-	if !strings.Contains(plain, "…") {
-		t.Fatalf("expected bare hint truncation to use ellipsis, got %q", plain)
-	}
-}
-
-func TestHelpLineTruncatesHintWithEllipsisWhenNarrow(t *testing.T) {
-	t.Setenv("TMUX", "")
-	t.Setenv("KITTY_WINDOW_ID", "")
-	m := newTestModelDefault(testutil.TempRepo(t))
-	m.ready = true
-	m.width = 18
-	m.focus = focusFiletree
-
-	line := m.helpLine()
-	plain := ansi.Strip(line)
-
-	if ansi.StringWidth(plain) != m.width {
-		t.Fatalf("expected footer width %d, got %d (%q)", m.width, ansi.StringWidth(plain), plain)
-	}
-	if !strings.Contains(plain, "…") {
-		t.Fatalf("expected truncated hint to use ellipsis when narrow, got %q", plain)
 	}
 }
 
@@ -686,27 +624,6 @@ func TestReloadBranchStateUsesBranchUpstream(t *testing.T) {
 	}
 	if m.statusData.branchSync.Name != git.StatusAhead || m.statusData.branchSync.Ahead != 1 {
 		t.Fatalf("expected branch sync ahead of origin/feature, got %+v", m.statusData.branchSync)
-	}
-}
-
-func TestHelpLineShowsVisualAtLeftInDiffFocus(t *testing.T) {
-	t.Setenv("TMUX", "")
-	t.Setenv("KITTY_WINDOW_ID", "")
-	m := newTestModelDefault(testutil.TempRepo(t))
-	m.ready = true
-	m.width = 96
-	m.focus = focusDiff
-	m.diffarea.SetNavMode(diffview.NavModeLine)
-	m.diffarea.Unstaged.DataRef().VisualActive = true
-
-	line := m.helpLine()
-	plain := ansi.Strip(line)
-
-	if !strings.HasPrefix(plain, "VISUAL") {
-		t.Fatalf("expected VISUAL indicator at start of footer, got %q", plain)
-	}
-	if !strings.HasSuffix(plain, "· diff: mode:line · render:unified · wrap:on · ? help") {
-		t.Fatalf("expected diff hint at end of footer, got %q", plain)
 	}
 }
 

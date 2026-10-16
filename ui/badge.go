@@ -40,6 +40,12 @@ func RenderBadgeText(label string, fg color.Color) string {
 	return lipgloss.NewStyle().Foreground(fg).Render(strings.TrimSpace(label))
 }
 
+// RenderChip renders a bold, padded label filled with bg, without rounded
+// caps, for a mode indicator in a panel header (e.g. VISUAL).
+func RenderChip(label string, bg color.Color) string {
+	return renderPill(label, bg, ColorDeepBg, true, false, true)
+}
+
 // BadgeGroupItem is one decoration name plus its foreground color, to be
 // rendered as part of a merged badge group.
 type BadgeGroupItem struct {

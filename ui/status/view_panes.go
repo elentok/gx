@@ -73,7 +73,7 @@ func (m Model) useStackedLayout() bool {
 }
 
 func (m Model) mainContentHeight() int {
-	mainH := m.height - 1
+	mainH := m.height
 	if mainH < 4 {
 		mainH = 4
 	}

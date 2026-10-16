@@ -197,10 +197,13 @@ type PanelOptions struct {
 	Height     int
 	Title      string
 	RightTitle string
-	Lines      []string
-	TitleColor color.Color
-	TitleBold  bool
-	Background color.Color // body fill
+	// RightTitleStyled marks RightTitle as already carrying its own
+	// foreground styling, so only the header background is applied.
+	RightTitleStyled bool
+	Lines            []string
+	TitleColor       color.Color
+	TitleBold        bool
+	Background       color.Color // body fill
 	// HeaderBackground fills the title row only, distinct from the body so an
 	// active panel's header can read as more prominent than an inactive
 	// one's. Defaults to Background when unset.
@@ -253,7 +256,9 @@ func RenderPanel(opts PanelOptions) string {
 		titleSeg = titleStyle.Render(opts.Title)
 	}
 	rightSeg := ""
-	if opts.RightTitle != "" {
+	if opts.RightTitleStyled && opts.RightTitle != "" {
+		rightSeg = RenderRowWithBackground(opts.RightTitle, headerBg)
+	} else if opts.RightTitle != "" {
 		rightSeg = lipgloss.NewStyle().Foreground(ColorSubtle).Background(headerBg).Render(opts.RightTitle)
 	}
 	titleW := ansi.StringWidth(titleSeg)

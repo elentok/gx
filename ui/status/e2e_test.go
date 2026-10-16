@@ -532,11 +532,11 @@ func TestStageE2E_UnstageOneLineAfterStagingAll_LineMode(t *testing.T) {
 
 	// Enter diff view and unstage just one line.
 	tm.Send(keySpecial(tea.KeyEnter))
-	waitForStageText(t, tm, "diff: mode:hunk", stageActionWait)
+	waitForStageStrippedText(t, tm, "hunk · ±", stageActionWait)
 	tm.Send(keySpecial(tea.KeyTab))
 	waitForStageText(t, tm, "Staged", stageActionWait)
 	tm.Send(keyRune('t'))
-	waitForStageText(t, tm, "diff: mode:line", stageActionWait)
+	waitForStageStrippedText(t, tm, "line · ±", stageActionWait)
 	tm.Send(keyRune('j'))
 	tm.Send(keyRune(' '))
 
@@ -702,7 +702,6 @@ func TestStageE2E_SideBySideShowsActiveHunkGutterIndicator(t *testing.T) {
 	tm.Send(keyRune('s'))
 	tm.Send(keyRune('f'))
 
-	waitForStageStrippedText(t, tm, "render:side-by-side", stageActionWait)
 	waitForStageStrippedText(t, tm, "[fullscreen]", stageActionWait)
 	waitForStageStrippedText(t, tm, "▌", stageActionWait)
 
@@ -722,7 +721,6 @@ func TestStageE2E_FiletreeSearchKeepsHighlightsAfterEnter(t *testing.T) {
 	tm.Send(keyRune('p'))
 	waitForStageText(t, tm, "Search", stageActionWait)
 	tm.Send(keySpecial(tea.KeyEnter))
-	waitForStageText(t, tm, "filetree · ? help", stageActionWait)
 	tm.Send(keyRune('n'))
 	tm.Send(keyRune('/'))
 	tm.Send(keySpecial(tea.KeyEsc))

@@ -2,6 +2,7 @@ package status
 
 import (
 	"fmt"
+	"image/color"
 	"os"
 	"path/filepath"
 
@@ -20,7 +21,7 @@ func (m *Model) renderDiffPane(width, height int) string {
 		return ""
 	}
 
-	expandedH, collapsedH := diffPaneHeights(height - 1)
+	expandedH, collapsedH := diffPaneHeights(height - 1) // seam row
 	seam := ui.RenderSeamRow(width, ui.SeamColor)
 	if m.diffarea.ActiveSection == diffarea.SectionStaged {
 		top := m.renderSectionPane(width, collapsedH, diffarea.SectionUnstaged)
@@ -67,11 +68,7 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 	if m.diffarea.Fullscreen {
 		titleText += " [fullscreen]"
 	}
-	contextText := ""
-	if !collapsed {
-		contextText = fmt.Sprintf("Context: %d", m.currentDiffContextLines())
-	}
-	rightTitleText := diffview.JoinDot(contextText, diffviewModel.StatusText(activeSection), m.searchCounterForDiffSection(section))
+	rightTitleText := m.diffSectionHeaderOptions(diffviewModel, section, activeSection, accent)
 
 	lines := make([]string, 0, bodyH)
 	if len(diff.ViewLines) == 0 && diffcore.HasBinaryDiff(diff.Parsed) {
@@ -97,6 +94,33 @@ func (m *Model) renderSectionPane(width, height int, section diffarea.Section) s
 		lines = append(lines, "")
 	}
 	return m.renderPanelWithBorderTitle(width, height, titleText, rightTitleText, lines, activeSection, section)
+}
+
+// diffSectionHeaderOptions builds the pre-styled right side of a diff panel
+// header. Only the focused panel shows the diff options; the others keep just
+// their scroll % and search counter.
+func (m Model) diffSectionHeaderOptions(diffviewModel *diffview.Model, section diffarea.Section, focused bool, accent color.Color) string {
+	dim := lipgloss.NewStyle().Foreground(ui.ColorSubtle)
+	search := m.searchCounterForDiffSection(section)
+	if !focused {
+		if text := diffview.JoinDot(diffviewModel.ScrollPercentText(), search); text != "" {
+			return dim.Render(text)
+		}
+		return ""
+	}
+	context := fmt.Sprintf("±%d", m.currentDiffContextLines())
+	out := dim.Render(diffview.JoinDot(m.navModeLabel(), context, diffviewModel.ScrollPercentText(), search))
+	if m.diffarea.Wrap() {
+		wrap := "wrap"
+		if icon := ui.Icons(m.settings.UseNerdFontIcons).Wrap; icon != "" {
+			wrap = icon + " " + wrap
+		}
+		out = lipgloss.NewStyle().Foreground(accent).Render(wrap) + dim.Render(" · ") + out
+	}
+	if diffviewModel.DataRef().VisualActive {
+		out = ui.RenderChip("VISUAL", accent) + " " + out
+	}
+	return out
 }
 
 const collapsedDiffSectionHeight = 3
@@ -158,12 +182,8 @@ func (m Model) sectionPlaceholder(section diffarea.Section, collapsed bool) stri
 	return ""
 }
 func (m *Model) syncDiffViewports() {
-	mainH := m.height - 1
-	if mainH < 4 {
-		mainH = 4
-	}
 	_, diffW := m.splitWidth()
-	filetreeH, diffH := m.splitHeight(mainH)
+	filetreeH, diffH := m.splitHeight(m.mainContentHeight())
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
 	}

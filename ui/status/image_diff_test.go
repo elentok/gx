@@ -218,7 +218,7 @@ func TestImageDiffPanelGeometryIncludesChromeRows(t *testing.T) {
 	repo := setupImageDiffRepo(t)
 	m, _ := newImageDiffTestModel(t, repo, DefaultSettings(), supportedCapability(), nil, nil)
 
-	diffX, diffY, _, _, ok := m.diffRect(m.height - 1)
+	diffX, diffY, _, _, ok := m.diffRect(m.height)
 	if !ok {
 		t.Fatal("expected a diff rect")
 	}

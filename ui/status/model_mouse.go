@@ -35,7 +35,7 @@ func (m Model) searchActive() bool {
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
-	mainH := m.height - 1
+	mainH := m.height
 	if mainH < 1 {
 		return false
 	}
@@ -54,7 +54,7 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 }
 
 func (m *Model) scrollFiletreeByMouse(x, y, dir int) bool {
-	mainH := m.height - 1
+	mainH := m.height
 	if mainH < 1 {
 		return false
 	}

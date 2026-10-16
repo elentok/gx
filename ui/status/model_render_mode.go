@@ -8,10 +8,6 @@ import (
 )
 
 func (m Model) deltaRenderWidth() int {
-	mainH := m.height - 1
-	if mainH < 4 {
-		mainH = 4
-	}
 	_, diffW := m.splitWidth()
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
 		diffW = m.width
@@ -41,11 +37,4 @@ func (m *Model) toggleRenderMode() tea.Cmd {
 	m.syncDiffViewports()
 	m.diffarea.ActiveSectionModel().EnsureActiveVisible(m.diffarea.NavMode())
 	return cmd
-}
-
-func (m Model) renderModeLabel() string {
-	if m.diffarea.RenderMode() == diffview.RenderModeSideBySide {
-		return "side-by-side"
-	}
-	return "unified"
 }

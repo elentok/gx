@@ -24,23 +24,21 @@ func (m Model) View() tea.View {
 	filetreeW, diffW := m.splitWidth()
 	filetreeH, diffH := m.splitHeight(mainH)
 
-	var body string
+	var out string
 	if m.diffarea.Fullscreen && m.focus == focusDiff {
-		body = m.renderDiffPane(m.width, mainH)
+		out = m.renderDiffPane(m.width, mainH)
 	} else {
 		filetreePanel := m.renderLeftPane(filetreeW, filetreeH)
 		diffPanel := m.renderDiffPane(diffW, diffH)
 		if m.useStackedLayout() {
 			seam := ui.RenderSeamRow(m.width, ui.SeamColor)
-			body = lipgloss.JoinVertical(lipgloss.Left, filetreePanel, seam, diffPanel)
+			out = lipgloss.JoinVertical(lipgloss.Left, filetreePanel, seam, diffPanel)
 		} else {
 			seam := ui.RenderSeamColumn(filetreeH, ui.SeamColor)
-			body = lipgloss.JoinHorizontal(lipgloss.Top, filetreePanel, seam, diffPanel)
+			out = lipgloss.JoinHorizontal(lipgloss.Top, filetreePanel, seam, diffPanel)
 		}
 	}
 
-	footer := m.helpLine()
-	out := lipgloss.JoinVertical(lipgloss.Left, body, footer)
 	if m.bump.IsOpen {
 		out = ui.OverlayCenter(out, m.bump.View(m.width), m.width, m.height)
 	} else if m.push.IsOpen {
