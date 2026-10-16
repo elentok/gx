@@ -154,6 +154,8 @@ type SessionResult struct {
 	Refused bool         `json:"refused,omitempty"`
 	Reason  string       `json:"reason,omitempty"`
 	Message string       `json:"message,omitempty"`
+	// Client is the TUI a focus request went to; empty with no TUI connected.
+	Client string `json:"client,omitempty"`
 }
 
 // sessionMeta is what a session's state dir records about it.

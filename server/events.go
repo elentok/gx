@@ -28,6 +28,8 @@ type Event struct {
 	Message string `json:"message,omitempty"`
 	// Kind (an events.Kind) tells root-parked causes apart.
 	Kind string `json:"kind,omitempty"`
+	// Client names the TUI an event is for, by its event-stream client id.
+	Client string `json:"client,omitempty"`
 }
 
 const (

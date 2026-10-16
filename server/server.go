@@ -472,6 +472,7 @@ var routeTable = []struct {
 	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},
 	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.markSessionRead)(w, r) }},
 	{"POST /v1/sessions/focus", (*Server).sessionFocusWrite},
+	{"POST /v1/sessions/show", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.focusSession)(w, r) }},
 	{"POST /v1/sessions/actionable", (*Server).sessionActionableWrite},
 	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.runSessionAction)(w, r) }},
 	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumeSession)(w, r) }},

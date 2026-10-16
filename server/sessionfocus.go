@@ -11,6 +11,10 @@ import (
 // event stream: the report would never expire.
 const ReasonFocusNotConnected = "not-connected"
 
+// EventSessionFocus asks a TUI to show a session; its Address is the session
+// id and its Client the TUI.
+const EventSessionFocus = "session-focus"
+
 // FocusReport is a TUI's terminal focus, the session it has on screen (empty
 // for none) and its terminal app. Client names the TUI's event stream
 // (/v1/events?client=); the report counts only while that stream is open.
@@ -71,6 +75,17 @@ func (f *focusReports) report(r FocusReport) bool {
 	return true
 }
 
+// focusedClient is the most recently focused TUI, or empty when it has
+// disconnected.
+func (f *focusReports) focusedClient() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, connected := f.reports[f.lastFocused]; !connected {
+		return ""
+	}
+	return f.lastFocused
+}
+
 // clickTarget is the terminal of the most recently focused TUI and whether
 // that TUI is still connected.
 func (f *focusReports) clickTarget() (termProgram string, connected bool) {
@@ -124,6 +139,22 @@ func (s *Server) reportFocus(req FocusReport) (SessionResult, error) {
 		return SessionResult{}, nil
 	}
 	return s.markSessionRead(SessionRequest{ID: req.Session})
+}
+
+// focusSession asks the most recently focused TUI to show the session. With no
+// TUI connected it does nothing: the banner click has already brought the
+// terminal forward.
+func (s *Server) focusSession(req SessionRequest) (SessionResult, error) {
+	_, meta, res, err := s.sessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	info := meta.info()
+	client := s.focus.focusedClient()
+	if client != "" {
+		s.events.publishEvent(Event{Type: EventSessionFocus, Address: req.ID, Client: client})
+	}
+	return SessionResult{Session: &info, Client: client}, nil
 }
 
 // markSessionRead clears the session's Unread.

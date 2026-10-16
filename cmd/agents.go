@@ -23,6 +23,7 @@ func newAgentsCmd() *cobra.Command {
 		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
 		newAgentsSessionCmd("resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),
 		newAgentsSessionCmd("run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Client).RunSessionAction),
+		newAgentsSessionCmd("focus", "show a session in the most recently focused TUI", (*apiclient.Client).FocusSession),
 		newAgentsReportFocusCmd())
 	return cmd
 }

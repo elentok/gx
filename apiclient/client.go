@@ -380,6 +380,14 @@ func (c *Client) MarkSessionRead(ctx context.Context, id string) (server.Session
 	return res, err
 }
 
+// FocusSession asks the most recently focused TUI to show a session; Client
+// names it, empty with no TUI connected.
+func (c *Client) FocusSession(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/show", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // RunSessionAction starts a session's Action; it runs on in the server. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) RunSessionAction(ctx context.Context, id string) (server.SessionResult, error) {
