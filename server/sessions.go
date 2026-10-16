@@ -18,8 +18,10 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/tickets"
 )
 
 // EventSessionChanged announces a new or changed interactive session; its
@@ -107,8 +109,13 @@ type SessionActionable struct {
 // creating client's terminal panel; zero means the loop default.
 type CreateSessionRequest struct {
 	Project string `json:"project"`
-	Dir     string `json:"dir"`
-	// Name falls back to the harness's Display name, then `<project>-<n>`.
+	// Dir is where the session runs; Worktree replaces it.
+	Dir string `json:"dir,omitempty"`
+	// Worktree names a new worktree, made from trunk by the Worktrees tab's
+	// path and branch rule, for the session to run in. gx never deletes it.
+	Worktree string `json:"worktree,omitempty"`
+	// Name falls back to Worktree, then the harness's Display name, then
+	// `<project>-<n>`.
 	Name   string `json:"name,omitempty"`
 	Ticket string `json:"ticket,omitempty"`
 	// Prompt is typed at the session's first Idle; empty starts it Idle.
@@ -138,7 +145,10 @@ type sessionMeta struct {
 	Harness string `json:"harness"`
 	Project string `json:"project"`
 	Dir     string `json:"dir"`
-	Name    string `json:"name,omitempty"`
+	// MadeWorktree marks a Dir gx made for this session: only there is the
+	// trust dialog answered for the person.
+	MadeWorktree bool   `json:"made_worktree,omitempty"`
+	Name         string `json:"name,omitempty"`
 	// AutoName marks a fallback name the Display name replaces; a typed name
 	// is never replaced.
 	AutoName bool   `json:"auto_name,omitempty"`
@@ -229,11 +239,13 @@ func (s *Server) sessionsRead(w http.ResponseWriter, _ *http.Request) {
 // createSession makes the session's state dir, writes its meta and starts its
 // holder. It writes no ticket status and takes no slot or permit.
 func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) {
-	if req.Project == "" || req.Dir == "" {
-		return sessionRefusal(ReasonSessionBadRequest, "a session needs a project and a dir"), nil
+	if req.Project == "" || (req.Dir == "") == (req.Worktree == "") {
+		return sessionRefusal(ReasonSessionBadRequest, "a session needs a project and either a dir or a new worktree"), nil
 	}
-	if fi, err := os.Stat(req.Dir); err != nil || !fi.IsDir() {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s does not exist", req.Dir)), nil
+	if req.Worktree == "" {
+		if fi, err := os.Stat(req.Dir); err != nil || !fi.IsDir() {
+			return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s does not exist", req.Dir)), nil
+		}
 	}
 	if req.Harness == "" {
 		req.Harness = string(harness.Claude)
@@ -245,10 +257,21 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if err != nil {
 		return SessionResult{}, err
 	}
+	if req.Worktree != "" {
+		dir, refusal := s.addSessionWorktree(req.Project, req.Worktree)
+		if refusal != "" {
+			return sessionRefusal(ReasonSessionBadRequest, refusal), nil
+		}
+		req.Dir = dir
+		if req.Name == "" {
+			req.Name = req.Worktree
+		}
+	}
 	meta := sessionMeta{
 		Harness:        req.Harness,
 		Project:        req.Project,
 		Dir:            req.Dir,
+		MadeWorktree:   req.Worktree != "",
 		Name:           req.Name,
 		Ticket:         req.Ticket,
 		FirstPrompt:    req.Prompt,
@@ -267,6 +290,32 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
+}
+
+// addSessionWorktree makes worktree name from the project's trunk, as the
+// Worktrees tab does: at <linked worktree dir>/<name> on branch <name>. It
+// returns the new worktree's path, or why it could not be made.
+func (s *Server) addSessionWorktree(project, name string) (string, string) {
+	if !filepath.IsLocal(name) {
+		return "", fmt.Sprintf("bad worktree name %q", name)
+	}
+	projectDir, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return "", err.Error()
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return "", err.Error()
+	}
+	trunk, err := tickets.Trunk(projectDir, repo.Root)
+	if err != nil {
+		return "", err.Error()
+	}
+	path := filepath.Join(repo.LinkedWorktreeDir(), name)
+	if err := git.AddWorktree(*repo, name, path, trunk); err != nil {
+		return "", fmt.Sprintf("create worktree %s: %v", name, err)
+	}
+	return path, ""
 }
 
 // saveNewSession gives meta its id and, when it has no name, the lowest free
@@ -361,8 +410,10 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 			"--harness", meta.Harness,
 			"--gx-session", meta.ID,
 			"--cols", strconv.Itoa(cols), "--rows", strconv.Itoa(rows),
-			"--dir", dir, "--", launch.Name,
+			"--dir", dir,
 		},
+		trustFlag(meta.MadeWorktree),
+		[]string{"--", launch.Name},
 		launch.Args)
 	cmd := exec.Command(holder[0], args...)
 	cmd.Dir = meta.Dir
@@ -372,6 +423,15 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	}
 	// Reap the holder; it outlives the server otherwise.
 	go func() { _ = cmd.Wait() }()
+	return nil
+}
+
+// trustFlag has the holder answer the trust dialog, only for a worktree gx
+// made: any other dir is left for the person to trust.
+func trustFlag(madeWorktree bool) []string {
+	if madeWorktree {
+		return []string{"--trust"}
+	}
 	return nil
 }
 
@@ -709,7 +769,7 @@ func waitForFile(path string, timeout time.Duration) {
 	}
 }
 
-// removeSession deletes an Exited session's state dir.
+// removeSession deletes an Exited session's state dir, never its Dir.
 func (s *Server) removeSession(req SessionRequest) (SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()

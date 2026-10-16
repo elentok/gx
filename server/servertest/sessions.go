@@ -52,6 +52,7 @@ func runTestHolder(args []string) error {
 	fs.IntVar(&opts.Cols, "cols", 0, "")
 	fs.IntVar(&opts.Rows, "rows", 0, "")
 	fs.StringVar(&dir, "dir", "", "")
+	fs.BoolVar(&opts.Trust, "trust", false, "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}

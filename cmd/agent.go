@@ -30,7 +30,7 @@ func newAgentHolderCmd() *cobra.Command {
 	var sessionID, dir, kind string
 	var opts nativerunner.HolderOptions
 	cmd := &cobra.Command{
-		Use:   "agent-holder --session-id <uuid> [--harness <name>] [--gx-session <id>] [--cols N --rows N] --dir <agent-dir> -- <cmd...>",
+		Use:   "agent-holder --session-id <uuid> [--harness <name>] [--gx-session <id>] [--cols N --rows N] [--trust] --dir <agent-dir> -- <cmd...>",
 		Short: "run a pty agent and record its output (started by the pty runner and the server)",
 		// Internal helper; the pty runner launches it under setsid.
 		Hidden: true,
@@ -47,6 +47,7 @@ func newAgentHolderCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kind, "harness", string(harness.Claude), "the harness that watches the agent")
 	cmd.Flags().StringVar(&opts.GXSession, "gx-session", "", "the gx session id, set as "+nativerunner.AgentSessionEnv+" in the agent's env")
 	cmd.Flags().StringVar(&dir, "dir", "", "the agent directory")
+	cmd.Flags().BoolVar(&opts.Trust, "trust", false, "answer the harness's trust dialog")
 	_ = cmd.MarkFlagRequired("session-id")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd

@@ -50,8 +50,10 @@ func programCommand(flag, conversationID string, opts harness.LaunchOptions) har
 	}
 }
 
-func (Harness) Watch(pid int, _ time.Time, _ harness.Screen, _ <-chan struct{}) (harness.Watcher, error) {
-	return &programWatcher{pid: pid}, nil
+func (h Harness) Watch(pid int, _ time.Time, scr harness.Screen, _ <-chan struct{}) (harness.Watcher, error) {
+	return &programWatcher{pid: pid, startup: func() bool {
+		return scr != nil && h.StartupScreen(nil, scr.Rows()).Dialog != harness.NoDialog
+	}}, nil
 }
 
 func (Harness) StartupScreen(_, rows []string) harness.Startup {
@@ -68,15 +70,21 @@ func (Harness) DisplayName(raw []byte) (string, bool) {
 }
 
 type programWatcher struct {
-	pid    int
-	mu     sync.Mutex
-	status harness.Status
+	pid int
+	// startup reports the trust dialog on screen, as claude's watcher does.
+	startup func() bool
+	mu      sync.Mutex
+	status  harness.Status
 }
 
 func (w *programWatcher) Status() harness.Status {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.status
+	st := w.status
+	w.mu.Unlock()
+	if st.State == harness.Starting && w.startup() {
+		return harness.Status{State: harness.Blocked, Blocked: harness.BlockedDialog}
+	}
+	return st
 }
 
 // ConversationID rereads the program's file each time, so a program that

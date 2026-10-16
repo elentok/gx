@@ -59,6 +59,8 @@ type HolderOptions struct {
 	GXSession string
 	// Cols and Rows size the pty; zero means HolderCols and HolderRows.
 	Cols, Rows int
+	// Trust answers the harness's trust dialog while the child starts.
+	Trust bool
 }
 
 func (o HolderOptions) size() (cols, rows int) {
@@ -162,6 +164,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// socket goes.
 	defer srv.finish()
 	go srv.serve(ln)
+	if opts.Trust {
+		go answerTrust(h, scr, ptmx, watcher, exited)
+	}
 	output := make(outputSignal, 1)
 	go srv.frames.run(output, srv.finished)
 	drained := make(chan struct{})
@@ -200,6 +205,32 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// ExitCode is -1 for a child killed by a signal.
 	code := strconv.Itoa(srv.exitCode)
 	return os.WriteFile(filepath.Join(dir, ExitCodeFile), []byte(code+"\n"), 0o644)
+}
+
+// answerTrust types the trust dialog's key until the child is past starting
+// up. As in Pty.Start, keys repeat while the dialog stays up, since claude
+// drops a key typed before it reads input.
+func answerTrust(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher harness.Watcher, exited <-chan struct{}) {
+	var next time.Time
+	for {
+		st := watcher.Status()
+		if st.State != harness.Starting && st.Blocked != harness.BlockedDialog {
+			return
+		}
+		if !time.Now().Before(next) {
+			if startup := h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()); startup.Dialog == harness.TrustDialog {
+				if _, err := io.WriteString(keys, startup.Key); err != nil {
+					return
+				}
+				next = time.Now().Add(trustKeyRepeat)
+			}
+		}
+		select {
+		case <-exited:
+			return
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
 }
 
 // programStatus makes the holder the child's terminal for OSC 7501, whatever

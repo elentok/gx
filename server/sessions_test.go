@@ -12,9 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -315,6 +317,110 @@ func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
 	got = waitForSession(ctx, t, h, evs, typed.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
 	if got.Name != "mine" {
 		t.Errorf("typed name = %q, want mine kept", got.Name)
+	}
+}
+
+func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
+	t.Setenv(agentfake.ProgramTrustEnv, "1")
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic", "01", "a", "")
+	repo := testutil.TempRepo(t)
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	trunk := gitOut(t, repo, "rev-parse", "main")
+	// HEAD off trunk, so a worktree made from HEAD would show.
+	gitOut(t, repo, "checkout", "-q", "-b", "other")
+	gitOut(t, repo, "commit", "-q", "--allow-empty", "-m", "off trunk")
+
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{
+		Project: "proj", Worktree: "feat", Harness: string(agentfake.HarnessKind),
+	})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	info, err := git.FindRepo(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, wt := res.Session.ID, filepath.Join(info.LinkedWorktreeDir(), "feat")
+	if res.Session.Dir != wt || res.Session.Name != "feat" {
+		t.Errorf("session dir, name = %s, %s; want %s, feat", res.Session.Dir, res.Session.Name, wt)
+	}
+	if got := gitOut(t, wt, "rev-parse", "--abbrev-ref", "HEAD"); got != "feat" {
+		t.Errorf("worktree branch = %s, want feat", got)
+	}
+	if got := gitOut(t, wt, "rev-parse", "HEAD"); got != trunk {
+		t.Errorf("worktree HEAD = %s, want trunk %s", got, trunk)
+	}
+
+	sessionDir := filepath.Join(h.SessionsDir, id)
+	holder := waitForHolder(t, sessionDir)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		raw, _ := os.ReadFile(filepath.Join(sessionDir, nativerunner.RawLogFile))
+		if strings.Contains(string(raw), agentfake.ProgramTrustPrompt) && !screenHas(t, holder, agentfake.ProgramTrustPrompt) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("trust dialog never shown and answered")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+		t.Fatalf("stop = %+v, %v", res, err)
+	}
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
+		t.Fatalf("remove = %+v, %v", res, err)
+	}
+	if _, err := os.Stat(wt); err != nil {
+		t.Errorf("worktree after remove: %v, want kept", err)
+	}
+}
+
+func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
+	t.Setenv(agentfake.ProgramTrustEnv, "1")
+	h, ctx, evs, id, _ := startFakeSession(t)
+	want := server.SessionStatus{State: server.SessionBlocked, Kind: "dialog"}
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status == want })
+	// Outlasts the holder's trust key repeat.
+	time.Sleep(time.Second)
+	if !screenHas(t, waitForHolder(t, filepath.Join(h.SessionsDir, id)), agentfake.ProgramTrustPrompt) {
+		t.Error("trust dialog answered for a dir gx did not make")
+	}
+}
+
+func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic", "01", "a", "")
+	repo := testutil.TempRepo(t)
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+	ctx := context.Background()
+	for name, req := range map[string]server.CreateSessionRequest{
+		"unknown project":  {Project: "nope", Worktree: "feat"},
+		"escaping name":    {Project: "proj", Worktree: "../feat"},
+		"dir and worktree": {Project: "proj", Worktree: "feat", Dir: t.TempDir()},
+		"existing branch":  {Project: "proj", Worktree: "main"},
+	} {
+		req.Harness = string(agentfake.HarnessKind)
+		res, err := h.Client.CreateSession(ctx, req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !res.Refused || res.Reason != server.ReasonSessionBadRequest {
+			t.Errorf("%s: create = %+v, want refused %s", name, res, server.ReasonSessionBadRequest)
+		}
+	}
+	if list, _ := h.Client.Sessions(ctx); len(list) != 0 {
+		t.Errorf("sessions = %+v, want none", list)
 	}
 }
 
