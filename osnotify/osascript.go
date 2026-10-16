@@ -16,6 +16,7 @@ func newOSAScript(run Runner) osascript {
 	return osascript{run: run}
 }
 
-func (n osascript) Notify(ctx context.Context, title, body string) error {
-	return runWithTimeout(ctx, n.run, "osascript", "-e", osascriptSource, title, body)
+// Notify ignores Group, Execute and Activate: osascript has no click action.
+func (n osascript) Notify(ctx context.Context, note Notification) error {
+	return runWithTimeout(ctx, n.run, "osascript", "-e", osascriptSource, note.Title, note.Body)
 }

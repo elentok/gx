@@ -4,4 +4,4 @@ import "context"
 
 type noop struct{}
 
-func (noop) Notify(context.Context, string, string) error { return nil }
+func (noop) Notify(context.Context, Notification) error { return nil }

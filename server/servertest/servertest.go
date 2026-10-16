@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
@@ -240,24 +241,21 @@ func flagValue(argv []string, flag string) string {
 	return ""
 }
 
-// Banner is one OS banner the server sent.
-type Banner struct{ Title, Body string }
-
 // Banners is an osnotify.Notifier that records every banner.
 type Banners struct {
 	mu   sync.Mutex
-	sent []Banner
+	sent []osnotify.Notification
 }
 
-func (b *Banners) Notify(_ context.Context, title, body string) error {
+func (b *Banners) Notify(_ context.Context, note osnotify.Notification) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.sent = append(b.sent, Banner{title, body})
+	b.sent = append(b.sent, note)
 	return nil
 }
 
 // Sent returns the banners recorded so far.
-func (b *Banners) Sent() []Banner {
+func (b *Banners) Sent() []osnotify.Notification {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return slices.Clone(b.sent)

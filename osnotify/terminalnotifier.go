@@ -11,7 +11,16 @@ func newTerminalNotifier(path string, run Runner) terminalNotifier {
 	return terminalNotifier{path: path, run: run}
 }
 
-// Notify uses a fixed group so a new banner replaces the previous one.
-func (n terminalNotifier) Notify(ctx context.Context, title, body string) error {
-	return runWithTimeout(ctx, n.run, n.path, "-title", title, "-message", body, "-group", "gx-config")
+func (n terminalNotifier) Notify(ctx context.Context, note Notification) error {
+	args := []string{"-title", note.Title, "-message", note.Body}
+	for _, opt := range []struct{ flag, value string }{
+		{"-group", note.Group},
+		{"-execute", note.Execute},
+		{"-activate", note.Activate},
+	} {
+		if opt.value != "" {
+			args = append(args, opt.flag, opt.value)
+		}
+	}
+	return runWithTimeout(ctx, n.run, n.path, args...)
 }

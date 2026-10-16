@@ -12,9 +12,19 @@ import (
 	"time"
 )
 
-// Notifier shows a banner with a title and a body.
+// Notification is one banner. Banners sharing a Group replace each other.
+// Execute is a shell command run on click; Activate is the bundle ID of the
+// app brought to the front on click. Empty fields are left out.
+type Notification struct {
+	Title, Body string
+	Group       string
+	Execute     string
+	Activate    string
+}
+
+// Notifier shows a banner.
 type Notifier interface {
-	Notify(ctx context.Context, title, body string) error
+	Notify(ctx context.Context, note Notification) error
 }
 
 // Runner runs a command to completion. Injected so tests never run one.

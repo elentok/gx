@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -171,20 +172,20 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 		name   string
 		write  func()
 		level  string
-		banner servertest.Banner
+		banner osnotify.Notification
 	}{
 		{"success", func() { servertest.WriteConfig(t, path, store, maxAgents(4)) },
-			server.EventLevelSuccess, servertest.Banner{Title: "gx config reloaded successfully", Body: "changed: execution-queue.max-agents"}},
+			server.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "changed: execution-queue.max-agents", Group: "gx-config"}},
 		{"unchanged", func() {},
-			server.EventLevelSuccess, servertest.Banner{Title: "gx config reloaded successfully", Body: "no changes"}},
+			server.EventLevelSuccess, osnotify.Notification{Title: "gx config reloaded successfully", Body: "no changes", Group: "gx-config"}},
 		{"warning", func() {
 			servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-agents": 4}, "server": map[string]any{"tcp-listen": true}})
-		}, server.EventLevelWarning, servertest.Banner{Title: "gx config reloaded with warnings", Body: "restart needed for server.tcp-listen"}},
+		}, server.EventLevelWarning, osnotify.Notification{Title: "gx config reloaded with warnings", Body: "restart needed for server.tcp-listen", Group: "gx-config"}},
 		{"invalid", func() {
 			if err := os.WriteFile(path, []byte(`{`), 0o644); err != nil {
 				t.Fatal(err)
 			}
-		}, server.EventLevelError, servertest.Banner{Title: "gx config reload failed"}},
+		}, server.EventLevelError, osnotify.Notification{Title: "gx config reload failed", Group: "gx-config"}},
 	}
 	// Baseline: the harness settings differ from any file in many keys.
 	servertest.WriteConfig(t, path, store, maxAgents(3))
@@ -228,7 +229,7 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 	}
 }
 
-func waitBanners(ctx context.Context, t *testing.T, h *servertest.Harness, n int) []servertest.Banner {
+func waitBanners(ctx context.Context, t *testing.T, h *servertest.Harness, n int) []osnotify.Notification {
 	t.Helper()
 	for {
 		if got := h.Banners.Sent(); len(got) >= n {
@@ -243,7 +244,7 @@ func waitBanners(ctx context.Context, t *testing.T, h *servertest.Harness, n int
 
 type failingNotifier struct{}
 
-func (failingNotifier) Notify(context.Context, string, string) error {
+func (failingNotifier) Notify(context.Context, osnotify.Notification) error {
 	return errors.New("terminal-notifier: exit status 1")
 }
 

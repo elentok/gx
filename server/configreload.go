@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/osnotify"
 )
 
 // ReloadResult is the outcome of one config reload. A refusal is a result
@@ -222,11 +223,14 @@ func (s *Server) reportReload(trigger string, res ReloadResult) {
 	s.banner(level, title, body)
 }
 
+// configBannerGroup makes each config banner replace the previous one.
+const configBannerGroup = "gx-config"
+
 // banner shows one OS banner and streams it as a config-reloaded event, for
 // the TUI to toast at its level.
 func (s *Server) banner(level, title, body string) {
 	go func() {
-		if err := s.cfg.Notifier.Notify(context.Background(), title, body); err != nil {
+		if err := s.cfg.Notifier.Notify(context.Background(), osnotify.Notification{Title: title, Body: body, Group: configBannerGroup}); err != nil {
 			s.log.Warn("OS banner failed", "title", title, "error", err)
 		}
 	}()

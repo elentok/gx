@@ -31,20 +31,47 @@ func TestNewSystemNotifier_NoopInTests(t *testing.T) {
 	}
 }
 
+var fullNote = Notification{
+	Title:    "gx title",
+	Body:     quotedBody,
+	Group:    "gx-agent-a",
+	Execute:  "gx agent focus a",
+	Activate: "net.kovidgoyal.kitty",
+}
+
 func TestTerminalNotifier_Argv(t *testing.T) {
-	r := &fakeRunner{}
-	if err := newTerminalNotifier("/opt/bin/terminal-notifier", r.run).Notify(context.Background(), "gx title", quotedBody); err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name string
+		note Notification
+		want []string
+	}{
+		{"all fields", fullNote, []string{
+			"-title", "gx title", "-message", quotedBody,
+			"-group", "gx-agent-a", "-execute", "gx agent focus a", "-activate", "net.kovidgoyal.kitty",
+		}},
+		{"empty optional fields", Notification{Title: "gx title", Body: quotedBody}, []string{
+			"-title", "gx title", "-message", quotedBody,
+		}},
 	}
-	want := []call{{"/opt/bin/terminal-notifier", []string{"-title", "gx title", "-message", quotedBody, "-group", "gx-config"}}}
-	if !reflect.DeepEqual(r.calls, want) {
-		t.Fatalf("calls = %#v, want %#v", r.calls, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &fakeRunner{}
+			found := func(string) (string, error) { return "/opt/bin/terminal-notifier", nil }
+			if err := Select("darwin", found, r.run).Notify(context.Background(), tt.note); err != nil {
+				t.Fatal(err)
+			}
+			want := []call{{"/opt/bin/terminal-notifier", tt.want}}
+			if !reflect.DeepEqual(r.calls, want) {
+				t.Fatalf("calls = %#v, want %#v", r.calls, want)
+			}
+		})
 	}
 }
 
 func TestOSAScript_Argv(t *testing.T) {
 	r := &fakeRunner{}
-	if err := newOSAScript(r.run).Notify(context.Background(), "gx title", quotedBody); err != nil {
+	missing := func(string) (string, error) { return "", exec.ErrNotFound }
+	if err := Select("darwin", missing, r.run).Notify(context.Background(), fullNote); err != nil {
 		t.Fatal(err)
 	}
 	want := []call{{"osascript", []string{"-e", osascriptSource, "gx title", quotedBody}}}
@@ -55,7 +82,7 @@ func TestOSAScript_Argv(t *testing.T) {
 
 func TestNotify_ReturnsRunnerError(t *testing.T) {
 	r := &fakeRunner{err: errors.New("boom")}
-	if err := newTerminalNotifier("terminal-notifier", r.run).Notify(context.Background(), "t", "b"); err == nil {
+	if err := newTerminalNotifier("terminal-notifier", r.run).Notify(context.Background(), Notification{Title: "t", Body: "b"}); err == nil {
 		t.Fatal("want error, got nil")
 	}
 	if len(r.calls) != 1 {
@@ -64,7 +91,7 @@ func TestNotify_ReturnsRunnerError(t *testing.T) {
 }
 
 func TestNoop_RunsNothing(t *testing.T) {
-	if err := (noop{}).Notify(context.Background(), "t", "b"); err != nil {
+	if err := (noop{}).Notify(context.Background(), Notification{Title: "t", Body: "b"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -98,7 +125,7 @@ func TestSelect(t *testing.T) {
 func TestSelect_TerminalNotifierUsesResolvedPath(t *testing.T) {
 	r := &fakeRunner{}
 	found := func(string) (string, error) { return "/opt/bin/terminal-notifier", nil }
-	if err := Select("darwin", found, r.run).Notify(context.Background(), "t", "b"); err != nil {
+	if err := Select("darwin", found, r.run).Notify(context.Background(), Notification{Title: "t", Body: "b"}); err != nil {
 		t.Fatal(err)
 	}
 	if r.calls[0].name != "/opt/bin/terminal-notifier" {
