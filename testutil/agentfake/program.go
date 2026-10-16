@@ -37,6 +37,8 @@ const (
 	// ActionConversation reports Control.ConversationID as the program's
 	// conversation id, as a harness does on /clear.
 	ActionConversation = "conversation"
+	// ActionSize writes the terminal's size as "size=<cols>x<rows>".
+	ActionSize = "size"
 )
 
 // ProgramDir holds the fake program's side channels. It is under the temp
@@ -200,6 +202,12 @@ func (p *program) control(c Control) error {
 		fmt.Fprint(p.out, c.Output)
 	case ActionConversation:
 		return os.WriteFile(p.convPath, []byte(c.ConversationID), 0o644)
+	case ActionSize:
+		cols, rows, err := term.GetSize(os.Stdout.Fd())
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(p.out, "size=%dx%d\r\n", cols, rows)
 	default:
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}

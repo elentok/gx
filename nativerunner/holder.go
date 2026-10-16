@@ -145,7 +145,12 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		proc:     cmd.Process,
 		pid:      pid,
 		watcher:  watcher,
-		frames:   newFrameHub(scr),
+		frames: newFrameHub(scr, cols, rows, func(cols, rows int) error {
+			// The screen first, so it already has the new size when the child
+			// redraws for it.
+			scr.Resize(cols, rows)
+			return pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+		}),
 		ops:      holderOptionalOps,
 		exited:   exited,
 		finished: make(chan struct{}),

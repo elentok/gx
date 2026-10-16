@@ -4,14 +4,18 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"maps"
+	"math"
 	"net"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/agentrunner/screen"
 )
 
@@ -40,10 +44,14 @@ var armedFrameTimers atomic.Int64
 // came too soon, so an idle child costs nothing.
 type frameHub struct {
 	scr *screen.Screen
+	// setSize resizes the pty and the screen.
+	setSize func(cols, rows int) error
 
 	mu     sync.Mutex
 	subs   map[*attachClient]struct{}
 	cursor screen.Cursor
+	// cols and rows are the pty's size, which outlives the attaches.
+	cols, rows int
 }
 
 // attachClient is one attach's pacing state, guarded by frameHub.mu.
@@ -59,14 +67,17 @@ type attachClient struct {
 	last  time.Time
 	keyed time.Time
 	timer *time.Timer
+	// width and height are the viewer's size, zero until it resizes, when its
+	// frames are the screen as is.
+	width, height int
 }
 
 func (c *attachClient) pending() bool {
 	return len(c.rows) > 0 || c.moved || c.full
 }
 
-func newFrameHub(scr *screen.Screen) *frameHub {
-	return &frameHub{scr: scr, subs: map[*attachClient]struct{}{}}
+func newFrameHub(scr *screen.Screen, cols, rows int, setSize func(cols, rows int) error) *frameHub {
+	return &frameHub{scr: scr, setSize: setSize, cols: cols, rows: rows, subs: map[*attachClient]struct{}{}}
 }
 
 // run flushes on each output signal until done closes.
@@ -90,7 +101,7 @@ func (f *frameHub) subscribe() (*attachClient, Frame) {
 	f.flushLocked()
 	c := &attachClient{slot: make(chan Frame, 1), rows: map[int]struct{}{}, last: time.Now()}
 	f.subs[c] = struct{}{}
-	return c, f.fullFrameLocked()
+	return c, f.fullFrameLocked(c)
 }
 
 func (f *frameHub) unsubscribe(c *attachClient) {
@@ -131,6 +142,46 @@ func (f *frameHub) keyed(c *attachClient) {
 	defer f.mu.Unlock()
 	c.keyed = time.Now()
 	f.paceLocked(c)
+}
+
+// resized records c's viewer size and gives c the pty's size.
+func (f *frameHub) resized(c *attachClient, width, height int) error {
+	if width <= 0 || height <= 0 || width > math.MaxUint16 || height > math.MaxUint16 {
+		return fmt.Errorf("invalid attach size %dx%d", width, height)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c.width, c.height = width, height
+	return f.ownLocked(c)
+}
+
+// own gives c the pty's size, as the viewer that last focused or typed.
+func (f *frameHub) own(c *attachClient) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.ownLocked(c)
+}
+
+// ownLocked resizes the pty to c's size, and since every attach's view of the
+// screen changes with it, owes each one a full frame.
+func (f *frameHub) ownLocked(c *attachClient) error {
+	if c.width == 0 || (c.width == f.cols && c.height == f.rows) {
+		return nil
+	}
+	if err := f.setSize(c.width, c.height); err != nil {
+		return err
+	}
+	f.cols, f.rows = c.width, c.height
+	// The full frames cover the rows the resize dirtied.
+	f.scr.TakeDirty()
+	f.cursor = f.scr.Cursor()
+	for s := range f.subs {
+		clear(s.rows)
+		s.moved = false
+		s.full = true
+		f.paceLocked(s)
+	}
+	return nil
 }
 
 // sent tells the hub c's slot is free, so the full frame owed for a drop goes
@@ -218,9 +269,9 @@ func (f *frameHub) stopTimerLocked(c *attachClient) {
 func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 	var frame Frame
 	if c.full {
-		frame = f.fullFrameLocked()
+		frame = f.fullFrameLocked(c)
 	} else {
-		frame = newFrame(f.cursor, f.scr.StyledRows(), slices.Sorted(maps.Keys(c.rows)))
+		frame = c.frame(f.cursor, f.scr.StyledRows(), slices.Sorted(maps.Keys(c.rows)))
 	}
 	clear(c.rows)
 	c.moved = false
@@ -228,23 +279,57 @@ func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 	return frame
 }
 
-func (f *frameHub) fullFrameLocked() Frame {
+func (f *frameHub) fullFrameLocked(c *attachClient) Frame {
 	rows := f.scr.StyledRows()
-	all := make([]int, len(rows))
+	n := len(rows)
+	if c.height > 0 {
+		n = c.height
+	}
+	all := make([]int, n)
 	for i := range all {
 		all[i] = i
 	}
-	return newFrame(f.cursor, rows, all)
+	return c.frame(f.cursor, rows, all)
 }
 
-func newFrame(cur screen.Cursor, rows []string, indexes []int) Frame {
+// frame builds a frame of the screen's rows at indexes, cropped or padded to
+// c's viewer size.
+func (c *attachClient) frame(cur screen.Cursor, rows []string, indexes []int) Frame {
 	frame := Frame{Cursor: FrameCursor{X: cur.X, Y: cur.Y, Visible: cur.Visible}}
-	for _, i := range indexes {
-		if i < len(rows) {
-			frame.Rows = append(frame.Rows, FrameRow{Index: i, ANSI: rows[i]})
+	if c.width == 0 {
+		for _, i := range indexes {
+			if i < len(rows) {
+				frame.Rows = append(frame.Rows, FrameRow{Index: i, ANSI: rows[i]})
+			}
 		}
+		return frame
+	}
+	if cur.X >= c.width || cur.Y >= c.height {
+		frame.Cursor.Visible = false
+	}
+	for _, i := range indexes {
+		if i >= c.height {
+			continue
+		}
+		var row string
+		if i < len(rows) {
+			row = rows[i]
+		}
+		frame.Rows = append(frame.Rows, FrameRow{Index: i, ANSI: fitRow(row, c.width)})
 	}
 	return frame
+}
+
+func fitRow(row string, width int) string {
+	w := ansi.StringWidth(row)
+	if w > width {
+		return ansi.Truncate(row, width, "")
+	}
+	// The reset keeps a style left open at the row's end off the padding.
+	if w < width {
+		return row + "\x1b[m" + strings.Repeat(" ", width-w)
+	}
+	return row
 }
 
 // outputSignal wakes the frameHub after each pty write without ever blocking
@@ -278,9 +363,20 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 		}
 		for {
 			typ, payload, err := readStreamMessage(in)
-			if err == nil && typ == StreamInput {
-				if err = h.input(payload); err == nil {
-					h.frames.keyed(client)
+			if err == nil {
+				switch typ {
+				case StreamInput:
+					// The child gets the key at the typing viewer's size.
+					if err = h.frames.own(client); err == nil {
+						if err = h.input(payload); err == nil {
+							h.frames.keyed(client)
+						}
+					}
+				case StreamResize:
+					var size AttachResize
+					if err = json.Unmarshal(payload, &size); err == nil {
+						err = h.frames.resized(client, size.Cols, size.Rows)
+					}
 				}
 			}
 			if err != nil {
@@ -408,6 +504,12 @@ func (a *HolderAttach) SendKey(k screen.Key) error {
 // Paste pastes text into the child.
 func (a *HolderAttach) Paste(text string) error {
 	return a.Send(StreamInput, AttachInput{Paste: text})
+}
+
+// Resize sends the viewer's size, which the child takes on, as the viewer
+// that last focused. Send it on focus.
+func (a *HolderAttach) Resize(cols, rows int) error {
+	return a.Send(StreamResize, AttachResize{Cols: cols, Rows: rows})
 }
 
 // Send writes a message to the holder.

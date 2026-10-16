@@ -29,6 +29,9 @@ const (
 	// StreamError carries why the holder closes the stream; nothing follows
 	// it.
 	StreamError
+	// StreamResize is the viewer's size a client sends on an attach when it
+	// focuses, as an AttachResize.
+	StreamResize
 )
 
 // maxStreamPayload bounds one stream message; a bigger one ends the stream
@@ -131,6 +134,14 @@ type InputKey struct {
 	Code rune          `json:"code"`
 	Text string        `json:"text,omitempty"`
 	Mod  screen.KeyMod `json:"mod,omitempty"`
+}
+
+// AttachResize is StreamResize's payload. The pty follows the size of the
+// attach that last resized or typed; every other attach gets its frames
+// cropped or padded to its own size.
+type AttachResize struct {
+	Cols int `json:"cols"`
+	Rows int `json:"rows"`
 }
 
 // streamError is StreamError's payload.
