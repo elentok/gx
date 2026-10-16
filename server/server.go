@@ -25,6 +25,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/tickets/schema"
@@ -201,6 +202,12 @@ type Config struct {
 	// Notifier shows OS banners for config reloads; nil means
 	// osnotify.NewSystemNotifier.
 	Notifier osnotify.Notifier
+
+	// Player plays session sounds; nil means sound.NewSystemPlayer.
+	Player sound.Player
+	// SessionBannerDelay is how long a session banner waits for triggers to
+	// merge; zero means defaultSessionBannerDelay.
+	SessionBannerDelay time.Duration
 }
 
 // DefaultTCPAddr is where the opt-in TCP listener binds.
@@ -259,6 +266,7 @@ type Server struct {
 	kick           chan struct{} // wakes keepClaiming
 	sessionWatches *sessionWatches
 	focus          *focusReports
+	sessionBanners sessionBanners
 	settling       sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
 }
 
@@ -270,6 +278,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()
+	}
+	if cfg.SessionBannerDelay == 0 {
+		cfg.SessionBannerDelay = defaultSessionBannerDelay
 	}
 	if cfg.SessionsDir == "" {
 		data, err := config.DataDir()
@@ -386,6 +397,9 @@ func New(cfg Config) (*Server, error) {
 
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
+	}
+	if s.cfg.Player == nil {
+		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
 	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()

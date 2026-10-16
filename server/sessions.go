@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -628,6 +629,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				if prev := m.info().Status; prev != st {
 					if raisesUnread(prev.State, st.State, msg.Status.Cancelled) {
 						s.raiseUnread(m)
+						s.triggerBanner(m.ID, unreadSound(st.State), "")
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
@@ -739,6 +741,7 @@ func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
 		exit = SessionExitClean
 	} else {
 		s.raiseUnread(m)
+		s.triggerBanner(m.ID, sound.Done, "")
 	}
 	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
 	m.FirstPrompt = ""

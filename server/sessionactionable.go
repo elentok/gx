@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/elentok/gx/sound"
 )
 
 func (s *Server) sessionActionableWrite(w http.ResponseWriter, r *http.Request) {
@@ -39,5 +41,6 @@ func (s *Server) markSessionActionable(req MarkActionableRequest) (SessionResult
 		info = m.info()
 		return true
 	})
+	s.triggerBanner(req.ID, sound.Attention, req.Reason)
 	return SessionResult{Session: &info}, nil
 }

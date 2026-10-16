@@ -21,8 +21,10 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -39,7 +41,10 @@ type Harness struct {
 	TCPAddr     string // empty unless started with StartWithTCP
 	// Banners records the OS banners the server sent, unless an option set
 	// its own Notifier. A harness never shows a real banner.
-	Banners   *Banners
+	Banners *Banners
+	// Sounds records the session sounds played, unless an option set its own
+	// Player.
+	Sounds    *Sounds
 	herdrDown atomic.Bool
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
@@ -262,6 +267,29 @@ func (b *Banners) Sent() []osnotify.Notification {
 	return slices.Clone(b.sent)
 }
 
+// SessionBannerDelay is a harness's session banner delay: long enough for a
+// test to land a second trigger inside the window, shorter than the real one.
+const SessionBannerDelay = 300 * time.Millisecond
+
+// Sounds is a sound.Player that records every sound played.
+type Sounds struct {
+	mu     sync.Mutex
+	played []sound.Name
+}
+
+func (p *Sounds) Play(_ context.Context, _ config.AgentsSoundsConfig, name sound.Name) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.played = append(p.played, name)
+}
+
+// Played returns the sounds recorded so far.
+func (p *Sounds) Played() []sound.Name {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.played)
+}
+
 // WaitForEvent returns the first streamed event of typ for address (any
 // address when empty), failing the test if the stream ends or ctx expires first.
 func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, typ, address string) server.Event {
@@ -391,6 +419,13 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}
 		h.cfg.Notifier = h.Banners
+	}
+	if h.cfg.Player == nil {
+		h.Sounds = &Sounds{}
+		h.cfg.Player = h.Sounds
+	}
+	if h.cfg.SessionBannerDelay == 0 {
+		h.cfg.SessionBannerDelay = SessionBannerDelay
 	}
 	// The real check reads ~/.claude.json, which would leak an extra-usage
 	// notice into the chat on a machine that has it on.

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/http"
 	"sync"
@@ -29,6 +30,9 @@ type focusReports struct {
 	reports map[string]FocusReport
 	// lastFocused is the client focused most recently; banner clicks go to it.
 	lastFocused string
+	// lastTerm outlives its client's disconnect, so a banner sent with no TUI
+	// still activates the terminal the person last used.
+	lastTerm string
 }
 
 func newFocusReports() *focusReports {
@@ -62,8 +66,18 @@ func (f *focusReports) report(r FocusReport) bool {
 	f.reports[r.Client] = r
 	if r.Focused {
 		f.lastFocused = r.Client
+		f.lastTerm = cmp.Or(r.TermProgram, f.lastTerm)
 	}
 	return true
+}
+
+// clickTarget is the terminal of the most recently focused TUI and whether
+// that TUI is still connected.
+func (f *focusReports) clickTarget() (termProgram string, connected bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, connected = f.reports[f.lastFocused]
+	return f.lastTerm, connected
 }
 
 // onScreen reports whether a focused TUI has the session on screen.
