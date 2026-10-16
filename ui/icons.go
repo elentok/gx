@@ -66,6 +66,12 @@ type IconSet struct {
 	// available (ui/tickets' ticketHasSuggestedActions), e.g. a needs-answer
 	// ticket's "Resume (I answered)".
 	SuggestedAction string
+
+	// Agent session states and marks the Agents tab adds; Idle, Blocked,
+	// Rate-limited, crashed and Actionable reuse the Ticket* glyphs above.
+	AgentStarting string
+	AgentExited   string
+	Unread        string
 }
 
 func Icons(useNerdFont bool) IconSet {
@@ -116,6 +122,10 @@ func Icons(useNerdFont bool) IconSet {
 			TicketPaused:             "P",
 
 			SuggestedAction: "*",
+
+			AgentStarting: "~",
+			AgentExited:   "x",
+			Unread:        "+",
 		}
 	}
 	return IconSet{
@@ -164,5 +174,9 @@ func Icons(useNerdFont bool) IconSet {
 		TicketPaused:             "",
 
 		SuggestedAction: "",
+
+		AgentStarting: "",
+		AgentExited:   "",
+		Unread:        "",
 	}
 }

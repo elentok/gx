@@ -127,11 +127,11 @@ func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
 	return qm
 }
 
-func (m Model) newAgentsModel() agentsui.Model {
+func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 	if m.settings.Server == nil {
-		return agentsui.NewModel(nil)
+		return agentsui.NewModel(nil, s)
 	}
-	return agentsui.NewModel(m.settings.Server.Client)
+	return agentsui.NewModel(m.settings.Server.Client, s)
 }
 
 func (m Model) View() tea.View {
@@ -274,7 +274,7 @@ func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabAgents:
 		return historyEntry{
 			viewState: viewState,
-			model:     m.newAgentsModel(),
+			model:     m.newAgentsModel(s),
 		}
 	case nav.TabWorktrees:
 		fallthrough

@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -30,8 +31,8 @@ func waitForText(t *testing.T, tm *teatest.TestModel, text string) {
 
 func TestAgents_NoServerSaysAServerIsNeeded(t *testing.T) {
 	for name, m := range map[string]tea.Model{
-		"no client": NewModel(nil),
-		"link down": withState(t, NewModel(&fakeSessionClient{}), nil, ticketsui.ServerLinkDown),
+		"no client": NewModel(nil, ui.Settings{}),
+		"link down": withState(t, NewModel(&fakeSessionClient{}, ui.Settings{}), nil, ticketsui.ServerLinkDown),
 	} {
 		t.Run(name, func(t *testing.T) {
 			tm := startAgentsTUI(t, m)
@@ -41,14 +42,14 @@ func TestAgents_NoServerSaysAServerIsNeeded(t *testing.T) {
 }
 
 func TestAgents_NoSessionsHintsNewSession(t *testing.T) {
-	m := withState(t, NewModel(&fakeSessionClient{}), &viewmodel.State{}, ticketsui.ServerLinkUp)
+	m := withState(t, NewModel(&fakeSessionClient{}, ui.Settings{}), &viewmodel.State{}, ticketsui.ServerLinkUp)
 	tm := startAgentsTUI(t, m)
 	waitForText(t, tm, "c new session")
 }
 
 func TestAgents_SessionsReplaceTheEmptyState(t *testing.T) {
 	st := &viewmodel.State{Sessions: []server.SessionInfo{{ID: "s1", Name: "fix login"}}}
-	m := withState(t, NewModel(&fakeSessionClient{}), st, ticketsui.ServerLinkUp)
+	m := withState(t, NewModel(&fakeSessionClient{}, ui.Settings{}), st, ticketsui.ServerLinkUp)
 	tm := startAgentsTUI(t, m)
 	waitForText(t, tm, "fix login")
 	if bytes.Contains(tm.CurrentFrame(), []byte("c new session")) {
@@ -57,7 +58,7 @@ func TestAgents_SessionsReplaceTheEmptyState(t *testing.T) {
 }
 
 func TestAgents_InputFocusedOnlyInTerminalFocus(t *testing.T) {
-	m := NewModel(&fakeSessionClient{})
+	m := NewModel(&fakeSessionClient{}, ui.Settings{})
 	if m.InputFocused() {
 		t.Fatal("sidebar focus must leave gx tab keys to the shell")
 	}
