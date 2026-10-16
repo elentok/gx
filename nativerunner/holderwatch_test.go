@@ -158,6 +158,8 @@ func (h settableHarness) Watch(int, time.Time, agentharness.Screen, <-chan struc
 	return h.w, nil
 }
 
+func (settableHarness) DisplayName([]byte) (string, bool) { return "", false }
+
 type settableWatcher struct {
 	mu             sync.Mutex
 	status         agentharness.Status

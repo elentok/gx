@@ -170,6 +170,8 @@ func (h recordingHarness) Watch(int, time.Time, agentharness.Screen, <-chan stru
 	return h.w, nil
 }
 
+func (recordingHarness) DisplayName([]byte) (string, bool) { return "", false }
+
 type recordingWatcher struct {
 	mu  sync.Mutex
 	got []agentharness.ProgramReport

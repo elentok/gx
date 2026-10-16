@@ -84,9 +84,10 @@ type streamStatus struct {
 	Blocked        harness.BlockedKind `json:"blocked,omitempty"`
 	Message        string              `json:"message,omitempty"`
 	ConversationID string              `json:"conversation_id,omitempty"`
+	DisplayName    string              `json:"display_name,omitempty"`
 }
 
-func newStreamStatus(s harness.Status, conversationID string) streamStatus {
+func newStreamStatus(s harness.Status, conversationID, displayName string) streamStatus {
 	return streamStatus{
 		State:          s.State,
 		Background:     s.Background,
@@ -94,6 +95,7 @@ func newStreamStatus(s harness.Status, conversationID string) streamStatus {
 		Blocked:        s.Blocked,
 		Message:        s.Message,
 		ConversationID: conversationID,
+		DisplayName:    displayName,
 	}
 }
 

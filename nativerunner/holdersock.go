@@ -90,6 +90,7 @@ type holderServer struct {
 	// pid is nil for a harness without claude's pid status.
 	pid     *harness.PidWatcher
 	watcher harness.Watcher
+	name    *displayName
 	frames  *frameHub
 	// inputs wakes the watch streams when a client types on an attach.
 	inputs signalHub
@@ -236,7 +237,7 @@ func (h *holderServer) watch(conn net.Conn) {
 	defer tick.Stop()
 	var last *streamStatus
 	for {
-		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID())
+		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get())
 		if last == nil || cur != *last {
 			if send(StreamStatus, cur) != nil {
 				return
@@ -419,13 +420,15 @@ type HolderWatch struct {
 	conn net.Conn
 }
 
-// WatchMessage is one message off a watch stream. Status and ConversationID
-// are set for StreamStatus, ExitCode for StreamExit.
+// WatchMessage is one message off a watch stream. Status, ConversationID and
+// DisplayName are set for StreamStatus, ExitCode for StreamExit.
 type WatchMessage struct {
 	Type           StreamType
 	Status         harness.Status
 	ConversationID string
-	ExitCode       int
+	// DisplayName is "" until the child sets one.
+	DisplayName string
+	ExitCode    int
 }
 
 // Next blocks for the next message, skipping types it does not know. An
@@ -442,7 +445,7 @@ func (w *HolderWatch) Next() (WatchMessage, error) {
 			if err := json.Unmarshal(payload, &s); err != nil {
 				return WatchMessage{}, err
 			}
-			return WatchMessage{Type: typ, Status: s.status(), ConversationID: s.ConversationID}, nil
+			return WatchMessage{Type: typ, Status: s.status(), ConversationID: s.ConversationID, DisplayName: s.DisplayName}, nil
 		case StreamExit:
 			var e streamExit
 			if err := json.Unmarshal(payload, &e); err != nil {

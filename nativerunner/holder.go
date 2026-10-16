@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -140,11 +142,12 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// Only claude's pid status backs the frozen status and deny-reason ops.
 	pid, _ := watcher.(*harness.PidWatcher)
 	srv := &holderServer{
-		scr:      scr,
-		ptmx:     ptmx,
-		proc:     cmd.Process,
-		pid:      pid,
-		watcher:  watcher,
+		scr:     scr,
+		ptmx:    ptmx,
+		proc:    cmd.Process,
+		pid:     pid,
+		watcher: watcher,
+		name:    &displayName{read: h.DisplayName},
 		frames: newFrameHub(scr, cols, rows, func(cols, rows int) error {
 			// The screen first, so it already has the new size when the child
 			// redraws for it.
@@ -164,7 +167,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
-		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, &programStatus{ptmx: ptmx, watcher: watcher}), ptmx)
+		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, &programStatus{ptmx: ptmx, watcher: watcher}), ptmx)
 	}()
 
 	waitErr := cmd.Wait()
@@ -217,6 +220,35 @@ func (s *programStatus) Write(p []byte) (int, error) {
 		s.watcher.Program(r)
 	}
 	return len(p), nil
+}
+
+// displayNameTail is how much earlier output displayName keeps, so a title
+// split across two reads is still seen whole.
+const displayNameTail = 1024
+
+// displayName keeps the harness's Display name of the child's output.
+type displayName struct {
+	read func(raw []byte) (string, bool)
+	mu   sync.Mutex
+	tail []byte
+	name string
+}
+
+func (d *displayName) Write(p []byte) (int, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	buf := append(d.tail, p...)
+	if name, ok := d.read(buf); ok {
+		d.name = name
+	}
+	d.tail = bytes.Clone(buf[max(len(buf)-displayNameTail, 0):])
+	return len(p), nil
+}
+
+func (d *displayName) get() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.name
 }
 
 // unread reports whether the child wrote output the holder has not read yet.

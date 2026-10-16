@@ -257,9 +257,111 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	}
 }
 
+func TestFirstPrompt_WaitsOutBlockedThenTypedAtIdle(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"})
+	holder := waitForHolder(t, filepath.Join(h.SessionsDir, id))
+
+	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "trust?"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	if screenHas(t, holder, "fix the bug") {
+		t.Fatal("first prompt typed while Blocked")
+	}
+
+	report(t, conv, agentfake.Control{State: "done"})
+	waitForScreen(t, holder, "fix the bug")
+	if _, ok := readMeta(t, h, id)["first_prompt"]; ok {
+		t.Error("first prompt still saved after it was typed")
+	}
+}
+
+func TestFirstPrompt_DroppedOnExit(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"})
+	if readMeta(t, h, id)["first_prompt"] != "fix the bug" {
+		t.Fatal("first prompt not saved")
+	}
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionExit}); err != nil {
+		t.Fatal(err)
+	}
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	if p, ok := readMeta(t, h, id)["first_prompt"]; ok {
+		t.Errorf("first prompt %v kept after exit", p)
+	}
+}
+
+func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{})
+	got := waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool { return true })
+	if got.Name != "proj-1" {
+		t.Errorf("name = %q, want proj-1", got.Name)
+	}
+
+	typed, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "mine", Harness: string(agentfake.HarnessKind)})
+	if err != nil || typed.Session == nil || typed.Session.Name != "mine" {
+		t.Fatalf("create typed = %+v, %v", typed, err)
+	}
+	second, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || second.Session == nil || second.Session.Name != "proj-2" {
+		t.Fatalf("create second = %+v, %v; want proj-2", second, err)
+	}
+
+	title(t, conv, "Fix bug")
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Name == "Fix bug" })
+	title(t, conv, "Fix the other bug")
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Name == "Fix the other bug" })
+
+	typedConv, _ := readMeta(t, h, typed.Session.ID)["conversation_id"].(string)
+	title(t, typedConv, "Some title")
+	report(t, typedConv, agentfake.Control{State: "done"})
+	got = waitForSession(ctx, t, h, evs, typed.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	if got.Name != "mine" {
+		t.Errorf("typed name = %q, want mine kept", got.Name)
+	}
+}
+
+func report(t *testing.T, conv string, c agentfake.Control) {
+	t.Helper()
+	c.Action = agentfake.ActionReport
+	if err := agentfake.SendProgramControl(conv, c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func title(t *testing.T, conv, title string) {
+	t.Helper()
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionTitle, Title: title}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func screenHas(t *testing.T, c *nativerunner.HolderClient, text string) bool {
+	t.Helper()
+	rows, _, err := c.Screen(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Contains(strings.Join(rows, "\n"), text)
+}
+
+func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !screenHas(t, c, text) {
+		if time.Now().After(deadline) {
+			t.Fatalf("screen never showed %q", text)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 // startFakeSession creates a fake-harness session and waits for its first
 // report, returning its id and conversation id.
 func startFakeSession(t *testing.T) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+	t.Helper()
+	return startFakeSessionWith(t, server.CreateSessionRequest{})
+}
+
+// startFakeSessionWith is startFakeSession for req in project proj.
+func startFakeSessionWith(t *testing.T, req server.CreateSessionRequest) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -268,7 +370,8 @@ func startFakeSession(t *testing.T) (*servertest.Harness, context.Context, <-cha
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	req.Project, req.Dir, req.Harness = "proj", t.TempDir(), string(agentfake.HarnessKind)
+	res, err := h.Client.CreateSession(ctx, req)
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}

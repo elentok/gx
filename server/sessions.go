@@ -108,8 +108,11 @@ type SessionActionable struct {
 type CreateSessionRequest struct {
 	Project string `json:"project"`
 	Dir     string `json:"dir"`
-	Name    string `json:"name,omitempty"`
-	Ticket  string `json:"ticket,omitempty"`
+	// Name falls back to the harness's Display name, then `<project>-<n>`.
+	Name   string `json:"name,omitempty"`
+	Ticket string `json:"ticket,omitempty"`
+	// Prompt is typed at the session's first Idle; empty starts it Idle.
+	Prompt string `json:"prompt,omitempty"`
 	// Harness defaults to claude.
 	Harness string `json:"harness,omitempty"`
 	Cols    int    `json:"cols,omitempty"`
@@ -131,12 +134,18 @@ type SessionResult struct {
 
 // sessionMeta is what a session's state dir records about it.
 type sessionMeta struct {
-	ID             string    `json:"id"`
-	Harness        string    `json:"harness"`
-	Project        string    `json:"project"`
-	Dir            string    `json:"dir"`
-	Name           string    `json:"name,omitempty"`
-	Ticket         string    `json:"ticket,omitempty"`
+	ID      string `json:"id"`
+	Harness string `json:"harness"`
+	Project string `json:"project"`
+	Dir     string `json:"dir"`
+	Name    string `json:"name,omitempty"`
+	// AutoName marks a fallback name the Display name replaces; a typed name
+	// is never replaced.
+	AutoName bool   `json:"auto_name,omitempty"`
+	Ticket   string `json:"ticket,omitempty"`
+	// FirstPrompt waits for the first Idle; it is cleared once typed or on
+	// exit.
+	FirstPrompt    string    `json:"first_prompt,omitempty"`
 	ConversationID string    `json:"conversation_id"`
 	CreatedAt      time.Time `json:"created_at"`
 	// Cols and Rows are the last size the session's holder started at.
@@ -236,20 +245,21 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if err != nil {
 		return SessionResult{}, err
 	}
-	id, dir, err := s.makeSessionDir()
-	if err != nil {
-		return SessionResult{}, err
-	}
 	meta := sessionMeta{
-		ID:             id,
 		Harness:        req.Harness,
 		Project:        req.Project,
 		Dir:            req.Dir,
 		Name:           req.Name,
 		Ticket:         req.Ticket,
+		FirstPrompt:    req.Prompt,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}
+	dir, err := s.saveNewSession(&meta)
+	if err != nil {
+		return SessionResult{}, err
+	}
+	id := meta.ID
 	if err := s.startSessionHolder(dir, &meta, req.Cols, req.Rows); err != nil {
 		return SessionResult{}, err
 	}
@@ -257,6 +267,39 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
+}
+
+// saveNewSession gives meta its id and, when it has no name, the lowest free
+// `<project>-<n>`, then saves it. Holding metaMu keeps two creates from
+// taking the same name.
+func (s *Server) saveNewSession(meta *sessionMeta) (string, error) {
+	s.sessionWatches.metaMu.Lock()
+	defer s.sessionWatches.metaMu.Unlock()
+	if meta.Name == "" {
+		list, err := s.listSessions()
+		if err != nil {
+			return "", err
+		}
+		meta.Name, meta.AutoName = freeSessionName(meta.Project, list), true
+	}
+	id, dir, err := s.makeSessionDir()
+	if err != nil {
+		return "", err
+	}
+	meta.ID = id
+	return dir, writeSessionMeta(dir, *meta)
+}
+
+func freeSessionName(project string, list []SessionInfo) string {
+	taken := map[string]bool{}
+	for _, s := range list {
+		taken[s.Name] = true
+	}
+	for n := 1; ; n++ {
+		if name := fmt.Sprintf("%s-%d", project, n); !taken[name] {
+			return name
+		}
+	}
 }
 
 // makeSessionDir claims a fresh short id by creating its dir. The id stays
@@ -468,7 +511,13 @@ func (s *Server) watchSession(dir, id string) {
 		switch msg.Type {
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
+			var prompt string
 			s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+				// A stop records the exit itself, and a status the stream sent
+				// before it must not revive the session.
+				if m.Status.State == SessionExited {
+					return false
+				}
 				changed := false
 				if m.info().Status != st {
 					m.Status, m.StatusChangedAt = st, time.Now()
@@ -478,12 +527,38 @@ func (s *Server) watchSession(dir, id string) {
 					m.ConversationID = msg.ConversationID
 					changed = true
 				}
+				if m.AutoName && msg.DisplayName != "" && msg.DisplayName != m.Name {
+					m.Name = msg.DisplayName
+					changed = true
+				}
+				if st.State == SessionIdle && m.FirstPrompt != "" {
+					prompt, m.FirstPrompt = m.FirstPrompt, ""
+					changed = true
+				}
 				return changed
 			})
+			if prompt != "" {
+				s.typeFirstPrompt(dir, id, prompt)
+			}
 		case nativerunner.StreamExit:
 			s.recordSessionExit(dir, id, sessionExitOf(msg.ExitCode))
 			return
 		}
+	}
+}
+
+// typeFirstPrompt sends Enter on its own, so the harness reads the prompt as
+// typed rather than as a paste ending in a newline.
+func (s *Server) typeFirstPrompt(dir, id, prompt string) {
+	c, err := nativerunner.DialHolder(dir)
+	if err == nil {
+		err = c.SendKeys(prompt)
+	}
+	if err == nil {
+		err = c.SendKeys("\r")
+	}
+	if err != nil {
+		s.log.Warn("type first prompt", "session", id, "err", err)
 	}
 }
 
@@ -535,8 +610,8 @@ func (s *Server) openSessionWatch(dir string) (*nativerunner.HolderWatch, error)
 	}
 }
 
-// recordSessionExit records the first exit seen; a stopped session exits
-// clean whatever the signal left as its code.
+// recordSessionExit records the first exit seen and drops an untyped first
+// prompt; a stopped session exits clean whatever the signal left as its code.
 func (s *Server) recordSessionExit(dir, id, exit string) {
 	s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
 		if m.Status.State == SessionExited {
@@ -546,6 +621,7 @@ func (s *Server) recordSessionExit(dir, id, exit string) {
 			exit = SessionExitClean
 		}
 		m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
+		m.FirstPrompt = ""
 		return true
 	})
 }
