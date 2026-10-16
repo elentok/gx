@@ -32,6 +32,12 @@ const (
 	// StreamResize is the viewer's size a client sends on an attach when it
 	// focuses, as an AttachResize.
 	StreamResize
+	// StreamScroll is the scroll offset a client sends on an attach, as an
+	// AttachScroll.
+	StreamScroll
+	// StreamCopy is a client's AttachCopy request on an attach, and the
+	// holder's streamCopied reply.
+	StreamCopy
 )
 
 // maxStreamPayload bounds one stream message; a bigger one ends the stream
@@ -102,13 +108,18 @@ type streamExit struct {
 }
 
 // Frame is StreamFrame's payload: the cursor and the rows that changed, each
-// a styled ANSI string. The first frame of an attach carries every row.
+// a styled ANSI string. The first frame of an attach carries every row, and
+// so does each frame of a scrolled attach, whose cursor is hidden.
 type Frame struct {
 	Cursor FrameCursor `json:"cursor"`
 	Rows   []FrameRow  `json:"rows"`
-	// ScrollOffset and ScrollMax are zero until attach can scroll.
+	// ScrollOffset is how many lines above the screen's top the view starts;
+	// ScrollMax, the scrollback's length, is the most it can be. Row i shows
+	// line ScrollMax-ScrollOffset+i, the line a LinePos names.
 	ScrollOffset int `json:"scroll_offset"`
 	ScrollMax    int `json:"scroll_max"`
+	// NewLines counts the lines output since the attach scrolled up.
+	NewLines int `json:"new_lines,omitempty"`
 }
 
 type FrameCursor struct {
@@ -142,6 +153,32 @@ type InputKey struct {
 type AttachResize struct {
 	Cols int `json:"cols"`
 	Rows int `json:"rows"`
+}
+
+// AttachScroll is StreamScroll's payload. The offset is the attach's alone;
+// while it is above zero, output grows it so the view stays on its lines.
+type AttachScroll struct {
+	Offset int `json:"offset"`
+}
+
+// AttachCopy is a StreamCopy request: the plain text from Start up to, not
+// including, End.
+type AttachCopy struct {
+	Start LinePos `json:"start"`
+	End   LinePos `json:"end"`
+}
+
+// LinePos is a cell, its line counted from the oldest scrollback line, the
+// screen's rows following the scrollback's.
+type LinePos struct {
+	Line int `json:"line"`
+	Col  int `json:"col"`
+}
+
+// streamCopied is the holder's StreamCopy reply, each line's trailing spaces
+// trimmed.
+type streamCopied struct {
+	Text string `json:"text"`
 }
 
 // streamError is StreamError's payload.

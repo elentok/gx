@@ -11,11 +11,20 @@ import (
 	"sync"
 
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/vt"
 )
 
 // scrollbackLines is fixed, not a setting (ADR 0037).
 const scrollbackLines = 10_000
+
+// The emulator drops its oldest line silently once full, so it holds up to
+// scrollbackSlack lines past scrollbackLines, which Write trims after each
+// writeChunk: its growth is then the count of lines pushed.
+const (
+	scrollbackSlack = scrollbackLines
+	writeChunk      = 4096
+)
 
 // Key is a key press to encode for the child.
 type Key = uv.Key
@@ -49,6 +58,8 @@ type Screen struct {
 	// allDirty covers what the touched lines miss: a resize reallocates
 	// them, and a screen switch shows a buffer whose marks are stale.
 	allDirty bool
+	// pushed counts the lines ever pushed to the main screen's scrollback.
+	pushed int
 }
 
 // NewScreen returns a cols×rows screen whose replies to terminal queries are
@@ -65,7 +76,7 @@ func NewScreenWithReplies(cols, rows int, replies io.Writer) *Screen {
 		replies = io.Discard
 	}
 	emu := vt.NewEmulator(cols, rows)
-	emu.SetScrollbackSize(scrollbackLines)
+	emu.SetScrollbackSize(scrollbackLines + scrollbackSlack)
 	s := &Screen{emu: emu, drained: make(chan struct{}), cursorVisible: true}
 	emu.SetCallbacks(vt.Callbacks{
 		CursorVisibility: func(visible bool) { s.cursorVisible = visible },
@@ -84,7 +95,27 @@ func NewScreenWithReplies(cols, rows int, replies io.Writer) *Screen {
 func (s *Screen) Write(p []byte) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.emu.Write(p)
+	n := 0
+	for len(p) > 0 {
+		chunk := p[:min(len(p), writeChunk)]
+		before := s.emu.ScrollbackLen()
+		m, err := s.emu.Write(chunk)
+		n += m
+		s.pushed += max(0, s.emu.ScrollbackLen()-before)
+		s.trimScrollback()
+		if err != nil {
+			return n, err
+		}
+		p = p[len(chunk):]
+	}
+	return n, nil
+}
+
+func (s *Screen) trimScrollback() {
+	if sb := s.emu.Scrollback(); sb.Len() > scrollbackLines {
+		sb.SetMaxLines(scrollbackLines)
+		sb.SetMaxLines(scrollbackLines + scrollbackSlack)
+	}
 }
 
 // Resize changes the screen size.
@@ -92,7 +123,71 @@ func (s *Screen) Resize(cols, rows int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.emu.Resize(cols, rows)
+	s.trimScrollback()
 	s.allDirty = true
+}
+
+// Pushed returns how many lines have ever scrolled off the main screen into
+// the scrollback, counting those since dropped.
+func (s *Screen) Pushed() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pushed
+}
+
+// StyledView returns n styled rows of the scrollback followed by the screen,
+// starting offset lines above the screen's top, with "" past the end.
+// offset is clamped to scrollMax, the scrollback's length.
+func (s *Screen) StyledView(offset, n int) (rows []string, scrollMax int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sb := s.emu.Scrollback()
+	scrollMax = sb.Len()
+	scr := strings.Split(s.emu.Render(), "\n")
+	top := scrollMax - min(offset, scrollMax)
+	rows = make([]string, n)
+	for i := range rows {
+		switch l := top + i; {
+		case l < scrollMax:
+			rows[i] = sb.Line(l).Render()
+		case l-scrollMax < len(scr):
+			rows[i] = scr[l-scrollMax]
+		}
+	}
+	return rows, scrollMax
+}
+
+// Text returns the plain text from column startCol of line startLine up to,
+// not including, column endCol of line endLine, each line's trailing spaces
+// trimmed. Lines count from the oldest scrollback line, the screen's rows
+// following the scrollback's.
+func (s *Screen) Text(startLine, startCol, endLine, endCol int) string {
+	if startLine > endLine || (startLine == endLine && startCol > endCol) {
+		startLine, startCol, endLine, endCol = endLine, endCol, startLine, startCol
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sb := s.emu.Scrollback()
+	n := sb.Len()
+	scr := strings.Split(s.emu.String(), "\n")
+	var lines []string
+	for l := max(startLine, 0); l <= min(endLine, n+len(scr)-1); l++ {
+		var text string
+		if l < n {
+			text = sb.Line(l).String()
+		} else {
+			text = scr[l-n]
+		}
+		from, to := 0, ansi.StringWidth(text)
+		if l == startLine {
+			from = startCol
+		}
+		if l == endLine {
+			to = endCol
+		}
+		lines = append(lines, strings.TrimRight(ansi.Cut(text, from, to), " "))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // Rows returns the visible screen as text, one entry per row, with trailing

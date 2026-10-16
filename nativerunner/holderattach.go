@@ -52,6 +52,8 @@ type frameHub struct {
 	cursor screen.Cursor
 	// cols and rows are the pty's size, which outlives the attaches.
 	cols, rows int
+	// pushed is the screen's Pushed as of the last flush.
+	pushed int
 }
 
 // attachClient is one attach's pacing state, guarded by frameHub.mu.
@@ -70,6 +72,9 @@ type attachClient struct {
 	// width and height are the viewer's size, zero until it resizes, when its
 	// frames are the screen as is.
 	width, height int
+	// offset is the viewer's scroll offset; newLines counts the lines output
+	// since it left zero.
+	offset, newLines int
 }
 
 func (c *attachClient) pending() bool {
@@ -124,16 +129,55 @@ func (f *frameHub) flushLocked() {
 	moved := cur != f.cursor
 	// Kept even with no attach, as the cursor a new attach's frame starts at.
 	f.cursor = cur
-	if len(dirty) == 0 && !moved {
+	pushed := f.scr.Pushed()
+	grown := pushed - f.pushed
+	f.pushed = pushed
+	if len(dirty) == 0 && !moved && grown == 0 {
 		return
 	}
 	for c := range f.subs {
-		for _, i := range dirty {
-			c.rows[i] = struct{}{}
+		if c.offset > 0 {
+			// A scrolled view changes only when lines arrive or it reaches
+			// down into the screen's dirty rows.
+			if grown > 0 || (len(dirty) > 0 && c.offset < f.viewHeightLocked(c)) {
+				c.offset += grown
+				c.newLines += grown
+				c.full = true
+			}
+		} else {
+			for _, i := range dirty {
+				c.rows[i] = struct{}{}
+			}
+			c.moved = c.moved || moved
 		}
-		c.moved = c.moved || moved
 		f.paceLocked(c)
 	}
+}
+
+func (f *frameHub) viewHeightLocked(c *attachClient) int {
+	if c.height > 0 {
+		return c.height
+	}
+	return f.rows
+}
+
+// scroll sets c's scroll offset and sends its new view at once.
+func (f *frameHub) scroll(c *attachClient, offset int) error {
+	if offset < 0 {
+		return fmt.Errorf("invalid scroll offset %d", offset)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c.offset = min(offset, f.scr.ScrollbackLen())
+	if c.offset == 0 {
+		c.newLines = 0
+	}
+	clear(c.rows)
+	c.moved = false
+	c.full = true
+	c.keyed = time.Now()
+	f.paceLocked(c)
+	return nil
 }
 
 // keyed opens c's key echo window, sending what its timer holds back at once.
@@ -268,10 +312,11 @@ func (f *frameHub) stopTimerLocked(c *attachClient) {
 // takeFrameLocked builds c's pending frame and marks it sent.
 func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 	var frame Frame
-	if c.full {
+	if c.full || c.offset > 0 {
 		frame = f.fullFrameLocked(c)
 	} else {
 		frame = c.frame(f.cursor, f.scr.StyledRows(), slices.Sorted(maps.Keys(c.rows)))
+		frame.ScrollMax = f.scr.ScrollbackLen()
 	}
 	clear(c.rows)
 	c.moved = false
@@ -280,16 +325,39 @@ func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 }
 
 func (f *frameHub) fullFrameLocked(c *attachClient) Frame {
+	if c.offset > 0 {
+		return f.scrolledFrameLocked(c)
+	}
 	rows := f.scr.StyledRows()
 	n := len(rows)
 	if c.height > 0 {
 		n = c.height
 	}
+	frame := c.frame(f.cursor, rows, allIndexes(n))
+	frame.ScrollMax = f.scr.ScrollbackLen()
+	return frame
+}
+
+// scrolledFrameLocked builds c's view of the scrollback and screen at its
+// offset, which the scrollback shrinking may lower.
+func (f *frameHub) scrolledFrameLocked(c *attachClient) Frame {
+	n := f.viewHeightLocked(c)
+	rows, scrollMax := f.scr.StyledView(c.offset, n)
+	c.offset = min(c.offset, scrollMax)
+	frame := c.frame(f.cursor, rows, allIndexes(n))
+	frame.Cursor.Visible = false
+	frame.ScrollOffset = c.offset
+	frame.ScrollMax = scrollMax
+	frame.NewLines = c.newLines
+	return frame
+}
+
+func allIndexes(n int) []int {
 	all := make([]int, n)
 	for i := range all {
 		all[i] = i
 	}
-	return c.frame(f.cursor, rows, all)
+	return all
 }
 
 // frame builds a frame of the screen's rows at indexes, cropped or padded to
@@ -355,6 +423,10 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 	defer h.frames.unsubscribe(client)
 	// Unknown client message types are skipped so newer clients keep working.
 	clientErr := make(chan error, 1)
+	// Copy replies go out through the loop below, the conn's only writer.
+	copied := make(chan streamCopied)
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		// The request's JSON ends in a newline. A stream header never starts
 		// with one, its length being capped well below 0x0a000000.
@@ -376,6 +448,20 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 					var size AttachResize
 					if err = json.Unmarshal(payload, &size); err == nil {
 						err = h.frames.resized(client, size.Cols, size.Rows)
+					}
+				case StreamScroll:
+					var s AttachScroll
+					if err = json.Unmarshal(payload, &s); err == nil {
+						err = h.frames.scroll(client, s.Offset)
+					}
+				case StreamCopy:
+					var c AttachCopy
+					if err = json.Unmarshal(payload, &c); err == nil {
+						select {
+						case copied <- streamCopied{Text: h.scr.Text(c.Start.Line, c.Start.Col, c.End.Line, c.End.Col)}:
+						case <-done:
+							return
+						}
 					}
 				}
 			}
@@ -399,6 +485,10 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 				return
 			}
 			h.frames.sent(client)
+		case c := <-copied:
+			if send(StreamCopy, c) != nil {
+				return
+			}
 		case <-h.finished:
 			// finish flushed the last output before closing finished.
 			for _, frame := range h.frames.drain(client) {
@@ -457,11 +547,12 @@ type HolderAttach struct {
 }
 
 // AttachMessage is one message off an attach stream. Frame is set for
-// StreamFrame, ExitCode for StreamExit.
+// StreamFrame, ExitCode for StreamExit, Text for StreamCopy.
 type AttachMessage struct {
 	Type     StreamType
 	Frame    Frame
 	ExitCode int
+	Text     string
 }
 
 // Next blocks for the next message, skipping types it does not know. A
@@ -486,6 +577,12 @@ func (a *HolderAttach) Next() (AttachMessage, error) {
 				return AttachMessage{}, err
 			}
 			return AttachMessage{Type: typ, ExitCode: e.Code}, nil
+		case StreamCopy:
+			var c streamCopied
+			if err := json.Unmarshal(payload, &c); err != nil {
+				return AttachMessage{}, err
+			}
+			return AttachMessage{Type: typ, Text: c.Text}, nil
 		case StreamError:
 			var e streamError
 			if err := json.Unmarshal(payload, &e); err != nil {
@@ -510,6 +607,17 @@ func (a *HolderAttach) Paste(text string) error {
 // that last focused. Send it on focus.
 func (a *HolderAttach) Resize(cols, rows int) error {
 	return a.Send(StreamResize, AttachResize{Cols: cols, Rows: rows})
+}
+
+// Scroll sets this attach's scroll offset, in lines above the screen's top.
+func (a *HolderAttach) Scroll(offset int) error {
+	return a.Send(StreamScroll, AttachScroll{Offset: offset})
+}
+
+// Copy asks for the plain text from start up to end; Next returns it as a
+// StreamCopy message.
+func (a *HolderAttach) Copy(start, end LinePos) error {
+	return a.Send(StreamCopy, AttachCopy{Start: start, End: end})
 }
 
 // Send writes a message to the holder.

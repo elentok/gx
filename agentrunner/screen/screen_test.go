@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/elentok/gx/agentrunner/screen"
 )
 
@@ -243,6 +244,39 @@ func TestScreen_ScrollbackCappedAt10000(t *testing.T) {
 	}
 	if got := s.StyledScrollback(10_000); got != "" {
 		t.Errorf("StyledScrollback(out of range) = %q, want empty", got)
+	}
+	if got := s.Pushed(); got != 10_099 {
+		t.Errorf("Pushed() = %d, want 10099, counting the dropped lines", got)
+	}
+}
+
+func TestScreen_StyledViewAndTextSpanScrollbackAndScreen(t *testing.T) {
+	s := screen.NewScreen(20, 3)
+	t.Cleanup(func() { _ = s.Close() })
+	for i := range 6 {
+		_, _ = fmt.Fprintf(s, "L%d   x\r\n", i)
+	}
+	// Scrollback L0-L3, screen L4, L5 and an empty row.
+	rows, scrollMax := s.StyledView(2, 4)
+	if scrollMax != 4 {
+		t.Fatalf("scrollMax = %d, want 4", scrollMax)
+	}
+	var plain []string
+	for _, r := range rows {
+		plain = append(plain, strings.TrimRight(ansi.Strip(r), " "))
+	}
+	if want := []string{"L2   x", "L3   x", "L4   x", "L5   x"}; !slices.Equal(plain, want) {
+		t.Errorf("StyledView(2, 4) = %q, want %q", plain, want)
+	}
+	if rows, _ := s.StyledView(99, 1); ansi.Strip(rows[0]) != "L0   x" {
+		t.Errorf("StyledView(99, 1) = %q, want the offset clamped to the oldest line", rows)
+	}
+
+	if got, want := s.Text(3, 1, 4, 4), "3   x\nL4"; got != want {
+		t.Errorf("Text(3,1 → 4,4) = %q, want %q", got, want)
+	}
+	if got, want := s.Text(4, 4, 3, 1), "3   x\nL4"; got != want {
+		t.Errorf("Text with start and end swapped = %q, want %q", got, want)
 	}
 }
 
