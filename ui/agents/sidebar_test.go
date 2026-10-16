@@ -41,6 +41,8 @@ func fixtureSessions() []server.SessionInfo {
 func sidebarModel(t *testing.T, nerd bool, sessions []server.SessionInfo, width, height int) Model {
 	t.Helper()
 	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd})
+	// Start on the first session in the sidebar, past the opening focus.
+	m.opened = true
 	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
 	return update1(t, m, tea.WindowSizeMsg{Width: width, Height: height})
 }

@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,9 +28,7 @@ var (
 	keyJump          = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "jump to session"))
 )
 
-// spinnerRestartMsg re-arms the Working spinner: its tick chain dies while
-// the tab is hidden.
-type spinnerRestartMsg struct{}
+type pageActivatedMsg struct{}
 
 // Model is the Agents tab: the server's interactive sessions.
 type Model struct {
@@ -61,13 +60,26 @@ type Model struct {
 	// attach is nil when no session is on screen.
 	attach *attachment
 	now    func() time.Time
+	// opened: the opening focus was picked, on the first snapshot.
+	opened bool
+	// lastViewed is the session viewed last by an earlier TUI.
+	lastViewed string
+	// focused: the TUI's terminal has focus.
+	focused     bool
+	termProgram string
+	// reporter is nil without a client.
+	reporter *focusReporter
 }
 
 // NewModel builds the tab; a nil client means there is no server to reach.
 func NewModel(client SessionClient, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, now: time.Now}
+	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, now: time.Now,
+		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
+	if client != nil {
+		m.reporter = &focusReporter{client: client}
+	}
 	if data, err := config.DataDir(); err == nil {
 		m.sessionsDir = filepath.Join(data, "sessions")
 	}
@@ -88,8 +100,14 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 				m.cursor = i
 			}
 		}
+		if !m.opened {
+			m.opened = true
+			m = m.open()
+		}
 	}
-	return m.refresh()
+	next, cmd := m.refresh()
+	next.(Model).reportFocus()
+	return next, cmd
 }
 
 // InputFocused tells the shell the page swallows every key: in the terminal,
@@ -99,20 +117,35 @@ func (m Model) InputFocused() bool {
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
-	return func() tea.Msg { return spinnerRestartMsg{} }
+	return func() tea.Msg { return pageActivatedMsg{} }
 }
 
-// OnPageDeactivated detaches: only the session on screen is attached. The
-// next activation redials.
+// OnPageDeactivated detaches, since only the session on screen is attached,
+// and tells the server no session is on screen. The next activation redials.
 func (m Model) OnPageDeactivated() tea.Cmd {
 	m.attach.close()
+	r := m.focusReport()
+	r.Session = ""
+	m.reporter.report(r)
 	return nil
 }
 
 func (m Model) Init() tea.Cmd { return nil }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	next.(Model).reportFocus()
+	return next, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.FocusMsg:
+		m.focused = true
+		return m, nil
+	case tea.BlurMsg:
+		m.focused = false
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.help, _ = m.help.Update(msg)
@@ -129,8 +162,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateAttached(msg)
 	case attachStreamMsg:
 		return m.updateAttachStream(msg)
-	case spinnerRestartMsg:
-		m.ticking = false
+	case pageActivatedMsg:
+		// The spinner's tick chain died while the tab was hidden. Focus
+		// reports reach only the page on screen, and switching tabs takes
+		// the terminal's focus.
+		m.ticking, m.focused = false, true
 		return m.refresh()
 	case tea.PasteMsg:
 		if m.terminalFocused {
@@ -221,9 +257,15 @@ func (m Model) selectedID() string {
 }
 
 func (m Model) View() tea.View {
+	v := tea.NewView(m.render())
+	v.ReportFocus = true
+	return v
+}
+
+func (m Model) render() string {
 	lines := m.lines()
 	if m.width <= 0 || m.height <= 0 {
-		return tea.NewView(strings.Join(lines, "\n"))
+		return strings.Join(lines, "\n")
 	}
 	var out string
 	if m.sidebarOnScreen() {
@@ -241,7 +283,7 @@ func (m Model) View() tea.View {
 	if m.help.IsOpen {
 		out = ui.OverlayCenter(out, m.help.View(), m.width, m.height)
 	}
-	return tea.NewView(out)
+	return out
 }
 
 func (m Model) sidebarOnScreen() bool {

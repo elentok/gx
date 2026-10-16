@@ -131,7 +131,7 @@ func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 	if m.settings.Server == nil {
 		return agentsui.NewModel(nil, s)
 	}
-	return agentsui.NewModel(m.settings.Server.Client, s)
+	return agentsui.NewModel(m.settings.Server.Client, s).WithLastViewedFile(agentsui.LastViewedFile())
 }
 
 func (m Model) View() tea.View {

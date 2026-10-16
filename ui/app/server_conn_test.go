@@ -31,6 +31,15 @@ type fakeServerClient struct {
 	slow     bool
 }
 
+func (f *fakeServerClient) EventsAs(ctx context.Context, since uint64, _ string) (<-chan server.Event, error) {
+	return f.Events(ctx, since)
+}
+
+// ReportFocus is reached: the Agents tab reports on every update.
+func (f *fakeServerClient) ReportFocus(context.Context, server.FocusReport) (server.SessionResult, error) {
+	return server.SessionResult{}, nil
+}
+
 func (f *fakeServerClient) Snapshot(context.Context) (server.Snapshot, error) {
 	return server.Snapshot{}, errors.New("not needed")
 }

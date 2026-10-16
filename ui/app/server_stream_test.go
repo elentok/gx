@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -35,9 +36,10 @@ type streamFake struct {
 }
 
 type fakeStream struct {
-	since uint64
-	ctx   context.Context
-	ch    chan server.Event
+	since  uint64
+	client string
+	ctx    context.Context
+	ch     chan server.Event
 }
 
 func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
@@ -51,9 +53,13 @@ func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
 }
 
 func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
+	return f.EventsAs(ctx, since, "")
+}
+
+func (f *streamFake) EventsAs(ctx context.Context, since uint64, client string) (<-chan server.Event, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	s := &fakeStream{since: since, ctx: ctx, ch: make(chan server.Event, 16)}
+	s := &fakeStream{since: since, client: client, ctx: ctx, ch: make(chan server.Event, 16)}
 	f.streams = append(f.streams, s)
 	return s.ch, nil
 }
@@ -193,6 +199,9 @@ func TestServerStream_StartupSnapshotsAndSubscribesFromSnapshotSeq(t *testing.T)
 	}
 	if got := f.stream(0).since; got != 10 {
 		t.Errorf("subscribed since %d, want 10", got)
+	}
+	if got := f.stream(0).client; got != agentsui.FocusClient {
+		t.Errorf("subscribed as %q, want the focus client %q", got, agentsui.FocusClient)
 	}
 }
 
@@ -568,7 +577,7 @@ func TestServerStream_UnregisteredHintComesFromShellOnFirstSnapshotOnly(t *testi
 	hints := func(cmd tea.Cmd) int {
 		n := 0
 		for _, got := range toastTexts(cmd) {
-			if got.Kind == notify.KindInfo && strings.Contains(got.Message,"not in a registered project") {
+			if got.Kind == notify.KindInfo && strings.Contains(got.Message, "not in a registered project") {
 				n++
 			}
 		}

@@ -121,19 +121,28 @@ func (m Model) toggleFocus() Model {
 	return m
 }
 
-// nextNeedingAttention is the next session after the cursor, wrapping, that
-// is Actionable, or failing that Unread; the cursor when there is none.
+// nextNeedingAttention is the next session after the cursor needing
+// attention; the cursor when there is none.
 func (m Model) nextNeedingAttention() int {
+	if i := m.attentionFrom(m.cursor + 1); i >= 0 {
+		return i
+	}
+	return m.cursor
+}
+
+// attentionFrom is the first session from start, wrapping, that is
+// Actionable, or failing that Unread; -1 when there is none.
+func (m Model) attentionFrom(start int) int {
 	for _, needs := range []func(server.SessionInfo) bool{
 		isActionable,
 		func(s server.SessionInfo) bool { return s.Unread.Unread },
 	} {
-		for step := 1; step <= len(m.sessions); step++ {
-			i := (m.cursor + step) % len(m.sessions)
+		for step := range len(m.sessions) {
+			i := (start + step) % len(m.sessions)
 			if needs(m.sessions[i]) {
 				return i
 			}
 		}
 	}
-	return m.cursor
+	return -1
 }

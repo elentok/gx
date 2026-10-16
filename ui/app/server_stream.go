@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
@@ -144,7 +145,7 @@ func (m Model) subscribe(since uint64) (Model, tea.Cmd) {
 	m.stream.streamCtx, m.stream.streamStop = ctx, stop
 	client := m.settings.Server.Client
 	return m, func() tea.Msg {
-		ch, err := client.Events(ctx, since)
+		ch, err := client.EventsAs(ctx, since, agentsui.FocusClient)
 		return streamSubscribedMsg{ctx: ctx, events: ch, err: err}
 	}
 }
