@@ -15,9 +15,10 @@ import (
 
 const sidebarWidth = 30
 
-// markSlotsWidth is the Unread and Actionable slots, 2 cells each, so a
-// wide-rendering glyph never squeezes its neighbour and names stay aligned.
-const markSlotsWidth = 4
+// markSlotsWidth is a gap cell after the name, then the Unread and
+// Actionable slots, 2 cells each, so a wide-rendering glyph never squeezes
+// its neighbour and names stay aligned.
+const markSlotsWidth = 5
 
 var (
 	styleProjectHeader = lipgloss.NewStyle().Foreground(ui.ColorBlue).Bold(true)
@@ -83,7 +84,7 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 			header := styleProjectHeader.Render(icons.FolderClosed + " " + s.Project)
 			rows = append(rows, sidebarRow{text: header, session: -1})
 		}
-		row := fit(" "+m.statusIcon(s, icons)+" "+sessionLabel(s), innerW-markSlotsWidth) + marks(s, icons)
+		row := fit(" "+m.statusIcon(s, icons)+" "+sessionLabel(s), innerW-markSlotsWidth) + " " + marks(s, icons)
 		if i == m.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
