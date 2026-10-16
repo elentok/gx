@@ -34,6 +34,9 @@ const (
 	ActionTitle = "title"
 	// ActionWrite writes Control.Output as is.
 	ActionWrite = "write"
+	// ActionConversation reports Control.ConversationID as the program's
+	// conversation id, as a harness does on /clear.
+	ActionConversation = "conversation"
 )
 
 // ProgramDir holds the fake program's side channels. It is under the temp
@@ -113,13 +116,14 @@ func runProgram() (int, error) {
 		return 0, err
 	}
 	defer ctl.Close()
-	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1"}
+	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath}
 	return p.run(os.Stdin, ctl)
 }
 
 type program struct {
-	out   io.Writer
-	trust bool
+	out      io.Writer
+	trust    bool
+	convPath string
 	// esc and osc track an escape sequence on input, so the terminal's
 	// reply to the probe is not echoed as typed text.
 	esc, osc bool
@@ -194,6 +198,8 @@ func (p *program) control(c Control) error {
 		fmt.Fprint(p.out, "\x1b]0;"+c.Title+"\a")
 	case ActionWrite:
 		fmt.Fprint(p.out, c.Output)
+	case ActionConversation:
+		return os.WriteFile(p.convPath, []byte(c.ConversationID), 0o644)
 	default:
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}

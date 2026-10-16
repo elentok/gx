@@ -52,6 +52,9 @@ type Control struct {
 	// Output is the raw terminal output an ActionWrite makes the fake program
 	// write, such as a mode switch or a terminal query.
 	Output string `json:"output,omitempty"`
+	// ConversationID is the id an ActionConversation makes the fake program
+	// report.
+	ConversationID string `json:"conversation_id,omitempty"`
 }
 
 const controlType = "agentfake_control"

@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -42,6 +44,16 @@ const (
 	SessionRateLimited = "rate-limited"
 	SessionExited      = "exited"
 )
+
+// How an Exited session ended, as SessionInfo.Exit.
+const (
+	SessionExitClean   = "clean"
+	SessionExitCrashed = "crashed"
+)
+
+// holderDialTimeout bounds how long a new session's holder has to open its
+// socket before the session counts as crashed.
+const holderDialTimeout = 10 * time.Second
 
 // SessionInfo is an interactive session on the wire: everything the Agents
 // tab shows.
@@ -116,19 +128,50 @@ type sessionMeta struct {
 	// Cols and Rows are the last size the session's holder started at.
 	Cols int `json:"cols,omitempty"`
 	Rows int `json:"rows,omitempty"`
+	// Status, StatusChangedAt and Exit are the last seen Session status; an
+	// empty State is Starting since CreatedAt.
+	Status          SessionStatus `json:"status"`
+	StatusChangedAt time.Time     `json:"status_changed_at,omitzero"`
+	Exit            string        `json:"exit,omitempty"`
 }
 
 func (m sessionMeta) info() SessionInfo {
-	return SessionInfo{
+	info := SessionInfo{
 		ID:              m.ID,
 		Name:            m.Name,
 		Project:         m.Project,
 		Dir:             m.Dir,
 		Harness:         m.Harness,
 		Ticket:          m.Ticket,
-		Status:          SessionStatus{State: SessionStarting},
-		StatusChangedAt: m.CreatedAt,
+		Status:          m.Status,
+		StatusChangedAt: m.StatusChangedAt,
+		Exit:            m.Exit,
 	}
+	if info.Status.State == "" {
+		info.Status.State = SessionStarting
+	}
+	if info.StatusChangedAt.IsZero() {
+		info.StatusChangedAt = m.CreatedAt
+	}
+	return info
+}
+
+// sessionStatusOf maps a Watch's status to a Session status.
+func sessionStatusOf(st harness.Status) SessionStatus {
+	out := SessionStatus{Kind: string(st.Blocked), Message: st.Message, Background: st.Background}
+	switch st.State {
+	case harness.Working:
+		out.State = SessionWorking
+	case harness.Idle:
+		out.State = SessionIdle
+	case harness.Blocked:
+		out.State = SessionBlocked
+	case harness.RateLimited:
+		out.State = SessionRateLimited
+	default:
+		out.State = SessionStarting
+	}
+	return out
 }
 
 func sessionRefusal(reason, msg string) SessionResult {
@@ -194,6 +237,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if err := s.startSessionHolder(dir, &meta, req.Cols, req.Rows); err != nil {
 		return SessionResult{}, err
 	}
+	s.sessionWatches.start(func() { s.watchSession(dir, id) })
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
@@ -299,12 +343,11 @@ func (s *Server) listSessions() ([]SessionInfo, error) {
 		if !e.IsDir() {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(s.cfg.SessionsDir, e.Name(), sessionMetaFile))
-		if err != nil {
+		meta, err := readSessionMeta(filepath.Join(s.cfg.SessionsDir, e.Name()))
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
-		var meta sessionMeta
-		if err := json.Unmarshal(data, &meta); err != nil {
+		if err != nil {
 			s.log.Warn("unreadable session meta", "session", e.Name(), "err", err)
 			continue
 		}
@@ -316,4 +359,189 @@ func (s *Server) listSessions() ([]SessionInfo, error) {
 		out[i] = m.info()
 	}
 	return out, nil
+}
+
+func readSessionMeta(dir string) (sessionMeta, error) {
+	var meta sessionMeta
+	data, err := os.ReadFile(filepath.Join(dir, sessionMetaFile))
+	if err != nil {
+		return meta, err
+	}
+	return meta, json.Unmarshal(data, &meta)
+}
+
+// sessionWatches runs one watchSession per live session for the server's
+// lifetime.
+type sessionWatches struct {
+	mu      sync.Mutex
+	stopped bool
+	stop    chan struct{}
+	running sync.WaitGroup
+	// metaMu serializes the watches' meta read-modify-writes.
+	metaMu sync.Mutex
+}
+
+func newSessionWatches() *sessionWatches {
+	return &sessionWatches{stop: make(chan struct{})}
+}
+
+func (w *sessionWatches) start(watch func()) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.stopped {
+		return
+	}
+	w.running.Add(1)
+	go func() {
+		defer w.running.Done()
+		watch()
+	}()
+}
+
+func (w *sessionWatches) isStopped() bool {
+	select {
+	case <-w.stop:
+		return true
+	default:
+		return false
+	}
+}
+
+// close ends every watch, which records nothing for its stream's end, and
+// waits for them.
+func (w *sessionWatches) close() {
+	w.mu.Lock()
+	if !w.stopped {
+		w.stopped = true
+		close(w.stop)
+	}
+	w.mu.Unlock()
+	w.running.Wait()
+}
+
+// watchSession records the session's status and conversation id from its
+// holder's watch stream until the stream ends. A stream that ends without an
+// exit while the server is up means the holder died: Exited crashed, with no
+// retry.
+func (s *Server) watchSession(dir, id string) {
+	stream, err := s.openSessionWatch(dir)
+	if err != nil {
+		if !s.sessionWatches.isStopped() {
+			s.log.Warn("session watch", "session", id, "err", err)
+			s.recordSessionExit(dir, id, savedSessionExit(dir))
+		}
+		return
+	}
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-s.sessionWatches.stop:
+		case <-done:
+		}
+		_ = stream.Close()
+	}()
+	for {
+		msg, err := stream.Next()
+		if err != nil {
+			if !s.sessionWatches.isStopped() {
+				s.recordSessionExit(dir, id, savedSessionExit(dir))
+			}
+			return
+		}
+		switch msg.Type {
+		case nativerunner.StreamStatus:
+			st := sessionStatusOf(msg.Status)
+			s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+				changed := false
+				if m.info().Status != st {
+					m.Status, m.StatusChangedAt = st, time.Now()
+					changed = true
+				}
+				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
+					m.ConversationID = msg.ConversationID
+					changed = true
+				}
+				return changed
+			})
+		case nativerunner.StreamExit:
+			s.recordSessionExit(dir, id, sessionExitOf(msg.ExitCode))
+			return
+		}
+	}
+}
+
+func sessionExitOf(code int) string {
+	if code == 0 {
+		return SessionExitClean
+	}
+	return SessionExitCrashed
+}
+
+// savedSessionExit is the exit the holder saved before its socket went, for
+// a child that exited before the watch connected; without one the holder
+// died.
+func savedSessionExit(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, nativerunner.ExitCodeFile))
+	if err != nil {
+		return SessionExitCrashed
+	}
+	code, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return SessionExitCrashed
+	}
+	return sessionExitOf(code)
+}
+
+// openSessionWatch waits for a just-started holder's socket, then opens its
+// watch stream.
+func (s *Server) openSessionWatch(dir string) (*nativerunner.HolderWatch, error) {
+	deadline := time.Now().Add(holderDialTimeout)
+	for {
+		c, err := nativerunner.DialHolder(dir)
+		if err == nil {
+			if !c.Supports(nativerunner.OpWatch) {
+				return nil, errors.New("holder does not serve watch")
+			}
+			return c.Watch()
+		}
+		if _, statErr := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); statErr == nil {
+			return nil, errors.New("holder exited before its watch opened")
+		}
+		if time.Now().After(deadline) {
+			return nil, err
+		}
+		select {
+		case <-s.sessionWatches.stop:
+			return nil, err
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+}
+
+func (s *Server) recordSessionExit(dir, id, exit string) {
+	s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+		m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
+		return true
+	})
+}
+
+// updateSessionMeta applies change to the session's saved meta and, when it
+// reports a change, saves it and publishes it.
+func (s *Server) updateSessionMeta(dir, id string, change func(*sessionMeta) bool) {
+	s.sessionWatches.metaMu.Lock()
+	defer s.sessionWatches.metaMu.Unlock()
+	meta, err := readSessionMeta(dir)
+	if err != nil {
+		s.log.Warn("read session meta", "session", id, "err", err)
+		return
+	}
+	if !change(&meta) {
+		return
+	}
+	if err := writeSessionMeta(dir, meta); err != nil {
+		s.log.Warn("save session meta", "session", id, "err", err)
+		return
+	}
+	s.events.publish(EventSessionChanged, id)
 }

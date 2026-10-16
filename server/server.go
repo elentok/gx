@@ -240,20 +240,21 @@ type Server struct {
 	gatesRaised map[gateHold]bool // touched only by the gate watchdog
 	rewatch     func()            // set by keepFresh when the watch is active
 
-	chat         *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
-	registry     *runRegistry
-	savedRuns    []trackedRun // handles the previous server left; consumed by reclaimRuns
-	refused      refusals
-	lands        landGuard
-	trunkLocks   trunkLocks
-	mergeInto    func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
-	landedProbe  func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
-	verdicts     verdictLog
-	nudges       nudgeLimiter
-	unavailable  unavailableNotes
-	trunkMissing missingTrunks
-	kick         chan struct{}  // wakes keepClaiming
-	settling     sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
+	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
+	registry       *runRegistry
+	savedRuns      []trackedRun // handles the previous server left; consumed by reclaimRuns
+	refused        refusals
+	lands          landGuard
+	trunkLocks     trunkLocks
+	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
+	landedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
+	verdicts       verdictLog
+	nudges         nudgeLimiter
+	unavailable    unavailableNotes
+	trunkMissing   missingTrunks
+	kick           chan struct{} // wakes keepClaiming
+	sessionWatches *sessionWatches
+	settling       sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.
@@ -377,6 +378,8 @@ func New(cfg Config) (*Server, error) {
 		landedProbe: git.IsAncestor,
 		events:      events,
 		kick:        make(chan struct{}, 1),
+
+		sessionWatches: newSessionWatches(),
 	}
 	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()
@@ -603,6 +606,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Stop claiming, let a land in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
 	stopFresh()
+	s.sessionWatches.close()
 	<-freshDone
 	<-herdrDone
 	<-claimDone
