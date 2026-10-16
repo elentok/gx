@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -269,5 +270,34 @@ func TestCreate_PickerScrollsToKeepTheSelectionVisible(t *testing.T) {
 	view := ansi.Strip(m.renderCreate())
 	if !strings.Contains(view, "/r/gx/wt29 ") || strings.Contains(view, "/r/gx/wt0 ") {
 		t.Fatalf("up from the top should scroll to the end:\n%s", view)
+	}
+}
+
+func TestCreate_MatchesRankByScoreWithinAndAcrossProjects(t *testing.T) {
+	m := createModel(t, &fakeSessionClient{})
+	m.listProjects = func() ([]formProject, error) {
+		return []formProject{
+			{Name: "gx", Root: "/r/gx", Worktrees: []string{"/r/gx/t-x-a-x-b"}},
+			{Name: "web", Root: "/r/web", Worktrees: []string{"/r/web/t-x-a-x-b", "/r/web/tab"}},
+		}, nil
+	}
+	m = step(t, m, letter("c"))
+	m = typeKeys(t, m, letter("t"), letter("a"), letter("b"))
+	var got []string
+	for _, e := range m.create.matches {
+		got = append(got, e.dir)
+	}
+	want := []string{"/r/web/tab", "/r/web/t-x-a-x-b", "/r/gx/t-x-a-x-b"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("matches = %v, want %v", got, want)
+	}
+}
+
+func TestCreate_HighlightsTheMatchedLabelRunes(t *testing.T) {
+	m := step(t, createModel(t, &fakeSessionClient{}), letter("c"))
+	m = typeKeys(t, m, letter("g"), letter(" "), letter("w"), letter("t"), letter("2"))
+	e, _ := m.create.selected()
+	if !slices.Equal(e.pos, []int{6, 7, 8}) {
+		t.Fatalf("label pos = %v, want wt2 at 6..8 of /r/gx/wt2", e.pos)
 	}
 }

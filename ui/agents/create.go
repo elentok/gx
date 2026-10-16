@@ -58,6 +58,8 @@ func (p formProject) dirs() []string {
 type formEntry struct {
 	project int
 	dir     string
+	score   int
+	pos     []int // matched rune indices of the entry's label
 }
 
 func (e formEntry) newWorktree() bool { return e.dir == "" }
@@ -206,45 +208,78 @@ func (m Model) updateFormProjects(msg formProjectsMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// filter keeps the entries matching query, in project order, and selects
-// the first.
+// filter keeps the entries matching query and selects the first. Projects
+// rank by their best match and dirs by score within a project, ties keeping
+// project order; each project's new-worktree entry stays last.
 func (f *createForm) filter() {
-	f.matches = nil
+	type group struct {
+		best    int
+		entries []formEntry
+	}
+	var groups []group
 	for i, p := range f.projects {
+		var g group
 		for _, d := range append(p.dirs(), "") {
 			e := formEntry{project: i, dir: d}
-			if fuzzyMatch(f.query, f.entryText(e)) {
-				f.matches = append(f.matches, e)
+			if f.match(&e) {
+				if len(g.entries) == 0 || e.score > g.best {
+					g.best = e.score
+				}
+				g.entries = append(g.entries, e)
 			}
 		}
+		if len(g.entries) > 0 {
+			slices.SortStableFunc(g.entries, func(a, b formEntry) int {
+				if a.newWorktree() != b.newWorktree() {
+					return boolCmp(a.newWorktree(), b.newWorktree())
+				}
+				return b.score - a.score
+			})
+			groups = append(groups, g)
+		}
+	}
+	slices.SortStableFunc(groups, func(a, b group) int { return b.best - a.best })
+	f.matches = nil
+	for _, g := range groups {
+		f.matches = append(f.matches, g.entries...)
 	}
 	f.sel, f.offset = 0, 0
 }
 
-// entryText is what the query matches an entry against.
-func (f *createForm) entryText(e formEntry) string {
-	label := newWorktreeLabel
-	if !e.newWorktree() {
-		label = shortDir(e.dir)
+func boolCmp(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
 	}
-	return f.projects[e.project].Name + " " + label
+	return -1
 }
 
-// fuzzyMatch reports whether each space-separated term of query appears in
-// text in order, ignoring case.
-func fuzzyMatch(query, text string) bool {
-	text = strings.ToLower(text)
-	for _, term := range strings.Fields(strings.ToLower(query)) {
-		rest := text
-		for _, r := range term {
-			i := strings.IndexRune(rest, r)
-			if i < 0 {
-				return false
-			}
-			rest = rest[i+len(string(r)):]
+// match scores e against query over "project label", keeping the matched
+// positions that fall in the label.
+func (f *createForm) match(e *formEntry) bool {
+	name := f.projects[e.project].Name
+	score, pos, ok := fuzzyScore(f.query, name+" "+entryLabel(*e))
+	if !ok {
+		return false
+	}
+	e.score = score
+	skip := len([]rune(name)) + 1
+	for _, p := range pos {
+		if p >= skip {
+			e.pos = append(e.pos, p-skip)
 		}
 	}
 	return true
+}
+
+// entryLabel is how the picker shows e.
+func entryLabel(e formEntry) string {
+	if e.newWorktree() {
+		return newWorktreeLabel
+	}
+	return shortDir(e.dir)
 }
 
 // selected is the chosen entry; false when nothing matches.
@@ -535,9 +570,8 @@ func (m Model) renderPicker(innerW int) []string {
 			continue
 		}
 		e := f.matches[r.entry]
-		text := "    " + newWorktreeLabel
+		text := "    " + highlightRunes(entryLabel(e), e.pos)
 		if !e.newWorktree() {
-			text = "    " + shortDir(e.dir)
 			if n := m.dirSessions(e.dir); n > 0 {
 				text += ui.StyleMuted.Render("  " + plural(n, "session"))
 			}
