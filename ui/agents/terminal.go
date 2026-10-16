@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,6 +61,13 @@ func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) st
 	title := m.statusIcon(s, icons) + " " + titleStyle.Render(displayName(s)) + " " + statusLabel(s)
 	if s.Ticket != "" {
 		title += " " + styleTicket.Render(s.Ticket)
+	}
+	if a := m.attach; a != nil && a.id == s.ID && a.offset > 0 {
+		badge := fmt.Sprintf("scrolled ↑ %d", a.offset)
+		if a.newLines > 0 {
+			badge += fmt.Sprintf("  +%d new", a.newLines)
+		}
+		title += " " + styleDetail.Render(badge)
 	}
 	return title
 }

@@ -4,6 +4,7 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,6 +27,8 @@ type fakeAttach struct {
 	keys   []screen.Key
 	pastes []string
 	sizes  [][2]int
+	// log orders the keys and scrolls sent.
+	log    []string
 	closed bool
 }
 
@@ -42,8 +45,18 @@ func (f *fakeAttach) Next() (nativerunner.AttachMessage, error) {
 	}
 }
 
-func (f *fakeAttach) SendKey(k screen.Key) error { f.keys = append(f.keys, k); return nil }
-func (f *fakeAttach) Paste(text string) error    { f.pastes = append(f.pastes, text); return nil }
+func (f *fakeAttach) SendKey(k screen.Key) error {
+	f.keys = append(f.keys, k)
+	f.log = append(f.log, "key:"+k.Text)
+	return nil
+}
+
+func (f *fakeAttach) Paste(text string) error { f.pastes = append(f.pastes, text); return nil }
+
+func (f *fakeAttach) Scroll(offset int) error {
+	f.log = append(f.log, "scroll:"+strconv.Itoa(offset))
+	return nil
+}
 func (f *fakeAttach) Resize(cols, rows int) error {
 	f.sizes = append(f.sizes, [2]int{cols, rows})
 	return nil

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
@@ -21,6 +22,7 @@ type AttachStream interface {
 	SendKey(k screen.Key) error
 	Paste(text string) error
 	Resize(cols, rows int) error
+	Scroll(offset int) error
 	Close() error
 }
 
@@ -59,6 +61,8 @@ type attachment struct {
 	exited bool
 	err    error
 	rows   []string
+	// offset, scrollMax and newLines are the latest frame's scroll state.
+	offset, scrollMax, newLines int
 }
 
 func (a *attachment) close() {
@@ -155,7 +159,9 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 	}
 	switch msg.msg.Type {
 	case nativerunner.StreamFrame:
-		a.rows = applyFrame(a.rows, msg.msg.Frame)
+		f := msg.msg.Frame
+		a.rows = applyFrame(a.rows, f)
+		a.offset, a.scrollMax, a.newLines = f.ScrollOffset, f.ScrollMax, f.NewLines
 	case nativerunner.StreamExit:
 		a.ended, a.exited = true, true
 		m.terminalFocused = false
@@ -186,6 +192,7 @@ const maxPasteBytes = 1 << 20
 func (m Model) sendKey(k tea.KeyPressMsg) {
 	if a := m.attach; a != nil && a.stream != nil && !a.ended {
 		m.resizeAttach()
+		a.snapToBottom()
 		_ = a.stream.SendKey(screen.Key{Code: k.Code, Text: k.Text, Mod: k.Mod})
 	}
 }
@@ -196,9 +203,40 @@ func (m Model) sendPaste(text string) tea.Cmd {
 	}
 	if a := m.attach; a != nil && a.stream != nil && !a.ended {
 		m.resizeAttach()
+		a.snapToBottom()
 		_ = a.stream.Paste(text)
 	}
 	return nil
+}
+
+// snapToBottom returns a scrolled-back view to the live screen, so input
+// typed while reading the scrollback is never sent blind.
+func (a *attachment) snapToBottom() {
+	if a.offset > 0 {
+		a.offset, a.newLines = 0, 0
+		_ = a.stream.Scroll(0)
+	}
+}
+
+// updateWheel scrolls the panel's view through the holder when the wheel is
+// over the panel, whichever pane has focus.
+func (m Model) updateWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
+	dir, ok := ui.WheelDirection(msg)
+	a := m.attach
+	if !ok || !m.overPanel(msg.Mouse()) || a == nil || a.stream == nil || a.ended {
+		return m, nil
+	}
+	// Set locally too, so wheel ticks faster than frames still add up.
+	if offset := max(0, min(a.offset-dir*ui.WheelScrollLines, a.scrollMax)); offset != a.offset {
+		a.offset = offset
+		_ = a.stream.Scroll(offset)
+	}
+	return m, nil
+}
+
+func (m Model) overPanel(mouse tea.Mouse) bool {
+	left := m.width - m.mainWidth()
+	return mouse.X >= left && mouse.X < m.width && mouse.Y >= 0 && mouse.Y < m.height
 }
 
 // resizeAttach gives the session the panel's size. It runs on focus and
