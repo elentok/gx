@@ -53,6 +53,26 @@ func TestScroll_WheelOverThePanelScrollsInEitherFocus(t *testing.T) {
 	}
 }
 
+func TestScroll_WheelGoesToAChildThatReportsTheMouse(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	fa := h.attaches["a"]
+	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{
+		Mouse: true, ScrollMax: 100, Rows: []nativerunner.FrameRow{{Index: 0, ANSI: "claude"}},
+	}}
+	m, _ = read(t, m, next)
+
+	ox, oy := m.screenOrigin()
+	m = update1(t, m, wheel(ox+3, oy+2, tea.MouseWheelUp))
+	m = update1(t, m, wheel(ox+3, oy+2, tea.MouseWheelDown))
+	// Over the panel's header, off the screen: nowhere to send it.
+	update1(t, m, wheel(ox+3, 0, tea.MouseWheelUp))
+	if want := []string{"wheel:3,2,false", "wheel:3,2,true"}; !slices.Equal(fa.log, want) {
+		t.Fatalf("wheel sent %v, want %v", fa.log, want)
+	}
+}
+
 func TestScroll_WheelStaysInsideTheScrollback(t *testing.T) {
 	m, fa := scrollModel(t, 0, 4, 0)
 	panelX := sidebarWidth + 5

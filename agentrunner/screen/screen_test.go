@@ -425,3 +425,30 @@ func TestTitle(t *testing.T) {
 		})
 	}
 }
+
+func TestScreen_SendWheelFollowsMouseModes(t *testing.T) {
+	cases := []struct {
+		name, modes string
+		reporting   bool
+		want        string
+	}{
+		{"off", "", false, ""},
+		{"x10", "\x1b[?1000h", true, "\x1b[M`!!"},
+		{"sgr", "\x1b[?1000h\x1b[?1006h", true, "\x1b[<64;1;1M"},
+		{"turned off", "\x1b[?1000h\x1b[?1000l", false, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var out syncBuffer
+			s := screen.NewScreenWithReplies(10, 2, &out)
+			_, _ = s.Write([]byte(c.modes))
+			if got := s.MouseReporting(); got != c.reporting {
+				t.Errorf("MouseReporting() = %v, want %v", got, c.reporting)
+			}
+			s.SendWheel(0, 0, false)
+			if got := written(t, s, &out); got != c.want {
+				t.Errorf("SendWheel(up) wrote %q, want %q", got, c.want)
+			}
+		})
+	}
+}

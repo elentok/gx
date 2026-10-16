@@ -85,7 +85,8 @@ func New(repo git.Repo, settings Settings) Model {
 	}
 	m.navState.SetInitialTab(m.settings.InitialRoute)
 	initialRoute := m.navState.Active()
-	page := m.newLivePage(initialRoute)
+	// No snapshot has arrived yet, so the page has nothing to reply to.
+	page, _ := m.newLivePage(initialRoute)
 	page.didInit = true
 	page.viewState = initialRoute
 	m.livePageByTab[initialRoute.Tab] = page
@@ -226,12 +227,13 @@ func normalizeFrameContent(content string, targetWidth, targetHeight int) string
 }
 
 // newHistoryEntry builds a page and, if it uses server state, hands it the
-// current state (or the "no snapshot yet" marker).
-func (m Model) newHistoryEntry(viewState nav.ViewState) historyEntry {
+// current state (or the "no snapshot yet" marker). The command is the page's
+// reply to that state, such as the Agents tab's attach dial, and must run.
+func (m Model) newHistoryEntry(viewState nav.ViewState) (historyEntry, tea.Cmd) {
 	entry := m.buildHistoryEntry(viewState)
-	// Server-state tabs are never history pages, so the command is dropped.
-	entry.model, _ = m.withServerState(entry.model)
-	return entry
+	var cmd tea.Cmd
+	entry.model, cmd = m.withServerState(entry.model)
+	return entry, cmd
 }
 
 func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {

@@ -255,3 +255,32 @@ func TestHolderAttach_OlderHolderIsUnsupported(t *testing.T) {
 		t.Errorf("screen op = %q, %v; want the snapshot to still answer", rows, err)
 	}
 }
+
+// TestHolderAttach_WheelReachesAChildThatReportsTheMouse: frames say the
+// child turned mouse reporting on, and a wheel turn reaches it encoded for
+// its modes.
+func TestHolderAttach_WheelReachesAChildThatReportsTheMouse(t *testing.T) {
+	dir := shortTempDir(t)
+	child := `stty raw -echo; printf '\033[?1000h\033[?1006hready'; ` +
+		`head -c 10 | od -An -c | tr -d ' \n'; sleep 10`
+	c, finished := startTestHolder(t, dir, settableHarness{w: &settableWatcher{}}, []string{"sh", "-c", child})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+	waitFor(t, "the child ready", func() bool {
+		rows, _, err := c.Screen(0)
+		return err == nil && len(rows) > 0 && strings.HasPrefix(rows[0], "ready")
+	})
+	a := attach(t, c)
+	if m := nextAttach(t, a); !m.Frame.Mouse {
+		t.Fatalf("first frame = %+v, want it to say the child reports the mouse", m.Frame)
+	}
+	if err := a.Wheel(2, 0, false); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the wheel turn read by the child", func() bool {
+		rows, _, _ := c.Screen(0)
+		return len(rows) > 0 && strings.Contains(rows[0], `033[<64;3;1M`)
+	})
+}

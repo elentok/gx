@@ -54,6 +54,8 @@ type frameHub struct {
 	cols, rows int
 	// pushed is the screen's Pushed as of the last flush.
 	pushed int
+	// mouse is the screen's MouseReporting as of the last flush.
+	mouse bool
 }
 
 // attachClient is one attach's pacing state, guarded by frameHub.mu.
@@ -132,6 +134,10 @@ func (f *frameHub) flushLocked() {
 	pushed := f.scr.Pushed()
 	grown := pushed - f.pushed
 	f.pushed = pushed
+	// A mouse mode change goes out with the cursor, as frames carry both.
+	if mouse := f.scr.MouseReporting(); mouse != f.mouse {
+		f.mouse, moved = mouse, true
+	}
 	if len(dirty) == 0 && !moved && grown == 0 {
 		return
 	}
@@ -318,6 +324,7 @@ func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 		frame = c.frame(f.cursor, f.scr.StyledRows(), slices.Sorted(maps.Keys(c.rows)))
 		frame.ScrollMax = f.scr.ScrollbackLen()
 	}
+	frame.Mouse = f.mouse
 	clear(c.rows)
 	c.moved = false
 	c.full = false
@@ -338,6 +345,7 @@ func (f *frameHub) fullFrameLocked(c *attachClient) Frame {
 		frame.ScrollMax = f.scr.ScrollbackLen()
 	}
 	frame.Full = true
+	frame.Mouse = f.mouse
 	return frame
 }
 
@@ -456,6 +464,11 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 					var s AttachScroll
 					if err = json.Unmarshal(payload, &s); err == nil {
 						err = h.frames.scroll(client, s.Offset)
+					}
+				case StreamWheel:
+					var w AttachWheel
+					if err = json.Unmarshal(payload, &w); err == nil {
+						h.scr.SendWheel(w.X, w.Y, w.Down)
 					}
 				case StreamCopy:
 					var c AttachCopy
@@ -615,6 +628,12 @@ func (a *HolderAttach) Resize(cols, rows int) error {
 // Scroll sets this attach's scroll offset, in lines above the screen's top.
 func (a *HolderAttach) Scroll(offset int) error {
 	return a.Send(StreamScroll, AttachScroll{Offset: offset})
+}
+
+// Wheel turns the wheel down, or up, over the child's cell (x, y), for a
+// child whose frames say it reports the mouse.
+func (a *HolderAttach) Wheel(x, y int, down bool) error {
+	return a.Send(StreamWheel, AttachWheel{X: x, Y: y, Down: down})
 }
 
 // Copy asks for the plain text from start up to end; Next returns it as a

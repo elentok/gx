@@ -143,9 +143,9 @@ func (m Model) handleOpen(vs nav.ViewState, notifyCmd tea.Cmd) (Model, tea.Cmd) 
 	} else {
 		outgoing = m.livePageByTab[m.navState.LiveTab()].model
 	}
-	entry := m.newHistoryEntry(tabVS)
+	entry, stateCmd := m.newHistoryEntry(tabVS)
 	m.history = append(m.history, entry)
-	return m, tea.Batch(notifyCmd, tea.ClearScreen, onPageDeactivatedCmd(outgoing), entry.model.Init(), m.resizeCurrentCmd())
+	return m, tea.Batch(notifyCmd, tea.ClearScreen, onPageDeactivatedCmd(outgoing), entry.model.Init(), stateCmd, m.resizeCurrentCmd())
 }
 
 func (m Model) handleBack(notifyCmd tea.Cmd) (Model, tea.Cmd) {

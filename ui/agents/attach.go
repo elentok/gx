@@ -24,6 +24,7 @@ type AttachStream interface {
 	Paste(text string) error
 	Resize(cols, rows int) error
 	Scroll(offset int) error
+	Wheel(x, y int, down bool) error
 	Copy(start, end nativerunner.LinePos) error
 	Close() error
 }
@@ -76,6 +77,8 @@ type attachment struct {
 	cursor nativerunner.FrameCursor
 	// offset, scrollMax and newLines are the latest frame's scroll state.
 	offset, scrollMax, newLines int
+	// mouse: the latest frame says the child reports the mouse.
+	mouse bool
 }
 
 func (a *attachment) close() {
@@ -225,6 +228,7 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 		a.rows = applyFrame(a.rows, f)
 		a.cursor = f.Cursor
 		a.offset, a.scrollMax, a.newLines = f.ScrollOffset, f.ScrollMax, f.NewLines
+		a.mouse = f.Mouse
 	case nativerunner.StreamExit:
 		a.ended, a.exited = true, true
 		m.terminalFocused = false
@@ -291,12 +295,20 @@ func (a *attachment) snapToBottom() {
 	}
 }
 
-// updateWheel scrolls the panel's view through the holder when the wheel is
-// over the panel, whichever pane has focus.
+// updateWheel handles the wheel over the panel, whichever pane has focus: a
+// child that reports the mouse gets it over its screen, as with tmux, since
+// one in the alternate screen (claude) has no scrollback; otherwise it
+// scrolls the panel's view through the holder.
 func (m Model) updateWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 	dir, ok := ui.WheelDirection(msg)
 	a := m.attach
 	if !ok || !m.overPanel(msg.Mouse()) || !a.live() {
+		return m, nil
+	}
+	if a.mouse && a.offset == 0 {
+		if x, y, ok := m.screenCell(msg.Mouse()); ok {
+			a.write(func(s AttachStream) error { return s.Wheel(x, y, dir > 0) })
+		}
 		return m, nil
 	}
 	// Set locally too, so wheel ticks faster than frames still add up.

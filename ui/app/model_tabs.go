@@ -77,13 +77,14 @@ func (m Model) switchToTab(tabVS, prevVS nav.ViewState) (Model, tea.Cmd) {
 	// Reconstruct when: no cached model, or the destination tab's view context changed
 	// (e.g. different worktree or ref) since the cached model was created.
 	if currentPage.model == nil || !navstate.SameViewContext(currentPage.viewState.Context(), tabVS.Context()) {
-		currentPage = m.newLivePage(tabVS)
+		var stateCmd tea.Cmd
+		currentPage, stateCmd = m.newLivePage(tabVS)
 		currentPage.didInit = true
 		currentPage.viewState = tabVS
 		m.livePageByTab[tabVS.Tab] = currentPage
 		// Init loads fresh data; stamp the tab so it won't auto-reload on the next switch.
 		m.gate.MarkLoaded(tabVS.Tab)
-		return m, tea.Batch(onPageDeactivatedCmd(outgoing), currentPage.model.Init(), m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
+		return m, tea.Batch(onPageDeactivatedCmd(outgoing), currentPage.model.Init(), stateCmd, m.resizeCurrentCmd(), onPageActivatedCmd(currentPage.model))
 	}
 	if !currentPage.didInit {
 		currentPage.didInit = true
@@ -294,10 +295,9 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 	return current, tea.Batch(cmds...)
 }
 
-func (m Model) newLivePage(viewState nav.ViewState) livePage {
-	return livePage{
-		model: m.newHistoryEntry(viewState).model,
-	}
+func (m Model) newLivePage(viewState nav.ViewState) (livePage, tea.Cmd) {
+	entry, cmd := m.newHistoryEntry(viewState)
+	return livePage{model: entry.model}, cmd
 }
 
 func (m Model) tabsView() string {

@@ -34,6 +34,10 @@ const (
 	TUITrustDropKeyEnv = "GX_AGENTFAKE_TUI_TRUST_DROP_KEY"
 	// TUINoPidFileEnv, set to "1", never writes the pid status file.
 	TUINoPidFileEnv = "GX_AGENTFAKE_TUI_NO_PID_FILE"
+	// TUIMouseEnv, set to "1", runs in the alternate screen with SGR mouse
+	// reporting on, as claude does, and counts the wheel events it reads on
+	// screen. An Esc then only interrupts as part of a sequence.
+	TUIMouseEnv = "GX_AGENTFAKE_TUI_MOUSE"
 )
 
 // ActionExit makes the TUI fake exit with Control.Code.
@@ -117,6 +121,7 @@ type tuiOptions struct {
 	trust     bool
 	dropKey   bool
 	noPidFile bool
+	mouse     bool
 }
 
 // parseTUIArgs accepts exactly the PTY runner's launch flags, so a new flag
@@ -138,6 +143,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		trust:     os.Getenv(TUITrustEnv) == "1",
 		dropKey:   os.Getenv(TUITrustDropKeyEnv) == "1",
 		noPidFile: os.Getenv(TUINoPidFileEnv) == "1",
+		mouse:     os.Getenv(TUIMouseEnv) == "1",
 	}, nil
 }
 
@@ -214,6 +220,10 @@ type tui struct {
 	arrow    []byte
 	typed    strings.Builder
 	prompt   string
+	// seq collects an escape sequence in mouse mode; wheelUp and wheelDown
+	// count the wheel events read.
+	seq                []byte
+	wheelUp, wheelDown int
 }
 
 // tuiEvent is one key from the terminal, one control, or the end of input.
@@ -225,6 +235,9 @@ type tuiEvent struct {
 
 func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 	events := tuiEvents(in, ctl)
+	if t.opts.mouse {
+		fmt.Fprint(t.out, "\x1b[?1049h\x1b[?1000h\x1b[?1006h")
+	}
 	if t.opts.trust {
 		t.draw()
 	} else if err := t.startSession(); err != nil {
@@ -248,6 +261,10 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 		case t.opts.trust:
 			if quit, err := t.trustKey(ev.key); quit || err != nil {
 				return 1, err
+			}
+		case t.opts.mouse && (ev.key == escKey || len(t.seq) > 0):
+			if err := t.mouseSeqKey(ev.key); err != nil {
+				return 0, err
 			}
 		case ev.key == '\r' || ev.key == '\n':
 			if err := t.submit(); err != nil {
@@ -296,6 +313,28 @@ func tuiEvents(in io.Reader, ctl io.Reader) <-chan tuiEvent {
 		}
 	}()
 	return events
+}
+
+// mouseSeqKey collects an escape sequence: an SGR mouse report counts its
+// wheel turns; anything else is an Esc, and interrupts.
+func (t *tui) mouseSeqKey(key byte) error {
+	t.seq = append(t.seq, key)
+	s := string(t.seq)
+	if s == "\x1b" || s == "\x1b[" || (strings.HasPrefix(s, "\x1b[<") && key != 'M' && key != 'm') {
+		return nil
+	}
+	t.seq = nil
+	if !strings.HasPrefix(s, "\x1b[<") {
+		return t.interrupt()
+	}
+	switch button, _, _ := strings.Cut(s[len("\x1b[<"):], ";"); button {
+	case "64":
+		t.wheelUp++
+	case "65":
+		t.wheelDown++
+	}
+	t.draw()
+	return nil
 }
 
 // trustKey takes one key at the trust dialog and reports whether it picked
@@ -487,6 +526,9 @@ func (t *tui) draw() {
 		rows = []string{"> " + t.prompt, "✻ Working…"}
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
+	}
+	if t.opts.mouse {
+		rows = append(rows, fmt.Sprintf("wheel up %d down %d", t.wheelUp, t.wheelDown))
 	}
 	fmt.Fprint(t.out, "\x1b[2J\x1b[H"+title+strings.Join(rows, "\r\n"))
 }

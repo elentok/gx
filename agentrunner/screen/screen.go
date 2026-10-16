@@ -68,6 +68,8 @@ type Screen struct {
 	allDirty bool
 	// pushed counts the lines ever pushed to the main screen's scrollback.
 	pushed int
+	// mouse is the mouse reporting modes the child turned on.
+	mouse map[ansi.Mode]bool
 }
 
 // NewScreen returns a cols×rows screen whose replies to terminal queries are
@@ -85,10 +87,12 @@ func NewScreenWithReplies(cols, rows int, replies io.Writer) *Screen {
 	}
 	emu := vt.NewEmulator(cols, rows)
 	emu.SetScrollbackSize(scrollbackLines + scrollbackSlack)
-	s := &Screen{emu: emu, drained: make(chan struct{}), cursorVisible: true}
+	s := &Screen{emu: emu, drained: make(chan struct{}), cursorVisible: true, mouse: map[ansi.Mode]bool{}}
 	emu.SetCallbacks(vt.Callbacks{
 		CursorVisibility: func(visible bool) { s.cursorVisible = visible },
 		AltScreen:        func(bool) { s.allDirty = true },
+		EnableMode:       func(m ansi.Mode) { s.setMouseMode(m, true) },
+		DisableMode:      func(m ansi.Mode) { s.setMouseMode(m, false) },
 	})
 	// The emulator writes replies and encoded input into a pipe, and an
 	// undrained pipe blocks the next Write that triggers one.
@@ -312,6 +316,38 @@ func (s *Screen) SendKey(k Key) {
 		return
 	}
 	s.emu.SendKey(uv.KeyPressEvent(k))
+}
+
+func (s *Screen) setMouseMode(m ansi.Mode, on bool) {
+	switch m {
+	case ansi.ModeMouseX10, ansi.ModeMouseNormal, ansi.ModeMouseHighlight, ansi.ModeMouseButtonEvent, ansi.ModeMouseAnyEvent:
+		if on {
+			s.mouse[m] = true
+		} else {
+			delete(s.mouse, m)
+		}
+	}
+}
+
+// MouseReporting reports whether the child turned on mouse reporting, so it
+// takes the wheel as mouse events.
+func (s *Screen) MouseReporting() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.mouse) > 0
+}
+
+// SendWheel encodes a wheel turn over cell (x, y), down or up, for the
+// child's mouse modes and writes it to the replies writer. Without mouse
+// reporting it writes nothing.
+func (s *Screen) SendWheel(x, y int, down bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	button := vt.MouseWheelUp
+	if down {
+		button = vt.MouseWheelDown
+	}
+	s.emu.SendMouse(vt.MouseWheel{X: x, Y: y, Button: button})
 }
 
 // Paste writes text to the replies writer, bracketed when the child turned on

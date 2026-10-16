@@ -38,6 +38,9 @@ const (
 	// StreamCopy is a client's AttachCopy request on an attach, and the
 	// holder's streamCopied reply.
 	StreamCopy
+	// StreamWheel is a wheel turn a client sends on an attach, as an
+	// AttachWheel, for a child that reports the mouse.
+	StreamWheel
 )
 
 // maxStreamPayload bounds one stream message; a bigger one ends the stream
@@ -125,6 +128,9 @@ type Frame struct {
 	ScrollMax    int `json:"scroll_max"`
 	// NewLines counts the lines output since the attach scrolled up.
 	NewLines int `json:"new_lines,omitempty"`
+	// Mouse is whether the child reports the mouse, so the wheel belongs to
+	// it rather than to the scrollback.
+	Mouse bool `json:"mouse,omitempty"`
 }
 
 type FrameCursor struct {
@@ -164,6 +170,14 @@ type AttachResize struct {
 // while it is above zero, output grows it so the view stays on its lines.
 type AttachScroll struct {
 	Offset int `json:"offset"`
+}
+
+// AttachWheel is StreamWheel's payload: a turn down, or up, over the
+// child's cell (X, Y).
+type AttachWheel struct {
+	X    int  `json:"x"`
+	Y    int  `json:"y"`
+	Down bool `json:"down,omitempty"`
 }
 
 // AttachCopy is a StreamCopy request: the plain text from Start up to, not

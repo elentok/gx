@@ -161,11 +161,27 @@ func (m Model) terminalCursor() *tea.Cursor {
 	if cols, rows := m.screenSize(); a.cursor.X >= cols || a.cursor.Y >= rows {
 		return nil
 	}
-	// Past the sidebar and seam and the panel's padding, below its header
-	// and the info lines.
-	x := m.width - m.mainWidth() + 1 + a.cursor.X
-	y := 1 + len(infoLines(m.sessions[m.cursor])) + a.cursor.Y
-	return tea.NewCursor(x, y)
+	x, y := m.screenOrigin()
+	return tea.NewCursor(x+a.cursor.X, y+a.cursor.Y)
+}
+
+// screenOrigin is where the session's screen starts on the page: past the
+// sidebar and seam and the panel's padding, below its header and the info
+// lines.
+func (m Model) screenOrigin() (x, y int) {
+	y = 1
+	if m.cursor < len(m.sessions) {
+		y += len(infoLines(m.sessions[m.cursor]))
+	}
+	return m.width - m.mainWidth() + 1, y
+}
+
+// screenCell is the session's screen cell under mouse; false off the screen.
+func (m Model) screenCell(mouse tea.Mouse) (x, y int, ok bool) {
+	ox, oy := m.screenOrigin()
+	cols, rows := m.screenSize()
+	x, y = mouse.X-ox, mouse.Y-oy
+	return x, y, x >= 0 && x < cols && y >= 0 && y < rows
 }
 
 // infoLines is the info row then a blank row, or none without an info row.

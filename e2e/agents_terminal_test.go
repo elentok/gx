@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 var (
@@ -63,7 +64,9 @@ type agentsEnv struct {
 	env, serverEnv []string
 }
 
-func newAgentsEnv(t *testing.T) *agentsEnv {
+// newAgentsEnv starts the server with extraEnv added, which reaches the
+// sessions' claude, such as the TUI fake's launch knobs.
+func newAgentsEnv(t *testing.T, extraEnv ...string) *agentsEnv {
 	t.Helper()
 	root, err := os.MkdirTemp("", "gxa")
 	if err != nil {
@@ -82,7 +85,7 @@ func newAgentsEnv(t *testing.T) *agentsEnv {
 			e.serverEnv = append(e.serverEnv, kv)
 		}
 	}
-	e.serverEnv = append(e.serverEnv, e.env...)
+	e.serverEnv = append(append(e.serverEnv, e.env...), extraEnv...)
 
 	store := filepath.Join(root, "data", "gx", "tickets")
 	servertest.WriteTicket(t, store, e.project, "some-epic", "01", "tiny", "")
@@ -275,12 +278,18 @@ func (v *vtTerm) cursor() (x, y int, visible bool) {
 // the session's screen.
 func openAgentsTab(t *testing.T, e *agentsEnv) *vtTerm {
 	t.Helper()
-	cmd := exec.Command(e.bin, "agents")
-	cmd.Dir = e.repo
-	cmd.Env = append(os.Environ(), append(e.env, "TERM=xterm-256color")...)
-	v := startVTTerm(t, cmd, 140, 40)
+	v := startTUI(t, e, "agents")
 	v.waitText("Welcome to Claude Code", 30*time.Second)
 	return v
+}
+
+// startTUI runs gx with args against e's server in a pty.
+func startTUI(t *testing.T, e *agentsEnv, args ...string) *vtTerm {
+	t.Helper()
+	cmd := exec.Command(e.bin, args...)
+	cmd.Dir = e.repo
+	cmd.Env = append(os.Environ(), append(e.env, "TERM=xterm-256color")...)
+	return startVTTerm(t, cmd, 140, 40)
 }
 
 // TestAgentsTerminal_ShowsTheAgentsColors: a launchd server has no TERM, and
@@ -344,4 +353,30 @@ func TestAgentsTerminal_WheelNeverReachesTheAgentAsArrows(t *testing.T) {
 	// all it read: arrow keys would show before the x.
 	v.send("x")
 	v.waitText("> x", 10*time.Second)
+}
+
+// TestAgentsTerminal_WheelReachesAnAgentThatReportsTheMouse: an agent in the
+// alternate screen, as claude runs, has no scrollback for gx to scroll; with
+// mouse reporting on it gets the wheel as mouse events and scrolls itself.
+func TestAgentsTerminal_WheelReachesAnAgentThatReportsTheMouse(t *testing.T) {
+	e := newAgentsEnv(t, agentfake.TUIMouseEnv+"=1")
+	e.createSession()
+	v := openAgentsTab(t, e)
+
+	x, y := v.waitText("wheel up 0 down 0", 5*time.Second)
+	v.wheelUp(x, y)
+	v.waitText("wheel up 1 down 0", 10*time.Second)
+}
+
+// TestAgentsTerminal_AttachesWhenSwitchedToAfterTheStateLoaded: the Agents
+// page built on a tab switch, with the server's state already loaded, must
+// still dial the selected session's live screen.
+func TestAgentsTerminal_AttachesWhenSwitchedToAfterTheStateLoaded(t *testing.T) {
+	e := newAgentsEnv(t)
+	e.createSession()
+	v := startTUI(t, e, "tickets")
+	v.waitText("tiny", 30*time.Second)
+
+	v.send("8") // the Agents tab
+	v.waitText("Welcome to Claude Code", 10*time.Second)
 }
