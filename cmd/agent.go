@@ -27,22 +27,25 @@ func newAgentCmd(d deps) *cobra.Command {
 }
 
 func newAgentHolderCmd() *cobra.Command {
-	var sessionID, gxSession, dir, kind string
+	var sessionID, dir, kind string
+	var opts nativerunner.HolderOptions
 	cmd := &cobra.Command{
-		Use:   "agent-holder --session-id <uuid> [--harness <name>] [--gx-session <id>] --dir <agent-dir> -- <cmd...>",
-		Short: "run a pty agent and record its output (started by the pty runner)",
+		Use:   "agent-holder --session-id <uuid> [--harness <name>] [--gx-session <id>] [--cols N --rows N] --dir <agent-dir> -- <cmd...>",
+		Short: "run a pty agent and record its output (started by the pty runner and the server)",
 		// Internal helper; the pty runner launches it under setsid.
 		Hidden: true,
 		Args:   cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return nativerunner.RunHarnessHolder(dir, agentrunner.Kind(kind), gxSession, args)
+			return nativerunner.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, args)
 		},
 	}
+	cmd.Flags().IntVar(&opts.Cols, "cols", 0, "the pty's width (default the loop's)")
+	cmd.Flags().IntVar(&opts.Rows, "rows", 0, "the pty's height (default the loop's)")
 	// The session id is unused here: it only puts the id in the holder's
 	// cmdline, which the liveness check requires.
 	cmd.Flags().StringVar(&sessionID, "session-id", "", "the agent's session id")
 	cmd.Flags().StringVar(&kind, "harness", string(harness.Claude), "the harness that watches the agent")
-	cmd.Flags().StringVar(&gxSession, "gx-session", "", "the gx session id, set as "+nativerunner.AgentSessionEnv+" in the agent's env")
+	cmd.Flags().StringVar(&opts.GXSession, "gx-session", "", "the gx session id, set as "+nativerunner.AgentSessionEnv+" in the agent's env")
 	cmd.Flags().StringVar(&dir, "dir", "", "the agent directory")
 	_ = cmd.MarkFlagRequired("session-id")
 	_ = cmd.MarkFlagRequired("dir")

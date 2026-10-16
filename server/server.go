@@ -143,6 +143,12 @@ type Config struct {
 	// ConfigPath is the config file a reload reads; empty means reload is
 	// unavailable.
 	ConfigPath string
+	// SessionsDir holds one state dir per interactive session; empty means
+	// <gx data dir>/sessions.
+	SessionsDir string
+	// Holder is the command that hosts an interactive session; nil means
+	// this executable's agent-holder.
+	Holder []string
 	// AgentRunner is the config agent-runner value the server started with;
 	// a reload only compares against it.
 	AgentRunner string
@@ -258,6 +264,13 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()
+	}
+	if cfg.SessionsDir == "" {
+		data, err := config.DataDir()
+		if err != nil {
+			return nil, err
+		}
+		cfg.SessionsDir = filepath.Join(data, "sessions")
 	}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return nil, err
@@ -422,6 +435,9 @@ var routeTable = []struct {
 	{"POST /v1/agents/prompt", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentPrompt)(w, r) }},
 	{"POST /v1/agents/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentInterrupt)(w, r) }},
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentAnswer)(w, r) }},
+	// Interactive sessions; /v1/agents/* is the loop agents'.
+	{"GET /v1/sessions", (*Server).sessionsRead},
+	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
@@ -470,6 +486,11 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Pending = s.pendingRows()
 	snap.Mode = s.pause.currentMode()
+	sessions, err := s.listSessions()
+	if err != nil {
+		s.log.Warn("list sessions for snapshot", "err", err)
+	}
+	snap.Sessions = sessions
 	_ = json.NewEncoder(w).Encode(snap)
 }
 

@@ -50,7 +50,7 @@ func programCommand(flag, conversationID string, opts harness.LaunchOptions) har
 	}
 }
 
-func (Harness) Watch(pid int, _ time.Time, _ <-chan struct{}) (harness.Watcher, error) {
+func (Harness) Watch(pid int, _ time.Time, _ harness.Screen, _ <-chan struct{}) (harness.Watcher, error) {
 	return &programWatcher{pid: pid}, nil
 }
 

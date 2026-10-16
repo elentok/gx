@@ -23,6 +23,7 @@ import (
 const testFlushInterval = 100 * time.Millisecond
 
 func TestMain(m *testing.M) {
+	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
 	os.Exit(m.Run())
 }

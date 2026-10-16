@@ -22,8 +22,8 @@ type capturingHarness struct {
 	watchers chan harness.Watcher
 }
 
-func (h capturingHarness) Watch(pid int, spawned time.Time, stop <-chan struct{}) (harness.Watcher, error) {
-	w, err := h.Harness.Watch(pid, spawned, stop)
+func (h capturingHarness) Watch(pid int, spawned time.Time, scr harness.Screen, stop <-chan struct{}) (harness.Watcher, error) {
+	w, err := h.Harness.Watch(pid, spawned, scr, stop)
 	h.watchers <- w
 	return w, err
 }
@@ -55,7 +55,7 @@ func holdProgram(t *testing.T, cmd harness.Command, conv string, env ...string) 
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	p := &heldProgram{t: t, dir: dir, conv: conv, done: make(chan error, 1)}
 	go func() {
-		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, "", append([]string{cmd.Name}, cmd.Args...))
+		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, nativerunner.HolderOptions{}, append([]string{cmd.Name}, cmd.Args...))
 	}()
 	select {
 	case p.watcher = <-watchers:

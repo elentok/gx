@@ -163,6 +163,7 @@ Run without a command to open the status UI.`,
 
 	root.AddCommand(
 		newAgentCmd(d),
+		newAgentsCmd(),
 		newClaudeCmd(d),
 		newWorktreesCmd(d),
 		newPushCmd(d),

@@ -34,6 +34,7 @@ type Harness struct {
 	Server      *server.Server // for reading the run registry; drive everything else through Client
 	Herdr       *herdrfake.State
 	StateDir    string
+	SessionsDir string // the interactive sessions' state dirs
 	TicketStore string
 	TCPAddr     string // empty unless started with StartWithTCP
 	// Banners records the OS banners the server sent, unless an option set
@@ -365,8 +366,11 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h := &Harness{
 		Herdr:       herdrfake.NewState(t),
 		StateDir:    filepath.Join(stateDir, "state"),
+		SessionsDir: filepath.Join(stateDir, "sessions"),
 		TicketStore: store,
 	}
+	// Runs before the temp dir goes, so no session holder outlives the test.
+	t.Cleanup(func() { stopSessionHolders(h.SessionsDir) })
 	h.herdrDown.Store(herdrDown)
 	// The server's herdr probe is `workspace list`; answer it unless told to fail.
 	h.Herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -377,7 +381,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	})
 	herdrfake.StartState(t, h.Herdr)
 
-	h.cfg = server.Config{StateDir: h.StateDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
+	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	// Every land pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }

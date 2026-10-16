@@ -1,0 +1,71 @@
+package servertest
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil/agentfake"
+)
+
+// holderArg is the first argument that runs the test binary as a holder. An
+// argument, not an env var: the holder's child inherits its env.
+const holderArg = "servertest-agent-holder"
+
+// WithTestHolder hosts interactive sessions in the test binary itself, whose
+// TestMain must call RunSessionProcesses. Pair it with the fake harness
+// (agentfake.HarnessKind) so no session runs claude.
+func WithTestHolder() func(*server.Config) {
+	return func(c *server.Config) { c.Holder = []string{os.Args[0], holderArg} }
+}
+
+// RunSessionProcesses registers the fake harness and, when the test binary
+// was started as a session's holder or as the fake harness's program, runs
+// that and exits. Call it first in TestMain.
+func RunSessionProcesses() {
+	agentfake.RegisterHarness()
+	if len(os.Args) > 1 && os.Args[1] == holderArg {
+		if err := runTestHolder(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	// After the holder check: the holder's env carries the program's marker.
+	if os.Getenv(agentfake.ProgramEnv) == "1" {
+		agentfake.Program()
+	}
+}
+
+// runTestHolder parses `gx agent-holder`'s flags.
+func runTestHolder(args []string) error {
+	fs := flag.NewFlagSet(holderArg, flag.ContinueOnError)
+	var dir, kind string
+	var opts nativerunner.HolderOptions
+	fs.String("session-id", "", "")
+	fs.StringVar(&kind, "harness", "", "")
+	fs.StringVar(&opts.GXSession, "gx-session", "", "")
+	fs.IntVar(&opts.Cols, "cols", 0, "")
+	fs.IntVar(&opts.Rows, "rows", 0, "")
+	fs.StringVar(&dir, "dir", "", "")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return nativerunner.RunHarnessHolder(dir, agentrunner.Kind(kind), opts, fs.Args())
+}
+
+// stopSessionHolders stops every live holder under dir.
+func stopSessionHolders(dir string) {
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		c, err := nativerunner.DialHolder(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		_ = c.Stop()
+	}
+}

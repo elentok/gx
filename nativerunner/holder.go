@@ -48,16 +48,34 @@ var holderAfterExit = func() {}
 
 // RunHolder runs a claude holder; see RunHarnessHolder.
 func RunHolder(dir string, argv []string) error {
-	return RunHarnessHolder(dir, harness.Claude, "", argv)
+	return RunHarnessHolder(dir, harness.Claude, HolderOptions{}, argv)
+}
+
+// HolderOptions are a holder's optional parts.
+type HolderOptions struct {
+	// GXSession, when set, goes into the child's env as AgentSessionEnv.
+	GXSession string
+	// Cols and Rows size the pty; zero means HolderCols and HolderRows.
+	Cols, Rows int
+}
+
+func (o HolderOptions) size() (cols, rows int) {
+	cols, rows = o.Cols, o.Rows
+	if cols <= 0 {
+		cols = HolderCols
+	}
+	if rows <= 0 {
+		rows = HolderRows
+	}
+	return cols, rows
 }
 
 // RunHarnessHolder runs argv in a pty, appends its output to raw.log in dir
 // and feeds it to a screen, while kind's harness watches the child. Once the
 // child exits it saves the last screen and the exit code to dir and returns.
-// A non-empty gxSession goes into the child's env as AgentSessionEnv. The
-// caller starts the holder in its own session, so it outlives whoever
+// The caller starts the holder in its own session, so it outlives whoever
 // launched it.
-func RunHarnessHolder(dir string, kind agentrunner.Kind, gxSession string, argv []string) error {
+func RunHarnessHolder(dir string, kind agentrunner.Kind, opts HolderOptions, argv []string) error {
 	if len(argv) == 0 {
 		return errors.New("agent-holder: no command to run")
 	}
@@ -65,17 +83,18 @@ func RunHarnessHolder(dir string, kind agentrunner.Kind, gxSession string, argv 
 	if err != nil {
 		return err
 	}
-	return runHolder(dir, h, gxSession, argv)
+	return runHolder(dir, h, opts, argv)
 }
 
-func runHolder(dir string, h harness.Harness, gxSession string, argv []string) error {
+func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string) error {
 	rawLog, err := os.OpenFile(filepath.Join(dir, RawLogFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
 	}
 	defer rawLog.Close()
 
-	scr := screen.NewScreen(HolderCols, HolderRows)
+	cols, rows := opts.size()
+	scr := screen.NewScreen(cols, rows)
 	defer scr.Close()
 
 	ptmx, tty, err := pty.Open()
@@ -86,7 +105,7 @@ func runHolder(dir string, h harness.Harness, gxSession string, argv []string) e
 	// Fd makes reads blocking, so Close never waits on the reader, which a
 	// grandchild still holding the tty keeps blocked.
 	_ = ptmx.Fd()
-	if err := pty.Setsize(ptmx, &pty.Winsize{Cols: HolderCols, Rows: HolderRows}); err != nil {
+	if err := pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}); err != nil {
 		_ = tty.Close()
 		return err
 	}
@@ -100,8 +119,8 @@ func runHolder(dir string, h harness.Harness, gxSession string, argv []string) e
 	defer ln.Close()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
-	if gxSession != "" {
-		cmd.Env = append(os.Environ(), AgentSessionEnv+"="+gxSession)
+	if opts.GXSession != "" {
+		cmd.Env = append(os.Environ(), AgentSessionEnv+"="+opts.GXSession)
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 	spawned := time.Now()

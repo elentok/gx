@@ -154,7 +154,7 @@ type settableHarness struct {
 	w *settableWatcher
 }
 
-func (h settableHarness) Watch(int, time.Time, <-chan struct{}) (agentharness.Watcher, error) {
+func (h settableHarness) Watch(int, time.Time, agentharness.Screen, <-chan struct{}) (agentharness.Watcher, error) {
 	return h.w, nil
 }
 

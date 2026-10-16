@@ -339,6 +339,21 @@ func (c *Client) queueWriteTo(ctx context.Context, path string, req server.Queue
 	return res, err
 }
 
+// CreateSession starts an interactive session. A refusal is a result
+// (Refused set), not an error.
+func (c *Client) CreateSession(ctx context.Context, req server.CreateSessionRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/create", req, &res)
+	return res, err
+}
+
+// Sessions lists the interactive sessions.
+func (c *Client) Sessions(ctx context.Context) ([]server.SessionInfo, error) {
+	var l []server.SessionInfo
+	err := c.get(ctx, "/v1/sessions", &l)
+	return l, err
+}
+
 // BudgetOverride lifts the budget latches. A refusal is a result (Refused set),
 // not an error.
 func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error) {

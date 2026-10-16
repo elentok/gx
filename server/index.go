@@ -77,6 +77,9 @@ type Snapshot struct {
 	// Mode is ModeRunning, ModePaused or ModeDraining; filled in by the handler.
 	// Empty from a server that predates it.
 	Mode string `json:"mode,omitempty"`
+	// Sessions are the interactive sessions, oldest first; filled in by the
+	// handler.
+	Sessions []SessionInfo `json:"sessions"`
 }
 
 // index is the server's in-memory view of the ticket store.
