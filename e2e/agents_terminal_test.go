@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -138,7 +139,14 @@ type vtTerm struct {
 	mu            sync.Mutex
 	emu           *vt.Emulator
 	cursorVisible bool
+	// mouseTracking is whether the command turned on mouse reporting; tail
+	// keeps a mode sequence split across reads whole.
+	mouseTracking bool
+	tail          []byte
 }
+
+// mouseModeSeq is a DEC private mode set or reset.
+var mouseModeSeq = regexp.MustCompile(`\x1b\[\?([0-9;]+)([hl])`)
 
 func startVTTerm(t *testing.T, cmd *exec.Cmd, cols, rows int) *vtTerm {
 	t.Helper()
@@ -156,6 +164,7 @@ func startVTTerm(t *testing.T, cmd *exec.Cmd, cols, rows int) *vtTerm {
 			if n > 0 {
 				v.mu.Lock()
 				_, _ = v.emu.Write(buf[:n])
+				v.trackMouseModes(buf[:n])
 				v.mu.Unlock()
 			}
 			if err != nil {
@@ -169,6 +178,36 @@ func startVTTerm(t *testing.T, cmd *exec.Cmd, cols, rows int) *vtTerm {
 		_ = ptmx.Close()
 	})
 	return v
+}
+
+// trackMouseModes follows the mouse reporting modes in the command's output,
+// which the emulator keeps to itself.
+func (v *vtTerm) trackMouseModes(out []byte) {
+	data := append(v.tail, out...)
+	for _, m := range mouseModeSeq.FindAllSubmatch(data, -1) {
+		for mode := range strings.SplitSeq(string(m[1]), ";") {
+			if mode == "1000" || mode == "1002" || mode == "1003" {
+				v.mouseTracking = string(m[2]) == "h"
+			}
+		}
+	}
+	v.tail = append([]byte(nil), data[max(0, len(data)-16):]...)
+}
+
+// wheelUp turns the wheel up over cell (x, y) as a terminal in the alternate
+// screen does: a mouse event when the command reports the mouse, else (the
+// alternate scroll mode) arrow keys.
+func (v *vtTerm) wheelUp(x, y int) {
+	v.t.Helper()
+	v.mu.Lock()
+	tracking := v.mouseTracking
+	if tracking {
+		v.emu.SendMouse(vt.MouseWheel{X: x, Y: y, Button: vt.MouseWheelUp})
+	}
+	v.mu.Unlock()
+	if !tracking {
+		v.send(strings.Repeat("\x1b[A", 3))
+	}
 }
 
 func (v *vtTerm) send(s string) {
@@ -286,4 +325,23 @@ func TestAgentsTerminal_ShowsTheAgentsCursor(t *testing.T) {
 		x, y, visible := v.cursor()
 		return visible && x == px+len("> abc") && y == py
 	})
+}
+
+// TestAgentsTerminal_WheelNeverReachesTheAgentAsArrows: the wheel over the
+// focused terminal scrolls gx's view of it. The terminal must not turn it
+// into arrow keys for the agent, which claude warns about.
+func TestAgentsTerminal_WheelNeverReachesTheAgentAsArrows(t *testing.T) {
+	e := newAgentsEnv(t)
+	e.createSession()
+	v := openAgentsTab(t, e)
+
+	v.send("\r") // focus the terminal
+	time.Sleep(300 * time.Millisecond)
+	x, y := v.waitText("Welcome to Claude Code", 5*time.Second)
+	v.wheelUp(x, y)
+	time.Sleep(300 * time.Millisecond)
+	// Typing snaps the view back to the live screen, where the fake echoes
+	// all it read: arrow keys would show before the x.
+	v.send("x")
+	v.waitText("> x", 10*time.Second)
 }

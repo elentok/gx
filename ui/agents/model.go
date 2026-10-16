@@ -327,8 +327,9 @@ func (m Model) selectedID() string {
 }
 
 func (m Model) View() tea.View {
-	v := tea.NewView(m.render())
-	v.ReportFocus = true
+	// The mouse mode also keeps the wheel from reaching the agent as arrow
+	// keys, as a terminal sends it to a program in the alternate screen.
+	v := ui.NewMainView(m.render())
 	v.Cursor = m.terminalCursor()
 	return v
 }
