@@ -71,6 +71,8 @@ type Screen struct {
 	pushed int
 	// mouse is the mouse reporting modes the child turned on.
 	mouse map[ansi.Mode]bool
+	st    stFilter
+	buf   []byte
 }
 
 // NewScreen returns a cols×rows screen whose replies to terminal queries are
@@ -111,8 +113,10 @@ func (s *Screen) Write(p []byte) (int, error) {
 	n := 0
 	for len(p) > 0 {
 		chunk := p[:min(len(p), writeChunk)]
+		s.buf = append(s.buf[:0], chunk...)
+		s.st.filter(s.buf)
 		before := s.emu.ScrollbackLen()
-		m, err := s.emu.Write(chunk)
+		m, err := s.emu.Write(s.buf)
 		n += m
 		s.pushed += max(0, s.emu.ScrollbackLen()-before)
 		s.trimScrollback()
