@@ -388,6 +388,14 @@ func (c *Client) RunSessionAction(ctx context.Context, id string) (server.Sessio
 	return res, err
 }
 
+// ResumeSession resumes an Exited session's conversation in a new holder. A
+// refusal is a result (Refused set), not an error.
+func (c *Client) ResumeSession(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/resume", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // MarkSessionActionable raises an agent's Actionable on its session. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) MarkSessionActionable(ctx context.Context, req server.MarkActionableRequest) (server.SessionResult, error) {

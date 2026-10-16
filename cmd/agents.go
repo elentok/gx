@@ -21,6 +21,7 @@ func newAgentsCmd() *cobra.Command {
 		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
 		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession),
 		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
+		newAgentsSessionCmd("resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),
 		newAgentsSessionCmd("run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Client).RunSessionAction),
 		newAgentsReportFocusCmd())
 	return cmd

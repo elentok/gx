@@ -38,6 +38,8 @@ const (
 	ReasonSessionNotLive        = "session-not-live"
 	ReasonSessionNotIdle        = "session-not-idle"
 	ReasonSessionNoAction       = "no-action"
+	ReasonSessionDirGone        = "dir-gone"
+	ReasonSessionNoResume       = "no-resume"
 )
 
 // sessionMetaFile holds a session's meta in its state dir.
@@ -169,9 +171,15 @@ type sessionMeta struct {
 	Ticket   string `json:"ticket,omitempty"`
 	// FirstPrompt waits for the first Idle; it is cleared once typed or on
 	// exit.
-	FirstPrompt    string    `json:"first_prompt,omitempty"`
+	FirstPrompt string `json:"first_prompt,omitempty"`
+	// ConversationID is the newest one the harness reported; a resume
+	// continues it.
 	ConversationID string    `json:"conversation_id"`
 	CreatedAt      time.Time `json:"created_at"`
+	// Run counts the session's resumes. A watch records only for the run it
+	// was started for, so a stopped holder's late stream end cannot exit the
+	// resumed one.
+	Run int `json:"run,omitempty"`
 	// Cols and Rows are the last size the session's holder started at.
 	Cols int `json:"cols,omitempty"`
 	Rows int `json:"rows,omitempty"`
@@ -305,10 +313,10 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		return SessionResult{}, err
 	}
 	id := meta.ID
-	if err := s.startSessionHolder(dir, &meta, req.Cols, req.Rows); err != nil {
+	if err := s.startSessionHolder(dir, &meta, req.Cols, req.Rows, false); err != nil {
 		return SessionResult{}, err
 	}
-	s.sessionWatches.start(func() { s.watchSession(dir, id) })
+	s.sessionWatches.start(func() { s.watchSession(dir, id, 0) })
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
@@ -395,10 +403,10 @@ func (s *Server) makeSessionDir() (id, dir string, err error) {
 	return "", "", errors.New("no free session id")
 }
 
-// startSessionHolder runs the harness's Launch in a detached holder, at cols x
-// rows, else the session's last saved size, else the loop default, and saves
-// meta with the size it used.
-func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows int) error {
+// startSessionHolder runs the harness's Launch, or its Resume of the saved
+// conversation, in a detached holder, at cols x rows, else the session's last
+// saved size, else the loop default, and saves meta with the size it used.
+func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows int, resume bool) error {
 	if cols <= 0 || rows <= 0 {
 		cols, rows = meta.Cols, meta.Rows
 	}
@@ -417,7 +425,14 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	if meta.Harness == string(harness.Claude) {
 		extra = s.settings.Load().AgentsClaudeArgs
 	}
-	launch := h.Launch(harness.LaunchOptions{SessionID: meta.ConversationID, Args: extra})
+	opts := harness.LaunchOptions{SessionID: meta.ConversationID, Args: extra}
+	launch := h.Launch(opts)
+	if resume {
+		var ok bool
+		if launch, ok = h.Resume(meta.ConversationID, opts); !ok {
+			return fmt.Errorf("harness %s cannot resume", meta.Harness)
+		}
+	}
 	holder := s.cfg.Holder
 	if len(holder) == 0 {
 		exe, err := os.Executable()
@@ -564,12 +579,16 @@ func (w *sessionWatches) close() {
 // holder's watch stream until the stream ends. A stream that ends without an
 // exit while the server is up means the holder died: Exited crashed, with no
 // retry.
-func (s *Server) watchSession(dir, id string) {
+func (s *Server) watchSession(dir, id string, run int) {
+	update := func(change func(*sessionMeta) bool) {
+		s.updateSessionMeta(dir, id, func(m *sessionMeta) bool { return m.Run == run && change(m) })
+	}
+	recordExit := func(exit string) { update(func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) }) }
 	stream, err := s.openSessionWatch(dir)
 	if err != nil {
 		if !s.sessionWatches.isStopped() {
 			s.log.Warn("session watch", "session", id, "err", err)
-			s.recordSessionExit(dir, id, savedSessionExit(dir))
+			recordExit(savedSessionExit(dir))
 		}
 		return
 	}
@@ -586,7 +605,7 @@ func (s *Server) watchSession(dir, id string) {
 		msg, err := stream.Next()
 		if err != nil {
 			if !s.sessionWatches.isStopped() {
-				s.recordSessionExit(dir, id, savedSessionExit(dir))
+				recordExit(savedSessionExit(dir))
 			}
 			return
 		}
@@ -594,7 +613,7 @@ func (s *Server) watchSession(dir, id string) {
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
 			var prompt string
-			s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
 				if m.Status.State == SessionExited {
@@ -626,13 +645,13 @@ func (s *Server) watchSession(dir, id string) {
 				s.typeFirstPrompt(dir, id, prompt)
 			}
 		case nativerunner.StreamInput:
-			s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+			update(func(m *sessionMeta) bool {
 				changed := m.Actionable.Reason != ""
 				m.Actionable = SessionActionable{}
 				return changed
 			})
 		case nativerunner.StreamExit:
-			s.recordSessionExit(dir, id, sessionExitOf(msg.ExitCode))
+			recordExit(sessionExitOf(msg.ExitCode))
 			return
 		}
 	}
@@ -707,20 +726,18 @@ func (s *Server) openSessionWatch(dir string) (*nativerunner.HolderWatch, error)
 
 // recordSessionExit records the first exit seen and drops an untyped first
 // prompt; a stopped session exits clean whatever the signal left as its code.
-func (s *Server) recordSessionExit(dir, id, exit string) {
-	s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
-		if m.Status.State == SessionExited {
-			return false
-		}
-		if m.Stopped {
-			exit = SessionExitClean
-		} else {
-			s.raiseUnread(m)
-		}
-		m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
-		m.FirstPrompt = ""
-		return true
-	})
+func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
+	if m.Status.State == SessionExited {
+		return false
+	}
+	if m.Stopped {
+		exit = SessionExitClean
+	} else {
+		s.raiseUnread(m)
+	}
+	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
+	m.FirstPrompt = ""
+	return true
 }
 
 // raisesUnread reports whether a move from one live state to another needs
@@ -794,7 +811,7 @@ func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
 		}
 		waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
 	}
-	s.recordSessionExit(dir, req.ID, SessionExitClean)
+	s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, SessionExitClean) })
 	meta, err := readSessionMeta(dir)
 	if err != nil {
 		return SessionResult{}, err
