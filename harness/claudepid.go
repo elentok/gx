@@ -28,6 +28,10 @@ const claudePermissionPrompt = "permission prompt"
 // pidStatusPoll is how often the watcher rereads claude's pid status file.
 const pidStatusPoll = 100 * time.Millisecond
 
+// transcriptSearchCap is the longest gap between searches for a transcript
+// that isn't there yet.
+const transcriptSearchCap = 5 * time.Second
+
 // PidStatus is what gx reads from claude's pid status file. WaitingFor is
 // set only while Status is waiting.
 type PidStatus struct {
@@ -65,11 +69,18 @@ type PidWatcher struct {
 	notBefore int64
 	// startup reports a pre-session dialog on screen; nil sees none.
 	startup func() bool
+	now     func() time.Time
+	find    func(projectsDir, conversationID string) ([]string, error)
 
 	// transcript is read only when its size changes; poll alone touches it.
 	transcript struct {
 		conversationID, path string
 		size                 int64
+		// A session left idle with no prompt never writes its transcript, so
+		// the search for it backs off rather than globbing every poll.
+		searchID   string
+		searchGap  time.Duration
+		nextSearch time.Time
 	}
 
 	mu   sync.Mutex
@@ -104,6 +115,8 @@ func newPidWatcher(sessionsDir string, pid int, spawned time.Time) *PidWatcher {
 		path:        filepath.Join(sessionsDir, strconv.Itoa(pid)+".json"),
 		projectsDir: filepath.Join(filepath.Dir(sessionsDir), "projects"),
 		notBefore:   spawned.Add(-pidStartSlack).UnixMilli(),
+		now:         time.Now,
+		find:        transcript.FindByIDIn,
 	}
 }
 
@@ -155,8 +168,17 @@ func (w *PidWatcher) poll() {
 func (w *PidWatcher) pollTranscript(conversationID string) {
 	t := &w.transcript
 	if conversationID != t.conversationID {
-		paths, err := transcript.FindByIDIn(w.projectsDir, conversationID)
+		now := w.now()
+		if conversationID != t.searchID {
+			t.searchID, t.searchGap, t.nextSearch = conversationID, pidStatusPoll, now
+		}
+		if now.Before(t.nextSearch) {
+			return
+		}
+		paths, err := w.find(w.projectsDir, conversationID)
 		if err != nil || len(paths) != 1 {
+			t.nextSearch = now.Add(t.searchGap)
+			t.searchGap = min(2*t.searchGap, transcriptSearchCap)
 			return
 		}
 		t.conversationID, t.path, t.size = conversationID, paths[0], -1

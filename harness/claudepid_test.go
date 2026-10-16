@@ -159,7 +159,52 @@ func rateLimitWatcher(t *testing.T, spawned time.Time) (w *PidWatcher, sessions,
 			t.Fatal(err)
 		}
 	}
-	return newPidWatcher(sessions, 4242, spawned), sessions, filepath.Join(project, "conv-1.jsonl")
+	// An empty transcript is found on the first poll, before any backoff.
+	transcriptPath = filepath.Join(project, "conv-1.jsonl")
+	appendLine(t, transcriptPath, "")
+	return newPidWatcher(sessions, 4242, spawned), sessions, transcriptPath
+}
+
+func TestPidWatcher_TranscriptSearchBacksOff(t *testing.T) {
+	spawned := time.Now()
+	w, sessions, tr := rateLimitWatcher(t, spawned)
+	if err := os.Remove(tr); err != nil {
+		t.Fatal(err)
+	}
+	clock := spawned
+	w.now = func() time.Time { return clock }
+	var searches []time.Duration
+	find := w.find
+	w.find = func(dir, id string) ([]string, error) {
+		searches = append(searches, clock.Sub(spawned))
+		return find(dir, id)
+	}
+	writePidFile(t, sessions, spawned, `,"status":"idle"`)
+	for range 1000 {
+		w.poll()
+		clock = clock.Add(pidStatusPoll)
+	}
+	var gaps []time.Duration
+	for i := 1; i < len(searches); i++ {
+		gaps = append(gaps, searches[i]-searches[i-1])
+	}
+	for i := 1; i < len(gaps); i++ {
+		if gaps[i] < gaps[i-1] {
+			t.Fatalf("gaps between searches shrank: %v", gaps)
+		}
+	}
+	if len(gaps) < 2 || gaps[len(gaps)-1] != transcriptSearchCap || gaps[len(gaps)-2] != transcriptSearchCap {
+		t.Fatalf("gaps between searches didn't settle at %v: %v", transcriptSearchCap, gaps)
+	}
+
+	appendLine(t, tr, sessionLimitLine(spawned.Add(time.Second)))
+	for range int(transcriptSearchCap / pidStatusPoll) {
+		w.poll()
+		clock = clock.Add(pidStatusPoll)
+	}
+	if got := w.Status(); got != rateLimited {
+		t.Fatalf("transcript written late: Status = %+v, want %+v", got, rateLimited)
+	}
 }
 
 func appendLine(t *testing.T, path, line string) {
