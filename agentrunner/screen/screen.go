@@ -20,6 +20,9 @@ const scrollbackLines = 10_000
 // Key is a key press to encode for the child.
 type Key = uv.Key
 
+// KeyMod is a Key's modifier bits.
+type KeyMod = uv.KeyMod
+
 // KeyUp and friends name the special keys a Key can carry.
 const (
 	KeyUp    = uv.KeyUp

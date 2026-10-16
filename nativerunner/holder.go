@@ -94,9 +94,6 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	defer rawLog.Close()
 
 	cols, rows := opts.size()
-	scr := screen.NewScreen(cols, rows)
-	defer scr.Close()
-
 	ptmx, tty, err := pty.Open()
 	if err != nil {
 		return err
@@ -105,6 +102,10 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// Fd makes reads blocking, so Close never waits on the reader, which a
 	// grandchild still holding the tty keeps blocked.
 	_ = ptmx.Fd()
+	// The screen answers the child's terminal queries and encodes attach
+	// input, so the child gets a real terminal's replies.
+	scr := screen.NewScreenWithReplies(cols, rows, ptmx)
+	defer scr.Close()
 	if err := pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}); err != nil {
 		_ = tty.Close()
 		return err

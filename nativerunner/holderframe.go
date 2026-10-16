@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
 )
 
@@ -19,8 +20,9 @@ const (
 	StreamStatus StreamType = iota + 1
 	// StreamExit carries the child's exit code; nothing follows it.
 	StreamExit
-	// StreamInput says a client typed or pasted on an attach; its payload is
-	// an empty object.
+	// StreamInput is a key or paste a client sends on an attach, as an
+	// AttachInput. On a watch stream it says a client typed or pasted, and its
+	// payload is an empty object.
 	StreamInput
 	// StreamFrame carries an attach's screen rows and cursor.
 	StreamFrame
@@ -115,6 +117,20 @@ type FrameCursor struct {
 type FrameRow struct {
 	Index int    `json:"index"`
 	ANSI  string `json:"ansi"`
+}
+
+// AttachInput is the payload of a StreamInput sent on an attach: a key event
+// or a paste. Keys travel as events rather than bytes so the holder can encode
+// them for the modes the child turned on.
+type AttachInput struct {
+	Key   *InputKey `json:"key,omitempty"`
+	Paste string    `json:"paste,omitempty"`
+}
+
+type InputKey struct {
+	Code rune          `json:"code"`
+	Text string        `json:"text,omitempty"`
+	Mod  screen.KeyMod `json:"mod,omitempty"`
 }
 
 // streamError is StreamError's payload.

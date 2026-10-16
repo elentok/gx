@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"io"
@@ -123,20 +124,29 @@ func (s outputSignal) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// attach streams frames until the holder finishes, then the exit.
-func (h *holderServer) attach(conn net.Conn) {
+// attach streams frames until the holder finishes, then the exit, and reads
+// the client's messages from in.
+func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 	if h.startStream() {
 		defer h.streams.Done()
 	}
 	_ = conn.SetDeadline(time.Time{})
 	frames, full := h.frames.subscribe()
 	defer h.frames.unsubscribe(frames)
-	// Client messages have no use yet beyond the size check; unknown types
-	// are skipped so newer clients keep working.
+	// Unknown client message types are skipped so newer clients keep working.
 	clientErr := make(chan error, 1)
 	go func() {
+		// The request's JSON ends in a newline. A stream header never starts
+		// with one, its length being capped well below 0x0a000000.
+		if b, err := in.Peek(1); err == nil && b[0] == '\n' {
+			_, _ = in.Discard(1)
+		}
 		for {
-			if _, _, err := readStreamMessage(conn); err != nil {
+			typ, payload, err := readStreamMessage(in)
+			if err == nil && typ == StreamInput {
+				err = h.input(payload)
+			}
+			if err != nil {
 				clientErr <- err
 				return
 			}
@@ -173,6 +183,25 @@ func (h *holderServer) attach(conn net.Conn) {
 			return
 		}
 	}
+}
+
+// input encodes a key or paste for the child's modes, which the screen writes
+// to the pty, and tells every watch stream a client typed.
+func (h *holderServer) input(payload []byte) error {
+	var in AttachInput
+	if err := json.Unmarshal(payload, &in); err != nil {
+		return err
+	}
+	switch {
+	case in.Key != nil:
+		h.scr.SendKey(screen.Key{Code: in.Key.Code, Text: in.Key.Text, Mod: in.Key.Mod})
+	case in.Paste != "":
+		h.scr.Paste(in.Paste)
+	default:
+		return nil
+	}
+	h.inputs.notify()
+	return nil
 }
 
 // sendPending sends the frames already queued, without waiting for more.
@@ -250,6 +279,16 @@ func (a *HolderAttach) Next() (AttachMessage, error) {
 			return AttachMessage{}, errors.New("holder attach: " + e.Message)
 		}
 	}
+}
+
+// SendKey types k into the child.
+func (a *HolderAttach) SendKey(k screen.Key) error {
+	return a.Send(StreamInput, AttachInput{Key: &InputKey{Code: k.Code, Text: k.Text, Mod: k.Mod}})
+}
+
+// Paste pastes text into the child.
+func (a *HolderAttach) Paste(text string) error {
+	return a.Send(StreamInput, AttachInput{Paste: text})
 }
 
 // Send writes a message to the holder.

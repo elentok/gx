@@ -32,6 +32,8 @@ const (
 	ActionReport = "report"
 	// ActionTitle sets the OSC 0 title to Control.Title.
 	ActionTitle = "title"
+	// ActionWrite writes Control.Output as is.
+	ActionWrite = "write"
 )
 
 // ProgramDir holds the fake program's side channels. It is under the temp
@@ -190,6 +192,8 @@ func (p *program) control(c Control) error {
 		p.report(c.State, c.Kind, c.Message)
 	case ActionTitle:
 		fmt.Fprint(p.out, "\x1b]0;"+c.Title+"\a")
+	case ActionWrite:
+		fmt.Fprint(p.out, c.Output)
 	default:
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}

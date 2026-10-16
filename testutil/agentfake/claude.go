@@ -49,6 +49,9 @@ type Control struct {
 	Message string `json:"message,omitempty"`
 	// Title is the OSC 0 title an ActionTitle makes the fake program set.
 	Title string `json:"title,omitempty"`
+	// Output is the raw terminal output an ActionWrite makes the fake program
+	// write, such as a mode switch or a terminal query.
+	Output string `json:"output,omitempty"`
 }
 
 const controlType = "agentfake_control"

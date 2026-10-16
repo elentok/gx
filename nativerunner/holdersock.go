@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -90,7 +91,9 @@ type holderServer struct {
 	pid     *harness.PidWatcher
 	watcher harness.Watcher
 	frames  *frameHub
-	ops     []string
+	// inputs wakes the watch streams when a client types on an attach.
+	inputs signalHub
+	ops    []string
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
 	exitCode int
@@ -119,7 +122,8 @@ func (h *holderServer) handle(conn net.Conn) {
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(holderIOTimeout))
 	var req holderRequest
-	if err := json.NewDecoder(conn).Decode(&req); err != nil {
+	dec := json.NewDecoder(conn)
+	if err := dec.Decode(&req); err != nil {
 		return
 	}
 	if req.Op == OpWatch && slices.Contains(h.ops, OpWatch) {
@@ -127,7 +131,9 @@ func (h *holderServer) handle(conn net.Conn) {
 		return
 	}
 	if req.Op == OpAttach && slices.Contains(h.ops, OpAttach) {
-		h.attach(conn)
+		// The decoder may have read past the request into the first stream
+		// messages.
+		h.attach(conn, bufio.NewReader(io.MultiReader(dec.Buffered(), conn)))
 		return
 	}
 	resp, after := h.answer(req)
@@ -224,6 +230,8 @@ func (h *holderServer) watch(conn net.Conn) {
 		_ = conn.SetWriteDeadline(time.Now().Add(holderIOTimeout))
 		return writeStreamMessage(conn, typ, v)
 	}
+	inputs := h.inputs.subscribe()
+	defer h.inputs.unsubscribe(inputs)
 	tick := time.NewTicker(holderWatchPoll)
 	defer tick.Stop()
 	var last *streamStatus
@@ -241,7 +249,46 @@ func (h *holderServer) watch(conn net.Conn) {
 			return
 		case <-gone:
 			return
+		case <-inputs:
+			if send(StreamInput, struct{}{}) != nil {
+				return
+			}
 		case <-tick.C:
+		}
+	}
+}
+
+// signalHub wakes every subscriber without blocking; signals a subscriber
+// has not taken yet collapse into one. The zero value is ready to use.
+type signalHub struct {
+	mu   sync.Mutex
+	subs map[chan struct{}]struct{}
+}
+
+func (s *signalHub) subscribe() chan struct{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.subs == nil {
+		s.subs = map[chan struct{}]struct{}{}
+	}
+	ch := make(chan struct{}, 1)
+	s.subs[ch] = struct{}{}
+	return ch
+}
+
+func (s *signalHub) unsubscribe(ch chan struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.subs, ch)
+}
+
+func (s *signalHub) notify() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for ch := range s.subs {
+		select {
+		case ch <- struct{}{}:
+		default:
 		}
 	}
 }
