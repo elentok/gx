@@ -106,11 +106,24 @@ type Startup struct {
 // Claude is the claude harness's name.
 const Claude agentrunner.Kind = "claude"
 
+// registered holds harnesses added at run time. Only test binaries add any,
+// so a fake never ships in the production registry.
+var registered = map[agentrunner.Kind]Harness{}
+
+// Register adds h as kind. It is not safe to call while sessions run: call
+// it from TestMain, before any Lookup.
+func Register(kind agentrunner.Kind, h Harness) {
+	registered[kind] = h
+}
+
 // Lookup returns the harness for kind.
 func Lookup(kind agentrunner.Kind) (Harness, error) {
 	switch kind {
 	case Claude:
 		return claudeHarness{}, nil
+	}
+	if h, ok := registered[kind]; ok {
+		return h, nil
 	}
 	return nil, fmt.Errorf("unknown harness %q", kind)
 }

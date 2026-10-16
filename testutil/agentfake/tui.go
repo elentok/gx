@@ -85,7 +85,12 @@ func TUIInputPath(home, sessionID string) string {
 // SendTUIControl writes c to the side channel of the TUI fake running
 // sessionID under home, waiting for the fake to create it.
 func SendTUIControl(home, sessionID string, c Control) error {
-	path := TUIControlPath(home, sessionID)
+	return sendControlWhenReady(TUIControlPath(home, sessionID), c)
+}
+
+// sendControlWhenReady writes c to the side-channel FIFO at path, waiting for
+// the fake to create it.
+func sendControlWhenReady(path string, c Control) error {
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		if _, err := os.Stat(path); err == nil {
 			break
@@ -219,30 +224,7 @@ type tuiEvent struct {
 }
 
 func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
-	events := make(chan tuiEvent)
-	go func() {
-		r := bufio.NewReader(in)
-		for {
-			b, err := r.ReadByte()
-			if err != nil {
-				events <- tuiEvent{err: err}
-				return
-			}
-			events <- tuiEvent{key: b}
-		}
-	}()
-	go func() {
-		scanner := bufio.NewScanner(ctl)
-		for scanner.Scan() {
-			var c Control
-			if err := json.Unmarshal(scanner.Bytes(), &c); err != nil {
-				events <- tuiEvent{err: fmt.Errorf("bad control line %q: %w", scanner.Text(), err)}
-				return
-			}
-			events <- tuiEvent{control: &c}
-		}
-	}()
-
+	events := tuiEvents(in, ctl)
 	if t.opts.trust {
 		t.draw()
 	} else if err := t.startSession(); err != nil {
@@ -252,7 +234,7 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 		switch {
 		case ev.err != nil:
 			// The PTY closed: claude exits cleanly.
-			if errors.Is(ev.err, io.EOF) || errors.Is(ev.err, syscall.EIO) {
+			if ptyClosed(ev.err) {
 				return 0, t.exit(0)
 			}
 			return 0, ev.err
@@ -280,6 +262,38 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 		}
 	}
 	return 0, nil
+}
+
+func ptyClosed(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EIO)
+}
+
+// tuiEvents merges the keys read from in with the controls read from ctl.
+func tuiEvents(in io.Reader, ctl io.Reader) <-chan tuiEvent {
+	events := make(chan tuiEvent)
+	go func() {
+		r := bufio.NewReader(in)
+		for {
+			b, err := r.ReadByte()
+			if err != nil {
+				events <- tuiEvent{err: err}
+				return
+			}
+			events <- tuiEvent{key: b}
+		}
+	}()
+	go func() {
+		scanner := bufio.NewScanner(ctl)
+		for scanner.Scan() {
+			var c Control
+			if err := json.Unmarshal(scanner.Bytes(), &c); err != nil {
+				events <- tuiEvent{err: fmt.Errorf("bad control line %q: %w", scanner.Text(), err)}
+				return
+			}
+			events <- tuiEvent{control: &c}
+		}
+	}()
+	return events
 }
 
 // trustKey takes one key at the trust dialog and reports whether it picked

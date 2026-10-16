@@ -22,6 +22,10 @@ func TestMain(m *testing.M) {
 	if os.Getenv(TUIEnv) == "1" {
 		TUIClaude()
 	}
+	if os.Getenv(ProgramEnv) == "1" {
+		Program()
+	}
+	RegisterHarness()
 	os.Exit(m.Run())
 }
 

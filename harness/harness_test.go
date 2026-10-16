@@ -26,6 +26,16 @@ func TestLookup_UnknownNameIsAnError(t *testing.T) {
 	}
 }
 
+func TestLookup_FindsARegisteredHarness(t *testing.T) {
+	if _, err := harness.Lookup("registered"); err == nil {
+		t.Fatal("Lookup(registered) succeeded before Register")
+	}
+	harness.Register("registered", claude(t))
+	if _, err := harness.Lookup("registered"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClaudeLaunch(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
 	cmd := claude(t).Launch(harness.LaunchOptions{SessionID: "s1", Args: []string{"--x"}, Env: []string{"FOO=bar"}})

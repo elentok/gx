@@ -40,8 +40,15 @@ type Control struct {
 	Running  bool   `json:"running,omitempty"`
 	// WaitingFor is the dialog an ActionBlock shows on the TUI fake.
 	WaitingFor string `json:"waiting_for,omitempty"`
-	// Code is the TUI fake's ActionExit exit code.
+	// Code is the ActionExit exit code of the TUI fake and the fake program.
 	Code int `json:"code,omitempty"`
+	// State, Kind and Message are the OSC 7501 report an ActionReport makes
+	// the fake program write.
+	State   string `json:"state,omitempty"`
+	Kind    string `json:"kind,omitempty"`
+	Message string `json:"message,omitempty"`
+	// Title is the OSC 0 title an ActionTitle makes the fake program set.
+	Title string `json:"title,omitempty"`
 }
 
 const controlType = "agentfake_control"
