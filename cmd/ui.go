@@ -272,19 +272,7 @@ func runTab(tab nav.TabID) error {
 		return err
 	}
 
-	info, err := git.IdentifyDir(cwd)
-	if err != nil {
-		return err
-	}
-	if info.Repo.IsBare && info.WorktreeRoot == "" {
-		return fmt.Errorf("gx %s must be run from a regular repo or linked worktree", tab)
-	}
-
-	root, err := git.WorktreeRoot(cwd)
-	if err != nil {
-		return err
-	}
-	repo, err := git.FindRepo(root)
+	repo, root, err := tabTarget(cwd, tab)
 	if err != nil {
 		return err
 	}
@@ -302,6 +290,36 @@ func runTab(tab nav.TabID) error {
 	p := tea.NewProgram(m)
 	_, err = p.Run()
 	return err
+}
+
+// tabTarget finds the repo and worktree root tab opens on from cwd. The
+// Agents tab spans every project, so it also opens from a bare repo's root,
+// with root set to the bare repo.
+func tabTarget(cwd string, tab nav.TabID) (*git.Repo, string, error) {
+	info, err := git.IdentifyDir(cwd)
+	if err != nil {
+		return nil, "", err
+	}
+	if info.Repo.IsBare && info.WorktreeRoot == "" {
+		if tab != nav.TabAgents {
+			return nil, "", fmt.Errorf("gx %s must be run from a regular repo or linked worktree", tab)
+		}
+		repo, err := git.FindRepo(cwd)
+		if err != nil {
+			return nil, "", err
+		}
+		return repo, repo.Root, nil
+	}
+
+	root, err := git.WorktreeRoot(cwd)
+	if err != nil {
+		return nil, "", err
+	}
+	repo, err := git.FindRepo(root)
+	if err != nil {
+		return nil, "", err
+	}
+	return repo, root, nil
 }
 
 // serverDeps carries the API client and the "start the server" action the TUI
