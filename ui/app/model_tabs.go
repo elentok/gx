@@ -257,20 +257,21 @@ func (m Model) newLivePage(viewState nav.ViewState) (livePage, tea.Cmd) {
 type tabSpec struct {
 	id    nav.TabID
 	label string
+	group string
 }
 
-// tabSpecs is the single source of truth for view order and labels, shared by
-// the title row and the relative tab switch.
+// tabSpecs is the single source of truth for view order, labels and groups,
+// shared by the title row, the view switcher and the relative tab switch.
 func (m Model) tabSpecs() []tabSpec {
 	return []tabSpec{
-		{id: nav.TabWorktrees, label: "worktrees"},
-		{id: nav.TabLog, label: "log"},
-		{id: nav.TabStatus, label: "status"},
-		{id: nav.TabStash, label: "stash"},
-		{id: nav.TabPRs, label: "prs"},
-		{id: nav.TabTickets, label: "tickets"},
-		{id: nav.TabQueue, label: "queue"},
-		{id: nav.TabAgents, label: "agents"},
+		{id: nav.TabWorktrees, label: "worktrees", group: "git"},
+		{id: nav.TabLog, label: "log", group: "git"},
+		{id: nav.TabStatus, label: "status", group: "git"},
+		{id: nav.TabStash, label: "stash", group: "git"},
+		{id: nav.TabPRs, label: "prs", group: "git"},
+		{id: nav.TabTickets, label: "tickets", group: "agents"},
+		{id: nav.TabQueue, label: "queue", group: "agents"},
+		{id: nav.TabAgents, label: "agents", group: "agents"},
 	}
 }
 

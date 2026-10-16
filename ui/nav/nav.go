@@ -73,6 +73,8 @@ type switchMsg struct {
 	ViewState ViewState
 }
 
+type openSwitcherMsg struct{}
+
 type backMsg struct{}
 
 // forceQuitMsg is ctrl+c's "quit right now, regardless of nav depth" signal —
@@ -95,6 +97,18 @@ func Switch(vs ViewState) tea.Cmd {
 	return func() tea.Msg {
 		return switchMsg{ViewState: vs}
 	}
+}
+
+// OpenSwitcher asks the app to open the view switcher, as ctrl+o does.
+func OpenSwitcher() tea.Cmd {
+	return func() tea.Msg {
+		return openSwitcherMsg{}
+	}
+}
+
+func IsOpenSwitcher(msg tea.Msg) bool {
+	_, ok := msg.(openSwitcherMsg)
+	return ok
 }
 
 func Back() tea.Cmd {

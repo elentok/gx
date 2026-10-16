@@ -14,6 +14,7 @@ const (
 	BindingGotoQueue     keys.BindingID = "app-goto-queue-tab"
 	BindingGotoAgents    keys.BindingID = "app-goto-agents-tab"
 	BindingNotifyHistory keys.BindingID = "app-notify-history"
+	BindingSwitchView    keys.BindingID = "app-switch-view"
 )
 
 func Bindings() []keys.Binding {
@@ -39,6 +40,7 @@ func Bindings() []keys.Binding {
 		{ID: BindingGotoQueue, Seq: []string{"g", "q"}, Categories: []string{"App"}, Title: "queue tab"},
 		{ID: BindingGotoAgents, Seq: []string{"g", "a"}, Categories: []string{"App"}, Title: "agents tab"},
 		{ID: BindingNotifyHistory, Seq: []string{"g", "n"}, Categories: []string{"App"}, Title: "notification history"},
+		{ID: BindingSwitchView, Seq: []string{"ctrl+o"}, Categories: []string{"App"}, Title: "switch view"},
 	}
 }
 

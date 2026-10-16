@@ -35,8 +35,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// normal page-update path below, exactly as if the modal were closed,
 		// so background polling loops keep rearming themselves.
 	}
+	if m.switcher.isOpen {
+		// Same pass-through rule as the notify history above.
+		switch v := msg.(type) {
+		case tea.KeyPressMsg:
+			next, cmd := m.updateSwitcherKey(v)
+			return next, tea.Batch(notifyCmd, cmd)
+		case tea.MouseMsg:
+			next, cmd := m.updateSwitcherMouse(v)
+			return next, tea.Batch(notifyCmd, cmd)
+		}
+	}
 
 	if mouse, ok := msg.(tea.MouseMsg); ok {
+		if click, ok := mouse.(tea.MouseClickMsg); ok && click.Button == tea.MouseLeft && click.Y == 0 {
+			if left := m.renderTitleRow(m.width).left; click.X >= left.start && click.X < left.end {
+				next, cmd := m.openSwitcher()
+				return next, tea.Batch(notifyCmd, cmd)
+			}
+		}
 		pageMsg, onPage := toPageMouse(mouse)
 		if !onPage {
 			return m, notifyCmd
@@ -81,6 +98,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next, cmd := m.applySwitch(tabVS, prev)
 		return next, tea.Batch(notifyCmd, cmd)
 	}
+	if nav.IsOpenSwitcher(msg) {
+		next, cmd := m.openSwitcher()
+		return next, tea.Batch(notifyCmd, cmd)
+	}
 	if vs, ok := nav.IsOpen(msg); ok {
 		return m.handleOpen(vs, notifyCmd)
 	}
@@ -117,6 +138,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var activeHasPendingChord bool
 		if kmp, ok := active.(keyManagerProvider); ok {
 			activeHasPendingChord = len(kmp.KeyManager().Prefix()) > 0
+		}
+		if key.String() == "ctrl+o" && !activeHasPendingChord {
+			if tf, ok := active.(terminalFocuser); !ok || !tf.TerminalFocused() {
+				next, cmd := m.openSwitcher()
+				return next, tea.Batch(notifyCmd, cmd)
+			}
 		}
 		if f, ok := active.(inputFocuser); (!ok || !f.InputFocused()) && !activeHasPendingChord {
 			if next, cmd, handled := m.handleShellChordKey(key); handled {

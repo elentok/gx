@@ -59,6 +59,7 @@ type Model struct {
 	notify        notify.Model
 	notifyLog     *notifylog.Log
 	notifyHistory notifyhistory.Model
+	switcher      switcher
 	gate          *reloadgate.ReloadGate
 
 	serverConn ServerConn
@@ -158,6 +159,9 @@ func (m Model) View() tea.View {
 	}
 	if stack := m.notify.View(); stack != "" {
 		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, ui.ChromeRows)
+	}
+	if m.switcher.isOpen {
+		content = ui.PlaceOverlay(content, m.renderSwitcher(), switcherX, ui.ChromeRows)
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
