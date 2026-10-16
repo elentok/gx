@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -18,6 +19,12 @@ import (
 )
 
 const createMaxWidth = 80
+
+// createChrome is the form's height outside the picker rows: the frame,
+// hint, Where line, blank lines and the text fields.
+const createChrome = 12
+
+const maxPickerRows = 16
 
 var createHint = ui.RenderInlineBindings(
 	key.NewBinding(key.WithHelp("tab/shift+tab", "field")),
@@ -37,6 +44,24 @@ type formProject struct {
 	Worktrees []string
 }
 
+// dirs is the project's root, then its worktrees.
+func (p formProject) dirs() []string {
+	var out []string
+	if p.Root != "" {
+		out = append(out, p.Root)
+	}
+	return append(out, p.Worktrees...)
+}
+
+// formEntry is one choice in the Where picker: a dir of a project, or a new
+// worktree in it when dir is empty.
+type formEntry struct {
+	project int
+	dir     string
+}
+
+func (e formEntry) newWorktree() bool { return e.dir == "" }
+
 // CreatePrefill pre-fills the create form; every field stays editable.
 type CreatePrefill struct {
 	Project, Dir, Name, Prompt, Ticket string
@@ -45,22 +70,24 @@ type CreatePrefill struct {
 type createField int
 
 const (
-	fieldProject createField = iota
-	fieldDir
+	fieldWhere createField = iota
 	fieldWorktree
 	fieldName
 	fieldPrompt
 )
 
-// createForm is the create-session form. projects is nil until loaded; dir
-// indexes dirs(), where the last entry is "new worktree…".
+// createForm is the create-session form. projects is nil until loaded, and
+// lists the focused project first. matches is the entries query keeps; sel
+// indexes it and offset is the first picker row shown.
 type createForm struct {
 	prefill  CreatePrefill
 	projects []formProject
 	loadErr  string
-	project  int
-	dir      int
 	field    createField
+	query    string
+	matches  []formEntry
+	sel      int
+	offset   int
 	worktree string
 	name     string
 	prompt   string
@@ -132,7 +159,7 @@ func (m Model) OpenCreateForm(p CreatePrefill) (Model, tea.Cmd) {
 	if m.client == nil {
 		return m, nil
 	}
-	m.create = &createForm{prefill: p, name: p.Name, prompt: p.Prompt, field: fieldDir}
+	m.create = &createForm{prefill: p, name: p.Name, prompt: p.Prompt, field: fieldWhere}
 	list := m.listProjects
 	return m, func() tea.Msg {
 		projects, err := list()
@@ -140,6 +167,8 @@ func (m Model) OpenCreateForm(p CreatePrefill) (Model, tea.Cmd) {
 	}
 }
 
+// updateFormProjects moves the pre-filled project first, adding it when the
+// store lacks it, and selects the pre-filled dir, adding it when absent.
 func (m Model) updateFormProjects(msg formProjectsMsg) (tea.Model, tea.Cmd) {
 	if m.create == nil {
 		return m, nil
@@ -150,55 +179,142 @@ func (m Model) updateFormProjects(msg formProjectsMsg) (tea.Model, tea.Cmd) {
 		f.loadErr = msg.err.Error()
 		return m, nil
 	}
-	f.projects = msg.projects
+	f.projects = slices.Clone(msg.projects)
+	if f.projects == nil {
+		f.projects = []formProject{}
+	}
 	if i := slices.IndexFunc(f.projects, func(p formProject) bool { return p.Name == f.prefill.Project }); i >= 0 {
-		f.project = i
+		p := f.projects[i]
+		f.projects = append([]formProject{p}, slices.Delete(f.projects, i, i+1)...)
 	} else if f.prefill.Project != "" {
 		f.projects = append([]formProject{{Name: f.prefill.Project}}, f.projects...)
 	}
-	if f.prefill.Dir != "" {
-		f.dir = f.dirIndex(f.prefill.Dir)
+	dir := f.prefill.Dir
+	if dir != "" && len(f.projects) > 0 {
+		p := &f.projects[0]
+		if !slices.ContainsFunc(p.dirs(), func(d string) bool { return filepath.Clean(d) == filepath.Clean(dir) }) {
+			p.Worktrees = append([]string{dir}, p.Worktrees...)
+		}
 	}
+	f.filter()
+	if dir != "" {
+		f.sel = max(0, slices.IndexFunc(f.matches, func(e formEntry) bool {
+			return e.project == 0 && filepath.Clean(e.dir) == filepath.Clean(dir)
+		}))
+	}
+	f.scroll(m.pickerRows())
 	return m, nil
 }
 
-// dirIndex is dir's entry, adding it first to the project's dirs when absent.
-func (f *createForm) dirIndex(dir string) int {
-	dirs := f.dirs()
-	if i := slices.IndexFunc(dirs, func(d string) bool { return filepath.Clean(d) == filepath.Clean(dir) }); i >= 0 {
-		return i
+// filter keeps the entries matching query, in project order, and selects
+// the first.
+func (f *createForm) filter() {
+	f.matches = nil
+	for i, p := range f.projects {
+		for _, d := range append(p.dirs(), "") {
+			e := formEntry{project: i, dir: d}
+			if fuzzyMatch(f.query, f.entryText(e)) {
+				f.matches = append(f.matches, e)
+			}
+		}
 	}
-	p := &f.projects[f.project]
-	p.Worktrees = append([]string{dir}, p.Worktrees...)
-	if p.Root == "" {
-		return 0
-	}
-	return 1
+	f.sel, f.offset = 0, 0
 }
 
-// dirs is the selected project's root, then its worktrees; "new worktree…"
-// follows them.
-func (f *createForm) dirs() []string {
-	if len(f.projects) == 0 {
-		return nil
+// entryText is what the query matches an entry against.
+func (f *createForm) entryText(e formEntry) string {
+	label := newWorktreeLabel
+	if !e.newWorktree() {
+		label = shortDir(e.dir)
 	}
-	p := f.projects[f.project]
-	var out []string
-	if p.Root != "" {
-		out = append(out, p.Root)
-	}
-	return append(out, p.Worktrees...)
+	return f.projects[e.project].Name + " " + label
 }
 
-func (f *createForm) newWorktree() bool { return f.dir == len(f.dirs()) }
+// fuzzyMatch reports whether each space-separated term of query appears in
+// text in order, ignoring case.
+func fuzzyMatch(query, text string) bool {
+	text = strings.ToLower(text)
+	for _, term := range strings.Fields(strings.ToLower(query)) {
+		rest := text
+		for _, r := range term {
+			i := strings.IndexRune(rest, r)
+			if i < 0 {
+				return false
+			}
+			rest = rest[i+len(string(r)):]
+		}
+	}
+	return true
+}
+
+// selected is the chosen entry; false when nothing matches.
+func (f *createForm) selected() (formEntry, bool) {
+	if f.sel < len(f.matches) {
+		return f.matches[f.sel], true
+	}
+	return formEntry{}, false
+}
+
+// selectedProject is the chosen entry's project name.
+func (f *createForm) selectedProject() string {
+	if e, ok := f.selected(); ok {
+		return f.projects[e.project].Name
+	}
+	return ""
+}
+
+func (f *createForm) newWorktree() bool {
+	e, ok := f.selected()
+	return ok && e.newWorktree()
+}
+
+// pickerRow is a project header (entry < 0) or a match.
+type pickerRow struct {
+	project int
+	entry   int
+}
+
+// rows is the picker's rows: each project with matches gets a header.
+func (f *createForm) rows() []pickerRow {
+	var out []pickerRow
+	for i, e := range f.matches {
+		if i == 0 || f.matches[i-1].project != e.project {
+			out = append(out, pickerRow{project: e.project, entry: -1})
+		}
+		out = append(out, pickerRow{project: e.project, entry: i})
+	}
+	return out
+}
+
+// scroll keeps the selection, and its header when it is a group's first
+// entry, within the n visible rows.
+func (f *createForm) scroll(n int) {
+	rows := f.rows()
+	at := slices.IndexFunc(rows, func(r pickerRow) bool { return r.entry == f.sel })
+	if at < 0 {
+		f.offset = 0
+		return
+	}
+	sel := at
+	if at > 0 && rows[at-1].entry < 0 {
+		at--
+	}
+	f.offset = max(min(f.offset, at), sel-n+1)
+	f.offset = max(0, min(f.offset, len(rows)-n))
+}
+
+// pickerRows is how many picker rows fit the screen.
+func (m Model) pickerRows() int {
+	return max(3, min(maxPickerRows, m.height-createChrome))
+}
 
 // fields is the form's fields in tab order; the worktree name only shows
 // for a new worktree.
 func (f *createForm) fields() []createField {
 	if f.newWorktree() {
-		return []createField{fieldProject, fieldDir, fieldWorktree, fieldName, fieldPrompt}
+		return []createField{fieldWhere, fieldWorktree, fieldName, fieldPrompt}
 	}
-	return []createField{fieldProject, fieldDir, fieldName, fieldPrompt}
+	return []createField{fieldWhere, fieldName, fieldPrompt}
 }
 
 func (f *createForm) moveField(step int) {
@@ -209,6 +325,8 @@ func (f *createForm) moveField(step int) {
 
 func (f *createForm) text() *string {
 	switch f.field {
+	case fieldWhere:
+		return &f.query
 	case fieldWorktree:
 		return &f.worktree
 	case fieldName:
@@ -222,9 +340,11 @@ func (f *createForm) text() *string {
 func (m Model) updateCreateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	f := *m.create
 	m.create = &f
+	query := f.query
 	switch msg.String() {
 	case "esc":
 		m.create = nil
+		return m, nil
 	case "tab":
 		f.moveField(1)
 	case "shift+tab":
@@ -246,23 +366,17 @@ func (m Model) updateCreateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			*t += msg.Text
 		}
 	}
+	if f.query != query && f.projects != nil {
+		f.filter()
+	}
+	f.scroll(m.pickerRows())
 	return m, nil
 }
 
-// choose steps the project or dir choice, wrapping; a new project starts on
-// its root.
+// choose steps the Where choice, wrapping.
 func (f *createForm) choose(step int) {
-	switch f.field {
-	case fieldProject:
-		if n := len(f.projects); n > 0 {
-			f.project = (f.project + step + n) % n
-			f.dir = 0
-		}
-	case fieldDir:
-		if len(f.projects) > 0 {
-			n := len(f.dirs()) + 1
-			f.dir = (f.dir + step + n) % n
-		}
+	if n := len(f.matches); f.field == fieldWhere && n > 0 {
+		f.sel = (f.sel + step + n) % n
 	}
 }
 
@@ -271,20 +385,25 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 	if f.sending || len(f.projects) == 0 {
 		return m, nil
 	}
+	e, ok := f.selected()
+	if !ok {
+		f.err = "nothing matches " + strconv.Quote(f.query)
+		return m, nil
+	}
 	req := server.CreateSessionRequest{
-		Project: f.projects[f.project].Name,
+		Project: f.projects[e.project].Name,
 		Name:    strings.TrimSpace(f.name),
 		Prompt:  f.prompt,
 		Ticket:  f.prefill.Ticket,
 	}
-	if f.newWorktree() {
+	if e.newWorktree() {
 		req.Worktree = strings.TrimSpace(f.worktree)
 		if req.Worktree == "" {
 			f.err = "a new worktree needs a name"
 			return m, nil
 		}
 	} else {
-		req.Dir = f.dirs()[f.dir]
+		req.Dir = e.dir
 	}
 	// The new session has no info lines yet, so it gets the whole panel.
 	req.Cols, req.Rows = max(m.mainWidth()-2, 1), max(m.height-2, 1)
@@ -353,12 +472,12 @@ func (m Model) renderCreate() string {
 		}
 		return ui.StyleMuted.Render("  " + name)
 	}
-	textLine := func(fl createField, name, value string) string {
+	textLine := func(fl createField, name, value string, w int) string {
 		cursor := ""
 		if f.field == fl {
 			cursor = "▏"
 		}
-		return fit(fit(label(fl, name), 12)+value+cursor, innerW)
+		return fit(fit(label(fl, name), 12)+value+cursor, w)
 	}
 	var lines []string
 	switch {
@@ -369,28 +488,14 @@ func (m Model) renderCreate() string {
 	case len(f.projects) == 0:
 		lines = append(lines, ui.StyleMuted.Render("no projects in the ticket store"))
 	default:
-		lines = append(lines, fit(label(fieldProject, "Project"), 12)+styleProjectHeader.Render(f.projects[f.project].Name), "")
-		lines = append(lines, label(fieldDir, "Dir"))
-		entries := append(f.dirs(), "")
-		for i, d := range entries {
-			text := "    " + newWorktreeLabel
-			if i < len(entries)-1 {
-				text = "    " + shortDir(d)
-				if n := m.dirSessions(d); n > 0 {
-					text += ui.StyleMuted.Render("  " + plural(n, "session"))
-				}
-			}
-			row := fit(text, innerW)
-			if i == f.dir {
-				row = ui.RenderRowHighlight(row)
-			}
-			lines = append(lines, row)
-		}
+		count := ui.StyleMuted.Render(strconv.Itoa(len(f.matches)))
+		lines = append(lines, textLine(fieldWhere, "Where", f.query, innerW-6)+fitLeft(count, 6), "")
+		lines = append(lines, m.renderPicker(innerW)...)
 		lines = append(lines, "")
 		if f.newWorktree() {
-			lines = append(lines, textLine(fieldWorktree, "Worktree", f.worktree))
+			lines = append(lines, textLine(fieldWorktree, "Worktree", f.worktree, innerW))
 		}
-		lines = append(lines, textLine(fieldName, "Name", f.name), textLine(fieldPrompt, "Prompt", f.prompt))
+		lines = append(lines, textLine(fieldName, "Name", f.name, innerW), textLine(fieldPrompt, "Prompt", f.prompt, innerW))
 		if f.prefill.Ticket != "" {
 			lines = append(lines, fit(ui.StyleMuted.Render("  Ticket")+"    "+styleTicket.Render(f.prefill.Ticket), innerW))
 		}
@@ -412,6 +517,46 @@ func (m Model) renderCreate() string {
 		HintColor:     ui.ColorSubtle,
 		TitleInBorder: true,
 	})
+}
+
+// renderPicker is the visible picker rows: project headers, then their dirs
+// and a new-worktree entry.
+func (m Model) renderPicker(innerW int) []string {
+	f := m.create
+	rows := f.rows()
+	if len(rows) == 0 {
+		return []string{ui.StyleMuted.Render("    no matches")}
+	}
+	end := min(len(rows), f.offset+m.pickerRows())
+	var lines []string
+	for _, r := range rows[f.offset:end] {
+		if r.entry < 0 {
+			lines = append(lines, fit("  "+styleProjectHeader.Render(f.projects[r.project].Name), innerW))
+			continue
+		}
+		e := f.matches[r.entry]
+		text := "    " + newWorktreeLabel
+		if !e.newWorktree() {
+			text = "    " + shortDir(e.dir)
+			if n := m.dirSessions(e.dir); n > 0 {
+				text += ui.StyleMuted.Render("  " + plural(n, "session"))
+			}
+		}
+		row := fit(text, innerW)
+		if r.entry == f.sel {
+			row = ui.RenderRowHighlight(row)
+		}
+		lines = append(lines, row)
+	}
+	return lines
+}
+
+// fitLeft right-aligns s in w cells.
+func fitLeft(s string, w int) string {
+	if pad := w - ansi.StringWidth(s); pad > 0 {
+		return strings.Repeat(" ", pad) + s
+	}
+	return s
 }
 
 func plural(n int, word string) string {

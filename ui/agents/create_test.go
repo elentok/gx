@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -82,7 +83,7 @@ func TestCreate_COpensTheFormOnTheFocusedProject(t *testing.T) {
 		t.Fatal("c did not open the form")
 	}
 	view := plainView(m)
-	for _, want := range []string{"New session", "Project", "gx", "/r/gx", newWorktreeLabel, "Name", "Prompt"} {
+	for _, want := range []string{"New session", "Where", "gx", "/r/gx", newWorktreeLabel, "Name", "Prompt"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("form lacks %q:\n%s", want, view)
 		}
@@ -95,7 +96,7 @@ func TestCreate_COpensTheFormOnTheFocusedProject(t *testing.T) {
 func TestCreate_LeaderCOpensTheForm(t *testing.T) {
 	m, cmd := leaderThen(t, createModel(t, &fakeSessionClient{}), letter("c"))
 	m = update1(t, m, cmd())
-	if m.create == nil || m.create.projects[m.create.project].Name != "gx" {
+	if m.create == nil || m.create.selectedProject() != "gx" {
 		t.Fatalf("leader c form = %+v, want one on gx", m.create)
 	}
 }
@@ -106,7 +107,7 @@ func TestCreate_WithNoSessionsDefaultsToTheCwdProject(t *testing.T) {
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 30})
 	m.terminalFocused = false
 	m = step(t, m, letter("c"))
-	if m.create == nil || m.create.projects[m.create.project].Name != "gx" {
+	if m.create == nil || m.create.selectedProject() != "gx" {
 		t.Fatalf("form = %+v, want one on the cwd project gx", m.create)
 	}
 }
@@ -114,7 +115,7 @@ func TestCreate_WithNoSessionsDefaultsToTheCwdProject(t *testing.T) {
 func TestCreate_SelectedSessionBeatsTheCwdProject(t *testing.T) {
 	m := createModel(t, &fakeSessionClient{}).WithCwdProject("web")
 	m = step(t, m, letter("c"))
-	if m.create == nil || m.create.projects[m.create.project].Name != "gx" {
+	if m.create == nil || m.create.selectedProject() != "gx" {
 		t.Fatalf("form = %+v, want one on the selected session's project gx", m.create)
 	}
 }
@@ -162,12 +163,12 @@ func TestCreate_SubmitSendsTheFieldsAndPanelSize(t *testing.T) {
 func TestCreate_NewWorktreeAsksForAName(t *testing.T) {
 	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "new"}}}
 	m := step(t, createModel(t, f), letter("c"))
-	m = typeKeys(t, m, keyUpMsg, tab, letter("f"), letter("t"))
+	m = typeKeys(t, m, letter("g"), letter("x"), letter(" "), letter("n"), letter("e"), letter("w"), tab, letter("f"), letter("t"))
 	if !strings.Contains(plainView(m), "Worktree") {
 		t.Fatal("new worktree did not ask for a name")
 	}
 	m = step(t, m, keyEnterMsg)
-	if got := lastCreate(t, f); got.Worktree != "ft" || got.Dir != "" {
+	if got := lastCreate(t, f); got.Project != "gx" || got.Worktree != "ft" || got.Dir != "" {
 		t.Fatalf("create = %+v, want worktree ft and no dir", got)
 	}
 }
@@ -200,5 +201,73 @@ func TestCreate_PrefilledFormIsEditable(t *testing.T) {
 	got := lastCreate(t, f)
 	if got.Project != "gx" || got.Dir != "/r/gx/wt1" || got.Name != "plax" || got.Prompt != "read it" || got.Ticket != "gx:e/7" {
 		t.Fatalf("create = %+v", got)
+	}
+}
+
+func TestCreate_PickerGroupsEveryProjectFocusedFirst(t *testing.T) {
+	m := step(t, createModel(t, &fakeSessionClient{}), letter("c"))
+	view := ansi.Strip(m.renderCreate())
+	gx, web := strings.Index(view, "\n│   gx "), strings.Index(view, "\n│   web ")
+	if gx < 0 || web < 0 || gx > web {
+		t.Fatalf("want a gx header before a web header:\n%s", view)
+	}
+	if strings.Count(view, newWorktreeLabel) != 2 {
+		t.Fatalf("want a new worktree entry per project:\n%s", view)
+	}
+}
+
+func TestCreate_TypingFuzzyFiltersAcrossProjects(t *testing.T) {
+	f := &fakeSessionClient{result: server.SessionResult{Session: &server.SessionInfo{ID: "new"}}}
+	m := step(t, createModel(t, f), letter("c"))
+	m = typeKeys(t, m, letter("W"), letter("b"))
+	view := ansi.Strip(m.renderCreate())
+	if strings.Contains(view, "/r/gx") || !strings.Contains(view, "/r/web") {
+		t.Fatalf("query wb should keep only web:\n%s", view)
+	}
+	m = step(t, m, keyEnterMsg)
+	if got := lastCreate(t, f); got.Project != "web" || got.Dir != "/r/web" {
+		t.Fatalf("create = %+v, want web at /r/web", got)
+	}
+}
+
+func TestCreate_TermsMatchProjectAndDirSeparately(t *testing.T) {
+	m := step(t, createModel(t, &fakeSessionClient{}), letter("c"))
+	m = typeKeys(t, m, letter("g"), letter(" "), letter("w"), letter("2"))
+	if e, ok := m.create.selected(); !ok || e.dir != "/r/gx/wt2" || len(m.create.matches) != 1 {
+		t.Fatalf("matches = %+v, want only /r/gx/wt2", m.create.matches)
+	}
+}
+
+func TestCreate_NoMatchRefusesToSubmit(t *testing.T) {
+	f := &fakeSessionClient{}
+	m := step(t, createModel(t, f), letter("c"))
+	m = typeKeys(t, m, letter("z"), letter("z"))
+	m = step(t, m, keyEnterMsg)
+	view := ansi.Strip(m.renderCreate())
+	if !strings.Contains(view, "no matches") || !strings.Contains(view, `nothing matches "zz"`) {
+		t.Fatalf("want no matches and a refusal:\n%s", view)
+	}
+	if len(f.creates) != 0 {
+		t.Fatalf("creates = %+v, want none", f.creates)
+	}
+}
+
+func TestCreate_PickerScrollsToKeepTheSelectionVisible(t *testing.T) {
+	m := createModel(t, &fakeSessionClient{})
+	m.listProjects = func() ([]formProject, error) {
+		var wts []string
+		for i := range 30 {
+			wts = append(wts, "/r/gx/wt"+strconv.Itoa(i))
+		}
+		return []formProject{{Name: "gx", Root: "/r/gx", Worktrees: wts}}, nil
+	}
+	m = step(t, m, letter("c"))
+	if strings.Contains(ansi.Strip(m.renderCreate()), "/r/gx/wt29 ") {
+		t.Fatal("the last worktree should start off-screen")
+	}
+	m = typeKeys(t, m, keyUpMsg, keyUpMsg)
+	view := ansi.Strip(m.renderCreate())
+	if !strings.Contains(view, "/r/gx/wt29 ") || strings.Contains(view, "/r/gx/wt0 ") {
+		t.Fatalf("up from the top should scroll to the end:\n%s", view)
 	}
 }
