@@ -9,7 +9,12 @@ import (
 
 // RunTestHolder runs a holder with h as its harness.
 func RunTestHolder(dir string, h harness.Harness, argv []string) error {
-	return runHolder(dir, h, argv)
+	return runHolder(dir, h, "", argv)
+}
+
+// RunTestSessionHolder runs a holder for the gx session gxSession.
+func RunTestSessionHolder(dir string, h harness.Harness, gxSession string, argv []string) error {
+	return runHolder(dir, h, gxSession, argv)
 }
 
 // PS is the real process table.

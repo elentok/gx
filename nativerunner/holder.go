@@ -22,10 +22,15 @@ import (
 
 // Files the holder keeps in a pty agent directory.
 const (
-	RawLogFile   = "raw.log"
-	ScreenFile   = "screen.txt"
-	ExitCodeFile = "exit-code"
+	RawLogFile = "raw.log"
+	ScreenFile = "screen.txt"
+	// LastScreenFile is the last screen as styled ANSI rows.
+	LastScreenFile = "last-screen.ansi"
+	ExitCodeFile   = "exit-code"
 )
+
+// AgentSessionEnv carries the gx session id into the child's env.
+const AgentSessionEnv = "GX_AGENT_SESSION"
 
 // The pty is wide so claude's TUI wraps as little as possible.
 const (
@@ -43,15 +48,16 @@ var holderAfterExit = func() {}
 
 // RunHolder runs a claude holder; see RunHarnessHolder.
 func RunHolder(dir string, argv []string) error {
-	return RunHarnessHolder(dir, harness.Claude, argv)
+	return RunHarnessHolder(dir, harness.Claude, "", argv)
 }
 
 // RunHarnessHolder runs argv in a pty, appends its output to raw.log in dir
 // and feeds it to a screen, while kind's harness watches the child. Once the
 // child exits it saves the last screen and the exit code to dir and returns.
-// The caller starts the holder in its own session, so it outlives whoever
+// A non-empty gxSession goes into the child's env as AgentSessionEnv. The
+// caller starts the holder in its own session, so it outlives whoever
 // launched it.
-func RunHarnessHolder(dir string, kind agentrunner.Kind, argv []string) error {
+func RunHarnessHolder(dir string, kind agentrunner.Kind, gxSession string, argv []string) error {
 	if len(argv) == 0 {
 		return errors.New("agent-holder: no command to run")
 	}
@@ -59,10 +65,10 @@ func RunHarnessHolder(dir string, kind agentrunner.Kind, argv []string) error {
 	if err != nil {
 		return err
 	}
-	return runHolder(dir, h, argv)
+	return runHolder(dir, h, gxSession, argv)
 }
 
-func runHolder(dir string, h harness.Harness, argv []string) error {
+func runHolder(dir string, h harness.Harness, gxSession string, argv []string) error {
 	rawLog, err := os.OpenFile(filepath.Join(dir, RawLogFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
@@ -94,6 +100,9 @@ func runHolder(dir string, h harness.Harness, argv []string) error {
 	defer ln.Close()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
+	if gxSession != "" {
+		cmd.Env = append(os.Environ(), AgentSessionEnv+"="+gxSession)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
 	spawned := time.Now()
 	if err := cmd.Start(); err != nil {
@@ -111,13 +120,18 @@ func runHolder(dir string, h harness.Harness, argv []string) error {
 	// Only claude's pid status backs the frozen status and deny-reason ops.
 	pid, _ := watcher.(*harness.PidWatcher)
 	srv := &holderServer{
-		scr:    scr,
-		ptmx:   ptmx,
-		proc:   cmd.Process,
-		pid:    pid,
-		ops:    holderOptionalOps,
-		exited: exited,
+		scr:      scr,
+		ptmx:     ptmx,
+		proc:     cmd.Process,
+		pid:      pid,
+		watcher:  watcher,
+		ops:      holderOptionalOps,
+		exited:   exited,
+		finished: make(chan struct{}),
 	}
+	// Runs before ln.Close, so watch streams get their exit before the
+	// socket goes.
+	defer srv.finish()
 	go srv.serve(ln)
 	drained := make(chan struct{})
 	go func() {
@@ -147,6 +161,9 @@ func runHolder(dir string, h harness.Harness, argv []string) error {
 		return waitErr
 	}
 	if err := os.WriteFile(filepath.Join(dir, ScreenFile), []byte(strings.Join(scr.Rows(), "\n")+"\n"), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, LastScreenFile), []byte(strings.Join(scr.StyledRows(), "\n")+"\n"), 0o644); err != nil {
 		return err
 	}
 	// ExitCode is -1 for a child killed by a signal.

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"syscall"
 	"time"
 
@@ -36,11 +38,19 @@ const (
 // then the reason as a prompt, as one step.
 const OpDenyReason = "deny-reason"
 
+// OpWatch upgrades the connection to a stream of StreamStatus messages, one
+// per change, ending in StreamExit. A close without StreamExit means the
+// holder died.
+const OpWatch = "watch"
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason}
+var holderOptionalOps = []string{OpDenyReason, OpWatch}
 
 const (
 	holderIOTimeout = 5 * time.Second
+	// holderWatchPoll is how often a watch stream checks the Watch, which has
+	// no change signal of its own.
+	holderWatchPoll = 100 * time.Millisecond
 	// holderStopGrace is how long stop waits for the child to exit on
 	// SIGTERM before it kills it.
 	holderStopGrace = 5 * time.Second
@@ -77,11 +87,20 @@ type holderServer struct {
 	ptmx *os.File
 	proc *os.Process
 	// pid is nil for a harness without claude's pid status.
-	pid *harness.PidWatcher
-	ops []string
+	pid     *harness.PidWatcher
+	watcher harness.Watcher
+	ops     []string
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
 	exitCode int
+	// finished closes once the holder has saved the child's exit, so a watch
+	// stream's StreamExit never beats the last-screen file.
+	finished chan struct{}
+
+	mu        sync.Mutex
+	finishing bool
+	// streams counts watch streams still sending, which finish waits for.
+	streams sync.WaitGroup
 }
 
 func (h *holderServer) serve(ln net.Listener) {
@@ -99,6 +118,10 @@ func (h *holderServer) handle(conn net.Conn) {
 	_ = conn.SetDeadline(time.Now().Add(holderIOTimeout))
 	var req holderRequest
 	if err := json.NewDecoder(conn).Decode(&req); err != nil {
+		return
+	}
+	if req.Op == OpWatch && slices.Contains(h.ops, OpWatch) {
+		h.watch(conn)
 		return
 	}
 	resp, after := h.answer(req)
@@ -178,6 +201,67 @@ func (h *holderServer) denyReason(reason string) error {
 	return nil
 }
 
+// watch streams the Watch's status until the holder finishes, then the exit.
+// The status op is frozen, so this is its push-based successor.
+func (h *holderServer) watch(conn net.Conn) {
+	if h.startStream() {
+		defer h.streams.Done()
+	}
+	_ = conn.SetDeadline(time.Time{})
+	// The client sends nothing more; its reads end when it hangs up.
+	gone := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(io.Discard, conn)
+		close(gone)
+	}()
+	send := func(typ StreamType, v any) error {
+		_ = conn.SetWriteDeadline(time.Now().Add(holderIOTimeout))
+		return writeStreamMessage(conn, typ, v)
+	}
+	tick := time.NewTicker(holderWatchPoll)
+	defer tick.Stop()
+	var last *streamStatus
+	for {
+		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID())
+		if last == nil || cur != *last {
+			if send(StreamStatus, cur) != nil {
+				return
+			}
+			last = &cur
+		}
+		select {
+		case <-h.finished:
+			_ = send(StreamExit, streamExit{Code: h.exitCode})
+			return
+		case <-gone:
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+// startStream counts a new watch stream unless the holder is finishing, when
+// the stream sends its exit at once and finish need not wait for it.
+func (h *holderServer) startStream() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.finishing {
+		return false
+	}
+	h.streams.Add(1)
+	return true
+}
+
+// finish tells the watch streams the exit is saved and waits for them to
+// send it.
+func (h *holderServer) finish() {
+	h.mu.Lock()
+	h.finishing = true
+	h.mu.Unlock()
+	close(h.finished)
+	h.streams.Wait()
+}
+
 // stop ends the child's whole session; the holder exits once the child does.
 func (h *holderServer) stop() {
 	pgid := -h.proc.Pid
@@ -250,6 +334,64 @@ func (c *HolderClient) DenyWithReason(reason string) error {
 	_, err := c.callWithin(holderRequest{Op: OpDenyReason, Reason: reason}, holderIOTimeout+2*holderDenyTimeout)
 	return err
 }
+
+// Watch opens the optional watch stream; check Supports first.
+func (c *HolderClient) Watch() (*HolderWatch, error) {
+	conn, err := net.DialTimeout("unix", c.sock, holderIOTimeout)
+	if err != nil {
+		return nil, err
+	}
+	_ = conn.SetWriteDeadline(time.Now().Add(holderIOTimeout))
+	if err := json.NewEncoder(conn).Encode(holderRequest{Op: OpWatch}); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	_ = conn.SetWriteDeadline(time.Time{})
+	return &HolderWatch{conn: conn}, nil
+}
+
+// HolderWatch is a live watch stream.
+type HolderWatch struct {
+	conn net.Conn
+}
+
+// WatchMessage is one message off a watch stream. Status and ConversationID
+// are set for StreamStatus, ExitCode for StreamExit.
+type WatchMessage struct {
+	Type           StreamType
+	Status         harness.Status
+	ConversationID string
+	ExitCode       int
+}
+
+// Next blocks for the next message, skipping types it does not know. An
+// error before a StreamExit means the holder died.
+func (w *HolderWatch) Next() (WatchMessage, error) {
+	for {
+		typ, payload, err := readStreamMessage(w.conn)
+		if err != nil {
+			return WatchMessage{}, err
+		}
+		switch typ {
+		case StreamStatus:
+			var s streamStatus
+			if err := json.Unmarshal(payload, &s); err != nil {
+				return WatchMessage{}, err
+			}
+			return WatchMessage{Type: typ, Status: s.status(), ConversationID: s.ConversationID}, nil
+		case StreamExit:
+			var e streamExit
+			if err := json.Unmarshal(payload, &e); err != nil {
+				return WatchMessage{}, err
+			}
+			return WatchMessage{Type: typ, ExitCode: e.Code}, nil
+		case StreamInput:
+			return WatchMessage{Type: typ}, nil
+		}
+	}
+}
+
+func (w *HolderWatch) Close() error { return w.conn.Close() }
 
 func (c *HolderClient) call(req holderRequest) (holderResponse, error) {
 	return c.callWithin(req, holderIOTimeout)

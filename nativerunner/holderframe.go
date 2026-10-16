@@ -1,0 +1,92 @@
+package nativerunner
+
+import (
+	"encoding/binary"
+	"encoding/json"
+	"fmt"
+	"io"
+
+	"github.com/elentok/gx/harness"
+)
+
+// StreamType is a holder.sock stream message's type. Types are append-only:
+// a reader skips a type it does not know, so an older client keeps working
+// against a newer holder.
+type StreamType uint8
+
+const (
+	// StreamStatus carries the Watch's Session status and conversation id.
+	StreamStatus StreamType = iota + 1
+	// StreamExit carries the child's exit code; nothing follows it.
+	StreamExit
+	// StreamInput says a client typed or pasted on an attach; its payload is
+	// an empty object.
+	StreamInput
+)
+
+// maxStreamPayload bounds one stream message; a bigger one ends the stream
+// with an error.
+const maxStreamPayload = 2 << 20
+
+// A stream message is [u32 payload length][u8 type][JSON payload], the
+// length big-endian.
+func writeStreamMessage(w io.Writer, typ StreamType, v any) error {
+	payload, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	if len(payload) > maxStreamPayload {
+		return fmt.Errorf("holder stream message of %d bytes is too big", len(payload))
+	}
+	msg := binary.BigEndian.AppendUint32(nil, uint32(len(payload)))
+	msg = append(msg, byte(typ))
+	_, err = w.Write(append(msg, payload...))
+	return err
+}
+
+func readStreamMessage(r io.Reader) (StreamType, []byte, error) {
+	var head [5]byte
+	if _, err := io.ReadFull(r, head[:]); err != nil {
+		return 0, nil, err
+	}
+	n := binary.BigEndian.Uint32(head[:4])
+	if n > maxStreamPayload {
+		return 0, nil, fmt.Errorf("holder stream message of %d bytes is too big", n)
+	}
+	payload := make([]byte, n)
+	if _, err := io.ReadFull(r, payload); err != nil {
+		return 0, nil, err
+	}
+	return StreamType(head[4]), payload, nil
+}
+
+// streamStatus is StreamStatus's payload.
+type streamStatus struct {
+	State          harness.State       `json:"state"`
+	Background     bool                `json:"background,omitempty"`
+	Cancelled      bool                `json:"cancelled,omitempty"`
+	Blocked        harness.BlockedKind `json:"blocked,omitempty"`
+	Message        string              `json:"message,omitempty"`
+	ConversationID string              `json:"conversation_id,omitempty"`
+}
+
+func newStreamStatus(s harness.Status, conversationID string) streamStatus {
+	return streamStatus{
+		State:          s.State,
+		Background:     s.Background,
+		Cancelled:      s.Cancelled,
+		Blocked:        s.Blocked,
+		Message:        s.Message,
+		ConversationID: conversationID,
+	}
+}
+
+func (s streamStatus) status() harness.Status {
+	return harness.Status{State: s.State, Background: s.Background, Cancelled: s.Cancelled, Blocked: s.Blocked, Message: s.Message}
+}
+
+// streamExit is StreamExit's payload. Code is -1 for a child killed by a
+// signal.
+type streamExit struct {
+	Code int `json:"code"`
+}
