@@ -167,6 +167,10 @@ func (s span) clip(width int) span {
 	return s
 }
 
+func (s span) contains(x int) bool {
+	return x >= s.start && x < s.end
+}
+
 // activeViewLabel names the page on screen: the top of the history stack on a
 // drill-down, else the live tab.
 func (m Model) activeViewLabel() string {

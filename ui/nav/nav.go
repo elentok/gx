@@ -111,6 +111,22 @@ func IsOpenSwitcher(msg tea.Msg) bool {
 	return ok
 }
 
+type openHelpMsg struct{}
+
+// OpenHelp asks the active page to open its help, as its "?" key does. It is
+// a message rather than a synthetic "?" key so a focused input or the agents
+// terminal never receives the keystroke.
+func OpenHelp() tea.Cmd {
+	return func() tea.Msg {
+		return openHelpMsg{}
+	}
+}
+
+func IsOpenHelp(msg tea.Msg) bool {
+	_, ok := msg.(openHelpMsg)
+	return ok
+}
+
 func Back() tea.Cmd {
 	return func() tea.Msg {
 		return backMsg{}

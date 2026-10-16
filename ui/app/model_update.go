@@ -49,9 +49,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if mouse, ok := msg.(tea.MouseMsg); ok {
 		if click, ok := mouse.(tea.MouseClickMsg); ok && click.Button == tea.MouseLeft && click.Y == 0 {
-			if left := m.renderTitleRow(m.width).left; click.X >= left.start && click.X < left.end {
+			row := m.renderTitleRow(m.width)
+			if row.left.contains(click.X) {
 				next, cmd := m.openSwitcher()
 				return next, tea.Batch(notifyCmd, cmd)
+			}
+			if row.help.contains(click.X) {
+				return m, tea.Batch(notifyCmd, nav.OpenHelp())
 			}
 		}
 		pageMsg, onPage := toPageMouse(mouse)

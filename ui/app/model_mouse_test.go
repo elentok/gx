@@ -149,7 +149,7 @@ func TestMouseOnChromeRowsStaysWithApp(t *testing.T) {
 
 	for _, msg := range []tea.MouseMsg{
 		tea.MouseClickMsg{X: 3, Y: 0, Button: tea.MouseLeft},
-		tea.MouseClickMsg{X: m.width - 2, Y: 0, Button: tea.MouseLeft},
+		tea.MouseClickMsg{X: m.width / 2, Y: 0, Button: tea.MouseLeft},
 		tea.MouseClickMsg{X: 3, Y: 1, Button: tea.MouseLeft},
 		tea.MouseWheelMsg{X: 3, Y: 1, Button: tea.MouseWheelDown},
 		tea.MouseMotionMsg{X: 3, Y: 0},
@@ -163,6 +163,79 @@ func TestMouseOnChromeRowsStaysWithApp(t *testing.T) {
 	}
 	if got := m.navState.ActiveTab(); got != nav.TabWorktrees {
 		t.Fatalf("active tab = %q, want unchanged", got)
+	}
+}
+
+// focusedRecorderStub reports a focused text input, which keeps shell keys
+// away from the page; the help click must still reach it.
+type focusedRecorderStub struct{ *mouseRecorderStub }
+
+func (focusedRecorderStub) InputFocused() bool { return true }
+
+func (s focusedRecorderStub) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	s.mouseRecorderStub.Update(msg)
+	return s, nil
+}
+
+func openHelpCount(msgs []tea.Msg) int {
+	n := 0
+	for _, msg := range msgs {
+		if nav.IsOpenHelp(msg) {
+			n++
+		}
+	}
+	return n
+}
+
+func TestHelpClickSendsOpenHelpToPage(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		width    int
+		help     string
+		focusing bool
+	}{
+		{"full", 120, "? help", false},
+		{"short", 30, "?", false},
+		{"input focused", 120, "? help", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			m, stub := withStubPage(newAppForMouseTest(t))
+			if tc.focusing {
+				live := m.livePageByTab[nav.TabWorktrees]
+				live.model = focusedRecorderStub{stub}
+				m.livePageByTab[nav.TabWorktrees] = live
+			}
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 30})
+			m = updated.(Model)
+			row := m.renderTitleRow(m.width)
+			if got := ansi.Cut(ansi.Strip(row.line), row.help.start, row.help.end); got != tc.help {
+				t.Fatalf("help span = %q, want %q", got, tc.help)
+			}
+
+			updated, cmd := m.Update(tea.MouseClickMsg{X: row.help.start, Y: 0, Button: tea.MouseLeft})
+			runAppCmd(updated.(Model), cmd)
+
+			if got := openHelpCount(stub.received); got != 1 {
+				t.Fatalf("page got %d OpenHelp msgs, want 1 (received %#v)", got, stub.received)
+			}
+		})
+	}
+}
+
+func TestClickOffHelpSendsNoOpenHelp(t *testing.T) {
+	t.Parallel()
+	m, stub := withStubPage(newAppForMouseTest(t))
+	row := m.renderTitleRow(m.width)
+
+	for _, x := range []int{0, row.left.end, row.help.start - 1, row.help.end} {
+		updated, cmd := m.Update(tea.MouseClickMsg{X: x, Y: 0, Button: tea.MouseLeft})
+		m = runAppCmd(updated.(Model), cmd)
+	}
+
+	if got := openHelpCount(stub.received); got != 0 {
+		t.Fatalf("page got %d OpenHelp msgs, want 0", got)
 	}
 }
 
