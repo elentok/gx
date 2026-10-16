@@ -15,7 +15,9 @@ import (
 	"github.com/creack/pty"
 	"golang.org/x/sys/unix"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/screen"
+	"github.com/elentok/gx/harness"
 )
 
 // Files the holder keeps in a pty agent directory.
@@ -39,13 +41,23 @@ const holderDrainTimeout = time.Second
 // hold the holder there.
 var holderAfterExit = func() {}
 
-// RunHolder runs argv in a pty, appends its output to raw.log in dir and
-// feeds it to a screen. Once the child exits it saves the last screen and
-// the exit code to dir and returns. The caller starts the holder in its own
-// session, so it outlives whoever launched it.
+// RunHolder runs a claude holder; see RunHarnessHolder.
 func RunHolder(dir string, argv []string) error {
+	return RunHarnessHolder(dir, harness.Claude, argv)
+}
+
+// RunHarnessHolder runs argv in a pty, appends its output to raw.log in dir
+// and feeds it to a screen, while kind's harness watches the child. Once the
+// child exits it saves the last screen and the exit code to dir and returns.
+// The caller starts the holder in its own session, so it outlives whoever
+// launched it.
+func RunHarnessHolder(dir string, kind agentrunner.Kind, argv []string) error {
 	if len(argv) == 0 {
 		return errors.New("agent-holder: no command to run")
+	}
+	h, err := harness.Lookup(kind)
+	if err != nil {
+		return err
 	}
 	rawLog, err := os.OpenFile(filepath.Join(dir, RawLogFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
@@ -68,11 +80,6 @@ func RunHolder(dir string, argv []string) error {
 		_ = tty.Close()
 		return err
 	}
-	sessionsDir, err := ClaudeSessionsDir()
-	if err != nil {
-		_ = tty.Close()
-		return err
-	}
 	ln, err := net.Listen("unix", filepath.Join(dir, HolderSocketFile))
 	if err != nil {
 		_ = tty.Close()
@@ -89,16 +96,25 @@ func RunHolder(dir string, argv []string) error {
 		_ = tty.Close()
 		return err
 	}
+	exited := make(chan struct{})
+	watcher, err := h.Watch(cmd.Process.Pid, spawned, exited)
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		_ = tty.Close()
+		return err
+	}
+	// Only claude's pid status backs the frozen status and deny-reason ops.
+	pid, _ := watcher.(*harness.PidWatcher)
 	srv := &holderServer{
 		scr:    scr,
 		ptmx:   ptmx,
 		proc:   cmd.Process,
-		pid:    newPidWatcher(sessionsDir, cmd.Process.Pid, spawned),
+		pid:    pid,
 		ops:    holderOptionalOps,
-		exited: make(chan struct{}),
+		exited: exited,
 	}
 	go srv.serve(ln)
-	go srv.pid.watch(srv.exited)
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)

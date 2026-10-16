@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
+	"github.com/elentok/gx/harness"
 )
 
 // HolderSocketFile is the holder's unix socket in a pty agent directory.
@@ -75,8 +76,9 @@ type holderServer struct {
 	scr  *screen.Screen
 	ptmx *os.File
 	proc *os.Process
-	pid  *pidWatcher
-	ops  []string
+	// pid is nil for a harness without claude's pid status.
+	pid *harness.PidWatcher
+	ops []string
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
 	exitCode int
@@ -122,7 +124,10 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 			return holderResponse{Error: fmt.Sprintf("claude exited (code %d)", h.exitCode)}, nil
 		default:
 		}
-		claude, turn := h.pid.state()
+		if h.pid == nil {
+			return holderResponse{}, nil
+		}
+		claude, turn := h.pid.PidState()
 		return holderResponse{Claude: claude, Turn: turn}, nil
 	case opScreen:
 		return holderResponse{Screen: h.scr.Rows(), Scrollback: h.scr.ScrollbackTail(req.Scrollback)}, nil
@@ -147,12 +152,15 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 // claude has taken the reason, so a status reader never sees the idle gap
 // between Esc and the reason, nor the one before claude starts on it.
 func (h *holderServer) denyReason(reason string) error {
-	h.pid.hold()
-	defer h.pid.release()
+	if h.pid == nil {
+		return errors.New("deny-reason needs claude's pid status")
+	}
+	h.pid.Hold()
+	defer h.pid.Release()
 	if _, err := h.ptmx.Write([]byte("\x1b")); err != nil {
 		return err
 	}
-	typedAt, ok := h.pid.waitLive(holderDenyTimeout, func(s PidStatus, _ int) bool { return s.Status == ClaudeIdle })
+	typedAt, ok := h.pid.WaitLive(holderDenyTimeout, func(s PidStatus, _ int) bool { return s.Status == ClaudeIdle })
 	if !ok {
 		return errors.New("claude did not go idle after Esc")
 	}
@@ -164,7 +172,7 @@ func (h *holderServer) denyReason(reason string) error {
 	if _, err := h.ptmx.Write([]byte("\r")); err != nil {
 		return err
 	}
-	if _, ok := h.pid.waitLive(holderDenyTimeout, func(_ PidStatus, turn int) bool { return turn > typedAt }); !ok {
+	if _, ok := h.pid.WaitLive(holderDenyTimeout, func(_ PidStatus, turn int) bool { return turn > typedAt }); !ok {
 		return errors.New("claude did not take the reason")
 	}
 	return nil

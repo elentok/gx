@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
 )
 
 // ptyRunnerName is the Runner value a pty agent records in meta.json.
@@ -173,8 +174,8 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 			if err != nil {
 				return err
 			}
-			if claudeui.ClassifyStartup(claudeui.ScreenText(scrolled, rows)) == claudeui.StartupTrust {
-				if err := ss.holder.SendKeys(claudeui.TrustKey(rows)); err != nil {
+			if startup := ptyHarness.StartupScreen(scrolled, rows); startup.Dialog == harness.TrustDialog {
+				if err := ss.holder.SendKeys(startup.Key); err != nil {
 					return err
 				}
 				nextTrustKey = time.Now().Add(trustKeyRepeat)
@@ -324,27 +325,35 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 		}
 		holder = []string{exe, "agent-holder"}
 	}
-	claude := p.Claude
-	if claude == "" {
-		claude = "claude"
+	launch := ptyHarness.Launch(harness.LaunchOptions{SessionID: sessionID, Args: ptyLaunchArgs(opts.Args), Env: opts.Env})
+	if p.Claude != "" {
+		launch.Name = p.Claude
 	}
 	args := slices.Concat(holder[1:],
 		// The holder takes the session id too, so its cmdline passes the
 		// liveness check like claude's.
-		[]string{"--session-id", sessionID, "--dir", dir, "--", claude},
-		ptyLaunchArgs(sessionID, opts.Args))
+		[]string{"--session-id", sessionID, "--harness", string(harness.Claude), "--dir", dir, "--", launch.Name},
+		launch.Args)
 	cmd := exec.Command(holder[0], args...)
 	cmd.Dir = opts.Cwd
-	cmd.Env = LaunchEnv(os.Environ(), opts.Env)
+	cmd.Env = launch.Env
 	if err := StartDetached(cmd); err != nil {
 		return nil, err
 	}
 	return cmd, nil
 }
 
-func ptyLaunchArgs(sessionID string, extra []string) []string {
+// ptyHarness is the loop's harness: always claude.
+var ptyHarness = func() harness.Harness {
+	h, err := harness.Lookup(harness.Claude)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}()
+
+func ptyLaunchArgs(extra []string) []string {
 	return append([]string{
-		"--session-id", sessionID,
 		"--permission-mode", "auto",
 		// The main screen keeps a scrollback to read back.
 		"--settings", `{"tui":"default"}`,

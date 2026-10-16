@@ -7,9 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
-	"strings"
 	"syscall"
+
+	"github.com/elentok/gx/harness"
 )
 
 // Launch helpers shared by the headless runner, the pty runner and the holder.
@@ -35,17 +35,9 @@ type Meta struct {
 	Offset int64 `json:"offset"`
 }
 
-// LaunchEnv drops only the vars that make claude think it is nested inside
-// another claude session, which would stop it saving its transcript and its
-// pid status file.
-func LaunchEnv(base, extra []string) []string {
-	env := slices.DeleteFunc(slices.Clone(base), func(kv string) bool {
-		name, _, _ := strings.Cut(kv, "=")
-		return name == "CLAUDECODE" || name == "CLAUDE_CODE_ENTRYPOINT" || name == "CLAUDE_CODE_CHILD_SESSION"
-	})
-	env = append(env, "DISABLE_AUTOUPDATER=1")
-	return append(env, extra...)
-}
+// LaunchEnv is the claude harness's launch environment, which the headless
+// runner shares.
+var LaunchEnv = harness.LaunchEnv
 
 // StartDetached starts cmd in its own session so it outlives the server and
 // its pid leads a process group that can be signalled as a whole.
