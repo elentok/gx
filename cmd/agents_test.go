@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
+	"net/http"
 	"path/filepath"
 	"testing"
 
@@ -50,6 +52,42 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	var refused server.SessionResult
 	if err := json.Unmarshal(out.Bytes(), &refused); err != nil || !refused.Refused || refused.Reason != server.ReasonSessionBadRequest {
 		t.Errorf("create without project = %s, want refused %s", out.String(), server.ReasonSessionBadRequest)
+	}
+}
+
+func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.CreateSessionRequest
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/sessions/create" {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(server.SessionResult{Session: &server.SessionInfo{ID: "s1", Name: got.Worktree}})
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	cmd := newAgentsCreateCmd(func() (*apiclient.Client, error) { return apiclient.New(sock), nil })
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--project", "proj", "--worktree", "feat", "--prompt", "fix the bug", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got.Worktree != "feat" || got.Prompt != "fix the bug" || got.Dir != "" {
+		t.Errorf("request = %+v, want worktree and prompt with no dir", got)
+	}
+	var res server.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil || res.Session == nil || res.Session.ID != "s1" {
+		t.Errorf("output = %q, %v; want the created session as JSON", out.String(), err)
 	}
 }
 

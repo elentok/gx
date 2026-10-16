@@ -20,7 +20,7 @@ import (
 func newAgentsCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
-	cmd.AddCommand(newAgentsCreateCmd(), newAgentsListCmd(),
+	cmd.AddCommand(newAgentsCreateCmd(serverClient), newAgentsListCmd(),
 		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
 		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession),
 		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
@@ -102,23 +102,27 @@ func newAgentsReportFocusCmd() *cobra.Command {
 	return cmd
 }
 
-func newAgentsCreateCmd() *cobra.Command {
+func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command {
 	var jsonOut bool
 	var req server.CreateSessionRequest
 	cmd := &cobra.Command{
-		Use:   "create --project <name> [--dir <dir>]",
+		Use:   "create --project <name> [--dir <dir> | --worktree <name>] [--prompt <text>]",
 		Short: "start an interactive session (prints its id)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			if req.Dir == "" {
-				req.Dir = "."
+			// The route refuses a dir and a worktree together, so only a
+			// dir-run session defaults to the current dir.
+			if req.Worktree == "" {
+				if req.Dir == "" {
+					req.Dir = "."
+				}
+				dir, err := filepath.Abs(req.Dir)
+				if err != nil {
+					return err
+				}
+				req.Dir = dir
 			}
-			dir, err := filepath.Abs(req.Dir)
-			if err != nil {
-				return err
-			}
-			req.Dir = dir
-			cl, err := serverClient()
+			cl, err := client()
 			if err != nil {
 				return err
 			}
@@ -127,6 +131,9 @@ func newAgentsCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&req.Project, "project", "", "the project the session belongs to")
 	cmd.Flags().StringVar(&req.Dir, "dir", "", "the dir the agent runs in (default the current dir)")
+	cmd.Flags().StringVar(&req.Worktree, "worktree", "", "make a new worktree from trunk with this name and run there")
+	cmd.Flags().StringVar(&req.Prompt, "prompt", "", "the first prompt, typed at the session's first Idle")
+	cmd.MarkFlagsMutuallyExclusive("dir", "worktree")
 	cmd.Flags().StringVar(&req.Name, "name", "", "the session's name")
 	cmd.Flags().StringVar(&req.Ticket, "ticket", "", "the Session ticket's address")
 	cmd.Flags().StringVar(&req.Harness, "harness", "", "the harness to run (default claude)")
