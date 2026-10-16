@@ -72,6 +72,9 @@ type IconSet struct {
 	AgentStarting string
 	AgentExited   string
 	Unread        string
+	// SessionLive marks a Tickets-tab row whose epic or ticket a live
+	// interactive session is linked to.
+	SessionLive string
 }
 
 func Icons(useNerdFont bool) IconSet {
@@ -126,6 +129,7 @@ func Icons(useNerdFont bool) IconSet {
 			AgentStarting: "~",
 			AgentExited:   "x",
 			Unread:        "+",
+			SessionLive:   ">",
 		}
 	}
 	return IconSet{
@@ -178,5 +182,6 @@ func Icons(useNerdFont bool) IconSet {
 		AgentStarting: "",
 		AgentExited:   "",
 		Unread:        "",
+		SessionLive:   "\uf120",
 	}
 }

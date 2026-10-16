@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tree"
@@ -47,6 +48,7 @@ var (
 	// distinct from every status color so it reads as an affordance, not a
 	// status signal.
 	suggestedActionBadgeStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow).Bold(true)
+	sessionMarkerStyle        = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 
@@ -134,7 +136,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if m.isCollapsed(epic) {
 		glyph = m.icons().TriangleCollapsed
 	}
-	line := fmt.Sprintf("%s %s %s (%d done / %d)", glyph, m.checkboxGlyph(m.epicChecked(epic)), epic.Name, epic.DoneCount(), epic.TotalCount())
+	line := fmt.Sprintf("%s %s %s%s (%d done / %d)", glyph, m.checkboxGlyph(m.epicChecked(epic)), epic.Name, m.sessionMarker(epic.Name), epic.DoneCount(), epic.TotalCount())
 	// Dimming tracks "every ticket done", not the current collapse toggle —
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
@@ -207,7 +209,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		}
 		line += " " + badgeStyle.Render(m.icons().SuggestedAction)
 	}
-	line += " " + titleStyle.Render(title)
+	line += " " + titleStyle.Render(title) + m.sessionMarker(t.Path)
 	if suffix := blockedBySuffix(epic, t, status); suffix != "" {
 		suffixStyle := blockedBySuffixStyle
 		if searchDim {
@@ -223,6 +225,17 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		return []string{appendRowMetrics(line, metrics, ui.StyleDim)}
 	}
 	return []string{appendRowMetrics(line, metrics, style)}
+}
+
+// sessionMarker is " <glyph>" when a live interactive session's Session
+// ticket is address, so nobody starts a second session on it; "" otherwise.
+func (m Model) sessionMarker(address string) string {
+	for _, s := range m.vm.Sessions {
+		if s.Ticket == address && s.Status.State != server.SessionExited {
+			return " " + sessionMarkerStyle.Render(m.icons().SessionLive)
+		}
+	}
+	return ""
 }
 
 // checkboxGlyph renders the execution-queue checkbox marker for a checked or
