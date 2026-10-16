@@ -88,6 +88,16 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 	}()
 
+	// The title row's help click always opens the stash help, even with the
+	// detail panel focused, where "?" would open the detail's help instead.
+	if nav.IsOpenHelp(msg) {
+		if !m.ModalOpen() && !m.help.IsOpen && !m.commitDetail.ModalOpen() {
+			m.keys.Reset()
+			m.help.Open(m.width, m.height)
+		}
+		return m, nil
+	}
+
 	if m.stashCreate.IsOpen {
 		return m.handleStashCreateUpdate(msg)
 	}

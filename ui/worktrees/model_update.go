@@ -32,6 +32,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	if m.pull.IsOpen {
 		return m.handlePullUpdate(msg)
 	}
+	if nav.IsOpenHelp(msg) {
+		return m.handleOpenHelp(), nil
+	}
 
 	var cmds []tea.Cmd
 

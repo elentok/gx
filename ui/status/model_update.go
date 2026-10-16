@@ -58,6 +58,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		next = model
 	}()
 
+	if nav.IsOpenHelp(msg) {
+		if !m.ModalOpen() {
+			m.help.Open(m.width, m.height)
+			m.keys.Reset()
+		}
+		return m, nil
+	}
 	if m.bump.IsOpen {
 		return m.handleBumpUpdate(msg)
 	}
