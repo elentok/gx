@@ -52,6 +52,38 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	}
 }
 
+func TestAgentActionable(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	created, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	client := func() (*apiclient.Client, error) { return h.Client, nil }
+
+	var out bytes.Buffer
+	req := server.MarkActionableRequest{ID: created.Session.ID, Reason: "review ready", Action: []string{"/review"}}
+	if err := runAgentActionable(ctx, client, &out, true, req); err != nil {
+		t.Fatal(err)
+	}
+	var res server.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	if res.Refused || res.Session == nil || res.Session.Actionable.Reason != "review ready" || len(res.Session.Actionable.Action) != 1 {
+		t.Errorf("actionable = %s, want the reason and action", out.String())
+	}
+
+	out.Reset()
+	noServer := func() (*apiclient.Client, error) {
+		t.Error("outside a session the server was called")
+		return h.Client, nil
+	}
+	if err := runAgentActionable(ctx, noServer, &out, false, server.MarkActionableRequest{Reason: "x"}); err != nil || out.Len() == 0 {
+		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
+	}
+}
+
 func TestAgentsStopAndRemove_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()

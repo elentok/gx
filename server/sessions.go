@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -100,8 +101,19 @@ type SessionUnread struct {
 }
 
 // SessionActionable is set while Reason is; Action is its ordered prompts.
+// Kind is the block's kind on one derived from Blocked, which wins over an
+// agent-raised one while the block lasts.
 type SessionActionable struct {
+	Kind   string   `json:"kind,omitempty"`
 	Reason string   `json:"reason,omitempty"`
+	Action []string `json:"action,omitempty"`
+}
+
+// MarkActionableRequest is the body of `gx agent actionable`: the caller's
+// session, why it needs the person and its optional Action.
+type MarkActionableRequest struct {
+	ID     string   `json:"id"`
+	Reason string   `json:"reason"`
 	Action []string `json:"action,omitempty"`
 }
 
@@ -168,6 +180,8 @@ type sessionMeta struct {
 	Exit            string        `json:"exit,omitempty"`
 	Stopped         bool          `json:"stopped,omitempty"`
 	Unread          SessionUnread `json:"unread,omitzero"`
+	// Actionable is the agent-raised one; the person's next input clears it.
+	Actionable SessionActionable `json:"actionable,omitzero"`
 }
 
 func (m sessionMeta) info() SessionInfo {
@@ -183,6 +197,10 @@ func (m sessionMeta) info() SessionInfo {
 		Exit:            m.Exit,
 		Stopped:         m.Stopped,
 		Unread:          m.Unread,
+		Actionable:      m.Actionable,
+	}
+	if st := m.Status; st.State == SessionBlocked {
+		info.Actionable = SessionActionable{Kind: st.Kind, Reason: cmp.Or(st.Message, st.Kind, SessionBlocked)}
 	}
 	if info.Status.State == "" {
 		info.Status.State = SessionStarting
@@ -605,6 +623,12 @@ func (s *Server) watchSession(dir, id string) {
 			if prompt != "" {
 				s.typeFirstPrompt(dir, id, prompt)
 			}
+		case nativerunner.StreamInput:
+			s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+				changed := m.Actionable.Reason != ""
+				m.Actionable = SessionActionable{}
+				return changed
+			})
 		case nativerunner.StreamExit:
 			s.recordSessionExit(dir, id, sessionExitOf(msg.ExitCode))
 			return

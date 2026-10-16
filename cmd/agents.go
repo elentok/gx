@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +23,44 @@ func newAgentsCmd() *cobra.Command {
 		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
 		newAgentsReportFocusCmd())
 	return cmd
+}
+
+// newAgentActionableCmd is `gx agent actionable`: the calling agent marks its
+// own session Actionable.
+func newAgentActionableCmd() *cobra.Command {
+	var jsonOut bool
+	var action []string
+	cmd := &cobra.Command{
+		Use:   "actionable <reason> [--send <prompt>]...",
+		Short: "mark this gx session Actionable until the person's next input; outside one, do nothing",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			req := server.MarkActionableRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Reason: args[0], Action: action}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runAgentActionable(ctx, serverClient, c.OutOrStdout(), jsonOut, req)
+		},
+	}
+	cmd.Flags().StringArrayVar(&action, "send", nil, "a prompt the Action sends; repeat for more, in order")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+// runAgentActionable sends req, or, with no session id, prints a note and
+// succeeds, so skills can call it unconditionally.
+func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.MarkActionableRequest) error {
+	if req.ID == "" {
+		_, err := fmt.Fprintf(w, "not in a gx session (%s unset); nothing marked\n", nativerunner.AgentSessionEnv)
+		return err
+	}
+	cl, err := client()
+	if err != nil {
+		return err
+	}
+	res, err := cl.MarkSessionActionable(ctx, req)
+	return printSessionResult(w, jsonOut, res, err)
 }
 
 func newAgentsReportFocusCmd() *cobra.Command {
