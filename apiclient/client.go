@@ -97,7 +97,16 @@ func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
 // The channel closes when the stream ends: the server dropped this client for
 // lagging, stopped, or ctx was cancelled. Re-snapshot and resubscribe then.
 func (c *Client) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
+	return c.EventsAs(ctx, since, "")
+}
+
+// EventsAs is Events for a client that reports focus: its reports count
+// while this stream is open.
+func (c *Client) EventsAs(ctx context.Context, since uint64, client string) (<-chan server.Event, error) {
 	path := fmt.Sprintf("/v1/events?since=%d", since)
+	if client != "" {
+		path += "&client=" + url.QueryEscape(client)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://gx"+path, nil)
 	if err != nil {
 		return nil, err
@@ -360,6 +369,22 @@ func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResu
 func (c *Client) RemoveSession(ctx context.Context, id string) (server.SessionResult, error) {
 	var res server.SessionResult
 	err := c.post(ctx, "/v1/sessions/remove", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
+// MarkSessionRead clears a session's Unread. A refusal is a result (Refused
+// set), not an error.
+func (c *Client) MarkSessionRead(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/mark-read", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
+// ReportFocus sends a TUI's focus report. A refusal is a result (Refused
+// set), not an error.
+func (c *Client) ReportFocus(ctx context.Context, req server.FocusReport) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/focus", req, &res)
 	return res, err
 }
 

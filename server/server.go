@@ -254,6 +254,7 @@ type Server struct {
 	trunkMissing   missingTrunks
 	kick           chan struct{} // wakes keepClaiming
 	sessionWatches *sessionWatches
+	focus          *focusReports
 	settling       sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
 }
 
@@ -380,6 +381,7 @@ func New(cfg Config) (*Server, error) {
 		kick:        make(chan struct{}, 1),
 
 		sessionWatches: newSessionWatches(),
+		focus:          newFocusReports(),
 	}
 	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()
@@ -443,6 +445,8 @@ var routeTable = []struct {
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
 	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},
+	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.markSessionRead)(w, r) }},
+	{"POST /v1/sessions/focus", (*Server).sessionFocusWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
@@ -500,7 +504,8 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 }
 
 // streamEvents is SSE: every event with seq > ?since, then live events until
-// the client leaves or is dropped for lagging. 410 means re-snapshot.
+// the client leaves or is dropped for lagging. 410 means re-snapshot. A
+// ?client= id keeps that client's focus reports alive while the stream is.
 func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	var since uint64
 	if v := r.URL.Query().Get("since"); v != "" {
@@ -517,6 +522,10 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer cancel()
+	if client := r.URL.Query().Get("client"); client != "" {
+		s.focus.connect(client)
+		defer s.focus.disconnect(client)
+	}
 	flusher, _ := w.(http.Flusher)
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")

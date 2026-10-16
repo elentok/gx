@@ -167,6 +167,7 @@ type sessionMeta struct {
 	StatusChangedAt time.Time     `json:"status_changed_at,omitzero"`
 	Exit            string        `json:"exit,omitempty"`
 	Stopped         bool          `json:"stopped,omitempty"`
+	Unread          SessionUnread `json:"unread,omitzero"`
 }
 
 func (m sessionMeta) info() SessionInfo {
@@ -181,6 +182,7 @@ func (m sessionMeta) info() SessionInfo {
 		StatusChangedAt: m.StatusChangedAt,
 		Exit:            m.Exit,
 		Stopped:         m.Stopped,
+		Unread:          m.Unread,
 	}
 	if info.Status.State == "" {
 		info.Status.State = SessionStarting
@@ -579,7 +581,10 @@ func (s *Server) watchSession(dir, id string) {
 					return false
 				}
 				changed := false
-				if m.info().Status != st {
+				if prev := m.info().Status; prev != st {
+					if raisesUnread(prev.State, st.State, msg.Status.Cancelled) {
+						s.raiseUnread(m)
+					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
 				}
@@ -679,11 +684,36 @@ func (s *Server) recordSessionExit(dir, id, exit string) {
 		}
 		if m.Stopped {
 			exit = SessionExitClean
+		} else {
+			s.raiseUnread(m)
 		}
 		m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
 		m.FirstPrompt = ""
 		return true
 	})
+}
+
+// raisesUnread reports whether a move from one live state to another needs
+// the person: a finished turn, a block or a rate limit. Idle from Starting is
+// the harness coming up, not a turn.
+func raisesUnread(from, to string, cancelled bool) bool {
+	if from == to {
+		return false
+	}
+	switch to {
+	case SessionIdle:
+		return !cancelled && from != SessionStarting
+	case SessionBlocked, SessionRateLimited:
+		return true
+	}
+	return false
+}
+
+// raiseUnread sets m's Unread unless a focused TUI has it on screen.
+func (s *Server) raiseUnread(m *sessionMeta) {
+	if !s.focus.onScreen(m.ID) {
+		m.Unread.Unread = true
+	}
 }
 
 // sessionWrite adapts a session verb to a POST handler. Refusals are results,

@@ -18,7 +18,38 @@ func newAgentsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs}
 	cmd.AddCommand(newAgentsCreateCmd(), newAgentsListCmd(),
 		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
-		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession))
+		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession),
+		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
+		newAgentsReportFocusCmd())
+	return cmd
+}
+
+func newAgentsReportFocusCmd() *cobra.Command {
+	var jsonOut bool
+	var req server.FocusReport
+	cmd := &cobra.Command{
+		Use:   "report-focus --client <id> [--focused] [--session <id>]",
+		Short: "report a TUI's terminal focus and the session on screen (counts while the client's event stream is open)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			res, err := cl.ReportFocus(ctx, req)
+			return printSessionResult(c.OutOrStdout(), jsonOut, res, err)
+		},
+	}
+	cmd.Flags().StringVar(&req.Client, "client", "", "the client id of the TUI's event stream")
+	cmd.Flags().BoolVar(&req.Focused, "focused", false, "the TUI's terminal has focus")
+	cmd.Flags().StringVar(&req.Session, "session", "", "the session on screen")
+	cmd.Flags().StringVar(&req.TermProgram, "term-program", os.Getenv("TERM_PROGRAM"), "the TUI's terminal app")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	_ = cmd.MarkFlagRequired("client")
 	return cmd
 }
 
@@ -95,7 +126,8 @@ func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 	return printSessionResult(w, jsonOut, res, err)
 }
 
-// printSessionResult prints a session write's outcome, its id when human.
+// printSessionResult prints a session write's outcome, its session's id when
+// human.
 func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err error) error {
 	switch {
 	case apiclient.IsNotRunning(err):
@@ -114,6 +146,9 @@ func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	if res.Session == nil {
+		return nil
 	}
 	_, err = fmt.Fprintln(w, res.Session.ID)
 	return err

@@ -188,8 +188,8 @@ func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
-	if got.Exit != server.SessionExitCrashed {
-		t.Errorf("exit = %q, want crashed", got.Exit)
+	if got.Exit != server.SessionExitCrashed || !got.Unread.Unread {
+		t.Errorf("session = %+v, want exited crashed and unread", got)
 	}
 }
 
@@ -206,8 +206,8 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 		t.Fatalf("stop = %+v, want the session", res)
 	}
 	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
-	if got.Exit != server.SessionExitClean || !got.Stopped {
-		t.Errorf("stopped session = %+v, want exited clean and stopped", got)
+	if got.Exit != server.SessionExitClean || !got.Stopped || got.Unread.Unread {
+		t.Errorf("stopped session = %+v, want exited clean, stopped and read", got)
 	}
 	if _, err := nativerunner.DialHolder(dir); err == nil {
 		t.Error("holder still serves after stop")
