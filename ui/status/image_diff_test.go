@@ -230,3 +230,22 @@ func TestImageDiffPanelGeometryIncludesChromeRows(t *testing.T) {
 		t.Fatalf("image origin = (%d,%d), want (%d,%d)", col, row, diffX+1, ui.ChromeRows+diffY+1)
 	}
 }
+
+func TestImageDiffPanelGeometryUsesMainContentHeight(t *testing.T) {
+	t.Parallel()
+	repo := setupImageDiffRepo(t)
+	m, _ := newImageDiffTestModel(t, repo, DefaultSettings(), supportedCapability(), nil, nil)
+
+	_, _, _, diffH, ok := m.diffRect(m.mainContentHeight())
+	if !ok {
+		t.Fatal("expected a diff rect")
+	}
+	expandedH, _ := diffPaneHeights(diffH)
+	_, _, _, rows, ok := m.PanelGeometry()
+	if !ok {
+		t.Fatal("expected panel geometry")
+	}
+	if rows != expandedH-2 {
+		t.Fatalf("panel rows = %d, want %d", rows, expandedH-2)
+	}
+}

@@ -68,11 +68,10 @@ func (m Model) SelectedImageFile() (string, bool) {
 // only stable once layout has settled, which is why it's computed at place-time
 // rather than cached.
 func (m Model) PanelGeometry() (originCol, originRow, availCols, availRows int, ok bool) {
-	mainH := m.height
-	if mainH < 1 {
+	if m.height < 1 {
 		return 0, 0, 0, 0, false
 	}
-	diffX, diffY, diffW, diffH, drOK := m.diffRect(mainH)
+	diffX, diffY, diffW, diffH, drOK := m.diffRect(m.mainContentHeight())
 	if !drOK || diffW <= 2 || diffH <= 2 {
 		return 0, 0, 0, 0, false
 	}

@@ -35,12 +35,11 @@ func (m Model) searchActive() bool {
 }
 
 func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
-	mainH := m.height
-	if mainH < 1 {
+	if m.height < 1 {
 		return false
 	}
 
-	diffX, diffY, diffW, diffH, ok := m.diffRect(mainH)
+	diffX, diffY, diffW, diffH, ok := m.diffRect(m.mainContentHeight())
 	if !ok || !(ui.Rect{X: diffX, Y: diffY, W: diffW, H: diffH}).Contains(x, y) {
 		return false
 	}
@@ -54,11 +53,10 @@ func (m *Model) scrollDiffByMouse(x, y, dir int) bool {
 }
 
 func (m *Model) scrollFiletreeByMouse(x, y, dir int) bool {
-	mainH := m.height
-	if mainH < 1 {
+	if m.height < 1 {
 		return false
 	}
-	filetreeX, filetreeY, filetreeW, filetreeH := m.filetreeRect(mainH)
+	filetreeX, filetreeY, filetreeW, filetreeH := m.filetreeRect(m.mainContentHeight())
 	if !(ui.Rect{X: filetreeX, Y: filetreeY, W: filetreeW, H: filetreeH}).Contains(x, y) {
 		return false
 	}
