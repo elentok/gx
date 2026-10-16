@@ -53,8 +53,9 @@ func ClaudeSessionsDir() (string, error) {
 	return filepath.Join(home, ".claude", "sessions"), nil
 }
 
-// PidWatcher follows one claude's pid status file and counts its status
-// changes as turns. It is the claude harness's Watcher.
+// PidWatcher follows one claude's pid status file, counting its status
+// changes as turns, and its OSC 7501 reports. It is the claude harness's
+// Watcher.
 type PidWatcher struct {
 	path string
 	// notBefore is the earliest startedAt, in Unix ms, of a file to trust.
@@ -71,6 +72,8 @@ type pidState struct {
 	last           PidStatus
 	conversationID string
 	turn           int
+	// program is the last OSC 7501 report, nil before one or after clear.
+	program *ProgramReport
 }
 
 // pidStartSlack is how far before the spawn claude's startedAt may fall and
@@ -145,8 +148,12 @@ func (w *PidWatcher) state() pidState {
 	return w.live
 }
 
+// Status puts claude's last OSC 7501 report over its pid file.
 func (w *PidWatcher) Status() Status {
 	st := w.state()
+	if s, ok := programStatus(st.program); ok {
+		return s
+	}
 	if !st.seen {
 		return Status{State: Starting}
 	}
@@ -171,9 +178,41 @@ func (w *PidWatcher) ConversationID() string {
 	return w.state().conversationID
 }
 
-// Program ignores OSC 7501 reports: claude's status still comes from its pid
-// file alone.
-func (w *PidWatcher) Program(ProgramReport) {}
+// Program keeps the last session-wide report; a per-task one doesn't say
+// what the session is doing. clear, sent on exit, hands back to the pid file.
+func (w *PidWatcher) Program(r ProgramReport) {
+	if r.TaskID != "" {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if r.State == "clear" {
+		w.live.program = nil
+		return
+	}
+	w.live.program = &r
+}
+
+func programStatus(r *ProgramReport) (Status, bool) {
+	if r == nil {
+		return Status{}, false
+	}
+	switch r.State {
+	case "working":
+		return Status{State: Working}, true
+	case "done":
+		return Status{State: Idle}, true
+	case "idle":
+		return Status{State: Idle, Cancelled: true}, true
+	case "blocked":
+		kind := BlockedQuestion
+		if r.Kind == string(BlockedPermission) {
+			kind = BlockedPermission
+		}
+		return Status{State: Blocked, Blocked: kind, Message: r.Message}, true
+	}
+	return Status{}, false
+}
 
 // Hold freezes what PidState and Status report at the current status until
 // Release.
