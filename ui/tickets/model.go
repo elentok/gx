@@ -178,7 +178,7 @@ func (m Model) KeyManager() keys.Manager { return m.keys }
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m Model) InputFocused() bool {
-	if m.help.InputFocused() {
+	if m.help.InputFocused() || m.statusMenuOpen || m.actionsMenu.IsOpen {
 		return true
 	}
 	_, ok := m.activeInputSearch()

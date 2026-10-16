@@ -20,6 +20,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) InputFocused() bool {
 	return m.mode == modeRename || m.mode == modeClone || m.mode == modeNew ||
 		m.mode == modeNewAndOpen || m.mode == modeCredentialPrompt || m.mode == modeSearch ||
+		m.mode == modeTerminalMenu || m.mode == modePushDiverged ||
 		m.pull.InputFocused() || m.helpModel.InputFocused()
 }
 

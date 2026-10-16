@@ -46,7 +46,7 @@ func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
 }
 
 // handleStatusMenuKey drives the open status menu: navigation/cancel is
-// components.UpdateMenu's generic j/k/enter/esc handling, so accepting an
+// components.UpdateMenu's generic filter/ctrl+n/ctrl+p/enter/esc handling, so accepting an
 // item re-resolves the selected row (rather than trusting a path captured at
 // open time) — nothing can move the sidebar selection while a modal owns key
 // input, so re-deriving it here is exactly as safe as capturing it up front,
@@ -64,7 +64,8 @@ func (m Model) handleStatusMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if !accepted {
 		return m, nil
 	}
-	value := m.statusMenu.Items[m.statusMenu.Cursor].Value
+	item, _ := m.statusMenu.Selected()
+	value := item.Value
 	if verb, isServer := strings.CutPrefix(value, serverMenuValuePrefix); isServer {
 		r, ok := m.selectedRow()
 		if !ok || r.isEpic() {

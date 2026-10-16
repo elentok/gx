@@ -49,7 +49,8 @@ func (m Model) handlePushDivergedKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeNormal
 		return m, notify.Info(ui.MessageAborted("push"))
 	}
-	choice := m.pushMenu.Items[m.pushMenu.Cursor].Value
+	item, _ := m.pushMenu.Selected()
+	choice := item.Value
 	switch choice {
 	case "rebase":
 		m.mode = modeNormal

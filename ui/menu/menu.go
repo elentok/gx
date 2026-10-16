@@ -1,9 +1,9 @@
 package menu
 
 import (
-	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/ui"
@@ -19,7 +19,7 @@ type Item struct {
 }
 
 // Run renders an interactive menu and returns the 0-based index of the chosen
-// item, or -1 if the user aborted (esc/q/ctrl+c).
+// item, or -1 if the user aborted (esc/ctrl+c).
 func Run(header string, items []Item) (int, error) {
 	return run(header, items, os.Stdin, os.Stdout)
 }
@@ -35,7 +35,21 @@ func run(header string, items []Item, in io.Reader, out io.Writer) (int, error) 
 	if !fm.done || fm.aborted {
 		return -1, nil
 	}
-	return fm.state.Cursor, nil
+	return fm.selectedIndex(), nil
+}
+
+// selectedIndex maps the picked item back to its index in items, since the
+// cursor indexes the filtered list.
+func (m model) selectedIndex() int {
+	it, ok := m.state.Selected()
+	if !ok {
+		return -1
+	}
+	idx, err := strconv.Atoi(it.Value)
+	if err != nil {
+		return -1
+	}
+	return idx
 }
 
 type model struct {
@@ -60,22 +74,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		switch msg.String() {
-		case "ctrl+c", "esc", "q":
+		if msg.String() == "ctrl+c" {
 			m.aborted = true
 			m.done = true
 			return m, tea.Quit
-		default:
-			// Number shortcuts: 1-based
-			key := msg.String()
-			if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
-				idx := int(key[0] - '1')
-				if idx < len(m.items) {
-					m.state.Cursor = idx
-					m.done = true
-					return m, tea.Quit
-				}
-			}
 		}
 	}
 	return m, nil
@@ -93,7 +95,7 @@ func (m model) View() tea.View {
 	sb.WriteString("\n")
 
 	sb.WriteString("\n")
-	sb.WriteString(ui.StyleDim.Render(components.MenuHintNumber))
+	sb.WriteString(ui.StyleDim.Render(components.MenuHint))
 	sb.WriteString("\n")
 
 	return tea.NewView(sb.String())
@@ -103,7 +105,8 @@ func menuState(items []Item) components.MenuState {
 	menuItems := make([]components.MenuItem, len(items))
 	for i, item := range items {
 		menuItems[i] = components.MenuItem{
-			Label:  fmt.Sprintf("%d. %s", i+1, item.Label),
+			Label:  item.Label,
+			Value:  strconv.Itoa(i),
 			Detail: item.Detail,
 		}
 	}

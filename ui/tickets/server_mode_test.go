@@ -396,7 +396,7 @@ func TestServerMode_StatusMenuOffersDirectStatusesAndWritesTheFile(t *testing.T)
 	if got, want := menuValues(m.statusMenu), []string{"open", "done", "server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
 		t.Fatalf("draft ticket menu = %v, want %v", got, want)
 	}
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	m = updated.(Model)
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {

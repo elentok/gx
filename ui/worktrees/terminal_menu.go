@@ -14,10 +14,10 @@ import (
 
 func terminalMenuItems() []components.MenuItem {
 	return []components.MenuItem{
-		{Label: "s  session", Value: "session", Detail: "new or jump to existing"},
-		{Label: "h  hsplit", Value: "hsplit", Detail: "horizontal split (stacked, top/bottom)"},
-		{Label: "v  vsplit", Value: "vsplit", Detail: "vertical split (side-by-side)"},
-		{Label: "t  tab", Value: "tab", Detail: "new tab"},
+		{Label: "session", Value: "session", Detail: "new or jump to existing"},
+		{Label: "hsplit", Value: "hsplit", Detail: "horizontal split (stacked, top/bottom)"},
+		{Label: "vsplit", Value: "vsplit", Detail: "vertical split (side-by-side)"},
+		{Label: "tab", Value: "tab", Detail: "new tab"},
 	}
 }
 
@@ -39,29 +39,17 @@ func (m Model) enterTerminalMenuFor(name, path string) Model {
 }
 
 func (m Model) handleTerminalMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "s":
-		return m.executeTerminalAction("session")
-	case "h":
-		return m.executeTerminalAction("hsplit")
-	case "v":
-		return m.executeTerminalAction("vsplit")
-	case "t":
-		return m.executeTerminalAction("tab")
-	default:
-		newState, done, selected, handled := components.UpdateMenu(msg, m.terminalMenu)
-		m.terminalMenu = newState
-		if !handled {
-			return m, nil
-		}
-		if done {
-			if selected {
-				return m.executeTerminalAction(m.terminalMenu.Items[m.terminalMenu.Cursor].Value)
-			}
-			m.mode = modeNormal
-		}
+	newState, done, selected, handled := components.UpdateMenu(msg, m.terminalMenu)
+	m.terminalMenu = newState
+	if !handled || !done {
 		return m, nil
 	}
+	if selected {
+		item, _ := m.terminalMenu.Selected()
+		return m.executeTerminalAction(item.Value)
+	}
+	m.mode = modeNormal
+	return m, nil
 }
 
 func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {

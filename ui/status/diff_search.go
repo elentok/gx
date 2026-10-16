@@ -10,7 +10,7 @@ import (
 )
 
 func (m Model) InputFocused() bool {
-	if m.push.InputFocused() || m.pull.InputFocused() || m.stash.InputFocused() || m.help.InputFocused() {
+	if m.bump.InputFocused() || m.push.InputFocused() || m.pull.InputFocused() || m.stash.InputFocused() || m.help.InputFocused() {
 		return true
 	}
 	if m.focus == focusFiletree {

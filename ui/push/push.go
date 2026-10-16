@@ -82,8 +82,8 @@ type Model struct {
 	forceYes bool
 
 	// pr prompt
-	prURL  string
-	prYes  bool
+	prURL string
+	prYes bool
 
 	// abort confirm (interrupt a running network command)
 	abortConfirmYes  bool
@@ -156,7 +156,10 @@ func (m *Model) Open(root string) error {
 }
 
 // Update handles all messages while the modal is open.
-func (m Model) InputFocused() bool { return m.creds.IsOpen }
+// InputFocused includes the diverged menu, whose filter takes every printable key.
+func (m Model) InputFocused() bool {
+	return m.creds.IsOpen || (m.IsOpen && m.phase == phaseDiverged)
+}
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
 	if m.creds.IsOpen {
@@ -548,7 +551,6 @@ func (m Model) View(width int) string {
 	return ""
 }
 
-
 func (m Model) runnerArgs(p phase) []string {
 	switch p {
 	case phaseFetching:
@@ -592,12 +594,6 @@ func (m Model) confirmPrompt() string {
 }
 
 func selectedMenuValue(state components.MenuState) string {
-	if len(state.Items) == 0 {
-		return ""
-	}
-	if state.Cursor < 0 || state.Cursor >= len(state.Items) {
-		return ""
-	}
-	return state.Items[state.Cursor].Value
+	it, _ := state.Selected()
+	return it.Value
 }
-

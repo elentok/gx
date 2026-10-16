@@ -383,7 +383,7 @@ func TestPushRejectedForcePushConfirmed(t *testing.T) {
 	waitForText(t, tm, "has diverged from the remote branch", loadWait)
 
 	// Choose force push (default is rebase, so move down once).
-	tm.Send(keyRune('j'))
+	tm.Send(keyCtrl('n'))
 	tm.Send(keySpecial(tea.KeyEnter))
 
 	// Status notifications now go through notify.NotifyMsg (not the status bar).

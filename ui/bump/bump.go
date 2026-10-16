@@ -13,7 +13,7 @@ import (
 type phase int
 
 const (
-	phasePick    phase = iota
+	phasePick phase = iota
 	phaseTagging
 	phaseFailed
 )
@@ -72,6 +72,9 @@ func (m *Model) Open(root string) error {
 	m.IsOpen = true
 	return nil
 }
+
+// InputFocused reports the version menu, whose filter takes every printable key.
+func (m Model) InputFocused() bool { return m.IsOpen && m.phase == phasePick }
 
 // Update handles all messages while the modal is open.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd, Result) {
@@ -137,10 +140,10 @@ func (m Model) cmdCreateTag() tea.Cmd {
 }
 
 func (m Model) selectedNewTag() string {
-	if m.menu.Cursor < 0 || m.menu.Cursor >= len(m.menu.Items) {
+	item, ok := m.menu.Selected()
+	if !ok {
 		return ""
 	}
-	item := m.menu.Items[m.menu.Cursor]
 	// Detail format: "v1.2.3 → v1.2.4" — extract the part after " → "
 	for i := len(item.Detail) - 1; i >= 0; i-- {
 		if item.Detail[i] == ' ' && i+1 < len(item.Detail) && item.Detail[i+1] == 'v' {

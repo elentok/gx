@@ -27,6 +27,15 @@ func TestInputFocused_FalseByDefault(t *testing.T) {
 	}
 }
 
+func TestInputFocused_TrueWhenDivergedMenuOpen(t *testing.T) {
+	m := New()
+	m.IsOpen = true
+	m.phase = phaseDiverged
+	if !m.InputFocused() {
+		t.Error("expected InputFocused=true while the diverged menu is open")
+	}
+}
+
 func TestInputFocused_TrueWhenCredsOpen(t *testing.T) {
 	m := newModelAtPRPrompt()
 	m.creds.IsOpen = true

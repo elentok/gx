@@ -232,4 +232,16 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 	if m.mode != modeTerminalMenu {
 		t.Fatalf("expected o to enter terminal menu mode, got mode=%v", m.mode)
 	}
+	if !m.InputFocused() {
+		t.Fatalf("terminal menu must report InputFocused so the shell passes printable keys to its filter")
+	}
+
+	updated, cmd = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
+	if cmd != nil {
+		t.Fatalf("s should filter the menu, not launch a session")
+	}
+	m = updated.(Model)
+	if m.mode != modeTerminalMenu || m.terminalMenu.Filter != "s" {
+		t.Fatalf("expected s to filter the open menu, got mode=%v filter=%q", m.mode, m.terminalMenu.Filter)
+	}
 }

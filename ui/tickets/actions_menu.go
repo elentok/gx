@@ -65,7 +65,8 @@ func (m actionsMenuModel) Update(msg tea.KeyPressMsg) (actionsMenuModel, actions
 	if !accepted {
 		return m, actionsMenuResult{Done: true}, true
 	}
-	action := m.state.Items[m.state.Cursor].Value
+	item, _ := m.state.Selected()
+	action := item.Value
 	return m, actionsMenuResult{Done: true, Accepted: true, Path: m.path, EpicName: m.epicName, TicketID: m.ticketID, Action: action}, true
 }
 
