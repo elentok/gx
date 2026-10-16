@@ -154,8 +154,16 @@ func TestClaudeStartupScreen(t *testing.T) {
 	}
 }
 
+// TestClaudeDisplayName: claude prefixes its title with a status glyph (✳
+// idle, a braille spinner while working); the name drops it, as the Agents
+// tab already shows the state.
 func TestClaudeDisplayName(t *testing.T) {
-	if got, ok := claude(t).DisplayName([]byte("x\x1b]0;✳ Fix bug\x07y")); !ok || got != "✳ Fix bug" {
-		t.Fatalf("DisplayName = %q, %v", got, ok)
+	for _, title := range []string{"✳ Fix bug", "⠂ Fix bug", "⠐ Fix bug", "Fix bug"} {
+		if got, ok := claude(t).DisplayName([]byte("x\x1b]0;" + title + "\x07y")); !ok || got != "Fix bug" {
+			t.Errorf("DisplayName(%q) = %q, %v", title, got, ok)
+		}
+	}
+	if got, ok := claude(t).DisplayName([]byte("\x1b]0;✳ \x07")); ok {
+		t.Errorf("glyph-only title = %q, want none", got)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/screen"
@@ -48,8 +49,16 @@ func (claudeHarness) StartupScreen(scrolled, rows []string) Startup {
 	return Startup{}
 }
 
+// DisplayName drops the status glyph claude prefixes its title with (✳
+// idle, a braille spinner while working): the Agents tab shows the state
+// with its own icon.
 func (claudeHarness) DisplayName(raw []byte) (string, bool) {
-	return screen.Title(raw)
+	title, ok := screen.Title(raw)
+	if !ok {
+		return "", false
+	}
+	name := strings.TrimLeftFunc(title, func(r rune) bool { return unicode.IsSymbol(r) || unicode.IsSpace(r) })
+	return name, name != ""
 }
 
 // LaunchEnv drops only the vars that make claude think it is nested inside
