@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
@@ -177,22 +178,32 @@ func applyFrame(rows []string, f nativerunner.Frame) []string {
 	return rows
 }
 
+// maxPasteBytes caps a paste so a stray huge clipboard can't flood the session.
+const maxPasteBytes = 1 << 20
+
 // sendKey types k into the attached session. It writes synchronously so keys
 // reach the session in the order they were pressed.
 func (m Model) sendKey(k tea.KeyPressMsg) {
 	if a := m.attach; a != nil && a.stream != nil && !a.ended {
+		m.resizeAttach()
 		_ = a.stream.SendKey(screen.Key{Code: k.Code, Text: k.Text, Mod: k.Mod})
 	}
 }
 
-func (m Model) sendPaste(text string) {
+func (m Model) sendPaste(text string) tea.Cmd {
+	if len(text) > maxPasteBytes {
+		return notify.Warning("paste too large (over 1 MB), not sent")
+	}
 	if a := m.attach; a != nil && a.stream != nil && !a.ended {
+		m.resizeAttach()
 		_ = a.stream.Paste(text)
 	}
+	return nil
 }
 
-// resizeAttach gives the session the panel's size; the pty follows the
-// viewer that last focused.
+// resizeAttach gives the session the panel's size. It runs on focus and
+// before every input, not only on change: the pty follows the viewer that
+// last focused or typed, and another viewer may have resized it since.
 func (m Model) resizeAttach() {
 	if a := m.attach; a != nil && a.stream != nil && !a.ended {
 		cols, rows := m.screenSize()

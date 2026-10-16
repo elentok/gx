@@ -124,7 +124,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.refresh()
 	case tea.PasteMsg:
 		if m.terminalFocused {
-			m.sendPaste(msg.Content)
+			return m, m.sendPaste(msg.Content)
 		}
 		return m, nil
 	case spinner.TickMsg:

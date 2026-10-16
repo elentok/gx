@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/notify"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -187,6 +188,73 @@ func TestAttach_TerminalFocusSendsEveryKeyToTheSession(t *testing.T) {
 	m = update1(t, m, tea.PasteMsg{Content: "pasted"})
 	if !slices.Equal(fa.pastes, []string{"pasted"}) {
 		t.Fatalf("pastes = %v", fa.pastes)
+	}
+}
+
+// focusedAttach is attachModel with session a attached and the terminal
+// focused.
+func focusedAttach(t *testing.T) (Model, *fakeAttach) {
+	t.Helper()
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, _ = dialed(t, m, cmd)
+	return update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}), h.attaches["a"]
+}
+
+func TestAttach_PasteOverTheLimitIsRefused(t *testing.T) {
+	m, fa := focusedAttach(t)
+	next, cmd := m.Update(tea.PasteMsg{Content: strings.Repeat("x", 2<<20)})
+	m = next.(Model)
+	if len(fa.pastes) != 0 {
+		t.Fatal("an oversized paste was sent")
+	}
+	if cmd == nil {
+		t.Fatal("an oversized paste showed no message")
+	}
+	if n, ok := cmd().(notify.NotifyMsg); !ok || n.Kind != notify.KindWarning {
+		t.Fatalf("refusal message = %#v, want a warning", n)
+	}
+
+	limit := strings.Repeat("x", maxPasteBytes)
+	m = update1(t, m, tea.PasteMsg{Content: limit})
+	if !slices.Equal(fa.pastes, []string{limit}) {
+		t.Fatal("a paste at the limit was not sent")
+	}
+}
+
+func TestAttach_CtrlVPassesThroughAsAKey(t *testing.T) {
+	m, fa := focusedAttach(t)
+	update1(t, m, tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
+	if len(fa.keys) != 1 || fa.keys[0].Code != 'v' || fa.keys[0].Mod != tea.ModCtrl {
+		t.Fatalf("keys = %+v, want ctrl+v", fa.keys)
+	}
+}
+
+func TestAttach_TypingSendsThePanelSize(t *testing.T) {
+	m, fa := focusedAttach(t)
+	fa.sizes = nil
+	m = update1(t, m, tea.KeyPressMsg{Code: 'x', Text: "x"})
+	update1(t, m, tea.PasteMsg{Content: "y"})
+	size := [2]int{80 - sidebarWidth - 1 - 2, 12 - 2}
+	if !slices.Equal(fa.sizes, [][2]int{size, size}) {
+		t.Fatalf("typing sent sizes %v, want the panel's inner size before each input", fa.sizes)
+	}
+}
+
+func TestAttach_WindowResizeSendsTheSizeOnlyWhileFocused(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, _ = dialed(t, m, cmd)
+	fa := h.attaches["a"]
+	m = update1(t, m, tea.WindowSizeMsg{Width: 100, Height: 20})
+	if len(fa.sizes) != 0 {
+		t.Fatalf("an unfocused resize sent sizes %v", fa.sizes)
+	}
+	m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	fa.sizes = nil
+	update1(t, m, tea.WindowSizeMsg{Width: 90, Height: 30})
+	if !slices.Equal(fa.sizes, [][2]int{{90 - sidebarWidth - 1 - 2, 30 - 2}}) {
+		t.Fatalf("a focused resize sent sizes %v", fa.sizes)
 	}
 }
 
