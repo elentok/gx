@@ -37,6 +37,7 @@ func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
 		return res, nil
 	}
 	if err := s.startResumedHolder(dir, &meta, time.Time{}); err != nil {
+		s.endFailedStart(dir, &meta)
 		return SessionResult{}, err
 	}
 	info := meta.info()
@@ -177,10 +178,5 @@ func (s *Server) autoResumeSession(id string) {
 		meta, reason = ended, err.Error()
 	}
 	s.log.Info("session not auto-resumed", "session", id, "reason", reason)
-	s.recordSessionExit(&meta, SessionExitCrashed)
-	if err := writeSessionMeta(dir, meta); err != nil {
-		s.log.Warn("save session meta", "session", id, "err", err)
-		return
-	}
-	s.events.publish(EventSessionChanged, id)
+	s.endFailedStart(dir, &meta)
 }

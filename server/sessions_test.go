@@ -459,7 +459,7 @@ func startFakeSession(t *testing.T) (*servertest.Harness, context.Context, <-cha
 // startFakeSessionWith is startFakeSession for req in project proj.
 func startFakeSessionWith(t *testing.T, req server.CreateSessionRequest, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	h := servertest.StartWithStore(t, t.TempDir(), append(opts, servertest.WithTestHolder())...)
+	h := servertest.StartWithStore(t, t.TempDir(), append([]func(*server.Config){servertest.WithTestHolder()}, opts...)...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)

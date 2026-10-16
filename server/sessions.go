@@ -316,7 +316,13 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		return SessionResult{}, err
 	}
 	id := meta.ID
-	if err := s.startSessionHolder(dir, &meta, req.Cols, req.Rows, false); err != nil {
+	s.sessionWatches.metaMu.Lock()
+	err = s.startSessionHolder(dir, &meta, req.Cols, req.Rows, false)
+	if err != nil {
+		s.endFailedStart(dir, &meta)
+	}
+	s.sessionWatches.metaMu.Unlock()
+	if err != nil {
 		return SessionResult{}, err
 	}
 	s.sessionWatches.start(func() { s.watchSession(dir, id, 0, time.Time{}) })
@@ -409,6 +415,7 @@ func (s *Server) makeSessionDir() (id, dir string, err error) {
 // startSessionHolder runs the harness's Launch, or its Resume of the saved
 // conversation, in a detached holder, at cols x rows, else the session's last
 // saved size, else the loop default, and saves meta with the size it used.
+// The caller holds metaMu.
 func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows int, resume bool) error {
 	if cols <= 0 || rows <= 0 {
 		cols, rows = meta.Cols, meta.Rows
@@ -464,6 +471,19 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	// Reap the holder; it outlives the server otherwise.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// endFailedStart saves a session whose holder did not start as Exited
+// crashed. Left Starting, it has no holder and no watch: Remove and Resume
+// refuse it and the next server start would auto-resume a conversation that
+// never ran. The caller holds metaMu.
+func (s *Server) endFailedStart(dir string, meta *sessionMeta) {
+	s.recordSessionExit(meta, SessionExitCrashed)
+	if err := writeSessionMeta(dir, *meta); err != nil {
+		s.log.Warn("save session meta", "session", meta.ID, "err", err)
+		return
+	}
+	s.events.publish(EventSessionChanged, meta.ID)
 }
 
 // trustFlag has the holder answer the trust dialog, only for a worktree gx
