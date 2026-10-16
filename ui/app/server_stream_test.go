@@ -261,9 +261,6 @@ func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
 			if got := h.m.stream.vm.ActionableCount(); got != 1 {
 				t.Errorf("ActionableCount = %d, want 1", got)
 			}
-			if got := ansi.Strip(h.m.tabsView()); !strings.Contains(got, "agents 1") {
-				t.Errorf("tabs = %q, want \"agents 1\"", got)
-			}
 		})
 	}
 }

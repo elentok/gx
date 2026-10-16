@@ -435,24 +435,10 @@ func TestGAMnemonicSwitchesToAgentsTab(t *testing.T) {
 	}
 }
 
-func TestAgentsTabLabelCountsActionableSessionsFromAnyTab(t *testing.T) {
+func TestAgentsTabLabelNeverCarriesTheCount(t *testing.T) {
 	t.Parallel()
 	m, _ := newAppModel(t)
-	m.stream.vm.Sessions = []server.SessionInfo{
-		{ID: "s1", Actionable: server.SessionActionable{Reason: "blocked"}},
-		{ID: "s2"},
-		{ID: "s3", Actionable: server.SessionActionable{Reason: "rate-limited"}},
-	}
-
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "agents 2") {
-		t.Fatalf("tabs = %q, want \"agents 2\"", got)
-	}
-}
-
-func TestAgentsTabLabelPlainWithNothingActionable(t *testing.T) {
-	t.Parallel()
-	m, _ := newAppModel(t)
-	m.stream.vm.Sessions = []server.SessionInfo{{ID: "s1"}}
+	m.stream.vm.Sessions = []server.SessionInfo{{ID: "s1", Actionable: server.SessionActionable{Reason: "blocked"}}}
 
 	for _, spec := range m.tabSpecs() {
 		if spec.id == nav.TabAgents && spec.label != "agents" {
@@ -839,29 +825,6 @@ func TestBackWithEmptyHistoryQuits(t *testing.T) {
 	}
 }
 
-func TestViewAppendsTabs(t *testing.T) {
-	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
-		ActiveWorktreePath: repoDir,
-	})
-	m.width = 120
-	m.height = 24
-
-	view := ansi.Strip(m.View().Content)
-	for _, want := range []string{"worktrees", "log", "status", "stash"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("expected tabs to include %q in %q", want, view)
-		}
-	}
-}
-
 func TestGChordOverlayIncludesAppAndChildHints(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
@@ -922,53 +885,6 @@ func TestChordNotTriggeredWhileHelpFilterFocused(t *testing.T) {
 	}
 }
 
-func TestViewMergesTabsIntoFooterLine(t *testing.T) {
-	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
-		ActiveWorktreePath: repoDir,
-	})
-	m.width = 120
-	m.height = 24
-
-	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
-	last := lines[len(lines)-1]
-	if !strings.Contains(last, "worktrees") || !strings.Contains(last, "status") {
-		t.Fatalf("expected tabs on footer line, got %q", last)
-	}
-	if strings.HasPrefix(strings.TrimLeft(last, " "), "? help") {
-		t.Fatalf("expected tabs on left side of footer, got %q", last)
-	}
-}
-
-func TestTabsUseBadgeCapsInFooter(t *testing.T) {
-	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-
-	m := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: repoDir},
-		ActiveWorktreePath: repoDir,
-	})
-	m.width = 120
-	m.height = 24
-
-	last := strings.Split(m.View().Content, "\n")
-	footer := last[len(last)-1]
-	if !strings.Contains(footer, "") || !strings.Contains(footer, "") {
-		t.Fatalf("expected pill badge caps in footer tabs")
-	}
-}
-
 func TestViewMatchesScreenHeight(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)
@@ -988,63 +904,6 @@ func TestViewMatchesScreenHeight(t *testing.T) {
 	lines := strings.Split(view, "\n")
 	if len(lines) != 24 {
 		t.Fatalf("expected 24 lines, got %d", len(lines))
-	}
-}
-
-func TestInjectTabsIntoFooterUsesEllipsisForRightTruncation(t *testing.T) {
-	t.Parallel()
-	width := 32
-	tabs := "worktrees log status"
-	right := "· 󰉸 context: 1 · filetree · ? help"
-	content := "body\n" + right
-
-	merged := injectTabsIntoFooter(content, tabs, width)
-	lines := strings.Split(ansi.Strip(merged), "\n")
-	last := lines[len(lines)-1]
-
-	if ansi.StringWidth(last) != width {
-		t.Fatalf("expected merged footer width %d, got %d (%q)", width, ansi.StringWidth(last), last)
-	}
-	if !strings.Contains(last, "…") {
-		t.Fatalf("expected right-side truncation to include ellipsis, got %q", last)
-	}
-}
-
-func TestInjectTabsIntoFooterIgnoresRightLineLeadingPadding(t *testing.T) {
-	t.Parallel()
-	width := 90
-	tabs := " worktrees   log   status "
-	right := strings.Repeat(" ", 120) + "· 󰉸 context: 1 · filetree · ? help"
-	content := "body\n" + right
-
-	merged := injectTabsIntoFooter(content, tabs, width)
-	lines := strings.Split(ansi.Strip(merged), "\n")
-	last := lines[len(lines)-1]
-
-	if ansi.StringWidth(last) != width {
-		t.Fatalf("expected merged footer width %d, got %d (%q)", width, ansi.StringWidth(last), last)
-	}
-	if !strings.Contains(last, "context: 1") {
-		t.Fatalf("expected context label to remain visible after merge, got %q", last)
-	}
-}
-
-func TestInjectTabsIntoFooterPreservesRightHintTailWithStatusPrefix(t *testing.T) {
-	t.Parallel()
-	width := 90
-	tabs := " worktrees   log   status "
-	right := "staged README.md" + strings.Repeat(" ", 20) + "· 󰉸 context: 1 · filetree · ? help"
-	content := "body\n" + right
-
-	merged := injectTabsIntoFooter(content, tabs, width)
-	lines := strings.Split(ansi.Strip(merged), "\n")
-	last := lines[len(lines)-1]
-
-	if ansi.StringWidth(last) != width {
-		t.Fatalf("expected merged footer width %d, got %d (%q)", width, ansi.StringWidth(last), last)
-	}
-	if !strings.Contains(last, "context: 1") {
-		t.Fatalf("expected context label to remain visible with status prefix, got %q", last)
 	}
 }
 
@@ -1701,15 +1560,12 @@ func TestServerIndicator(t *testing.T) {
 		{ServerConn{State: ServerHerdrUnavailable}, "server ⚠ herdr unavailable"},
 	}
 	for _, tc := range cases {
-		if got := ansi.Strip(base.WithServerConn(tc.conn).tabsView()); !strings.Contains(got, tc.want) {
-			t.Errorf("tabs = %q, want it to contain %q", got, tc.want)
+		if got := base.WithServerConn(tc.conn).serverConn.indicator(); got != tc.want {
+			t.Errorf("indicator = %q, want %q", got, tc.want)
 		}
 	}
-	if got := ansi.Strip(base.WithServerConn(ServerConn{}).tabsView()); strings.Contains(got, "server") {
-		t.Errorf("unprobed tabs = %q, want no server indicator", got)
-	}
-	if got := ansi.Strip(base.tabsView()); strings.Contains(got, "attached") {
-		t.Errorf("tabs = %q, want no \"(attached)\"", got)
+	if got := base.WithServerConn(ServerConn{}).serverConn.indicator(); got != "" {
+		t.Errorf("unprobed indicator = %q, want none", got)
 	}
 }
 

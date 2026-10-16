@@ -35,14 +35,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// so background polling loops keep rearming themselves.
 	}
 
-	if click, ok := msg.(tea.MouseClickMsg); ok {
-		mouse := click.Mouse()
-		if mouse.Button == tea.MouseLeft {
-			if id, hit := m.tabHitAt(mouse.X, mouse.Y); hit {
-				next, cmd := m.switchTab(nav.ViewState{Tab: id})
-				return next, tea.Batch(notifyCmd, cmd)
-			}
+	if mouse, ok := msg.(tea.MouseMsg); ok {
+		pageMsg, onPage := toPageMouse(mouse)
+		if !onPage {
+			return m, notifyCmd
 		}
+		msg = pageMsg
 	}
 
 	if next, cmd, ok := m.updateServerConn(msg); ok {
@@ -158,6 +156,29 @@ func (m Model) handleBack(notifyCmd tea.Cmd) (Model, tea.Cmd) {
 	m.restoreLogSelectionFromPoppedPage(popped)
 	return m, tea.Batch(notifyCmd, tea.ClearScreen, onPageDeactivatedCmd(popped.model), onPageActivatedCmd(m.activePage().model), m.resizeCurrentCmd())
 
+}
+
+// toPageMouse moves a mouse message into page coordinates; false means it hit
+// the chrome rows and stays with the app.
+func toPageMouse(msg tea.MouseMsg) (tea.Msg, bool) {
+	if msg.Mouse().Y < chromeRows {
+		return nil, false
+	}
+	switch v := msg.(type) {
+	case tea.MouseClickMsg:
+		v.Y -= chromeRows
+		return v, true
+	case tea.MouseReleaseMsg:
+		v.Y -= chromeRows
+		return v, true
+	case tea.MouseMotionMsg:
+		v.Y -= chromeRows
+		return v, true
+	case tea.MouseWheelMsg:
+		v.Y -= chromeRows
+		return v, true
+	}
+	return msg, true
 }
 
 func viewStateOf(model tea.Model) (nav.ViewState, bool) {

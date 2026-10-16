@@ -2,18 +2,13 @@ package app
 
 import (
 	"path/filepath"
-	"strconv"
-	"strings"
-	"unicode"
 
-	"github.com/elentok/gx/ui"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 )
 
 func (m *Model) ensureLivePages() {
@@ -159,47 +154,6 @@ func onPageDeactivatedCmd(model tea.Model) tea.Cmd {
 	return nil
 }
 
-func injectTabsIntoFooter(content, tabs string, width int) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) == 0 {
-		return content
-	}
-	if width <= 0 {
-		lines[len(lines)-1] = lines[len(lines)-1] + " " + tabs
-		return strings.Join(lines, "\n")
-	}
-	tabs = ansi.Truncate(tabs, width, "")
-	tabsW := ansi.StringWidth(tabs)
-	if tabsW >= width {
-		lines[len(lines)-1] = tabs
-		return strings.Join(lines, "\n")
-	}
-	rightMax := width - tabsW - 1
-	if rightMax < 0 {
-		rightMax = 0
-	}
-	rightContent := strings.TrimLeftFunc(lines[len(lines)-1], unicode.IsSpace)
-	right := rightContent
-	rightW := ansi.StringWidth(rightContent)
-	if rightW > rightMax {
-		if rightMax <= 0 {
-			right = ""
-		} else if rightMax == 1 {
-			right = "…"
-		} else {
-			// Keep the tail where compact footer hints live (context/mode/help).
-			right = "…" + ansi.TruncateLeft(rightContent, rightW-rightMax+1, "")
-		}
-	}
-	rightW = ansi.StringWidth(right)
-	gap := width - tabsW - rightW
-	if gap < 1 {
-		gap = 1
-	}
-	lines[len(lines)-1] = tabs + strings.Repeat(" ", gap) + right
-	return strings.Join(lines, "\n")
-}
-
 // handleShellChordKey returns (newModel, cmd, handled) where handled indicates the key was consumed.
 func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
@@ -300,79 +254,24 @@ func (m Model) newLivePage(viewState nav.ViewState) (livePage, tea.Cmd) {
 	return livePage{model: entry.model}, cmd
 }
 
-func (m Model) tabsView() string {
-	specs := m.tabSpecs()
-	parts := make([]string, 0, len(specs))
-	for _, tab := range specs {
-		parts = append(parts, renderTab(tab))
-	}
-
-	if ind := m.serverConn.indicator(); ind != "" {
-		parts = append(parts, ui.RenderBadge(ind, ui.BadgeVariantSurface, false, false))
-	}
-	return strings.Join(parts, " ")
-}
-
 type tabSpec struct {
-	id     nav.TabID
-	label  string
-	active bool
+	id    nav.TabID
+	label string
 }
 
-// tabSpecs is the single source of truth for tab order/labels, shared by
-// tabsView (rendering) and tabHitAt (click hit-testing) so they can't drift.
+// tabSpecs is the single source of truth for view order and labels, shared by
+// the title row and the relative tab switch.
 func (m Model) tabSpecs() []tabSpec {
-	activeTab := m.navState.ActiveTab()
 	return []tabSpec{
-		{id: nav.TabWorktrees, label: "worktrees", active: activeTab == nav.TabWorktrees},
-		{id: nav.TabLog, label: "log", active: activeTab == nav.TabLog},
-		{id: nav.TabStatus, label: "status", active: activeTab == nav.TabStatus},
-		{id: nav.TabStash, label: "stash", active: activeTab == nav.TabStash},
-		{id: nav.TabPRs, label: "prs", active: activeTab == nav.TabPRs},
-		{id: nav.TabTickets, label: "tickets", active: activeTab == nav.TabTickets},
-		{id: nav.TabQueue, label: "queue", active: activeTab == nav.TabQueue},
-		{id: nav.TabAgents, label: m.agentsTabLabel(), active: activeTab == nav.TabAgents},
+		{id: nav.TabWorktrees, label: "worktrees"},
+		{id: nav.TabLog, label: "log"},
+		{id: nav.TabStatus, label: "status"},
+		{id: nav.TabStash, label: "stash"},
+		{id: nav.TabPRs, label: "prs"},
+		{id: nav.TabTickets, label: "tickets"},
+		{id: nav.TabQueue, label: "queue"},
+		{id: nav.TabAgents, label: "agents"},
 	}
-}
-
-// agentsTabLabel carries the Actionable count so any tab shows that a session
-// needs the person.
-func (m Model) agentsTabLabel() string {
-	if n := m.stream.vm.ActionableCount(); n > 0 {
-		return "agents " + strconv.Itoa(n)
-	}
-	return "agents"
-}
-
-func renderTab(tab tabSpec) string {
-	if tab.active {
-		return ui.RenderBadge(tab.label, ui.BadgeVariantOrange, true, false)
-	}
-	return ui.RenderBadge(tab.label, ui.BadgeVariantSurface, true, false)
-}
-
-// tabHitAt reports which tab (if any) occupies screen coordinate (x, y),
-// recomputing the same left-to-right layout injectTabsIntoFooter renders
-// every frame — tabs always start at column 0 of the footer's last line, so
-// no state needs to survive between render and click. A tab whose full label
-// is truncated off-screen at the current width is not reported as a hit.
-func (m Model) tabHitAt(x, y int) (nav.TabID, bool) {
-	if m.width <= 0 || y != m.height-1 {
-		return "", false
-	}
-	pos := 0
-	for _, spec := range m.tabSpecs() {
-		w := ansi.StringWidth(renderTab(spec))
-		end := pos + w
-		if end > m.width {
-			return "", false
-		}
-		if x >= pos && x < end {
-			return spec.id, true
-		}
-		pos = end + 1 // account for the single-space separator
-	}
-	return "", false
 }
 
 func (m Model) switchRelativeTab(delta int) (Model, tea.Cmd) {

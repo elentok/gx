@@ -92,13 +92,13 @@ func TestServerMode_ConnectionDropAndReconnect(t *testing.T) {
 	m := newServerShell(t, client)
 
 	m = probe(t, m)
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ● pid 4242") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "server ● pid 4242") {
 		t.Fatalf("up: tabs = %q", got)
 	}
 
 	client.down = true
 	m = probe(t, m)
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ○ down") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "server ○ down") {
 		t.Fatalf("down: tabs = %q", got)
 	}
 	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "server down — s to start") {
@@ -114,7 +114,7 @@ func TestServerMode_ConnectionDropAndReconnect(t *testing.T) {
 
 func TestServerMode_VersionMismatchIsReadOnly(t *testing.T) {
 	m := probe(t, newServerShell(t, &fakeServerClient{readOnly: true}))
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "read-only") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "read-only") {
 		t.Fatalf("tabs = %q", got)
 	}
 }
@@ -127,7 +127,7 @@ func TestNoServerDeps_ShowsDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := New(*repo, Settings{ActiveWorktreePath: repoDir})
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ○ down") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "server ○ down") {
 		t.Fatalf("tabs = %q, want the down indicator", got)
 	}
 }
@@ -137,7 +137,7 @@ func TestServerMode_HerdrUnavailableShowsInIndicator(t *testing.T) {
 
 	m = probe(t, m)
 
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ⚠ herdr unavailable") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "server ⚠ herdr unavailable") {
 		t.Errorf("tabs = %q, want the herdr indicator", got)
 	}
 }
@@ -154,7 +154,7 @@ func TestServerMode_ConnectionDropAfterTabSwitchDoesNotPanic(t *testing.T) {
 	client.down = false
 	m = probe(t, m)
 
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ● pid 4242") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "server ● pid 4242") {
 		t.Errorf("tabs = %q, want the server back up", got)
 	}
 }
@@ -165,7 +165,7 @@ func TestServerMode_SlowHandshakeKeepsLastState(t *testing.T) {
 
 	client.slow = true
 	m = probe(t, m)
-	if got := ansi.Strip(m.tabsView()); !strings.Contains(got, "server ● pid 4242") {
+	if got := m.serverConn.indicator(); !strings.Contains(got, "server ● pid 4242") {
 		t.Fatalf("slow handshake flipped the state: tabs = %q", got)
 	}
 }

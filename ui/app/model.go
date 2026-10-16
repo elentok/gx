@@ -142,8 +142,7 @@ func (m Model) View() tea.View {
 	if strings.TrimSpace(content) == "" {
 		content = "\n"
 	}
-	content = normalizeFrameContent(content, m.width, m.height)
-	content = injectTabsIntoFooter(content, m.tabsView(), m.width)
+	content = m.withChrome(content)
 	if m.keyPrefix != "" {
 		hints := hintsForPrefix(m.keyPrefix)
 		if source, ok := m.activePage().model.(ui.ChordHintSource); ok {
@@ -158,15 +157,34 @@ func (m Model) View() tea.View {
 		content = m.notifyHistory.View(content, m.width, m.height)
 	}
 	if stack := m.notify.View(); stack != "" {
-		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, 1)
+		content = ui.OverlayTopRightMargin(content, stack, m.width, 1, chromeRows)
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
 	v.MouseMode = child.MouseMode
 	v.ReportFocus = child.ReportFocus
-	v.Cursor = child.Cursor
+	if child.Cursor != nil {
+		cursor := *child.Cursor
+		cursor.Y += chromeRows
+		v.Cursor = &cursor
+	}
 	v.OnMouse = child.OnMouse
 	return v
+}
+
+// withChrome normalizes the page to the rows it was given and puts the title
+// row and the blank row on top.
+func (m Model) withChrome(page string) string {
+	pageHeight := 0
+	if m.height > 0 {
+		pageHeight = m.childWindowSizeMsg().Height
+	}
+	page = normalizeFrameContent(page, m.width, pageHeight)
+	lines := append([]string{m.renderTitleRow(m.width).line, m.blankChromeRow(m.width)}, strings.Split(page, "\n")...)
+	if m.height > 0 && len(lines) > m.height {
+		lines = lines[:m.height]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) activePage() historyEntry {
@@ -290,11 +308,7 @@ func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 }
 
 func (m Model) childWindowSizeMsg() tea.WindowSizeMsg {
-	height := m.height
-	if height < 1 {
-		height = 1
-	}
-	return tea.WindowSizeMsg{Width: m.width, Height: height}
+	return tea.WindowSizeMsg{Width: m.width, Height: max(1, m.height-chromeRows)}
 }
 
 func (m Model) resizeCurrentCmd() tea.Cmd {
