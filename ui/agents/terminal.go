@@ -123,7 +123,7 @@ func (m Model) terminalLines(s server.SessionInfo) []string {
 	}
 	if s.Status.State != server.SessionExited && (live == nil || !live.exited) {
 		switch {
-		case live != nil && live.err != nil:
+		case live != nil && live.err != nil && !live.retrying:
 			return append(lines, styleReason.Render("attach failed: "+live.err.Error()))
 		case live == nil || live.rows == nil:
 			return append(lines, ui.StyleMuted.Render("live screen not attached yet"))

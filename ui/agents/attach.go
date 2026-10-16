@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -56,7 +57,13 @@ type attachment struct {
 	// stream is nil until the dial returns, and for a snapshot.
 	stream AttachStream
 	closed bool
-	// ended: the stream is over (exit or error), so it must not be redialed
+	// status is the session's status when the dial started; an attach that
+	// ended with an error redials once the session's status moves on.
+	status  server.SessionStatus
+	attempt int
+	// retrying: a failed dial waits for its next attempt.
+	retrying bool
+	// ended: the stream is over (exit or error). An exit is never redialed
 	// while the same session stays on screen.
 	ended  bool
 	exited bool
@@ -83,6 +90,15 @@ type attachedMsg struct {
 	err      error
 }
 
+type attachRetryMsg struct{ a *attachment }
+
+// A Starting session's holder socket often doesn't exist yet when the tab
+// dials, so the dial is retried with backoff, up to maxAttachRetries times.
+const (
+	maxAttachRetries = 6
+	attachRetryBase  = 100 * time.Millisecond
+)
+
 type attachStreamMsg struct {
 	a   *attachment
 	msg nativerunner.AttachMessage
@@ -104,7 +120,7 @@ func (m Model) attachTarget() string {
 // attach of a session no longer shown and dials the one now shown.
 func (m Model) syncAttach() (Model, tea.Cmd) {
 	want := m.attachTarget()
-	if m.attach != nil && !m.attach.closed && m.attach.id == want {
+	if a := m.attach; a != nil && !a.closed && a.id == want && !m.redialDue(a) {
 		return m, nil
 	}
 	m.attach.close()
@@ -112,9 +128,22 @@ func (m Model) syncAttach() (Model, tea.Cmd) {
 	if want == "" {
 		return m, nil
 	}
-	a := &attachment{id: want}
+	return m.dialAttach(0)
+}
+
+// redialDue: a, the selected session's attach, failed and the session's
+// status has changed since it dialed.
+func (m Model) redialDue(a *attachment) bool {
+	return a.ended && !a.exited && a.err != nil && a.status != m.sessions[m.cursor].Status
+}
+
+// dialAttach replaces the attach with a new dial of the selected session.
+func (m Model) dialAttach(attempt int) (Model, tea.Cmd) {
+	m.attach.close()
+	s := m.sessions[m.cursor]
+	a := &attachment{id: s.ID, status: s.Status, attempt: attempt}
 	m.attach = a
-	dir, dial := filepath.Join(m.sessionsDir, want), m.dial
+	dir, dial := filepath.Join(m.sessionsDir, s.ID), m.dial
 	return m, func() tea.Msg {
 		stream, snapshot, err := dial(dir)
 		return attachedMsg{a: a, stream: stream, snapshot: snapshot, err: err}
@@ -140,6 +169,10 @@ func (m Model) updateAttached(msg attachedMsg) (Model, tea.Cmd) {
 	}
 	if msg.err != nil || msg.stream == nil {
 		a.ended, a.err, a.rows = true, msg.err, msg.snapshot
+		if msg.err != nil && a.status.State == server.SessionStarting && a.attempt < maxAttachRetries {
+			a.retrying = true
+			return m, tea.Tick(attachRetryBase<<a.attempt, func(time.Time) tea.Msg { return attachRetryMsg{a: a} })
+		}
 		return m, nil
 	}
 	a.stream = msg.stream
@@ -147,6 +180,13 @@ func (m Model) updateAttached(msg attachedMsg) (Model, tea.Cmd) {
 		m.resizeAttach()
 	}
 	return m, readAttach(a)
+}
+
+func (m Model) updateAttachRetry(msg attachRetryMsg) (Model, tea.Cmd) {
+	if a := msg.a; a != m.attach || a.closed {
+		return m, nil
+	}
+	return m.dialAttach(msg.a.attempt + 1)
 }
 
 func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {

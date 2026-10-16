@@ -188,6 +188,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateAFK(msg)
 	case attachedMsg:
 		return m.updateAttached(msg)
+	case attachRetryMsg:
+		return m.updateAttachRetry(msg)
 	case attachStreamMsg:
 		return m.updateAttachStream(msg)
 	case formProjectsMsg:

@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -89,12 +90,17 @@ func (f *fakeAttach) frame(rows ...string) {
 type fakeHolders struct {
 	attaches  map[string]*fakeAttach
 	snapshots map[string][]string
-	dialed    []string
+	// down lists the sessions whose holder socket doesn't exist yet.
+	down   map[string]bool
+	dialed []string
 }
 
 func (h *fakeHolders) dial(dir string) (AttachStream, []string, error) {
 	id := filepath.Base(dir)
 	h.dialed = append(h.dialed, id)
+	if h.down[id] {
+		return nil, nil, errors.New("no holder")
+	}
 	if rows, ok := h.snapshots[id]; ok {
 		return nil, rows, nil
 	}
@@ -114,8 +120,13 @@ func attachModel(t *testing.T, h *fakeHolders) (Model, tea.Cmd) {
 	m.sessionsDir = "/sessions"
 	m.dial = h.dial
 	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
+	return withStatusOfA(m, idleStatus)
+}
+
+// withStatusOfA delivers a snapshot of sessions a (in status) and b (idle).
+func withStatusOfA(m Model, status server.SessionStatus) (Model, tea.Cmd) {
 	st := &viewmodel.State{Sessions: []server.SessionInfo{
-		{ID: "a", Name: "alpha", Project: "gx", Status: idleStatus},
+		{ID: "a", Name: "alpha", Project: "gx", Status: status},
 		{ID: "b", Name: "beta", Project: "gx", Status: idleStatus},
 	}}
 	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
@@ -326,6 +337,104 @@ func TestAttach_OlderHolderShowsASnapshot(t *testing.T) {
 	}
 	if view := plainView(m); !strings.Contains(view, "old holder screen") || strings.Contains(view, "attach failed") {
 		t.Fatalf("snapshot not shown:\n%s", view)
+	}
+}
+
+var startingStatus = server.SessionStatus{State: server.SessionStarting}
+
+// startingModel shows session a Starting over holders where a's is down.
+func startingModel(t *testing.T) (Model, tea.Cmd, *fakeHolders) {
+	t.Helper()
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}, down: map[string]bool{"a": true}}
+	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m.sessionsDir = "/sessions"
+	m.dial = h.dial
+	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
+	m, cmd := withStatusOfA(m, startingStatus)
+	return m, cmd, h
+}
+
+func TestAttach_StartingSessionRetriesUntilTheHolderAppears(t *testing.T) {
+	m, cmd, h := startingModel(t)
+	m, retry := dialed(t, m, cmd)
+	if retry == nil {
+		t.Fatal("a failed dial of a Starting session was not retried")
+	}
+	if view := plainView(m); strings.Contains(view, "attach failed") {
+		t.Fatalf("attach failed shown while retrying:\n%s", view)
+	}
+
+	h.down["a"] = false
+	next, cmd := m.Update(attachRetryMsg{a: m.attach})
+	m, _ = dialed(t, next.(Model), cmd)
+	h.attaches["a"].frame("$ claude")
+	m, _ = read(t, m, readAttach(m.attach))
+	if view := plainView(m); !strings.Contains(view, "$ claude") || strings.Contains(view, "attach failed") {
+		t.Fatalf("the retry did not attach:\n%s", view)
+	}
+}
+
+func TestAttach_RetriesAreBounded(t *testing.T) {
+	m, cmd, h := startingModel(t)
+	m, retry := dialed(t, m, cmd)
+	for retry != nil {
+		next, cmd := m.Update(attachRetryMsg{a: m.attach})
+		m, retry = dialed(t, next.(Model), cmd)
+	}
+	if len(h.dialed) != 1+maxAttachRetries {
+		t.Fatalf("dialed %d times, want %d", len(h.dialed), 1+maxAttachRetries)
+	}
+	if view := plainView(m); !strings.Contains(view, "attach failed: no holder") {
+		t.Fatalf("giving up did not show the error:\n%s", view)
+	}
+}
+
+func TestAttach_StaleRetryIsDropped(t *testing.T) {
+	m, cmd, h := startingModel(t)
+	m, _ = dialed(t, m, cmd)
+	stale := attachRetryMsg{a: m.attach}
+	m = update1(t, m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if _, cmd := m.Update(stale); cmd != nil {
+		t.Fatal("a retry of a session no longer on screen redialed")
+	}
+	if !slices.Equal(h.dialed, []string{"a"}) {
+		t.Fatalf("dialed %v", h.dialed)
+	}
+}
+
+func TestAttach_FailedAttachRedialsWhenTheSessionChanges(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}, down: map[string]bool{"a": true}}
+	m, cmd := attachModel(t, h)
+	m, retry := dialed(t, m, cmd)
+	if retry != nil {
+		t.Fatal("a failed dial of an Idle session was retried")
+	}
+
+	m, cmd = withStatusOfA(m, idleStatus)
+	if cmd != nil {
+		t.Fatal("an unchanged session redialed")
+	}
+
+	h.down["a"] = false
+	m, cmd = withStatusOfA(m, startingStatus)
+	m, _ = dialed(t, m, cmd)
+	if m.attach.stream != h.attaches["a"] {
+		t.Fatal("a session change did not redial the failed attach")
+	}
+}
+
+func TestAttach_ExitedAttachIsNotRedialedOnSessionUpdate(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	h.attaches["a"].msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamExit}
+	m, _ = read(t, m, next)
+
+	if _, cmd := withStatusOfA(m, startingStatus); cmd != nil {
+		t.Fatal("a session update redialed an exited attach")
+	}
+	if !slices.Equal(h.dialed, []string{"a"}) {
+		t.Fatalf("dialed %v", h.dialed)
 	}
 }
 
