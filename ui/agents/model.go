@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
@@ -78,7 +79,10 @@ type Model struct {
 	dial        attachDialer
 	// attach is nil when no session is on screen.
 	attach *attachment
-	now    func() time.Time
+	// copy is nil outside copy mode.
+	copy      *copyMode
+	clipWrite func(string) error
+	now       func() time.Time
 	// opened: the opening focus was picked, on the first snapshot.
 	opened bool
 	// lastViewed is the session viewed last by an earlier TUI.
@@ -94,7 +98,7 @@ type Model struct {
 func NewModel(client SessionClient, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, now: time.Now, listProjects: listFormProjects,
+	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: listFormProjects,
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{client: client}
@@ -131,9 +135,9 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 
 // InputFocused tells the shell the page swallows every key: in the terminal,
 // after the leader, in the jump popup, create form, confirm or menu and while
-// typing a help filter.
+// typing a help filter, and in copy mode.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.InputFocused()
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -195,7 +199,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ticking, m.focused = false, true
 		return m.refresh()
 	case tea.PasteMsg:
-		if m.terminalFocused {
+		if m.terminalFocused && m.copy == nil {
 			return m, m.sendPaste(msg.Content)
 		}
 		return m, nil

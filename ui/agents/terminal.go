@@ -69,6 +69,9 @@ func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) st
 		}
 		title += " " + styleDetail.Render(badge)
 	}
+	if m.copy != nil && m.copy.a.id == s.ID {
+		title += " " + styleDetail.Render("copy")
+	}
 	return title
 }
 
@@ -124,6 +127,9 @@ func (m Model) terminalLines(s server.SessionInfo) []string {
 			return append(lines, styleReason.Render("attach failed: "+live.err.Error()))
 		case live == nil || live.rows == nil:
 			return append(lines, ui.StyleMuted.Render("live screen not attached yet"))
+		}
+		if m.copy != nil && m.copy.a == live {
+			return append(lines, m.copyRows(live.rows)...)
 		}
 		return append(lines, live.rows...)
 	}

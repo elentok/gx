@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"fmt"
 	"io"
 	"path/filepath"
 	"slices"
@@ -57,6 +58,11 @@ func (f *fakeAttach) Scroll(offset int) error {
 	f.log = append(f.log, "scroll:"+strconv.Itoa(offset))
 	return nil
 }
+func (f *fakeAttach) Copy(start, end nativerunner.LinePos) error {
+	f.log = append(f.log, fmt.Sprintf("copy:%d.%d-%d.%d", start.Line, start.Col, end.Line, end.Col))
+	return nil
+}
+
 func (f *fakeAttach) Resize(cols, rows int) error {
 	f.sizes = append(f.sizes, [2]int{cols, rows})
 	return nil

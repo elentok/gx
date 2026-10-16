@@ -23,6 +23,7 @@ type AttachStream interface {
 	Paste(text string) error
 	Resize(cols, rows int) error
 	Scroll(offset int) error
+	Copy(start, end nativerunner.LinePos) error
 	Close() error
 }
 
@@ -167,7 +168,10 @@ func (m Model) updateAttachStream(msg attachStreamMsg) (Model, tea.Cmd) {
 		m.terminalFocused = false
 		// Shown until the server reports the exit and the saved last screen loads.
 		m.lastScreen = lastScreen{id: a.id, rows: a.rows}
+		m.copy = nil
 		return m, nil
+	case nativerunner.StreamCopy:
+		return m, tea.Batch(m.writeCopied(msg.msg.Text), readAttach(a))
 	}
 	return m, readAttach(a)
 }

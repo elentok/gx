@@ -26,6 +26,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"X"}, Title: "remove session"},
 	{Seq: []string{"r"}, Title: "resume session"},
 	{Seq: []string{"a"}, Title: "run action"},
+	{Seq: []string{"["}, Title: "copy mode"},
 	{Seq: []string{"n"}, Title: "next session"},
 	{Seq: []string{"p"}, Title: "previous session"},
 	{Seq: []string{"u"}, Title: "next needing attention"},
@@ -75,6 +76,9 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateConfirmKey(msg)
 	case m.menuOpen:
 		return m.updateMenuKey(msg)
+	case m.copy != nil:
+		// Copy mode takes every key, the leader too, so `g g` stays its own.
+		return m.updateCopyKey(msg)
 	case m.leaderPending:
 		m.leaderPending = false
 		if isLeader {
@@ -109,6 +113,8 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m.resumeSelected()
 	case "a":
 		return m.runActionSelected()
+	case "[":
+		return m.enterCopyMode()
 	case "n":
 		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
 	case "p":
