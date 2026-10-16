@@ -150,6 +150,7 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 	working := []server.SessionInfo{{ID: "w", Project: "gx", Status: server.SessionStatus{State: server.SessionWorking}}}
 
 	m := NewModel(&fakeSessionClient{}, ui.Settings{})
+	m.sessionsDir = "" // no attach, so a cmd can only be a tick
 	if _, cmd := m.WithServerState(&viewmodel.State{Sessions: idle}, ticketsui.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled with no Working session")
 	}
@@ -170,7 +171,9 @@ func TestSidebar_SpinnerTicksOnlyWhileAWorkingSessionIsVisible(t *testing.T) {
 		offscreen = append(offscreen, idle[0])
 	}
 	offscreen = append(offscreen, working...)
-	sized := update1(t, NewModel(&fakeSessionClient{}, ui.Settings{}), tea.WindowSizeMsg{Width: 70, Height: 10})
+	fresh := NewModel(&fakeSessionClient{}, ui.Settings{})
+	fresh.sessionsDir = ""
+	sized := update1(t, fresh, tea.WindowSizeMsg{Width: 70, Height: 10})
 	if _, cmd := sized.WithServerState(&viewmodel.State{Sessions: offscreen}, ticketsui.ServerLinkUp); cmd != nil {
 		t.Fatal("tick scheduled for a Working session scrolled off screen")
 	}

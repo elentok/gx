@@ -105,12 +105,19 @@ func statusLabel(s server.SessionInfo) string {
 // terminalLines is the terminal panel body: the info row (then a blank row)
 // and the screen.
 func (m Model) terminalLines(s server.SessionInfo) []string {
-	var lines []string
-	if info := infoRow(s); info != "" {
-		lines = append(lines, info, "")
+	lines := infoLines(s)
+	live := m.attach
+	if live != nil && live.id != s.ID {
+		live = nil
 	}
-	if s.Status.State != server.SessionExited {
-		return append(lines, ui.StyleMuted.Render("live screen not attached yet"))
+	if s.Status.State != server.SessionExited && (live == nil || !live.exited) {
+		switch {
+		case live != nil && live.err != nil:
+			return append(lines, styleReason.Render("attach failed: "+live.err.Error()))
+		case live == nil || live.rows == nil:
+			return append(lines, ui.StyleMuted.Render("live screen not attached yet"))
+		}
+		return append(lines, live.rows...)
 	}
 	lines = append(lines, ui.StyleMuted.Render("<leader> r to resume"), "")
 	if m.lastScreen.id != s.ID {
@@ -120,6 +127,24 @@ func (m Model) terminalLines(s server.SessionInfo) []string {
 		lines = append(lines, styleLastScreen.Render(ansi.Strip(row)))
 	}
 	return lines
+}
+
+// infoLines is the info row then a blank row, or none without an info row.
+func infoLines(s server.SessionInfo) []string {
+	if info := infoRow(s); info != "" {
+		return []string{info, ""}
+	}
+	return nil
+}
+
+// screenSize is the panel's room for the session's screen: inside the border,
+// below the info lines.
+func (m Model) screenSize() (cols, rows int) {
+	cols, rows = m.mainWidth()-2, m.height-2
+	if m.cursor < len(m.sessions) {
+		rows -= len(infoLines(m.sessions[m.cursor]))
+	}
+	return max(cols, 1), max(rows, 1)
 }
 
 // infoRow is the Actionable reason with the prompts `<leader> a` would run,
