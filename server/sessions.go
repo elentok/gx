@@ -36,6 +36,8 @@ const (
 	ReasonSessionUnknown        = "unknown-session"
 	ReasonSessionLive           = "session-live"
 	ReasonSessionNotLive        = "session-not-live"
+	ReasonSessionNotIdle        = "session-not-idle"
+	ReasonSessionNoAction       = "no-action"
 )
 
 // sessionMetaFile holds a session's meta in its state dir.
@@ -636,9 +638,15 @@ func (s *Server) watchSession(dir, id string) {
 	}
 }
 
-// typeFirstPrompt sends Enter on its own, so the harness reads the prompt as
-// typed rather than as a paste ending in a newline.
 func (s *Server) typeFirstPrompt(dir, id, prompt string) {
+	if err := typeSessionPrompt(dir, prompt); err != nil {
+		s.log.Warn("type first prompt", "session", id, "err", err)
+	}
+}
+
+// typeSessionPrompt sends Enter on its own, so the harness reads the prompt
+// as typed rather than as a paste ending in a newline.
+func typeSessionPrompt(dir, prompt string) error {
 	c, err := nativerunner.DialHolder(dir)
 	if err == nil {
 		err = c.SendKeys(prompt)
@@ -646,9 +654,7 @@ func (s *Server) typeFirstPrompt(dir, id, prompt string) {
 	if err == nil {
 		err = c.SendKeys("\r")
 	}
-	if err != nil {
-		s.log.Warn("type first prompt", "session", id, "err", err)
-	}
+	return err
 }
 
 func sessionExitOf(code int) string {

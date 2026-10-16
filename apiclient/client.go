@@ -380,6 +380,14 @@ func (c *Client) MarkSessionRead(ctx context.Context, id string) (server.Session
 	return res, err
 }
 
+// RunSessionAction starts a session's Action; it runs on in the server. A
+// refusal is a result (Refused set), not an error.
+func (c *Client) RunSessionAction(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/run-action", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // MarkSessionActionable raises an agent's Actionable on its session. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) MarkSessionActionable(ctx context.Context, req server.MarkActionableRequest) (server.SessionResult, error) {

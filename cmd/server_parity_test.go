@@ -58,6 +58,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/mark-read":  "agents mark-read",
 	"POST /v1/sessions/focus":      "agents report-focus",
 	"POST /v1/sessions/actionable": "agent actionable",
+	"POST /v1/sessions/run-action": "agents run-action",
 }
 
 // plannedRoutes are routes whose CLI verb a queued ticket builds: the server op

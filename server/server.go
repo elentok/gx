@@ -187,6 +187,10 @@ type Config struct {
 	// means DefaultLandStopTimeout.
 	LandStopTimeout time.Duration
 
+	// ActionStepStartTimeout bounds how long an Action step waits for its
+	// prompt to go Working; zero means DefaultActionStepStartTimeout.
+	ActionStepStartTimeout time.Duration
+
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string
@@ -448,6 +452,7 @@ var routeTable = []struct {
 	{"POST /v1/sessions/mark-read", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.markSessionRead)(w, r) }},
 	{"POST /v1/sessions/focus", (*Server).sessionFocusWrite},
 	{"POST /v1/sessions/actionable", (*Server).sessionActionableWrite},
+	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.runSessionAction)(w, r) }},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
