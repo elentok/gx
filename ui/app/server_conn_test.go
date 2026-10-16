@@ -92,14 +92,14 @@ func TestServerMode_ConnectionDropAndReconnect(t *testing.T) {
 	m := newServerShell(t, client)
 
 	m = probe(t, m)
-	if got := m.serverConn.indicator(); !strings.Contains(got, "server ● pid 4242") {
-		t.Fatalf("up: tabs = %q", got)
+	if got := titleText(m); !strings.Contains(got, "● ? help") {
+		t.Fatalf("up: title = %q", got)
 	}
 
 	client.down = true
 	m = probe(t, m)
-	if got := m.serverConn.indicator(); !strings.Contains(got, "server ○ down") {
-		t.Fatalf("down: tabs = %q", got)
+	if got := titleText(m); !strings.Contains(got, "○ server down") {
+		t.Fatalf("down: title = %q", got)
 	}
 	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "server down — s to start") {
 		t.Fatalf("down: Queue tab has no banner:\n%s", got)
@@ -114,8 +114,8 @@ func TestServerMode_ConnectionDropAndReconnect(t *testing.T) {
 
 func TestServerMode_VersionMismatchIsReadOnly(t *testing.T) {
 	m := probe(t, newServerShell(t, &fakeServerClient{readOnly: true}))
-	if got := m.serverConn.indicator(); !strings.Contains(got, "read-only") {
-		t.Fatalf("tabs = %q", got)
+	if got := titleText(m); !strings.Contains(got, "read-only") {
+		t.Fatalf("title = %q", got)
 	}
 }
 
@@ -127,8 +127,8 @@ func TestNoServerDeps_ShowsDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := New(*repo, Settings{ActiveWorktreePath: repoDir})
-	if got := m.serverConn.indicator(); !strings.Contains(got, "server ○ down") {
-		t.Fatalf("tabs = %q, want the down indicator", got)
+	if got := titleText(m); !strings.Contains(got, "○ server down") {
+		t.Fatalf("title = %q, want the down indicator", got)
 	}
 }
 
@@ -137,8 +137,8 @@ func TestServerMode_HerdrUnavailableShowsInIndicator(t *testing.T) {
 
 	m = probe(t, m)
 
-	if got := m.serverConn.indicator(); !strings.Contains(got, "server ⚠ herdr unavailable") {
-		t.Errorf("tabs = %q, want the herdr indicator", got)
+	if got := titleText(m); !strings.Contains(got, "⚠ herdr unavailable") {
+		t.Errorf("title = %q, want the herdr indicator", got)
 	}
 }
 
@@ -154,8 +154,8 @@ func TestServerMode_ConnectionDropAfterTabSwitchDoesNotPanic(t *testing.T) {
 	client.down = false
 	m = probe(t, m)
 
-	if got := m.serverConn.indicator(); !strings.Contains(got, "server ● pid 4242") {
-		t.Errorf("tabs = %q, want the server back up", got)
+	if got := titleText(m); !strings.Contains(got, "● ? help") {
+		t.Errorf("title = %q, want the server back up", got)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestServerMode_SlowHandshakeKeepsLastState(t *testing.T) {
 
 	client.slow = true
 	m = probe(t, m)
-	if got := m.serverConn.indicator(); !strings.Contains(got, "server ● pid 4242") {
-		t.Fatalf("slow handshake flipped the state: tabs = %q", got)
+	if got := titleText(m); !strings.Contains(got, "● ? help") {
+		t.Fatalf("slow handshake flipped the state: title = %q", got)
 	}
 }

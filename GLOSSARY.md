@@ -335,9 +335,11 @@ truth. The JSON result carries `"via": "server"` and an `actor` (who asked). Ref
 It holds no scheduler state of its own and never starts agents. _Avoid_: loop registry (the
 in-process ralph-loop it replaced).
 
-**Server indicator** — the Queue tab's label for the server's reachability (running, down,
-starting). Replaces the "(attached)" suffix. When down, the Queue tab is cleared and offers to
-start the server; the Tickets tab still reads markdown.
+**Server indicator** — the colored icon on the right of the title row that shows the server's
+state on every view: green when up, red with `server down`, yellow with `read-only — restart` or
+`herdr unavailable`; nothing before the first probe. On narrow rows the words shorten, then drop;
+the icon never drops. When down, the Queue tab is cleared and offers to start the server; the
+Tickets tab still reads markdown.
 
 **Launch** — the server starting an iteration: claim the ticket, create the worktree, open the
 herdr tab and start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).

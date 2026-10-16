@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strconv"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -16,6 +17,9 @@ var (
 	titleCaretStyle = titleBgStyle.Foreground(ui.ColorOverlay)
 	titleHelpKey    = titleBgStyle.Foreground(ui.ColorSubtle).Bold(true)
 	titleHelpWord   = titleBgStyle.Foreground(ui.ColorOverlay)
+
+	titleAgentsWord  = titleBgStyle.Foreground(ui.ColorOverlay)
+	titleAgentsCount = titleBgStyle.Foreground(ui.ColorRed).Bold(true)
 )
 
 // span is a half-open column range [start, end) on the title row.
@@ -51,36 +55,66 @@ func renderSegments(segs []titleSegment) string {
 	return b.String()
 }
 
+// serverWords picks which of the server badge's word forms a shape shows.
+type serverWords int
+
+const (
+	serverWordsFull serverWords = iota
+	serverWordsShort
+	serverWordsNone
+)
+
+func (b serverBadge) words(w serverWords) string {
+	switch w {
+	case serverWordsFull:
+		return b.full
+	case serverWordsShort:
+		return b.short
+	}
+	return ""
+}
+
+// titleShape is one step of the drop order: what the row keeps.
+type titleShape struct {
+	shortHelp bool
+	words     serverWords
+	brand     bool
+	caret     bool
+}
+
+// titleDropOrder runs widest to narrowest; the first shape that fits wins.
+// The agents count and the server icon are in every shape.
+var titleDropOrder = []titleShape{
+	{brand: true, caret: true},
+	{shortHelp: true, brand: true, caret: true},
+	{shortHelp: true, words: serverWordsShort, brand: true, caret: true},
+	{shortHelp: true, words: serverWordsNone, brand: true, caret: true},
+	{shortHelp: true, words: serverWordsNone, caret: true},
+	{shortHelp: true, words: serverWordsNone},
+}
+
 // renderTitleRow builds the title row for width (<= 0 means unbounded).
 func (m Model) renderTitleRow(width int) titleRow {
-	left := []titleSegment{
-		{" ", titleBgStyle},
-		{"gx", titleBrandStyle},
-		{" ", titleBgStyle},
-		{"›", titleSepStyle},
-		{" ", titleBgStyle},
-		{m.activeViewLabel(), titleViewStyle},
-		{" ", titleBgStyle},
-		{"▾", titleCaretStyle},
+	name := m.activeViewLabel()
+	shape := titleDropOrder[0]
+	for _, shape = range titleDropOrder {
+		if width <= 0 || m.titleWidth(shape, name) <= width {
+			break
+		}
 	}
-	// Attention items (ticket 03) go between the left group and help.
-	right := []titleSegment{
-		{"?", titleHelpKey},
-		{" ", titleBgStyle},
-		{"help", titleHelpWord},
-		{" ", titleBgStyle},
+	if over := m.titleWidth(shape, name) - width; width > 0 && over > 0 {
+		name = ansi.Truncate(name, max(ansi.StringWidth(name)-over, 1), "…")
 	}
+	left, right, helpW := m.titleGroups(shape, name)
 	leftW := segmentsWidth(left)
 	rightW := segmentsWidth(right)
-	gap := 1
-	if width > leftW+rightW {
-		gap = width - leftW - rightW
-	}
+	gap := max(width-leftW-rightW, 1)
+	helpStart := leftW + gap + rightW - helpW - 1
 	row := titleRow{
 		line: renderSegments(left) + titleBgStyle.Render(strings.Repeat(" ", gap)) + renderSegments(right),
 		// The leading margin is not part of the click target.
 		left: span{start: 1, end: leftW},
-		help: span{start: leftW + gap, end: leftW + gap + rightW - 1},
+		help: span{start: helpStart, end: helpStart + helpW},
 	}
 	if width > 0 {
 		row.line = ansi.Truncate(row.line, width, "")
@@ -88,6 +122,43 @@ func (m Model) renderTitleRow(width int) titleRow {
 		row.help = row.help.clip(width)
 	}
 	return row
+}
+
+// titleWidth is the row's width in shape with the minimum one-column gap.
+func (m Model) titleWidth(shape titleShape, name string) int {
+	left, right, _ := m.titleGroups(shape, name)
+	return segmentsWidth(left) + 1 + segmentsWidth(right)
+}
+
+// titleGroups returns the left group, the right group (attention items then
+// help, with a trailing margin) and the width of the help item.
+func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSegment, helpW int) {
+	sp := titleSegment{" ", titleBgStyle}
+	left = []titleSegment{sp}
+	if shape.brand {
+		left = append(left, titleSegment{"gx", titleBrandStyle}, sp, titleSegment{"›", titleSepStyle}, sp)
+	}
+	left = append(left, titleSegment{name, titleViewStyle})
+	if shape.caret {
+		left = append(left, sp, titleSegment{"▾", titleCaretStyle})
+	}
+
+	if n := m.stream.vm.ActionableCount(); n > 0 {
+		right = append(right, titleSegment{"agents", titleAgentsWord}, sp, titleSegment{strconv.Itoa(n), titleAgentsCount}, sp)
+	}
+	if b, ok := m.serverConn.badge(ui.Icons(m.settings.UseNerdFontIcons)); ok {
+		style := titleBgStyle.Foreground(b.color)
+		right = append(right, titleSegment{b.icon, style}, sp)
+		if words := b.words(shape.words); words != "" {
+			right = append(right, titleSegment{words, style}, sp)
+		}
+	}
+	help := []titleSegment{{"?", titleHelpKey}}
+	if !shape.shortHelp {
+		help = append(help, sp, titleSegment{"help", titleHelpWord})
+	}
+	right = append(append(right, help...), sp)
+	return left, right, segmentsWidth(help)
 }
 
 func (s span) clip(width int) span {

@@ -1536,39 +1536,6 @@ func TestE2E_InterruptedInitialLoad_ReloadsOnReturn(t *testing.T) {
 	}
 }
 
-// TestServerIndicator is seam D: each connection state renders its indicator
-// on the tab bar (shown on every tab), an unprobed shell renders none, and the
-// queue tab label never carries "(attached)".
-func TestServerIndicator(t *testing.T) {
-	t.Parallel()
-	repoDir := testutil.TempRepo(t)
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		t.Fatalf("FindRepo: %v", err)
-	}
-	base := New(*repo, Settings{
-		InitialRoute:       nav.ViewState{Tab: nav.TabQueue, WorktreeRoot: repoDir},
-		ActiveWorktreePath: repoDir,
-	})
-	cases := []struct {
-		conn ServerConn
-		want string
-	}{
-		{ServerConn{State: ServerUp, PID: 4242}, "server ● pid 4242"},
-		{ServerConn{State: ServerDown}, "server ○ down"},
-		{ServerConn{State: ServerReadOnly}, "server ◐ read-only — restart"},
-		{ServerConn{State: ServerHerdrUnavailable}, "server ⚠ herdr unavailable"},
-	}
-	for _, tc := range cases {
-		if got := base.WithServerConn(tc.conn).serverConn.indicator(); got != tc.want {
-			t.Errorf("indicator = %q, want %q", got, tc.want)
-		}
-	}
-	if got := base.WithServerConn(ServerConn{}).serverConn.indicator(); got != "" {
-		t.Errorf("unprobed indicator = %q, want none", got)
-	}
-}
-
 func TestQueueTabLabelPlain(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

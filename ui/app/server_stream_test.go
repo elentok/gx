@@ -261,6 +261,9 @@ func TestServerStream_SessionEventRefreshesSessionsOnAnyTab(t *testing.T) {
 			if got := h.m.stream.vm.ActionableCount(); got != 1 {
 				t.Errorf("ActionableCount = %d, want 1", got)
 			}
+			if got := titleText(h.m); !strings.Contains(got, "agents 1 ●") {
+				t.Errorf("title = %q, want the agents count before the server icon", got)
+			}
 		})
 	}
 }
