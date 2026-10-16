@@ -1,11 +1,9 @@
-package agents
+package ui
 
 import (
 	"slices"
 	"strings"
 	"unicode"
-
-	"github.com/elentok/gx/ui"
 )
 
 // Fuzzy score weights: every matched rune scores, more so at a word start or
@@ -17,11 +15,12 @@ const (
 	maxGapPenalty    = 8
 )
 
-// fuzzyScore matches each space-separated term of query against text as an
-// in-order subsequence, ignoring case. ok is false when a term does not
-// match; pos is the matched rune indices of text, ascending. An empty query
-// matches everything with score 0.
-func fuzzyScore(query, text string) (score int, pos []int, ok bool) {
+// FuzzyScore matches each space-separated term of query against text as an
+// in-order subsequence, ignoring case, and ranks the match (unlike
+// FuzzyMatch). ok is false when a term does not match; pos is the matched
+// rune indices of text, ascending. An empty query matches everything with
+// score 0.
+func FuzzyScore(query, text string) (score int, pos []int, ok bool) {
 	runes := lowerRunes(text)
 	for _, term := range strings.Fields(query) {
 		s, p, found := bestTermMatch(lowerRunes(term), runes)
@@ -91,9 +90,9 @@ func isWordSep(r rune) bool {
 	return unicode.IsSpace(r) || strings.ContainsRune("/-_.~", r)
 }
 
-// highlightRunes renders text with the runes at pos (ascending) in
-// ui.StyleFilterMatch.
-func highlightRunes(text string, pos []int) string {
+// HighlightMatches renders text with the runes at pos (ascending) in
+// StyleFilterMatch.
+func HighlightMatches(text string, pos []int) string {
 	if len(pos) == 0 {
 		return text
 	}
@@ -109,7 +108,7 @@ func highlightRunes(text string, pos []int) string {
 			j++
 		}
 		if matched {
-			b.WriteString(ui.StyleFilterMatch.Render(string(runes[i:j])))
+			b.WriteString(StyleFilterMatch.Render(string(runes[i:j])))
 		} else {
 			b.WriteString(string(runes[i:j]))
 		}

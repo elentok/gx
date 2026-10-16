@@ -260,7 +260,7 @@ func boolCmp(a, b bool) int {
 // positions that fall in the label.
 func (f *createForm) match(e *formEntry) bool {
 	name := f.projects[e.project].Name
-	score, pos, ok := fuzzyScore(f.query, name+" "+entryLabel(*e))
+	score, pos, ok := ui.FuzzyScore(f.query, name+" "+entryLabel(*e))
 	if !ok {
 		return false
 	}
@@ -570,7 +570,7 @@ func (m Model) renderPicker(innerW int) []string {
 			continue
 		}
 		e := f.matches[r.entry]
-		text := "    " + highlightRunes(entryLabel(e), e.pos)
+		text := "    " + ui.HighlightMatches(entryLabel(e), e.pos)
 		if !e.newWorktree() {
 			if n := m.dirSessions(e.dir); n > 0 {
 				text += ui.StyleMuted.Render("  " + plural(n, "session"))
