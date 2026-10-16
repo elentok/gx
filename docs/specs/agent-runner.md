@@ -220,8 +220,8 @@ Dependencies:
     that I, investigate or a future watchdog can steer a live agent. [T05]
 69. As a user, I want these verbs to take a ticket address (`<epic>/<id>`) that resolves to the
     live iteration, so that I never type a label. [T08]
-70. As a user, I want no live terminal attach, so that the design stays within what native
-    runners can promise. [map]
+70. As a user, I want no live terminal attach to a loop session, so that the design stays within what native
+    runners can promise. Interactive sessions are the exception (ADR 0037). [map]
 
 ### Watch CLI
 

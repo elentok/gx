@@ -215,12 +215,47 @@ takes its prompts, and reports whether it is working, idle or blocked. herdr is 
 An iteration keeps the agent runner that started it; changing the setting affects only new launches.
 _Avoid_: "runner" alone, "backend", "run".
 
+**Harness** — the agent program a session runs: claude today; codex or opencode later. Separate
+from the agent runner that hosts it: the runner decides how a session is hosted, the harness decides
+what runs inside it. Say "agent harness" in full where "test harness" could be meant. _Avoid_:
+"kind", "agent kind", "provider".
+
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
 multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
-agent read-only and act on it with one-shot prompt, interrupt and answer verbs, but never attach to its terminal. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
+agent read-only and act on it with one-shot prompt, interrupt and answer verbs. Only an interactive session can be viewed live and typed into. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
 
 **Session** — one agent hosted by an agent runner, identified by its label. Replaces herdr's
 tab, pane and workspace triple as what ralph-loop holds on to. _Avoid_: "pane", "tab" outside herdr.
+
+**Interactive session** — a session a person starts and types into from the Agents tab, rather than
+one the loop launches for an iteration. `gx server` keeps it alive while no TUI is open. _Avoid_:
+"chat", "agent" alone (an agent is the program in the session, not the session).
+
+**Resume (interactive session)** — relaunch an Exited interactive session on its latest
+conversation, in the same dir, keeping the same session (name, Unread, Actionable). A person does it
+by hand, or gx does it once on server start for sessions that were live before. Not the queue's
+resume, which belongs to the pause **Gate**. _Avoid_: restart (sounds like a fresh conversation).
+
+**Session ticket** — the map epic or map ticket an interactive session was started from. Set once,
+when the session is created, and shown with the session. It never changes the ticket's status: the
+person in the session works the ticket. _Avoid_: assignee, claim (a claim is a ticket status).
+
+**Session status** — what an interactive session is doing now: Starting, Working, Idle, Blocked,
+Rate-limited or Exited. Finer than an agent runner's working/idle/blocked, which the loop keeps
+using. _Avoid_: "state" for this (state is the runner's coarse view).
+
+**Unread** — an interactive session did something worth seeing (finished a turn, became blocked or
+rate-limited, or exited) while no person was looking at it. Viewing the session marks it read.
+Says nothing about whether the person must act. _Avoid_: needs attention (retired name, see ADR
+0018), unseen.
+
+**Actionable** — the agent needs something specific from the person: an answer to a permission
+prompt, question or dialog (while Blocked), or a next step the agent itself raised. Viewing does not
+clear it; resolving the block or typing into the session does. Always carries a reason.
+_Avoid_: unread (a read session can still be actionable).
+
+**Action** — the prompts an agent attaches to an Actionable it raised, which gx can send into the
+session on the person's request (e.g. clear, then run the next design step).
 
 **Headless runner** — the native agent runner that drives claude through its non-interactive,
 structured-event mode. The default native choice.
@@ -487,6 +522,15 @@ The app-shell `Update` wrapper calls `AppendViewStateChanged` after every child 
 pre/post `ViewState` and emitting `ViewStateChanged` automatically when navigation is enabled.
 Explicit `ViewStateChanged` emissions remain supported for specialized timing needs.
 
+**Leader key** — the one key that, while an embedded terminal has focus, says the next key is a gx
+action, not input for the session. Pressing it twice sends it to the session.
+_Avoid_: prefix key, escape key.
+
+**Copy mode** — a mode of an embedded terminal where keys move a cursor through the session's
+scrollback and select text to copy, instead of going to the session. Scrolling back with the mouse
+wheel alone is not copy mode.
+_Avoid_: scroll mode, select mode.
+
 ## Pull and Push Lifecycle
 
 A pull or push runs as a sequence of **phases**, some of which are interactive prompts and some of
@@ -685,8 +729,9 @@ iteration). Recovery runs at most once per `(ticket, kind)` and three times per 
 
 ## Notification Surfaces
 
-The three places a run event can surface. They are distinct surfaces, not levels of the same
-thing: an event may reach any combination of them. (A **destination** is something else — see below.)
+The four places a run or session event can surface. They are distinct surfaces, not levels of the
+same thing: an event may reach any combination of them. (A **destination** is something else — see
+below.)
 
 **TUI** — Queue tab state, driven by `reduceLiveEvent`. Everything gx knows shows up here.
 
@@ -697,6 +742,13 @@ screen.
 subset of run events, for a person away from the terminal. The word **push** is retired for this
 sense: it collided with `git push` and with mobile push notifications, and `notify` was already
 taken by the toast package.
+
+**Banner** — an OS-level notification, sent once by the server (never by a TUI), with an optional
+sound. For a person at the machine who isn't looking at the session it concerns. Distinct from a
+**toast**, which lives inside the TUI.
+
+**AFK mode** — a person-set, machine-wide state in which interactive session events also go to
+**Chat**, for a person away from the machine. It adds a surface; it never silences banners.
 
 **Destination** — a chat transport plus its target (a Telegram chat id or a Slack webhook URL). The
 unit of chat batching, gating and muting: two projects with the same target share one destination.
