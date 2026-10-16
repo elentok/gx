@@ -76,10 +76,10 @@ func TestCopyMode_Moves(t *testing.T) {
 		{"w forward across a line", letters("kww"), nativerunner.LinePos{Line: 101}},
 		{"ctrl+u", []tea.KeyPressMsg{ctrl('u')}, nativerunner.LinePos{Line: 96}},
 		{"ctrl+d", []tea.KeyPressMsg{ctrl('d')}, nativerunner.LinePos{Line: 106}},
-		{"PgUp", []tea.KeyPressMsg{{Code: tea.KeyPgUp}}, nativerunner.LinePos{Line: 91}},
-		{"PgDn clamps to the last line", []tea.KeyPressMsg{{Code: tea.KeyPgDown}}, nativerunner.LinePos{Line: 109}},
+		{"PgUp", []tea.KeyPressMsg{{Code: tea.KeyPgUp}}, nativerunner.LinePos{Line: 90}},
+		{"PgDn clamps to the last line", []tea.KeyPressMsg{{Code: tea.KeyPgDown}}, nativerunner.LinePos{Line: 110}},
 		{"g g", letters("lgg"), nativerunner.LinePos{}},
-		{"G", letters("lkG"), nativerunner.LinePos{Line: 109}},
+		{"G", letters("lkG"), nativerunner.LinePos{Line: 110}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestCopyMode_CursorPastTheViewScrollsIt(t *testing.T) {
 	m = pressKeys(t, m, tea.KeyPressMsg{Code: tea.KeyPgUp})
 	m = pressKeys(t, m, letters("gg")...)
 	pressKeys(t, m, letters("G")...)
-	if want := []string{"scroll:1", "scroll:11", "scroll:100", "scroll:0"}; !slices.Equal(fa.log, want) {
+	if want := []string{"scroll:1", "scroll:12", "scroll:100", "scroll:0"}; !slices.Equal(fa.log, want) {
 		t.Fatalf("sent %v, want %v", fa.log, want)
 	}
 }
@@ -141,7 +141,7 @@ func TestCopyMode_CursorPastTheViewWheelsAChildThatReportsTheMouse(t *testing.T)
 		want = append(want, "wheel:1,0,false")
 	}
 	// G goes to the bottom row without scrolling, then j wheels down there.
-	want = append(want, "wheel:0,9,true")
+	want = append(want, "wheel:0,10,true")
 	if !slices.Equal(fa.log, want) {
 		t.Fatalf("sent %v, want %v", fa.log, want)
 	}

@@ -144,6 +144,18 @@ func (m Model) InputFocused() bool {
 	return m.terminalFocused || m.leaderPending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.InputFocused()
 }
 
+// TerminalFocused tells the shell ctrl+o is the page's: the agent's in the
+// terminal, the leader's after it. Copy mode and popups leave it to the shell,
+// so it opens the switcher or says to close the modal.
+func (m Model) TerminalFocused() bool {
+	return m.leaderPending || m.terminalFocused && m.copy == nil && !m.ModalOpen()
+}
+
+// ModalOpen is true while the jump, create, confirm, menu or help popup is open.
+func (m Model) ModalOpen() bool {
+	return m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.IsOpen
+}
+
 func (m Model) OnPageActivated() tea.Cmd {
 	return func() tea.Msg { return pageActivatedMsg{} }
 }

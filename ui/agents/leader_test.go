@@ -191,6 +191,71 @@ func TestLeader_DigitSwitchesTab(t *testing.T) {
 	}
 }
 
+var ctrlO = tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
+
+func TestLeader_CtrlOOpensTheSwitcherSendingNothing(t *testing.T) {
+	m, a := focusedTerminal(t)
+	m = update1(t, m, ctrlA)
+	if !m.TerminalFocused() {
+		t.Fatal("TerminalFocused()=false with the leader pending, so the shell would take ctrl+o")
+	}
+	next, cmd := m.Update(ctrlO)
+	if cmd == nil || !nav.IsOpenSwitcher(cmd()) {
+		t.Fatal("leader ctrl+o did not open the switcher")
+	}
+	if next.(Model).leaderPending || len(a.keys) != 0 {
+		t.Fatalf("pending=%v sent=%+v, want leader mode over and nothing sent", next.(Model).leaderPending, a.keys)
+	}
+}
+
+func TestTerminal_PlainCtrlOReachesTheSession(t *testing.T) {
+	m, a := focusedTerminal(t)
+	if !m.TerminalFocused() {
+		t.Fatal("TerminalFocused()=false with the terminal focused")
+	}
+	update1(t, m, ctrlO)
+	if len(a.keys) != 1 || a.keys[0].Code != 'o' || a.keys[0].Mod != tea.ModCtrl {
+		t.Fatalf("sent %+v, want one ctrl+o", a.keys)
+	}
+}
+
+func TestTerminalFocused_FalseInTheSidebarAndCopyMode(t *testing.T) {
+	m, _ := attachModel(t, &fakeHolders{attaches: map[string]*fakeAttach{}})
+	if m.TerminalFocused() {
+		t.Fatal("TerminalFocused()=true in the sidebar")
+	}
+	m, _ = focusedTerminal(t)
+	m.copy = &copyMode{}
+	if m.TerminalFocused() {
+		t.Fatal("TerminalFocused()=true in copy mode")
+	}
+}
+
+func TestModalOpen_EachPopup(t *testing.T) {
+	m, _ := focusedTerminal(t)
+	if m.ModalOpen() {
+		t.Fatal("ModalOpen()=true with no popup")
+	}
+	for name, open := range map[string]func(*Model){
+		"jump":    func(m *Model) { m.jump = &jumpPopup{} },
+		"create":  func(m *Model) { m.create = &createForm{} },
+		"confirm": func(m *Model) { m.confirm.IsOpen = true },
+		"menu":    func(m *Model) { m.menuOpen = true },
+		"help":    func(m *Model) { m.help.IsOpen = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := m
+			open(&m)
+			if !m.ModalOpen() {
+				t.Fatal("ModalOpen()=false")
+			}
+			if m.TerminalFocused() {
+				t.Fatal("TerminalFocused()=true over a popup, so ctrl+o would skip the modal guard")
+			}
+		})
+	}
+}
+
 func TestLeader_QGoesBack(t *testing.T) {
 	m, _ := focusedTerminal(t)
 	_, cmd := leaderThen(t, m, letter("q"))

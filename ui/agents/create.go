@@ -441,7 +441,7 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 		req.Dir = e.dir
 	}
 	// The new session has no info lines yet, so it gets the whole panel.
-	req.Cols, req.Rows = max(m.mainWidth()-2, 1), max(m.height-2, 1)
+	req.Cols, req.Rows = max(m.mainWidth()-2, 1), max(m.height-1, 1)
 	f.sending, f.err = true, ""
 	client := m.client
 	return m, func() tea.Msg {

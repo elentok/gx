@@ -154,8 +154,7 @@ func (m Model) terminalLines(s server.SessionInfo) []string {
 func (m Model) terminalCursor() *tea.Cursor {
 	a := m.attach
 	if !m.terminalFocused || !a.live() || a.offset > 0 || !a.cursor.Visible || m.copy != nil ||
-		m.jump != nil || m.create != nil || m.menuOpen || m.confirm.IsOpen || m.leaderPending || m.help.IsOpen ||
-		m.selectedID() != a.id {
+		m.ModalOpen() || m.leaderPending || m.selectedID() != a.id {
 		return nil
 	}
 	if cols, rows := m.screenSize(); a.cursor.X >= cols || a.cursor.Y >= rows {
@@ -195,7 +194,7 @@ func infoLines(s server.SessionInfo) []string {
 // screenSize is the panel's room for the session's screen: inside the border,
 // below the info lines.
 func (m Model) screenSize() (cols, rows int) {
-	cols, rows = m.mainWidth()-2, m.height-2
+	cols, rows = m.mainWidth()-2, m.height-1
 	if m.cursor < len(m.sessions) {
 		rows -= len(infoLines(m.sessions[m.cursor]))
 	}

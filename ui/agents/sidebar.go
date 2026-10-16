@@ -116,8 +116,7 @@ func (m Model) visibleRows() []sidebarRow {
 // own the screen, so a click under them is dropped.
 func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
-	if mouse.Button != tea.MouseLeft || m.copy != nil || m.jump != nil || m.create != nil ||
-		m.menuOpen || m.confirm.IsOpen || m.leaderPending || m.help.IsOpen {
+	if mouse.Button != tea.MouseLeft || m.copy != nil || m.ModalOpen() || m.leaderPending {
 		return m, nil
 	}
 	i, ok := m.sidebarSessionAt(mouse.X, mouse.Y)

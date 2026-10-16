@@ -232,7 +232,7 @@ func TestAttach_TerminalFocusSendsEveryKeyToTheSession(t *testing.T) {
 		t.Fatal("enter in the sidebar did not focus the terminal")
 	}
 	fa := h.attaches["a"]
-	if !slices.Equal(fa.sizes, [][2]int{{80 - sidebarWidth - 1 - 2, 12 - 2}}) {
+	if !slices.Equal(fa.sizes, [][2]int{{80 - sidebarWidth - 1 - 2, 12 - 1}}) {
 		t.Fatalf("focus sent sizes %v, want the panel's inner size", fa.sizes)
 	}
 
@@ -319,7 +319,7 @@ func TestAttach_RefocusSendsTheSizeAgain(t *testing.T) {
 	m, fa := focusedAttach(t)
 	m = pressKeys(t, m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl}, tea.KeyPressMsg{Code: tea.KeyTab})
 	m = pressKeys(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	size := [2]int{80 - sidebarWidth - 1 - 2, 12 - 2}
+	size := [2]int{80 - sidebarWidth - 1 - 2, 12 - 1}
 	if !slices.Equal(fa.sizes, [][2]int{size, size}) {
 		t.Fatalf("focusing twice sent sizes %v, want the size on each focus", fa.sizes)
 	}
@@ -329,7 +329,7 @@ func TestAttach_HidingTheSidebarWhileFocusedSendsTheNewSize(t *testing.T) {
 	m, fa := focusedAttach(t)
 	fa.sizes = nil
 	pressKeys(t, m, tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl}, letter("b"))
-	if !slices.Equal(fa.sizes, [][2]int{{80 - 2, 12 - 2}}) {
+	if !slices.Equal(fa.sizes, [][2]int{{80 - 2, 12 - 1}}) {
 		t.Fatalf("hiding the sidebar sent sizes %v, want the full width", fa.sizes)
 	}
 }
@@ -394,7 +394,7 @@ func TestAttach_WindowResizeSendsTheSizeOnlyWhileFocused(t *testing.T) {
 	m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	fa.sizes = nil
 	update1(t, m, tea.WindowSizeMsg{Width: 90, Height: 30})
-	if !slices.Equal(fa.sizes, [][2]int{{90 - sidebarWidth - 1 - 2, 30 - 2}}) {
+	if !slices.Equal(fa.sizes, [][2]int{{90 - sidebarWidth - 1 - 2, 30 - 1}}) {
 		t.Fatalf("a focused resize sent sizes %v", fa.sizes)
 	}
 }

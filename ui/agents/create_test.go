@@ -149,7 +149,7 @@ func TestCreate_SubmitSendsTheFieldsAndPanelSize(t *testing.T) {
 	m := step(t, createModel(t, f), letter("c"))
 	m = typeKeys(t, m, keyDownMsg, tab, letter("f"), letter("i"), letter("x"), tab, letter("g"), letter("o"))
 	m = step(t, m, keyEnterMsg)
-	want := server.CreateSessionRequest{Project: "gx", Dir: "/r/gx/wt1", Name: "fix", Prompt: "go", Cols: 80 - sidebarWidth - 3, Rows: 28}
+	want := server.CreateSessionRequest{Project: "gx", Dir: "/r/gx/wt1", Name: "fix", Prompt: "go", Cols: 80 - sidebarWidth - 3, Rows: 29}
 	if got := lastCreate(t, f); got != want {
 		t.Fatalf("create = %+v, want %+v", got, want)
 	}
