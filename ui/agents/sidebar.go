@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -107,6 +108,37 @@ func (m Model) visibleRows() []sidebarRow {
 	}
 	offset := max(0, cursorRow-bodyH+1)
 	return rows[offset : offset+bodyH]
+}
+
+// updateClick selects the session clicked in the sidebar and focuses its
+// terminal, as selecting it from the jump popup does. Popups and copy mode
+// own the screen, so a click under them is dropped.
+func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
+	mouse := msg.Mouse()
+	if mouse.Button != tea.MouseLeft || m.copy != nil || m.jump != nil || m.create != nil ||
+		m.menuOpen || m.confirm.IsOpen || m.leaderPending || m.help.IsOpen {
+		return m, nil
+	}
+	i, ok := m.sidebarSessionAt(mouse.X, mouse.Y)
+	if !ok {
+		return m, nil
+	}
+	m.terminalFocused = false
+	return m.selectAndFocus(i)
+}
+
+// sidebarSessionAt is the session on the sidebar row under (x, y); false off
+// the sidebar and on project headers and gaps.
+func (m Model) sidebarSessionAt(x, y int) (int, bool) {
+	if !m.sidebarOnScreen() || x < 0 || x >= sidebarWidth {
+		return 0, false
+	}
+	// Row 0 is the panel's header.
+	rows := m.visibleRows()
+	if i := y - 1; i >= 0 && i < len(rows) && rows[i].session >= 0 {
+		return rows[i].session, true
+	}
+	return 0, false
 }
 
 func (m Model) renderSidebar() string {

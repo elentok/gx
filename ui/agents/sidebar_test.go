@@ -134,6 +134,50 @@ func TestSidebar_JKAndArrowsMoveTheSelection(t *testing.T) {
 	}
 }
 
+func click(x, y int) tea.MouseClickMsg {
+	return tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}
+}
+
+func TestSidebar_ClickSelectsAndFocusesTheSession(t *testing.T) {
+	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
+	// Row 0 is the header, then the gx project's header, s1, s3, s4.
+	m = update1(t, m, click(5, 4))
+	if got := m.selectedID(); got != "s4" {
+		t.Fatalf("selected %s, want s4", got)
+	}
+	if !m.terminalFocused {
+		t.Fatal("terminal not focused after clicking a live session")
+	}
+
+	// From the focused terminal, an Exited session leaves the sidebar focused.
+	m = update1(t, m, click(5, 7))
+	if got := m.selectedID(); got != "s2" {
+		t.Fatalf("selected %s, want s2", got)
+	}
+	if m.terminalFocused {
+		t.Fatal("terminal focused after clicking an Exited session")
+	}
+}
+
+func TestSidebar_ClickOffASessionRowDoesNothing(t *testing.T) {
+	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
+	for _, c := range []tea.MouseClickMsg{
+		click(5, 0), click(5, 1), click(5, 5), click(5, 13), click(40, 4),
+		{X: 5, Y: 4, Button: tea.MouseRight},
+	} {
+		if got := update1(t, m, c); got.selectedID() != "s1" || got.terminalFocused {
+			t.Fatalf("%+v: selected %s, focused %v; want s1 in the sidebar", c, got.selectedID(), got.terminalFocused)
+		}
+	}
+}
+
+func TestSidebar_ClickIsIgnoredUnderAPopup(t *testing.T) {
+	m := press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "/")
+	if got := update1(t, m, click(5, 4)); got.selectedID() != "s1" {
+		t.Fatalf("selected %s under the jump popup, want s1", got.selectedID())
+	}
+}
+
 func TestSidebar_SelectionFollowsTheSessionAcrossUpdates(t *testing.T) {
 	m := press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "j")
 	sessions := append([]server.SessionInfo{{ID: "s0", Project: "gx"}}, fixtureSessions()...)

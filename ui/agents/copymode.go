@@ -2,6 +2,7 @@ package agents
 
 import (
 	"strings"
+	"time"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
@@ -76,7 +77,10 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 	if c.pendingG {
 		c.pendingG = false
-		if k == "g" {
+		if k == "g" && c.a.mouse {
+			// The child's history has no known top to wheel to.
+			c.cursor = nativerunner.LinePos{Line: c.a.scrollMax - c.a.offset}
+		} else if k == "g" {
 			c.cursor = nativerunner.LinePos{}
 			m.scrollToCopyCursor()
 		}
@@ -138,10 +142,47 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+	if c.a.mouse {
+		m.wheelToCopyCursor()
+		return m, nil
+	}
 	c.cursor.Line = max(0, min(c.cursor.Line, last))
 	m.scrollToCopyCursor()
 	return m, nil
 }
+
+// wheelToCopyCursor keeps the cursor on screen for a child that reports the
+// mouse, such as claude in its fullscreen mode: its history lives in the
+// child, not the holder's scrollback, so a move past an edge turns the
+// child's wheel, one tick per line. A selection pins the child, since the
+// text under it would move. Ticks go wheelTickGap apart, as claude speeds up
+// a burst of them.
+func (m Model) wheelToCopyCursor() {
+	c := m.copy
+	top, h := m.copyView()
+	over := 0
+	if c.cursor.Line < top {
+		over = c.cursor.Line - top
+	} else if bottom := top + h - 1; c.cursor.Line > bottom {
+		over = c.cursor.Line - bottom
+	}
+	c.cursor.Line -= over
+	if over == 0 || c.selecting {
+		return
+	}
+	x, y, down := c.cursor.Col, c.cursor.Line-top, over > 0
+	for i := range max(over, -over) {
+		c.a.write(func(s AttachStream) error {
+			if i > 0 {
+				time.Sleep(wheelTickGap)
+			}
+			return s.Wheel(x, y, down)
+		})
+	}
+}
+
+// wheelTickGap is the least gap at which claude scrolls a line per tick.
+const wheelTickGap = 40 * time.Millisecond
 
 // scrollToCopyCursor scrolls the view through the holder just enough to show
 // the cursor.

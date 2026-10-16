@@ -103,6 +103,61 @@ func TestCopyMode_CursorPastTheViewScrollsIt(t *testing.T) {
 	}
 }
 
+// copyMouseModel is copyModel with a child that reports the mouse, as
+// claude in its fullscreen mode does: its history lives in the child, so the
+// holder has none for it beyond the screen.
+func copyMouseModel(t *testing.T) (Model, *fakeAttach) {
+	t.Helper()
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	fa := h.attaches["a"]
+	fr := nativerunner.Frame{Mouse: true, ScrollMax: 100}
+	for i, r := range copyRowsText {
+		fr.Rows = append(fr.Rows, nativerunner.FrameRow{Index: i, ANSI: r})
+	}
+	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: fr}
+	m, _ = read(t, m, next)
+	m = update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, _ = leaderThen(t, m, letter("["))
+	if m.copy == nil {
+		t.Fatal("<leader> [ did not enter copy mode")
+	}
+	fa.log = nil
+	return m, fa
+}
+
+func TestCopyMode_CursorPastTheViewWheelsAChildThatReportsTheMouse(t *testing.T) {
+	m, fa := copyMouseModel(t)
+	m = pressKeys(t, m, letters("lkkk")...)
+	if want := (nativerunner.LinePos{Line: 100, Col: 1}); m.copy.cursor != want {
+		t.Fatalf("cursor = %+v, want %+v on the top row", m.copy.cursor, want)
+	}
+	m = pressKeys(t, m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
+	m = pressKeys(t, m, letters("G")...)
+	pressKeys(t, m, letters("j")...)
+	want := []string{"wheel:1,0,false", "wheel:1,0,false"}
+	for range 5 {
+		want = append(want, "wheel:1,0,false")
+	}
+	// G goes to the bottom row without scrolling, then j wheels down there.
+	want = append(want, "wheel:0,9,true")
+	if !slices.Equal(fa.log, want) {
+		t.Fatalf("sent %v, want %v", fa.log, want)
+	}
+}
+
+func TestCopyMode_SelectingKeepsAMouseChildStill(t *testing.T) {
+	m, fa := copyMouseModel(t)
+	m = pressKeys(t, m, letters("vkkk")...)
+	if len(fa.log) != 0 {
+		t.Fatalf("sent %v while selecting, want nothing", fa.log)
+	}
+	if m.copy.cursor.Line != 100 {
+		t.Fatalf("cursor on line %d, want the top row 100", m.copy.cursor.Line)
+	}
+}
+
 func TestCopyMode_RendersTheSelection(t *testing.T) {
 	m, _, _ := copyModel(t, 0, 100)
 	m = pressKeys(t, m, letters("vll")...)

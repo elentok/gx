@@ -224,6 +224,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateKey(msg)
 	case tea.MouseWheelMsg:
 		return m.updateWheel(msg)
+	case tea.MouseClickMsg:
+		return m.updateClick(msg)
 	}
 	return m, nil
 }
