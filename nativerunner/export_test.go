@@ -3,7 +3,14 @@ package nativerunner
 import (
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/harness"
 )
+
+// RunTestHolder runs a holder with h as its harness.
+func RunTestHolder(dir string, h harness.Harness, argv []string) error {
+	return runHolder(dir, h, argv)
+}
 
 // PS is the real process table.
 var PS ProcessTable = psTable{}

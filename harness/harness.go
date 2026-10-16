@@ -50,6 +50,8 @@ type Watcher interface {
 	Status() Status
 	// ConversationID is "" until the harness reports one.
 	ConversationID() string
+	// Program takes each OSC 7501 report the child writes, in order.
+	Program(r ProgramReport)
 }
 
 // State is a Session status, less Exited: the server derives that from

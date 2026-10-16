@@ -4,13 +4,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
+	agentharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"golang.org/x/sys/unix"
 )
@@ -118,6 +121,72 @@ func TestHolder_PTYIsWide(t *testing.T) {
 	if got := strings.Fields(string(raw)); len(got) != 2 || got[1] != strconv.Itoa(nativerunner.HolderCols) {
 		t.Errorf("stty size = %q; want %d columns", raw, nativerunner.HolderCols)
 	}
+}
+
+// probeChild probes for OSC 7501, prints the reply it reads (ESC as E, BEL as
+// B), then reports a question and clears.
+const probeChild = `stty -icanon -echo min 1; printf '\033]7501;?\007'
+r=$(dd bs=1 count=9 2>/dev/null | tr '\033\007' 'EB'); printf 'reply:%s\n' "$r"
+printf '\033]7501;state=blocked:app=fake:kind=question:msg=UmVkIG9yIGJsdWU/\007'
+printf '\033]7501;state=clear:app=fake\007'; cat >/dev/null`
+
+func TestHolder_AnswersProgramStatusProbeAndFeedsReportsToWatch(t *testing.T) {
+	dir := shortTempDir(t)
+	w := &recordingWatcher{}
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		_ = nativerunner.RunTestHolder(dir, recordingHarness{w: w}, []string{"sh", "-c", probeChild})
+	}()
+	var c *nativerunner.HolderClient
+	waitFor(t, "holder.sock answers", func() bool {
+		var err error
+		c, err = nativerunner.DialHolder(dir)
+		return err == nil
+	})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+
+	waitForScreen(t, c, "reply:E]7501;?B")
+	want := []agentharness.ProgramReport{
+		{State: "blocked", App: "fake", Kind: "question", Progress: -1, Message: "Red or blue?"},
+		{State: "clear", App: "fake", Progress: -1},
+	}
+	waitFor(t, "the watch has both reports", func() bool { return len(w.reports()) == len(want) })
+	if got := w.reports(); !reflect.DeepEqual(got, want) {
+		t.Errorf("reports = %+v; want %+v", got, want)
+	}
+}
+
+// recordingHarness is a harness whose Watch records OSC 7501 reports.
+type recordingHarness struct {
+	agentharness.Harness
+	w *recordingWatcher
+}
+
+func (h recordingHarness) Watch(int, time.Time, <-chan struct{}) (agentharness.Watcher, error) {
+	return h.w, nil
+}
+
+type recordingWatcher struct {
+	mu  sync.Mutex
+	got []agentharness.ProgramReport
+}
+
+func (w *recordingWatcher) Status() agentharness.Status { return agentharness.Status{} }
+func (w *recordingWatcher) ConversationID() string      { return "" }
+func (w *recordingWatcher) Program(r agentharness.ProgramReport) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.got = append(w.got, r)
+}
+
+func (w *recordingWatcher) reports() []agentharness.ProgramReport {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return slices.Clone(w.got)
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {

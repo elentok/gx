@@ -59,6 +59,10 @@ func RunHarnessHolder(dir string, kind agentrunner.Kind, argv []string) error {
 	if err != nil {
 		return err
 	}
+	return runHolder(dir, h, argv)
+}
+
+func runHolder(dir string, h harness.Harness, argv []string) error {
 	rawLog, err := os.OpenFile(filepath.Join(dir, RawLogFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
@@ -118,7 +122,7 @@ func RunHarnessHolder(dir string, kind agentrunner.Kind, argv []string) error {
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
-		_, _ = io.Copy(io.MultiWriter(rawLog, scr), ptmx)
+		_, _ = io.Copy(io.MultiWriter(rawLog, scr, &programStatus{ptmx: ptmx, watcher: watcher}), ptmx)
 	}()
 
 	waitErr := cmd.Wait()
@@ -148,6 +152,26 @@ func RunHarnessHolder(dir string, kind agentrunner.Kind, argv []string) error {
 	// ExitCode is -1 for a child killed by a signal.
 	code := strconv.Itoa(srv.exitCode)
 	return os.WriteFile(filepath.Join(dir, ExitCodeFile), []byte(code+"\n"), 0o644)
+}
+
+// programStatus makes the holder the child's terminal for OSC 7501, whatever
+// the harness: it answers each probe on the pty and hands each report to the
+// watcher.
+type programStatus struct {
+	parser  harness.ProgramStatusParser
+	ptmx    io.Writer
+	watcher harness.Watcher
+}
+
+func (s *programStatus) Write(p []byte) (int, error) {
+	probes, reports := s.parser.Feed(p)
+	for range probes {
+		_, _ = io.WriteString(s.ptmx, harness.ProgramStatusProbe)
+	}
+	for _, r := range reports {
+		s.watcher.Program(r)
+	}
+	return len(p), nil
 }
 
 // unread reports whether the child wrote output the holder has not read yet.

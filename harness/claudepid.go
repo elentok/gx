@@ -171,6 +171,10 @@ func (w *PidWatcher) ConversationID() string {
 	return w.state().conversationID
 }
 
+// Program ignores OSC 7501 reports: claude's status still comes from its pid
+// file alone.
+func (w *PidWatcher) Program(ProgramReport) {}
+
 // Hold freezes what PidState and Status report at the current status until
 // Release.
 func (w *PidWatcher) Hold() {
