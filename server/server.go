@@ -441,6 +441,8 @@ var routeTable = []struct {
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
+	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
+	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.

@@ -191,6 +191,72 @@ func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
 	}
 }
 
+func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
+	h, ctx, evs, id, _ := startFakeSession(t)
+	dir := filepath.Join(h.SessionsDir, id)
+	waitForHolder(t, dir)
+
+	res, err := h.Client.StopSession(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Refused || res.Session == nil {
+		t.Fatalf("stop = %+v, want the session", res)
+	}
+	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	if got.Exit != server.SessionExitClean || !got.Stopped {
+		t.Errorf("stopped session = %+v, want exited clean and stopped", got)
+	}
+	if _, err := nativerunner.DialHolder(dir); err == nil {
+		t.Error("holder still serves after stop")
+	}
+	if _, err := os.Stat(filepath.Join(dir, nativerunner.LastScreenFile)); err != nil {
+		t.Errorf("last screen not kept: %v", err)
+	}
+
+	res, err = h.Client.StopSession(ctx, id)
+	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNotLive {
+		t.Errorf("stop again = %+v, %v; want refused %s", res, err, server.ReasonSessionNotLive)
+	}
+}
+
+func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
+	h, ctx, evs, id, _ := startFakeSession(t)
+	dir := filepath.Join(h.SessionsDir, id)
+
+	res, err := h.Client.RemoveSession(ctx, id)
+	if err != nil || !res.Refused || res.Reason != server.ReasonSessionLive {
+		t.Fatalf("remove live = %+v, %v; want refused %s", res, err, server.ReasonSessionLive)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("refused remove touched the state dir: %v", err)
+	}
+
+	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+		t.Fatalf("stop = %+v, %v", res, err)
+	}
+	res, err = h.Client.RemoveSession(ctx, id)
+	if err != nil || res.Refused {
+		t.Fatalf("remove = %+v, %v", res, err)
+	}
+	servertest.WaitForEvent(ctx, t, evs, server.EventSessionChanged, id)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("state dir after remove: %v, want gone", err)
+	}
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Sessions) != 0 {
+		t.Errorf("snapshot sessions = %+v, want none", snap.Sessions)
+	}
+
+	res, err = h.Client.RemoveSession(ctx, id)
+	if err != nil || !res.Refused || res.Reason != server.ReasonSessionUnknown {
+		t.Errorf("remove gone = %+v, %v; want refused %s", res, err, server.ReasonSessionUnknown)
+	}
+}
+
 // startFakeSession creates a fake-harness session and waits for its first
 // report, returning its id and conversation id.
 func startFakeSession(t *testing.T) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {

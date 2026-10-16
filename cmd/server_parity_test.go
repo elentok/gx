@@ -53,6 +53,8 @@ var routeVerbs = map[string]string{
 	"POST /v1/epics/merge":       "server epics merge",
 	"GET /v1/sessions":           "agents list",
 	"POST /v1/sessions/create":   "agents create",
+	"POST /v1/sessions/stop":     "agents stop",
+	"POST /v1/sessions/remove":   "agents remove",
 }
 
 // plannedRoutes are routes whose CLI verb a queued ticket builds: the server op

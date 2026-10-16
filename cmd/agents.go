@@ -16,7 +16,9 @@ import (
 // newAgentsCmd is `gx agents`: the server's interactive sessions.
 func newAgentsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newAgentsCreateCmd(), newAgentsListCmd())
+	cmd.AddCommand(newAgentsCreateCmd(), newAgentsListCmd(),
+		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
+		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession))
 	return cmd
 }
 
@@ -55,12 +57,46 @@ func newAgentsCreateCmd() *cobra.Command {
 	return cmd
 }
 
+type sessionWriteFunc func(*apiclient.Client, context.Context, string) (server.SessionResult, error)
+
+// newAgentsSessionCmd is a session write that takes only the session's id.
+func newAgentsSessionCmd(verb, short string, write sessionWriteFunc) *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   verb + " <id>",
+		Short: short,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runAgentsSessionWrite(c.Context(), cl, c.OutOrStdout(), jsonOut, write, args[0])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func runAgentsSessionWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, write sessionWriteFunc, id string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := write(cl, ctx, id)
+	return printSessionResult(w, jsonOut, res, err)
+}
+
 // runAgentsCreate never starts the server: a dead socket is a refusal.
 func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.CreateSessionRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	res, err := cl.CreateSession(ctx, req)
+	return printSessionResult(w, jsonOut, res, err)
+}
+
+// printSessionResult prints a session write's outcome, its id when human.
+func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err error) error {
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = server.SessionResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}

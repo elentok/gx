@@ -30,6 +30,9 @@ const EventSessionChanged = "session-changed"
 const (
 	ReasonSessionBadRequest     = "bad-request"
 	ReasonSessionUnknownHarness = "unknown-harness"
+	ReasonSessionUnknown        = "unknown-session"
+	ReasonSessionLive           = "session-live"
+	ReasonSessionNotLive        = "session-not-live"
 )
 
 // sessionMetaFile holds a session's meta in its state dir.
@@ -55,6 +58,10 @@ const (
 // socket before the session counts as crashed.
 const holderDialTimeout = 10 * time.Second
 
+// sessionStopTimeout bounds how long a stop waits for the holder to save its
+// exit; it outlasts the holder's own SIGTERM-to-SIGKILL grace.
+const sessionStopTimeout = 15 * time.Second
+
 // SessionInfo is an interactive session on the wire: everything the Agents
 // tab shows.
 type SessionInfo struct {
@@ -68,7 +75,9 @@ type SessionInfo struct {
 	Status          SessionStatus `json:"status"`
 	StatusChangedAt time.Time     `json:"status_changed_at"`
 	// Exit is how an Exited session ended.
-	Exit       string            `json:"exit,omitempty"`
+	Exit string `json:"exit,omitempty"`
+	// Stopped marks a session the person stopped; it is never auto-resumed.
+	Stopped    bool              `json:"stopped,omitempty"`
 	Unread     SessionUnread     `json:"unread"`
 	Actionable SessionActionable `json:"actionable"`
 }
@@ -107,6 +116,11 @@ type CreateSessionRequest struct {
 	Rows    int    `json:"rows,omitempty"`
 }
 
+// SessionRequest names the session a stop or remove acts on.
+type SessionRequest struct {
+	ID string `json:"id"`
+}
+
 // SessionResult is a session write's outcome: the session, or a refusal.
 type SessionResult struct {
 	Session *SessionInfo `json:"session,omitempty"`
@@ -133,6 +147,7 @@ type sessionMeta struct {
 	Status          SessionStatus `json:"status"`
 	StatusChangedAt time.Time     `json:"status_changed_at,omitzero"`
 	Exit            string        `json:"exit,omitempty"`
+	Stopped         bool          `json:"stopped,omitempty"`
 }
 
 func (m sessionMeta) info() SessionInfo {
@@ -146,6 +161,7 @@ func (m sessionMeta) info() SessionInfo {
 		Status:          m.Status,
 		StatusChangedAt: m.StatusChangedAt,
 		Exit:            m.Exit,
+		Stopped:         m.Stopped,
 	}
 	if info.Status.State == "" {
 		info.Status.State = SessionStarting
@@ -519,11 +535,121 @@ func (s *Server) openSessionWatch(dir string) (*nativerunner.HolderWatch, error)
 	}
 }
 
+// recordSessionExit records the first exit seen; a stopped session exits
+// clean whatever the signal left as its code.
 func (s *Server) recordSessionExit(dir, id, exit string) {
 	s.updateSessionMeta(dir, id, func(m *sessionMeta) bool {
+		if m.Status.State == SessionExited {
+			return false
+		}
+		if m.Stopped {
+			exit = SessionExitClean
+		}
 		m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
 		return true
 	})
+}
+
+// sessionWrite adapts a session verb to a POST handler. Refusals are results,
+// so they answer 200.
+func sessionWrite(do func(SessionRequest) (SessionResult, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req SessionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		res, err := do(req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, res)
+	}
+}
+
+// sessionDir resolves a request's session to its state dir and meta, or the
+// refusal for an id that names none.
+func (s *Server) sessionDir(id string) (string, sessionMeta, SessionResult, error) {
+	if id == "" || filepath.Base(id) != id || strings.HasPrefix(id, ".") {
+		return "", sessionMeta{}, sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("bad session id %q", id)), nil
+	}
+	dir := filepath.Join(s.cfg.SessionsDir, id)
+	meta, err := readSessionMeta(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", sessionMeta{}, sessionRefusal(ReasonSessionUnknown, fmt.Sprintf("no session %s", id)), nil
+	}
+	return dir, meta, SessionResult{}, err
+}
+
+// stopSession marks the session stopped by the person, then has its holder
+// end claude and waits for the holder to save its exit and last screen. It
+// leaves no Unread.
+func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
+	dir, res, err := s.markSessionStopped(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	// A holder that is already gone has nothing to stop; its exit is recorded
+	// below all the same.
+	if c, err := nativerunner.DialHolder(dir); err == nil {
+		if err := c.Stop(); err != nil {
+			return SessionResult{}, fmt.Errorf("stop session %s: %w", req.ID, err)
+		}
+		waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
+	}
+	s.recordSessionExit(dir, req.ID, SessionExitClean)
+	meta, err := readSessionMeta(dir)
+	if err != nil {
+		return SessionResult{}, err
+	}
+	info := meta.info()
+	return SessionResult{Session: &info}, nil
+}
+
+// markSessionStopped saves Stopped before the holder is asked to stop, so the
+// watch records the exit the stop causes as clean.
+func (s *Server) markSessionStopped(id string) (string, SessionResult, error) {
+	s.sessionWatches.metaMu.Lock()
+	defer s.sessionWatches.metaMu.Unlock()
+	dir, meta, res, err := s.sessionDir(id)
+	if res.Refused || err != nil {
+		return "", res, err
+	}
+	if meta.Status.State == SessionExited {
+		return "", sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", id)), nil
+	}
+	meta.Stopped = true
+	return dir, SessionResult{}, writeSessionMeta(dir, meta)
+}
+
+func waitForFile(path string, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// removeSession deletes an Exited session's state dir.
+func (s *Server) removeSession(req SessionRequest) (SessionResult, error) {
+	s.sessionWatches.metaMu.Lock()
+	defer s.sessionWatches.metaMu.Unlock()
+	dir, meta, res, err := s.sessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	if meta.Status.State != SessionExited {
+		return sessionRefusal(ReasonSessionLive, fmt.Sprintf("session %s is live; stop it first", req.ID)), nil
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return SessionResult{}, err
+	}
+	s.events.publish(EventSessionChanged, req.ID)
+	info := meta.info()
+	return SessionResult{Session: &info}, nil
 }
 
 // updateSessionMeta applies change to the session's saved meta and, when it

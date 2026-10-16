@@ -347,6 +347,22 @@ func (c *Client) CreateSession(ctx context.Context, req server.CreateSessionRequ
 	return res, err
 }
 
+// StopSession ends a live session's holder. A refusal is a result (Refused
+// set), not an error.
+func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/stop", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
+// RemoveSession deletes an Exited session's state dir. A refusal is a result
+// (Refused set), not an error.
+func (c *Client) RemoveSession(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/remove", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // Sessions lists the interactive sessions.
 func (c *Client) Sessions(ctx context.Context) ([]server.SessionInfo, error) {
 	var l []server.SessionInfo
