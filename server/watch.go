@@ -51,7 +51,10 @@ func (s *Server) keepFresh(ctx context.Context) {
 				for range w.Errors {
 				}
 			}()
-			s.rewatch = func() { WatchTree(w, s.cfg.TicketStore) }
+			rewatch := func() { WatchTree(w, s.cfg.TicketStore) }
+			s.rewatch.Store(&rewatch)
+			// The watcher closes on return; a late rescan must not touch it.
+			defer s.rewatch.Store(nil)
 		}
 	}
 
@@ -104,8 +107,8 @@ func (s *Server) ticketChanged(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) rescan() {
-	if s.rewatch != nil {
-		s.rewatch() // pick up directories created since the last scan
+	if rewatch := s.rewatch.Load(); rewatch != nil {
+		(*rewatch)() // pick up directories created since the last scan
 	}
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		s.log.Warn("rescan ticket store", "err", err)

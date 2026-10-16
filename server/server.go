@@ -249,8 +249,8 @@ type Server struct {
 	parkHold    recoveryHold
 	defectScan  sync.Mutex
 	deadlocks   deadlocks
-	gatesRaised map[gateHold]bool // touched only by the gate watchdog
-	rewatch     func()            // set by keepFresh when the watch is active
+	gatesRaised map[gateHold]bool      // touched only by the gate watchdog
+	rewatch     atomic.Pointer[func()] // set by keepFresh when the watch is active; read by every rescan caller
 
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry       *runRegistry
