@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.34.0 - 2026-10-16
+
+- Added the Agents tab (tab 8, `g a`) for running interactive agent sessions (claude) under the gx server, across every project.
+  - The server creates, lists, stops, removes and resumes sessions. Each session runs in a detached holder process under `<data dir>/sessions/<id>/`. Sessions are kept out of `runs.json` and slots. The server reattaches them on start and can resume them automatically (`agents.resume-on-start`). A session can start in a project root, an existing worktree or a new worktree, with an optional first prompt that is typed once the agent is idle. A session with no name gets `<project>-<n>`, which is replaced by the agent's own title.
+  - Added live session status (Starting, Working, Idle, Blocked, Rate-limited, Exited). It comes from the agent's OSC 7501 reports, claude's pid file and transcript (rate limits), and the trust dialog. Watch streams push on change and run no tickers, so an idle session does no periodic work.
+  - Added Unread and Actionable marks. Unread rises on a finished turn, Blocked, Rate-limited or an unexpected exit, unless a focused TUI has the session on screen. Added `gx agent actionable <reason> [--send <prompt>]...`, so an agent can raise Actionable with a suggested Action. Run Action sends those prompts one turn at a time. `gx-design` now raises Actionable when it needs you.
+  - Added the live terminal panel. Frames are paced and dirty rows only, with colors and cursor. It sends keys and pastes (pastes over 1 MB are refused), and the pty size follows the active viewer. It has 10,000 lines of scrollback with wheel scrolling (the wheel is forwarded to agents that use mouse reporting) and a vi-style copy mode (`<leader> [`). Shift, Shift+Enter and modified arrows reach the agent the way xterm sends them.
+  - Added a sidebar grouped by project, with status icons, Unread/Actionable marks, mouse click and a `b` toggle. Also added a jump-to-agent popup, a leader key (`agents.leader-key`), a create form (`c`) with a fuzzy, ranked "Where" picker that defaults to the current repo's project, an `m` menu (Run Action, Mark read, Stop, Remove, Resume) and an Exited view. The tab opens on the session you viewed last.
+  - Added banners and built-in sounds for sessions (`agents.banners.*`, `agents.sounds.*`). Clicking a banner focuses that session in the TUI. Added AFK mode (`gx afk [on|off]`, `<leader> z`), which also sends session alerts to the project's chat destinations.
+  - Added CLI verbs: `gx agents` (opens the TUI on the Agents tab, also from a bare repo's root), `gx agents create [--worktree] [--prompt]`, `gx agents list --json`, `gx agents run-action` and `gx agents focus`. Added the matching `/v1/sessions` API endpoints.
+  - The Tickets tab can start a session for a ticket or map epic, and marks tickets that have a linked live session.
+  - Added `agents.claude-args` to pass extra arguments to claude.
+- Changed every modal menu to filter as you type, using fuzzy matching. Every printable key is now filter text. Arrows or `ctrl+n`/`ctrl+p` move, `enter` picks, `esc` cancels. The `1`-`9` quick-select keys and the worktrees terminal menu's `s`/`h`/`v`/`t` shortcuts are gone.
+- Changed OS notifications to carry a group and click actions (terminal-notifier `-group`/`-execute`/`-activate`).
+- Fixed leaked session holders and test fakes after a stop right after create, or after a killed test.
+
 ## v0.33.0 - 2026-10-13
 
 - Added auto-merge for epics. The server owns landing a finished epic on its target, records the result, and hands off to a merge ticket when a fast-forward isn't possible.
