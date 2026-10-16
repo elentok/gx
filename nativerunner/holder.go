@@ -125,6 +125,7 @@ func runHolder(dir string, h harness.Harness, gxSession string, argv []string) e
 		proc:     cmd.Process,
 		pid:      pid,
 		watcher:  watcher,
+		frames:   newFrameHub(scr),
 		ops:      holderOptionalOps,
 		exited:   exited,
 		finished: make(chan struct{}),
@@ -133,10 +134,12 @@ func runHolder(dir string, h harness.Harness, gxSession string, argv []string) e
 	// socket goes.
 	defer srv.finish()
 	go srv.serve(ln)
+	output := make(outputSignal, 1)
+	go srv.frames.run(output, srv.finished)
 	drained := make(chan struct{})
 	go func() {
 		defer close(drained)
-		_, _ = io.Copy(io.MultiWriter(rawLog, scr, &programStatus{ptmx: ptmx, watcher: watcher}), ptmx)
+		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, &programStatus{ptmx: ptmx, watcher: watcher}), ptmx)
 	}()
 
 	waitErr := cmd.Wait()

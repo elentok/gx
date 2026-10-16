@@ -120,6 +120,10 @@ func (s *Screen) Cursor() Cursor {
 func (s *Screen) DirtyRows() []int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.dirtyRows()
+}
+
+func (s *Screen) dirtyRows() []int {
 	var rows []int
 	if s.allDirty {
 		for y := range s.emu.Height() {
@@ -135,10 +139,24 @@ func (s *Screen) DirtyRows() []int {
 	return rows
 }
 
+// TakeDirty returns DirtyRows and marks them clean in one step, so no change
+// slips in between the two.
+func (s *Screen) TakeDirty() []int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rows := s.dirtyRows()
+	s.clearDirty()
+	return rows
+}
+
 // ClearDirty marks every visible row clean.
 func (s *Screen) ClearDirty() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.clearDirty()
+}
+
+func (s *Screen) clearDirty() {
 	s.allDirty = false
 	// The slice shares its backing array with the emulator's buffer.
 	clear(s.emu.Touched())

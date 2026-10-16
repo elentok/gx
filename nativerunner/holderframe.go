@@ -22,6 +22,11 @@ const (
 	// StreamInput says a client typed or pasted on an attach; its payload is
 	// an empty object.
 	StreamInput
+	// StreamFrame carries an attach's screen rows and cursor.
+	StreamFrame
+	// StreamError carries why the holder closes the stream; nothing follows
+	// it.
+	StreamError
 )
 
 // maxStreamPayload bounds one stream message; a bigger one ends the stream
@@ -89,4 +94,30 @@ func (s streamStatus) status() harness.Status {
 // signal.
 type streamExit struct {
 	Code int `json:"code"`
+}
+
+// Frame is StreamFrame's payload: the cursor and the rows that changed, each
+// a styled ANSI string. The first frame of an attach carries every row.
+type Frame struct {
+	Cursor FrameCursor `json:"cursor"`
+	Rows   []FrameRow  `json:"rows"`
+	// ScrollOffset and ScrollMax are zero until attach can scroll.
+	ScrollOffset int `json:"scroll_offset"`
+	ScrollMax    int `json:"scroll_max"`
+}
+
+type FrameCursor struct {
+	X       int  `json:"x"`
+	Y       int  `json:"y"`
+	Visible bool `json:"visible"`
+}
+
+type FrameRow struct {
+	Index int    `json:"index"`
+	ANSI  string `json:"ansi"`
+}
+
+// streamError is StreamError's payload.
+type streamError struct {
+	Message string `json:"message"`
 }

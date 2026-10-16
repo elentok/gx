@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -47,4 +48,12 @@ func SetHolderDenyTimeout(t *testing.T, d time.Duration) {
 	old := holderDenyTimeout
 	holderDenyTimeout = d
 	t.Cleanup(func() { holderDenyTimeout = old })
+}
+
+// SendOversizedHeader writes the header of a message one byte over the
+// stream limit, which writeStreamMessage itself refuses to send.
+func SendOversizedHeader(a *HolderAttach) error {
+	head := binary.BigEndian.AppendUint32(nil, maxStreamPayload+1)
+	_, err := a.conn.Write(append(head, byte(StreamInput)))
+	return err
 }

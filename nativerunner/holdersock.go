@@ -44,7 +44,7 @@ const OpDenyReason = "deny-reason"
 const OpWatch = "watch"
 
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach}
 
 const (
 	holderIOTimeout = 5 * time.Second
@@ -89,6 +89,7 @@ type holderServer struct {
 	// pid is nil for a harness without claude's pid status.
 	pid     *harness.PidWatcher
 	watcher harness.Watcher
+	frames  *frameHub
 	ops     []string
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
@@ -99,7 +100,8 @@ type holderServer struct {
 
 	mu        sync.Mutex
 	finishing bool
-	// streams counts watch streams still sending, which finish waits for.
+	// streams counts watch and attach streams still sending, which finish
+	// waits for.
 	streams sync.WaitGroup
 }
 
@@ -122,6 +124,10 @@ func (h *holderServer) handle(conn net.Conn) {
 	}
 	if req.Op == OpWatch && slices.Contains(h.ops, OpWatch) {
 		h.watch(conn)
+		return
+	}
+	if req.Op == OpAttach && slices.Contains(h.ops, OpAttach) {
+		h.attach(conn)
 		return
 	}
 	resp, after := h.answer(req)
@@ -240,8 +246,8 @@ func (h *holderServer) watch(conn net.Conn) {
 	}
 }
 
-// startStream counts a new watch stream unless the holder is finishing, when
-// the stream sends its exit at once and finish need not wait for it.
+// startStream counts a new stream unless the holder is finishing, when the
+// stream sends its exit at once and finish need not wait for it.
 func (h *holderServer) startStream() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -252,9 +258,10 @@ func (h *holderServer) startStream() bool {
 	return true
 }
 
-// finish tells the watch streams the exit is saved and waits for them to
-// send it.
+// finish queues the last output's frame, tells the streams the exit is saved
+// and waits for them to send it.
 func (h *holderServer) finish() {
+	h.frames.flush()
 	h.mu.Lock()
 	h.finishing = true
 	h.mu.Unlock()
@@ -337,17 +344,27 @@ func (c *HolderClient) DenyWithReason(reason string) error {
 
 // Watch opens the optional watch stream; check Supports first.
 func (c *HolderClient) Watch() (*HolderWatch, error) {
+	conn, err := c.openStream(OpWatch)
+	if err != nil {
+		return nil, err
+	}
+	return &HolderWatch{conn: conn}, nil
+}
+
+// openStream sends the request for a streaming op and hands back the
+// connection the stream runs on.
+func (c *HolderClient) openStream(op string) (net.Conn, error) {
 	conn, err := net.DialTimeout("unix", c.sock, holderIOTimeout)
 	if err != nil {
 		return nil, err
 	}
 	_ = conn.SetWriteDeadline(time.Now().Add(holderIOTimeout))
-	if err := json.NewEncoder(conn).Encode(holderRequest{Op: OpWatch}); err != nil {
+	if err := json.NewEncoder(conn).Encode(holderRequest{Op: op}); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
 	_ = conn.SetWriteDeadline(time.Time{})
-	return &HolderWatch{conn: conn}, nil
+	return conn, nil
 }
 
 // HolderWatch is a live watch stream.

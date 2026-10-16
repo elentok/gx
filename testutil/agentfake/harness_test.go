@@ -55,7 +55,7 @@ func holdProgram(t *testing.T, cmd harness.Command, conv string, env ...string) 
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	p := &heldProgram{t: t, dir: dir, conv: conv, done: make(chan error, 1)}
 	go func() {
-		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, append([]string{cmd.Name}, cmd.Args...))
+		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, "", append([]string{cmd.Name}, cmd.Args...))
 	}()
 	select {
 	case p.watcher = <-watchers:
