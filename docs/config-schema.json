@@ -350,7 +350,7 @@
     },
     "agents": {
       "type": "object",
-      "description": "Model and effort level each coding agent runs under. For each field: an absent key uses gx's built-in default; an explicit empty string (\"\") means \"inherit\" — gx passes no flag for that knob, leaving the agent CLI's own configuration in charge. Values are passed through as-is (trimmed of surrounding whitespace) and are never validated against a model/effort allowlist.",
+      "description": "Coding agent settings: the model and effort level each agent runs under, and the interactive (Agents tab) session keys. For model/effort: an absent key uses gx's built-in default; an explicit empty string (\"\") means \"inherit\" — gx passes no flag for that knob, leaving the agent CLI's own configuration in charge. Values are passed through as-is (trimmed of surrounding whitespace) and are never validated against a model/effort allowlist.",
       "additionalProperties": false,
       "properties": {
         "claude": {
@@ -390,6 +390,56 @@
             "model": "gpt-5.6-sol",
             "effort": "medium"
           }
+        },
+        "leader-key": {
+          "description": "Key (or list of keys) that starts a leader sequence in the Agents tab. A malformed or blank value falls back to the default. Default: ctrl+a.",
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+          ],
+          "default": "ctrl+a"
+        },
+        "resume-on-start": {
+          "type": "boolean",
+          "description": "Resume the interactive sessions that were running when the server last stopped. Default: true.",
+          "default": true
+        },
+        "banners": {
+          "type": "object",
+          "description": "OS banners for interactive sessions.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Show a banner when an interactive session finishes or needs attention. Default: true.",
+              "default": true
+            }
+          }
+        },
+        "sounds": {
+          "type": "object",
+          "description": "Sounds for interactive sessions.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Play a sound when an interactive session finishes or needs attention. Default: true.",
+              "default": true
+            },
+            "done": {
+              "type": "string",
+              "description": "Sound file played when a session finishes, relative to the config dir. Empty means the built-in sound."
+            },
+            "attention": {
+              "type": "string",
+              "description": "Sound file played when a session needs attention, relative to the config dir. Empty means the built-in sound."
+            }
+          }
+        },
+        "claude-args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extra arguments passed to claude in interactive sessions. Default: none."
         }
       },
       "default": {

@@ -1,0 +1,78 @@
+package config
+
+import (
+	"slices"
+	"testing"
+)
+
+func TestParseAgentsSessionKeysDefaultWhenAbsent(t *testing.T) {
+	cfg, err := Parse([]byte(`{"agents":{"claude":{"model":"opus"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := cfg.Agents
+	if !slices.Equal(a.LeaderKey, []string{"ctrl+a"}) {
+		t.Errorf("LeaderKey = %v, want [ctrl+a]", a.LeaderKey)
+	}
+	if !a.ResumeOnStart || !a.Banners.Enabled || !a.Sounds.Enabled {
+		t.Errorf("ResumeOnStart/Banners/Sounds = %v/%v/%v, want all true", a.ResumeOnStart, a.Banners.Enabled, a.Sounds.Enabled)
+	}
+	if a.Sounds.Done != "" || a.Sounds.Attention != "" || a.ClaudeArgs != nil {
+		t.Errorf("Sounds/ClaudeArgs = %+v/%v, want built-in sounds and no args", a.Sounds, a.ClaudeArgs)
+	}
+}
+
+func TestParseAgentsSessionKeysSetValues(t *testing.T) {
+	cfg, err := Parse([]byte(`{"agents":{
+		"leader-key":"ctrl+b",
+		"resume-on-start":false,
+		"banners":{"enabled":false},
+		"sounds":{"enabled":false,"done":"sounds/done.aiff","attention":"/abs/attention.aiff"},
+		"claude-args":["--verbose","--add-dir","/tmp"]
+	}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := cfg.Agents
+	if !slices.Equal(a.LeaderKey, []string{"ctrl+b"}) {
+		t.Errorf("LeaderKey = %v, want [ctrl+b]", a.LeaderKey)
+	}
+	if a.ResumeOnStart || a.Banners.Enabled || a.Sounds.Enabled {
+		t.Errorf("ResumeOnStart/Banners/Sounds = %v/%v/%v, want all false", a.ResumeOnStart, a.Banners.Enabled, a.Sounds.Enabled)
+	}
+	if a.Sounds.Done != "sounds/done.aiff" || a.Sounds.Attention != "/abs/attention.aiff" {
+		t.Errorf("Sounds = %+v", a.Sounds)
+	}
+	if !slices.Equal(a.ClaudeArgs, []string{"--verbose", "--add-dir", "/tmp"}) {
+		t.Errorf("ClaudeArgs = %v", a.ClaudeArgs)
+	}
+	if a.Claude.Model != defaultClaudeModel {
+		t.Errorf("Claude.Model = %q, want default kept", a.Claude.Model)
+	}
+}
+
+func TestParseAgentsLeaderKey(t *testing.T) {
+	cases := []struct {
+		name, raw string
+		want      []string
+	}{
+		{"string", `"ctrl+space"`, []string{"ctrl+space"}},
+		{"list", `["ctrl+a","ctrl+]"]`, []string{"ctrl+a", "ctrl+]"}},
+		{"number falls back", `3`, []string{"ctrl+a"}},
+		{"empty string falls back", `""`, []string{"ctrl+a"}},
+		{"empty list falls back", `[]`, []string{"ctrl+a"}},
+		{"blank entry falls back", `["ctrl+b"," "]`, []string{"ctrl+a"}},
+		{"mixed list falls back", `["ctrl+b",1]`, []string{"ctrl+a"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := Parse([]byte(`{"agents":{"leader-key":` + tc.raw + `}}`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(cfg.Agents.LeaderKey, tc.want) {
+				t.Errorf("LeaderKey = %v, want %v", cfg.Agents.LeaderKey, tc.want)
+			}
+		})
+	}
+}

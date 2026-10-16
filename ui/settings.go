@@ -60,7 +60,7 @@ func (s Settings) ImplementSkill() string {
 }
 
 // AgentConfig returns the configured model/effort for agent, falling back to
-// gx's built-in defaults when s.Agents as a whole is the zero value (e.g. a
+// gx's built-in defaults when both kinds' model/effort are empty (e.g. a
 // Settings built without loading config, the same defensive shape
 // MaxConcurrentTicketsPerEpic/ImplementSkill use). Once s.Agents is
 // populated — which config.Load always produces, since its own defaults are
@@ -69,7 +69,7 @@ func (s Settings) ImplementSkill() string {
 // setting" case; see config.AgentConfig). This correctly preserves a
 // per-kind inherit choice (e.g. Claude explicitly emptied while Codex is
 // left at its real values — see config.TestLoadAgentsConfigExplicitEmptyStringMeansInherit)
-// because s.Agents as a whole stays non-zero whenever any field anywhere
+// because the pair stays non-zero whenever any field anywhere
 // still holds a real value.
 //
 // Known limitation: a Settings where the user has deliberately emptied
@@ -80,7 +80,7 @@ func (s Settings) ImplementSkill() string {
 // never-loaded/defensive reading (built-in defaults), the same as before.
 func (s Settings) AgentConfig(agent ralphloop.AgentKind) config.AgentConfig {
 	agents := s.Agents
-	if agents == (config.AgentsConfig{}) {
+	if agents.Claude == (config.AgentConfig{}) && agents.Codex == (config.AgentConfig{}) {
 		agents = config.DefaultAgentsConfig()
 	}
 	if agent == ralphloop.AgentCodex {

@@ -97,6 +97,12 @@ type Settings struct {
 
 	// WatchConfig reloads Config.ConfigPath whenever it is saved.
 	WatchConfig bool
+
+	// The interactive-session keys of config agents.*.
+	AgentsResumeOnStart bool
+	AgentsBanners       bool
+	AgentsSounds        config.AgentsSoundsConfig
+	AgentsClaudeArgs    []string
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -121,6 +127,10 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		},
 		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
 		WatchConfig:               cfg.Server.WatchConfig,
+		AgentsResumeOnStart:       cfg.Agents.ResumeOnStart,
+		AgentsBanners:             cfg.Agents.Banners.Enabled,
+		AgentsSounds:              cfg.Agents.Sounds,
+		AgentsClaudeArgs:          cfg.Agents.ClaudeArgs,
 	}
 }
 

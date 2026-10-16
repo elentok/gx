@@ -204,6 +204,17 @@ func Parse(data []byte) (Config, error) {
 				Model  *string `json:"model"`
 				Effort *string `json:"effort"`
 			} `json:"codex"`
+			LeaderKey     json.RawMessage `json:"leader-key"`
+			ResumeOnStart *bool           `json:"resume-on-start"`
+			Banners       *struct {
+				Enabled *bool `json:"enabled"`
+			} `json:"banners"`
+			Sounds *struct {
+				Enabled   *bool   `json:"enabled"`
+				Done      *string `json:"done"`
+				Attention *string `json:"attention"`
+			} `json:"sounds"`
+			ClaudeArgs []string `json:"claude-args"`
 		} `json:"agents"`
 		Subscription *struct {
 			SuppressExtraUsageWarning *bool `json:"suppress-extra-usage-warning"`
@@ -316,6 +327,29 @@ func Parse(data []byte) (Config, error) {
 		}
 		if raw.Agents.Codex != nil {
 			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex.Model, raw.Agents.Codex.Effort)
+		}
+		if keys, ok := parseLeaderKey(raw.Agents.LeaderKey); ok {
+			cfg.Agents.LeaderKey = keys
+		}
+		if raw.Agents.ResumeOnStart != nil {
+			cfg.Agents.ResumeOnStart = *raw.Agents.ResumeOnStart
+		}
+		if raw.Agents.Banners != nil && raw.Agents.Banners.Enabled != nil {
+			cfg.Agents.Banners.Enabled = *raw.Agents.Banners.Enabled
+		}
+		if s := raw.Agents.Sounds; s != nil {
+			if s.Enabled != nil {
+				cfg.Agents.Sounds.Enabled = *s.Enabled
+			}
+			if s.Done != nil {
+				cfg.Agents.Sounds.Done = strings.TrimSpace(*s.Done)
+			}
+			if s.Attention != nil {
+				cfg.Agents.Sounds.Attention = strings.TrimSpace(*s.Attention)
+			}
+		}
+		if raw.Agents.ClaudeArgs != nil {
+			cfg.Agents.ClaudeArgs = raw.Agents.ClaudeArgs
 		}
 	}
 	if raw.Subscription != nil && raw.Subscription.SuppressExtraUsageWarning != nil {
