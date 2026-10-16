@@ -149,11 +149,138 @@ func TestActions_ResumeRefusalShowsItsMessage(t *testing.T) {
 	}
 }
 
+func withSession(m Model, id string, edit func(*server.SessionInfo)) Model {
+	m.sessions = slices.Clone(m.sessions)
+	for i := range m.sessions {
+		if m.sessions[i].ID == id {
+			edit(&m.sessions[i])
+		}
+	}
+	return m
+}
+
+func withAction(m Model, id string, action ...string) Model {
+	return withSession(m, id, func(s *server.SessionInfo) {
+		s.Actionable = server.SessionActionable{Reason: "review", Action: action}
+	})
+}
+
+func withUnread(m Model, id string) Model {
+	return withSession(m, id, func(s *server.SessionInfo) { s.Unread.Unread = true })
+}
+
+func TestActions_RunActionSendsWithNoConfirm(t *testing.T) {
+	for name, press := range map[string]func(*testing.T, Model) Model{
+		"sidebar": func(t *testing.T, m Model) Model { m, _ = act(t, m, letter("a")); return m },
+		"leader": func(t *testing.T, m Model) Model {
+			m, cmd := leaderThen(t, m, letter("a"))
+			return update1(t, m, cmd())
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := &fakeSessionClient{}
+			m := press(t, withAction(actionModel(t, f, "live"), "live", "go on"))
+			if m.confirm.IsOpen {
+				t.Fatal("run action asked")
+			}
+			if got := calls(f); !slices.Equal(got, []string{"action live"}) {
+				t.Fatalf("calls = %v", got)
+			}
+		})
+	}
+}
+
+func TestActions_RunActionRefusalShowsItsMessage(t *testing.T) {
+	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Reason: server.ReasonSessionNotIdle, Message: "session live is working, not idle"}}
+	_, note := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
+	if note != "session live is working, not idle" {
+		t.Fatalf("footer = %q, want the refusal", note)
+	}
+}
+
+func TestActions_RunActionWithoutAnActionSaysSo(t *testing.T) {
+	f := &fakeSessionClient{}
+	_, note := act(t, actionModel(t, f, "live"), letter("a"))
+	if note != "no action" {
+		t.Fatalf("footer = %q, want no action", note)
+	}
+	if got := calls(f); len(got) != 0 {
+		t.Fatalf("calls = %v, want none", got)
+	}
+}
+
+func menuLabels(m Model) []string {
+	var labels []string
+	for _, it := range m.menu.Items {
+		labels = append(labels, it.Label)
+	}
+	return labels
+}
+
+func TestActions_MenuListsOnlyTheApplicableItems(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		id   string
+		prep func(Model) Model
+		want []string
+	}{
+		{"live", "live", func(m Model) Model { return m }, []string{"Stop"}},
+		{"live unread with an action", "live", func(m Model) Model {
+			return withUnread(withAction(m, "live", "go on"), "live")
+		}, []string{"Stop", "Mark read", "Run Action"}},
+		{"exited", "done", func(m Model) Model { return m }, []string{"Resume", "Remove"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, _ := act(t, tc.prep(actionModel(t, &fakeSessionClient{}, tc.id)), letter("m"))
+			if !m.menuOpen || !m.InputFocused() {
+				t.Fatal("m did not open the menu")
+			}
+			if got := menuLabels(m); !slices.Equal(got, tc.want) {
+				t.Fatalf("menu = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// pick filters the open menu to label and accepts it.
+func pick(t *testing.T, m Model, label string) (Model, string) {
+	t.Helper()
+	for _, r := range label {
+		m = update1(t, m, letter(string(r)))
+	}
+	return act(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+}
+
+func TestActions_MenuMarkReadSendsMarkRead(t *testing.T) {
+	f := &fakeSessionClient{}
+	m, _ := act(t, withUnread(actionModel(t, f, "live"), "live"), letter("m"))
+	m, _ = pick(t, m, "mark")
+	if m.menuOpen {
+		t.Fatal("the menu stayed open")
+	}
+	if got := calls(f); !slices.Equal(got, []string{"mark-read live"}) {
+		t.Fatalf("calls = %v", got)
+	}
+}
+
+func TestActions_MenuStopAsks(t *testing.T) {
+	f := &fakeSessionClient{}
+	m, _ := act(t, actionModel(t, f, "live"), letter("m"))
+	m, _ = pick(t, m, "stop")
+	if !m.confirm.IsOpen || len(calls(f)) != 0 {
+		t.Fatalf("Stop from the menu did not ask; calls = %v", calls(f))
+	}
+	act(t, m, letter("y"))
+	if got := calls(f); !slices.Equal(got, []string{"stop live"}) {
+		t.Fatalf("calls = %v", got)
+	}
+}
+
 func TestActions_WhichKeyListsThem(t *testing.T) {
 	m := actionModel(t, &fakeSessionClient{}, "live")
 	m = update1(t, m, ctrlA)
 	view := plainView(m)
-	for _, want := range []string{"stop session", "remove session", "resume session"} {
+	for _, want := range []string{"stop session", "remove session", "resume session", "run action"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("which-key lacks %q:\n%s", want, view)
 		}

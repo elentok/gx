@@ -7,6 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -62,6 +64,90 @@ func (m Model) resumeSelected() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, sessionActionCmd("resume", m.client.ResumeSession, s.ID)
+}
+
+// runActionSelected runs the Action at once: it only sends prompts the
+// session's own agent wrote, and the server refuses unless it is Idle.
+func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
+	s, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+	if len(s.Actionable.Action) == 0 {
+		return m, notify.Info("no action")
+	}
+	return m, sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
+}
+
+func (m Model) markReadSelected() (tea.Model, tea.Cmd) {
+	s, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+	return m, sessionActionCmd("mark read", m.client.MarkSessionRead, s.ID)
+}
+
+// sessionMenuItems lists the items that apply to s, in a fixed order; each
+// Value is the action key it runs.
+func sessionMenuItems(s server.SessionInfo) []components.MenuItem {
+	live := s.Status.State != server.SessionExited
+	var items []components.MenuItem
+	add := func(applies bool, label, value string) {
+		if applies {
+			items = append(items, components.MenuItem{Label: label, Value: value})
+		}
+	}
+	add(live, "Stop", "x")
+	add(!live, "Resume", "r")
+	add(!live, "Remove", "X")
+	add(s.Unread.Unread, "Mark read", "mark-read")
+	add(len(s.Actionable.Action) > 0, "Run Action", "a")
+	return items
+}
+
+func (m Model) openMenu() (tea.Model, tea.Cmd) {
+	s, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+	m.menu = components.MenuState{Items: sessionMenuItems(s)}
+	m.menuOpen = true
+	return m, nil
+}
+
+func (m Model) updateMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	next, decided, accepted, handled := components.UpdateMenu(msg, m.menu)
+	if !handled {
+		return m, nil
+	}
+	m.menu = next
+	if !decided {
+		return m, nil
+	}
+	m.menuOpen = false
+	item, ok := m.menu.Selected()
+	if !accepted || !ok {
+		return m, nil
+	}
+	switch item.Value {
+	case "x":
+		return m.stopSelected()
+	case "r":
+		return m.resumeSelected()
+	case "X":
+		return m.removeSelected()
+	case "mark-read":
+		return m.markReadSelected()
+	case "a":
+		return m.runActionSelected()
+	}
+	return m, nil
+}
+
+func (m Model) renderMenu() string {
+	prompt := "Session " + displayName(m.sessions[m.cursor]) + ":"
+	return components.RenderMenuModal("Session", prompt, m.menu, "",
+		ui.ColorBorder, ui.ColorBlue, ui.ColorSubtle, ui.ColorText, 48)
 }
 
 func sessionActionCmd(verb string, call sessionCall, id string) tea.Cmd {

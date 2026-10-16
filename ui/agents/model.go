@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -31,6 +32,8 @@ var (
 	keyStop          = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "stop session"))
 	keyRemove        = key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "remove session"))
 	keyResume        = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resume session"))
+	keyRunAction     = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "run action"))
+	keyMenu          = key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "session menu"))
 )
 
 type pageActivatedMsg struct{}
@@ -63,7 +66,10 @@ type Model struct {
 	// snapshot lists it.
 	pendingSelect string
 	// confirm asks y/n before a Stop or Remove.
-	confirm       confirm.Model
+	confirm confirm.Model
+	// menu is the `m` menu of the selected session's actions.
+	menu          components.MenuState
+	menuOpen      bool
 	help          help.Model
 	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
@@ -124,10 +130,10 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 }
 
 // InputFocused tells the shell the page swallows every key: in the terminal,
-// after the leader, in the jump popup, create form or confirm and while typing
-// a help filter.
+// after the leader, in the jump popup, create form, confirm or menu and while
+// typing a help filter.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.InputFocused()
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -237,6 +243,10 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.removeSelected()
 	case key.Matches(msg, keyResume):
 		return m.resumeSelected()
+	case key.Matches(msg, keyRunAction):
+		return m.runActionSelected()
+	case key.Matches(msg, keyMenu):
+		return m.openMenu()
 	default:
 		return m, nil
 	}
@@ -319,6 +329,9 @@ func (m Model) render() string {
 	}
 	if m.create != nil {
 		out = ui.OverlayCenter(out, m.renderCreate(), m.width, m.height)
+	}
+	if m.menuOpen {
+		out = ui.OverlayCenter(out, m.renderMenu(), m.width, m.height)
 	}
 	if m.confirm.IsOpen {
 		out = ui.OverlayCenter(out, m.confirm.View(m.width), m.width, m.height)
