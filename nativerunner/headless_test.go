@@ -601,11 +601,14 @@ func TestHeadless_StatusDoesNotBlockOnAStartInProgress(t *testing.T) {
 	h := newHarness(t)
 	s := h.start(t, "epic-01")
 	b := blockingProcs{entered: make(chan struct{}), release: make(chan struct{})}
+	procs := h.runner.Procs
 	h.runner.Procs = b
 
 	done := make(chan error, 1)
+	var started agentrunner.Session
 	go func() {
-		_, err := h.runner.Start(agentrunner.StartOptions{
+		var err error
+		started, err = h.runner.Start(agentrunner.StartOptions{
 			Label: "epic-02", Epic: "epic", Cwd: h.cwd,
 			Env: []string{fakeClaudeEnv + "=1", fakeClaudeRecord + "=" + h.record},
 		})
@@ -629,6 +632,11 @@ func TestHeadless_StatusDoesNotBlockOnAStartInProgress(t *testing.T) {
 	close(b.release)
 	if err := <-done; err != nil {
 		t.Errorf("Start = %v", err)
+	}
+	// blockingProcs serves one Lookup; Stop needs the real ones.
+	h.runner.Procs = procs
+	if err := h.runner.Stop(started); err != nil {
+		t.Errorf("Stop = %v", err)
 	}
 }
 

@@ -730,17 +730,32 @@ func savedSessionExit(dir string) string {
 // openSessionWatch waits for a just-started holder's socket, then opens its
 // watch stream.
 func (s *Server) openSessionWatch(dir string) (*nativerunner.HolderWatch, error) {
+	c, err := s.dialNewHolder(dir)
+	if errors.Is(err, errHolderExited) {
+		return nil, errors.New("holder exited before its watch opened")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !c.Supports(nativerunner.OpWatch) {
+		return nil, errors.New("holder does not serve watch")
+	}
+	return c.Watch()
+}
+
+var errHolderExited = errors.New("holder exited")
+
+// dialNewHolder waits for a just-started holder's socket, until the holder
+// saves an exit, holderDialTimeout passes or the server stops.
+func (s *Server) dialNewHolder(dir string) (*nativerunner.HolderClient, error) {
 	deadline := time.Now().Add(holderDialTimeout)
 	for {
 		c, err := nativerunner.DialHolder(dir)
 		if err == nil {
-			if !c.Supports(nativerunner.OpWatch) {
-				return nil, errors.New("holder does not serve watch")
-			}
-			return c.Watch()
+			return c, nil
 		}
 		if _, statErr := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); statErr == nil {
-			return nil, errors.New("holder exited before its watch opened")
+			return nil, errHolderExited
 		}
 		if time.Now().After(deadline) {
 			return nil, err
@@ -829,13 +844,19 @@ func (s *Server) sessionDir(id string) (string, sessionMeta, SessionResult, erro
 // end claude and waits for the holder to save its exit and last screen. It
 // leaves no Unread.
 func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
-	dir, res, err := s.markSessionStopped(req.ID)
+	dir, starting, res, err := s.markSessionStopped(req.ID)
 	if res.Refused || err != nil {
 		return res, err
 	}
+	// A Starting session's holder may not have opened its socket yet; left
+	// undialed, it would run on with no session to stop it.
+	dial := nativerunner.DialHolder
+	if starting {
+		dial = s.dialNewHolder
+	}
 	// A holder that is already gone has nothing to stop; its exit is recorded
 	// below all the same.
-	if c, err := nativerunner.DialHolder(dir); err == nil {
+	if c, err := dial(dir); err == nil {
 		if err := c.Stop(); err != nil {
 			return SessionResult{}, fmt.Errorf("stop session %s: %w", req.ID, err)
 		}
@@ -851,19 +872,21 @@ func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
 }
 
 // markSessionStopped saves Stopped before the holder is asked to stop, so the
-// watch records the exit the stop causes as clean.
-func (s *Server) markSessionStopped(id string) (string, SessionResult, error) {
+// watch records the exit the stop causes as clean. starting reports the
+// session was still Starting.
+func (s *Server) markSessionStopped(id string) (dir string, starting bool, res SessionResult, err error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(id)
 	if res.Refused || err != nil {
-		return "", res, err
+		return "", false, res, err
 	}
 	if meta.Status.State == SessionExited {
-		return "", sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", id)), nil
+		return "", false, sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", id)), nil
 	}
 	meta.Stopped = true
-	return dir, SessionResult{}, writeSessionMeta(dir, meta)
+	starting = meta.Status.State == "" || meta.Status.State == SessionStarting
+	return dir, starting, SessionResult{}, writeSessionMeta(dir, meta)
 }
 
 func waitForFile(path string, timeout time.Duration) {

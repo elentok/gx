@@ -1,10 +1,14 @@
 package servertest
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
@@ -15,6 +19,10 @@ import (
 // holderArg is the first argument that runs the test binary as a holder. An
 // argument, not an env var: the holder's child inherits its env.
 const holderArg = "servertest-agent-holder"
+
+// TestPidEnv is the pid of the test process a test holder exits with, so a
+// test killed before its cleanup leaves no holder running. TestMain sets it.
+const TestPidEnv = "GX_SERVERTEST_PID"
 
 // WithTestHolder hosts interactive sessions in the test binary itself, whose
 // TestMain must call RunSessionProcesses. Pair it with the fake harness
@@ -29,6 +37,9 @@ func WithTestHolder() func(*server.Config) {
 func RunSessionProcesses() {
 	agentfake.RegisterHarness()
 	if len(os.Args) > 1 && os.Args[1] == holderArg {
+		if pid, err := strconv.Atoi(os.Getenv(TestPidEnv)); err == nil {
+			go exitWithTest(pid)
+		}
 		if err := runTestHolder(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -38,6 +49,20 @@ func RunSessionProcesses() {
 	// After the holder check: the holder's env carries the program's marker.
 	if os.Getenv(agentfake.ProgramEnv) == "1" {
 		agentfake.Program()
+	}
+	// The holders this test process starts inherit it, unless a test set one.
+	if os.Getenv(TestPidEnv) == "" {
+		_ = os.Setenv(TestPidEnv, strconv.Itoa(os.Getpid()))
+	}
+}
+
+// exitWithTest ends the holder once the test process pid is gone. The
+// holder's child goes with it, its pty hung up.
+func exitWithTest(pid int) {
+	for range time.Tick(200 * time.Millisecond) {
+		if errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+			os.Exit(1)
+		}
 	}
 }
 

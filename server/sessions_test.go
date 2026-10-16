@@ -212,6 +212,51 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 	}
 }
 
+// A stop right after create comes before the holder opens its socket; the
+// holder must still be stopped, not left running.
+func TestStopSession_StopsAHolderStillStarting(t *testing.T) {
+	h, ctx, _, id, _ := startFakeSession(t)
+	dir := filepath.Join(h.SessionsDir, id)
+
+	res, err := h.Client.StopSession(ctx, id)
+	if err != nil || res.Refused {
+		t.Fatalf("stop = %+v, %v", res, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err != nil {
+		t.Errorf("holder saved no exit by the time stop returned: %v", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if _, err := nativerunner.DialHolder(dir); err == nil {
+		t.Error("holder still serves after stop")
+	}
+}
+
+// A test killed before its cleanup runs must not leave its holders running:
+// a test holder exits once the test process is gone.
+func TestTestHolder_ExitsWithItsTestProcess(t *testing.T) {
+	test := exec.Command("sleep", "60")
+	if err := test.Start(); err != nil {
+		t.Fatal(err)
+	}
+	// The holder watches this stand-in for the test process.
+	t.Setenv(servertest.TestPidEnv, strconv.Itoa(test.Process.Pid))
+	h, _, _, id, conv := startFakeSession(t)
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+
+	_ = test.Process.Kill()
+	_ = test.Wait()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		// The holder and its program both carry the conversation id.
+		if exec.Command("pgrep", "-f", conv).Run() != nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			_ = exec.Command("pkill", "-f", conv).Run()
+			t.Fatal("the session's holder outlived its test")
+		}
+	}
+}
+
 func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 	h, ctx, evs, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
