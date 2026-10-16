@@ -17,7 +17,7 @@ func (m QueueModel) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m QueueModel) ModalOpen() bool {
-	return m.help.IsOpen || m.confirm.IsOpen || m.watch.open
+	return m.help.IsOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen || m.watch.open
 }
 
 // recomputeQueueSearchMatches rebuilds the match set against the current

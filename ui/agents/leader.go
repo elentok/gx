@@ -121,6 +121,20 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m.updateSidebarKey(msg)
 }
 
+// openHelp rebuilds the help, since the leader and focus-sidebar keys are
+// configurable, and opens it.
+func (m Model) openHelp() Model {
+	m.help = help.NewModel([]help.KeySection{
+		help.NewKeySection("Terminal", keys.Binding{
+			Seq: m.focusSidebarKeys()[:1], Display: strings.Join(m.focusSidebarKeys(), "/"), Title: "focus sidebar",
+		}),
+		help.NewKeySection("Leader ("+m.leaderKeys()[0]+" then)", m.leaderBindings()...),
+		help.NewKeySection("Sidebar", sidebarBindings...),
+	})
+	m.help.Open(m.width, m.height)
+	return m
+}
+
 // runLeaderAction runs the key pressed after the leader; esc and unbound keys
 // are dropped.
 func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
@@ -158,15 +172,7 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	case "ctrl+o":
 		return m, nav.OpenSwitcher()
 	case "?":
-		m.help = help.NewModel([]help.KeySection{
-			help.NewKeySection("Terminal", keys.Binding{
-				Seq: m.focusSidebarKeys()[:1], Display: strings.Join(m.focusSidebarKeys(), "/"), Title: "focus sidebar",
-			}),
-			help.NewKeySection("Leader ("+m.leaderKeys()[0]+" then)", m.leaderBindings()...),
-			help.NewKeySection("Sidebar", sidebarBindings...),
-		})
-		m.help.Open(m.width, m.height)
-		return m, nil
+		return m.openHelp(), nil
 	default:
 		if len(k) == 1 && k[0] >= '1' && k[0] <= '8' {
 			return m, nav.Switch(nav.ViewState{Tab: digitTabs[k[0]-'1']})

@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
+	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -180,6 +181,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if nav.IsOpenHelp(msg) {
+		// Copy mode blocks it like a modal: it takes every key, so its own
+		// leader can't reach "?" either.
+		if m.ModalOpen() || m.copy != nil {
+			return m, nil
+		}
+		m.leaderPending = false
+		return m.openHelp(), nil
+	}
 	switch msg := msg.(type) {
 	case tea.FocusMsg:
 		m.focused = true

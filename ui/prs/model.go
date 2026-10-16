@@ -80,6 +80,13 @@ func (m Model) OnPageActivated() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if nav.IsOpenHelp(msg) {
+		if !m.ModalOpen() {
+			m.keys.Reset()
+			m.help.Open(m.width, m.height)
+		}
+		return m, nil
+	}
 	if m.help.IsOpen {
 		if _, ok := msg.(tea.KeyPressMsg); ok {
 			var cmd tea.Cmd

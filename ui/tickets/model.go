@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
@@ -199,6 +200,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if nav.IsOpenHelp(msg) {
+		if !m.ModalOpen() {
+			m.keys.Reset()
+			m.help.Open(m.width, m.height)
+		}
+		return m, nil
+	}
 	if next, cmd, ok := m.updateServer(msg); ok {
 		return next, cmd
 	}
