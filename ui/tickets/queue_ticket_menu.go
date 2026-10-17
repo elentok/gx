@@ -1,6 +1,8 @@
 package tickets
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/tickets"
@@ -17,7 +19,6 @@ func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
 			branch:       epic.MergeTarget,
 			queueable:    queueableAddresses(epic, m.checkedPaths()),
 			serverReason: serverReason(m.serverAPI, m.link),
-			onQueue:      true,
 		})
 		return m, nil
 	}
@@ -75,8 +76,8 @@ func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
 	return entries[idx].Value.epic, true
 }
 
-// handleQueueEpicMenuPick mirrors Model.handleEpicMenuPick; Check all is dim
-// here, so it never arrives.
+// handleQueueEpicMenuPick mirrors Model.handleEpicMenuPick; Check all goes to
+// the Tickets tab, which owns the checked set.
 func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	epic, ok := m.selectedQueueEpic()
 	if !ok || epic.Path != msg.target.address {
@@ -86,6 +87,11 @@ func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea
 		return m, cmdApplyEpicStatus(m.serverAPI, m.settings.TicketStore, epic, msg.status)
 	}
 	switch msg.action {
+	case actionCheckAll:
+		paths := eligibleEpicPaths(epic)
+		return m, tea.Batch(
+			func() tea.Msg { return CheckPathsMsg{Paths: paths} },
+			notify.Success(fmt.Sprintf("checked %d tickets", len(paths))))
 	case actionQueueEpic:
 		return m, cmdQueueEpic(m.serverAPI, queueableAddresses(epic, m.checkedPaths()))
 	case actionEditEpic:

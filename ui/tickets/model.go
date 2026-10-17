@@ -277,6 +277,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case epicMenuPickMsg:
 		return m.handleEpicMenuPick(msg)
 
+	case CheckPathsMsg:
+		m.setPathsChecked(msg.Paths, true)
+		return m, nil
+
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd

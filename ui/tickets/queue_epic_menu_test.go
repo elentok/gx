@@ -10,6 +10,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/elentok/gx/tickets"
 )
 
 // queueOnEpicHeader is a server-mode Queue tab with gx:alpha's header
@@ -49,8 +51,35 @@ func TestQueueEpicMenu_HeaderOpensTheFullEpicMenu(t *testing.T) {
 			t.Errorf("menu lacks %q:\n%s", it.Label, view)
 		}
 	}
-	if !strings.Contains(view, ticketsTabOnly) {
-		t.Errorf("Check all is not dim with %q:\n%s", ticketsTabOnly, view)
+	for _, it := range items {
+		if it.Label == "Check all" && it.Disabled != "" {
+			t.Errorf("Check all is dim with %q", it.Disabled)
+		}
+	}
+}
+
+func TestQueueEpicMenu_CheckAllChecksEveryTicketOnTheTicketsTab(t *testing.T) {
+	m := queueOnEpicHeader(t, fakeServerAPI{calls: &[]string{}})
+	m.epics[0].Tickets = append(m.epics[0].Tickets,
+		tickets.Ticket{Number: 2, Identifier: "02", Title: "Second", Path: "gx:alpha/02", Status: "open"})
+	m.clampSelected()
+
+	_, cmd := chooseQueueMenuItem(t, pressQueueMenuKey(t, m), "Check all")
+	if cmd == nil {
+		t.Fatal("Check all issued no cmd")
+	}
+	tm, _ := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
+	batch, _ := cmd().(tea.BatchMsg)
+	for _, c := range batch {
+		if msg, ok := c().(CheckPathsMsg); ok {
+			next, _ := tm.Update(msg)
+			tm = next.(Model)
+		}
+	}
+	for _, path := range []string{"gx:alpha/01", "gx:alpha/02"} {
+		if !tm.isChecked(path) {
+			t.Errorf("Tickets tab checked = %v, want %s", tm.checked, path)
+		}
 	}
 }
 

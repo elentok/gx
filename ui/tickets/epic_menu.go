@@ -28,7 +28,6 @@ const (
 	ticketsNotDone  = "tickets not done"
 	alreadyMerged   = "already merged"
 	nothingToQueue  = "nothing to queue"
-	ticketsTabOnly  = "on the Tickets tab"
 	actionCheckAll  = "check-all"
 	actionQueueEpic = "queue-epic"
 	actionEditEpic  = "edit-epic"
@@ -46,8 +45,6 @@ type epicMenuInput struct {
 	queueable    []string
 	serverReason string
 	archived     bool
-	// onQueue dims Check all: the checked set lives on the Tickets tab.
-	onQueue bool
 }
 
 // epicMenuItems lists every action for an epic, in the shape of
@@ -93,7 +90,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	items = append(items,
 		pick("Add epic to queue", "", actionQueueEpic, contextmenu.Queue,
 			firstReason(in.serverReason, reasonIf(len(in.queueable) == 0, nothingToQueue))),
-		pick("Check all", "", actionCheckAll, contextmenu.Queue, reasonIf(in.onQueue, ticketsTabOnly)),
+		pick("Check all", "", actionCheckAll, contextmenu.Queue, ""),
 		pick("Edit ticket.md", "e e", actionEditEpic, contextmenu.EditCopy, ""),
 		pick("Yank", "y y", actionYankEpic, contextmenu.EditCopy, ""))
 
@@ -148,12 +145,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.action {
 	case actionCheckAll:
-		eligible := eligibleEpicTickets(epic)
-		paths := make([]string, len(eligible))
-		for i, t := range eligible {
-			paths[i] = t.Path
-		}
-		m.setPathsChecked(paths, true)
+		m.setPathsChecked(eligibleEpicPaths(epic), true)
 		return m, nil
 	case actionQueueEpic:
 		return m, cmdQueueEpic(m.serverAPI, queueableAddresses(epic, m.vm.Queue))

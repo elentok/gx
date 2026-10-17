@@ -71,6 +71,20 @@ func eligibleEpicTickets(epic tickets.Epic) []tickets.Ticket {
 	return out
 }
 
+func eligibleEpicPaths(epic tickets.Epic) []string {
+	eligible := eligibleEpicTickets(epic)
+	paths := make([]string, len(eligible))
+	for i, t := range eligible {
+		paths[i] = t.Path
+	}
+	return paths
+}
+
+// CheckPathsMsg adds Paths to the Tickets tab's checked set. The Queue tab's
+// epic Check all sends it, and the app shell routes it to the Tickets tab,
+// which owns the set.
+type CheckPathsMsg struct{ Paths []string }
+
 // epicChecked reports whether every one of epic's eligible (non-done) tickets
 // is checked (also used to render the epic row's own checkbox glyph). A
 // zero-eligible epic (no tickets, or all done) renders unchecked: it has
@@ -95,12 +109,7 @@ func (m Model) epicChecked(epic tickets.Epic) bool {
 // is a no-op either way.
 func (m *Model) toggleEpicChecked(r row) {
 	epic := m.epicAt(r)
-	eligible := eligibleEpicTickets(epic)
-	paths := make([]string, len(eligible))
-	for i, t := range eligible {
-		paths[i] = t.Path
-	}
-	m.setPathsChecked(paths, !m.epicChecked(epic))
+	m.setPathsChecked(eligibleEpicPaths(epic), !m.epicChecked(epic))
 }
 
 // toggleTicketChecked toggles r's ticket. Unchecking is always immediate.
