@@ -300,7 +300,7 @@ func TestModalOpen_EachPopup(t *testing.T) {
 		"jump":    func(m *Model) { m.jump = &jumpPopup{} },
 		"create":  func(m *Model) { m.create = &createForm{} },
 		"confirm": func(m *Model) { m.confirm.IsOpen = true },
-		"menu":    func(m *Model) { m.menuOpen = true },
+		"menu":    func(m *Model) { m.menu.IsOpen = true },
 		"help":    func(m *Model) { m.help.IsOpen = true },
 	} {
 		t.Run(name, func(t *testing.T) {

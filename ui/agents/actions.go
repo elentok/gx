@@ -7,9 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -87,22 +86,38 @@ func (m Model) markReadSelected() (tea.Model, tea.Cmd) {
 	return m, sessionActionCmd("mark read", m.client.MarkSessionRead, s.ID)
 }
 
-// sessionMenuItems lists the items that apply to s, in a fixed order; each
-// Value is the action key it runs.
-func sessionMenuItems(s server.SessionInfo) []components.MenuItem {
+// sessionMenuPickMsg carries a menu pick back to Update: the session actions
+// open the confirm on the model, which an item's Run cannot reach.
+type sessionMenuPickMsg struct {
+	id  string
+	key string
+}
+
+// sessionMenuItems lists every session item in a fixed order; those that
+// don't apply to s are dim with the reason.
+func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInfo] {
 	live := s.Status.State != server.SessionExited
-	var items []components.MenuItem
-	add := func(applies bool, label, value string) {
-		if applies {
-			items = append(items, components.MenuItem{Label: label, Value: value})
+	item := func(label, key, pick, disabled string) contextmenu.Item[server.SessionInfo] {
+		return contextmenu.Item[server.SessionInfo]{
+			Label: label, Key: key, Group: contextmenu.Agent, Disabled: disabled,
+			Run: func(s server.SessionInfo) tea.Cmd {
+				return func() tea.Msg { return sessionMenuPickMsg{id: s.ID, key: pick} }
+			},
 		}
 	}
-	add(live, "Stop", "x")
-	add(!live, "Resume", "r")
-	add(!live, "Remove", "X")
-	add(s.Unread.Unread, "Mark read", "mark-read")
-	add(len(s.Actionable.Action) > 0, "Run Action", "a")
-	return items
+	reason := func(applies bool, why string) string {
+		if applies {
+			return ""
+		}
+		return why
+	}
+	return []contextmenu.Item[server.SessionInfo]{
+		item("Stop", "x", "x", reason(live, "exited")),
+		item("Resume", "r", "r", reason(!live, "running")),
+		item("Remove", "X", "X", reason(!live, "running")),
+		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
+		item("Run Action", "a", "a", reason(len(s.Actionable.Action) > 0, "no action")),
+	}
 }
 
 func (m Model) openMenu() (tea.Model, tea.Cmd) {
@@ -110,26 +125,23 @@ func (m Model) openMenu() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	m.menu = components.MenuState{Items: sessionMenuItems(s)}
-	m.menuOpen = true
+	m.menu = m.menu.Open(s, "Session "+displayName(s), sessionMenuItems(s))
 	return m, nil
 }
 
 func (m Model) updateMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	next, decided, accepted, handled := components.UpdateMenu(msg, m.menu)
-	if !handled {
+	var cmd tea.Cmd
+	m.menu, cmd = m.menu.Update(msg)
+	return m, cmd
+}
+
+// updateMenuPick runs a pick only while its session is still the selected
+// one; the session actions work on the selection.
+func (m Model) updateMenuPick(msg sessionMenuPickMsg) (tea.Model, tea.Cmd) {
+	if msg.id != m.selectedID() {
 		return m, nil
 	}
-	m.menu = next
-	if !decided {
-		return m, nil
-	}
-	m.menuOpen = false
-	item, ok := m.menu.Selected()
-	if !accepted || !ok {
-		return m, nil
-	}
-	switch item.Value {
+	switch msg.key {
 	case "x":
 		return m.stopSelected()
 	case "r":
@@ -142,12 +154,6 @@ func (m Model) updateMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.runActionSelected()
 	}
 	return m, nil
-}
-
-func (m Model) renderMenu() string {
-	prompt := "Session " + displayName(m.sessions[m.cursor]) + ":"
-	return components.RenderMenuModal("Session", prompt, m.menu, "",
-		ui.ColorBorder, ui.ColorBlue, ui.ColorSubtle, ui.ColorText, 48)
 }
 
 func sessionActionCmd(verb string, call sessionCall, id string) tea.Cmd {

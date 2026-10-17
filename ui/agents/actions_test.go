@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/notify"
@@ -209,34 +210,88 @@ func TestActions_RunActionWithoutAnActionSaysSo(t *testing.T) {
 	}
 }
 
-func menuLabels(m Model) []string {
-	var labels []string
-	for _, it := range m.menu.Items {
-		labels = append(labels, it.Label)
+// menuRow is the plain text of the open menu's row for label.
+func menuRow(t *testing.T, m Model, label string) string {
+	t.Helper()
+	for line := range strings.SplitSeq(ansi.Strip(m.menu.View()), "\n") {
+		if strings.Contains(line, "  "+label+" ") {
+			return line
+		}
 	}
-	return labels
+	t.Fatalf("no %q row in the menu:\n%s", label, ansi.Strip(m.menu.View()))
+	return ""
 }
 
-func TestActions_MenuListsOnlyTheApplicableItems(t *testing.T) {
+func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		id   string
 		prep func(Model) Model
-		want []string
+		want map[string]string // label -> key hint or dim reason
 	}{
-		{"live", "live", func(m Model) Model { return m }, []string{"Stop"}},
+		{"live", "live", func(m Model) Model { return m }, map[string]string{
+			"Stop": "x", "Resume": "running", "Remove": "running", "Mark read": "nothing unread", "Run Action": "no action",
+		}},
 		{"live unread with an action", "live", func(m Model) Model {
 			return withUnread(withAction(m, "live", "go on"), "live")
-		}, []string{"Stop", "Mark read", "Run Action"}},
-		{"exited", "done", func(m Model) Model { return m }, []string{"Resume", "Remove"}},
+		}, map[string]string{"Stop": "x", "Run Action": "a"}},
+		{"exited", "done", func(m Model) Model { return m }, map[string]string{
+			"Stop": "exited", "Resume": "r", "Remove": "X",
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, _ := act(t, tc.prep(actionModel(t, &fakeSessionClient{}, tc.id)), letter("m"))
-			if !m.menuOpen || !m.InputFocused() {
+			if !m.menu.IsOpen || !m.InputFocused() {
 				t.Fatal("m did not open the menu")
 			}
-			if got := menuLabels(m); !slices.Equal(got, tc.want) {
-				t.Fatalf("menu = %v, want %v", got, tc.want)
+			for label, hint := range tc.want {
+				if row := menuRow(t, m, label); !strings.HasSuffix(strings.TrimRight(row, " │"), " "+hint) {
+					t.Errorf("%s row = %q, want it to end in %q", label, row, hint)
+				}
+			}
+			if strings.Contains(m.menu.View(), "Watch") {
+				t.Error("the session menu has a Watch item")
+			}
+		})
+	}
+}
+
+func TestActions_MenuDimItemMakesNoCall(t *testing.T) {
+	f := &fakeSessionClient{}
+	m, _ := act(t, actionModel(t, f, "live"), letter("m"))
+	m, _ = pick(t, m, "resume")
+	if !m.menu.IsOpen || len(calls(f)) != 0 {
+		t.Fatalf("Enter on a dim Resume closed the menu or called; calls = %v", calls(f))
+	}
+}
+
+func TestActions_MenuItemsMakeTheirSessionCalls(t *testing.T) {
+	for _, tc := range []struct {
+		filter, id string
+		prep       func(Model) Model
+		want       string
+	}{
+		{"resume", "done", func(m Model) Model { return m }, "resume done"},
+		{"run", "live", func(m Model) Model { return withAction(m, "live", "go on") }, "action live"},
+		{"remove", "live", func(m Model) Model {
+			return withSession(m, "live", func(s *server.SessionInfo) { s.Status.State = server.SessionExited })
+		}, ""},
+	} {
+		t.Run(tc.filter, func(t *testing.T) {
+			f := &fakeSessionClient{}
+			m, _ := act(t, tc.prep(actionModel(t, f, tc.id)), letter("m"))
+			m, _ = pick(t, m, tc.filter)
+			if m.menu.IsOpen {
+				t.Fatal("the menu stayed open")
+			}
+			if tc.want == "" {
+				if !m.confirm.IsOpen {
+					t.Fatal("Remove of an exited session did not ask")
+				}
+				return
+			}
+			if got := calls(f); !slices.Equal(got, []string{tc.want}) {
+				t.Fatalf("calls = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -255,7 +310,7 @@ func TestActions_MenuMarkReadSendsMarkRead(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, withUnread(actionModel(t, f, "live"), "live"), letter("m"))
 	m, _ = pick(t, m, "mark")
-	if m.menuOpen {
+	if m.menu.IsOpen {
 		t.Fatal("the menu stayed open")
 	}
 	if got := calls(f); !slices.Equal(got, []string{"mark-read live"}) {

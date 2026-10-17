@@ -96,7 +96,7 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.updateCreateKey(msg)
 	case m.confirm.IsOpen:
 		return m.updateConfirmKey(msg)
-	case m.menuOpen:
+	case m.menu.IsOpen:
 		return m.updateMenuKey(msg)
 	case m.copy != nil:
 		// Copy mode takes every key, the leader too, so `g g` stays its own.

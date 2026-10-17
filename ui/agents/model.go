@@ -15,8 +15,8 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/clip"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -73,8 +73,7 @@ type Model struct {
 	// confirm asks y/n before a Stop or Remove.
 	confirm confirm.Model
 	// menu is the `m` menu of the selected session's actions.
-	menu          components.MenuState
-	menuOpen      bool
+	menu          contextmenu.Menu[server.SessionInfo]
 	help          help.Model
 	width, height int
 	// sessionsDir holds the sessions' state dirs; empty when unknown.
@@ -142,7 +141,7 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 // after the leader, in the jump popup, create form, confirm or menu and while
 // typing a help filter, and in copy mode.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.InputFocused()
 }
 
 // TerminalFocused tells the shell ctrl+o is the page's: the agent's in the
@@ -154,7 +153,7 @@ func (m Model) TerminalFocused() bool {
 
 // ModalOpen is true while the jump, create, confirm, menu or help popup is open.
 func (m Model) ModalOpen() bool {
-	return m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menuOpen || m.help.IsOpen
+	return m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.IsOpen
 }
 
 func (m Model) OnPageActivated() tea.Cmd {
@@ -220,6 +219,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSessionCreated(msg)
 	case sessionActionMsg:
 		return m.updateSessionAction(msg)
+	case sessionMenuPickMsg:
+		return m.updateMenuPick(msg)
 	case pageActivatedMsg:
 		// The spinner's tick chain died while the tab was hidden. Focus
 		// reports reach only the page on screen, and switching tabs takes
@@ -378,8 +379,8 @@ func (m Model) render() string {
 	if m.create != nil {
 		out = ui.OverlayCenter(out, m.renderCreate(), m.width, m.height)
 	}
-	if m.menuOpen {
-		out = ui.OverlayCenter(out, m.renderMenu(), m.width, m.height)
+	if m.menu.IsOpen {
+		out = ui.OverlayCenter(out, m.menu.View(), m.width, m.height)
 	}
 	if m.confirm.IsOpen {
 		out = ui.OverlayCenter(out, m.confirm.View(m.width), m.width, m.height)
