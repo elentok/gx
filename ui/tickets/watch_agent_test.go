@@ -489,8 +489,8 @@ func TestWatch_HerdrDimReasons(t *testing.T) {
 	t.Run("no server", func(t *testing.T) {
 		fakeHerdrOnlyLog(t)
 		_, ready := requestTicketMenu(t, selectTicketRow(t, loadedModelWithTicket(t)))
-		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != serverNotRunning {
-			t.Errorf("Watch disabled = %q, want %q", got, serverNotRunning)
+		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != noAgentLog {
+			t.Errorf("Watch disabled = %q, want %q", got, noAgentLog)
 		}
 	})
 }

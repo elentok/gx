@@ -396,7 +396,9 @@ component with its current items.
   - log found, agent ended (including a done ticket whose log is kept) → enabled, "not live";
   - `ErrNoAgent` or pruned log → dim "no agent log";
   - `ErrUnsupported` (herdr Codex) → dim "not supported for codex";
-  - herdr agent and no server → dim "server not running".
+  - server set but its iterations read fails → dim "server not running". With no server the
+    Herdr lookup is nil: only the server knows herdr iterations, so a ticket without a native
+    agent dims "no agent log".
 - PTY agents: Watch reads the transcript the Locator returns. The holder-screen snapshot path
   (`holderScreen` seam) is removed from Watch.
 - Herdr: until the herdr Watch ticket lands, Watch on a herdr agent keeps today's jump-to-pane

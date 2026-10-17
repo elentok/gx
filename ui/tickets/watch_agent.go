@@ -48,15 +48,17 @@ var agentLog = func(ctx context.Context, address string, herdr herdrLookup) (age
 	return agentlog.Locator{StateDir: stateDir, Herdr: herdr}.AgentLog(ctx, a)
 }
 
-// errServerDown marks a herdr lookup that had no server to ask.
+// errServerDown marks a herdr lookup whose server didn't answer.
 var errServerDown = errors.New(serverNotRunning)
 
-// serverHerdrLookup looks an address up in the server's iterations read.
+// serverHerdrLookup looks an address up in the server's iterations read. Nil
+// without a server: only the server knows herdr iterations, so herdr isn't in
+// play and an agentless ticket reads as having no agent log.
 func serverHerdrLookup(api ServerAPI) herdrLookup {
+	if api == nil {
+		return nil
+	}
 	return func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error) {
-		if api == nil {
-			return agentlog.HerdrIteration{}, false, errServerDown
-		}
 		list, err := api.Iterations(ctx)
 		if err != nil {
 			return agentlog.HerdrIteration{}, false, fmt.Errorf("%w: %v", errServerDown, err)
@@ -82,8 +84,7 @@ func agentAddress(path, id string) string {
 const notForCodex = "not supported for codex"
 
 // watchReason is why Watch can't open address's agent log, empty when it
-// can, whether the agent still runs or has ended. Without a server a herdr
-// agent can't be told apart from no agent, so the missing server is the reason.
+// can, whether the agent still runs or has ended.
 func watchReason(api ServerAPI, address string) string {
 	log, err := agentLog(context.Background(), address, serverHerdrLookup(api))
 	switch {
