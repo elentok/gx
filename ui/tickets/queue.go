@@ -120,7 +120,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 	queueTree := tree.NewModel[queueNode]()
 	queueTree.SetIsSelectable(func(n queueNode) bool {
 		switch n.kind {
-		case nodeEpicSeparator, nodeEpicStatus, nodeEpicContext, nodeEpicError:
+		case nodeEpicSeparator, nodeEpicContext, nodeEpicError:
 			return false
 		default:
 			return true
@@ -219,6 +219,8 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTicketMenuReady(msg), nil
 	case ticketMenuPickMsg:
 		return m.handleTicketMenuPick(msg)
+	case epicMenuPickMsg:
+		return m.handleQueueEpicMenuPick(msg)
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd

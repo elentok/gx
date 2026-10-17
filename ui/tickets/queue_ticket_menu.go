@@ -3,12 +3,24 @@ package tickets
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 // handleQueueTicketMenuKey applies the "m" keymap: the Tickets tab's ticket
-// Context menu plus the Queue group.
+// Context menu plus the Queue group, or on an epic header the epic menu.
 func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
+	if epic, ok := m.selectedQueueEpic(); ok {
+		m.ticketMenu = openEpicContextMenu(m.ticketMenu, epicMenuInput{
+			epic:         epic,
+			branch:       epic.MergeTarget,
+			queueable:    queueableAddresses(epic, m.checkedPaths()),
+			serverReason: serverReason(m.serverAPI, m.link),
+			onQueue:      true,
+		})
+		return m, nil
+	}
 	r, ok := m.selectedQueueRow()
 	if !ok {
 		return m, notify.Info("select a ticket to see its actions")
@@ -49,6 +61,37 @@ func (m QueueModel) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.
 	}
 	if cmd, ok := ticketMenuEditCopy(msg.action, m.yankQueueTicketSummary, m.yankQueueTicketFilePath, m.cmdEditSelectedFile); ok {
 		return m, cmd
+	}
+	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+}
+
+// selectedQueueEpic is the selected epic header's epic; ok is false off one.
+func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
+	entries := m.queueTree.Entries()
+	idx := m.queueTree.SelectedIndex()
+	if idx < 0 || idx >= len(entries) || entries[idx].Value.kind != nodeEpicStatus {
+		return tickets.Epic{}, false
+	}
+	return entries[idx].Value.epic, true
+}
+
+// handleQueueEpicMenuPick mirrors Model.handleEpicMenuPick; Check all is dim
+// here, so it never arrives.
+func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
+	epic, ok := m.selectedQueueEpic()
+	if !ok || epic.Path != msg.target.address {
+		return m, nil
+	}
+	if msg.status != "" {
+		return m, cmdApplyEpicStatus(m.settings.TicketStore, epic, msg.status)
+	}
+	switch msg.action {
+	case actionQueueEpic:
+		return m, cmdQueueEpic(m.serverAPI, queueableAddresses(epic, m.checkedPaths()))
+	case actionEditEpic:
+		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+	case actionYankEpic:
+		return m, m.yankQueueTicketSummary()
 	}
 	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }

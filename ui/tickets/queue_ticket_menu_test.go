@@ -72,7 +72,7 @@ func groupsOf(items []contextmenu.Item[ticketTarget]) []contextmenu.Group {
 
 func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) {
 	var calls []string
-	m := queueWithTicket(newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), "needs-answer", nil)
+	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), "needs-answer", nil)
 	m, ready := requestQueueMenu(t, m)
 
 	tabs := ticketMenuItems(newTicketMenuInput(m.epics[0], m.epics[0].Tickets[0], false, ""))
@@ -103,7 +103,7 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 
 func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
-	m := queueWithTicket(newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), "needs-repair", muted)
+	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), "needs-repair", muted)
 	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Unmute")
 	cmd()
 	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
@@ -117,6 +117,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	m := newMaintenanceQueue(t, fakeServerAPI{calls: &calls})
 	m.epics[0].Tickets[0].Body = "## Proposed Remedy\n\nrun it"
 	m.clampSelected()
+	m = selectFirstQueueTicketRow(t, m)
 	_, ready := requestQueueMenu(t, m)
 	item := itemByLabel(t, ready.items, label)
 	if item.Group != contextmenu.Queue || item.Key != "A" || item.Disabled != "" {
@@ -131,6 +132,7 @@ func TestQueueTicketMenu_ApproveRecoveryProposal(t *testing.T) {
 	m = newMaintenanceQueue(t, fakeServerAPI{})
 	m.epics[0].Tickets[0].Body = "## Notes\n\nnothing"
 	m.clampSelected()
+	m = selectFirstQueueTicketRow(t, m)
 	_, ready = requestQueueMenu(t, m)
 	if got := itemByLabel(t, ready.items, label).Disabled; got != noProposal {
 		t.Errorf("approve with no proposal disabled = %q, want %q", got, noProposal)
@@ -146,6 +148,7 @@ func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	m.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: "needs-repair", Mutes: muted}}}}
 	m.checked = map[string]bool{path: true}
 	m.clampSelected()
+	m = selectFirstQueueTicketRow(t, m)
 
 	m, ready := requestQueueMenu(t, m)
 	for _, label := range append(orchestrationLabels(), "Approve recovery proposal") {
@@ -183,10 +186,7 @@ func TestQueueTicketMenu_StaleLivenessOpensNothing(t *testing.T) {
 				{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 			}}
 			m, _ := deliverQueue(t, snap, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
-			m.selectFirstRow()
-			for m.selectedQueuePath() == "" {
-				m.queueTree.SetSelectedIndex(m.queueTree.SelectedIndex() + 1)
-			}
+			m = selectFirstQueueTicketRow(t, m)
 			m, ready := requestQueueMenu(t, m)
 			m = stale(m)
 			updated, _ := m.Update(ready)
@@ -208,6 +208,7 @@ func openQueueTranscript(t *testing.T, store, path string) tea.Msg {
 	m.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: "done"}}}}
 	m.checked = map[string]bool{path: true}
 	m.clampSelected()
+	m = selectFirstQueueTicketRow(t, m)
 	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Transcript")
 	if cmd == nil {
 		t.Fatal("Transcript returned no Cmd")

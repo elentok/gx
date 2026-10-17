@@ -194,6 +194,8 @@ func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 		return m, notify.Success(msg.ok), true
 	case serverWriteMsg:
 		return m, msg.toast(), true
+	case epicQueuedMsg:
+		return m, msg.toast(), true
 	case serverRemovedMsg:
 		note := notify.Success(fmt.Sprintf("removed %d ticket(s) from the queue", msg.removed))
 		if msg.problem != "" {

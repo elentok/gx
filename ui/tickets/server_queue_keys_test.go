@@ -25,6 +25,7 @@ func newMaintenanceQueue(t *testing.T, api fakeServerAPI) QueueModel {
 	m.epics = []tickets.Epic{{Name: "gx:alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: "gx:alpha/01", Status: "open"}}}}
 	m.checked = map[string]bool{"gx:alpha/01": true}
 	m.clampSelected()
+	m = selectFirstQueueTicketRow(t, m)
 	return m
 }
 

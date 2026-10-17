@@ -14,10 +14,12 @@ import (
 
 var muted = []schema.MuteRecord{{EventType: "notification-storm"}}
 
-func queueWithTicket(m QueueModel, status string, mutes []schema.MuteRecord) QueueModel {
+func queueWithTicket(t *testing.T, m QueueModel, status string, mutes []schema.MuteRecord) QueueModel {
+	t.Helper()
 	m.epics[0].Tickets[0].Status = status
 	m.epics[0].Tickets[0].Mutes = mutes
 	m.clampSelected()
+	m = selectFirstQueueTicketRow(t, m)
 	return m
 }
 

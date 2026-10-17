@@ -213,7 +213,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
-	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+	m := selectFirstQueueTicketRow(t, loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked)))
 
 	var headerLine, rowLine string
 	for _, line := range m.queueBody(80) {
@@ -230,9 +230,7 @@ func TestQueueModelListRowsIndentMatchesHeaderIndent(t *testing.T) {
 	}
 	headerIndent := len(headerLine) - len(strings.TrimLeft(headerLine, " "))
 	// rowLine's first rune is the selection mark column (a space when
-	// unselected, "▌" when this row holds the cursor — the ticket row is
-	// selected by default now that filler rows are excluded from selection,
-	// see ticket 17), which strings.TrimLeft's space-only trim can't skip past
+	// unselected, "▌" when this row holds the cursor, as it does here), which strings.TrimLeft's space-only trim can't skip past
 	// on its own.
 	rowRunes := []rune(rowLine)
 	rowRest := string(rowRunes[1:])

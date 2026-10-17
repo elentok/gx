@@ -28,6 +28,7 @@ const (
 	ticketsNotDone  = "tickets not done"
 	alreadyMerged   = "already merged"
 	nothingToQueue  = "nothing to queue"
+	ticketsTabOnly  = "on the Tickets tab"
 	actionCheckAll  = "check-all"
 	actionQueueEpic = "queue-epic"
 	actionEditEpic  = "edit-epic"
@@ -45,6 +46,8 @@ type epicMenuInput struct {
 	queueable    []string
 	serverReason string
 	archived     bool
+	// onQueue dims Check all: the checked set lives on the Tickets tab.
+	onQueue bool
 }
 
 // epicMenuItems lists every action for an epic, in the shape of
@@ -90,7 +93,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	items = append(items,
 		pick("Add epic to queue", "", actionQueueEpic, contextmenu.Queue,
 			firstReason(in.serverReason, reasonIf(len(in.queueable) == 0, nothingToQueue))),
-		pick("Check all", "", actionCheckAll, contextmenu.Queue, ""),
+		pick("Check all", "", actionCheckAll, contextmenu.Queue, reasonIf(in.onQueue, ticketsTabOnly)),
 		pick("Edit ticket.md", "e e", actionEditEpic, contextmenu.EditCopy, ""),
 		pick("Yank", "y y", actionYankEpic, contextmenu.EditCopy, ""))
 
@@ -107,18 +110,21 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 // openEpicMenu opens the Context menu on epic. Nothing in it needs liveness,
 // so it opens at once.
 func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
-	in := epicMenuInput{
+	m.ticketMenu = openEpicContextMenu(m.ticketMenu, epicMenuInput{
 		epic:         epic,
 		branch:       epic.MergeTarget,
-		queueable:    m.queueableAddresses(epic),
+		queueable:    queueableAddresses(epic, m.vm.Queue),
 		serverReason: serverReason(m.serverAPI, m.link),
 		archived:     archived,
-	}
+	})
+	return m
+}
+
+func openEpicContextMenu(menu contextmenu.Menu[ticketTarget], in epicMenuInput) contextmenu.Menu[ticketTarget] {
 	// In server mode Name is the "project:epic" address the merge and start
 	// session want; Path is what the selection is matched against.
-	target := ticketTarget{address: epic.Path, epicName: epic.Name}
-	m.ticketMenu = m.ticketMenu.Open(target, fmt.Sprintf("Epic %q", epic.Name), epicMenuItems(in))
-	return m
+	target := ticketTarget{address: in.epic.Path, epicName: in.epic.Name}
+	return menu.Open(target, fmt.Sprintf("Epic %q", in.epic.Name), epicMenuItems(in))
 }
 
 // selectedEpic is the selected epic row's epic; ok is false off an epic row.
@@ -150,7 +156,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 		m.setPathsChecked(paths, true)
 		return m, nil
 	case actionQueueEpic:
-		return m, cmdQueueEpic(m.serverAPI, m.queueableAddresses(epic))
+		return m, cmdQueueEpic(m.serverAPI, queueableAddresses(epic, m.vm.Queue))
 	case actionEditEpic:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case actionYankEpic:
@@ -162,11 +168,11 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 // queueableAddresses is every open, not-yet-queued ticket of epic in ticket
 // order. It goes by the frontmatter status, not the rendered one, so blocked
 // tickets are sent and the server decides on them.
-func (m Model) queueableAddresses(epic tickets.Epic) []string {
+func queueableAddresses(epic tickets.Epic, queue []string) []string {
 	var addrs []string
 	for _, t := range epic.Tickets {
 		open := schema.Status(strings.ToLower(strings.TrimSpace(t.Status))) == schema.StatusOpen
-		if open && !slices.Contains(m.vm.Queue, t.Path) {
+		if open && !slices.Contains(queue, t.Path) {
 			addrs = append(addrs, t.Path)
 		}
 	}

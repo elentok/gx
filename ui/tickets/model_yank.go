@@ -54,9 +54,14 @@ func (m Model) yankTicketFilePath() tea.Cmd {
 }
 
 // yankQueueTicketSummary is the Queue tab's counterpart to
-// Model.yankTicketSummary ("yy") — every queue row already carries its own
-// ticket (queueRow), so there's no epic-row case to guard against.
+// Model.yankTicketSummary ("yy").
 func (m QueueModel) yankQueueTicketSummary() tea.Cmd {
+	if epic, ok := m.selectedQueueEpic(); ok {
+		if err := ticketsClipboardWrite(epic.Name); err != nil {
+			return notify.Error("clipboard copy failed: " + err.Error())
+		}
+		return notify.Info("yanked epic")
+	}
 	r, ok := m.selectedQueueRow()
 	if !ok {
 		return notify.Warning("no ticket selected")

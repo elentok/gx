@@ -20,8 +20,8 @@ const (
 )
 
 // cmdEditSelectedFile opens the selected row's ticket file for editing,
-// mirroring the Tickets tab's Model.cmdEditSelectedFile — the Queue tab only
-// ever selects tickets (no epic rows), so there's no epic ticket.md case to handle.
+// mirroring the Tickets tab's Model.cmdEditSelectedFile; an epic header opens
+// its ticket.md.
 func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	file, ok := m.selectedEditTarget()
 	if !ok {
@@ -32,6 +32,10 @@ func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd
 
 // selectedEditTarget is the file the selected row's address resolves to.
 func (m QueueModel) selectedEditTarget() (file string, ok bool) {
+	if epic, ok := m.selectedQueueEpic(); ok {
+		file, err := epicFile(m.settings.TicketStore, epic)
+		return file, err == nil
+	}
 	row, ok := m.selectedQueueRow()
 	if !ok {
 		return "", false
