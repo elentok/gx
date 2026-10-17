@@ -168,9 +168,13 @@ func (m Model) sidebarSessionAt(x, y int) (int, bool) {
 
 func (m Model) renderSidebar() string {
 	visible := m.visibleRows()
+	hovered, hovering := m.hoveredSession()
 	lines := make([]string, len(visible))
 	for i, r := range visible {
 		lines[i] = r.text
+		if hovering && r.session == hovered && hovered != m.cursor {
+			lines[i] = ui.RenderRowHover(r.text)
+		}
 	}
 	active := !m.terminalFocused
 	titleColor, headerBg := headerColors(active)

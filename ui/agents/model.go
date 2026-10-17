@@ -95,6 +95,9 @@ type Model struct {
 	termProgram string
 	// reporter is nil without a client.
 	reporter *focusReporter
+	// hoverAt is the last mouse position; its zero value is on the panel
+	// header, so no row is hovered.
+	hoverAt tea.Mouse
 }
 
 // NewModel builds the tab; a nil client means there is no server to reach.
@@ -174,9 +177,11 @@ func (m Model) Init() tea.Cmd { return nil }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.update(msg)
-	next.(Model).reportFocus()
-	next.(Model).syncAttachSize()
-	return next, cmd
+	nm := next.(Model)
+	nm.refreshHover()
+	nm.reportFocus()
+	nm.syncAttachSize()
+	return nm, cmd
 }
 
 func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -249,6 +254,9 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateWheel(msg)
 	case tea.MouseClickMsg:
 		return m.updateClick(msg)
+	case tea.MouseMotionMsg:
+		m.hoverAt = msg.Mouse()
+		return m, nil
 	}
 	return m, nil
 }
@@ -356,7 +364,10 @@ func (m Model) selectedID() string {
 func (m Model) View() tea.View {
 	// The mouse mode also keeps the wheel from reaching the agent as arrow
 	// keys, as a terminal sends it to a program in the alternate screen.
+	// All-motion is safe with an agent that reports the mouse: gx forwards it
+	// only the wheel (see updateWheel), which every mode reports.
 	v := ui.NewMainView(m.render())
+	v.MouseMode = tea.MouseModeAllMotion
 	v.Cursor = m.terminalCursor()
 	return v
 }

@@ -31,11 +31,12 @@ func withHoverStub(m Model) (Model, *hoverStub) {
 	return m, stub
 }
 
-func TestViewUsesAllMotionOnTicketsAndQueueOnly(t *testing.T) {
+func TestViewUsesAllMotionOnHoverTabsOnly(t *testing.T) {
 	t.Parallel()
 	for tab, want := range map[nav.TabID]tea.MouseMode{
 		nav.TabTickets:   tea.MouseModeAllMotion,
 		nav.TabQueue:     tea.MouseModeAllMotion,
+		nav.TabAgents:    tea.MouseModeAllMotion,
 		nav.TabWorktrees: tea.MouseModeCellMotion,
 		nav.TabStatus:    tea.MouseModeCellMotion,
 	} {
