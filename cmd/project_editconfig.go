@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -101,7 +102,7 @@ func runProjectEditConfig(d deps, name string) error {
 			keepTmp = true
 			return fmt.Errorf("project.json changed while you were editing; your edits are in %s", tmpPath)
 		}
-		if err := writeFileAtomic(livePath, edited); err != nil {
+		if err := fsutil.WriteFileAtomic(livePath, edited); err != nil {
 			return err
 		}
 		fmt.Fprintf(d.stdout, "saved %s\n", livePath)
@@ -215,29 +216,4 @@ func askEditAgain(in *bufio.Reader, out io.Writer) bool {
 		return true
 	}
 	return false
-}
-
-func writeFileAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmp.Name())
-		return err
-	}
-	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
-		os.Remove(tmp.Name())
-		return err
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		os.Remove(tmp.Name())
-		return err
-	}
-	return nil
 }

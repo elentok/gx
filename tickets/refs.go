@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -81,7 +82,7 @@ func RewriteRefsInFile(path string, fn func(ref string) string) (bool, error) {
 	if !changed {
 		return false, nil
 	}
-	return true, writeFileAtomic(path, []byte(next))
+	return true, fsutil.WriteFileAtomic(path, []byte(next))
 }
 
 // ValidateRefs is ValidateProject's cross-ticket half, run on epics already in

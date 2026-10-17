@@ -201,9 +201,8 @@ func acquireNotificationStateLock(path string) (*os.File, bool, error) {
 }
 
 // writeNotificationStateAtomically replaces path's content via a
-// same-directory temp file plus rename, matching tickets/schema/write.go's
-// writeFileAtomic so a concurrent reader never observes a torn/truncated
-// write.
+// same-directory temp file plus rename, matching fsutil.WriteFileAtomic so a
+// concurrent reader never observes a torn/truncated write.
 func writeNotificationStateAtomically(path string, state NotificationState) error {
 	b, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {

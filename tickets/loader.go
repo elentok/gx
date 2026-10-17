@@ -12,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -373,7 +374,7 @@ func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) err
 	if err != nil {
 		return fmt.Errorf("marshaling %s: %w", ticketPath, err)
 	}
-	return writeFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
+	return fsutil.WriteFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
 }
 
 func hasMappingKey(mapping *yaml.Node, key string) bool {
@@ -441,7 +442,7 @@ func stampTicketMDTiming(path, raw string, mutate func(*epicTiming) bool) error 
 	if err != nil {
 		return fmt.Errorf("marshaling %s: %w", path, err)
 	}
-	return writeFileAtomic(path, []byte("---\n"+string(out)+"---\n"+body))
+	return fsutil.WriteFileAtomic(path, []byte("---\n"+string(out)+"---\n"+body))
 }
 
 // setMappingTime sets key to t in mapping, appending the key when absent.
@@ -455,39 +456,6 @@ func setMappingTime(mapping *yaml.Node, key string, t time.Time) {
 		}
 	}
 	mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
-}
-
-// writeFileAtomic replaces path's content via a same-directory temp file
-// plus rename, so a concurrent reader never observes a torn/truncated write.
-// Duplicated from ralphloop's/schema's writeFileAtomic (a ~15-line helper)
-// rather than exported cross-package, per
-// .scratch/ralph-tickets-visibility/issues/02-tickets-set-cli.md's Answer.
-// Shared within this package by both ticket.md timing writes and
-// tickets/migrate.go's ticket-file rewrites.
-func writeFileAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Chmod(tmpPath, 0644); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return nil
 }
 
 // idsToStrings lowers schema.TicketIDs to plain strings for tickets.Ticket's

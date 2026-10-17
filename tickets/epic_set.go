@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -121,7 +122,7 @@ func editEpicTicketMD(ticketPath string, edit func(mapping *yaml.Node, body *str
 	if err != nil {
 		return fmt.Errorf("marshaling %s: %w", ticketPath, err)
 	}
-	return writeFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
+	return fsutil.WriteFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
 }
 
 // setMappingValue overwrites key's value in mapping, appending the key when

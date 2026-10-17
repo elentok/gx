@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -153,7 +154,7 @@ func writeMigration(files []migratedTicketFile) (MigrationResult, error) {
 		if err != nil {
 			return MigrationResult{}, fmt.Errorf("marshaling %s: %w", f.path, err)
 		}
-		if err := writeFileAtomic(f.path, out); err != nil {
+		if err := fsutil.WriteFileAtomic(f.path, out); err != nil {
 			return MigrationResult{}, fmt.Errorf("writing %s: %w", f.path, err)
 		}
 		result.Changes = append(result.Changes, MigrationChange{Path: f.path, Notes: f.notes})

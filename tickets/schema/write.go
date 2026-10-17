@@ -2,7 +2,8 @@ package schema
 
 import (
 	"os"
-	"path/filepath"
+
+	"github.com/elentok/gx/fsutil"
 )
 
 // UpdateTicket reads path's frontmatter ticket, applies mutate to it,
@@ -47,7 +48,7 @@ func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, out)
+	return fsutil.WriteFileAtomic(path, out)
 }
 
 // ClearIterationStatus removes path's iteration_status, leaving Status and
@@ -57,35 +58,4 @@ func ClearIterationStatus(path string) error {
 	return UpdateTicket(path, func(t *Ticket) {
 		t.IterationStatus = ""
 	})
-}
-
-// writeFileAtomic replaces path's content via a same-directory temp file
-// plus rename, so a concurrent reader never observes a torn/truncated write
-// from an in-place os.WriteFile. Duplicated from ralphloop's writeFileAtomic
-// (a ~15-line helper) rather than exported cross-package, per
-// .scratch/ralph-tickets-visibility/issues/02-tickets-set-cli.md's Answer.
-func writeFileAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Chmod(tmpPath, 0644); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return nil
 }

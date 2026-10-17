@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -277,14 +278,14 @@ func WriteProjectFile(projectDir string, pf config.ProjectFile) error {
 	if err := os.MkdirAll(projectDir, 0o755); err != nil {
 		return err
 	}
-	return writeFileAtomic(filepath.Join(projectDir, config.ProjectFileName), append(data, '\n'))
+	return fsutil.WriteFileAtomic(filepath.Join(projectDir, config.ProjectFileName), append(data, '\n'))
 }
 
 func writeStoreFile(f storeFile, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	if err := writeFileAtomic(dst, f.data); err != nil {
+	if err := fsutil.WriteFileAtomic(dst, f.data); err != nil {
 		return fmt.Errorf("copying %s: %w", f.src, err)
 	}
 	return nil
