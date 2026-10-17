@@ -323,6 +323,21 @@ func TestCodeReviewDefinesDeferred(t *testing.T) {
 	}
 }
 
+// TestCodeReviewReadsQualitySkillsByPath pins that quality subagents Read the
+// configured skill's SKILL.md: the default one sets disable-model-invocation,
+// so the Skill tool never lists it and the axis silently degraded.
+func TestCodeReviewReadsQualitySkillsByPath(t *testing.T) {
+	raw := readFile(t, "gx-code-review/SKILL.md")
+	if strings.Contains(raw, "Skill(skill:") {
+		t.Error("gx-code-review must not tell subagents to invoke review skills via the Skill tool")
+	}
+	for _, want := range []string{"`skills/<name>/SKILL.md`", "`~/.claude/skills/<name>/SKILL.md`", "--iteration-status needs-answer"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("gx-code-review must name %s", want)
+		}
+	}
+}
+
 // TestFollowUpAddHasOneRoute pins gx-follow-up as the only skill that files a
 // follow-up: any other caller naming the verb would skip its dedupe.
 func TestFollowUpAddHasOneRoute(t *testing.T) {
