@@ -92,6 +92,33 @@ func TestCopyMode_Moves(t *testing.T) {
 	}
 }
 
+func TestCopyMode_LinesStayPutWhileTheScrollbackTrims(t *testing.T) {
+	tests := []struct {
+		name string
+		keys string
+		want nativerunner.LinePos
+	}{
+		{"the cursor stays on its line", "j", nativerunner.LinePos{Line: 102}},
+		{"g g goes to the oldest retained line", "gg", nativerunner.LinePos{Line: 3}},
+		{"G goes to the last line", "G", nativerunner.LinePos{Line: 113}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m, fa, next := copyModel(t, 0, 100)
+			fr := nativerunner.Frame{ScrollMax: 100, ScrollBase: 3, Full: true}
+			for i, r := range copyRowsText {
+				fr.Rows = append(fr.Rows, nativerunner.FrameRow{Index: i, ANSI: r})
+			}
+			fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: fr}
+			m, _ = read(t, m, next)
+			m = pressKeys(t, m, letters(tt.keys)...)
+			if m.copy.cursor != tt.want {
+				t.Fatalf("cursor = %+v, want %+v", m.copy.cursor, tt.want)
+			}
+		})
+	}
+}
+
 func TestCopyMode_CursorPastTheViewScrollsIt(t *testing.T) {
 	m, fa, _ := copyModel(t, 0, 100)
 	m = pressKeys(t, m, letters("kk")...)

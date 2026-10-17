@@ -322,7 +322,7 @@ func (f *frameHub) takeFrameLocked(c *attachClient) Frame {
 		frame = f.fullFrameLocked(c)
 	} else {
 		frame = c.frame(f.cursor, f.scr.StyledRows(), slices.Sorted(maps.Keys(c.rows)))
-		frame.ScrollMax = f.scr.ScrollbackLen()
+		frame.ScrollBase, frame.ScrollMax = f.scr.ScrollbackSpan()
 	}
 	frame.Mouse = f.mouse
 	clear(c.rows)
@@ -342,7 +342,7 @@ func (f *frameHub) fullFrameLocked(c *attachClient) Frame {
 			n = c.height
 		}
 		frame = c.frame(f.cursor, rows, allIndexes(n))
-		frame.ScrollMax = f.scr.ScrollbackLen()
+		frame.ScrollBase, frame.ScrollMax = f.scr.ScrollbackSpan()
 	}
 	frame.Full = true
 	frame.Mouse = f.mouse
@@ -353,12 +353,13 @@ func (f *frameHub) fullFrameLocked(c *attachClient) Frame {
 // offset, which the scrollback shrinking may lower.
 func (f *frameHub) scrolledFrameLocked(c *attachClient) Frame {
 	n := f.viewHeightLocked(c)
-	rows, scrollMax := f.scr.StyledView(c.offset, n)
+	rows, trimmed, scrollMax := f.scr.StyledView(c.offset, n)
 	c.offset = min(c.offset, scrollMax)
 	frame := c.frame(f.cursor, rows, allIndexes(n))
 	frame.Cursor.Visible = false
 	frame.ScrollOffset = c.offset
 	frame.ScrollMax = scrollMax
+	frame.ScrollBase = trimmed
 	frame.NewLines = c.newLines
 	return frame
 }

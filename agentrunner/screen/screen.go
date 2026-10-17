@@ -70,6 +70,10 @@ type Screen struct {
 	allDirty bool
 	// pushed counts the lines ever pushed to the main screen's scrollback.
 	pushed int
+	// trimmed counts the lines trimmed off the scrollback's top, so a line
+	// number counts from the oldest line ever pushed and keeps naming the same
+	// line while the scrollback trims.
+	trimmed int
 	// mouse is the mouse reporting modes the child turned on.
 	mouse map[ansi.Mode]bool
 	st    stFilter
@@ -131,6 +135,7 @@ func (s *Screen) Write(p []byte) (int, error) {
 
 func (s *Screen) trimScrollback() {
 	if sb := s.emu.Scrollback(); sb.Len() > scrollbackLines {
+		s.trimmed += sb.Len() - scrollbackLines
 		sb.SetMaxLines(scrollbackLines)
 		sb.SetMaxLines(scrollbackLines + scrollbackSlack)
 	}
@@ -153,14 +158,23 @@ func (s *Screen) Pushed() int {
 	return s.pushed
 }
 
+// ScrollbackSpan returns how many lines were trimmed off the scrollback's top
+// and how many it holds, read together.
+func (s *Screen) ScrollbackSpan() (trimmed, n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.trimmed, s.emu.ScrollbackLen()
+}
+
 // StyledView returns n styled rows of the scrollback followed by the screen,
 // starting offset lines above the screen's top, with "" past the end.
-// offset is clamped to scrollMax, the scrollback's length.
-func (s *Screen) StyledView(offset, n int) (rows []string, scrollMax int) {
+// offset is clamped to scrollMax, the scrollback's length; trimmed is as in
+// ScrollbackSpan.
+func (s *Screen) StyledView(offset, n int) (rows []string, trimmed, scrollMax int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sb := s.emu.Scrollback()
-	scrollMax = sb.Len()
+	trimmed, scrollMax = s.trimmed, sb.Len()
 	scr := strings.Split(s.emu.Render(), "\n")
 	top := scrollMax - min(offset, scrollMax)
 	rows = make([]string, n)
@@ -172,19 +186,28 @@ func (s *Screen) StyledView(offset, n int) (rows []string, scrollMax int) {
 			rows[i] = scr[l-scrollMax]
 		}
 	}
-	return rows, scrollMax
+	return rows, trimmed, scrollMax
 }
 
 // Text returns the plain text from column startCol of line startLine up to,
 // not including, column endCol of line endLine, each line's trailing spaces
-// trimmed. Lines count from the oldest scrollback line, the screen's rows
-// following the scrollback's.
+// trimmed. Lines count from the oldest line ever pushed to the scrollback,
+// trimmed ones included, the screen's rows following the scrollback's. A
+// trimmed position is clamped to the oldest retained line's start.
 func (s *Screen) Text(startLine, startCol, endLine, endCol int) string {
 	if startLine > endLine || (startLine == endLine && startCol > endCol) {
 		startLine, startCol, endLine, endCol = endLine, endCol, startLine, startCol
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	startLine -= s.trimmed
+	endLine -= s.trimmed
+	if startLine < 0 {
+		startLine, startCol = 0, 0
+	}
+	if endLine < 0 {
+		endLine, endCol = 0, 0
+	}
 	sb := s.emu.Scrollback()
 	n := sb.Len()
 	scr := strings.Split(s.emu.String(), "\n")

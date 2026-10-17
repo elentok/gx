@@ -122,10 +122,12 @@ type Frame struct {
 	// drops any rows it kept past them.
 	Full bool `json:"full,omitempty"`
 	// ScrollOffset is how many lines above the screen's top the view starts;
-	// ScrollMax, the scrollback's length, is the most it can be. Row i shows
-	// line ScrollMax-ScrollOffset+i, the line a LinePos names.
+	// ScrollMax, the scrollback's length, is the most it can be. ScrollBase
+	// counts the lines trimmed off the scrollback's top. Row i shows line
+	// ScrollBase+ScrollMax-ScrollOffset+i, the line a LinePos names.
 	ScrollOffset int `json:"scroll_offset"`
 	ScrollMax    int `json:"scroll_max"`
+	ScrollBase   int `json:"scroll_base,omitempty"`
 	// NewLines counts the lines output since the attach scrolled up.
 	NewLines int `json:"new_lines,omitempty"`
 	// Mouse is whether the child reports the mouse, so the wheel belongs to
@@ -187,8 +189,9 @@ type AttachCopy struct {
 	End   LinePos `json:"end"`
 }
 
-// LinePos is a cell, its line counted from the oldest scrollback line, the
-// screen's rows following the scrollback's.
+// LinePos is a cell, its line counted from the oldest line ever pushed to the
+// scrollback, trimmed ones included, the screen's rows following the
+// scrollback's.
 type LinePos struct {
 	Line int `json:"line"`
 	Col  int `json:"col"`

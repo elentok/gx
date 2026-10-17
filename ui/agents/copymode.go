@@ -20,8 +20,9 @@ var (
 )
 
 // copyMode is keyboard copy mode over the attach's frames. Positions are
-// nativerunner.LinePos: lines count from the oldest scrollback line, so they
-// stay put while the view scrolls.
+// nativerunner.LinePos: lines count from the oldest line ever pushed to the
+// scrollback, so they stay put while the view scrolls and the scrollback
+// trims.
 type copyMode struct {
 	// a is the attach copy mode was entered on; another attach ends it.
 	a      *attachment
@@ -56,7 +57,8 @@ func (m Model) enterCopyMode() (tea.Model, tea.Cmd) {
 // copyView is the view's top line and its height in rows.
 func (m Model) copyView() (top, height int) {
 	_, height = m.screenSize()
-	return m.attach.scrollMax - m.attach.offset, height
+	a := m.attach
+	return a.scrollBase + a.scrollMax - a.offset, height
 }
 
 // copyLineText is the plain text of a line in view, "" for one out of view.
@@ -79,15 +81,15 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		c.pendingG = false
 		if k == "g" && c.a.mouse {
 			// The child's history has no known top to wheel to.
-			c.cursor = nativerunner.LinePos{Line: c.a.scrollMax - c.a.offset}
+			c.cursor = nativerunner.LinePos{Line: c.a.scrollBase + c.a.scrollMax - c.a.offset}
 		} else if k == "g" {
-			c.cursor = nativerunner.LinePos{}
+			c.cursor = nativerunner.LinePos{Line: c.a.scrollBase}
 			m.scrollToCopyCursor()
 		}
 		return m, nil
 	}
 	top, h := m.copyView()
-	last := c.a.scrollMax + h - 1
+	last := c.a.scrollBase + c.a.scrollMax + h - 1
 	switch k {
 	case "h", "left":
 		c.cursor.Col = max(c.cursor.Col-1, 0)
@@ -146,7 +148,7 @@ func (m Model) updateCopyKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.wheelToCopyCursor()
 		return m, nil
 	}
-	c.cursor.Line = max(0, min(c.cursor.Line, last))
+	c.cursor.Line = max(c.a.scrollBase, min(c.cursor.Line, last))
 	m.scrollToCopyCursor()
 	return m, nil
 }
@@ -191,9 +193,9 @@ func (m Model) scrollToCopyCursor() {
 	top, h := m.copyView()
 	offset := a.offset
 	if line < top {
-		offset = a.scrollMax - line
+		offset = a.scrollBase + a.scrollMax - line
 	} else if line >= top+h {
-		offset = a.scrollMax - (line - h + 1)
+		offset = a.scrollBase + a.scrollMax - (line - h + 1)
 	}
 	if offset = max(0, min(offset, a.scrollMax)); offset != a.offset {
 		a.scroll(offset)

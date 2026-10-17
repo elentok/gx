@@ -250,6 +250,35 @@ func TestScreen_ScrollbackCappedAt10000(t *testing.T) {
 	}
 }
 
+func TestScreen_TextLinesStayPutWhileTheScrollbackTrims(t *testing.T) {
+	s := screen.NewScreen(10, 2)
+	t.Cleanup(func() { _ = s.Close() })
+	write := func(from, to int) {
+		var b strings.Builder
+		for i := from; i < to; i++ {
+			fmt.Fprintf(&b, "%d\r\n", i)
+		}
+		_, _ = s.Write([]byte(b.String()))
+	}
+	write(0, 10_100)
+	if trimmed, n := s.ScrollbackSpan(); trimmed != 99 || n != 10_000 {
+		t.Fatalf("ScrollbackSpan() = %d, %d, want 99, 10000", trimmed, n)
+	}
+	if _, trimmed, _ := s.StyledView(0, 1); trimmed != 99 {
+		t.Errorf("StyledView trimmed = %d, want 99", trimmed)
+	}
+	if got, want := s.Text(5000, 0, 5001, 4), "5000\n5001"; got != want {
+		t.Errorf("Text(5000 → 5001) = %q, want %q", got, want)
+	}
+	write(10_100, 10_150)
+	if got, want := s.Text(5000, 0, 5001, 4), "5000\n5001"; got != want {
+		t.Errorf("Text(5000 → 5001) after more output = %q, want %q", got, want)
+	}
+	if got, want := s.Text(10, 1, 150, 3), "149\n150"; got != want {
+		t.Errorf("Text from a trimmed line = %q, want %q, clamped to the oldest retained line", got, want)
+	}
+}
+
 func TestScreen_StyledViewAndTextSpanScrollbackAndScreen(t *testing.T) {
 	s := screen.NewScreen(20, 3)
 	t.Cleanup(func() { _ = s.Close() })
@@ -257,7 +286,7 @@ func TestScreen_StyledViewAndTextSpanScrollbackAndScreen(t *testing.T) {
 		_, _ = fmt.Fprintf(s, "L%d   x\r\n", i)
 	}
 	// Scrollback L0-L3, screen L4, L5 and an empty row.
-	rows, scrollMax := s.StyledView(2, 4)
+	rows, _, scrollMax := s.StyledView(2, 4)
 	if scrollMax != 4 {
 		t.Fatalf("scrollMax = %d, want 4", scrollMax)
 	}
@@ -268,7 +297,7 @@ func TestScreen_StyledViewAndTextSpanScrollbackAndScreen(t *testing.T) {
 	if want := []string{"L2   x", "L3   x", "L4   x", "L5   x"}; !slices.Equal(plain, want) {
 		t.Errorf("StyledView(2, 4) = %q, want %q", plain, want)
 	}
-	if rows, _ := s.StyledView(99, 1); ansi.Strip(rows[0]) != "L0   x" {
+	if rows, _, _ := s.StyledView(99, 1); ansi.Strip(rows[0]) != "L0   x" {
 		t.Errorf("StyledView(99, 1) = %q, want the offset clamped to the oldest line", rows)
 	}
 
