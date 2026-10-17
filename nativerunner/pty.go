@@ -411,10 +411,15 @@ func (p *Pty) markDied(ss *ptySession, err error) {
 }
 
 // died maps a failed holder call to ErrSessionDied: claude's exit code when
-// the holder saved one, so claude exited, else the holder failure itself.
+// the holder reported or saved one, so claude exited, else the holder failure
+// itself.
 func (p *Pty) died(ss *ptySession, err error) error {
 	if err == nil {
 		return nil
+	}
+	var exited *ClaudeExitedError
+	if errors.As(err, &exited) {
+		return agentrunner.SessionDied(exited.Error())
 	}
 	code, rerr := os.ReadFile(filepath.Join(p.Root, ss.session.Label, ExitCodeFile))
 	if rerr == nil {

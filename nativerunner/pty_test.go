@@ -329,6 +329,16 @@ func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
 	}
 }
 
+// The holder's status reports the exit while it drains, before exit-code is
+// on disk.
+func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
+	p := &nativerunner.Pty{Root: t.TempDir()}
+	err := nativerunner.Died(p, "e-01", fmt.Errorf("wait: %w", &nativerunner.ClaudeExitedError{Code: 3}))
+	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.HasSuffix(err.Error(), ": claude exited (code 3)") || strings.Contains(err.Error(), "holder failed") {
+		t.Fatalf("died = %v; want session died: claude exited (code 3)", err)
+	}
+}
+
 func TestPty_HolderCrashIsSessionDied(t *testing.T) {
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})

@@ -77,7 +77,16 @@ type holderResponse struct {
 	// Claude is nil until claude's pid status file first appears.
 	Claude *PidStatus `json:"claude,omitempty"`
 	Turn   int        `json:"turn,omitempty"`
+	// Exited is claude's exit code, reported by status once claude exits.
+	Exited *int `json:"exited,omitempty"`
 }
+
+// ClaudeExitedError is status's error once claude has exited. The holder
+// writes exit-code only after its drain, so this is how a caller tells a
+// normal exit from a holder failure until then.
+type ClaudeExitedError struct{ Code int }
+
+func (e *ClaudeExitedError) Error() string { return fmt.Sprintf("claude exited (code %d)", e.Code) }
 
 // holderServer answers holder.sock requests for one child.
 type holderServer struct {
@@ -94,7 +103,7 @@ type holderServer struct {
 	// changes wakes the watch streams when what they send may have changed:
 	// on the watcher's own changes and on output, which drives the rest.
 	changes signalHub
-	ops    []string
+	ops     []string
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
 	exitCode int
@@ -157,7 +166,9 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		// answering while it drains, so an exit must not read as idle.
 		select {
 		case <-h.exited:
-			return holderResponse{Error: fmt.Sprintf("claude exited (code %d)", h.exitCode)}, nil
+			// Error too, so an older client still fails the call.
+			exited := &ClaudeExitedError{Code: h.exitCode}
+			return holderResponse{Error: exited.Error(), Exited: &exited.Code}, nil
 		default:
 		}
 		if h.pid == nil {
@@ -369,6 +380,9 @@ func (c *HolderClient) Supports(op string) bool { return slices.Contains(c.ops, 
 // appears, and the number of status changes the holder has seen.
 func (c *HolderClient) Status() (*PidStatus, int, error) {
 	resp, err := c.call(holderRequest{Op: opStatus})
+	if resp.Exited != nil {
+		return nil, 0, &ClaudeExitedError{Code: *resp.Exited}
+	}
 	return resp.Claude, resp.Turn, err
 }
 

@@ -5,8 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 )
+
+// Died maps err from a holder call for the session label, as Pty does.
+func Died(p *Pty, label string, err error) error {
+	return p.died(&ptySession{session: agentrunner.Session{Label: label}}, err)
+}
 
 // RunTestHolder runs a holder with h as its harness.
 func RunTestHolder(dir string, h harness.Harness, argv []string) error {

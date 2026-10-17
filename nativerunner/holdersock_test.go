@@ -1,6 +1,7 @@
 package nativerunner_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -167,8 +168,9 @@ func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
 		}
 		return err != nil
 	})
-	if !strings.Contains(err.Error(), "claude exited (code 3)") {
-		t.Errorf("status error = %v; want claude exited (code 3)", err)
+	var exited *nativerunner.ClaudeExitedError
+	if !errors.As(err, &exited) || exited.Code != 3 {
+		t.Errorf("status error = %v; want ClaudeExitedError with code 3", err)
 	}
 }
 
