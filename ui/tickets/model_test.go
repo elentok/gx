@@ -661,11 +661,57 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 		t.Fatalf("expected click on the preview panel to leave selection at entry 1, got %d", m.sidebarTree.SelectedIndex())
 	}
 
-	// A non-left click must not move the selection either.
-	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: line + 1})
+}
+
+// TestModel_RightClickOpensContextMenu covers ticket 12: a right click on a
+// ticket or epic row selects it and opens the menu "m" opens; on the preview
+// panel, a blank area or a group header it does nothing.
+func TestModel_RightClickOpensContextMenu(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-second-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
-	if m.sidebarTree.SelectedIndex() != 1 {
-		t.Fatalf("expected non-left click to leave selection at entry 1, got %d", m.sidebarTree.SelectedIndex())
+
+	// Entry 0 is the "Open epics" header, 1 the epic, 2/3 its tickets.
+	lineOf := func(idx int) int {
+		m.sidebarTree.SetSelectedIndex(idx)
+		return selectedSidebarLine(t, m)
+	}
+	headerLine, epicLine, ticketLine := lineOf(0), lineOf(1), lineOf(3)
+	m.sidebarTree.SetSelectedIndex(2)
+
+	sidebarW, _ := m.splitWidth()
+	for name, click := range map[string]tea.MouseClickMsg{
+		"preview": {Button: tea.MouseRight, X: sidebarW, Y: ticketLine + 1},
+		"blank":   {Button: tea.MouseRight, X: 0, Y: 38},
+		"header":  {Button: tea.MouseRight, X: 0, Y: headerLine + 1},
+	} {
+		updated, cmd := m.Update(click)
+		got := updated.(Model)
+		if got.sidebarTree.SelectedIndex() != 2 || got.ticketMenu.IsOpen || got.ticketMenuPending != "" || cmd != nil {
+			t.Errorf("%s: expected a right click to do nothing, got selection=%d menuOpen=%v pending=%q cmd=%v",
+				name, got.sidebarTree.SelectedIndex(), got.ticketMenu.IsOpen, got.ticketMenuPending, cmd != nil)
+		}
+	}
+
+	updated, cmd := m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: ticketLine + 1})
+	m = updated.(Model)
+	if m.sidebarTree.SelectedIndex() != 3 {
+		t.Fatalf("expected right click to select entry 3, got %d", m.sidebarTree.SelectedIndex())
+	}
+	if want := ticketPath(root, "my-epic", "02-second-ticket.md"); m.ticketMenuPending != want || cmd == nil {
+		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.ticketMenuPending, cmd != nil)
+	}
+
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, X: 0, Y: epicLine + 1})
+	m = updated.(Model)
+	if m.sidebarTree.SelectedIndex() != 1 || !m.ticketMenu.IsOpen || !strings.Contains(m.ticketMenu.View(), "Add epic to queue") {
+		t.Fatalf("expected the epic menu open on entry 1, got selection=%d view:\n%s", m.sidebarTree.SelectedIndex(), m.ticketMenu.View())
 	}
 }
 

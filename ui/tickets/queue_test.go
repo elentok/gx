@@ -1258,18 +1258,67 @@ func TestQueueModelMouseClickSelectsRowOnly(t *testing.T) {
 		t.Fatalf("expected click-to-select to not open the confirm modal")
 	}
 
-	// A non-left click must not move the selection.
-	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(ticketRows[0])})
-	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != ticketRows[2] {
-		t.Fatalf("expected non-left click to leave selection at row %d, got %d", ticketRows[2], m.queueTree.SelectedIndex())
-	}
-
 	// A click above the body (row -1) must not crash or change selection.
 	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: 0})
 	m = updated.(QueueModel)
 	if m.queueTree.SelectedIndex() != ticketRows[2] {
 		t.Fatalf("expected out-of-bounds click to leave selection at row %d, got %d", ticketRows[2], m.queueTree.SelectedIndex())
+	}
+}
+
+// TestQueueModelRightClickOpensContextMenu covers ticket 12: a right click on
+// a ticket row or epic header selects it and opens the menu "m" opens; on
+// another header line or the preview it does nothing.
+func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-first.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "alpha", "02-second.md", "Status: open\n\nBody.\n")
+	checked := map[string]bool{
+		ticketPath(root, "alpha", "01-first.md"):  true,
+		ticketPath(root, "alpha", "02-second.md"): true,
+	}
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+
+	rowOf := map[queueNodeKind]int{}
+	var secondTicket int
+	for i, e := range m.queueTree.Entries() {
+		if _, seen := rowOf[e.Value.kind]; !seen {
+			rowOf[e.Value.kind] = i
+		}
+		if e.Value.kind == nodeQueueTicket {
+			secondTicket = i
+		}
+	}
+	rowY := func(entryIdx int) int { return 1 + queueHeaderReservedLines + entryIdx }
+	start := m.queueTree.SelectedIndex()
+	px, py, _, _ := m.previewFocus.previewRect(m.width, m.contentHeight())
+
+	for name, click := range map[string]tea.MouseClickMsg{
+		"preview": {Button: tea.MouseRight, X: px, Y: py},
+		"context": {Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicContext])},
+	} {
+		updated, cmd := m.Update(click)
+		got := updated.(QueueModel)
+		if got.queueTree.SelectedIndex() != start || got.ticketMenu.IsOpen || got.ticketMenuPending != "" || cmd != nil {
+			t.Errorf("%s: expected a right click to do nothing, got selection=%d menuOpen=%v pending=%q cmd=%v",
+				name, got.queueTree.SelectedIndex(), got.ticketMenu.IsOpen, got.ticketMenuPending, cmd != nil)
+		}
+	}
+
+	updated, cmd := m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(secondTicket)})
+	m = updated.(QueueModel)
+	if m.queueTree.SelectedIndex() != secondTicket {
+		t.Fatalf("expected right click to select row %d, got %d", secondTicket, m.queueTree.SelectedIndex())
+	}
+	if want := ticketPath(root, "alpha", "02-second.md"); m.ticketMenuPending != want || cmd == nil {
+		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.ticketMenuPending, cmd != nil)
+	}
+
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicStatus])})
+	m = updated.(QueueModel)
+	if m.queueTree.SelectedIndex() != rowOf[nodeEpicStatus] || !m.ticketMenu.IsOpen || !strings.Contains(m.ticketMenu.View(), "Add epic to queue") {
+		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.queueTree.SelectedIndex(), m.ticketMenu.View())
 	}
 }
 

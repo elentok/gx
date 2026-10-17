@@ -184,7 +184,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
-	if nm.selectedTicketPath() != m.selectedTicketPath() {
+	if nm.ticketMenuPending != nm.selectedTicketPath() {
 		nm.ticketMenuPending = ""
 	}
 	nm.syncPreviewViewport()
@@ -395,13 +395,17 @@ func (m Model) sidebarBody(sidebarViewportH, width int) []string {
 // toggle, no confirm). A click inside the preview panel's bounds instead
 // hands focus to it (wheel events then scroll the preview, see
 // updateInner's MouseWheelMsg case), without changing the sidebar
-// selection.
+// selection. A right click on a ticket or epic row selects it and opens its
+// Context menu as "m" does; anywhere else it does nothing.
 func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
-	if mouse.Button != tea.MouseLeft {
+	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.previewFocus.clickToFocus(mouse, m.width, m.contentHeight()) {
+	if m.previewFocus.inPreview(mouse, m.width, m.contentHeight()) {
+		if mouse.Button == tea.MouseLeft {
+			m.previewFocus.focusPreviewPane()
+		}
 		return m, nil
 	}
 	sidebarW, _ := m.splitWidth()
@@ -416,6 +420,18 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 		}
 	}
 	bodyLine := mouse.Y - 1
+	if mouse.Button == tea.MouseRight {
+		idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine)
+		if !ok {
+			return m, nil
+		}
+		if _, ok := rowFromEntry(m.sidebarTree.Entries()[idx]); !ok {
+			return m, nil
+		}
+		m.focus = focusSidebar
+		m.sidebarTree.SetSelectedIndex(idx)
+		return m.handleSuggestedActionsKey()
+	}
 	m.focus = focusSidebar
 	m.sidebarTree.SelectAtBodyLine(bodyLine)
 	return m, nil

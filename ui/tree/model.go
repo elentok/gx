@@ -172,11 +172,19 @@ func (m *Model[T]) SetSelectedIndex(index int) {
 // rendered line (never clamps onto the last entry) or lands on a row
 // SetIsSelectable excludes.
 func (m *Model[T]) SelectAtBodyLine(bodyLine int) {
+	if idx, ok := m.EntryAtBodyLine(bodyLine); ok {
+		m.SetSelectedIndex(idx)
+	}
+}
+
+// EntryAtBodyLine is SelectAtBodyLine's hit-test without the selection: the
+// selectable entry index under bodyLine, or ok false when there is none.
+func (m Model[T]) EntryAtBodyLine(bodyLine int) (int, bool) {
 	idx := list.ItemAtLine(m.list.Offset(), len(m.entries), m.entryLineHeight, bodyLine)
 	if idx < 0 || !m.isEntrySelectable(idx) {
-		return
+		return -1, false
 	}
-	m.SetSelectedIndex(idx)
+	return idx, true
 }
 
 // entryLineHeight is m.entries' list.LineHeight: it reports how many

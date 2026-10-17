@@ -159,7 +159,7 @@ type queueSpinnerRestartMsg struct{}
 func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(QueueModel)
-	if nm.selectedQueuePath() != m.selectedQueuePath() {
+	if nm.ticketMenuPending != nm.selectedQueuePath() {
 		nm.ticketMenuPending = ""
 	}
 	nm.syncQueuePreviewViewport()
@@ -336,16 +336,32 @@ func (m QueueModel) previewRect() (x, y, w, h int) {
 // handleQueueMouseClick selects the row under the click without triggering
 // any secondary action (no confirm, no checkbox toggle). A click inside the
 // preview panel's bounds instead hands focus to it (mirroring Model's
-// handleSidebarMouseClick), without changing the queue selection.
+// handleSidebarMouseClick), without changing the queue selection. A right
+// click on a ticket row or epic header selects it and opens its Context menu
+// as "m" does; anywhere else it does nothing.
 func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
-	if mouse.Button != tea.MouseLeft {
+	if mouse.Button != tea.MouseLeft && mouse.Button != tea.MouseRight {
 		return m, nil
 	}
-	if m.previewFocus.clickToFocus(mouse, m.width, m.contentHeight()) {
+	if m.previewFocus.inPreview(mouse, m.width, m.contentHeight()) {
+		if mouse.Button == tea.MouseLeft {
+			m.previewFocus.focusPreviewPane()
+		}
 		return m, nil
 	}
 	bodyLine := mouse.Y - 1 - queueHeaderReservedLines
+	if mouse.Button == tea.MouseRight {
+		idx, ok := m.queueTree.EntryAtBodyLine(bodyLine)
+		if !ok {
+			return m, nil
+		}
+		if kind := m.queueTree.Entries()[idx].Value.kind; kind != nodeQueueTicket && kind != nodeEpicStatus {
+			return m, nil
+		}
+		m.queueTree.SetSelectedIndex(idx)
+		return m.handleQueueTicketMenuKey()
+	}
 	m.queueTree.SelectAtBodyLine(bodyLine)
 	return m, nil
 }

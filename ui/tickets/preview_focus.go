@@ -144,18 +144,12 @@ func (p previewFocus) previewRect(width, contentHeight int) (x, y, w, h int) {
 	return sidebarW + 1, 0, previewW, previewH
 }
 
-// clickToFocus bounds-checks a mouse click against the preview panel's rect
-// (as returned by previewRect for the given width/contentHeight) and, when
-// the click lands inside it, hands focus to the preview pane. Returns
-// whether the click was handled this way, so the caller's own
-// row-under-click selection logic can skip running when it was.
-func (p *previewFocus) clickToFocus(mouse tea.Mouse, width, contentHeight int) bool {
+// inPreview bounds-checks a mouse click against the preview panel's rect (as
+// returned by previewRect for the given width/contentHeight), so the caller's
+// row-under-click logic can skip a click that landed on the preview.
+func (p *previewFocus) inPreview(mouse tea.Mouse, width, contentHeight int) bool {
 	px, py, pw, ph := p.previewRect(width, contentHeight)
-	if mouse.X >= px && mouse.X < px+pw && mouse.Y >= py && mouse.Y < py+ph {
-		p.focusPreviewPane()
-		return true
-	}
-	return false
+	return mouse.X >= px && mouse.X < px+pw && mouse.Y >= py && mouse.Y < py+ph
 }
 
 // updatePreviewKey routes a key through the preview's own search overlay,
