@@ -115,9 +115,16 @@ func (m Model) visibleRows() []sidebarRow {
 // terminal, as selecting it from the jump popup does; a click in the terminal
 // focuses it. Popups and copy mode own the screen, so a click under them is
 // dropped. The agent never sees a click, even one with mouse tracking on.
+// A right click on a session opens its Context menu, as m does.
 func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
-	if mouse.Button != tea.MouseLeft || m.copy != nil || m.ModalOpen() || m.leaderPending {
+	if m.copy != nil || m.ModalOpen() || m.leaderPending {
+		return m, nil
+	}
+	if mouse.Button == tea.MouseRight {
+		return m.rightClick(mouse)
+	}
+	if mouse.Button != tea.MouseLeft {
 		return m, nil
 	}
 	if !m.sidebarOnScreen() || mouse.X > sidebarWidth {
@@ -130,6 +137,19 @@ func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	}
 	m.terminalFocused = false
 	return m.selectAndFocus(i)
+}
+
+func (m Model) rightClick(mouse tea.Mouse) (tea.Model, tea.Cmd) {
+	i, ok := m.sidebarSessionAt(mouse.X, mouse.Y)
+	if !ok {
+		return m, nil
+	}
+	m.cursor = i
+	next, cmd := m.refresh()
+	m = next.(Model)
+	m.terminalFocused = false
+	next, menuCmd := m.openMenu()
+	return next, tea.Batch(cmd, menuCmd)
 }
 
 // sidebarSessionAt is the session on the sidebar row under (x, y); false off
