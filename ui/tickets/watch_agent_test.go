@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -12,15 +13,21 @@ import (
 
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets"
 )
 
 const watchLogLine = `{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"hello from the agent"}]}}` + "\n"
 
 func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
-	prev := nativeAgentLog
-	t.Cleanup(func() { nativeAgentLog = prev })
-	nativeAgentLog = func(context.Context, string) (agentlog.Log, error) { return log, err }
+	fakeAgentLog(t, func(context.Context, string, herdrLookup) (agentlog.Log, error) { return log, err })
+}
+
+func fakeAgentLog(t *testing.T, f func(context.Context, string, herdrLookup) (agentlog.Log, error)) {
+	t.Helper()
+	prev := agentLog
+	t.Cleanup(func() { agentLog = prev })
+	agentLog = f
 }
 
 func TestWatchAgent_RendersLogInModal(t *testing.T) {
@@ -30,7 +37,7 @@ func TestWatchAgent_RendersLogInModal(t *testing.T) {
 	}
 	fakeNativeLog(t, agentlog.Log{Path: path}, nil)
 
-	loaded, ok := cmdWatchAgent("gx:epic/01")().(watchLoadedMsg)
+	loaded, ok := cmdWatchAgent(nil, "gx:epic/01")().(watchLoadedMsg)
 	if !ok {
 		t.Fatal("expected watchLoadedMsg")
 	}
@@ -68,7 +75,7 @@ func openLiveWatch(t *testing.T, texts ...string) (m Model, path string, ended *
 	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return *ended }}, nil)
 	m = newServerModel(t)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	next, tick = next.(Model).Update(cmdWatchAgent("gx:epic/01")())
+	next, tick = next.(Model).Update(cmdWatchAgent(nil, "gx:epic/01")())
 	t.Cleanup(func() {
 		if m.watch.tail != nil {
 			m.watch.tail.Close()
@@ -210,23 +217,10 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 	appendWatchLog(t, path, "pty conversation")
 	fakeNativeLog(t, agentlog.Log{Path: path, PtyDir: "/pty/dir"}, nil)
 
-	loaded := cmdWatchAgent("gx:epic/01")().(watchLoadedMsg)
+	loaded := cmdWatchAgent(nil, "gx:epic/01")().(watchLoadedMsg)
 	t.Cleanup(func() { loaded.tail.Close() })
 	if view := (watchModal{}).Open(loaded, 120, 40).View(); !strings.Contains(view, "pty conversation") {
 		t.Errorf("modal missing the pty agent's conversation:\n%s", view)
-	}
-}
-
-func TestWatch_NativeLive_OpensLogNotPane(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "out.jsonl")
-	if err := os.WriteFile(path, []byte(watchLogLine), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return false }}, nil)
-
-	cmd := cmdServerWatch(nil, "gx:epic/01", "01")
-	if _, ok := cmd().(watchLoadedMsg); !ok {
-		t.Error("expected the native log modal")
 	}
 }
 
@@ -234,18 +228,18 @@ func TestWatch_NativeLive_OpensLogNotPane(t *testing.T) {
 // the returned undo runs, i.e. on the Update goroutine.
 func failOnNativeLog(t *testing.T) (undo func()) {
 	t.Helper()
-	prev := nativeAgentLog
-	nativeAgentLog = func(context.Context, string) (agentlog.Log, error) {
+	prev := agentLog
+	agentLog = func(context.Context, string, herdrLookup) (agentlog.Log, error) {
 		t.Error("native liveness resolved on the Update goroutine")
 		return agentlog.Log{}, agentlog.ErrNoAgent
 	}
-	return func() { nativeAgentLog = prev }
+	return func() { agentLog = prev }
 }
 
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd := cmdServerWatch(fakeServerAPI{}, "gx:epic/01", "01")
+	cmd := cmdWatchAgent(fakeServerAPI{}, "gx:epic/01")
 	undo()
 	cmd()
 }
@@ -391,14 +385,12 @@ func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			log.Path = watchLogFile(t)
-			prev := nativeAgentLog
-			t.Cleanup(func() { nativeAgentLog = prev })
-			nativeAgentLog = func(_ context.Context, address string) (agentlog.Log, error) {
+			fakeAgentLog(t, func(_ context.Context, address string, _ herdrLookup) (agentlog.Log, error) {
 				if !strings.HasSuffix(address, ":my-epic/01") {
 					return agentlog.Log{}, agentlog.ErrNoAgent
 				}
 				return log, nil
-			}
+			})
 			m := selectTicketRow(t, loadedModelWithTicket(t))
 			m = openWatchFromMenu(t, m)
 			if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· live") {
@@ -435,22 +427,118 @@ func TestWatch_NoOrPrunedLogDims(t *testing.T) {
 	}
 }
 
-func TestNativeAgentLogKept(t *testing.T) {
+func TestWatchReason_NativeLog(t *testing.T) {
 	cases := []struct {
 		name string
 		log  agentlog.Log
 		err  error
-		want bool
+		want string
 	}{
-		{"no native agent", agentlog.Log{}, agentlog.ErrNoAgent, false},
-		{"running", agentlog.Log{Path: "x", Ended: endedFunc(false)}, nil, true},
-		{"ended", agentlog.Log{Path: "x", Ended: endedFunc(true)}, nil, true},
-		{"pruned", agentlog.Log{Pruned: true}, nil, false},
+		{"no native agent", agentlog.Log{}, agentlog.ErrNoAgent, noAgentLog},
+		{"running", agentlog.Log{Path: "x", Ended: endedFunc(false)}, nil, ""},
+		{"ended", agentlog.Log{Path: "x", Ended: endedFunc(true)}, nil, ""},
+		{"pruned", agentlog.Log{Pruned: true}, nil, noAgentLog},
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
-		if got := nativeAgentLogKept("gx:epic/01"); got != c.want {
-			t.Errorf("%s: nativeAgentLogKept = %v, want %v", c.name, got, c.want)
+		if got := watchReason(fakeServerAPI{}, "gx:epic/01"); got != c.want {
+			t.Errorf("%s: watchReason = %q, want %q", c.name, got, c.want)
 		}
 	}
+}
+
+// fakeHerdrOnlyLog runs the real locator against an empty state dir, so every
+// log comes from the herdr lookup the tab hands it.
+func fakeHerdrOnlyLog(t *testing.T) {
+	t.Helper()
+	stateDir := t.TempDir()
+	fakeAgentLog(t, func(ctx context.Context, address string, herdr herdrLookup) (agentlog.Log, error) {
+		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
+		if err != nil {
+			return agentlog.Log{}, err
+		}
+		return agentlog.Locator{StateDir: stateDir, Herdr: herdr}.AgentLog(ctx, a)
+	})
+}
+
+// herdrAPI is a server running one herdr iteration of agent on gx:alpha/01.
+func herdrAPI(agent, transcript string) fakeServerAPI {
+	return fakeServerAPI{iterations: []server.IterationInfo{
+		{Address: "gx:alpha/01", Agent: agent, Transcript: transcript, Pane: "p1", Tab: "t1"},
+	}}
+}
+
+func TestWatch_HerdrClaudeOpensLiveModal(t *testing.T) {
+	fakeHerdrOnlyLog(t)
+	m := watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", watchLogFile(t)))
+	m = openWatchFromMenu(t, m)
+	if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· live") || !strings.Contains(view, "hello from the agent") {
+		t.Errorf("Watch on a herdr claude agent did not open live:\n%s", view)
+	}
+}
+
+func TestWatch_HerdrDimReasons(t *testing.T) {
+	t.Run("codex", func(t *testing.T) {
+		fakeHerdrOnlyLog(t)
+		m := watchTicketTab(t, "claimed").WithServer(herdrAPI("codex", ""))
+		_, ready := requestTicketMenu(t, m)
+		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != notForCodex {
+			t.Errorf("Watch disabled = %q, want %q", got, notForCodex)
+		}
+	})
+	t.Run("no server", func(t *testing.T) {
+		fakeHerdrOnlyLog(t)
+		_, ready := requestTicketMenu(t, selectTicketRow(t, loadedModelWithTicket(t)))
+		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != serverNotRunning {
+			t.Errorf("Watch disabled = %q, want %q", got, serverNotRunning)
+		}
+	})
+}
+
+// fakeFocus records the herdr tabs focused.
+func fakeFocus(t *testing.T) *[]string {
+	t.Helper()
+	var focused []string
+	prev := focusIterationTab
+	t.Cleanup(func() { focusIterationTab = prev })
+	focusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
+	return &focused
+}
+
+func TestGoToPane_HerdrOnlyAndFocusesPane(t *testing.T) {
+	t.Run("tickets", func(t *testing.T) {
+		fakeHerdrOnlyLog(t)
+		focused := fakeFocus(t)
+		_, ready := requestTicketMenu(t, watchTicketTab(t, "claimed"))
+		if hasItem(ready.items, "Go to pane") {
+			t.Error("Go to pane shown for a ticket with no herdr agent")
+		}
+		m, ready := requestTicketMenu(t, watchTicketTab(t, "claimed").WithServer(herdrAPI("claude", "")))
+		updated, _ := m.Update(ready)
+		_, cmd := chooseTicketMenuItem(t, updated.(Model), "Go to pane")
+		if cmd == nil {
+			t.Fatal("Go to pane returned no Cmd")
+		}
+		cmd()
+		if !slices.Equal(*focused, []string{"t1"}) {
+			t.Errorf("focused = %v, want [t1]", *focused)
+		}
+	})
+	t.Run("queue", func(t *testing.T) {
+		fakeHerdrOnlyLog(t)
+		focused := fakeFocus(t)
+		m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
+		if _, ready := requestQueueMenu(t, m); hasItem(ready.items, "Go to pane") {
+			t.Error("Go to pane shown for a ticket with no herdr agent")
+		}
+		m.serverAPI = herdrAPI("codex", "")
+		_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Go to pane")
+		if cmd == nil {
+			t.Fatal("Go to pane returned no Cmd")
+		}
+		cmd()
+		if !slices.Equal(*focused, []string{"t1"}) {
+			t.Errorf("focused = %v, want [t1]", *focused)
+		}
+	})
 }

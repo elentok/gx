@@ -572,9 +572,9 @@ Dependencies:
 - "Transcript": always listed. Renders the session through the existing claude and codex markdown
   exporters and the ticket markdown renderer. The session lookup used by evolve digests moves to a
   shared package so evolve and the TUI resolve sessions the same way. [P2-T06]
-- "Watch": listed only while the agent is live. herdr = jump to pane ("Answer in pane" is
-  removed); pty and headless = a live modal following the rendered conversation, ticking only
-  while open (see queue-tab-actions.md). [P2-T06]
+- "Watch": a live modal following the rendered conversation, ticking only while open, for every
+  runner but herdr Codex (see queue-tab-actions.md). A herdr agent's pane has its own "Go to
+  pane" item ("Answer in pane" is removed). [P2-T06]
 
 **Doctor**
 

@@ -366,21 +366,27 @@ func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 	}
 }
 
-func TestTicketMenuItems_Watch(t *testing.T) {
+func TestTicketMenuItems_GoToPane(t *testing.T) {
+	if hasItem(ticketMenuItems(ticketMenuInput{}), "Go to pane") {
+		t.Error("Go to pane shown without a herdr pane")
+	}
 	for _, tt := range []struct {
 		name string
 		in   ticketMenuInput
 		want string
 	}{
-		{"no agent", ticketMenuInput{}, noAgentLog},
-		{"pane but herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, noAgentLog},
-		{"native log", ticketMenuInput{nativeLog: true}, ""},
 		{"live pane", ticketMenuInput{paneLive: true}, ""},
+		{"herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, herdrDownText},
 	} {
-		if got := itemByLabel(t, ticketMenuItems(tt.in), "Watch").Disabled; got != tt.want {
-			t.Errorf("%s: watch disabled = %q, want %q", tt.name, got, tt.want)
+		item := itemByLabel(t, ticketMenuItems(tt.in), "Go to pane")
+		if item.Disabled != tt.want || item.Group != contextmenu.Agent {
+			t.Errorf("%s: Go to pane = %q in %v, want %q in Agent", tt.name, item.Disabled, item.Group, tt.want)
 		}
 	}
+}
+
+func hasItem(items []contextmenu.Item[ticketTarget], label string) bool {
+	return slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == label })
 }
 
 func TestTicketMenuItems_InvestigateOnceWhenSuggested(t *testing.T) {

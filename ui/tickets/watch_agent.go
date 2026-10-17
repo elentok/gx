@@ -2,6 +2,8 @@ package tickets
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -18,19 +20,23 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-// actionWatch looks at a live agent, per runner: a native agent's log in the
-// Watch modal, a herdr agent's pane by jumping to it. Handled by
+// actionWatch opens an agent's conversation in the Watch modal, for every
+// runner; actionGoToPane jumps to a herdr agent's pane. Handled by
 // dispatchMenuAction.
-const actionWatch = "watch"
+const (
+	actionWatch    = "watch"
+	actionGoToPane = "go-to-pane"
+)
 
 // maxWatchLines bounds the modal to the log's tail so a long run can't stall
 // the Update goroutine.
 const maxWatchLines = 2000
 
-// nativeAgentLog is a package-level seam so tests can fake the agent log. It
-// locates only native agents (no herdr lookup): a ticket without one is
-// watched through its herdr pane instead.
-var nativeAgentLog = func(ctx context.Context, address string) (agentlog.Log, error) {
+// herdrLookup finds a live herdr iteration by full ticket address.
+type herdrLookup = func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error)
+
+// agentLog is a package-level seam so tests can fake the agent log.
+var agentLog = func(ctx context.Context, address string, herdr herdrLookup) (agentlog.Log, error) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return agentlog.Log{}, err
@@ -39,7 +45,29 @@ var nativeAgentLog = func(ctx context.Context, address string) (agentlog.Log, er
 	if err != nil {
 		return agentlog.Log{}, err
 	}
-	return agentlog.Locator{StateDir: stateDir}.AgentLog(ctx, a)
+	return agentlog.Locator{StateDir: stateDir, Herdr: herdr}.AgentLog(ctx, a)
+}
+
+// errServerDown marks a herdr lookup that had no server to ask.
+var errServerDown = errors.New(serverNotRunning)
+
+// serverHerdrLookup looks an address up in the server's iterations read.
+func serverHerdrLookup(api ServerAPI) herdrLookup {
+	return func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error) {
+		if api == nil {
+			return agentlog.HerdrIteration{}, false, errServerDown
+		}
+		list, err := api.Iterations(ctx)
+		if err != nil {
+			return agentlog.HerdrIteration{}, false, fmt.Errorf("%w: %v", errServerDown, err)
+		}
+		for _, it := range list {
+			if it.Address == address {
+				return agentlog.HerdrIteration{Agent: it.Agent, Transcript: it.Transcript}, true, nil
+			}
+		}
+		return agentlog.HerdrIteration{}, false, nil
+	}
 }
 
 // agentAddress is the address the log lookup takes for a row's Path: already
@@ -51,11 +79,22 @@ func agentAddress(path, id string) string {
 	return path
 }
 
-// nativeAgentLogKept reports whether address's native agent has a log Watch
-// can open, whether the agent still runs or has ended.
-func nativeAgentLogKept(address string) bool {
-	log, err := nativeAgentLog(context.Background(), address)
-	return err == nil && !log.Pruned
+const notForCodex = "not supported for codex"
+
+// watchReason is why Watch can't open address's agent log, empty when it
+// can, whether the agent still runs or has ended. Without a server a herdr
+// agent can't be told apart from no agent, so the missing server is the reason.
+func watchReason(api ServerAPI, address string) string {
+	log, err := agentLog(context.Background(), address, serverHerdrLookup(api))
+	switch {
+	case err == nil && !log.Pruned:
+		return ""
+	case errors.Is(err, agentlog.ErrUnsupported):
+		return notForCodex
+	case errors.Is(err, errServerDown):
+		return serverNotRunning
+	}
+	return noAgentLog
 }
 
 // watchTickInterval matches `gx server agents watch`'s follow interval.
@@ -226,13 +265,13 @@ func (w watchModal) View() string {
 	return components.RenderOutputModal(title, w.vp.View(), hint, ui.ColorBorder, ui.ColorGreen, ui.ColorGray, w.vp.Width())
 }
 
-// cmdWatchAgent opens address's native agent log live, rendered with the same
-// renderer and tail stepper as `gx server agents watch`. A pty agent's log is
-// its conversation transcript, not its terminal screen. The tail stays on
-// this run's log, so a later resumed run is not followed.
-func cmdWatchAgent(address string) tea.Cmd {
+// cmdWatchAgent opens address's agent log live, rendered with the same
+// renderer and tail stepper as `gx server agents watch`. A pty or herdr
+// agent's log is its conversation transcript, not its terminal screen. The
+// tail stays on this run's log, so a later resumed run is not followed.
+func cmdWatchAgent(api ServerAPI, address string) tea.Cmd {
 	return func() tea.Msg {
-		log, err := nativeAgentLog(context.Background(), address)
+		log, err := agentLog(context.Background(), address, serverHerdrLookup(api))
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}

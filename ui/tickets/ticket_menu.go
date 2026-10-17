@@ -27,12 +27,15 @@ type ticketMenuPickMsg struct {
 // ticketMenuInput is what ticketMenuItems needs; liveness is resolved off the
 // Update goroutine, the rest is read from the model when "m" is pressed.
 type ticketMenuInput struct {
-	rendered             tickets.RenderedStatus
-	ticket               tickets.Ticket
-	isMap                bool
-	paneLive, nativeLog bool
-	herdrDown            bool
-	archived             bool
+	rendered tickets.RenderedStatus
+	ticket   tickets.Ticket
+	isMap    bool
+	// paneLive marks a herdr agent, the only kind with a pane to go to.
+	paneLive  bool
+	herdrDown bool
+	archived  bool
+	// watchReason is why Watch is dim; empty when it can open.
+	watchReason string
 	// serverReason is why orchestration writes are off; empty when usable.
 	serverReason string
 	// onQueue adds the Queue group, which only the Queue tab offers.
@@ -117,12 +120,14 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	if !unmute {
 		items = append(items, server("Unmute & Reopen", "", actionUnmuteReopen, notMuted))
 	}
-	watchable := in.nativeLog || (in.paneLive && !in.herdrDown)
 	items = append(items,
-		pick("Watch", "", actionWatch, contextmenu.Agent, reasonIf(!watchable, noAgentLog)),
+		pick("Watch", "", actionWatch, contextmenu.Agent, in.watchReason),
 		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""))
 	if !investigateSuggested(in.rendered) {
 		items = append(items, pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
+	}
+	if in.paneLive {
+		items = append(items, pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
 
 	if in.onQueue {
@@ -245,7 +250,7 @@ func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
 	return func() tea.Msg {
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
-		in.nativeLog = nativeAgentLogKept(agentAddress(address, target.ticketID))
+		in.watchReason = watchReason(api, agentAddress(address, target.ticketID))
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in)}
 	}
 }

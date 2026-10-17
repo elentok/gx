@@ -441,20 +441,18 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 	}
 }
 
-// Seam D: on herdr, Watch jumps to the tab from the iterations read, and
+// Seam D: on herdr, Go to pane jumps to the tab from the iterations read, and
 // Resume issues unpark.
-func TestServerMode_WatchJumpsToPaneAndResume(t *testing.T) {
-	var focused []string
-	defer func(prev func(string) error) { focusIterationTab = prev }(focusIterationTab)
-	focusIterationTab = func(tab string) error { focused = append(focused, tab); return nil }
+func TestServerMode_GoToPaneAndResume(t *testing.T) {
+	focused := fakeFocus(t)
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 
 	var calls []string
 	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
-	m, cmd := chooseTicketMenuItem(t, openAnswerMenu(t, api), "Watch")
+	m, cmd := chooseTicketMenuItem(t, openAnswerMenu(t, api), "Go to pane")
 	cmd()
-	if !slices.Equal(focused, []string{"t1"}) {
-		t.Fatalf("focused = %v", focused)
+	if !slices.Equal(*focused, []string{"t1"}) {
+		t.Fatalf("focused = %v", *focused)
 	}
 
 	_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), resumeLabel)
