@@ -192,6 +192,31 @@ func TestSnapshot_CarriesCategoryAndExportedAt(t *testing.T) {
 	}
 }
 
+func TestSnapshot_CarriesMutes(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	with := strings.Replace(string(raw), "status: open", "status: needs-repair\nmutes:\n  - event_type: notification-storm\n    tripped_at: 2026-10-11T09:30:00Z", 1)
+	if err := os.WriteFile(path, []byte(with), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2026, 10, 11, 9, 30, 0, 0, time.UTC)
+	if len(snap.Tickets) != 1 || len(snap.Tickets[0].Mutes) != 1 ||
+		snap.Tickets[0].Mutes[0].EventType != "notification-storm" || !snap.Tickets[0].Mutes[0].TrippedAt.Equal(want) {
+		t.Errorf("tickets = %+v, want the mute", snap.Tickets)
+	}
+}
+
 func TestSnapshot_CarriesTheEpicsMergedAt(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

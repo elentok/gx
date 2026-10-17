@@ -277,8 +277,8 @@ type Ticket struct {
 // MuteRecord is one tripped notification throttle: the event type that
 // tripped it and when.
 type MuteRecord struct {
-	EventType string    `yaml:"event_type"`
-	TrippedAt time.Time `yaml:"tripped_at"`
+	EventType string    `yaml:"event_type" json:"event_type"`
+	TrippedAt time.Time `yaml:"tripped_at" json:"tripped_at"`
 }
 
 // IsCommitless reports whether t is exempt from landed-commit verification:

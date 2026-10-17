@@ -112,17 +112,44 @@ func TestTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"},
+		{Address: "gx:alpha/01", Title: "First", Status: "needs-repair", Mutes: muted},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
-	r, _ := m.selectedRow()
-	m.epics[r.epicIdx].Tickets[r.ticketIdx].Mutes = muted
 
 	_, cmd := chooseTicketMenuItem(t, pressMenuKey(t, m), "Unmute")
+	if cmd == nil {
+		t.Fatal("unmute is dim for a muted server ticket")
+	}
 	cmd()
 	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
+	for name, tt := range map[string]struct {
+		mutes []schema.MuteRecord
+		want  string
+	}{
+		"muted":   {muted, ""},
+		"unmuted": {nil, notMuted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newServerModel(t).WithServer(fakeServerAPI{})
+			m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+				{Address: "gx:alpha/01", Title: "First", Status: "needs-repair", Mutes: tt.mutes},
+			}})
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+			_, ready := requestTicketMenu(t, selectTicketRow(t, updated.(Model)))
+			item := itemByLabel(t, ready.items, "Unmute & Reopen")
+			if item.Disabled != tt.want {
+				t.Errorf("unmute disabled = %q, want %q", item.Disabled, tt.want)
+			}
+			if tt.mutes != nil && item.Group != contextmenu.Suggested {
+				t.Errorf("unmute group = %v, want Suggested", item.Group)
+			}
+		})
 	}
 }
 

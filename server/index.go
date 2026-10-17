@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // TicketInfo is one ticket in the snapshot. Markdown stays the truth: this is
@@ -46,6 +47,8 @@ type TicketInfo struct {
 
 	Category   string    `json:"category,omitempty"`
 	ExportedAt time.Time `json:"exported_at,omitzero"`
+	// Mutes is what the Context menu's "Unmute & Reopen" keys off.
+	Mutes []schema.MuteRecord `json:"mutes,omitempty"`
 
 	// EpicMergedAt is the ticket's epic's merged_at. It rides on every ticket
 	// rather than in a separate epic list so a stamp reaches clients through
@@ -213,6 +216,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 
 		Category:   t.Category,
 		ExportedAt: t.ExportedAt,
+		Mutes:      t.Mutes,
 	}
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)

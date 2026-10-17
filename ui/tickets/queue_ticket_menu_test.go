@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/viewmodel"
 )
 
 // requestQueueMenu presses "m" and returns the ready message its cmd
@@ -108,6 +109,20 @@ func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 	cmd()
 	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestQueueTicketMenu_ServerTicketMutesEnableUnmute(t *testing.T) {
+	m := newMaintenanceQueue(t, fakeServerAPI{})
+	m, _ = m.applyServerState(&viewmodel.State{
+		Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair", Mutes: muted}},
+		Queue:   []string{"gx:alpha/01"},
+	})
+	m = selectFirstQueueTicketRow(t, m)
+	_, ready := requestQueueMenu(t, m)
+	item := itemByLabel(t, ready.items, "Unmute & Reopen")
+	if item.Disabled != "" || item.Group != contextmenu.Suggested {
+		t.Errorf("unmute = %+v, want enabled in Suggested", item)
 	}
 }
 
