@@ -21,7 +21,7 @@ func TestOpenHelpOpensHelp(t *testing.T) {
 	}
 }
 
-func TestOpenHelpFromSearchTypesNothing(t *testing.T) {
+func TestOpenHelpFromSearchEndsSearch(t *testing.T) {
 	m := newTestModel()
 	m.width, m.height = 120, 40
 	m.search.Start("fix")
@@ -33,8 +33,8 @@ func TestOpenHelpFromSearchTypesNothing(t *testing.T) {
 	if !m.help.IsOpen {
 		t.Fatal("expected help open")
 	}
-	if m.search.Mode() != search.SearchModeInput || m.search.Query() != "fix" {
-		t.Fatalf("search changed: mode %v query %q", m.search.Mode(), m.search.Query())
+	if m.search.Mode() != search.SearchModeNone || m.search.Query() != "" {
+		t.Fatalf("search not ended: mode %v query %q", m.search.Mode(), m.search.Query())
 	}
 }
 

@@ -50,11 +50,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	// The title row's help click always opens the log's own help, even with the
 	// detail panel focused, where "?" would open the detail's help instead.
 	if nav.IsOpenHelp(msg) {
-		if !m.ModalOpen() && !m.help.IsOpen && !m.rebaseConfirm.isOpen() && !m.commitDetail.ModalOpen() {
-			m.keys.Reset()
-			m.help.Open(m.width, m.height)
+		if m.ModalOpen() || m.help.IsOpen || m.rebaseConfirm.isOpen() || m.commitDetail.ModalOpen() {
+			return m, nil
 		}
-		return m, nil
+		m, cmd = nav.EndSearch(m, m.search.InputFocused() || m.commitDetail.InputFocused())
+		m.keys.Reset()
+		m.help.Open(m.width, m.height)
+		return m, cmd
 	}
 	// Delegate to rebase confirm modal while it's open.
 	if m.rebaseConfirm.isOpen() {

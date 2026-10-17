@@ -59,11 +59,13 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}()
 
 	if nav.IsOpenHelp(msg) {
-		if !m.ModalOpen() {
-			m.help.Open(m.width, m.height)
-			m.keys.Reset()
+		if m.ModalOpen() {
+			return m, nil
 		}
-		return m, nil
+		m, cmd = nav.EndSearch(m, m.searchInputFocused())
+		m.help.Open(m.width, m.height)
+		m.keys.Reset()
+		return m, cmd
 	}
 	if m.bump.IsOpen {
 		return m.handleBumpUpdate(msg)

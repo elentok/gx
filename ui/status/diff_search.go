@@ -10,9 +10,11 @@ import (
 )
 
 func (m Model) InputFocused() bool {
-	if m.bump.InputFocused() || m.push.InputFocused() || m.pull.InputFocused() || m.stash.InputFocused() || m.help.InputFocused() {
-		return true
-	}
+	return m.bump.InputFocused() || m.push.InputFocused() || m.pull.InputFocused() || m.stash.InputFocused() || m.help.InputFocused() ||
+		m.searchInputFocused()
+}
+
+func (m Model) searchInputFocused() bool {
 	if m.focus == focusFiletree {
 		return m.fileTreeModel.Search().InputFocused()
 	}

@@ -165,11 +165,14 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nav.IsOpenHelp(msg) {
-		if !m.ModalOpen() {
-			m.keys.Reset()
-			m.help.Open(m.width, m.height)
+		if m.ModalOpen() {
+			return m, nil
 		}
-		return m, nil
+		var cmd tea.Cmd
+		m, cmd = nav.EndSearch(m, m.search.InputFocused())
+		m.keys.Reset()
+		m.help.Open(m.width, m.height)
+		return m, cmd
 	}
 	if next, cmd, ok := m.updateServerDown(msg); ok {
 		return next, cmd

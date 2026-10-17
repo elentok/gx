@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/search"
 )
 
 func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
@@ -18,14 +19,37 @@ func TestOpenHelp_TicketsOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	updated, _ = updated.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	updated, _ = updated.Update(nav.OpenHelp()())
 	m = updated.(Model)
 
 	if !m.help.IsOpen {
 		t.Fatal("OpenHelp did not open help")
 	}
-	if q := m.search.Query(); q != "" {
-		t.Fatalf("OpenHelp typed %q into the search input", q)
+	if m.search.Mode() != search.SearchModeNone || m.search.Query() != "" {
+		t.Fatalf("search not ended: mode %v query %q", m.search.Mode(), m.search.Query())
+	}
+}
+
+func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: open\n\nBody.\n")
+
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = updated.(Model)
+	m.focus = focusPreview
+	m.previewSearch.Start("body")
+	updated, _ = m.Update(nav.OpenHelp()())
+	m = updated.(Model)
+
+	if !m.help.IsOpen {
+		t.Fatal("OpenHelp did not open help")
+	}
+	if m.previewSearch.Mode() != search.SearchModeNone || m.previewSearch.Query() != "" {
+		t.Fatalf("preview search not ended: mode %v query %q", m.previewSearch.Mode(), m.previewSearch.Query())
 	}
 }
 
@@ -47,14 +71,15 @@ func TestOpenHelp_QueueOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'f', Text: "f"})
 	updated, _ = updated.Update(nav.OpenHelp()())
 	m = updated.(QueueModel)
 
 	if !m.help.IsOpen {
 		t.Fatal("OpenHelp did not open help")
 	}
-	if q := m.search.Query(); q != "" {
-		t.Fatalf("OpenHelp typed %q into the search input", q)
+	if m.search.Mode() != search.SearchModeNone || m.search.Query() != "" {
+		t.Fatalf("search not ended: mode %v query %q", m.search.Mode(), m.search.Query())
 	}
 }
 

@@ -199,11 +199,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nav.IsOpenHelp(msg) {
-		if !m.ModalOpen() {
-			m.keys.Reset()
-			m.help.Open(m.width, m.height)
+		if m.ModalOpen() {
+			return m, nil
 		}
-		return m, nil
+		_, searching := m.activeInputSearch()
+		var cmd tea.Cmd
+		m, cmd = nav.EndSearch(m, searching)
+		m.keys.Reset()
+		m.help.Open(m.width, m.height)
+		return m, cmd
 	}
 	if next, cmd, ok := m.updateServer(msg); ok {
 		return next, cmd

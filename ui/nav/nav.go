@@ -127,6 +127,18 @@ func IsOpenHelp(msg tea.Msg) bool {
 	return ok
 }
 
+// EndSearch is how every page treats a focused search input on OpenHelp:
+// opening help ends the search, and closing help does not restore it. It
+// replays Esc through the page's own Update, so the search ends exactly as
+// the user's Esc would end it, match clearing and all.
+func EndSearch[M tea.Model](page M, searching bool) (M, tea.Cmd) {
+	if !searching {
+		return page, nil
+	}
+	next, cmd := page.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	return next.(M), cmd
+}
+
 func Back() tea.Cmd {
 	return func() tea.Msg {
 		return backMsg{}

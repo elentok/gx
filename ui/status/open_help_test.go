@@ -33,10 +33,11 @@ func TestOpenHelpOpensHelp(t *testing.T) {
 	}
 }
 
-func TestOpenHelpFromSearchTypesNothing(t *testing.T) {
+func TestOpenHelpFromSearchEndsSearch(t *testing.T) {
 	t.Parallel()
 	m := newOpenHelpModel(t)
 	updated, _ := m.Update(tea.KeyPressMsg{Code: '/', Text: "/"})
+	updated, _ = updated.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
 	m = updated.(Model)
 	if !m.InputFocused() {
 		t.Fatal("expected search input focused after /")
@@ -46,8 +47,14 @@ func TestOpenHelpFromSearchTypesNothing(t *testing.T) {
 	if !m.help.IsOpen {
 		t.Fatal("expected help open")
 	}
-	if s := m.fileTreeModel.Search(); s.Mode() != search.SearchModeInput || s.Query() != "" {
-		t.Fatalf("search changed: mode %v query %q", s.Mode(), s.Query())
+	if s := m.fileTreeModel.Search(); s.Mode() != search.SearchModeNone || s.Query() != "" {
+		t.Fatalf("search not ended: mode %v query %q", s.Mode(), s.Query())
+	}
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = updated.(Model)
+	if m.help.IsOpen || m.InputFocused() {
+		t.Fatalf("closing help: help open %v, input focused %v", m.help.IsOpen, m.InputFocused())
 	}
 }
 
