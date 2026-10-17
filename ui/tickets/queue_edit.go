@@ -23,11 +23,21 @@ const (
 // mirroring the Tickets tab's Model.cmdEditSelectedFile — the Queue tab only
 // ever selects tickets (no epic rows), so there's no epic ticket.md case to handle.
 func (m QueueModel) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
-	row, ok := m.selectedQueueRow()
+	file, ok := m.selectedEditTarget()
 	if !ok {
 		return notify.Warning("nothing selected")
 	}
-	return editTicketFile(m.worktreeRoot, m.settings, row.ticket.FilePath(), splitType)
+	return editTicketFile(m.worktreeRoot, m.settings, file, splitType)
+}
+
+// selectedEditTarget is the file the selected row's address resolves to.
+func (m QueueModel) selectedEditTarget() (file string, ok bool) {
+	row, ok := m.selectedQueueRow()
+	if !ok {
+		return "", false
+	}
+	file, _ = resolveTicketPath(m.settings.TicketStore, row.ticket.Path)
+	return file, true
 }
 
 func (m QueueModel) handleEditFileFinished(msg editFileFinishedMsg) (QueueModel, tea.Cmd) {

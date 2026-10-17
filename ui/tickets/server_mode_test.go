@@ -352,8 +352,12 @@ func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	if got, want := menuValues(m.statusMenu), []string{"server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
+	if got, want := menuValues(m.statusMenu), []string{"draft", "done", "server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
 		t.Fatalf("open ticket menu = %v, want %v", got, want)
+	}
+	for range 2 {
+		updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
+		m = updated.(Model)
 	}
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = updated.(Model)
@@ -365,7 +369,7 @@ func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)
-	if got, want := menuValues(m.statusMenu), []string{"server:unpark", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
+	if got, want := menuValues(m.statusMenu), []string{"open", "draft", "done", "server:unpark", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
 		t.Fatalf("parked ticket menu = %v, want %v", got, want)
 	}
 	m.statusMenuOpen = false
@@ -384,20 +388,26 @@ func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
 // direct statuses and the edit chords must reach the ticket's file instead.
 func serverModelWithTicketFile(t *testing.T) (Model, string) {
 	t.Helper()
-	file := filepath.Join(t.TempDir(), "20-a.md")
-	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	m := newServerModel(t)
+	return serverModelWithStoreTicket(t, fakeServerAPI{}, false)
+}
+
+// serverModelWithStoreTicket serves a draft gx:alpha/20 whose file lives in a
+// temp store, in a map epic when isMap is set.
+func serverModelWithStoreTicket(t *testing.T, api fakeServerAPI, isMap bool) (Model, string) {
+	t.Helper()
+	store := t.TempDir()
+	file := writeStoreTicket(t, store, "20-a.md", "---\nid: \"20\"\nstatus: draft\ntype: research\n---\n\n# 20 — A\n\nBody.\n")
+	m := newServerModel(t).WithServer(api)
+	m.settings.TicketStore = store
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file},
+		{Address: "gx:alpha/20", Title: "A", Status: "draft", File: file, EpicIsMap: isMap},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return selectTicketRow(t, updated.(Model)), file
 }
 
 func TestServerMode_StatusMenuOffersDirectStatusesAndWritesTheFile(t *testing.T) {
-	m, file := serverModelWithTicketFile(t)
+	m, file := serverModelWithStoreTicket(t, fakeServerAPI{}, true)
 
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
 	m = updated.(Model)

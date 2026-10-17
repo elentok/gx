@@ -77,7 +77,7 @@ type QueueModel struct {
 	// the Tickets tab's own m.search (see ui/tickets/search.go).
 	search search.Model
 
-	// confirm backs the "C"/"c" clear keymaps and the "x" cascade-delete keymap
+	// confirm backs the "C"/"c" clear keymaps and the "x" delete keymap
 	// (handleQueueKey) — the Queue tab is read-only for selection (ticket 08),
 	// so this is the only modal this tab opens outside the agent-picker menu.
 	confirm confirm.Model
@@ -251,8 +251,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleQueueConfirmMouseUpdate(msg)
 		}
 		return m.handleQueueMouseClick(msg)
-	case cascadeDeleteConfirmedMsg:
-		return m.handleCascadeDeleteConfirmed(msg)
 	}
 	return m, nil
 }
@@ -495,10 +493,10 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m.handleServerClearKey(fmt.Sprintf("Dequeue %d completed ticket(s)?", len(paths)), paths)
 			}
 		case bindingQueueDelete:
-			if m.serverAPI != nil {
-				return m.handleServerDeleteKey()
+			if m.serverAPI == nil {
+				return m, notify.Warning(serverNotRunning)
 			}
-			return m.handleQueueDeleteKey()
+			return m.handleServerDeleteKey()
 		case bindingQueueSuggestedActions:
 			return m.handleQueueSuggestedActionsKey()
 		case bindingQueueApprove:

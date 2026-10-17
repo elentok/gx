@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -91,13 +92,19 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 	}
 	epic := m.epicAt(r)
 	ticket := epic.Tickets[r.ticketIdx]
+	file, address := resolveTicketPath(m.settings.TicketStore, ticket.Path)
 
 	if status == schema.StatusOpen {
-		if err := checkTicketBodyBeforeOpen(ticket.FilePath()); err != nil {
+		if err := checkTicketBodyBeforeOpen(file); err != nil {
 			return m, notify.Error(err.Error())
 		}
 	}
 	if status == schema.StatusDone {
+		// ADR 0030: a map epic's tickets never land, so a person closes them;
+		// a loop epic's done comes only from the server's landing.
+		if !epic.IsMap {
+			return m, notify.Error(doneIsSetByServer)
+		}
 		if unresolved := epic.UnresolvedBlockers(ticket); len(unresolved) > 0 {
 			return m, notify.Error(fmt.Sprintf(
 				"%s has unresolved blocked_by (%s); refusing to mark done",
@@ -105,8 +112,11 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 			))
 		}
 	}
-	return m, cmdApplyTicketStatus(ticket.FilePath(), status)
+	return m, cmdApplyTicketStatus(m.serverAPI, file, address, status)
 }
+
+// doneIsSetByServer refuses Set done on a loop-epic ticket.
+const doneIsSetByServer = "done is set by the server"
 
 // checkTicketBodyBeforeOpen mirrors cmd/tickets_set.go's checkBodyBeforeOpen:
 // refuses to open a ticket with no body, since "nothing schedulable is
@@ -129,13 +139,17 @@ type statusChangedMsg struct{}
 
 // cmdApplyTicketStatus performs the validated write in a Cmd (not inline in
 // applyStatusChange) so a filesystem error surfaces as a toast rather than a
-// panic on the Update goroutine.
-func cmdApplyTicketStatus(path string, status schema.Status) tea.Cmd {
+// panic on the Update goroutine. The write is local; a running server is then
+// pinged about address.
+func cmdApplyTicketStatus(api ServerAPI, file, address string, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
-		if err := schema.UpdateTicket(path, func(t *schema.Ticket) {
+		if err := schema.UpdateTicket(file, func(t *schema.Ticket) {
 			t.Status = status
 		}); err != nil {
 			return notify.Error(err.Error())()
+		}
+		if api != nil && address != "" {
+			_ = api.TicketChanged(context.Background(), address)
 		}
 		return statusChangedMsg{}
 	}

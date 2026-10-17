@@ -41,17 +41,15 @@ func isParkedStatus(status string) bool {
 }
 
 // newServerStatusMenu lists, first, the direct statuses other than ticket's
-// own (only when its file is known), then the server actions that apply to
+// own, then the server actions that apply to
 // its state: a parked ticket unparks, any other unfinished one parks; both
 // can be cancelled or relaunched. A finished ticket has no server actions.
 func newServerStatusMenu(ticket tickets.Ticket, rendered tickets.RenderedStatus) components.MenuState {
 	var items []components.MenuItem
-	if ticket.File != "" {
-		current := schema.Status(strings.ToLower(strings.TrimSpace(ticket.Status)))
-		for _, status := range serverDirectStatuses {
-			if status != current {
-				items = append(items, components.MenuItem{Label: statusMenuLabels[status], Value: string(status)})
-			}
+	current := schema.Status(strings.ToLower(strings.TrimSpace(ticket.Status)))
+	for _, status := range serverDirectStatuses {
+		if status != current {
+			items = append(items, components.MenuItem{Label: statusMenuLabels[status], Value: string(status)})
 		}
 	}
 	if rendered.Terminal() {
