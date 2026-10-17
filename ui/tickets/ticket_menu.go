@@ -304,5 +304,5 @@ func (m Model) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) 
 	if cmd, ok := ticketMenuEditCopy(msg.action, m.yankTicketSummary, m.yankTicketFilePath, m.cmdEditSelectedFile); ok {
 		return m, cmd
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.link, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }

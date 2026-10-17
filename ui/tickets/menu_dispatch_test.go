@@ -3,6 +3,7 @@ package tickets
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -32,6 +33,30 @@ func writeTicketFile(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// With the link down the answer has no resume step, so it is saved and the
+// toast follows (see TestTicketsTab_NoServer_AnswerSavesThenNeedsServer)
+// without an unpark; with the link up the unpark is sent as before.
+func TestAnswerResume_LinkDownSkipsTheUnpark(t *testing.T) {
+	var calls []string
+	api := fakeServerAPI{calls: &calls}
+	if cmd := answerResume(api, ServerLinkDown, "gx:alpha/01"); cmd != nil {
+		cmd()
+		t.Fatalf("link down: resume = non-nil, calls = %v", calls)
+	}
+	if cmd := answerResume(nil, ServerLinkUp, "gx:alpha/01"); cmd != nil {
+		t.Fatal("no api: resume = non-nil")
+	}
+
+	cmd := answerResume(api, ServerLinkUp, "gx:alpha/01")
+	if cmd == nil {
+		t.Fatal("link up: resume = nil")
+	}
+	cmd()
+	if !slices.Equal(calls, []string{"changed gx:alpha/01", "unpark gx:alpha/01"}) {
+		t.Fatalf("link up: calls = %v", calls)
+	}
 }
 
 func TestTicketsTab_NoServer_AnswerSavesThenNeedsServer(t *testing.T) {

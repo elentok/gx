@@ -154,7 +154,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	case actionYankEpic:
 		return m, m.yankTicketSummary()
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.link, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
 // queueableAddresses is every open, not-yet-queued ticket of epic in ticket

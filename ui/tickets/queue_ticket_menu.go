@@ -63,7 +63,7 @@ func (m QueueModel) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.
 	if cmd, ok := ticketMenuEditCopy(msg.action, m.yankQueueTicketSummary, m.yankQueueTicketFilePath, m.cmdEditSelectedFile); ok {
 		return m, cmd
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.link, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
 // selectedQueueEpic is the selected epic header's epic; ok is false off one.
@@ -99,5 +99,5 @@ func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea
 	case actionYankEpic:
 		return m, m.yankQueueTicketSummary()
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.link, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
