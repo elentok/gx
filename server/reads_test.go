@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -227,5 +228,30 @@ func TestSnapshot_CarriesTheEpicsMapKind(t *testing.T) {
 	}
 	if len(snap.Tickets) != 2 || !snap.Tickets[0].EpicIsMap || snap.Tickets[1].EpicIsMap {
 		t.Errorf("tickets = %+v, want epic-a's map kind on its ticket only", snap.Tickets)
+	}
+}
+
+func TestSnapshot_CarriesTheEpicsMergeTargetAndStatus(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	servertest.SetProjectTrunk(t, store, "proj", repo, "main")
+	epicMD := filepath.Join(store, "proj", "epic-a", "ticket.md")
+	if err := os.WriteFile(epicMD, []byte("---\nstatus: draft\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Tickets) != 2 {
+		t.Fatalf("tickets = %+v, want 2", snap.Tickets)
+	}
+	for _, ti := range snap.Tickets {
+		if ti.EpicMergeTarget != "main" || ti.EpicStatus != "draft" {
+			t.Errorf("%s: merge target %q, status %q, want main and draft", ti.Address, ti.EpicMergeTarget, ti.EpicStatus)
+		}
 	}
 }

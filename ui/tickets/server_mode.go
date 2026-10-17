@@ -305,7 +305,10 @@ func epicsFromViewModel(vm viewmodel.State, scope viewmodel.Scope) []gxtickets.E
 		if !seen {
 			i = len(epics)
 			byName[name] = i
-			epics = append(epics, gxtickets.Epic{Name: name, Path: name, MergedAt: info.EpicMergedAt, IsMap: info.EpicIsMap})
+			epics = append(epics, gxtickets.Epic{
+				Name: name, Path: name, MergedAt: info.EpicMergedAt, IsMap: info.EpicIsMap,
+				Status: info.EpicStatus, MergeTarget: info.EpicMergeTarget,
+			})
 		}
 		epics[i].Tickets = append(epics[i].Tickets, ticketFromInfo(info, id))
 	}

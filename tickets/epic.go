@@ -48,6 +48,9 @@ type Epic struct {
 	// MergedAt is when the epic's branch landed on its target; a Merged epic
 	// is one with it set.
 	MergedAt time.Time
+	// MergeTarget is the branch the epic merges into. Only a server snapshot
+	// sets it; the loader leaves it empty.
+	MergeTarget string
 
 	// The evolve fields come from ticket.md's frontmatter; zero when unset.
 	EvolvedAt              time.Time

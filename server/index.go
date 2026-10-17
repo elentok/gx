@@ -54,6 +54,11 @@ type TicketInfo struct {
 	// EpicIsMap is set on a wayfinder map epic's tickets, riding along like
 	// EpicMergedAt.
 	EpicIsMap bool `json:"epic_is_map,omitempty"`
+	// EpicStatus is the epic's ticket.md status, riding along likewise.
+	EpicStatus string `json:"epic_status,omitempty"`
+	// EpicMergeTarget is the branch an epic merge lands on; filled in by the
+	// snapshot handler, empty when the project has no repo or trunk.
+	EpicMergeTarget string `json:"epic_merge_target,omitempty"`
 
 	// sum fingerprints the file the index read, so a claim can tell the file
 	// moved on since. Unexported: it is not part of the API.
@@ -122,6 +127,7 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 				info := ticketInfo(project, filepath.Base(e.Path), t)
 				info.EpicMergedAt = e.MergedAt
 				info.EpicIsMap = e.IsMap
+				info.EpicStatus = e.Status
 				list = append(list, info)
 			}
 		}

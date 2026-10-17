@@ -522,6 +522,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 			snap.Tickets[i].Recovery = recoveryState(s.parkHold.state(t.Address), t.Address, snap.Tickets)
 		}
 	}
+	s.fillEpicMergeTargets(snap.Tickets)
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Pending = s.pendingRows()

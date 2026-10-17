@@ -35,8 +35,7 @@ var epicDirectStatuses = []schema.Status{schema.StatusDraft, schema.StatusOpen}
 // epicMenuInput is what epicMenuItems reads from an epic row.
 type epicMenuInput struct {
 	epic tickets.Epic
-	// branch is the branch the epic merges into; "" while the snapshot does
-	// not carry it.
+	// branch is the branch the epic merges into; "" when unknown.
 	branch       string
 	serverReason string
 	archived     bool
@@ -102,6 +101,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
 	in := epicMenuInput{
 		epic:         epic,
+		branch:       epic.MergeTarget,
 		serverReason: serverReason(m.serverAPI, m.link),
 		archived:     archived,
 	}

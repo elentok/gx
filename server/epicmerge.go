@@ -41,9 +41,7 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	if e.IsMap {
 		return refusal(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand"), nil
 	}
-	first := slices.MinFunc(e.Tickets, func(x, y tickets.Ticket) int {
-		return cmp.Or(cmp.Compare(x.Number, y.Number), cmp.Compare(x.Identifier, y.Identifier))
-	})
+	first := lowestTicket(e)
 	one := ralphloop.OneIteration{Epic: a.Epic, Ticket: first}
 	_, target, err := s.rootRefs(a.Project, epics, a.Epic, first, repo)
 	if err != nil {
@@ -71,6 +69,51 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 		return QueueResult{}, errors.New("fork manual merge ticket for " + root.String())
 	}
 	return QueueResult{MergeTicket: tickets.Address{Project: a.Project, Epic: a.Epic, ID: id}.String()}, nil
+}
+
+// lowestTicket is the ticket an epic's root refs are worked out from.
+func lowestTicket(e tickets.Epic) tickets.Ticket {
+	return slices.MinFunc(e.Tickets, func(x, y tickets.Ticket) int {
+		return cmp.Or(cmp.Compare(x.Number, y.Number), cmp.Compare(x.Identifier, y.Identifier))
+	})
+}
+
+// fillEpicMergeTargets sets each ticket's EpicMergeTarget to the branch
+// epicMerge would land its epic on. rootRefs runs git, so once per epic.
+func (s *Server) fillEpicMergeTargets(list []TicketInfo) {
+	targets := map[tickets.Address]string{}
+	for i, info := range list {
+		a, err := tickets.ParseAddress(info.Address, tickets.AddressContext{})
+		if err != nil {
+			continue
+		}
+		key := tickets.Address{Project: a.Project, Epic: a.Epic}
+		target, ok := targets[key]
+		if !ok {
+			target = s.epicMergeTarget(key)
+			targets[key] = target
+		}
+		list[i].EpicMergeTarget = target
+	}
+}
+
+// epicMergeTarget is "" when the target can't be worked out: the menu then
+// just says "Merge".
+func (s *Server) epicMergeTarget(a tickets.Address) string {
+	dir, repo, err := s.projectOf(a.Project)
+	if err != nil {
+		return ""
+	}
+	epics, _ := s.idx.epicsOf(dir)
+	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == a.Epic })
+	if i < 0 || epics[i].IsMap || len(epics[i].Tickets) == 0 {
+		return ""
+	}
+	_, target, err := s.rootRefs(a.Project, epics, a.Epic, lowestTicket(epics[i]), repo)
+	if err != nil {
+		return ""
+	}
+	return target
 }
 
 // epicMergeRefusal is the refusal for a manual merge of e, nil when it may go.

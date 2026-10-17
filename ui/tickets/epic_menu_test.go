@@ -78,6 +78,19 @@ func TestEpicMenu_MergeLabelNamesTheBranch(t *testing.T) {
 	itemByLabel(t, items, "Merge into main")
 }
 
+func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
+	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}), server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "A", Status: "open", EpicStatus: "draft", EpicMergeTarget: "main"},
+	}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	view := openEpicMenuOn(t, updated.(Model), "gx:alpha").ticketMenu.View()
+	for _, want := range []string{"Merge into main", "already draft"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("view lacks %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestEpicMenu_CurrentStatusIsDim(t *testing.T) {
 	items := epicMenuItems(epicMenuInput{epic: tickets.Epic{Status: "open"}})
 	if got := itemByLabel(t, items, "Set open").Disabled; got != "already open" {
