@@ -89,6 +89,21 @@ navigation, opening, and future multi-select operations.
 **Active item** (diff panel) — the currently focused hunk (NavModeHunk) or changed line
 (NavModeLine). Governs keyboard navigation and yank/comment targets.
 
+**Context menu** — the one menu, opened with `m`, that lists everything a person can do to the
+focused item: suggested actions first, then the rest in groups. It looks and behaves the same in
+every tab. An action that can't run on its Target stays listed, dim, with the reason it can't.
+_Avoid_: actions menu, suggested-actions menu, session menu (retired names), Action (an Agents-tab
+term).
+
+**Target** — the focused item a Context menu acts on: a ticket row, an epic row, a session.
+Not the branch a ticket lands on (see **Base** / **Target**); where both could be meant, name the
+branch itself (e.g. "Merge into main"). _Avoid_: context (taken by the context window and `ViewContext`),
+subject.
+
+**Watch** — read an agent's conversation, live, without acting on it: its prompts, replies, tool
+calls and results, the same on every agent runner. Distinct from attaching to its terminal, which
+shows the screen. _Avoid_: tail, view log, attach.
+
 **Snap** — when a scroll operation moves the viewport such that the selection or active item is no
 longer visible, snap clamps it to the nearest visible item at the new viewport edge.
 
@@ -307,6 +322,13 @@ diagnostics). _Avoid_: run log.
 **Server** — the long-lived gx process that is the sole scheduler (`gx server …`). The TUI and CLI
 are its clients; they reach it over its API (ADR 0028). _Avoid_: daemon, orchestrator.
 
+**Author write** — a change a person may make to a ticket: its body, or its status to `draft` or
+`open`. It names the ticket by address and edits the ticket's file in the store.
+
+**Orchestration write** — a change only the server may make: park, unpark, unmute, cancel,
+relaunch, land and the other server verbs. A client asks for one by address and never writes the
+file itself. With no server running, it can't happen.
+
 **Server lock** — the one flock in the state dir that makes the server a singleton. A second
 `gx server start` fails on it instead of racing the first. Replaces the per-repo attach lock that
 let one TUI process own the Queue. _Avoid_: Attach / Attached / Detach / SelfAttached, Attach lock,
@@ -358,6 +380,8 @@ the branch it lands on. Only `base:` is declared (a branch or a ticket address);
 derived (a child's is its parent's branch, a top-level ticket's is trunk) and is none for a
 commitless ticket. The resolved base is recorded at claim as read-only `resolved_base`. `gx merge`
 takes `target`, not `base`.
+Not the Context menu's **Target** (the focused item); where both could be meant, name the
+branch itself (e.g. "merges into main").
 
 **Trunk** — the branch a project's top-level tickets land on: `main`, `develop`, a release branch.
 Set per project; detected from the repo when unset. A top-level ticket's **Target** is trunk.
