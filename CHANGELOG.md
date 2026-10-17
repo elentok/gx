@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.34.1 - 2026-10-17
+
+- Replaced the bottom tab bar with a top title row.
+  - The title row shows attention items and drops them in a fixed order at narrow widths.
+  - Added the `ctrl+o` view switcher overlay, a grouped fuzzy picker. It is wired to the Agents page, which recovers its last row.
+  - Dropped the footer row from the remaining pages. Status diff options now live in the focused panel header. Worktrees busy and paste state now show in the panel header, and the PASTE chip is shared.
+  - Clicking `?` in the title row now opens help on the Worktrees, Log, Stash, Status, PRs, Tickets, Queue and Agents pages.
+  - The help dialog has a new About section. The Worktrees help lists app keys, and cancel shows `esc`/`q`.
+  - Added the `ctrl+q` focus-sidebar key to the agents terminal.
+- Fixed kitty image diffs, which are now offset by the chrome height.
+- Fixed the stash list so it uses its full page height.
+- Fixed Status mouse-scroll and panel geometry so they use the main content height.
+
 ## v0.34.0 - 2026-10-16
 
 - Added the Agents tab (tab 8, `g a`) for running interactive agent sessions (claude) under the gx server, across every project.
