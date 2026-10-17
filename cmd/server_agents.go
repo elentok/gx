@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -200,24 +199,18 @@ func runAgentsWatch(ctx context.Context, log agentlog.Log, opts agentsWatchOpts,
 		_, err := fmt.Fprintf(w, "log pruned; transcript: %s\n", log.Transcript)
 		return err
 	}
-	f, err := os.Open(log.Path)
+	if !opts.Follow {
+		log.Ended = nil
+	}
+	var render func([]byte) []string
+	if opts.JSON {
+		render = func(raw []byte) []string { return []string{string(raw)} }
+	}
+	t, err := agentlog.OpenTail(log, render)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	if _, err := f.Seek(log.Offset, io.SeekStart); err != nil {
-		return err
-	}
-
-	format := func(line string) []string {
-		if line == "" {
-			return nil
-		}
-		if opts.JSON {
-			return []string{line}
-		}
-		return agentlog.Render([]byte(line))
-	}
+	defer t.Close()
 	write := func(lines []string) error {
 		for _, l := range lines {
 			if _, err := fmt.Fprintln(w, l); err != nil {
@@ -227,58 +220,33 @@ func runAgentsWatch(ctx context.Context, log agentlog.Log, opts agentsWatchOpts,
 		return nil
 	}
 
-	// The backlog is buffered so --tail can cut it; later lines stream.
-	var backlog []string
-	inBacklog := true
-	flushBacklog := func() error {
-		if opts.Tail > 0 && len(backlog) > opts.Tail {
-			backlog = backlog[len(backlog)-opts.Tail:]
-		}
-		inBacklog = false
-		return write(backlog)
+	// The backlog is the first step, so --tail can cut it; later lines stream.
+	backlog, ended, err := t.Step()
+	if err != nil {
+		return err
 	}
-
-	r := bufio.NewReader(f)
-	var partial string
-	// lastDrain: the agent was seen ended, so the next EOF is final. Reading
-	// once more after that catches what it wrote just before exiting.
-	lastDrain := false
-	for {
-		chunk, err := r.ReadString('\n')
-		if err == nil {
-			lines := format(partial + strings.TrimSuffix(chunk, "\n"))
-			partial = ""
-			if inBacklog {
-				backlog = append(backlog, lines...)
-			} else if werr := write(lines); werr != nil {
-				return werr
-			}
-			continue
-		}
-		if err != io.EOF {
-			return err
-		}
-		partial += chunk
-		if !opts.Follow || lastDrain {
-			if inBacklog {
-				backlog = append(backlog, format(partial)...)
-				return flushBacklog()
-			}
-			return write(format(partial))
-		}
-		if inBacklog {
-			if err := flushBacklog(); err != nil {
-				return err
-			}
-		}
-		if log.Ended != nil && log.Ended() {
-			lastDrain = true
-			continue
-		}
+	if !opts.Follow {
+		backlog = append(backlog, t.Flush()...)
+	}
+	if opts.Tail > 0 && len(backlog) > opts.Tail {
+		backlog = backlog[len(backlog)-opts.Tail:]
+	}
+	if err := write(backlog); err != nil {
+		return err
+	}
+	for opts.Follow && !ended {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-time.After(logFollowInterval):
 		}
+		var lines []string
+		if lines, ended, err = t.Step(); err != nil {
+			return err
+		}
+		if err := write(lines); err != nil {
+			return err
+		}
 	}
+	return nil
 }
