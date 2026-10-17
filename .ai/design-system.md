@@ -4,7 +4,9 @@ Use this file when making UI changes in `gx`.
 
 ## Goal
 
-Keep new UI work inside the shared design system instead of adding screen-local styling, hints, icons, or interaction patterns.
+gx has to be visually beautiful — this is a core product principle (see `index.md`). Keep new UI work
+inside the shared design system instead of adding screen-local styling, hints, icons, or interaction
+patterns.
 
 Read this alongside:
 
