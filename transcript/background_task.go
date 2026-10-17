@@ -85,7 +85,32 @@ type backgroundTaskLine struct {
 		// An async Agent launch: {isAsync, status: "async_launched", agentId}.
 		Status  string `json:"status"`
 		AgentID string `json:"agentId"`
+		// A TaskOutput result: {retrieval_status, task: {task_id, ...}}.
+		RetrievalStatus string `json:"retrieval_status"`
+		// A TaskStop result: {message, task_id}.
+		StoppedTaskID string `json:"task_id"`
 	} `json:"toolUseResult"`
+}
+
+// reportsOnTasks reports whether a non-assistant line is the CLI reporting on
+// a task. A tool_result counts only from TaskOutput or TaskStop: any other
+// tool (a Read or Monitor of the task's .output file) can echo the id in a
+// path while the task still runs.
+func (l backgroundTaskLine) reportsOnTasks() bool {
+	var m struct {
+		Content []struct {
+			Type string `json:"type"`
+		} `json:"content"`
+	}
+	// String content (a task-notification) fails to unmarshal: not a tool_result.
+	if json.Unmarshal(l.Message, &m) == nil {
+		for _, c := range m.Content {
+			if c.Type == "tool_result" {
+				return l.ToolUseResult.RetrievalStatus != "" || l.ToolUseResult.StoppedTaskID != ""
+			}
+		}
+	}
+	return true
 }
 
 // interimNotificationNote marks a task-notification for a subagent that ended
@@ -97,9 +122,10 @@ const interimNotificationNote = "the result below may be interim"
 // backgrounded-shell-command start markers (a tool_result carrying
 // backgroundTaskId) and, for each, whether it was later resolved. A marker
 // resolves as soon as its task id string appears anywhere on a later
-// non-sidechain transcript line — regardless of that line's
-// type/origin/JSON nesting — because the CLI necessarily refers to a task by
-// its id wherever it reports on it, whatever shape that report takes.
+// non-sidechain line the CLI wrote to report on tasks (see reportsOnTasks) —
+// regardless of that line's JSON nesting — because the CLI necessarily refers
+// to a task by its id wherever it reports on it, whatever shape that report
+// takes.
 // Sidechain-scoped markers (isSidechain: true) are excluded entirely, both
 // as start markers and as resolution lines — a subagent's background task
 // belongs to the subagent's lifetime, never the parent iteration's, so a
@@ -196,11 +222,13 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 
 		// The agent's own tool calls name its task (a Monitor on the output
 		// path, say) without the task having finished: only what the CLI
-		// reports back can resolve it.
-		if entry.Type != "assistant" && !strings.Contains(raw, interimNotificationNote) {
+		// reports back can resolve it. A report on an already-resolved task
+		// (its notification after a TaskOutput read) still wakes the agent,
+		// so it re-arms AwaitingTurnEnd too.
+		if entry.Type != "assistant" && entry.reportsOnTasks() && !strings.Contains(raw, interimNotificationNote) {
 			for _, taskID := range order {
 				m := markers[taskID]
-				if !m.resolved && containsTaskIDToken(raw, taskID) {
+				if containsTaskIDToken(raw, taskID) {
 					m.resolved = true
 					awaitingTurnEnd = true
 					lastResolvedAt, _ = time.Parse(time.RFC3339Nano, entry.Timestamp)

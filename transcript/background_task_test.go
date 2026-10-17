@@ -409,6 +409,72 @@ func TestReadBackgroundTasks_AwaitsTurnEndAfterResolution(t *testing.T) {
 	}
 }
 
+// readOutputLine mirrors the tool_result of the agent's own Read of a task's
+// .output file: it names the task id in a path, but the CLI isn't reporting on
+// the task.
+func readOutputLine(taskID, timestamp string) string {
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-read","type":"tool_result","content":"ok"}]},"toolUseResult":{"type":"text","file":{"filePath":"/private/tmp/claude-501/x/tasks/` + taskID + `.output","content":"ok"}}}`
+}
+
+func TestReadBackgroundTasks_AgentsOwnReadOfTheOutputDoesNotResolve(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
+		readOutputLine("task-1", "2026-08-12T17:00:05.000000000Z"),
+	)
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskOutstandingFresh {
+		t.Errorf("Markers = %+v, want task-1 outstanding-fresh", reading.Markers)
+	}
+}
+
+// The line order of the title-bar-impl/16 incident: the agent Read-polled the
+// output, ended its turn, and the notification then woke it into a new turn.
+func TestReadBackgroundTasks_NotificationAfterReadPollAwaitsTurnEnd(t *testing.T) {
+	start := startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z")
+	read := readOutputLine("task-1", "2026-08-12T17:00:05.000000000Z")
+	waiting := assistantLine("end_turn", "2026-08-12T17:00:10.000000000Z")
+	notice := notificationLine("task-1", "tool-1", "completed", "2026-08-12T17:00:14.000000000Z")
+	toolCall := assistantLine("tool_use", "2026-08-12T17:00:16.000000000Z")
+	for _, tc := range []struct {
+		name  string
+		lines []string
+		want  bool
+	}{
+		{"turn ended after the read", []string{start, read, waiting}, false},
+		{"notified", []string{start, read, waiting, notice}, true},
+		{"new turn running", []string{start, read, waiting, notice, toolCall}, true},
+	} {
+		reading, err := ReadBackgroundTasks(writeTranscript(t, tc.lines...), capDuration, readAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reading.AwaitingTurnEnd != tc.want {
+			t.Errorf("%s: AwaitingTurnEnd = %v, want %v", tc.name, reading.AwaitingTurnEnd, tc.want)
+		}
+	}
+}
+
+// A report on an already-resolved task (TaskOutput read it, then its
+// notification lands after the turn ended) wakes the agent all the same.
+func TestReadBackgroundTasks_LaterReportOnResolvedTaskRearms(t *testing.T) {
+	path := writeTranscript(t,
+		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
+		taskOutputLine("task-1", "2026-08-12T17:00:05.000000000Z"),
+		assistantLine("end_turn", "2026-08-12T17:00:10.000000000Z"),
+		notificationLine("task-1", "tool-1", "completed", "2026-08-12T17:00:14.000000000Z"),
+	)
+	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reading.AwaitingTurnEnd {
+		t.Error("AwaitingTurnEnd = false, want true")
+	}
+}
+
 // A Monitor that never reported expires on its own timeout (400s here), long
 // before the 2h cap of a backgrounded shell command.
 func TestReadBackgroundTasks_MonitorAgesOutAtItsOwnTimeout(t *testing.T) {
