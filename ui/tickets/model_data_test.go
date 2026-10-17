@@ -4,60 +4,69 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/keys"
 )
 
-// TestDeriveCollapsedSidebar_ClosedEpicDefaultsCollapsedOpenEpicDoesNot covers
-// ticket 02's core policy: a closed epic's ID gets a derived default of
-// collapsed with no explicit state at all, while an open epic gets none (so
-// it stays expanded).
-func TestDeriveCollapsedSidebar_ClosedEpicDefaultsCollapsedOpenEpicDoesNot(t *testing.T) {
+// TestDeriveCollapsedSidebar_EveryEpicDefaultsCollapsed covers the default
+// policy: open, closed and archived epics all start collapsed with no
+// explicit state at all, so the sidebar first shows one row per epic.
+func TestDeriveCollapsedSidebar_EveryEpicDefaultsCollapsed(t *testing.T) {
 	t.Parallel()
 	epics := []tickets.Epic{
 		{Path: "closed-epic", Tickets: []tickets.Ticket{{Status: "done"}}},
 		{Path: "open-epic", Tickets: []tickets.Ticket{{Status: "open"}}},
 	}
+	archived := []tickets.Epic{{Path: "archived-epic", Tickets: []tickets.Ticket{{Status: "done"}}}}
 
-	got := deriveCollapsedSidebar(nil, epics, nil, "")
+	got := deriveCollapsedSidebar(nil, epics, archived, "")
 
-	if !got["closed-epic"] {
-		t.Fatalf("expected closed epic to default to collapsed, got %v", got["closed-epic"])
-	}
-	if got["open-epic"] {
-		t.Fatalf("expected open epic to have no collapse default, got collapsed=%v", got["open-epic"])
-	}
-}
-
-// TestDeriveCollapsedSidebar_ReopenedEpicLosesCollapsedDefault covers the
-// no-stickiness requirement: an epic that closes then reopens must lose its
-// collapsed default on the very next derivation, not stay stuck collapsed.
-func TestDeriveCollapsedSidebar_ReopenedEpicLosesCollapsedDefault(t *testing.T) {
-	t.Parallel()
-	closed := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: "done"}}}}
-	reopened := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: "open"}}}}
-
-	if got := deriveCollapsedSidebar(nil, closed, nil, ""); !got["epic"] {
-		t.Fatalf("expected closed epic to default to collapsed, got %v", got["epic"])
-	}
-	if got := deriveCollapsedSidebar(nil, reopened, nil, ""); got["epic"] {
-		t.Fatalf("expected reopened epic to lose its collapsed default, got collapsed=%v", got["epic"])
+	for _, path := range []string{"closed-epic", "open-epic", "archived-epic"} {
+		if !got[path] {
+			t.Fatalf("expected %s to default to collapsed, got %v", path, got[path])
+		}
 	}
 }
 
-// TestDeriveCollapsedSidebar_ExplicitToggleBeatsClosedDefault covers both
-// directions of an explicit user toggle on a closed epic overriding the
-// declared default.
-func TestDeriveCollapsedSidebar_ExplicitToggleBeatsClosedDefault(t *testing.T) {
+// TestNewModel_StartsWithEveryEpicCollapsedAndCursorOnFirstEpic covers the
+// startup the user sees: one row per epic, no ticket rows, and the cursor on
+// the first epic rather than the section header above it.
+func TestNewModel_StartsWithEveryEpicCollapsedAndCursorOnFirstEpic(t *testing.T) {
 	t.Parallel()
-	epics := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: "done"}}}}
+	root := t.TempDir()
+	writeTicket(t, root, "alpha", "01-alpha-ticket.md", "Status: open\n\nBody.\n")
+	writeTicket(t, root, "beta", "01-beta-ticket.md", "Status: open\n\nBody.\n")
 
-	expanded := deriveCollapsedSidebar(map[string]bool{"epic": false}, epics, nil, "")
-	if expanded["epic"] {
-		t.Fatalf("expected explicit expand to beat closed-epic default, got collapsed=%v", expanded["epic"])
+	m := deliverLoadDefaults(t, NewModel(root, ui.Settings{}, keys.New(nil)))
+
+	for _, e := range m.sidebarTree.Entries() {
+		if e.Value.kind == nodeTicket {
+			t.Fatalf("expected no ticket rows at startup, got entry %q", e.ID)
+		}
 	}
+	r, ok := m.selectedRow()
+	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "alpha" {
+		t.Fatalf("expected cursor on the first epic row, got row=%+v ok=%v", r, ok)
+	}
+}
 
-	collapsed := deriveCollapsedSidebar(map[string]bool{"epic": true}, epics, nil, "")
-	if !collapsed["epic"] {
-		t.Fatalf("expected explicit collapse to be honored, got collapsed=%v", collapsed["epic"])
+// TestDeriveCollapsedSidebar_ExplicitToggleBeatsDefault covers both
+// directions of an explicit user toggle overriding the declared default, for
+// an open and a closed epic.
+func TestDeriveCollapsedSidebar_ExplicitToggleBeatsDefault(t *testing.T) {
+	t.Parallel()
+	for _, status := range []string{"open", "done"} {
+		epics := []tickets.Epic{{Path: "epic", Tickets: []tickets.Ticket{{Status: status}}}}
+
+		expanded := deriveCollapsedSidebar(map[string]bool{"epic": false}, epics, nil, "")
+		if expanded["epic"] {
+			t.Fatalf("%s: expected explicit expand to beat the default, got collapsed=%v", status, expanded["epic"])
+		}
+
+		collapsed := deriveCollapsedSidebar(map[string]bool{"epic": true}, epics, nil, "")
+		if !collapsed["epic"] {
+			t.Fatalf("%s: expected explicit collapse to be honored, got collapsed=%v", status, collapsed["epic"])
+		}
 	}
 }
 

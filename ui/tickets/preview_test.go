@@ -24,10 +24,8 @@ func TestModel_SelectingTicketShowsFrontmatterAndBodyNoHeader(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, ticket] - move down twice to select the
-	// ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), ticket] - move down once to
+	// select the ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -65,10 +63,8 @@ func TestModel_PreviewFrontmatterUsesPrettifiedFieldLabels(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, 01-blocker, 02-blocked] - move down three
-	// times to select 02.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), 01-blocker, 02-blocked] - move
+	// down twice to select 02.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -91,7 +87,8 @@ func TestModel_PreviewBlockedBySuffixOmittedOnceResolved(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows sorted by group: [epic, blocker-ticket(open), blocked-ticket(blocked)]
+	// rows: [section header, epic (selected), blocker-ticket,
+	// blocked-ticket] - move down twice to select the blocked ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -122,7 +119,7 @@ func TestModel_PreviewPlainEpicShowsHeaderOnly(t *testing.T) {
 	m = updated.(Model)
 
 	// The epic's own sidebar row renders its name + open/total count
-	// regardless of selection (row 0 is now the section header).
+	// regardless of selection.
 	content := ansi.Strip(m.View().Content)
 	if !strings.Contains(content, "my-epic") || !strings.Contains(content, "(0 done / 1)") {
 		t.Fatalf("expected epic name + open/total count in preview header, got:\n%s", content)
@@ -145,10 +142,7 @@ func TestModel_PreviewMapEpicShowsMapBadgeAndBody(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Row 0 is the section header; move down once to select the epic itself.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-
+	// Selection starts on the epic itself.
 	content := ansi.Strip(m.View().Content)
 	if !strings.Contains(content, "wayfinder-epic") || !strings.Contains(content, "[map]") || !strings.Contains(content, "(0 done / 0)") {
 		t.Fatalf("expected epic name + [map] badge + open/total count in preview header, got:\n%s", content)
@@ -177,10 +171,8 @@ func TestModel_PreviewUnreadableTicketShowsErrorMessage(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, ticket] - move down twice to select the
-	// ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), ticket] - move down once to
+	// select the ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -200,10 +192,8 @@ func TestModel_PreviewUnrecognizedStatusShowsReadError(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, ticket] - move down twice to select the
-	// ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), ticket] - move down once to
+	// select the ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -224,9 +214,7 @@ func TestModel_PreviewScrollbarAppearsOnlyWhenBodyOverflows(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, short-ticket, long-ticket]
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), short-ticket, long-ticket]
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	shortContent := m.View().Content
@@ -290,8 +278,6 @@ func TestModel_BJumpsPreviewToBottomFromListFocus(t *testing.T) {
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
 
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
 	m = updated.(Model)
@@ -318,8 +304,6 @@ func TestModel_BJumpsPreviewToBottomFromPreviewFocus(t *testing.T) {
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
@@ -358,8 +342,6 @@ func TestModel_PreviewSearchHighlightsMatch(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

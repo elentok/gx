@@ -51,9 +51,7 @@ func TestModel_SpaceTogglesCheckedOnTicketRow(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Move onto the ticket row (row 0 is the section header, row 1 the epic).
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// Move from the epic row onto its ticket row.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -90,8 +88,10 @@ func TestModel_SpaceOnSectionRowIsNoOp(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	m = updated.(Model)
 	if _, ok := m.selectedRow(); ok {
-		t.Fatalf("expected initial selection on section row to report ok=false")
+		t.Fatalf("expected selection on section row to report ok=false")
 	}
 
 	before := len(m.checked)
@@ -111,10 +111,6 @@ func TestModel_SpaceOnEpicRowChecksAllTickets(t *testing.T) {
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-
-	// Move off the initial section-header selection onto the epic row.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
 	r, ok := m.selectedRow()
@@ -151,10 +147,7 @@ func TestModel_SpaceToggleOnDoneTicketIsNoOp(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Move onto the first (done) ticket row (row 0 is the section header,
-	// row 1 the epic).
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// Move from the epic row onto the first (done) ticket row.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -185,10 +178,6 @@ func TestModel_SpaceOnEpicRowChecksOnlyNonDoneTickets(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Move off the initial section-header selection onto the epic row.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-
 	r, ok := m.selectedRow()
 	if !ok || !r.isEpic() {
 		t.Fatalf("expected initial selection on epic row, got row=%+v ok=%v", r, ok)
@@ -216,10 +205,8 @@ func TestModel_CheckingBlockedTicketOpensConfirmModal(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Rows: [section header, epic, first-ticket, second-ticket]. Move to
-	// second-ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// Rows: [section header, epic (selected), first-ticket, second-ticket].
+	// Move to second-ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -267,8 +254,6 @@ func TestModel_CheckingTicketWithAlreadyCheckedBlockersSkipsConfirm(t *testing.T
 	// Check the blocker first (row 2: first-ticket).
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
 	updated, _ = m.Update(spacePress())
 	m = updated.(Model)
 
@@ -304,8 +289,6 @@ func TestModel_ConfirmingBlockedModalChecksTicketAndBlockers(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
@@ -348,8 +331,6 @@ func TestModel_CancelingBlockedModalLeavesCheckedSetUnchanged(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})

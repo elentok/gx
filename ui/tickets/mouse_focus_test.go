@@ -25,10 +25,8 @@ func TestModel_ClickInsidePreviewBoundsFocusesItAndRoutesWheel(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, ticket] - move down twice to select the
-	// long-bodied ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), ticket] - move down once to
+	// select the long-bodied ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -129,10 +127,8 @@ func TestModel_WheelOverPreviewScrollsItRegardlessOfFocus(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// rows: [section header, epic, ticket] - move down twice to select the
-	// long-bodied ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// rows: [section header, epic (selected), ticket] - move down once to
+	// select the long-bodied ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 
@@ -198,8 +194,6 @@ func TestModel_MouseWheelWhileHelpOpenScrollsHelpNotPreview(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	m = updated.(Model)
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 

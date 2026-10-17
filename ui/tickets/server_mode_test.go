@@ -133,11 +133,14 @@ func newServerModel(t *testing.T) Model {
 	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{})
 }
 
-// withState hands the tab the state the app shell would deliver for snap.
+// withState hands the tab the state the app shell would deliver for snap,
+// then expands its open epics.
 func withState(m Model, snap server.Snapshot) Model {
 	st := viewmodel.State{}.ApplySnapshot(snap)
 	next, _ := m.WithServerState(&st, ServerLinkUp)
-	return next.(Model)
+	m = next.(Model)
+	expandOpenEpics(&m)
+	return m
 }
 
 func TestServerMode_SnapshotRendersReducedRows(t *testing.T) {

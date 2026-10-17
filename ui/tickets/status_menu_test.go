@@ -15,16 +15,16 @@ func sPress() tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: 's', Text: "s"}
 }
 
-// selectTicketRow moves the sidebar selection onto the first ticket row:
-// rows are [section header, epic, ticket] (ticket 03a made the section
-// header a real cursor-reachable root node), so "j" twice from the initial
-// section-header selection.
+// selectTicketRow moves the sidebar selection onto the first visible ticket
+// row.
 func selectTicketRow(t *testing.T, m Model) Model {
 	t.Helper()
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	for i, e := range m.sidebarTree.Entries() {
+		if e.Value.kind == nodeTicket {
+			m.sidebarTree.SetSelectedIndex(i)
+			break
+		}
+	}
 	if r, ok := m.selectedRow(); !ok || r.isEpic() {
 		t.Fatalf("expected selection on a ticket row, got row=%+v ok=%v", r, ok)
 	}

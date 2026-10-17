@@ -226,6 +226,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.autoCheckForkedChildren(msg.epics)
+		firstLoad := !m.loaded
 		m.loaded = true
 		m.epics = msg.epics
 		m.archivedEpicCount = msg.archivedEpicCount
@@ -234,6 +235,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.recomputeSearchMatches()
 		}
 		m.clampSelected()
+		if firstLoad {
+			m.selectFirstEpic()
+		}
 		if msg.err != nil {
 			return m, notify.Error("load .scratch/: " + msg.err.Error())
 		}
@@ -325,6 +329,17 @@ func (m *Model) clampSelected() {
 	m.refreshSidebarCollapse()
 	m.sidebarTree.SetEntries(m.buildSidebarEntries())
 	m.sidebarTree.SkipUnselectable(1)
+}
+
+// selectFirstEpic puts the cursor on the first epic row, so a freshly loaded
+// tab opens on an epic rather than on the section header above it.
+func (m *Model) selectFirstEpic() {
+	for i, e := range m.sidebarTree.Entries() {
+		if e.Value.kind == nodeEpic {
+			m.sidebarTree.SetSelectedIndex(i)
+			return
+		}
+	}
 }
 
 // refreshSidebarCollapse re-derives m.sidebarTree's collapse map fresh from

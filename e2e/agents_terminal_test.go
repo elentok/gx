@@ -375,7 +375,7 @@ func TestAgentsTerminal_AttachesWhenSwitchedToAfterTheStateLoaded(t *testing.T) 
 	e := newAgentsEnv(t)
 	e.createSession()
 	v := startTUI(t, e, "tickets")
-	v.waitText("tiny", 30*time.Second)
+	v.waitText("some-epic", 30*time.Second)
 
 	v.send("8") // the Agents tab
 	v.waitText("Welcome to Claude Code", 10*time.Second)

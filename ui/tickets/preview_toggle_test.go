@@ -38,9 +38,9 @@ func TestModel_TVHidesPreviewAndGivesListFullWidth(t *testing.T) {
 			t.Fatalf("width %d: expected no preview panel while hidden", width)
 		}
 
-		// rows: [section header, epic, ticket] - "l" on the leaf ticket would
-		// normally focus the preview.
-		m = pressKeys(t, m, 'j', 'j', 'l').(Model)
+		// rows: [section header, epic (selected), ticket] - "l" on the leaf
+		// ticket would normally focus the preview.
+		m = pressKeys(t, m, 'j', 'l').(Model)
 		if m.focus != focusSidebar {
 			t.Fatalf("width %d: expected focus to stay on the list while preview hidden, got %v", width, m.focus)
 		}

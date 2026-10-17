@@ -15,7 +15,7 @@ import (
 // archived epic and moves the cursor onto that epic's one ticket row,
 // mirroring TestModel_ExpandArchivedSectionLoadsAndPopulatesCollapsedByDefault's
 // expand sequence (both the section and the epic default to collapsed, ticket
-// 04's closedEpicDefaults).
+// 04's epicCollapseDefaults).
 func selectArchivedTicketRow(t *testing.T, m Model) Model {
 	t.Helper()
 	m.sidebarTree.SetSelectedIndex(archivedSectionHeaderIndex(t, m))
@@ -141,4 +141,3 @@ func TestModel_ReadOnlyKeysStillWorkOnArchivedRow(t *testing.T) {
 		t.Fatalf("expected archived epic still rendered after read-only keys, got:\n%s", m.View().Content)
 	}
 }
-

@@ -458,7 +458,7 @@ func TestServerStream_TicketsTabLoadingThenCurrentState(t *testing.T) {
 
 	h.probeUp()
 	// A tab built (or rebuilt after a worktree change) now starts current.
-	if view := ticketsTab(h).View().Content; !strings.Contains(view, "Zeta ticket") {
+	if view := ticketsTab(h).View().Content; !strings.Contains(view, "alpha") {
 		t.Fatalf("rebuilt tab missing delivered state:\n%s", view)
 	}
 }

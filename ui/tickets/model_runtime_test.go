@@ -72,9 +72,7 @@ func TestModel_EditChordOnEpicOpensTicketMD(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Row 0 is the section header; move down once to select the epic itself.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// Selection starts on the epic itself.
 	path, ok, warning := m.selectedEditTarget()
 	want := filepath.Join(root, ".scratch", "my-epic", "ticket.md")
 	if !ok || path != want {
@@ -101,9 +99,7 @@ func TestModel_EditChordOnEpicWithoutTicketMDIsNoOpWithWarning(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Row 0 is the section header; move down once to select the epic itself.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// Selection starts on the epic itself.
 	if _, ok, warning := m.selectedEditTarget(); ok || warning != "epic has no ticket.md to edit" {
 		t.Fatalf("selectedEditTarget ok=%v warning=%q, want the no-ticket.md warning", ok, warning)
 	}

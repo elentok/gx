@@ -202,8 +202,13 @@ func (m Model) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model,
 		return m, nil
 	}
 	m.vm = *st
+	firstLoad := !m.loaded
 	m.loaded = true
-	return m.applyServerRows(), nil
+	m = m.applyServerRows()
+	if firstLoad {
+		m.selectFirstEpic()
+	}
+	return m, nil
 }
 
 // WithCwdProject scopes the tab to the registered project the TUI started in;

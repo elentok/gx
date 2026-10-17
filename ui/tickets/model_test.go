@@ -32,9 +32,28 @@ func TestNewModel_RendersEmptyStateWithNoScratchDir(t *testing.T) {
 	}
 }
 
-// deliverLoad feeds one disk load of the fixture through Update. It skips
-// Init, whose down fallback would also start a store watch.
+// deliverLoad is deliverLoadDefaults plus expandOpenEpics.
 func deliverLoad(t *testing.T, m Model) Model {
+	t.Helper()
+	m = deliverLoadDefaults(t, m)
+	expandOpenEpics(&m)
+	return m
+}
+
+// expandOpenEpics explicitly expands every open epic, so a test about rows
+// inside an epic can see them without its own expand step.
+func expandOpenEpics(m *Model) {
+	for _, e := range m.epics {
+		if !e.AllDone() {
+			m.explicitCollapsed[e.Path] = false
+		}
+	}
+	m.clampSelected()
+}
+
+// deliverLoadDefaults feeds one disk load of the fixture through Update. It
+// skips Init, whose down fallback would also start a store watch.
+func deliverLoadDefaults(t *testing.T, m Model) Model {
 	t.Helper()
 	updated, _ := m.Update(m.cmdLoadDisk()())
 	return updated.(Model)
@@ -275,9 +294,6 @@ func TestNewModel_FullyDoneEpicStartsCollapsedAndDimmed(t *testing.T) {
 	if strings.Contains(content, "First ticket") || strings.Contains(content, "Second ticket") {
 		t.Fatalf("expected done-epic's tickets hidden by default collapse, got:\n%s", content)
 	}
-	if !strings.Contains(content, "Only ticket") {
-		t.Fatalf("expected open-epic to start expanded, got:\n%s", content)
-	}
 }
 
 func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
@@ -290,7 +306,7 @@ func TestModel_EpicsLoadedMsgPreservesManualCollapseToggle(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Manually collapse open-epic, which defaults to expanded.
+	// Manually collapse open-epic, which deliverLoad expanded.
 	setCollapsedEpic(&m, indexOfEpic(t, m, "open-epic"), true)
 	if !m.isCollapsed(findEpic(t, m, "open-epic")) {
 		t.Fatalf("expected open-epic collapsed after manual toggle")
@@ -359,25 +375,6 @@ func TestModel_ExpandedClosedSectionSurvivesRepeatedRefresh(t *testing.T) {
 		if !strings.Contains(m.View().Content, "Only ticket") {
 			t.Fatalf("refresh %d: expected Closed section's ticket visible, got:\n%s", i+1, m.View().Content)
 		}
-	}
-}
-
-func TestNewModel_ZeroTicketEpicStartsExpanded(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	testutil.Mkdir(t, filepath.Join(root, ".scratch", "empty-epic", "issues"))
-	testutil.EnsureEpicTicketMD(t, filepath.Join(root, ".scratch", "empty-epic"))
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-
-	// A zero-ticket epic is never AllDone (epicSection), so it
-	// lands in the never-collapsed-by-default Open section and must not
-	// start dimmed/collapsed itself either.
-	if m.isCollapsed(findEpic(t, m, "empty-epic")) {
-		t.Fatalf("expected zero-ticket epic to start expanded")
 	}
 }
 
@@ -570,15 +567,23 @@ func TestModel_NavigationCanSelectSectionHeaders(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Selection starts on the "Open epics" header itself.
-	if _, ok := m.selectedRow(); ok {
-		t.Fatalf("expected initial selection on the Open header to report ok=false")
+	// Selection starts on open-epic, the first epic row.
+	r, ok := m.selectedRow()
+	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "open-epic" {
+		t.Fatalf("expected initial selection on open-epic, got row=%+v ok=%v", r, ok)
 	}
 
-	// Moving down lands on open-epic, a real selectable row.
+	// Moving up reaches the "Open epics" header, which reports ok=false.
+	updated, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	m = updated.(Model)
+	if _, ok := m.selectedRow(); ok {
+		t.Fatalf("expected moving up from open-epic to land on the Open header (ok=false)")
+	}
+
+	// Moving down lands back on open-epic, a real selectable row.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
-	r, ok := m.selectedRow()
+	r, ok = m.selectedRow()
 	if !ok || !r.isEpic() || m.epics[r.epicIdx].Name != "open-epic" {
 		t.Fatalf("expected selection on open-epic after moving off the header, got row=%+v ok=%v", r, ok)
 	}
@@ -620,17 +625,15 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Navigate to the second ticket row: entry 0 is the "Open epics" header
-	// (itself cursor-reachable now), entry 1 its epic, entries 2/3 its two
-	// tickets — three downs from the header lands on the second ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
+	// Navigate to the second ticket row: entry 0 is the "Open epics" header,
+	// entry 1 its epic (where selection starts), entries 2/3 its two tickets
+	// — two downs from the epic lands on the second ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	m = updated.(Model)
 	if m.sidebarTree.SelectedIndex() != 3 {
-		t.Fatalf("expected selection at entry 3 after three downs, got %d", m.sidebarTree.SelectedIndex())
+		t.Fatalf("expected selection at entry 3 after two downs, got %d", m.sidebarTree.SelectedIndex())
 	}
 	line := selectedSidebarLine(t, m)
 	checkedBefore := len(m.checked)
@@ -765,12 +768,8 @@ func TestModel_NavigationSkipsCollapsedEpicTickets(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Selection starts on the "Open epics" header; move onto epic-a first.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-
-	// Rows so far: [header, epic-a, first-ticket, epic-b, second-ticket].
-	// Collapse epic-a, then moving down once should land on epic-b, not its
+	// Rows so far: [header, epic-a (selected), first-ticket, epic-b,
+	// second-ticket]. Collapse epic-a, then moving down once should land on epic-b, not its
 	// now-hidden ticket.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
@@ -795,11 +794,7 @@ func TestModel_NoGlobalCollapseExpandAllBinding(t *testing.T) {
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = updated.(Model)
 
-	// Selection starts on the "Open epics" header; move onto epic-a first.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-
-	// Collapsing the selected epic (epic-a) must not affect epic-b.
+	// Selection starts on epic-a. Collapsing it must not affect epic-b.
 	updated, _ = m.Update(tea.KeyPressMsg{Code: 'h', Text: "h"})
 	m = updated.(Model)
 
