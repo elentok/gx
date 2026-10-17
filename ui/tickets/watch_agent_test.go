@@ -217,14 +217,6 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 	}
 }
 
-func TestWatchAgent_PrunedLogPointsAtTranscript(t *testing.T) {
-	fakeNativeLog(t, agentlog.Log{Pruned: true, Transcript: "/t/x.jsonl"}, nil)
-	loaded := cmdWatchAgent("gx:epic/01")().(watchLoadedMsg)
-	if got := strings.Join(loaded.lines, "\n"); !strings.Contains(got, "/t/x.jsonl") {
-		t.Errorf("lines = %q", got)
-	}
-}
-
 func TestWatch_NativeLive_OpensLogNotPane(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.jsonl")
 	if err := os.WriteFile(path, []byte(watchLogLine), 0o644); err != nil {
@@ -232,7 +224,7 @@ func TestWatch_NativeLive_OpensLogNotPane(t *testing.T) {
 	}
 	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return false }}, nil)
 
-	cmd := cmdServerWatch(nil, "gx:epic/01")
+	cmd := cmdServerWatch(nil, "gx:epic/01", "01")
 	if _, ok := cmd().(watchLoadedMsg); !ok {
 		t.Error("expected the native log modal")
 	}
@@ -253,7 +245,7 @@ func failOnNativeLog(t *testing.T) (undo func()) {
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd := cmdServerWatch(fakeServerAPI{}, "gx:epic/01")
+	cmd := cmdServerWatch(fakeServerAPI{}, "gx:epic/01", "01")
 	undo()
 	cmd()
 }
@@ -334,9 +326,116 @@ func TestMenuReady_DeliveredOnce(t *testing.T) {
 	}
 }
 
-func TestNativeAgentLive(t *testing.T) {
-	alive := func() bool { return false }
-	ended := func() bool { return true }
+// watchLogFile writes a one-line agent log and returns its path.
+func watchLogFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "out.jsonl")
+	appendWatchLog(t, path, "hello from the agent")
+	return path
+}
+
+func endedFunc(ended bool) func() bool { return func() bool { return ended } }
+
+// watchTicketTab is the Tickets tab with one ticket in status selected.
+func watchTicketTab(t *testing.T, status string) Model {
+	t.Helper()
+	// The open sibling keeps the epic expanded when status is done.
+	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: status},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+	}})
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = selectTicketRow(t, updated.(Model))
+	if got := m.selectedTicketPath(); got != "gx:alpha/01" {
+		t.Fatalf("selected %q, want gx:alpha/01", got)
+	}
+	return m
+}
+
+// openWatchFromMenu opens the Context menu and picks Watch, returning the
+// model with the modal loaded.
+func openWatchFromMenu(t *testing.T, m Model) Model {
+	t.Helper()
+	m, ready := requestTicketMenu(t, m)
+	updated, _ := m.Update(ready)
+	m, cmd := chooseTicketMenuItem(t, updated.(Model), "Watch")
+	if cmd == nil {
+		t.Fatal("Watch is dim or returned no Cmd")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(Model)
+	t.Cleanup(func() {
+		if m.watch.tail != nil {
+			m.watch.tail.Close()
+		}
+	})
+	return m
+}
+
+func TestWatch_EndedAgentOpensNotLive(t *testing.T) {
+	for _, status := range []string{"claimed", "done"} {
+		t.Run(status, func(t *testing.T) {
+			fakeNativeLog(t, agentlog.Log{Path: watchLogFile(t), Ended: endedFunc(true)}, nil)
+			m := openWatchFromMenu(t, watchTicketTab(t, status))
+			if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· not live") || !strings.Contains(view, "hello from the agent") {
+				t.Errorf("Watch did not open the ended log not live:\n%s", view)
+			}
+		})
+	}
+}
+
+func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
+	for name, log := range map[string]agentlog.Log{
+		"headless": {Ended: endedFunc(false)},
+		"pty":      {PtyDir: "/pty/dir", Ended: endedFunc(false)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			log.Path = watchLogFile(t)
+			prev := nativeAgentLog
+			t.Cleanup(func() { nativeAgentLog = prev })
+			nativeAgentLog = func(_ context.Context, address string) (agentlog.Log, error) {
+				if !strings.HasSuffix(address, ":my-epic/01") {
+					return agentlog.Log{}, agentlog.ErrNoAgent
+				}
+				return log, nil
+			}
+			m := selectTicketRow(t, loadedModelWithTicket(t))
+			m = openWatchFromMenu(t, m)
+			if view := m.watch.View(); !m.watch.open || !strings.Contains(view, "· live") {
+				t.Errorf("Watch without a server did not open live:\n%s", view)
+			}
+		})
+	}
+}
+
+func TestWatch_NoOrPrunedLogDims(t *testing.T) {
+	cases := map[string]struct {
+		log agentlog.Log
+		err error
+	}{
+		"no agent": {agentlog.Log{}, agentlog.ErrNoAgent},
+		"pruned":   {agentlog.Log{Pruned: true}, nil},
+	}
+	for name, c := range cases {
+		t.Run(name+"/tickets", func(t *testing.T) {
+			fakeNativeLog(t, c.log, c.err)
+			_, ready := requestTicketMenu(t, watchTicketTab(t, "claimed"))
+			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != noAgentLog {
+				t.Errorf("Watch disabled = %q, want %q", got, noAgentLog)
+			}
+		})
+		t.Run(name+"/queue", func(t *testing.T) {
+			fakeNativeLog(t, c.log, c.err)
+			m := selectFirstQueueTicketRow(t, newServerQueueModel(t, nil))
+			_, ready := requestQueueMenu(t, m)
+			if got := itemByLabel(t, ready.items, "Watch").Disabled; got != noAgentLog {
+				t.Errorf("Watch disabled = %q, want %q", got, noAgentLog)
+			}
+		})
+	}
+}
+
+func TestNativeAgentLogKept(t *testing.T) {
 	cases := []struct {
 		name string
 		log  agentlog.Log
@@ -344,14 +443,14 @@ func TestNativeAgentLive(t *testing.T) {
 		want bool
 	}{
 		{"no native agent", agentlog.Log{}, agentlog.ErrNoAgent, false},
-		{"running", agentlog.Log{Path: "x", Ended: alive}, nil, true},
-		{"ended", agentlog.Log{Path: "x", Ended: ended}, nil, false},
+		{"running", agentlog.Log{Path: "x", Ended: endedFunc(false)}, nil, true},
+		{"ended", agentlog.Log{Path: "x", Ended: endedFunc(true)}, nil, true},
 		{"pruned", agentlog.Log{Pruned: true}, nil, false},
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
-		if got := nativeAgentLive("gx:epic/01"); got != c.want {
-			t.Errorf("%s: nativeAgentLive = %v, want %v", c.name, got, c.want)
+		if got := nativeAgentLogKept("gx:epic/01"); got != c.want {
+			t.Errorf("%s: nativeAgentLogKept = %v, want %v", c.name, got, c.want)
 		}
 	}
 }

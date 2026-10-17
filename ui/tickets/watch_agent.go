@@ -42,11 +42,20 @@ var nativeAgentLog = func(ctx context.Context, address string) (agentlog.Log, er
 	return agentlog.Locator{StateDir: stateDir}.AgentLog(ctx, a)
 }
 
-// nativeAgentLive reports whether address's agent runs on a native runner and
-// its process is still alive.
-func nativeAgentLive(address string) bool {
+// agentAddress is the address the log lookup takes for a row's Path: already
+// an address in server mode, a ticket file while the tab reads disk.
+func agentAddress(path, id string) string {
+	if a, ok := tickets.AddressOfPath(path, id); ok {
+		return a.String()
+	}
+	return path
+}
+
+// nativeAgentLogKept reports whether address's native agent has a log Watch
+// can open, whether the agent still runs or has ended.
+func nativeAgentLogKept(address string) bool {
 	log, err := nativeAgentLog(context.Background(), address)
-	return err == nil && !log.Pruned && log.Ended != nil && !log.Ended()
+	return err == nil && !log.Pruned
 }
 
 // watchTickInterval matches `gx server agents watch`'s follow interval.
@@ -63,7 +72,8 @@ type watchLoadedMsg struct {
 	// step, when set, loads the content delta away (`[` -1, `]` +1), or
 	// returns nil past an end.
 	step func(delta int) tea.Cmd
-	// live marks a Watch: the header shows live or "agent ended".
+	// live marks a Watch: the header shows live, or "not live" when ended
+	// already holds at open.
 	live  bool
 	ended bool
 	// tail, when set, is stepped once per tick for new lines.
@@ -87,6 +97,7 @@ type watchModal struct {
 	title    string
 	step     func(delta int) tea.Cmd
 	live     bool
+	notLive  bool
 	ended    bool
 	tail     *agentlog.Tail
 	gen      int64
@@ -102,7 +113,7 @@ func (w watchModal) Open(msg watchLoadedMsg, width, height int) watchModal {
 	vp := viewport.New(viewport.WithWidth(watchContentWidth(width)), viewport.WithHeight(vpH))
 	vp.SetContent(strings.Join(msg.lines, "\n"))
 	vp.GotoBottom()
-	w = watchModal{open: true, title: msg.title, step: msg.step, live: msg.live, ended: msg.ended, tail: msg.tail, lines: msg.lines, vp: vp}
+	w = watchModal{open: true, title: msg.title, step: msg.step, live: msg.live, notLive: msg.ended, tail: msg.tail, lines: msg.lines, vp: vp}
 	if w.tail != nil {
 		w.gen = watchGen.Add(1)
 	}
@@ -198,6 +209,8 @@ func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
 func (w watchModal) View() string {
 	title := w.title
 	switch {
+	case w.live && w.notLive:
+		title += " · not live"
 	case w.live && w.ended:
 		title += " · agent ended"
 	case w.live:
@@ -224,10 +237,6 @@ func cmdWatchAgent(address string) tea.Cmd {
 			return notify.Error("watch: " + err.Error())()
 		}
 		msg := watchLoadedMsg{title: "Agent " + address, live: true}
-		if log.Pruned {
-			msg.lines, msg.ended = []string{"log pruned; transcript: " + log.Transcript}, true
-			return msg
-		}
 		tail, err := agentlog.OpenTail(log, nil)
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()

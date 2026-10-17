@@ -43,7 +43,7 @@ func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings
 		file, address := resolveTicketPath(settings.TicketStore, result.Path)
 		return cmdTranscript(file, address, width)
 	case actionWatch:
-		return cmdServerWatch(api, result.Path)
+		return cmdServerWatch(api, result.Path, result.TicketID)
 	}
 	return nil
 }

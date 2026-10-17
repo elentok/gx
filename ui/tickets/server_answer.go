@@ -58,13 +58,14 @@ func resolveTicketPath(store, path string) (file, address string) {
 	return path, ""
 }
 
-// cmdServerWatch opens a live native agent's log, else focuses the iteration
-// tab the iterations read names.
-func cmdServerWatch(api ServerAPI, address string) tea.Cmd {
-	// Liveness shells out to ps, so it is resolved inside the Cmd.
-	watch, focus := cmdWatchAgent(address), cmdServerFocusPane(api, address)
+// cmdServerWatch opens a native agent's log, live or ended, else focuses the
+// iteration tab the iterations read names. The log needs no server.
+func cmdServerWatch(api ServerAPI, path, id string) tea.Cmd {
+	address := agentAddress(path, id)
+	// The log lookup reads the state dir, so it is resolved inside the Cmd.
+	watch, focus := cmdWatchAgent(address), cmdServerFocusPane(api, path)
 	return func() tea.Msg {
-		if nativeAgentLive(address) {
+		if nativeAgentLogKept(address) {
 			return watch()
 		}
 		return focus()

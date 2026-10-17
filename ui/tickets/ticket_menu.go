@@ -30,7 +30,7 @@ type ticketMenuInput struct {
 	rendered             tickets.RenderedStatus
 	ticket               tickets.Ticket
 	isMap                bool
-	paneLive, nativeLive bool
+	paneLive, nativeLog bool
 	herdrDown            bool
 	archived             bool
 	// serverReason is why orchestration writes are off; empty when usable.
@@ -117,7 +117,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	if !unmute {
 		items = append(items, server("Unmute & Reopen", "", actionUnmuteReopen, notMuted))
 	}
-	watchable := in.nativeLive || (in.paneLive && !in.herdrDown)
+	watchable := in.nativeLog || (in.paneLive && !in.herdrDown)
 	items = append(items,
 		pick("Watch", "", actionWatch, contextmenu.Agent, reasonIf(!watchable, noAgentLog)),
 		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""))
@@ -245,7 +245,7 @@ func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
 	return func() tea.Msg {
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
-		in.nativeLive = nativeAgentLive(address)
+		in.nativeLog = nativeAgentLogKept(agentAddress(address, target.ticketID))
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in)}
 	}
 }

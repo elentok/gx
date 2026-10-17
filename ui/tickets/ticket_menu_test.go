@@ -374,7 +374,7 @@ func TestTicketMenuItems_Watch(t *testing.T) {
 	}{
 		{"no agent", ticketMenuInput{}, noAgentLog},
 		{"pane but herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, noAgentLog},
-		{"native log", ticketMenuInput{nativeLive: true}, ""},
+		{"native log", ticketMenuInput{nativeLog: true}, ""},
 		{"live pane", ticketMenuInput{paneLive: true}, ""},
 	} {
 		if got := itemByLabel(t, ticketMenuItems(tt.in), "Watch").Disabled; got != tt.want {
