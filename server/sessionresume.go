@@ -128,7 +128,7 @@ func (s *Server) restoreSessions() {
 		}
 		if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil || info.Stopped {
 			exit := savedSessionExit(dir)
-			s.updateSessionMeta(dir, info.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) })
+			s.updateSessionMetaOrWarn(dir, info.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, exit) })
 			continue
 		}
 		dead = append(dead, info.ID)

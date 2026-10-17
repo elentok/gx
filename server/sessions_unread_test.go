@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -126,6 +128,23 @@ func TestReportFocus_RefusesUnknownClientOrSession(t *testing.T) {
 	}
 	if res, err := h.Client.MarkSessionRead(ctx, "abcdef"); err != nil || res.Reason != server.ReasonSessionUnknown {
 		t.Errorf("mark read unknown = %+v, %v; want refused %s", res, err, server.ReasonSessionUnknown)
+	}
+}
+
+func TestMarkRead_FailedSaveIsAnError(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSession(t)
+	report(t, conv, agentfake.Control{State: "working"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	report(t, conv, agentfake.Control{State: "done"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Unread.Unread })
+	dir := filepath.Join(h.SessionsDir, id)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	if res, err := h.Client.MarkSessionRead(ctx, id); err == nil {
+		t.Errorf("mark read with an unsavable meta = %+v, nil; want an error", res)
 	}
 }
 

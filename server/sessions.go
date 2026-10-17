@@ -604,7 +604,7 @@ func (w *sessionWatches) close() {
 // retry. Any exit before crashUntil is crashed too.
 func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 	update := func(change func(*sessionMeta) bool) {
-		s.updateSessionMeta(dir, id, func(m *sessionMeta) bool { return m.Run == run && change(m) })
+		s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool { return m.Run == run && change(m) })
 	}
 	recordExit := func(exit string) {
 		if time.Now().Before(crashUntil) {
@@ -862,7 +862,9 @@ func (s *Server) stopSession(req SessionRequest) (SessionResult, error) {
 		}
 		waitForFile(filepath.Join(dir, nativerunner.ExitCodeFile), sessionStopTimeout)
 	}
-	s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, SessionExitClean) })
+	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool { return s.recordSessionExit(m, SessionExitClean) }); err != nil {
+		return SessionResult{}, err
+	}
 	meta, err := readSessionMeta(dir)
 	if err != nil {
 		return SessionResult{}, err
@@ -920,20 +922,27 @@ func (s *Server) removeSession(req SessionRequest) (SessionResult, error) {
 
 // updateSessionMeta applies change to the session's saved meta and, when it
 // reports a change, saves it and publishes it.
-func (s *Server) updateSessionMeta(dir, id string, change func(*sessionMeta) bool) {
+func (s *Server) updateSessionMeta(dir, id string, change func(*sessionMeta) bool) error {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	meta, err := readSessionMeta(dir)
 	if err != nil {
-		s.log.Warn("read session meta", "session", id, "err", err)
-		return
+		return fmt.Errorf("read session %s meta: %w", id, err)
 	}
 	if !change(&meta) {
-		return
+		return nil
 	}
 	if err := writeSessionMeta(dir, meta); err != nil {
-		s.log.Warn("save session meta", "session", id, "err", err)
-		return
+		return fmt.Errorf("save session %s meta: %w", id, err)
 	}
 	s.events.publish(EventSessionChanged, id)
+	return nil
+}
+
+// updateSessionMetaOrWarn is updateSessionMeta for background callers, which
+// have no request to fail.
+func (s *Server) updateSessionMetaOrWarn(dir, id string, change func(*sessionMeta) bool) {
+	if err := s.updateSessionMeta(dir, id, change); err != nil {
+		s.log.Warn("update session meta", "session", id, "err", err)
+	}
 }

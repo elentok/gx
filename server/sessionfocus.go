@@ -164,11 +164,13 @@ func (s *Server) markSessionRead(req SessionRequest) (SessionResult, error) {
 		return res, err
 	}
 	var info SessionInfo
-	s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		changed := m.Unread != SessionUnread{}
 		m.Unread = SessionUnread{}
 		info = m.info()
 		return changed
-	})
+	}); err != nil {
+		return SessionResult{}, err
+	}
 	return SessionResult{Session: &info}, nil
 }

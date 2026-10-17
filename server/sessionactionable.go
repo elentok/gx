@@ -36,11 +36,13 @@ func (s *Server) markSessionActionable(req MarkActionableRequest) (SessionResult
 		return sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has exited", req.ID)), nil
 	}
 	var info SessionInfo
-	s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
+	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.Actionable = SessionActionable{Reason: req.Reason, Action: req.Action}
 		info = m.info()
 		return true
-	})
+	}); err != nil {
+		return SessionResult{}, err
+	}
 	s.triggerBanner(req.ID, sound.Attention, req.Reason)
 	return SessionResult{Session: &info}, nil
 }
