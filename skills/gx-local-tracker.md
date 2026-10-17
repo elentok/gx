@@ -132,11 +132,11 @@ conversation history.
   validated write. Only the flags passed are changed; every other field is left exactly as it was.
   Never hand-edit frontmatter YAML directly when a `set` flag exists for the field.
 - **Create a ticket**: `gx tickets add <epic> --slug <slug> --body -` (body on stdin) writes the
-  ticket `open` and prints its address. The body may open with a frontmatter block (the per-ticket
-  template your skill defines): `add` merges its `blocked_by`, `type`, `expected_context_window`,
-  `commitless` and `parent` into the one block it writes. `id` is ignored (the allocated id wins,
-  with a warning), `status` may only be `open` or `draft`, and any other field refuses the add with
-  nothing written. Then validate it.
+  ticket `open` and prints its address. Set fields with flags, in the same write: `--blocked-by
+  01,03`, `--type`, `--expected-context-window`, `--commitless`, `--category` and `--parent` (parsed
+  as `gx tickets set` parses them). Omit `--blocked-by` when nothing gates the ticket: no flag means
+  no blockers. Write the body without a frontmatter block. (A leading block is still accepted for
+  older callers, but a field set both there and by a flag refuses the add.) Then validate it.
 - **Address a ticket**: agents name a ticket by its address, `project:epic/NN` (`epic/NN` or `NN`
   work as input when the epic is implied). Read it with `gx tickets show <addr>`; given an epic
   address (`project:epic`, or a bare `epic` in the cwd project) `show` prints the epic's `ticket.md`
@@ -246,8 +246,8 @@ that drives it.
   (a frontmatter block at the top may set `provisional_destination: true`). Then run
   `gx tickets validate` on any ticket of the epic. Later edits to the map body (Decisions so far,
   Not yet specified, Out of scope) go through `gx tickets section <project:epic> <heading> -`.
-- **Child ticket**: `gx tickets add <epic> --slug <slug> --body -`, with the ticket's `type` and
-  `blocked_by` in a frontmatter block at the top of the body and the question under `## Question`.
+- **Child ticket**: `gx tickets add <epic> --slug <slug> --type <type> [--blocked-by <ids>] --body
+  -`, with the question under `## Question`.
 - **Blocking**: `blocked_by`, as for any ticket.
 - **Frontier**: the rule under "Frontier" above, applied by hand: the lowest-numbered `open` ticket
   whose `blocked_by` tokens have all resolved. The server never computes one for a map epic.

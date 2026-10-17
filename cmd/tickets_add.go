@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
 )
 
@@ -41,12 +43,15 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 // body and is written open in that one write (no draft stub to promote), and
 // the output names it by address — an agent never needs the file path.
 //
-// The body may open with its own frontmatter block (the ticket template does):
-// its settable fields are merged in rather than written as a second block. See
-// bodyFrontmatter.
-func runTicketsAddBody(epicPath, parent, slug, body string, jsonOut bool, w, stderr io.Writer) error {
+// The fields come from flags (see addFieldFlags) or, kept for older callers,
+// from a frontmatter block opening the body: its settable fields are merged in
+// rather than written as a second block. See bodyFrontmatter.
+func runTicketsAddBody(epicPath, parent, slug, body string, flags addFrontmatter, jsonOut bool, w, stderr io.Writer) error {
 	fm, text, err := bodyFrontmatter(body)
 	if err != nil {
+		return err
+	}
+	if err := fm.merge(flags); err != nil {
 		return err
 	}
 	if strings.TrimSpace(text) == "" {
@@ -84,6 +89,101 @@ type addFrontmatter struct {
 	Commitless            bool     `yaml:"commitless"`
 	Parent                string   `yaml:"parent"`
 	Category              string   `yaml:"category"`
+
+	// set names the fields given, by YAML name, so a zero value given
+	// (commitless: false) still conflicts with the same field from a flag.
+	set map[string]bool
+}
+
+// addFieldFlags are add's per-field flags, keyed by flag name, with the YAML
+// field each one sets — the same fields a body frontmatter block sets.
+var addFieldFlags = []struct{ flag, field string }{
+	{"blocked-by", "blocked_by"},
+	{"type", "type"},
+	{"expected-context-window", "expected_context_window"},
+	{"commitless", "commitless"},
+	{"category", "category"},
+}
+
+// fieldFlags reads the addFieldFlags passed on fs into an addFrontmatter,
+// parsing them as `tickets set` does. An omitted --blocked-by is no blockers.
+func fieldFlags(fs *pflag.FlagSet) (addFrontmatter, error) {
+	fm := addFrontmatter{set: map[string]bool{}}
+	for _, f := range addFieldFlags {
+		if !fs.Changed(f.flag) {
+			continue
+		}
+		fm.set[f.field] = true
+		v, _ := fs.GetString(f.flag)
+		switch f.flag {
+		case "blocked-by":
+			if v != "" {
+				fm.BlockedBy = strings.Split(v, ",")
+			}
+		case "type":
+			fm.Type = v
+		case "expected-context-window":
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				return fm, fmt.Errorf("--expected-context-window %q: want a non-negative integer", v)
+			}
+			fm.ExpectedContextWindow = n
+		case "commitless":
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return fm, fmt.Errorf("--commitless %q: want true or false", v)
+			}
+			fm.Commitless = b
+		case "category":
+			fm.Category = v
+		}
+	}
+	return fm, fm.validate()
+}
+
+// merge applies the fields flags set onto fm, refusing any field fm's body
+// frontmatter already set: two sources for one field is a caller mistake.
+func (fm *addFrontmatter) merge(flags addFrontmatter) error {
+	for _, f := range addFieldFlags {
+		if flags.set[f.field] && fm.set[f.field] {
+			return fmt.Errorf("--%s conflicts with the body's %s; set it in one place", f.flag, f.field)
+		}
+	}
+	if flags.set["blocked_by"] {
+		fm.BlockedBy = flags.BlockedBy
+	}
+	if flags.set["type"] {
+		fm.Type = flags.Type
+	}
+	if flags.set["expected_context_window"] {
+		fm.ExpectedContextWindow = flags.ExpectedContextWindow
+	}
+	if flags.set["commitless"] {
+		fm.Commitless = flags.Commitless
+	}
+	if flags.set["category"] {
+		fm.Category = flags.Category
+	}
+	return nil
+}
+
+// validate checks fm's enum and range fields, wherever they came from.
+func (fm addFrontmatter) validate() error {
+	switch schema.Status(fm.Status) {
+	case "", schema.StatusOpen, schema.StatusDraft:
+	default:
+		return fmt.Errorf("status %q; a new ticket is open or draft", fm.Status)
+	}
+	if fm.Type != "" && !schema.TicketType(fm.Type).Valid() {
+		return fmt.Errorf("unknown type %q", fm.Type)
+	}
+	if !schema.Category(fm.Category).Valid() {
+		return fmt.Errorf("invalid category %q, want bug or idea", fm.Category)
+	}
+	if fm.ExpectedContextWindow < 0 {
+		return errors.New("expected_context_window must not be negative")
+	}
+	return nil
 }
 
 // bodyFrontmatter splits a leading frontmatter block off body and validates
@@ -99,19 +199,16 @@ func bodyFrontmatter(body string) (addFrontmatter, string, error) {
 	if err := dec.Decode(&fm); err != nil && !errors.Is(err, io.EOF) {
 		return fm, "", fmt.Errorf("body frontmatter: %w (settable: blocked_by, type, expected_context_window, commitless, parent, category)", err)
 	}
-	switch schema.Status(fm.Status) {
-	case "", schema.StatusOpen, schema.StatusDraft:
-	default:
-		return fm, "", fmt.Errorf("body frontmatter: status %q; a new ticket is open or draft", fm.Status)
+	var keys map[string]any
+	if err := yaml.Unmarshal([]byte(yamlPart), &keys); err != nil {
+		return fm, "", fmt.Errorf("body frontmatter: %w", err)
 	}
-	if fm.Type != "" && !schema.TicketType(fm.Type).Valid() {
-		return fm, "", fmt.Errorf("body frontmatter: unknown type %q", fm.Type)
+	fm.set = map[string]bool{}
+	for k := range keys {
+		fm.set[k] = true
 	}
-	if !schema.Category(fm.Category).Valid() {
-		return fm, "", fmt.Errorf("body frontmatter: invalid category %q, want bug or idea", fm.Category)
-	}
-	if fm.ExpectedContextWindow < 0 {
-		return fm, "", errors.New("body frontmatter: expected_context_window must not be negative")
+	if err := fm.validate(); err != nil {
+		return fm, "", fmt.Errorf("body frontmatter: %w", err)
 	}
 	return fm, text, nil
 }

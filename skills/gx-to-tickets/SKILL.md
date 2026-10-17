@@ -185,10 +185,16 @@ what was decided.
 
 ### 6. Publish the tickets
 
-Create one ticket per call with `gx tickets add <epic-slug> --slug <slug> --body -` (see
-[gx-local-tracker.md](../gx-local-tracker.md)), in dependency order (blockers first); it allocates
-the ID and prints the ticket's address. Each file's `blocked_by` lists the ticket IDs it depends on. Use
-the per-ticket template below — one ticket per file, never a single combined file.
+Create one ticket per call (see [gx-local-tracker.md](../gx-local-tracker.md)), in dependency order
+(blockers first); it allocates the ID and prints the ticket's address:
+
+```sh
+gx tickets add <epic-slug> --slug <slug> --type implement --expected-context-window 20000 \
+  [--blocked-by 01,03] --body -
+```
+
+`--blocked-by` lists the ticket IDs it depends on; leave it out when nothing gates the ticket. Use
+the per-ticket template below as the body — one ticket per call, never a single combined file.
 
 Work the **frontier** (see [gx-local-tracker.md](../gx-local-tracker.md)): any ticket whose blockers
 are all done. For a purely linear chain that means top to bottom.
@@ -218,14 +224,6 @@ running it only if the user has explicitly asked for a second code-review ticket
 <ticket-template>
 
 ```markdown
----
-id: "<NN>"
-status: open
-blocked_by: []
-type: implement
-expected_context_window: 20000
----
-
 # <NN> — <Ticket title>
 
 ## What to build
@@ -251,8 +249,8 @@ implementation list.
 ### Frontmatter fields
 
 See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are
-published as `open` unless instructed otherwise, with `blocked_by: []` when nothing gates them —
-`gx tickets add --body` lands the body and the status in one write, so there's no window where an
+published as `open` unless instructed otherwise, with no `--blocked-by` when nothing gates them —
+`gx tickets add --body` lands the body, the fields and the status in one write, so there's no window where an
 empty ticket is schedulable. Without `--body`, the stub lands
 `draft`; fill in the body first, then `gx tickets set <addr> --status open` to publish it.
 

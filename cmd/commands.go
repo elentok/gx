@@ -320,22 +320,35 @@ func newTicketsCmd(d deps) *cobra.Command {
 	})
 	var addParent, addSlug, addBody string
 	var addJSON bool
-	addCmd := newEpicScopedCmd(d, "add <epic|parent-addr>",
+	var addCmd *cobra.Command
+	addCmd = newEpicScopedCmd(d, "add <epic|parent-addr>",
 		"atomically allocate the next ticket ID and stamp out a ticket (a draft stub, or open with --body)",
 		func(arg string, _ []string, out io.Writer) error {
+			flags, err := fieldFlags(addCmd.Flags())
+			if err != nil {
+				return err
+			}
 			epicPath, parent, err := resolveAddTarget(d, arg, addParent)
 			if err != nil {
 				return err
 			}
 			if addBody == "" {
+				if len(flags.set) > 0 {
+					return fmt.Errorf("field flags need --body; fill a stub's fields in with `tickets set`")
+				}
 				return runTicketsAdd(epicPath, parent, addSlug, out)
 			}
 			body, err := readBodyArg(d, addBody)
 			if err != nil {
 				return err
 			}
-			return runTicketsAddBody(epicPath, parent, addSlug, body, addJSON, out, d.stderr)
+			return runTicketsAddBody(epicPath, parent, addSlug, body, flags, addJSON, out, d.stderr)
 		})
+	addCmd.Flags().String("blocked-by", "", "with --body, set blocked_by (comma-separated ticket IDs; omitted means none)")
+	addCmd.Flags().String("type", "", "with --body, set the type field (default implement)")
+	addCmd.Flags().String("expected-context-window", "", "with --body, set expected_context_window")
+	addCmd.Flags().String("commitless", "", "with --body, set commitless (true/false)")
+	addCmd.Flags().String("category", "", "with --body, set category (bug or idea)")
 	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
 	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; stub lands at <id>-<slug>.md)")
 	addCmd.Flags().StringVar(&addBody, "body", "", "ticket body, or - to read it from stdin; the ticket is written open and printed by address")

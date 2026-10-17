@@ -56,7 +56,7 @@ func TestRunTicketsAddBody_NewEpicWritesTicketMD(t *testing.T) {
 	epicPath := filepath.Join(t.TempDir(), "new-epic")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", false, &stdout, nil); err != nil {
+	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestRunTicketsAddBody_ExistingEpicKeepsTicketMD(t *testing.T) {
 	testutil.WriteFile(t, epicPath, "ticket.md", want)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", false, &stdout, nil); err != nil {
+	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -370,6 +370,52 @@ func TestExecute_TicketsAdd_CrossProject(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(cwd, "nope:inbox")); !os.IsNotExist(statErr) {
 		t.Errorf("stray directory created in cwd: %v", statErr)
+	}
+}
+
+func TestExecute_TicketsAdd_FieldFlags(t *testing.T) {
+	repo, project := setupShowProject(t)
+
+	if _, err := runIn(t, repo, "tickets", "add", "mine:inbox", "--slug", "first", "--body", "# First\n"); err != nil {
+		t.Fatalf("add first: %v", err)
+	}
+	if _, err := runIn(t, repo, "tickets", "add", "mine:inbox", "--slug", "second", "--body", "# Second\n",
+		"--blocked-by", "01", "--type", "research", "--expected-context-window", "60000",
+		"--commitless", "true", "--category", "bug"); err != nil {
+		t.Fatalf("add with flags: %v", err)
+	}
+	tk, err := schema.ParseTicket(filepath.Join(project, "inbox", "issues", "02-second.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tk.BlockedBy) != 1 || tk.BlockedBy[0] != "01" || tk.Type != schema.TicketType("research") ||
+		tk.ExpectedContextWindow != 60000 || !tk.Commitless || tk.Category != schema.CategoryBug ||
+		tk.Status != schema.StatusOpen {
+		t.Errorf("ticket = %+v, want the flags' fields, open", tk)
+	}
+}
+
+func TestExecute_TicketsAdd_FieldFlagErrors(t *testing.T) {
+	repo, project := setupShowProject(t)
+
+	for name, args := range map[string][]string{
+		"conflicts with body":   {"--body", "---\ntype: research\n---\n\n# X\n", "--type", "research"},
+		"bool conflict":         {"--body", "---\ncommitless: false\n---\n\n# X\n", "--commitless", "true"},
+		"bad type":              {"--body", "# X\n", "--type", "nope"},
+		"bad window":            {"--body", "# X\n", "--expected-context-window", "lots"},
+		"bad commitless":        {"--body", "# X\n", "--commitless", "maybe"},
+		"bad category":          {"--body", "# X\n", "--category", "nope"},
+		"dangling blocked_by":   {"--body", "# X\n", "--blocked-by", "07"},
+		"bad flag on a stub":    {"--type", "nope"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := runIn(t, repo, append([]string{"tickets", "add", "mine:inbox", "--slug", "x"}, args...)...); err == nil {
+				t.Errorf("add %v succeeded, want an error", args)
+			}
+		})
+	}
+	if matches, _ := filepath.Glob(filepath.Join(project, "inbox", "issues", "*.md")); len(matches) != 0 {
+		t.Errorf("refused adds left tickets behind: %v", matches)
 	}
 }
 
