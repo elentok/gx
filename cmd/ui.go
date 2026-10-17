@@ -351,6 +351,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		EnableNavigation: true,
 		DiffContextLines: cfg.StageDiffContextLines,
 		NameAliases:      cfg.NameAliases,
+		TicketStore:      cfg.TicketStore.Path,
 		LogConfig:        cfg.Log,
 		ExecutionQueue:   cfg.ExecutionQueue,
 		Notifications:    cfg.Notifications,

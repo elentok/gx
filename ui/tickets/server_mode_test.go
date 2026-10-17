@@ -529,7 +529,7 @@ func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
 		t.Fatalf("ticketFile = %q, %v", got, err)
 	}
 
-	m = m.WithTicketStore(store)
+	m.settings.TicketStore = store
 	if msg, ok := m.cmdServerResumeAnswered("gx:alpha/01")().(serverWriteMsg); !ok || msg.problem != "" {
 		t.Fatalf("resume result = %+v", msg)
 	}

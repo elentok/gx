@@ -119,8 +119,6 @@ type Model struct {
 	// serverAPI feeds vm (server_mode.go); nil keeps the tab reading the
 	// store for good.
 	serverAPI ServerAPI
-	// ticketStore locates the ticket files "Answer…" edits directly in server mode.
-	ticketStore string
 	// link is the link half of the last WithServerState delivery; nothing else
 	// writes it (server_link.go).
 	link ServerLink

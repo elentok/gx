@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -18,10 +19,15 @@ func (m QueueModel) handleQueueSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
 	status := r.epic.RenderedStatus(r.ticket)
-	// A queue row's Path is its file, not an address, so only a herdr pane
-	// can make it watchable.
-	paneLive := !m.settings.HerdrUnavailable && ticketPaneLive(r.epic.Name, r.ticket.DisplayNumber())
-	items := suggestedActionItems(status, r.ticket, paneLive, false, m.settings.HerdrUnavailable)
+	paneEpic, nativeLive := r.epic.Name, false
+	if _, address := resolveTicketPath(m.settings.TicketStore, r.ticket.Path); address != "" {
+		// A server-mode row's epic is "project:epic"; the herdr panes are named
+		// by the bare epic. Only an address locates a native agent.
+		paneEpic, _, _ = tickets.SplitTrailerValue(address)
+		nativeLive = nativeAgentLive(address)
+	}
+	paneLive := !m.settings.HerdrUnavailable && ticketPaneLive(paneEpic, r.ticket.DisplayNumber())
+	items := suggestedActionItems(status, r.ticket, paneLive, nativeLive, m.settings.HerdrUnavailable)
 	if m.serverAPI != nil && isParkedRoot(r.epic, m.checked) {
 		items = append([]components.MenuItem{mergeMenuItem}, items...)
 	}
@@ -47,15 +53,31 @@ func (m QueueModel) handleQueueActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, t
 	if result.Action == actionInvestigate {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
 	}
+	file, address := resolveTicketPath(m.settings.TicketStore, result.Path)
 	if result.Action == actionTranscript {
-		// A queue row's Path is its file, not an address, so the native
-		// agent dir is skipped.
-		return m, cmdTranscript(result.Path, "", m.width)
+		return m, cmdTranscript(file, address, m.width)
 	}
+	if result.Action == actionWatch && address != "" {
+		return m, cmdWatchAddress(address, result.TicketID)
+	}
+	result.Path = file
 	if cmd, ok := answerActionCmd(m.worktreeRoot, m.settings, result); ok {
 		return m, cmd
 	}
-	return m, cmdApplySuggestedAction(result.Path, result.Action, func() tea.Msg { return queueActionAppliedMsg{} })
+	return m, cmdApplySuggestedAction(file, result.Action, func() tea.Msg { return queueActionAppliedMsg{} })
+}
+
+// cmdWatchAddress opens address's live native agent, else focuses its herdr
+// pane. Liveness shells out to ps, so it is resolved inside the Cmd.
+func cmdWatchAddress(address, ticketID string) tea.Cmd {
+	epic, _, _ := tickets.SplitTrailerValue(address)
+	watch, focus := cmdWatchAgent(address), cmdFocusPane(epic, ticketID)
+	return func() tea.Msg {
+		if nativeAgentLive(address) {
+			return watch()
+		}
+		return focus()
+	}
 }
 
 // queueActionAppliedMsg reports that cmdApplySuggestedAction's write finished

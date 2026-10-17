@@ -19,13 +19,6 @@ var focusIterationTab = func(tabID string) error {
 	return err
 }
 
-// WithTicketStore sets the ticket-store root "Answer…" resolves ticket files
-// under in server mode.
-func (m Model) WithTicketStore(path string) Model {
-	m.ticketStore = path
-	return m
-}
-
 // serverIteration is address's live iteration from the server's iterations read.
 func (m Model) serverIteration(address string) (server.IterationInfo, bool) {
 	list, err := m.serverAPI.Iterations(context.Background())
@@ -53,6 +46,15 @@ func ticketFile(store, address string) (string, error) {
 	return matches[0], nil
 }
 
+// resolveTicketPath maps a row's Path, an address in server mode and a file
+// otherwise, to its ticket file. address is "" for a file.
+func resolveTicketPath(store, path string) (file, address string) {
+	if f, err := ticketFile(store, path); err == nil {
+		return f, path
+	}
+	return path, ""
+}
+
 // serverAnswerActionCmd dispatches the "m" menu's server-mode entries. Resume
 // is the server's unpark; Answer… edits the file directly and pings the server
 // before resuming; Watch opens a live native agent's log, else focuses the
@@ -63,7 +65,7 @@ func (m Model) serverAnswerActionCmd(result actionsMenuResult) (tea.Cmd, bool) {
 	case actionResumeAnswered:
 		return m.cmdServerWrite(serverVerbUnpark, address), true
 	case actionAnswer:
-		path, err := ticketFile(m.ticketStore, address)
+		path, err := ticketFile(m.settings.TicketStore, address)
 		if err != nil {
 			return notify.Error("answer: " + err.Error()), true
 		}

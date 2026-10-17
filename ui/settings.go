@@ -26,13 +26,16 @@ type Settings struct {
 	RenderHeartbeat  bool
 	DiffContextLines int               // used by the status diff view
 	NameAliases      map[string]string // used by the worktrees view
-	LogConfig        config.LogConfig
-	ExecutionQueue   config.ExecutionQueueConfig
-	Notifications    config.NotificationsConfig
-	Skills           config.SkillsConfig
-	Agents           config.AgentsConfig
-	Budget           config.BudgetConfig
-	Subscription     config.SubscriptionConfig
+	// TicketStore is the ticket store's root, where the tickets tabs resolve
+	// a server-mode address to its ticket file.
+	TicketStore    string
+	LogConfig      config.LogConfig
+	ExecutionQueue config.ExecutionQueueConfig
+	Notifications  config.NotificationsConfig
+	Skills         config.SkillsConfig
+	Agents         config.AgentsConfig
+	Budget         config.BudgetConfig
+	Subscription   config.SubscriptionConfig
 }
 
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.

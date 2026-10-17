@@ -196,7 +196,7 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
 	}
 	if result.Action == actionTranscript {
-		file, err := ticketFile(m.ticketStore, result.Path)
+		file, err := ticketFile(m.settings.TicketStore, result.Path)
 		if err != nil {
 			return m, notify.Error("transcript: " + err.Error())
 		}
