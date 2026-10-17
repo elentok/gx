@@ -12,17 +12,25 @@ import (
 // claimEventType is the run-log event written when a ticket is claimed.
 const claimEventType = "iteration-started"
 
+// Warning is a non-fatal finding about the ticket file at Path.
+type Warning struct {
+	Path string
+	Text string
+}
+
+func (w Warning) String() string { return w.Path + ": " + w.Text }
+
 // ProjectWarnings reports the base-derivation problems that are worth a look
 // but never fail validation. Every ticket here is a leaf of its epic, so the
 // derivation rules for roots (an epic's own blocked_by) are not checked.
 // Terminal and commitless tickets are skipped: they derive no base.
-func ProjectWarnings(projectDir string) ([]string, error) {
+func ProjectWarnings(projectDir string) ([]Warning, error) {
 	epics, err := Load(projectDir)
 	if err != nil {
 		return nil, err
 	}
 	graph := newProjectGraph(ProjectName(projectDir), epics)
-	var warnings []string
+	var warnings []Warning
 	for _, epic := range epics {
 		lastClaim := lastClaimBases(filepath.Join(epic.Path, "run-log.jsonl"))
 		for _, t := range epic.Tickets {
@@ -31,8 +39,8 @@ func ProjectWarnings(projectDir string) ([]string, error) {
 			}
 			warnings = append(warnings, graph.baseWarnings(epic.Name, t)...)
 			if claimed, ok := lastClaim[t.Identifier]; ok && t.ResolvedBase != "" && claimed != t.ResolvedBase {
-				warnings = append(warnings, fmt.Sprintf("%s: ticket %s: resolved_base %s differs from the last claim (%s)",
-					t.Path, t.DisplayNumber(), t.ResolvedBase, claimed))
+				warnings = append(warnings, Warning{t.Path, fmt.Sprintf("ticket %s: resolved_base %s differs from the last claim (%s)",
+					t.DisplayNumber(), t.ResolvedBase, claimed)})
 			}
 		}
 	}
@@ -41,8 +49,8 @@ func ProjectWarnings(projectDir string) ([]string, error) {
 
 // baseWarnings flags the blocker shapes that leave a ticket without an
 // unambiguous derived base.
-func (g *projectGraph) baseWarnings(epic string, t Ticket) []string {
-	var warnings []string
+func (g *projectGraph) baseWarnings(epic string, t Ticket) []Warning {
+	var warnings []Warning
 	unlanded := 0
 	for _, ref := range t.BlockedBy {
 		key, err := g.resolve(epic, ref)
@@ -55,13 +63,13 @@ func (g *projectGraph) baseWarnings(epic string, t Ticket) []string {
 		}
 		unlanded++
 		if !strings.HasPrefix(key, epic+"/") {
-			warnings = append(warnings, fmt.Sprintf("%s: ticket %s: blocker %q is in another epic, so no base is derived",
-				t.Path, t.DisplayNumber(), ref))
+			warnings = append(warnings, Warning{t.Path, fmt.Sprintf("ticket %s: blocker %q is in another epic, so no base is derived",
+				t.DisplayNumber(), ref)})
 		}
 	}
 	if unlanded >= 2 && t.Base == "" {
-		warnings = append(warnings, fmt.Sprintf("%s: ticket %s: %d unlanded commitful blockers and no base: set base: to pick one",
-			t.Path, t.DisplayNumber(), unlanded))
+		warnings = append(warnings, Warning{t.Path, fmt.Sprintf("ticket %s: %d unlanded commitful blockers and no base: set base: to pick one",
+			t.DisplayNumber(), unlanded)})
 	}
 	return warnings
 }

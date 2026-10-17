@@ -26,7 +26,7 @@ func runTicketsValidate(path string, w, stderr io.Writer) error {
 		if err := tickets.ValidateProject(projectDir); err != nil {
 			return err
 		}
-		if err := printProjectWarnings(projectDir, stderr); err != nil {
+		if err := printTicketWarnings(projectDir, path, stderr); err != nil {
 			return err
 		}
 	}
@@ -66,6 +66,36 @@ func printProjectWarnings(projectDir string, w io.Writer) error {
 	}
 	for _, warning := range warnings {
 		fmt.Fprintf(w, "warning: %s\n", warning)
+	}
+	return nil
+}
+
+// printTicketWarnings writes the findings for the ticket at path to w, and
+// folds every other ticket's into one count: an agent validating its own
+// ticket shouldn't wade through the whole project's.
+func printTicketWarnings(projectDir, path string, w io.Writer) error {
+	warnings, err := tickets.ProjectWarnings(projectDir)
+	if err != nil {
+		return err
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	others := map[string]bool{}
+	for _, warning := range warnings {
+		if filepath.Clean(warning.Path) == abs {
+			fmt.Fprintf(w, "warning: %s\n", warning)
+		} else {
+			others[warning.Path] = true
+		}
+	}
+	switch len(others) {
+	case 0:
+	case 1:
+		fmt.Fprintln(w, "1 other ticket has warnings; run `gx tickets validate --all`")
+	default:
+		fmt.Fprintf(w, "%d other tickets have warnings; run `gx tickets validate --all`\n", len(others))
 	}
 	return nil
 }

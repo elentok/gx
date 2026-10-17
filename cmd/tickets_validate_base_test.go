@@ -51,6 +51,35 @@ func TestExecute_TicketsValidate_BaseOnCommitfulPasses(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsValidate_OtherTicketsWarningsFoldToOneLine(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeEpicTicket(t, dir, "e", "01-a.md", ticketFrontmatter("01", ""))
+	writeEpicTicket(t, dir, "e", "02-b.md", ticketFrontmatter("02", ""))
+	blocked := "blocked_by:\n  - \"01\"\n  - \"02\"\n"
+	writeEpicTicket(t, dir, "e", "03-c.md", ticketFrontmatter("03", blocked))
+	writeEpicTicket(t, dir, "other", "01-d.md", ticketFrontmatter("01", "blocked_by:\n  - \"e/01\"\n"))
+	path04 := writeEpicTicket(t, dir, "e", "04-d.md", ticketFrontmatter("04", blocked))
+
+	stderr, err := validateStderr(t, path04)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "warning: " + path04 + ": ticket 04: 2 unlanded commitful blockers and no base: set base: to pick one\n" +
+		"2 other tickets have warnings; run `gx tickets validate --all`\n"
+	if stderr != want {
+		t.Errorf("stderr = %q, want %q", stderr, want)
+	}
+
+	stderr, err = validateStderr(t, filepath.Join(dir, "e", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "3 other tickets have warnings; run `gx tickets validate --all`\n"; stderr != want {
+		t.Errorf("stderr = %q, want %q", stderr, want)
+	}
+}
+
 func TestExecute_TicketsValidate_BaseWarnings(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
