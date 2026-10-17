@@ -136,11 +136,12 @@ ff-only-merge path (case-2.1 merge candidates and the "merge, skip review" pick 
   (create `$root/.archive` first if missing) — a plain filesystem move inside the store, no git
   staging or commit in the repo.
 - **Safe deletes** (branches/worktrees with `recommendation == "delete"`, or investigated as "safe
-  to delete" in Step 3): run `git branch -d <branch>`, then `git worktree remove <path>` if the
-  entry has a `path`. Never pass `--force` to either. If git refuses (not fully merged — the
+  to delete" in Step 3): run `git worktree remove <path>` if the entry has a `path`, then
+  `git branch -d <branch>` — git refuses to delete a branch still checked out in a worktree.
+  Never pass `--force` to either. If git refuses (dirty worktree or not fully merged — the
   scan's or an investigation's classification was wrong), stop for that item only: leave it as-is,
   and add it to an end-of-run failure list with the equivalent force command
-  (`git branch -D <branch>` / `git worktree remove --force <path>`) printed for you to run
+  (`git worktree remove --force <path>` / `git branch -D <branch>`) printed for you to run
   manually — never run the force command yourself.
 - **Case-2.2 "add review ticket" picks**: run `gx tickets ensure-code-review <epic>`, then flag
   the epic as needs-review in the end-of-run report. Do not attempt to merge it in this run.
