@@ -146,7 +146,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		settings:          settings,
 		keys:              km,
 		sidebarTree:       sidebarTree,
-		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys)),
+		help:              help.NewModel(help.BuildSections(km, *sidebarTree.Keys(), extraKeys), settings.About),
 		search:            search.NewModel(),
 		previewFocus:      newPreviewFocus(),
 		confirm:           confirm.New(),

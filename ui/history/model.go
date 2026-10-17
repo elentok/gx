@@ -110,7 +110,7 @@ func NewModel(root string, loadProjects ProjectLoader, loadConversations Convers
 		loadConversations: loadConversations,
 		grepFunc:          grepFunc,
 		notify:            notify.New(false),
-		help:              help.NewModel(nil),
+		help:              help.NewModel(nil, nil),
 		projFilter:        filter.NewModel(),
 		convFilter:        filter.NewModel(),
 		grepFilter:        filter.NewModel(),

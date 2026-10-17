@@ -101,7 +101,7 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 			return git.CommitImageDiffBlobs(worktreeRoot, ref, file)
 		},
 	}
-	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys))
+	m.help = help.NewModel(help.BuildSections(m.keys, extraKeys), settings.About)
 	m.amendConfirm = amend.New()
 	m.reword = reword.New()
 	m.reload()

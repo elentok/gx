@@ -51,7 +51,7 @@ func NewModelWithScope(worktreeRoot string, settings ui.Settings, extraKeys keys
 		worktreeRoot: worktreeRoot,
 		settings:     settings,
 		keys:         km,
-		help:         help.NewModel(help.BuildSections(km, extraKeys)),
+		help:         help.NewModel(help.BuildSections(km, extraKeys), settings.About),
 		allRepos:     allRepos,
 	}
 }

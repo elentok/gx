@@ -6,12 +6,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/version"
 )
 
 func TestHelpNewModel(t *testing.T) {
-	m := NewModel(nil)
+	m := NewModel(nil, nil)
 	if m.IsOpen {
 		t.Error("expected IsOpen=false initially")
 	}
@@ -23,7 +24,7 @@ func TestHelpNewModel(t *testing.T) {
 func TestHelpOpenAndView(t *testing.T) {
 	m := NewModel([]KeySection{
 		{Title: "Navigation", Bindings: []keys.Binding{{Seq: []string{"j"}, Title: "down"}}},
-	})
+	}, nil)
 	m.Open(120, 40)
 	if !m.IsOpen {
 		t.Error("expected IsOpen=true after Open")
@@ -35,7 +36,7 @@ func TestHelpOpenAndView(t *testing.T) {
 }
 
 func TestHelpViewClosedIsEmpty(t *testing.T) {
-	m := NewModel(nil)
+	m := NewModel(nil, nil)
 	if got := m.View(); got != "" {
 		t.Errorf("View() on closed help = %q, want empty", got)
 	}
@@ -49,7 +50,7 @@ func TestHelpCloseKeys(t *testing.T) {
 		{Code: tea.KeyEnter},
 	}
 	for _, msg := range msgs {
-		m := NewModel(nil)
+		m := NewModel(nil, nil)
 		m.Open(120, 40)
 		next, _ := m.Update(msg)
 		if next.IsOpen {
@@ -68,7 +69,7 @@ func helpWithBindings() Model {
 			{Seq: []string{"d"}, Title: "delete"},
 			{Seq: []string{"x"}, Title: "down to bottom"},
 		}},
-	})
+	}, nil)
 	m.Open(120, 40)
 	return m
 }
@@ -151,7 +152,7 @@ func TestHelpMouseWheelScrollsContentLikeKeyboard(t *testing.T) {
 	for range 40 {
 		bindings = append(bindings, keys.Binding{Seq: []string{"j"}, Title: "binding"})
 	}
-	m := NewModel([]KeySection{{Title: "Navigation", Bindings: bindings}})
+	m := NewModel([]KeySection{{Title: "Navigation", Bindings: bindings}}, nil)
 	m.Open(120, 20)
 	if m.Viewport.YOffset() != 0 {
 		t.Fatalf("expected initial YOffset=0, got %d", m.Viewport.YOffset())
@@ -189,7 +190,7 @@ func TestHelpViewShowsVersionInBottomBorder(t *testing.T) {
 	for range 40 {
 		bindings = append(bindings, keys.Binding{Seq: []string{"j"}, Title: "binding"})
 	}
-	m := NewModel([]KeySection{{Title: "Navigation", Bindings: bindings}})
+	m := NewModel([]KeySection{{Title: "Navigation", Bindings: bindings}}, nil)
 	m.Open(120, 20)
 
 	bottomBorder := func(m Model) string {
@@ -216,14 +217,13 @@ func TestHelpViewShowsVersionInBottomBorder(t *testing.T) {
 	}
 }
 
-// The About tests swap the package-level provider, so they don't run in parallel.
 func TestHelpAboutSectionRendersProviderLinesAtTop(t *testing.T) {
-	SetAboutProvider(func() []AboutLine {
-		return []AboutLine{{Label: "server", Value: "running"}, {Label: "pid", Value: "42"}}
-	})
-	t.Cleanup(func() { SetAboutProvider(nil) })
-
+	t.Parallel()
 	m := helpWithBindings()
+	m.about = func() []ui.AboutLine {
+		return []ui.AboutLine{{Label: "server", Value: "running"}, {Label: "pid", Value: "42"}}
+	}
+	m.Open(100, 40)
 	lines := strings.Split(ansi.Strip(m.Viewport.View()), "\n")
 	if got := strings.TrimSpace(lines[0]); got != "About" {
 		t.Errorf("first line = %q, want About", got)
@@ -237,7 +237,7 @@ func TestHelpAboutSectionRendersProviderLinesAtTop(t *testing.T) {
 }
 
 func TestHelpAboutSectionAbsentWithoutProvider(t *testing.T) {
-	SetAboutProvider(nil)
+	t.Parallel()
 	m := helpWithBindings()
 	if strings.Contains(ansi.Strip(m.Viewport.View()), "About") {
 		t.Error("About section rendered with no provider registered")
@@ -245,7 +245,7 @@ func TestHelpAboutSectionAbsentWithoutProvider(t *testing.T) {
 }
 
 func TestHelpWindowSizeMsg(t *testing.T) {
-	m := NewModel(nil)
+	m := NewModel(nil, nil)
 	m.Open(120, 40)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
 	_ = next // just ensure no panic

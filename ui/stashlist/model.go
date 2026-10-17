@@ -43,7 +43,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		split:        splitview.NewSplit(list, detail),
 		stashCreate:  stashpkg.New(),
 		keys:         km,
-		help:         help.NewModel(help.BuildSections(km, extraKeys)),
+		help:         help.NewModel(help.BuildSections(km, extraKeys), settings.About),
 	}
 	return m
 }

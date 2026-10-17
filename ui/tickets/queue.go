@@ -140,7 +140,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 		keys:             km,
 		queueTree:        queueTree,
 		entriesCache:     &queueEntriesCache{},
-		help:             help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys)),
+		help:             help.NewModel(help.BuildSections(km, *queueTree.Keys(), extraKeys), settings.About),
 		previewFocus:     newPreviewFocus(),
 	}
 }

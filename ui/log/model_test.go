@@ -27,7 +27,7 @@ func newTestModel() Model {
 		keys:   newLogManager(),
 		search: search.NewModel(),
 	}
-	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys()))
+	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys()), nil)
 	m.listPanel = newListPanel()
 	m.split = splitview.New(m.listPanel, m.commitDetail)
 	return m

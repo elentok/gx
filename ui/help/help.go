@@ -33,10 +33,13 @@ type Model struct {
 	KeySections []KeySection
 	Viewport    viewport.Model
 	filter      filter.Model
+	about       func() []ui.AboutLine
 }
 
-func NewModel(keySections []KeySection) Model {
-	return Model{IsOpen: false, KeySections: keySections, Viewport: viewport.New(), filter: filter.NewModel()}
+// NewModel builds a closed help modal. about supplies the About section's
+// lines (ui.Settings.About); nil leaves the section out.
+func NewModel(keySections []KeySection, about func() []ui.AboutLine) Model {
+	return Model{IsOpen: false, KeySections: keySections, Viewport: viewport.New(), filter: filter.NewModel(), about: about}
 }
 
 // InputFocused reports whether the help filter input is currently capturing
@@ -208,7 +211,7 @@ func (m *Model) setContainerSize(containerWidth, containerHeight int) {
 }
 
 func (m Model) content(width int) string {
-	return renderAbout() + RenderColumns(m.visibleSections(), width, m.filter.Query())
+	return renderAbout(m.about) + RenderColumns(m.visibleSections(), width, m.filter.Query())
 }
 
 // visibleSections narrows the sections to those with bindings matching the

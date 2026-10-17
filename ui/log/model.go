@@ -115,7 +115,7 @@ func NewModel(worktreeRoot, startRef string, settings ui.Settings, filter LogFil
 		keys:             newLogManager(),
 		search:           search.NewModel(),
 	}
-	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys))
+	m.help = help.NewModel(help.BuildSections(m.keys, m.search.Keys(), extraKeys), settings.About)
 	m.amendConfirm = amend.New()
 	m.bump = bump.New()
 	m.push = push.New()

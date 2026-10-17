@@ -2,40 +2,17 @@ package help
 
 import (
 	"strings"
-	"sync/atomic"
 
 	"github.com/elentok/gx/ui"
 )
 
-// AboutLine is one label/value row of the help dialog's About section.
-type AboutLine struct {
-	Label, Value string
-}
-
-// The app owns the state About shows (server, split app), while every page
-// builds its own help model, so a package-level hook lets the app register it
-// once instead of wiring it through each page. Atomic because parallel tests
-// each start an app that registers its own.
-var aboutProvider atomic.Pointer[func() []AboutLine]
-
-// SetAboutProvider registers the function that returns the About section's
-// current lines; nil removes it.
-func SetAboutProvider(f func() []AboutLine) {
-	if f == nil {
-		aboutProvider.Store(nil)
-		return
-	}
-	aboutProvider.Store(&f)
-}
-
-// renderAbout is the About section followed by a blank line, or "" when no
-// provider is registered.
-func renderAbout() string {
-	f := aboutProvider.Load()
-	if f == nil {
+// renderAbout is the About section followed by a blank line, or "" when there
+// is no provider.
+func renderAbout(about func() []ui.AboutLine) string {
+	if about == nil {
 		return ""
 	}
-	lines := (*f)()
+	lines := about()
 	labelW := 0
 	for _, l := range lines {
 		labelW = max(labelW, len(l.Label))

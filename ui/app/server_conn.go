@@ -114,7 +114,7 @@ func (m Model) applyServerConn(msg serverConnMsg) (Model, tea.Cmd) {
 	if msg.slow {
 		return m, nil
 	}
-	prev := m.serverConn.link()
+	prev := m.serverConn().link()
 	m.setServerConn(msg.conn)
 	return m.onLinkChange(prev)
 }

@@ -39,7 +39,7 @@ func titleModel(t *testing.T, nerd bool, width int, conn ServerConn, actionable 
 	}
 	s.UseNerdFontIcons = nerd
 	m := New(*repo, s)
-	m.serverConn = ServerConn{}
+	m.setServerConn(ServerConn{})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 10})
 	if conn.State != ServerUnknown {
 		next, _ = next.Update(serverConnMsg{conn: conn})

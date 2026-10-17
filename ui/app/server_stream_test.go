@@ -549,7 +549,7 @@ func TestServerStream_SnapshotNeverToastsButFailureDoes(t *testing.T) {
 func TestServerStream_FailureStreakToastsOnceAndRetriesOnProbeTick(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.snapErr = context.DeadlineExceeded
-	h.m.serverConn = ServerConn{State: ServerUp}
+	h.m.setServerConn(ServerConn{State: ServerUp})
 	fail := func() []notify.NotifyMsg {
 		h.m.stream.snapshotting = true
 		next, cmd := h.m.Update(streamSnapshotMsg{gen: h.m.stream.gen, err: f.snapErr})
@@ -619,7 +619,7 @@ func TestServerStream_NoRetryWhileLinkDown(t *testing.T) {
 	h, _ := newStreamHarness(t)
 	h.probeUp()
 	h.m.stream.snapshotFailing = true
-	h.m.serverConn = ServerConn{State: ServerDown}
+	h.m.setServerConn(ServerConn{State: ServerDown})
 	if h.m.streamWanted() {
 		t.Fatal("a failing snapshot must not be retried while the link is down")
 	}

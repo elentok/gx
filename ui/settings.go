@@ -36,6 +36,14 @@ type Settings struct {
 	Agents         config.AgentsConfig
 	Budget         config.BudgetConfig
 	Subscription   config.SubscriptionConfig
+	// About returns the help dialog's About lines; nil hides the section. The
+	// app sets it, and each page hands it to its help model.
+	About func() []AboutLine
+}
+
+// AboutLine is one label/value row of the help dialog's About section.
+type AboutLine struct {
+	Label, Value string
 }
 
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.

@@ -144,7 +144,7 @@ func NewModel(worktreeRoot string, isBareRepo bool, settings ui.Settings, initia
 		settings:         settings,
 		initialPath:      initialPath,
 		diffContextLines: settings.DiffContextLines,
-		help:             help.NewModel(append(help.BuildSections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys(), extraKeys), diffHeaderHelpSection())),
+		help:             help.NewModel(append(help.BuildSections(statusKeys, *diffarreaModel.Keys(), *fileTreeModel.Keys(), extraKeys), diffHeaderHelpSection()), settings.About),
 		keys:             statusKeys,
 		focus:            focusFiletree,
 		diffarea:         diffarreaModel,

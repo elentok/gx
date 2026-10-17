@@ -77,7 +77,7 @@ type streamQueueMsg struct {
 // live is retried on the next probe tick.
 func (m Model) streamWanted() bool {
 	return m.settings.Server != nil &&
-		m.serverConn.State != ServerDown &&
+		m.serverConn().State != ServerDown &&
 		!m.stream.snapshotting &&
 		(m.stream.streamCtx == nil || m.stream.snapshotFailing)
 }
@@ -113,7 +113,7 @@ func (m Model) cancelStream() Model {
 // told only when it changed, and hidden pages catch up when switched to.
 func (m Model) onLinkChange(prev ticketsui.ServerLink) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	if m.serverConn.State == ServerDown {
+	if m.serverConn().State == ServerDown {
 		var watch tea.Cmd
 		m, watch = m.startStoreWatch()
 		cmds = append(cmds, watch)
@@ -130,7 +130,7 @@ func (m Model) onLinkChange(prev ticketsui.ServerLink) (Model, tea.Cmd) {
 			cmds = append(cmds, snapshot)
 		}
 	}
-	if m.serverConn.link() != prev {
+	if m.serverConn().link() != prev {
 		var deliver tea.Cmd
 		m, deliver = m.deliverServerState()
 		cmds = append(cmds, deliver)
@@ -291,7 +291,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 	case ticketsui.ResnapshotRequestedMsg:
 		// The queue is refetched when the snapshot lands. Down-mode "R" never
 		// reaches here: the tabs reload from disk.
-		if m.serverConn.State == ServerDown {
+		if m.serverConn().State == ServerDown {
 			return m, nil, true
 		}
 		m.stream.queueRequested = true
@@ -339,7 +339,7 @@ func (m Model) serverState() *viewmodel.State {
 // withServerState gives model the current state if it uses server state.
 func (m Model) withServerState(model tea.Model) (tea.Model, tea.Cmd) {
 	if p, ok := model.(serverStatePage); ok {
-		return p.WithServerState(m.serverState(), m.serverConn.link())
+		return p.WithServerState(m.serverState(), m.serverConn().link())
 	}
 	return model, nil
 }

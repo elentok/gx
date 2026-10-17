@@ -14,9 +14,8 @@ import (
 	"github.com/elentok/gx/version"
 )
 
-// Not parallel: the About provider is package-level, and every New registers
-// its own.
 func TestHelpAbout_ShowsCurrentServerAndSplitApp(t *testing.T) {
+	t.Parallel()
 	repoDir := testutil.TempRepo(t)
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

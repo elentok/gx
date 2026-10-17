@@ -146,7 +146,7 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 	if n := m.stream.vm.ActionableCount(); n > 0 {
 		right = append(right, titleSegment{"agents", titleAgentsWord}, sp, titleSegment{strconv.Itoa(n), titleAgentsCount}, sp)
 	}
-	if b, ok := m.serverConn.badge(ui.Icons(m.settings.UseNerdFontIcons)); ok {
+	if b, ok := m.serverConn().badge(ui.Icons(m.settings.UseNerdFontIcons)); ok {
 		style := titleBgStyle.Foreground(b.color)
 		right = append(right, titleSegment{b.icon, style}, sp)
 		if words := b.words(shape.words); words != "" {

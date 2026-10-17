@@ -130,7 +130,7 @@ func (m Model) openHelp() Model {
 		}),
 		help.NewKeySection("Leader ("+m.leaderKeys()[0]+" then)", m.leaderBindings()...),
 		help.NewKeySection("Sidebar", sidebarBindings...),
-	})
+	}, m.settings.About)
 	m.help.Open(m.width, m.height)
 	return m
 }
