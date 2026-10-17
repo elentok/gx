@@ -70,6 +70,34 @@ func TestQueueEpicMenu_MergeByAddress(t *testing.T) {
 	}
 }
 
+func TestQueueEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
+	store := t.TempDir()
+	epicMD := filepath.Join(store, "gx", "alpha", "ticket.md")
+	if err := os.MkdirAll(filepath.Dir(epicMD), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(epicMD, []byte("---\nstatus: draft\n---\n\n# alpha\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var calls []string
+	m := queueOnEpicHeader(t, fakeServerAPI{calls: &calls})
+	m.settings.TicketStore = store
+
+	_, cmd := chooseQueueMenuItem(t, pressQueueMenuKey(t, m), "Set open")
+	if cmd == nil {
+		t.Fatal("Set open issued no cmd")
+	}
+	if msg := cmd(); msg != (statusChangedMsg{}) {
+		t.Fatalf("Set open = %#v", msg)
+	}
+	if raw, _ := os.ReadFile(epicMD); !strings.Contains(string(raw), "status: open") {
+		t.Errorf("ticket.md = %s, want status: open", raw)
+	}
+	if !slices.Equal(calls, []string{"changed gx:alpha"}) {
+		t.Errorf("calls = %v, want [changed gx:alpha]", calls)
+	}
+}
+
 func TestQueueEpicMenu_CheckedSetKeysIgnoreTheHeader(t *testing.T) {
 	var calls []string
 	m := queueOnEpicHeader(t, fakeServerAPI{calls: &calls})

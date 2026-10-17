@@ -35,9 +35,11 @@ func epicMenuModel(t *testing.T, api fakeServerAPI) (Model, string) {
 	return updated.(Model), epicMD
 }
 
-func TestEpicMenu_SetStatusWritesTheEpicFile(t *testing.T) {
-	for name, api := range map[string]ServerAPI{"server": fakeServerAPI{calls: &[]string{}}, "no server": nil} {
+func TestEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
+	var calls []string
+	for name, api := range map[string]ServerAPI{"server": fakeServerAPI{calls: &calls}, "no server": nil} {
 		t.Run(name, func(t *testing.T) {
+			calls = nil
 			m, epicMD := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
 			m.serverAPI = api
 			_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Set open")
@@ -49,6 +51,13 @@ func TestEpicMenu_SetStatusWritesTheEpicFile(t *testing.T) {
 			}
 			if raw, _ := os.ReadFile(epicMD); !strings.Contains(string(raw), "status: open") {
 				t.Errorf("ticket.md = %s, want status: open", raw)
+			}
+			var want []string
+			if api != nil {
+				want = []string{"changed gx:alpha"}
+			}
+			if !slices.Equal(calls, want) {
+				t.Errorf("calls = %v, want %v", calls, want)
 			}
 		})
 	}

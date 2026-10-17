@@ -83,7 +83,7 @@ func (m QueueModel) handleQueueEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea
 		return m, nil
 	}
 	if msg.status != "" {
-		return m, cmdApplyEpicStatus(m.settings.TicketStore, epic, msg.status)
+		return m, cmdApplyEpicStatus(m.serverAPI, m.settings.TicketStore, epic, msg.status)
 	}
 	switch msg.action {
 	case actionQueueEpic:

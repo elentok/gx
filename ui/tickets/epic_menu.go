@@ -144,7 +144,7 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.status != "" {
-		return m, cmdApplyEpicStatus(m.settings.TicketStore, epic, msg.status)
+		return m, cmdApplyEpicStatus(m.serverAPI, m.settings.TicketStore, epic, msg.status)
 	}
 	switch msg.action {
 	case actionCheckAll:
@@ -226,9 +226,9 @@ func epicFile(store string, epic tickets.Epic) (string, error) {
 	return "", fmt.Errorf("epic %s has no ticket.md", epic.Name)
 }
 
-// cmdApplyEpicStatus is an Author write to the epic's own file; the store
-// watch carries it to a running server.
-func cmdApplyEpicStatus(store string, epic tickets.Epic, status schema.Status) tea.Cmd {
+// cmdApplyEpicStatus is an Author write to the epic's own file, then a ping to
+// a running server, like cmdApplyTicketStatus.
+func cmdApplyEpicStatus(api ServerAPI, store string, epic tickets.Epic, status schema.Status) tea.Cmd {
 	return func() tea.Msg {
 		file, err := epicFile(store, epic)
 		if err == nil {
@@ -237,6 +237,9 @@ func cmdApplyEpicStatus(store string, epic tickets.Epic, status schema.Status) t
 		}
 		if err != nil {
 			return notify.Error(err.Error())()
+		}
+		if api != nil {
+			_ = api.TicketChanged(context.Background(), epic.Path)
 		}
 		return statusChangedMsg{}
 	}
