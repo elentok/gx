@@ -374,10 +374,10 @@ func TestLoad_TicketMDKindMapMakesAMapEpic(t *testing.T) {
 	if err != nil || len(epics) != 2 {
 		t.Fatalf("Load = %v, %v", epics, err)
 	}
-	if m := epics[0]; !m.IsMap || m.MapBody != "# Map\n\n## Destination\n" {
-		t.Errorf("kind: map epic: IsMap=%v MapBody=%q", m.IsMap, m.MapBody)
+	if m := epics[0]; !m.IsMap || m.Body != "# Map\n\n## Destination\n" {
+		t.Errorf("kind: map epic: IsMap=%v Body=%q", m.IsMap, m.Body)
 	}
-	if epics[1].IsMap {
-		t.Error("ticket.md without kind: map should not be IsMap")
+	if p := epics[1]; p.IsMap || p.Body != "Plan link.\n" {
+		t.Errorf("plain epic: IsMap=%v Body=%q", p.IsMap, p.Body)
 	}
 }

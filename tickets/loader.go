@@ -220,6 +220,7 @@ func loadEpicTicketMD(epic *Epic) {
 		return
 	}
 	epic.HasTicketMD = true
+	epic.Body = schema.ParseBody(string(raw))
 
 	fm, ok := schema.FrontmatterYAML(string(raw))
 	if !ok {
@@ -229,10 +230,7 @@ func loadEpicTicketMD(epic *Epic) {
 	if err := yaml.Unmarshal([]byte(fm), &wire); err != nil {
 		return
 	}
-	if wire.Kind == KindMap {
-		epic.IsMap = true
-		epic.MapBody = schema.ParseBody(string(raw))
-	}
+	epic.IsMap = wire.Kind == KindMap
 	epic.Status = wire.Status
 	epic.BlockedBy = wire.BlockedBy
 	epic.Base = wire.Base

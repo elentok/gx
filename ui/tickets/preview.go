@@ -71,7 +71,7 @@ func renderViewportWithScrollbar(vp viewport.Model) []string {
 // ticket row is rendered by renderTicketPreview, shared with the Queue tab's
 // own preview pane (see queue_preview.go). An epic row gets its own header
 // (name + optional [map] badge + open/total count) followed by its ticket.md
-// body for a wayfinder-map epic, or nothing for a plain one. The second and
+// body. The second and
 // third return values are the park-section scroll target line index and
 // whether one exists — always false for an epic row.
 func (m Model) previewContent(width int) (string, int, bool) {
@@ -177,16 +177,15 @@ func highlightParkSection(rendered string, status tickets.RenderedStatus) (out s
 	return strings.Join(lines, "\n"), start, true
 }
 
-// previewEpicContent renders an epic row's preview: a header line, plus -
-// for a wayfinder-map epic only - a rule and its ticket.md body rendered
-// through the same glamour path as a ticket body. A plain epic (not kind: map)
-// has no single representative file to preview, so it's header-only.
+// previewEpicContent renders an epic row's preview: a header line, plus a
+// rule and its ticket.md body rendered through the same glamour path as a
+// ticket body. An empty body gets no rule.
 func previewEpicContent(epic tickets.Epic, width int) string {
 	header := previewEpicHeaderLine(epic)
 	if fields := epicFrontmatterFields(epic); len(fields) > 0 {
 		header += "\n" + renderFrontmatterFields(fields, width)
 	}
-	if !epic.IsMap {
+	if strings.TrimSpace(epic.Body) == "" {
 		return header
 	}
 
@@ -195,19 +194,19 @@ func previewEpicContent(epic tickets.Epic, width int) string {
 	b.WriteString("\n")
 	b.WriteString(previewRuleStyle.Render(strings.Repeat("─", max(width, 0))))
 	b.WriteString("\n")
-	b.WriteString(renderTicketMarkdown(epic.MapBody, width))
+	b.WriteString(renderTicketMarkdown(epic.Body, width))
 	return b.String()
 }
 
-// withEpicTicketMD fills a server-mode epic's ticket.md timestamps. The
-// snapshot carries tickets only, so they are read from the epic directory
+// withEpicTicketMD fills a server-mode epic's ticket.md body and timestamps.
+// The snapshot carries tickets only, so they are read from the epic directory
 // that holds the first ticket's file (<epic>/issues/<ticket>.md).
 func withEpicTicketMD(epic tickets.Epic) tickets.Epic {
 	if epic.HasTicketMD || len(epic.Tickets) == 0 || epic.Tickets[0].File == "" {
 		return epic
 	}
 	md := tickets.LoadEpicTicketMD(filepath.Dir(filepath.Dir(epic.Tickets[0].File)))
-	epic.CompletedAt, epic.EvolvedAt = md.CompletedAt, md.EvolvedAt
+	epic.Body, epic.CompletedAt, epic.EvolvedAt = md.Body, md.CompletedAt, md.EvolvedAt
 	return epic
 }
 

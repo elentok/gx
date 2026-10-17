@@ -30,7 +30,7 @@ type Epic struct {
 	Name    string
 	Path    string
 	IsMap   bool   // a wayfinder map: ticket.md says kind: map
-	MapBody string // ticket.md's body, only set when IsMap
+	Body    string // ticket.md's body
 	Tickets []Ticket
 
 	// HasTicketMD is true when the epic has its ticket.md entry file, whose

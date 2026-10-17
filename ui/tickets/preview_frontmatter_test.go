@@ -146,6 +146,38 @@ func TestPreviewEpicContent_OmitsUnsetTimes(t *testing.T) {
 	}
 }
 
+func TestPreviewEpicContent_ShowsPlainEpicBodyAfterRule(t *testing.T) {
+	t.Parallel()
+	out := ansi.Strip(previewEpicContent(tickets.Epic{Name: "widgets", Body: "Implementation of the spec.\n"}, 80))
+	rule := strings.Index(out, "─")
+	body := strings.Index(out, "Implementation of the spec.")
+	if rule == -1 || body == -1 || body < rule {
+		t.Fatalf("expected a rule then the ticket.md body, got:\n%s", out)
+	}
+}
+
+func TestPreviewEpicContent_NoRuleForEmptyBody(t *testing.T) {
+	t.Parallel()
+	out := ansi.Strip(previewEpicContent(tickets.Epic{Name: "widgets", Body: "\n"}, 80))
+	if strings.Contains(out, "─") {
+		t.Fatalf("expected no rule for an empty body, got:\n%s", out)
+	}
+}
+
+func TestWithEpicTicketMD_ReadsServerModeEpicBodyFromDisk(t *testing.T) {
+	t.Parallel()
+	epicDir := t.TempDir()
+	md := "---\nstatus: open\n---\nImplementation of the spec.\n"
+	if err := os.WriteFile(filepath.Join(epicDir, "ticket.md"), []byte(md), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	epic := tickets.Epic{Name: "p:widgets", Tickets: []tickets.Ticket{{File: filepath.Join(epicDir, "issues", "01-a.md")}}}
+
+	if got := withEpicTicketMD(epic); got.Body != "Implementation of the spec.\n" {
+		t.Fatalf("expected ticket.md body, got %q", got.Body)
+	}
+}
+
 func TestWithEpicTicketMD_ReadsServerModeEpicTimesFromDisk(t *testing.T) {
 	t.Parallel()
 	epicDir := t.TempDir()
