@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -148,6 +149,45 @@ func TestSessionBanner_SwitchesOff(t *testing.T) {
 				t.Errorf("sound played = %v, want %v", got, tc.sounds)
 			}
 		})
+	}
+}
+
+// blockingPlayer signals playing and holds Play until release closes.
+type blockingPlayer struct{ playing, release chan struct{} }
+
+func (p blockingPlayer) Play(context.Context, config.AgentsSoundsConfig, sound.Name) {
+	close(p.playing)
+	<-p.release
+}
+
+func TestSessionBanner_StopWaitsForSound(t *testing.T) {
+	p := blockingPlayer{playing: make(chan struct{}), release: make(chan struct{})}
+	h, ctx, evs, id, conv := startBannerSession(t, func(c *server.Config) { c.Player = p })
+	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
+	select {
+	case <-p.playing:
+	case <-time.After(3 * servertest.SessionBannerDelay):
+		t.Fatal("sound never played")
+	}
+	stopped := make(chan struct{})
+	go func() { _ = h.Stop(); close(stopped) }()
+	select {
+	case <-stopped:
+		t.Fatal("stop returned while the sound was playing")
+	case <-time.After(servertest.SessionBannerDelay):
+	}
+	close(p.release)
+	<-stopped
+}
+
+func TestSessionBanner_StopDropsPending(t *testing.T) {
+	h, ctx, evs, id, conv := startBannerSession(t)
+	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
+	if err := h.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if banners, sounds := waitAlerts(h, 0); len(banners) != 0 || len(sounds) != 0 {
+		t.Errorf("banners = %+v, sounds = %v; want none", banners, sounds)
 	}
 }
 

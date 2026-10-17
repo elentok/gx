@@ -50,7 +50,16 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 		b.pending = map[string]*bannerTrigger{}
 	}
 	b.pending[id] = &bannerTrigger{sound: snd, reason: reason}
-	time.AfterFunc(s.cfg.SessionBannerDelay, func() { s.fireBanner(id) })
+	// Waits as a session watch, so close drops the banner and doesn't wait out the delay.
+	s.sessionWatches.start(func() {
+		delay := time.NewTimer(s.cfg.SessionBannerDelay)
+		defer delay.Stop()
+		select {
+		case <-delay.C:
+			s.fireBanner(id)
+		case <-s.sessionWatches.stop:
+		}
+	})
 }
 
 func (s *Server) fireBanner(id string) {
@@ -87,7 +96,7 @@ func (s *Server) fireBanner(id string) {
 		s.sendSessionBanner(info, title, body)
 	}
 	if set.AgentsSounds.Enabled {
-		go s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound)
+		s.sessionWatches.start(func() { s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
 	}
 }
 
