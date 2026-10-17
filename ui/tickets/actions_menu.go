@@ -117,7 +117,7 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
 	epic := m.epicAt(r)
-	return m.openTicketMenu(epic, epic.Tickets[r.ticketIdx])
+	return m.openTicketMenu(epic, epic.Tickets[r.ticketIdx], r.archived)
 }
 
 // selectedTicketPath is the selected ticket row's path, or "" off a ticket.

@@ -62,7 +62,6 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 		{Code: 'a', Text: "a"},
 		{Code: 'D', Text: "D"},
 		{Code: ' ', Text: " "},
-		{Code: 'm', Text: "m"},
 	}
 	for _, press := range presses {
 		updated, cmd := m.Update(press)

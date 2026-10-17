@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"fmt"
 	"os"
 	"slices"
 	"strings"
@@ -11,7 +12,10 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/keys"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 // requestTicketMenu presses "m" and returns the ready message its cmd
@@ -277,6 +281,125 @@ func TestTicketMenuItems_StatusPickCarriesTheStatus(t *testing.T) {
 	target := ticketTarget{address: "gx:alpha/01"}
 	if got := item.Run(target)(); got != (ticketMenuPickMsg{target: target, status: schema.StatusDraft}) {
 		t.Errorf("pick = %+v", got)
+	}
+}
+
+// stubTicketEditor records the path and read-only flag each edit launches.
+func stubTicketEditor(t *testing.T) *[]string {
+	t.Helper()
+	var launched []string
+	orig := launchTicketEditor
+	launchTicketEditor = func(_ string, _ ui.Settings, path string, _ terminalrun.SplitType, readOnly bool) tea.Cmd {
+		launched = append(launched, fmt.Sprintf("%s ro=%v", path, readOnly))
+		return func() tea.Msg { return nil }
+	}
+	t.Cleanup(func() { launchTicketEditor = orig })
+	return &launched
+}
+
+func TestTicketMenu_AgentAndEditCopyGroups(t *testing.T) {
+	m, file := serverModelWithStoreTicket(t, fakeServerAPI{}, false)
+	m = pressMenuKey(t, m)
+	view := m.ticketMenu.View()
+	for _, want := range []string{"Agent", "Edit/copy", "Watch", "Transcript", "Investigate",
+		"Edit file (vsplit)", "e v", "Yank epic - ticket", "y y", "Yank file path", "y f"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("menu view lacks %q:\n%s", want, view)
+		}
+	}
+
+	launched := stubTicketEditor(t)
+	_, cmd := chooseTicketMenuItem(t, m, "Edit file (tab)")
+	if cmd == nil {
+		t.Fatal("edit issued no cmd")
+	}
+	if want := []string{file + " ro=false"}; !slices.Equal(*launched, want) {
+		t.Errorf("launched = %v, want %v", *launched, want)
+	}
+
+	for _, tt := range []struct{ label, chord string }{
+		{"Yank epic - ticket", "yy"},
+		{"Yank file path", "yf"},
+	} {
+		got := stubClipboard(t)
+		closed, _ := chooseTicketMenuItem(t, m, tt.label)
+		fromMenu := *got
+		*got = ""
+		next := tea.Model(closed)
+		for _, r := range tt.chord {
+			next, _ = next.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
+		}
+		if fromMenu == "" || fromMenu != *got {
+			t.Errorf("%s copied %q, %s copies %q", tt.label, fromMenu, tt.chord, *got)
+		}
+	}
+}
+
+func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
+	root := t.TempDir()
+	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: needs-repair\n\nBody.\n")
+	m := NewModel(root, ui.Settings{}, keys.New(nil))
+	m = deliverLoad(t, m)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	m = selectArchivedTicketRow(t, updated.(Model))
+
+	m, ready := requestTicketMenu(t, m)
+	var enabled []string
+	for _, it := range ready.items {
+		switch {
+		case it.Disabled == "":
+			enabled = append(enabled, it.Label)
+		case it.Label != "Watch" && it.Disabled != archivedText:
+			t.Errorf("%s disabled = %q, want %q", it.Label, it.Disabled, archivedText)
+		}
+	}
+	want := []string{"Transcript", "Edit file", "Edit file (split)", "Edit file (vsplit)", "Edit file (tab)", "Yank epic - ticket", "Yank file path"}
+	if !slices.Equal(enabled, want) {
+		t.Errorf("enabled = %v, want %v", enabled, want)
+	}
+
+	launched := stubTicketEditor(t)
+	updated, _ = m.Update(ready)
+	chooseTicketMenuItem(t, updated.(Model), "Edit file")
+	if len(*launched) != 1 || !strings.HasSuffix((*launched)[0], "01-old-ticket.md ro=true") {
+		t.Errorf("launched = %v, want the archived file read-only", *launched)
+	}
+}
+
+func TestTicketMenuItems_Watch(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		in   ticketMenuInput
+		want string
+	}{
+		{"no agent", ticketMenuInput{}, noAgentLog},
+		{"pane but herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, noAgentLog},
+		{"native log", ticketMenuInput{nativeLive: true}, ""},
+		{"live pane", ticketMenuInput{paneLive: true}, ""},
+	} {
+		if got := itemByLabel(t, ticketMenuItems(tt.in), "Watch").Disabled; got != tt.want {
+			t.Errorf("%s: watch disabled = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestTicketMenuItems_InvestigateOnceWhenSuggested(t *testing.T) {
+	for _, tt := range []struct {
+		rendered tickets.RenderedStatus
+		want     contextmenu.Group
+	}{
+		{tickets.StatusNeedsRepair, contextmenu.Suggested},
+		{tickets.StatusOpen, contextmenu.Agent},
+	} {
+		var groups []contextmenu.Group
+		for _, it := range ticketMenuItems(ticketMenuInput{rendered: tt.rendered}) {
+			if it.Label == "Investigate" {
+				groups = append(groups, it.Group)
+			}
+		}
+		if !slices.Equal(groups, []contextmenu.Group{tt.want}) {
+			t.Errorf("%v: investigate groups = %v, want [%v]", tt.rendered, groups, tt.want)
+		}
 	}
 }
 

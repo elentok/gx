@@ -36,13 +36,13 @@ const (
 
 // archivedBlockedBindings lists every mutating binding archivedReadOnlyGuard
 // must block on an archived row. A future mutating binding needs an entry
-// here to be guarded — nothing else enforces that.
+// here to be guarded — nothing else enforces that. The "m" menu is not here:
+// it opens on an archived row with its writes dim.
 var archivedBlockedBindings = map[keys.BindingID]bool{
-	bindingTicketsReplaceQueue:     true,
-	bindingTicketsAddToQueue:       true,
-	bindingTicketsDrainReplace:     true,
-	bindingTicketsToggleCheck:      true,
-	bindingTicketsSuggestedActions: true,
+	bindingTicketsReplaceQueue: true,
+	bindingTicketsAddToQueue:   true,
+	bindingTicketsDrainReplace: true,
+	bindingTicketsToggleCheck:  true,
 }
 
 // newTicketsManager builds the key manager for the sidebar's "extra"

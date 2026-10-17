@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 // ticketTarget is the ticket row a Context menu was opened on. epicName is
@@ -31,6 +32,7 @@ type ticketMenuInput struct {
 	isMap                bool
 	paneLive, nativeLive bool
 	herdrDown            bool
+	archived             bool
 	// serverReason is why orchestration writes are off; empty when usable.
 	serverReason string
 }
@@ -41,6 +43,8 @@ const (
 	notParked      = "not parked"
 	notMuted       = "not muted"
 	herdrDownText  = "herdr not running"
+	noAgentLog     = "no agent log"
+	archivedText   = "archived"
 )
 
 // ticketMenuItems lists every action for a ticket. An action shown under
@@ -109,10 +113,68 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		items = append(items, server("Unmute & Reopen", "", actionUnmuteReopen, notMuted))
 	}
 
-	if in.nativeLive || (in.paneLive && !in.herdrDown) {
-		items = append(items, pick("Watch", "", actionWatch, contextmenu.Agent, ""))
+	watchable := in.nativeLive || (in.paneLive && !in.herdrDown)
+	items = append(items,
+		pick("Watch", "", actionWatch, contextmenu.Agent, reasonIf(!watchable, noAgentLog)),
+		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""))
+	if !investigateSuggested(in.rendered) {
+		items = append(items, pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
-	return append(items, pick("Transcript", "", actionTranscript, contextmenu.Agent, ""))
+
+	for _, e := range ticketMenuEdits {
+		items = append(items, pick(e.label, e.key, e.action, contextmenu.EditCopy, ""))
+	}
+	items = append(items,
+		pick("Yank epic - ticket", "y y", actionYankSummary, contextmenu.EditCopy, ""),
+		pick("Yank file path", "y f", actionYankFilePath, contextmenu.EditCopy, ""))
+
+	if in.archived {
+		for i, it := range items {
+			if !archivedAllowed(it) {
+				items[i].Disabled = archivedText
+			}
+		}
+	}
+	return items
+}
+
+// archivedAllowed reports whether an item reads rather than writes, so an
+// archived row keeps it.
+func archivedAllowed(it contextmenu.Item[ticketTarget]) bool {
+	return it.Group == contextmenu.EditCopy || it.Label == "Watch" || it.Label == "Transcript"
+}
+
+const (
+	actionYankSummary  = "yank-summary"
+	actionYankFilePath = "yank-file-path"
+)
+
+// ticketMenuEdits mirrors the e-prefix chords in newTicketsManager.
+var ticketMenuEdits = []struct {
+	label, key, action string
+	split              terminalrun.SplitType
+}{
+	{"Edit file", "e e", "edit", terminalrun.InPlace},
+	{"Edit file (split)", "e s", "edit-hsplit", terminalrun.HSplit},
+	{"Edit file (vsplit)", "e v", "edit-vsplit", terminalrun.VSplit},
+	{"Edit file (tab)", "e t", "edit-tab", terminalrun.Tab},
+}
+
+// runTicketMenuEditCopy runs an Edit/copy pick through its chord's handler,
+// so the menu and the chord can't drift; handled is false for other picks.
+func (m Model) runTicketMenuEditCopy(action string) (cmd tea.Cmd, handled bool) {
+	switch action {
+	case actionYankSummary:
+		return m.yankTicketSummary(), true
+	case actionYankFilePath:
+		return m.yankTicketFilePath(), true
+	}
+	for _, e := range ticketMenuEdits {
+		if e.action == action {
+			return m.cmdEditSelectedFile(e.split), true
+		}
+	}
+	return nil, false
 }
 
 func reasonIf(applies bool, why string) string {
@@ -152,7 +214,7 @@ type ticketMenuReadyMsg struct {
 
 // openTicketMenu resolves liveness in a Cmd (it shells out to ps), so the
 // menu opens once the result comes back.
-func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket) (tea.Model, tea.Cmd) {
+func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived bool) (tea.Model, tea.Cmd) {
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
 	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
@@ -162,6 +224,7 @@ func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket) (tea.Mod
 		ticket:       ticket,
 		isMap:        epic.IsMap,
 		herdrDown:    m.settings.HerdrUnavailable,
+		archived:     archived,
 		serverReason: m.serverReason(),
 	}
 	prompt := fmt.Sprintf("Ticket %q", ticket.Title)
@@ -197,6 +260,9 @@ func (m Model) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) 
 	}
 	if msg.status != "" {
 		return m.applyStatusChange(msg.status)
+	}
+	if cmd, ok := m.runTicketMenuEditCopy(msg.action); ok {
+		return m, cmd
 	}
 	return m.runMenuAction(actionsMenuResult{
 		Done: true, Accepted: true,

@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -21,19 +22,24 @@ type editFileFinishedMsg struct {
 // cmdEditSelectedFile opens the selected row's underlying file for editing:
 // a ticket's own file, or an epic's ticket.md. An epic without a ticket.md
 // has nothing to edit, so it's a no-op with an inline message rather than a
-// crash.
+// crash. An archived row's file opens read-only.
 func (m Model) cmdEditSelectedFile(splitType terminalrun.SplitType) tea.Cmd {
 	target, ok, warning := m.selectedEditTarget()
 	if !ok {
 		return notify.Warning(warning)
 	}
-	return editTicketFile(m.worktreeRoot, m.settings, target, splitType)
+	r, _ := m.selectedRow()
+	return launchTicketEditor(m.worktreeRoot, m.settings, target, splitType, r.archived)
 }
+
+// launchTicketEditor is a seam so tests can see what the Tickets tab edits.
+var launchTicketEditor = editTicketFile
 
 // editTicketFile launches $EDITOR on path via the given split mode, shared by
 // every tab with an edit-file chord (Tickets, Queue) so the launched command
-// is identical regardless of which tab's model calls it.
-func editTicketFile(worktreeRoot string, settings ui.Settings, path string, splitType terminalrun.SplitType) tea.Cmd {
+// is identical regardless of which tab's model calls it. readOnly only takes
+// effect for the vi family; other editors have no common flag for it.
+func editTicketFile(worktreeRoot string, settings ui.Settings, path string, splitType terminalrun.SplitType, readOnly bool) tea.Cmd {
 	editor := strings.TrimSpace(os.Getenv("EDITOR"))
 	if editor == "" {
 		return notify.Warning("$EDITOR is not set")
@@ -44,9 +50,20 @@ func editTicketFile(worktreeRoot string, settings ui.Settings, path string, spli
 	}
 
 	args := ui.EditorLaunchArgs(parts[0], parts[1:], path, 0)
+	if readOnly && isViEditor(parts[0]) {
+		args = append([]string{"-R"}, args...)
+	}
 	return terminalrun.CommandWithSplit(worktreeRoot, settings.Terminal, splitType, parts[0], args, func(err error, splitApp string) tea.Msg {
 		return editFileFinishedMsg{err: err, splitApp: splitApp}
 	})
+}
+
+func isViEditor(bin string) bool {
+	switch filepath.Base(bin) {
+	case "vi", "vim", "nvim":
+		return true
+	}
+	return false
 }
 
 // selectedEditTarget resolves the file path to edit for the current
