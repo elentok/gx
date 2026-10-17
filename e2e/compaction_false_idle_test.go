@@ -26,7 +26,7 @@ var (
 func agentfakeBinary(t *testing.T) string {
 	t.Helper()
 	buildAgentfakeOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "gx-e2e-agentfake")
+		dir, err := os.MkdirTemp(binRoot, "agentfake")
 		if err != nil {
 			buildAgentfakeErr = err
 			return

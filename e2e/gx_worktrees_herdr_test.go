@@ -28,7 +28,7 @@ var (
 func gxBinary(t *testing.T) string {
 	t.Helper()
 	buildGxOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "gx-e2e-bin")
+		dir, err := os.MkdirTemp(binRoot, "bin")
 		if err != nil {
 			buildGxErr = err
 			return

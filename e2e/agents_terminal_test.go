@@ -8,8 +8,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -33,7 +35,7 @@ var (
 func tuiFakeBinary(t *testing.T) string {
 	t.Helper()
 	buildTUIFakeOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "gx-e2e-agentfaketui")
+		dir, err := os.MkdirTemp(binRoot, "agentfaketui")
 		if err != nil {
 			buildTUIFakeErr = err
 			return
@@ -55,10 +57,11 @@ func tuiFakeBinary(t *testing.T) string {
 // agentsEnv is a real gx server of its own (its own state dir, so its own
 // socket) whose claude is the TUI fake, and a project to run sessions in.
 type agentsEnv struct {
-	t       *testing.T
-	bin     string
-	repo    string
-	project string
+	t        *testing.T
+	bin      string
+	repo     string
+	project  string
+	dataHome string
 	// env isolates every gx process; serverEnv is the server's whole
 	// environment, without TERM, as launchd starts it.
 	env, serverEnv []string
@@ -73,9 +76,9 @@ func newAgentsEnv(t *testing.T, extraEnv ...string) *agentsEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(root) })
-	e := &agentsEnv{t: t, bin: gxBinary(t), repo: testutil.TempRepo(t), project: "agentsproj"}
+	e := &agentsEnv{t: t, bin: gxBinary(t), repo: testutil.TempRepo(t), project: "agentsproj", dataHome: filepath.Join(root, "data")}
 	e.env = []string{
-		"XDG_DATA_HOME=" + filepath.Join(root, "data"),
+		"XDG_DATA_HOME=" + e.dataHome,
 		"XDG_STATE_HOME=" + filepath.Join(root, "state"),
 		"HOME=" + filepath.Join(root, "home"),
 		"PATH=" + tuiFakeBinary(t) + string(os.PathListSeparator) + os.Getenv("PATH"),
@@ -127,10 +130,53 @@ func (e *agentsEnv) createSession() {
 		e.t.Fatalf("agents create: %v\n%s", err, out)
 	}
 	e.t.Cleanup(func() {
+		// Read before the stop, which may remove the session's dir.
+		conv := e.conversationID(res.Session.ID)
 		cmd := exec.Command(e.bin, "agents", "stop", res.Session.ID)
 		cmd.Env = e.serverEnv
-		_ = cmd.Run()
+		if out, err := cmd.CombinedOutput(); err != nil {
+			e.t.Errorf("agents stop: %v\n%s", err, out)
+		}
+		reapSession(e.t, conv)
 	})
+}
+
+func (e *agentsEnv) conversationID(sessionID string) string {
+	e.t.Helper()
+	data, err := os.ReadFile(filepath.Join(e.dataHome, "gx", "sessions", sessionID, "meta.json"))
+	var meta struct {
+		ConversationID string `json:"conversation_id"`
+	}
+	if err == nil {
+		err = json.Unmarshal(data, &meta)
+	}
+	if err != nil || meta.ConversationID == "" {
+		e.t.Fatalf("session %s meta: %v\n%s", sessionID, err, data)
+	}
+	return meta.ConversationID
+}
+
+// reapSession waits for the session's processes to exit. Holders are
+// detached, so one that outlives its stop would run forever: SIGKILL its
+// process group, and its program's, as a last resort.
+func reapSession(t *testing.T, conv string) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		// The holder and its program both carry the conversation id.
+		out, err := exec.Command("pgrep", "-f", conv).Output()
+		if err != nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			for pid := range strings.FieldsSeq(string(out)) {
+				if n, err := strconv.Atoi(pid); err == nil {
+					_ = syscall.Kill(-n, syscall.SIGKILL)
+				}
+			}
+			t.Errorf("the session's processes outlived its stop: %s", strings.Join(strings.Fields(string(out)), " "))
+			return
+		}
+	}
 }
 
 // vtTerm runs a command in a pty and keeps its screen in a terminal emulator,

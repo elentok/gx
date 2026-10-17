@@ -30,7 +30,7 @@ var (
 func workerBinary(t *testing.T) string {
 	t.Helper()
 	buildWorkerOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "gx-e2e-agentfakeworker")
+		dir, err := os.MkdirTemp(binRoot, "agentfakeworker")
 		if err != nil {
 			buildWorkerErr = err
 			return
