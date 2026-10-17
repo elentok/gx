@@ -255,6 +255,11 @@ func (c *Client) TicketPark(ctx context.Context, address, reason string) (server
 	return c.queueWriteTo(ctx, "/v1/tickets/park", server.QueueRequest{Address: address, ParkReason: reason})
 }
 
+// TicketUnmute clears a ticket's mutes and reopens it if it was parked needs-repair.
+func (c *Client) TicketUnmute(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/unmute", server.QueueRequest{Address: address})
+}
+
 // TicketCancel cancels a ticket and its non-terminal fork descendants; stop
 // lets it stop a live pane first.
 func (c *Client) TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error) {

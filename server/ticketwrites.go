@@ -12,9 +12,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Refusal reasons of the ticket writes (park, relaunch).
+// Refusal reasons of the ticket writes (park, relaunch, unmute).
 const (
 	ReasonReasonRequired   = "reason-required"
+	ReasonNotMuted         = "not-muted"
 	ReasonIterationRunning = "iteration-running"
 	ReasonTicketDone       = "ticket-done"
 	ReasonHerdrUnavailable = "herdr-unavailable"
@@ -112,6 +113,20 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
 		}
 		s.events.publish(EventTicketParked, ref.addr.String())
+		return QueueResult{}, nil
+	})
+}
+
+// ticketUnmute clears a ticket's mutes and reopens it if the mute parked it.
+func (s *Server) ticketUnmute(req QueueRequest) (QueueResult, error) {
+	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
+		if len(ref.ticket.Mutes) == 0 {
+			return refusal(ReasonNotMuted, ref.addr.String()+" is not muted"), nil
+		}
+		if err := ralphloop.UnmuteTicket(ref.ticket.Path, time.Now()); err != nil {
+			return QueueResult{}, fmt.Errorf("unmute %s: %w", ref.addr, err)
+		}
+		s.rescan()
 		return QueueResult{}, nil
 	})
 }

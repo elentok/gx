@@ -321,7 +321,7 @@ func TestUnmuteTicket_Parked_ClearsMutesDemotesReopens(t *testing.T) {
 	if !strings.Contains(raw, "## Comments") || !strings.Contains(raw, "retired from `## Needs Repair`") {
 		t.Errorf("Needs Repair not retired into Comments:\n%s", raw)
 	}
-	if !strings.Contains(raw, "unmuted via Suggested Actions") {
+	if !strings.Contains(raw, "— unmuted") {
 		t.Errorf("unmute audit note missing:\n%s", raw)
 	}
 }
@@ -347,7 +347,7 @@ func TestUnmuteTicket_Unparked_ClearsMutesLeavesStatus(t *testing.T) {
 	}
 
 	raw := mustRead(t, path)
-	if !strings.Contains(raw, "unmuted via Suggested Actions") {
+	if !strings.Contains(raw, "— unmuted") {
 		t.Errorf("unmute audit note missing:\n%s", raw)
 	}
 }

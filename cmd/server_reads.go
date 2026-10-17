@@ -626,6 +626,20 @@ func newServerTicketsCmd() *cobra.Command {
 	park.Flags().BoolVar(&parkJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(park)
 
+	var unmuteJSON bool
+	unmute := &cobra.Command{
+		Use:   "unmute <project:epic/NN>",
+		Short: "clear a ticket's mutes and reopen it if it was parked needs-repair",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverQueueWrite(c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketUnmute(ctx, args[0])
+			})
+		},
+	}
+	unmute.Flags().BoolVar(&unmuteJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(unmute)
+
 	var cancelJSON, cancelStop bool
 	cancel := &cobra.Command{
 		Use:   "cancel <project:epic/NN>",

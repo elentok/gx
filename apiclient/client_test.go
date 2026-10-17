@@ -83,6 +83,36 @@ func TestNegotiate_APIVersionMismatchGoesReadOnly(t *testing.T) {
 	}
 }
 
+func TestTicketUnmute_PostsTheAddressAndReturnsTheResult(t *testing.T) {
+	dir, err := os.MkdirTemp("", "gxc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "s.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.QueueRequest
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/tickets/unmute", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(server.QueueResult{Refused: true, Reason: server.ReasonNotMuted})
+	})
+	srv := &http.Server{Handler: mux}
+	go srv.Serve(ln)
+	t.Cleanup(func() { srv.Close() })
+
+	res, err := apiclient.New(sock).TicketUnmute(context.Background(), "p:e/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Address != "p:e/01" || !res.Refused || res.Reason != server.ReasonNotMuted {
+		t.Errorf("request = %+v, result = %+v", got, res)
+	}
+}
+
 // followServer serves /v1/snapshot with an incrementing seq and replays
 // scripted event streams, one per /v1/events call.
 func followServer(t *testing.T, streams [][]server.Event) (*apiclient.Client, *int) {

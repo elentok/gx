@@ -76,6 +76,81 @@ func TestPark_RefusesUnknownTicket(t *testing.T) {
 	}
 }
 
+const mutedFrontmatter = "mutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n"
+
+func writeMuted(t *testing.T, path, status, body string) {
+	t.Helper()
+	content := "---\nid: \"01\"\nstatus: " + status + "\ntype: implement\n" + mutedFrontmatter + "---\n# first\n\n" + body
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUnmute_ReopensANeedsRepairTicketAndDemotesItsSection(t *testing.T) {
+	h, path := startTicketWrites(t)
+	writeMuted(t, path, "needs-repair", "## Needs Repair\n\nnotification storm tripped a mute\n")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01")
+	if err != nil || res.Refused {
+		t.Fatalf("unmute = %+v, %v", res, err)
+	}
+	data, _ := os.ReadFile(path)
+	raw := string(data)
+	for _, want := range []string{"status: open", "## Comments", "retired from `## Needs Repair`", "— unmuted"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("ticket lacks %q:\n%s", want, raw)
+		}
+	}
+	for _, unwanted := range []string{"mutes:", "\n## Needs Repair\n", "via Suggested Actions"} {
+		if strings.Contains(raw, unwanted) {
+			t.Errorf("ticket still has %q:\n%s", unwanted, raw)
+		}
+	}
+}
+
+func TestUnmute_LeavesANonParkedTicketsStatusAlone(t *testing.T) {
+	h, path := startTicketWrites(t)
+	writeMuted(t, path, "open", "Body text.\n")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+		t.Fatalf("unmute = %+v, %v", res, err)
+	}
+	data, _ := os.ReadFile(path)
+	if raw := string(data); !strings.Contains(raw, "status: open") || strings.Contains(raw, "mutes:") {
+		t.Errorf("want status kept and mutes cleared:\n%s", raw)
+	}
+}
+
+func TestUnmute_RefusesATicketWithNoMutes(t *testing.T) {
+	h, path := startTicketWrites(t)
+	before, _ := os.ReadFile(path)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/01")
+	if err != nil || !res.Refused || res.Reason != server.ReasonNotMuted {
+		t.Fatalf("unmute = %+v, %v; want %s refusal", res, err, server.ReasonNotMuted)
+	}
+	if after, _ := os.ReadFile(path); string(after) != string(before) {
+		t.Errorf("refused unmute changed the ticket:\n%s", after)
+	}
+}
+
+func TestUnmute_RefusesUnknownTicket(t *testing.T) {
+	h, _ := startTicketWrites(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := h.Client.TicketUnmute(ctx, "proj:epic-a/99")
+	if err != nil || !res.Refused || res.Reason != server.ReasonUnknownTicket {
+		t.Fatalf("unmute = %+v, %v", res, err)
+	}
+}
+
 func TestRelaunch_StartsAFreshIterationOfAParkedTicket(t *testing.T) {
 	h, path := startTicketWrites(t)
 	start, prompt, _ := registerLaunch(h)
