@@ -366,6 +366,53 @@ func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 	}
 }
 
+func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
+	items := ticketMenuItems(ticketMenuInput{
+		rendered: tickets.StatusNeedsRepair,
+		ticket:   tickets.Ticket{Status: "needs-repair"},
+		archived: true,
+	})
+	reads := []string{actionWatch, actionTranscript, actionYankSummary, actionYankFilePath}
+	for _, e := range ticketMenuEdits {
+		reads = append(reads, e.action)
+	}
+	var enabled []string
+	for _, it := range items {
+		if it.Disabled != "" {
+			continue
+		}
+		msg, _ := it.Run(ticketTarget{})().(ticketMenuPickMsg)
+		if !slices.Contains(reads, msg.action) {
+			t.Errorf("%s (action %q) enabled on an archived row", it.Label, msg.action)
+		}
+		enabled = append(enabled, msg.action)
+	}
+	slices.Sort(enabled)
+	slices.Sort(reads)
+	if !slices.Equal(enabled, reads) {
+		t.Errorf("enabled actions = %v, want %v", enabled, reads)
+	}
+}
+
+func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
+	for _, tt := range []struct {
+		status   string
+		rendered tickets.RenderedStatus
+		wantKey  string
+	}{
+		{"needs-answer", tickets.StatusNeedsAnswer, ""},
+		{"needs-repair", tickets.StatusNeedsRepair, "enter"},
+	} {
+		items := ticketMenuItems(ticketMenuInput{
+			rendered: tt.rendered,
+			ticket:   tickets.Ticket{Status: tt.status},
+		})
+		if got := itemByLabel(t, items, resumeLabel).Key; got != tt.wantKey {
+			t.Errorf("%s: Resume key = %q, want %q", tt.status, got, tt.wantKey)
+		}
+	}
+}
+
 func TestTicketMenuItems_GoToPane(t *testing.T) {
 	if hasItem(ticketMenuItems(ticketMenuInput{}), "Go to pane") {
 		t.Error("Go to pane shown without a herdr pane")

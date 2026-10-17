@@ -60,6 +60,9 @@ const actionApprove = "approve"
 // with the reason.
 func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	item := func(label, key string, group contextmenu.Group, disabled string, msg ticketMenuPickMsg) contextmenu.Item[ticketTarget] {
+		if in.archived && !archivedAllowed(group, msg.action) {
+			disabled = archivedText
+		}
 		return contextmenu.Item[ticketTarget]{
 			Label: label, Key: key, Group: group, Disabled: disabled,
 			Run: func(t ticketTarget) tea.Cmd {
@@ -87,9 +90,14 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		items = append(items, pick(startSessionMenuItem.Label, "", actionStartSession, contextmenu.Suggested, ""))
 	}
 	if answer {
+		// enter only unparks needs-repair, so a needs-answer row gets no hint.
+		resumeKey := ""
+		if parked {
+			resumeKey = "enter"
+		}
 		items = append(items,
 			pick("Answer…", "", actionAnswer, contextmenu.Suggested, ""),
-			pick(resumeLabel, "enter", actionResume, contextmenu.Suggested, in.serverReason))
+			pick(resumeLabel, resumeKey, actionResume, contextmenu.Suggested, in.serverReason))
 	}
 	if investigateSuggested(in.rendered) {
 		items = append(items, pick("Investigate", "", actionInvestigate, contextmenu.Suggested, reasonIf(in.herdrDown, herdrDownText)))
@@ -141,21 +149,13 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	items = append(items,
 		pick("Yank epic - ticket", "y y", actionYankSummary, contextmenu.EditCopy, ""),
 		pick("Yank file path", "y f", actionYankFilePath, contextmenu.EditCopy, ""))
-
-	if in.archived {
-		for i, it := range items {
-			if !archivedAllowed(it) {
-				items[i].Disabled = archivedText
-			}
-		}
-	}
 	return items
 }
 
 // archivedAllowed reports whether an item reads rather than writes, so an
-// archived row keeps it.
-func archivedAllowed(it contextmenu.Item[ticketTarget]) bool {
-	return it.Group == contextmenu.EditCopy || it.Label == "Watch" || it.Label == "Transcript"
+// archived row keeps it. Edits open an archived file read-only.
+func archivedAllowed(group contextmenu.Group, action string) bool {
+	return group == contextmenu.EditCopy || action == actionWatch || action == actionTranscript
 }
 
 const (
