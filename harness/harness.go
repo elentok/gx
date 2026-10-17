@@ -64,6 +64,22 @@ type Watcher interface {
 	OnChange(f func())
 }
 
+// PidStatusWatcher is a Watcher that follows a claude-style pid status file
+// and can freeze it. A host checks Watch's result for it: only such a watcher
+// backs the frozen status and deny-reason ops.
+type PidStatusWatcher interface {
+	Watcher
+	// PidState returns the last status read, nil before the file first
+	// appears, and the turn count.
+	PidState() (*PidStatus, int)
+	// Hold freezes what PidState and Status report until Release.
+	Hold()
+	Release()
+	// WaitLive waits up to timeout for the live status to meet cond and
+	// returns the live turn it met it at.
+	WaitLive(timeout time.Duration, cond func(s PidStatus, turn int) bool) (int, bool)
+}
+
 // State is a Session status, less Exited: the server derives that from
 // process death.
 type State int

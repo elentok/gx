@@ -225,6 +225,8 @@ func (w *PidWatcher) pollTranscript(conversationID string) {
 	}
 }
 
+var _ PidStatusWatcher = (*PidWatcher)(nil)
+
 // PidState returns the last status read, nil before the file first appears,
 // and the turn count.
 func (w *PidWatcher) PidState() (*PidStatus, int) {

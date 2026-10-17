@@ -143,8 +143,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = tty.Close()
 		return err
 	}
-	// Only claude's pid status backs the frozen status and deny-reason ops.
-	pid, _ := watcher.(*harness.PidWatcher)
+	pid, _ := watcher.(harness.PidStatusWatcher)
 	srv := &holderServer{
 		scr:     scr,
 		ptmx:    ptmx,

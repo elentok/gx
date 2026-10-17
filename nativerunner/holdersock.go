@@ -93,8 +93,8 @@ type holderServer struct {
 	scr  *screen.Screen
 	ptmx *os.File
 	proc *os.Process
-	// pid is nil for a harness without claude's pid status.
-	pid     *harness.PidWatcher
+	// pid is nil for a harness whose watcher has no pid status.
+	pid     harness.PidStatusWatcher
 	watcher harness.Watcher
 	name    *displayName
 	frames  *frameHub
