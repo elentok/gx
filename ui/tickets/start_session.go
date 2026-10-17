@@ -4,8 +4,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/elentok/gx/ui/components"
 )
 
 // actionStartSession hands a map epic or one of its open tickets to the
@@ -13,7 +11,7 @@ import (
 // starting a session writes no ticket status.
 const actionStartSession = "start-session"
 
-var startSessionMenuItem = components.MenuItem{Label: "Start session…", Value: actionStartSession}
+const startSessionLabel = "Start session…"
 
 // StartSessionMsg asks the app shell to open the Agents tab's create form
 // pre-filled for a map epic or ticket. The fields mirror agents.CreatePrefill,

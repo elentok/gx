@@ -2,10 +2,11 @@ package tickets
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
@@ -40,38 +41,16 @@ const actionUnmuteReopen = serverVerbUnmute
 // cmdAnswerThen).
 const actionAnswer = "answer"
 
-// statusActionItems are the actions that earn a row the badge. The answer
-// items only apply to needs-answer; investigate is whitelisted to the
-// statuses that signal an actual problem (needs-answer, needs-repair, error)
-// rather than excluding the healthy ones — Open/Claimed/Done are healthy, but
-// so are Blocked (waiting on a dependency), Draft (not yet offered to an
-// agent) and WaitingForChildren (own work already done), none of which have a
-// live or stalled session worth investigating. Whitelisting also fails closed
-// for any status added to the enum later, instead of showing the badge by
-// default. herdrDown (ui.Settings.HerdrUnavailable) drops Investigate, whose
-// launch opens a herdr tab.
-func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) []components.MenuItem {
-	var items []components.MenuItem
-	if answerSuggested(status) {
-		items = append(items,
-			components.MenuItem{Label: "Answer…", Value: actionAnswer},
-			components.MenuItem{Label: resumeLabel, Value: actionResume})
-	}
-	if !herdrDown && investigateSuggested(status) {
-		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
-	}
-	if unmuteSuggested(ticket) {
-		items = append(items, components.MenuItem{Label: "Unmute & Reopen", Value: actionUnmuteReopen})
-	}
-	return items
-}
-
-// answerSuggested, investigateSuggested and unmuteSuggested decide the
-// Suggested actions for both menus and the row badge, so they cannot drift.
+// answerSuggested, investigateSuggested and unmuteSuggested decide which
+// ticket Context menu items move to Suggested.
 func answerSuggested(status tickets.RenderedStatus) bool {
 	return status == tickets.StatusNeedsAnswer
 }
 
+// investigateSuggested whitelists the statuses that signal an actual problem
+// rather than excluding the healthy ones: Blocked, Draft and
+// WaitingForChildren are healthy too, with no live or stalled session worth
+// investigating, and a status added to the enum later fails closed.
 func investigateSuggested(status tickets.RenderedStatus) bool {
 	return status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError
 }
@@ -80,10 +59,13 @@ func unmuteSuggested(ticket tickets.Ticket) bool {
 	return len(ticket.Mutes) > 0
 }
 
-// ticketHasSuggestedActions reports whether ticket's row should carry the
-// "m" suggested-actions badge (ui.IconSet.SuggestedAction).
-func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) bool {
-	return len(statusActionItems(status, ticket, herdrDown)) > 0
+// ticketHasSuggestedActions reports whether a row carries the "m" badge
+// (ui.IconSet.SuggestedAction): its Context menu has an enabled Suggested
+// item.
+func ticketHasSuggestedActions(in ticketMenuInput) bool {
+	return slices.ContainsFunc(ticketMenuItems(in), func(it contextmenu.Item[ticketTarget]) bool {
+		return it.Group == contextmenu.Suggested && it.Disabled == ""
+	})
 }
 
 // cmdLaunchInvestigate opens a new herdr tab in the epic's workspace and

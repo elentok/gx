@@ -12,7 +12,7 @@ import (
 )
 
 func menuHasStartSession(m Model) bool {
-	return m.ticketMenu.IsOpen && strings.Contains(m.ticketMenu.View(), startSessionMenuItem.Label)
+	return m.ticketMenu.IsOpen && strings.Contains(m.ticketMenu.View(), startSessionLabel)
 }
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {
@@ -50,7 +50,7 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 		selectTicketByAddress(t, &m, tc.address)
 		_, ready := requestTicketMenu(t, m)
 		got := slices.ContainsFunc(ready.items, func(it contextmenu.Item[ticketTarget]) bool {
-			return it.Label == startSessionMenuItem.Label
+			return it.Label == startSessionLabel
 		})
 		if got != tc.want {
 			t.Errorf("%s: start session offered = %v, want %v", tc.address, got, tc.want)
@@ -81,7 +81,7 @@ func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
 			suggested = append(suggested, it.Label)
 		}
 	}
-	if want := []string{startSessionMenuItem.Label, "Merge"}; !slices.Equal(suggested, want) {
+	if want := []string{startSessionLabel, "Merge"}; !slices.Equal(suggested, want) {
 		t.Errorf("suggested = %v, want %v", suggested, want)
 	}
 }

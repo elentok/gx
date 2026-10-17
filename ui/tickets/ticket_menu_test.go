@@ -258,24 +258,6 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 	}
 }
 
-func TestTicketMenuItems_SuggestedNotRepeated(t *testing.T) {
-	items := ticketMenuItems(ticketMenuInput{
-		rendered: tickets.StatusNeedsAnswer,
-		ticket:   tickets.Ticket{Status: "needs-answer", Mutes: muted},
-	})
-	for _, label := range []string{resumeLabel, "Unmute & Reopen"} {
-		var groups []contextmenu.Group
-		for _, it := range items {
-			if it.Label == label {
-				groups = append(groups, it.Group)
-			}
-		}
-		if !slices.Equal(groups, []contextmenu.Group{contextmenu.Suggested}) {
-			t.Errorf("%s groups = %v, want only Suggested", label, groups)
-		}
-	}
-}
-
 func TestTicketMenuItems_StatusPickCarriesTheStatus(t *testing.T) {
 	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{rendered: tickets.StatusOpen}), "Set draft")
 	target := ticketTarget{address: "gx:alpha/01"}
@@ -434,26 +416,6 @@ func TestTicketMenuItems_GoToPane(t *testing.T) {
 
 func hasItem(items []contextmenu.Item[ticketTarget], label string) bool {
 	return slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == label })
-}
-
-func TestTicketMenuItems_InvestigateOnceWhenSuggested(t *testing.T) {
-	for _, tt := range []struct {
-		rendered tickets.RenderedStatus
-		want     contextmenu.Group
-	}{
-		{tickets.StatusNeedsRepair, contextmenu.Suggested},
-		{tickets.StatusOpen, contextmenu.Agent},
-	} {
-		var groups []contextmenu.Group
-		for _, it := range ticketMenuItems(ticketMenuInput{rendered: tt.rendered}) {
-			if it.Label == "Investigate" {
-				groups = append(groups, it.Group)
-			}
-		}
-		if !slices.Equal(groups, []contextmenu.Group{tt.want}) {
-			t.Errorf("%v: investigate groups = %v, want [%v]", tt.rendered, groups, tt.want)
-		}
-	}
 }
 
 func TestTicketsTab_StatusKeyOpensNothing(t *testing.T) {

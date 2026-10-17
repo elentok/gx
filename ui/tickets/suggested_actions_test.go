@@ -5,114 +5,74 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
-	"github.com/elentok/gx/ui/components"
+	"github.com/elentok/gx/ui/contextmenu"
 )
 
-func TestSuggestedActionItems_NeedsAnswer_NoMutes_ResumeAndInvestigate(t *testing.T) {
+func TestTicketMenuItems_SuggestableItemsBuiltOnce(t *testing.T) {
 	t.Parallel()
-	items := statusActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, false)
-	want := []string{actionAnswer, actionResume, actionInvestigate}
-	if got := itemValues(items); !slices.Equal(got, want) {
-		t.Errorf("items = %v, want %v", got, want)
-	}
-}
-
-func TestSuggestedActionItems_HerdrDown_HidesHerdrOnlyItems(t *testing.T) {
-	t.Parallel()
-	items := statusActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true)
-	want := []string{actionAnswer, actionResume}
-	if got := itemValues(items); !slices.Equal(got, want) {
-		t.Errorf("items = %v, want %v", got, want)
-	}
-	if ticketHasSuggestedActions(tickets.StatusNeedsRepair, tickets.Ticket{}, true) {
-		t.Error("needs-repair carries a badge with herdr down, want none: Investigate is its only item")
-	}
-}
-
-func TestSuggestedActionItems_NoBadgeWithoutStatusActions(t *testing.T) {
-	t.Parallel()
-	for _, status := range []tickets.RenderedStatus{tickets.StatusClaimed, tickets.StatusDone} {
-		if ticketHasSuggestedActions(status, tickets.Ticket{}, false) {
-			t.Errorf("a %v ticket carries a badge, want none", status)
-		}
-	}
-}
-
-func itemValues(items []components.MenuItem) []string {
-	values := make([]string, len(items))
-	for i, item := range items {
-		values[i] = item.Value
-	}
-	return values
-}
-
-func TestSuggestedActionItems_NeedsRepairOrError_IncludesInvestigate(t *testing.T) {
-	t.Parallel()
-	for _, status := range []tickets.RenderedStatus{tickets.StatusNeedsRepair, tickets.StatusError} {
-		items := statusActionItems(status, tickets.Ticket{}, false)
-		if len(items) != 1 || items[0].Value != actionInvestigate {
-			t.Errorf("status %v: items = %v, want just %q", status, items, actionInvestigate)
-		}
-	}
-}
-
-func TestSuggestedActionItems_HealthyStatuses_NoInvestigate(t *testing.T) {
-	t.Parallel()
-	for _, status := range []tickets.RenderedStatus{
-		tickets.StatusOpen,
-		tickets.StatusClaimed,
-		tickets.StatusDone,
-		tickets.StatusBlocked,
-		tickets.StatusDraft,
-		tickets.StatusWaitingForChildren,
+	type want struct{ resume, investigate, unmute contextmenu.Group }
+	home := want{contextmenu.Server, contextmenu.Agent, contextmenu.Server}
+	for _, tt := range []struct {
+		name string
+		in   ticketMenuInput
+		want want
+	}{
+		{"open", ticketMenuInput{rendered: tickets.StatusOpen}, home},
+		{"claimed", ticketMenuInput{rendered: tickets.StatusClaimed}, home},
+		{"needs-answer", ticketMenuInput{rendered: tickets.StatusNeedsAnswer, ticket: tickets.Ticket{Status: "needs-answer"}},
+			want{contextmenu.Suggested, contextmenu.Suggested, contextmenu.Server}},
+		{"needs-repair", ticketMenuInput{rendered: tickets.StatusNeedsRepair, ticket: tickets.Ticket{Status: "needs-repair"}},
+			want{contextmenu.Server, contextmenu.Suggested, contextmenu.Server}},
+		{"error", ticketMenuInput{rendered: tickets.StatusError}, want{contextmenu.Server, contextmenu.Suggested, contextmenu.Server}},
+		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}},
+			want{contextmenu.Server, contextmenu.Agent, contextmenu.Suggested}},
 	} {
-		items := statusActionItems(status, tickets.Ticket{}, false)
-		if len(items) != 0 {
-			t.Errorf("status %v: items = %v, want none", status, items)
-		}
-	}
-}
-
-func TestSuggestedActionItems_MutedTicket_AnyStatus_IncludesUnmute(t *testing.T) {
-	t.Parallel()
-	muted := tickets.Ticket{Mutes: []schema.MuteRecord{{EventType: "notification-storm"}}}
-
-	for _, status := range []tickets.RenderedStatus{tickets.StatusOpen, tickets.StatusNeedsRepair, tickets.StatusClaimed} {
-		items := statusActionItems(status, muted, false)
-		found := false
-		for _, item := range items {
-			if item.Value == actionUnmuteReopen {
-				found = true
+		items := ticketMenuItems(tt.in)
+		for label, group := range map[string]contextmenu.Group{
+			resumeLabel: tt.want.resume, "Investigate": tt.want.investigate, "Unmute & Reopen": tt.want.unmute,
+		} {
+			var groups []contextmenu.Group
+			for _, it := range items {
+				if it.Label == label {
+					groups = append(groups, it.Group)
+				}
+			}
+			if !slices.Equal(groups, []contextmenu.Group{group}) {
+				t.Errorf("%s: %s groups = %v, want [%v]", tt.name, label, groups, group)
 			}
 		}
-		if !found {
-			t.Errorf("status %q: items = %v, want to include %q", status, items, actionUnmuteReopen)
+		if got, want := hasItem(items, "Answer…"), tt.name == "needs-answer"; got != want {
+			t.Errorf("%s: Answer… shown = %v, want %v", tt.name, got, want)
 		}
 	}
 }
 
-func TestSuggestedActionItems_NoMutes_NoUnmuteAction(t *testing.T) {
+func TestTicketHasSuggestedActions_AgreesWithMenu(t *testing.T) {
 	t.Parallel()
-	items := statusActionItems(tickets.StatusOpen, tickets.Ticket{}, false)
-	for _, item := range items {
-		if item.Value == actionUnmuteReopen {
-			t.Errorf("items = %v, want no %q for a ticket with no Mutes", items, actionUnmuteReopen)
+	for _, tt := range []struct {
+		name string
+		in   ticketMenuInput
+		want bool
+	}{
+		{"open", ticketMenuInput{rendered: tickets.StatusOpen}, false},
+		{"claimed", ticketMenuInput{rendered: tickets.StatusClaimed}, false},
+		{"done", ticketMenuInput{rendered: tickets.StatusDone}, false},
+		{"blocked", ticketMenuInput{rendered: tickets.StatusBlocked}, false},
+		{"needs-answer", ticketMenuInput{rendered: tickets.StatusNeedsAnswer}, true},
+		{"needs-answer herdr down", ticketMenuInput{rendered: tickets.StatusNeedsAnswer, herdrDown: true}, true},
+		{"needs-repair", ticketMenuInput{rendered: tickets.StatusNeedsRepair}, true},
+		{"needs-repair herdr down", ticketMenuInput{rendered: tickets.StatusNeedsRepair, herdrDown: true}, false},
+		{"error herdr down", ticketMenuInput{rendered: tickets.StatusError, herdrDown: true}, false},
+		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}}, true},
+		{"muted open server down", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}, serverReason: serverNotRunning}, false},
+		{"open on a map", ticketMenuInput{rendered: tickets.StatusOpen, isMap: true}, true},
+		{"archived needs-repair", ticketMenuInput{rendered: tickets.StatusNeedsRepair, archived: true}, false},
+	} {
+		menu := slices.ContainsFunc(ticketMenuItems(tt.in), func(it contextmenu.Item[ticketTarget]) bool {
+			return it.Group == contextmenu.Suggested && it.Disabled == ""
+		})
+		if got := ticketHasSuggestedActions(tt.in); got != tt.want || menu != tt.want {
+			t.Errorf("%s: badge = %v, menu has enabled Suggested = %v, want %v", tt.name, got, menu, tt.want)
 		}
-	}
-}
-
-func TestTicketHasSuggestedActions_MutedTicket_True(t *testing.T) {
-	t.Parallel()
-	muted := tickets.Ticket{Mutes: []schema.MuteRecord{{EventType: "notification-storm"}}}
-	if !ticketHasSuggestedActions(tickets.StatusOpen, muted, false) {
-		t.Error("ticketHasSuggestedActions = false, want true for a muted ticket")
-	}
-}
-
-func TestTicketHasSuggestedActions_NoMutesNoNeedsAnswer_False(t *testing.T) {
-	t.Parallel()
-	if ticketHasSuggestedActions(tickets.StatusOpen, tickets.Ticket{}, false) {
-		t.Error("ticketHasSuggestedActions = true, want false for an unmuted open ticket")
 	}
 }

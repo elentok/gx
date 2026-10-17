@@ -55,9 +55,9 @@ const (
 
 const actionApprove = "approve"
 
-// ticketMenuItems lists every action for a ticket. An action shown under
-// Suggested is not repeated in its own group; one that doesn't apply is dim
-// with the reason.
+// ticketMenuItems lists every action for a ticket. Each is built once in its
+// own group and moved to Suggested when it is suggested; one that doesn't
+// apply is dim with the reason.
 func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	item := func(label, key string, group contextmenu.Group, disabled string, msg ticketMenuPickMsg) contextmenu.Item[ticketTarget] {
 		if in.archived && !archivedAllowed(group, msg.action) {
@@ -82,28 +82,21 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	server := func(label, key, action, why string) contextmenu.Item[ticketTarget] {
 		return pick(label, key, action, contextmenu.Server, firstReason(in.serverReason, finished, why))
 	}
+	suggest := func(suggested bool, it contextmenu.Item[ticketTarget]) contextmenu.Item[ticketTarget] {
+		if suggested {
+			it.Group = contextmenu.Suggested
+		}
+		return it
+	}
 	parked := isParkedStatus(in.ticket.Status)
-	answer, unmute := answerSuggested(in.rendered), unmuteSuggested(in.ticket)
+	answer := answerSuggested(in.rendered)
 
 	var items []contextmenu.Item[ticketTarget]
 	if in.isMap && in.rendered == tickets.StatusOpen {
-		items = append(items, pick(startSessionMenuItem.Label, "", actionStartSession, contextmenu.Suggested, ""))
+		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
 	}
 	if answer {
-		// enter only unparks needs-repair, so a needs-answer row gets no hint.
-		resumeKey := ""
-		if parked {
-			resumeKey = "enter"
-		}
-		items = append(items,
-			pick("Answer…", "", actionAnswer, contextmenu.Suggested, ""),
-			pick(resumeLabel, resumeKey, actionResume, contextmenu.Suggested, in.serverReason))
-	}
-	if investigateSuggested(in.rendered) {
-		items = append(items, pick("Investigate", "", actionInvestigate, contextmenu.Suggested, reasonIf(in.herdrDown, herdrDownText)))
-	}
-	if unmute {
-		items = append(items, pick("Unmute & Reopen", "", actionUnmuteReopen, contextmenu.Suggested, in.serverReason))
+		items = append(items, pick("Answer…", "", actionAnswer, contextmenu.Suggested, ""))
 	}
 
 	current := schema.Status(strings.ToLower(strings.TrimSpace(in.ticket.Status)))
@@ -118,22 +111,24 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		items = append(items, item("Set "+string(status), "", contextmenu.Status, why, ticketMenuPickMsg{status: status}))
 	}
 
-	items = append(items, server("Park", "", serverVerbPark, reasonIf(parked, alreadyParked)))
-	if !answer {
-		items = append(items, server(resumeLabel, "enter", actionResume, reasonIf(!parked, notParked)))
-	}
+	// A needs-answer Resume clears an announce-and-stop park, which the
+	// status doesn't show as parked; enter only unparks needs-repair, so it
+	// gets no hint.
+	resumeKey := reasonIf(parked || !answer, "enter")
+	unmute := unmuteSuggested(in.ticket)
 	items = append(items,
+		server("Park", "", serverVerbPark, reasonIf(parked, alreadyParked)),
+		suggest(answer, server(resumeLabel, resumeKey, actionResume, reasonIf(!parked && !answer, notParked))),
 		server("Cancel", "", serverVerbCancel, ""),
-		server("Relaunch", "", serverVerbRelaunch, ""))
-	if !unmute {
-		items = append(items, server("Unmute & Reopen", "", actionUnmuteReopen, notMuted))
-	}
-	items = append(items,
+		server("Relaunch", "", serverVerbRelaunch, ""),
+		// A mute outlives the status (see actionUnmuteReopen), so a finished
+		// ticket keeps its Unmute.
+		suggest(unmute, pick("Unmute & Reopen", "", actionUnmuteReopen, contextmenu.Server,
+			firstReason(in.serverReason, reasonIf(!unmute, firstReason(finished, notMuted))))),
 		pick("Watch", "", actionWatch, contextmenu.Agent, in.watchReason),
-		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""))
-	if !investigateSuggested(in.rendered) {
-		items = append(items, pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
-	}
+		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""),
+		suggest(investigateSuggested(in.rendered),
+			pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText))))
 	if in.paneLive {
 		items = append(items, pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
@@ -268,6 +263,17 @@ func (t ticketTarget) result(action string) actionsMenuResult {
 		Path: t.address, EpicName: t.epicName, TicketID: t.ticketID,
 		Action: action,
 	}
+}
+
+// rowHasSuggestedActions keys a row's badge off the menu "m" would open on it.
+func (m Model) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Ticket, archived bool) bool {
+	in := newTicketMenuInput(epic, ticket, m.settings.HerdrUnavailable, serverReason(m.serverAPI, m.link))
+	in.archived = archived
+	return ticketHasSuggestedActions(in)
+}
+
+func (m QueueModel) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Ticket) bool {
+	return ticketHasSuggestedActions(newTicketMenuInput(epic, ticket, m.settings.HerdrUnavailable, serverReason(m.serverAPI, m.link)))
 }
 
 func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived bool) (tea.Model, tea.Cmd) {
