@@ -259,7 +259,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case answerEditorFinishedMsg:
 		var cmd tea.Cmd
-		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg, func() tea.Msg { return statusChangedMsg{} })
+		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg)
 		return m, cmd
 
 	case checkAddConfirmedMsg:

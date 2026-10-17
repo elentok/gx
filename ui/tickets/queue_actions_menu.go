@@ -47,24 +47,22 @@ func (m QueueModel) handleQueueActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, t
 	if !result.Done || !result.Accepted {
 		return m, nil
 	}
-	if result.Action == actionMerge {
-		return m, cmdEpicMerge(m.serverAPI, result.EpicName)
-	}
-	if result.Action == actionInvestigate {
-		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
-	}
-	file, address := resolveTicketPath(m.settings.TicketStore, result.Path)
-	if result.Action == actionTranscript {
-		return m, cmdTranscript(file, address, m.width)
-	}
-	if result.Action == actionWatch && address != "" {
-		return m, cmdWatchAddress(address, result.TicketID)
-	}
-	result.Path = file
-	if cmd, ok := answerActionCmd(m.worktreeRoot, m.settings, result); ok {
+	if cmd, ok := dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, result); ok {
 		return m, cmd
 	}
-	return m, cmdApplySuggestedAction(file, result.Action, func() tea.Msg { return queueActionAppliedMsg{} })
+	file, address := resolveTicketPath(m.settings.TicketStore, result.Path)
+	switch result.Action {
+	case actionInvestigate:
+		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
+	case actionTranscript:
+		return m, cmdTranscript(file, address, m.width)
+	case actionWatch:
+		if address != "" {
+			return m, cmdWatchAddress(address, result.TicketID)
+		}
+		return m, cmdFocusPane(result.EpicName, result.TicketID)
+	}
+	return m, nil
 }
 
 // cmdWatchAddress opens address's live native agent, else focuses its herdr
@@ -79,7 +77,3 @@ func cmdWatchAddress(address, ticketID string) tea.Cmd {
 		return focus()
 	}
 }
-
-// queueActionAppliedMsg reports that cmdApplySuggestedAction's write finished
-// successfully, so updateInner can trigger the same reload cmdLoadQueue uses.
-type queueActionAppliedMsg struct{}

@@ -46,17 +46,13 @@ type answerEditorFinishedMsg struct {
 	before       string
 	worktreeRoot string
 	settings     ui.Settings
-	// resume replaces the file-write resume once the editor is done; server
-	// mode sets it to ping and unpark through the server.
+	// resume pings and unparks through the server once the editor is done;
+	// nil with no server, which only the server can resume through.
 	resume tea.Cmd
 }
 
-// cmdAnswer opens $EDITOR at ticket path's "## Needs Answer" heading,
+// cmdAnswerThen opens $EDITOR at ticket path's "## Needs Answer" heading,
 // snapshotting that section first for the in-place comparison.
-func cmdAnswer(worktreeRoot string, settings ui.Settings, path string) tea.Cmd {
-	return cmdAnswerThen(worktreeRoot, settings, path, nil)
-}
-
 func cmdAnswerThen(worktreeRoot string, settings ui.Settings, path string, resume tea.Cmd) tea.Cmd {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -79,27 +75,25 @@ func cmdAnswerThen(worktreeRoot string, settings ui.Settings, path string, resum
 
 // handleAnswerEditorFinished asks what to do next once the editor exits
 // in place: resume when the section changed, else offer to keep editing.
-// onApplied builds the tab's own reload message after the resume write.
-func handleAnswerEditorFinished(c confirm.Model, msg answerEditorFinishedMsg, onApplied func() tea.Msg) (confirm.Model, tea.Cmd) {
+func handleAnswerEditorFinished(c confirm.Model, msg answerEditorFinishedMsg) (confirm.Model, tea.Cmd) {
 	if msg.err != nil {
 		return c, notify.Error("answer failed: " + msg.err.Error())
 	}
 	if msg.splitApp != "" {
-		return c, notify.Info("opened " + msg.splitApp + " split: edit the ticket by hand, then choose 'Resume (I answered)'")
+		return c, notify.Info("opened " + msg.splitApp + " split: edit the ticket by hand, then choose '" + resumeLabel + "'")
 	}
 	raw, err := os.ReadFile(msg.path)
 	if err != nil {
 		return c, notify.Error("answer: " + err.Error())
 	}
 	if needsAnswerSection(string(raw)) != msg.before {
-		resume := msg.resume
-		if resume == nil {
-			resume = cmdApplySuggestedAction(msg.path, actionResumeAnswered, onApplied)
+		if msg.resume == nil {
+			return c, notify.Warning(answerSavedNeedsServer)
 		}
 		return c.Open(confirm.Options{
 			Prompt:     "Resume the ticket?",
 			DefaultYes: true,
-			AcceptCmd:  resume,
+			AcceptCmd:  msg.resume,
 		}), nil
 	}
 	return c.Open(confirm.Options{
@@ -107,18 +101,6 @@ func handleAnswerEditorFinished(c confirm.Model, msg answerEditorFinishedMsg, on
 		DefaultYes: true,
 		AcceptCmd:  cmdAnswerThen(msg.worktreeRoot, msg.settings, msg.path, msg.resume),
 	}), nil
-}
-
-// answerActionCmd dispatches Answer… and Watch, which need more than a path
-// (like actionInvestigate); ok is false for any other action.
-func answerActionCmd(worktreeRoot string, settings ui.Settings, result actionsMenuResult) (tea.Cmd, bool) {
-	switch result.Action {
-	case actionAnswer:
-		return cmdAnswer(worktreeRoot, settings, result.Path), true
-	case actionWatch:
-		return cmdFocusPane(result.EpicName, result.TicketID), true
-	}
-	return nil, false
 }
 
 func cmdFocusPane(epicName, identifier string) tea.Cmd {

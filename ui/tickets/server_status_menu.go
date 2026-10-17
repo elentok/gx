@@ -18,6 +18,7 @@ import (
 const (
 	serverVerbPark     = "park"
 	serverVerbUnpark   = "unpark"
+	serverVerbUnmute   = "unmute"
 	serverVerbCancel   = "cancel"
 	serverVerbRelaunch = "relaunch"
 
@@ -62,7 +63,11 @@ func newServerStatusMenu(ticket tickets.Ticket, rendered tickets.RenderedStatus)
 	}
 	verbs = append(verbs, serverVerbCancel, serverVerbRelaunch)
 	for _, v := range verbs {
-		items = append(items, components.MenuItem{Label: v, Value: serverMenuValuePrefix + v})
+		label := v
+		if v == serverVerbUnpark {
+			label = resumeLabel
+		}
+		items = append(items, components.MenuItem{Label: label, Value: serverMenuValuePrefix + v})
 	}
 	return components.MenuState{Items: items}
 }
@@ -73,9 +78,12 @@ type serverWriteMsg struct {
 	problem string
 }
 
-// cmdServerWrite issues verb for address through the server.
-func (m Model) cmdServerWrite(verb, address string) tea.Cmd {
-	api := m.serverAPI
+// cmdServerWrite issues verb for address through the server. With no server
+// it writes nothing: orchestration writes have no file fallback.
+func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
+	if api == nil {
+		return notify.Warning(serverNotRunning)
+	}
 	return func() tea.Msg {
 		ctx := context.Background()
 		var (
@@ -89,6 +97,8 @@ func (m Model) cmdServerWrite(verb, address string) tea.Cmd {
 			res, err = api.TicketCancel(ctx, address, true)
 		case serverVerbRelaunch:
 			res, err = api.TicketRelaunch(ctx, address)
+		case serverVerbUnmute:
+			res, err = api.TicketUnmute(ctx, address)
 		case serverVerbUnpark:
 			var rr server.RepairResult
 			rr, err = api.Repair(ctx, serverVerbUnpark, server.RepairRequest{Address: address})
@@ -122,5 +132,5 @@ func (m Model) handleServerUnparkEnter() (cmd tea.Cmd, handled bool) {
 	if !isParkedStatus(ticket.Status) {
 		return nil, false
 	}
-	return m.cmdServerWrite(serverVerbUnpark, ticket.Path), true
+	return cmdServerWrite(m.serverAPI, serverVerbUnpark, ticket.Path), true
 }

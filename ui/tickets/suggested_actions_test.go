@@ -12,7 +12,7 @@ import (
 func TestSuggestedActionItems_NeedsAnswer_NoMutes_ResumeAndInvestigate(t *testing.T) {
 	t.Parallel()
 	items := statusActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, false)
-	want := []string{actionAnswer, actionResumeAnswered, actionInvestigate}
+	want := []string{actionAnswer, actionResume, actionInvestigate}
 	if got := itemValues(items); !slices.Equal(got, want) {
 		t.Errorf("items = %v, want %v", got, want)
 	}
@@ -21,7 +21,7 @@ func TestSuggestedActionItems_NeedsAnswer_NoMutes_ResumeAndInvestigate(t *testin
 func TestSuggestedActionItems_HerdrDown_HidesHerdrOnlyItems(t *testing.T) {
 	t.Parallel()
 	items := suggestedActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true, false, true)
-	want := []string{actionAnswer, actionResumeAnswered, actionTranscript}
+	want := []string{actionAnswer, actionResume, actionTranscript}
 	if got := itemValues(items); !slices.Equal(got, want) {
 		t.Errorf("items = %v, want %v", got, want)
 	}
@@ -55,7 +55,7 @@ func TestSuggestedActionItems_WatchOnlyWhileLive(t *testing.T) {
 func TestSuggestedActionItems_WatchBeforeTranscript_NoBadge(t *testing.T) {
 	t.Parallel()
 	items := suggestedActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true, false, false)
-	want := []string{actionAnswer, actionResumeAnswered, actionInvestigate, actionWatch, actionTranscript}
+	want := []string{actionAnswer, actionResume, actionInvestigate, actionWatch, actionTranscript}
 	if got := itemValues(items); !slices.Equal(got, want) {
 		t.Errorf("items = %v, want %v", got, want)
 	}

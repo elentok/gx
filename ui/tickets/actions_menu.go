@@ -2,7 +2,6 @@ package tickets
 
 import (
 	"fmt"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -87,18 +86,6 @@ func (m actionsMenuModel) View() string {
 		ui.ColorText,
 		48,
 	)
-}
-
-// cmdApplySuggestedAction performs the write in a Cmd (not inline in the
-// caller) so a filesystem error surfaces as a toast rather than a panic on
-// the Update goroutine, mirroring cmdApplyTicketStatus.
-func cmdApplySuggestedAction(path, action string, onSuccess func() tea.Msg) tea.Cmd {
-	return func() tea.Msg {
-		if err := applySuggestedAction(path, action, time.Now()); err != nil {
-			return notify.Error(err.Error())()
-		}
-		return onSuccess()
-	}
 }
 
 // actionsMenuReadyMsg carries a suggested-actions menu whose agent liveness
@@ -186,8 +173,8 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if !result.Done || !result.Accepted {
 		return m, nil
 	}
-	if result.Action == actionMerge {
-		return m, cmdEpicMerge(m.serverAPI, result.EpicName)
+	if cmd, ok := dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, result); ok {
+		return m, cmd
 	}
 	if result.Action == actionStartSession {
 		return m, startSessionCmd(result.Path)
@@ -202,8 +189,8 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmdTranscript(file, result.Path, m.width)
 	}
-	if cmd, ok := m.serverAnswerActionCmd(result); ok {
-		return m, cmd
+	if result.Action == actionWatch {
+		return m, m.cmdServerWatch(result.Path)
 	}
 	return m, nil
 }

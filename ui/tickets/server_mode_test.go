@@ -101,6 +101,11 @@ func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string) (server
 	return server.QueueResult{}, nil
 }
 
+func (f fakeServerAPI) TicketUnmute(_ context.Context, address string) (server.QueueResult, error) {
+	f.record("unmute " + address)
+	return server.QueueResult{}, nil
+}
+
 func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (server.QueueResult, error) {
 	f.record("approve " + address)
 	return server.QueueResult{}, nil
@@ -486,7 +491,7 @@ func TestServerMode_WatchJumpsToPaneAndResume(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
 	m := openAnswerMenu(t, api)
-	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswer, actionResumeAnswered, actionInvestigate, actionWatch, actionTranscript}; !slices.Equal(got, want) {
+	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswer, actionResume, actionInvestigate, actionWatch, actionTranscript}; !slices.Equal(got, want) {
 		t.Fatalf("menu = %v, want %v", got, want)
 	}
 
@@ -533,7 +538,7 @@ func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
 	}
 
 	m.settings.TicketStore = store
-	if msg, ok := m.cmdServerResumeAnswered("gx:alpha/01")().(serverWriteMsg); !ok || msg.problem != "" {
+	if msg, ok := cmdServerResumeAnswered(m.serverAPI, "gx:alpha/01")().(serverWriteMsg); !ok || msg.problem != "" {
 		t.Fatalf("resume result = %+v", msg)
 	}
 	if !slices.Equal(calls, []string{"changed gx:alpha/01", "unpark gx:alpha/01"}) {

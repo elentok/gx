@@ -71,7 +71,7 @@ func (m Model) handleStatusMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if !ok || r.isEpic() {
 			return m, nil
 		}
-		return m, m.cmdServerWrite(verb, m.epicAt(r).Tickets[r.ticketIdx].Path)
+		return m, cmdServerWrite(m.serverAPI, verb, m.epicAt(r).Tickets[r.ticketIdx].Path)
 	}
 	return m.applyStatusChange(schema.Status(value))
 }

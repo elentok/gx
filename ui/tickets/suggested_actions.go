@@ -2,10 +2,8 @@ package tickets
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
@@ -13,21 +11,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// actionResumeAnswered reopens a needs-answer ticket and demotes its
-// "## Needs Answer" stub, the same write unparkAnswered performs
-// automatically for a gate park (ralphloop.UnparkTicket). This menu exists
-// for the park kind that pre-pass can't safely auto-clear — an
-// announce-and-stop (zero-commit) park's live-but-idle pane looks identical
-// to an answered gate park, so a person confirms it explicitly here instead.
-const actionResumeAnswered = "resume-answered"
+// actionResume is the server's unpark, under the one "Resume" label the "m"
+// and "s" menus share. The "m" menu offers it for the park kind the server
+// can't safely auto-clear — an announce-and-stop (zero-commit) park's
+// live-but-idle pane looks identical to an answered gate park, so a person
+// confirms it explicitly here instead.
+const (
+	actionResume = serverVerbUnpark
+	resumeLabel  = "Resume"
+)
 
 // actionInvestigate opens a new herdr tab and launches a fresh
 // gx-investigate session for the ticket (see cmdLaunchInvestigate), for any
-// status signaling a problem (see suggestedActionItems). applySuggestedAction
-// never handles it — dispatch happens in
-// handleActionsMenuKey/handleQueueActionsMenuKey, which have the epic name
-// and ticket identifier the herdr launch needs and applySuggestedAction's
-// path-only signature doesn't carry.
+// status signaling a problem (see suggestedActionItems).
 const actionInvestigate = "investigate"
 
 // investigateSkill is the skill cmdLaunchInvestigate's prompt invokes.
@@ -38,11 +34,10 @@ const investigateSkill = "gx-investigate"
 // callback (see ralphloop.muteSource) never moves the ticket to
 // needs-repair, so gating on status alone would leave that mute invisible
 // and unclearable from the Tickets tab.
-const actionUnmuteReopen = "unmute-reopen"
+const actionUnmuteReopen = serverVerbUnmute
 
-// actionAnswer opens $EDITOR at the ticket's "## Needs Answer" heading.
-// Handled by handleActionsMenuKey/handleQueueActionsMenuKey (see cmdAnswer),
-// never applySuggestedAction.
+// actionAnswer opens $EDITOR at the ticket's "## Needs Answer" heading (see
+// cmdAnswerThen).
 const actionAnswer = "answer"
 
 // suggestedActionItems returns ticket's suggested-action menu items, given
@@ -74,7 +69,7 @@ func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, her
 	if status == tickets.StatusNeedsAnswer {
 		items = append(items,
 			components.MenuItem{Label: "Answer…", Value: actionAnswer},
-			components.MenuItem{Label: "Resume (I answered)", Value: actionResumeAnswered})
+			components.MenuItem{Label: resumeLabel, Value: actionResume})
 	}
 	if !herdrDown && (status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError) {
 		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
@@ -89,17 +84,6 @@ func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, her
 // "m" suggested-actions badge (ui.IconSet.SuggestedAction).
 func ticketHasSuggestedActions(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) bool {
 	return len(statusActionItems(status, ticket, herdrDown)) > 0
-}
-
-// applySuggestedAction performs action's write against the ticket at path.
-func applySuggestedAction(path, action string, now time.Time) error {
-	switch action {
-	case actionResumeAnswered:
-		return ralphloop.UnparkTicket(path, now)
-	case actionUnmuteReopen:
-		return ralphloop.UnmuteTicket(path, now)
-	}
-	return nil
 }
 
 // cmdLaunchInvestigate opens a new herdr tab in the epic's workspace and

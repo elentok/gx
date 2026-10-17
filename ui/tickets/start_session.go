@@ -9,8 +9,8 @@ import (
 )
 
 // actionStartSession hands a map epic or one of its open tickets to the
-// Agents tab's create form. Handled by handleActionsMenuKey, never
-// applySuggestedAction: starting a session writes no ticket status.
+// Agents tab's create form. Handled by handleActionsMenuKey;
+// starting a session writes no ticket status.
 const actionStartSession = "start-session"
 
 var startSessionMenuItem = components.MenuItem{Label: "Start session…", Value: actionStartSession}

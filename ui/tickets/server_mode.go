@@ -37,6 +37,7 @@ type ServerAPI interface {
 	TicketPark(ctx context.Context, address, reason string) (server.QueueResult, error)
 	TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error)
 	TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error)
+	TicketUnmute(ctx context.Context, address string) (server.QueueResult, error)
 	TicketApprove(ctx context.Context, address string) (server.QueueResult, error)
 	EpicMerge(ctx context.Context, address string) (server.QueueResult, error)
 	Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error)

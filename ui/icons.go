@@ -66,7 +66,7 @@ type IconSet struct {
 
 	// SuggestedAction badges a ticket row that has a "m"-menu suggested action
 	// available (ui/tickets' ticketHasSuggestedActions), e.g. a needs-answer
-	// ticket's "Resume (I answered)".
+	// ticket's "Resume".
 	SuggestedAction string
 
 	// Agent session states and marks the Agents tab adds; Idle, Blocked,

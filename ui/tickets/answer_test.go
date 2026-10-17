@@ -46,8 +46,9 @@ func TestHandleAnswerEditorFinished_InPlace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := writeAnswerTicket(t, tt.after)
-			msg := answerEditorFinishedMsg{path: path, before: needsAnswerSection(answerTicket)}
-			c, _ := handleAnswerEditorFinished(confirm.New(), msg, func() tea.Msg { return nil })
+			resume := func() tea.Msg { return nil }
+			msg := answerEditorFinishedMsg{path: path, before: needsAnswerSection(answerTicket), resume: resume}
+			c, _ := handleAnswerEditorFinished(confirm.New(), msg)
 			if !c.IsOpen || !strings.Contains(c.View(80), tt.wantPrompt) {
 				t.Errorf("open=%v view=%q, want prompt %q", c.IsOpen, c.View(80), tt.wantPrompt)
 			}
@@ -58,7 +59,7 @@ func TestHandleAnswerEditorFinished_InPlace(t *testing.T) {
 func TestHandleAnswerEditorFinished_Split_HintNoModal(t *testing.T) {
 	t.Parallel()
 	msg := answerEditorFinishedMsg{splitApp: "tmux", path: writeAnswerTicket(t, answerTicket)}
-	c, cmd := handleAnswerEditorFinished(confirm.New(), msg, func() tea.Msg { return nil })
+	c, cmd := handleAnswerEditorFinished(confirm.New(), msg)
 	if c.IsOpen {
 		t.Error("confirm opened for a split launch, want a hint only")
 	}

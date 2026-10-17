@@ -55,42 +55,16 @@ func resolveTicketPath(store, path string) (file, address string) {
 	return path, ""
 }
 
-// serverAnswerActionCmd dispatches the "m" menu's server-mode entries. Resume
-// is the server's unpark; Answer… edits the file directly and pings the server
-// before resuming; Watch opens a live native agent's log, else focuses the
-// iteration tab the iterations read names. ok is false for any other action.
-func (m Model) serverAnswerActionCmd(result actionsMenuResult) (tea.Cmd, bool) {
-	address := result.Path
-	switch result.Action {
-	case actionResumeAnswered:
-		return m.cmdServerWrite(serverVerbUnpark, address), true
-	case actionAnswer:
-		path, err := ticketFile(m.settings.TicketStore, address)
-		if err != nil {
-			return notify.Error("answer: " + err.Error()), true
-		}
-		return cmdAnswerThen(m.worktreeRoot, m.settings, path, m.cmdServerResumeAnswered(address)), true
-	case actionWatch:
-		// Liveness shells out to ps, so it is resolved inside the Cmd.
-		watch, focus := cmdWatchAgent(address), m.cmdServerFocusPane(address)
-		return func() tea.Msg {
-			if nativeAgentLive(address) {
-				return watch()
-			}
-			return focus()
-		}, true
-	}
-	return nil, false
-}
-
-// cmdServerResumeAnswered pings the server about the answer just written, then
-// unparks.
-func (m Model) cmdServerResumeAnswered(address string) tea.Cmd {
-	api := m.serverAPI
-	unpark := m.cmdServerWrite(serverVerbUnpark, address)
+// cmdServerWatch opens a live native agent's log, else focuses the iteration
+// tab the iterations read names.
+func (m Model) cmdServerWatch(address string) tea.Cmd {
+	// Liveness shells out to ps, so it is resolved inside the Cmd.
+	watch, focus := cmdWatchAgent(address), m.cmdServerFocusPane(address)
 	return func() tea.Msg {
-		_ = api.TicketChanged(context.Background(), address)
-		return unpark()
+		if nativeAgentLive(address) {
+			return watch()
+		}
+		return focus()
 	}
 }
 

@@ -110,10 +110,7 @@ func TestWatch_NativeLive_OpensLogNotPane(t *testing.T) {
 	}
 	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return false }}, nil)
 
-	cmd, ok := Model{}.serverAnswerActionCmd(actionsMenuResult{Action: actionWatch, Path: "gx:epic/01"})
-	if !ok {
-		t.Fatal("Watch not dispatched")
-	}
+	cmd := Model{}.cmdServerWatch("gx:epic/01")
 	if _, ok := cmd().(watchLoadedMsg); !ok {
 		t.Error("expected the native log modal")
 	}
@@ -134,11 +131,8 @@ func failOnNativeLog(t *testing.T) (undo func()) {
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd, ok := Model{serverAPI: fakeServerAPI{}}.serverAnswerActionCmd(actionsMenuResult{Action: actionWatch, Path: "gx:epic/01"})
+	cmd := Model{serverAPI: fakeServerAPI{}}.cmdServerWatch("gx:epic/01")
 	undo()
-	if !ok || cmd == nil {
-		t.Fatal("Watch not dispatched")
-	}
 	cmd()
 }
 

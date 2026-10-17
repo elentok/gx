@@ -22,7 +22,7 @@ import (
 
 // actionWatch looks at a live agent, per runner: a native agent's log in the
 // Watch modal, a herdr agent's pane by jumping to it. Handled by
-// handleActionsMenuKey/handleQueueActionsMenuKey, never applySuggestedAction.
+// handleActionsMenuKey/handleQueueActionsMenuKey.
 const actionWatch = "watch"
 
 // maxWatchLines bounds the modal to the log's tail so a long run can't stall
