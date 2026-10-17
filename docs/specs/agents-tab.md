@@ -496,6 +496,9 @@ matters. Avoid "agent kind", "needs attention" as a status name, "restart".
 
 - Precedence: Exited > OSC 7501 > pid file > transcript (rate limit) > screen rules
   (pre-session only). [T03]
+- A held rate limit is the exception: it beats an OSC 7501 `done` (and any Idle, or a Working from
+  before it) until the next Working, from OSC 7501 or the pid file, clears it. Blocked still beats
+  a held rate limit. [review]
 - Claude Code hooks are not used (blocked in some orgs). [map]
 
 ### Session status model
