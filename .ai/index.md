@@ -11,6 +11,41 @@ Issues live as local markdown files under `.scratch/`. See
 
 Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+## Testing
+
+- Test the packages you touched plus their direct importers (find importers with the gopls-mcp
+  references/dependency tools). Don't run `go test ./...` for a local change.
+- ralph-loop's land step runs no tests: it only cherry-picks commits onto the feature branch. The
+  full suite runs in CI (`.github/workflows/ci.yml`, on pushes and PRs to `main`): `go test ./...
+  -timeout=10m`, `make test-race`, and `go test ./e2e/...`.
+- Once a targeted run passes, stop. Don't rerun the full suite to double-check.
+- Always pass `-timeout` (e.g. `-timeout=120s`) when you pass `-count=N` or `-race`. Without it a
+  hung test blocks until the tool times out.
+- `server/` is the slowest package by far (minutes, close to the default `go test` timeout under
+  load). Run it only when you touched `server/` or `server/servertest/`, and scope it with `-run`.
+- If a test run moves to the background, wait for its completion notice. Don't poll its output
+  file.
+
+## Package map
+
+There is no `internal/` directory. Top-level packages live at the repo root:
+
+- `cmd/` — CLI commands (`gx tickets`, `gx agent`, ...)
+- `server/` — the gx server; `server/servertest/` holds its test helpers
+- `ralphloop/` — ralph-loop scheduler, landing and verification
+- `tickets/`, `tickets/schema/` — local markdown ticket tracker
+- `agentrunner/` — the agent-runner interface; `nativerunner/` — herdr-free runners
+- `harness/` — what runs inside an interactive agent session
+- `herdr/` — herdr CLI/socket client
+- `runner/` — runs a child command with inherited stdio
+- `git/` — git operations
+- `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
+- `e2e/` — end-to-end tests (slow, CI only)
+- `testutil/` — fakes and helpers: `testutil/agentfake`, `testutil/herdrfake`,
+  `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`
+
+Run `rtk go list ./...` for the full list.
+
 ## Core principle: gx must be visually beautiful
 
 Beauty is a requirement, not polish. A feature that works but looks cluttered is not done.
