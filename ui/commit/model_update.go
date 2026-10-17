@@ -41,6 +41,12 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		next = model
 	}()
 
+	// Handled before the modals, which would swallow it.
+	if trunkMsg, ok := msg.(TrunkLoadedMsg); ok {
+		m.trunk = trunkMsg.trunk
+		return m, nil
+	}
+
 	// Delegate all messages to amend.Model while it's open.
 	if m.amendConfirm.IsOpen {
 		return m.handleAmendUpdate(msg)

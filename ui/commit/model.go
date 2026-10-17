@@ -108,7 +108,20 @@ func NewModel(worktreeRoot, ref, filterPath string, settings ui.Settings, extraK
 	return m
 }
 
-func (m Model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd { return m.cmdLoadTrunk() }
+
+// TrunkLoadedMsg carries the trunk resolved off the update path. Containers
+// that embed the commit view must forward it to Update.
+type TrunkLoadedMsg struct{ trunk string }
+
+func (m Model) cmdLoadTrunk() tea.Cmd {
+	worktreeRoot := m.worktreeRoot
+	return func() tea.Msg {
+		// A trunk error only drops the trunk colour; the log and status views warn.
+		trunk, _ := tickets.TrunkFor(worktreeRoot)
+		return TrunkLoadedMsg{trunk: trunk}
+	}
+}
 
 func normalizedRef(ref string) string {
 	ref = strings.TrimSpace(ref)
@@ -132,7 +145,7 @@ func (m Model) WithRef(ref string) (Model, tea.Cmd) {
 	m.reload()
 	var cmd tea.Cmd
 	m.overlay, cmd = m.overlay.Disrupt(m.settings.ImageDiffs)
-	return m, cmd
+	return m, tea.Batch(cmd, m.cmdLoadTrunk())
 }
 
 // WithScreenOrigin injects the detail panel's absolute screen origin (and
@@ -167,8 +180,6 @@ func (m Model) WithContainerFocus(focused bool) Model {
 }
 
 func (m *Model) reload() {
-	// A trunk error only drops the trunk colour; the log and status views warn.
-	m.trunk, _ = tickets.TrunkFor(m.worktreeRoot)
 	m.details, m.err = git.CommitDetailsForRef(m.worktreeRoot, m.ref)
 	if m.err != nil {
 		m.files = nil

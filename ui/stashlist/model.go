@@ -154,9 +154,9 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		}
 		return m, nil
 
-	case imagediff.SettleMsg:
-		// commit.Model's only async round-trip; forward the debounce tick to the
-		// detail panel that owns the overlay (ADR 0010).
+	case imagediff.SettleMsg, commitui.TrunkLoadedMsg:
+		// commit.Model's only async round-trips: the image-diff debounce tick
+		// (ADR 0010) and the trunk lookup.
 		updated, detailCmd := m.commitDetail.Update(msg)
 		m.commitDetail = updated.(commitui.Model)
 		return m, detailCmd

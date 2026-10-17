@@ -106,10 +106,10 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case imagediff.SettleMsg:
-		// commit.Model is synchronous apart from this debounce tick; the log
-		// container doesn't broadcast unknown messages, so forward it explicitly
-		// to the detail panel that owns the overlay (ADR 0010).
+	case imagediff.SettleMsg, commit.TrunkLoadedMsg:
+		// commit.Model is synchronous apart from the image-diff debounce tick
+		// (ADR 0010) and its trunk lookup; the log container doesn't broadcast
+		// unknown messages, so forward them explicitly to the detail panel.
 		updated, detailCmd := m.commitDetail.Update(msg)
 		m.commitDetail = updated.(commit.Model)
 		return m, detailCmd
