@@ -214,7 +214,11 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case watchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
-		return m, nil
+		return m, m.watch.tick()
+	case watchStepMsg:
+		var cmd tea.Cmd
+		m.watch, cmd = m.watch.Step(msg)
+		return m, cmd
 	case ticketMenuReadyMsg:
 		return m.handleTicketMenuReady(msg), nil
 	case ticketMenuPickMsg:
