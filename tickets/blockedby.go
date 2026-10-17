@@ -71,8 +71,8 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 			errs := g.checkBlockedBy(e.Name, *t)
 			if !t.IsTerminal() {
 				errs = append(errs, g.cycleErrors(e.Name, *t)...)
+				errs = append(errs, epicErrs...)
 			}
-			errs = append(errs, epicErrs...)
 			if len(errs) > 0 {
 				t.BlockedByErr = errors.Join(errs...).Error()
 				continue

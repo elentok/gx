@@ -124,6 +124,20 @@ func TestResolveCrossEpic_UnknownEpicIsError(t *testing.T) {
 	}
 }
 
+func TestResolveCrossEpic_EpicLevelErrorSkipsTerminalTickets(t *testing.T) {
+	epics := []Epic{{Name: "d", BlockedBy: []string{"zz"}, Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "02", Status: "open"},
+	}}}
+	d := ResolveCrossEpic("p", EpicRelease{}, epics)[0]
+	if got := d.Tickets[0].BlockedByErr; got != "" {
+		t.Errorf("done ticket: BlockedByErr = %q, want none", got)
+	}
+	if got := d.RenderedStatus(d.Tickets[1]); got != StatusError {
+		t.Errorf("open ticket: got %v, want error", got)
+	}
+}
+
 func TestValidateRefs_WholeEpicCycleNamesTheEpic(t *testing.T) {
 	epics := []Epic{
 		{Name: "a", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"d/01"}}}},
