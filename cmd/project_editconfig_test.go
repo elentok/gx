@@ -139,9 +139,14 @@ func TestProjectEditConfig_InvalidSaveLoops(t *testing.T) {
 
 func TestProjectEditConfig_NonTTYInvalidFailsWithoutPrompt(t *testing.T) {
 	e := newEditConfigEnv(t, false, "y\n", `{"bogus": 1}`)
-	if err := runProjectEditConfig(e.d, "proj"); err == nil {
-		t.Fatal("want error")
+	err := runProjectEditConfig(e.d, "proj")
+	if err == nil || !strings.Contains(err.Error(), e.lastTmp) {
+		t.Fatalf("err = %v, want error naming %s", err, e.lastTmp)
 	}
+	if _, err := os.Stat(e.lastTmp); err != nil {
+		t.Errorf("temp copy not kept: %v", err)
+	}
+	os.Remove(e.lastTmp)
 	if strings.Contains(e.out.String(), "Edit again") {
 		t.Errorf("prompted without a TTY: %q", e.out.String())
 	}

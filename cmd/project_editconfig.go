@@ -86,7 +86,8 @@ func runProjectEditConfig(d deps, name string) error {
 		}
 		if err := validateProjectConfig(edited); err != nil {
 			if !tty {
-				return fmt.Errorf("invalid project.json, not saved: %w", err)
+				keepTmp = true
+				return fmt.Errorf("invalid project.json, not saved; your edits are in %s: %w", tmpPath, err)
 			}
 			fmt.Fprintf(d.stderr, "invalid project.json: %v\n", err)
 			if !askEditAgain(answers, d.stdout) {
