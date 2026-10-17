@@ -41,16 +41,14 @@ func (m Model) serverConn() ServerConn { return loadConn(m.conn) }
 // setServerConn is the one writer of the connection state.
 func (m *Model) setServerConn(c ServerConn) { m.conn.Store(&c) }
 
+// words reuses the title-row badge's words so the two can't drift; the badge
+// has none for the up and unknown states.
 func (c ServerConn) words() string {
-	switch c.State {
-	case ServerUp:
+	if c.State == ServerUp {
 		return "running"
-	case ServerDown:
-		return "down"
-	case ServerReadOnly:
-		return "read-only — restart"
-	case ServerHerdrUnavailable:
-		return "herdr unavailable"
+	}
+	if b, ok := c.badge(ui.IconSet{}); ok {
+		return b.full
 	}
 	return "connecting"
 }

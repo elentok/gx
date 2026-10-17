@@ -47,7 +47,7 @@ func TestHelpAbout_ShowsCurrentServerAndSplitApp(t *testing.T) {
 	}
 
 	view = helpAbout(ServerConn{State: ServerDown})
-	if !strings.Contains(view, "server   down") {
+	if !strings.Contains(view, "server   server down") {
 		t.Errorf("help view missing down state:\n%s", view)
 	}
 	if strings.Contains(view, "pid ") {
