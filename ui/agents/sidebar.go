@@ -112,11 +112,16 @@ func (m Model) visibleRows() []sidebarRow {
 }
 
 // updateClick selects the session clicked in the sidebar and focuses its
-// terminal, as selecting it from the jump popup does. Popups and copy mode
-// own the screen, so a click under them is dropped.
+// terminal, as selecting it from the jump popup does; a click in the terminal
+// focuses it. Popups and copy mode own the screen, so a click under them is
+// dropped. The agent never sees a click, even one with mouse tracking on.
 func (m Model) updateClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	mouse := msg.Mouse()
 	if mouse.Button != tea.MouseLeft || m.copy != nil || m.ModalOpen() || m.leaderPending {
+		return m, nil
+	}
+	if !m.sidebarOnScreen() || mouse.X > sidebarWidth {
+		m.focusTerminal()
 		return m, nil
 	}
 	i, ok := m.sidebarSessionAt(mouse.X, mouse.Y)

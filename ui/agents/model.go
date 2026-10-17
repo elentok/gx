@@ -255,10 +255,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keyFocusTerminal):
-		if m.attachTarget() != "" {
-			m.terminalFocused = true
-			m.resizeAttach()
-		}
+		m.focusTerminal()
 		return m, nil
 	case key.Matches(msg, keyDown):
 		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
@@ -294,11 +291,16 @@ func (m Model) selectAndFocus(i int) (tea.Model, tea.Cmd) {
 	m.cursor = i
 	next, cmd := m.refresh()
 	m = next.(Model)
+	m.focusTerminal()
+	return m, cmd
+}
+
+// focusTerminal focuses the selected session's terminal when it has one.
+func (m *Model) focusTerminal() {
 	if m.attachTarget() != "" {
 		m.terminalFocused = true
 		m.resizeAttach()
 	}
-	return m, cmd
 }
 
 // refresh starts what the newly shown sessions need: the spinner, the

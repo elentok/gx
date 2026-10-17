@@ -162,12 +162,34 @@ func TestSidebar_ClickSelectsAndFocusesTheSession(t *testing.T) {
 func TestSidebar_ClickOffASessionRowDoesNothing(t *testing.T) {
 	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
 	for _, c := range []tea.MouseClickMsg{
-		click(5, 0), click(5, 1), click(5, 5), click(5, 13), click(40, 4),
-		{X: 5, Y: 4, Button: tea.MouseRight},
+		click(5, 0), click(5, 1), click(5, 5), click(5, 13), click(sidebarWidth, 4),
+		{X: 5, Y: 4, Button: tea.MouseRight}, {X: 40, Y: 4, Button: tea.MouseRight},
 	} {
 		if got := update1(t, m, c); got.selectedID() != "s1" || got.terminalFocused {
 			t.Fatalf("%+v: selected %s, focused %v; want s1 in the sidebar", c, got.selectedID(), got.terminalFocused)
 		}
+	}
+}
+
+func TestSidebar_ClickInTheTerminalFocusesIt(t *testing.T) {
+	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
+	m = update1(t, m, click(40, 4))
+	if got := m.selectedID(); got != "s1" {
+		t.Fatalf("selected %s, want s1", got)
+	}
+	if !m.terminalFocused {
+		t.Fatal("terminal not focused after clicking it")
+	}
+
+	// An Exited session has no terminal to focus.
+	m = update1(t, m, click(5, 7))
+	if m = update1(t, m, click(40, 4)); m.selectedID() != "s2" || m.terminalFocused {
+		t.Fatal("terminal focused after clicking an Exited session's screen")
+	}
+
+	popup := press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "/")
+	if update1(t, popup, click(40, 4)).terminalFocused {
+		t.Fatal("terminal focused by a click under the jump popup")
 	}
 }
 
