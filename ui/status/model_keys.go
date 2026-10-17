@@ -26,7 +26,6 @@ const (
 	bindingYankAll      keys.BindingID = "yank-all"
 	bindingYankFilename keys.BindingID = "yank-filename"
 	bindingLazygitLog   keys.BindingID = "lazygit-log"
-	bindingRefreshMenu  keys.BindingID = "refresh-menu"
 	bindingCancelChord  keys.BindingID = "cancel-chord"
 	bindingGotoPR       keys.BindingID = "goto-pr"
 
@@ -82,10 +81,6 @@ func newStatusManager() keys.Manager {
 		{ID: bindingYankAll, Seq: []string{"y", "a"}, Categories: []string{}, Title: ""}, // hidden back-compat alias for 'ay'
 		{ID: bindingYankFilename, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank filename"},
 		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
-
-		// m-prefix chords
-		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh menu"},
-		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
 		// Shared single-key bindings (both filetree and diff focus)
 		{ID: bindingToggleSection, Seq: []string{"tab"}, Categories: []string{"Diff"}, Title: "toggle staged/unstaged"},
@@ -154,8 +149,6 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (Model, tea
 		return m, m.yankAllContext()
 	case bindingYankFilename:
 		return m, m.yankFilename()
-	case bindingRefreshMenu:
-		return m, tea.Batch(notify.Success("refreshed"), m.refreshPreserveScroll())
 	case bindingCancelChord:
 		return m, nil
 	case bindingToggleSection:

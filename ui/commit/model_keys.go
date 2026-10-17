@@ -37,7 +37,6 @@ const (
 	bindingYankSubject keys.BindingID = "yank-subject"
 	bindingYankMessage keys.BindingID = "yank-message"
 	bindingComment     keys.BindingID = "comment"
-	bindingRefreshMenu keys.BindingID = "refresh-menu"
 	bindingCancelChord keys.BindingID = "cancel-chord"
 	bindingAmend       keys.BindingID = "amend"
 	bindingReword      keys.BindingID = "reword"
@@ -90,9 +89,6 @@ func newCommitManager() keys.Manager {
 		{ID: bindingYankSubject, Seq: []string{"y", "s"}, Categories: []string{"Yank"}, Title: "yank commit subject"},
 		{ID: bindingYankMessage, Seq: []string{"y", "m"}, Categories: []string{"Yank"}, Title: "yank commit message"},
 		{ID: bindingCancelChord, Seq: []string{"y", "esc"}, Categories: []string{}, Title: ""},
-
-		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
-		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 
 		{ID: bindingReword, Seq: []string{"r", "w"}, Categories: []string{"Actions"}, Title: "reword commit"},
 
@@ -229,7 +225,7 @@ func (m Model) dispatchBinding(id keys.BindingID) (tea.Model, tea.Cmd) {
 			m.focusHeader = false
 		}
 		return m, nil
-	case bindingRefresh, bindingRefreshMenu:
+	case bindingRefresh:
 		m.reload()
 		return m, notify.Success("refreshed")
 	case bindingGotoTop:

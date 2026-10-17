@@ -35,7 +35,6 @@ const (
 	bindingGotoTop     keymgr.BindingID = "goto-top"
 	bindingGoOutput    keymgr.BindingID = "go-output"
 	bindingGotoPR      keymgr.BindingID = "goto-pr"
-	bindingRefreshMenu keymgr.BindingID = "refresh-menu"
 	bindingCancelChord keymgr.BindingID = "cancel-chord"
 )
 
@@ -67,9 +66,6 @@ func newWorktreesManager() keymgr.Manager {
 		{ID: bindingGoOutput, Seq: []string{"g", "o"}, Categories: []string{"Go to"}, Title: "view output"},
 		{ID: bindingGotoPR, Seq: []string{"g", "p"}, Categories: []string{"Go to"}, Title: "open PR"},
 		{ID: bindingCancelChord, Seq: []string{"g", "esc"}, Categories: []string{}, Title: ""},
-
-		{ID: bindingRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
-		{ID: bindingCancelChord, Seq: []string{"m", "esc"}, Categories: []string{}, Title: ""},
 	})
 }
 
@@ -182,7 +178,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 			return m.enterConfirm(prompt, cmdRebasePreflight(m.repo, *wt), ""), nil
 		}
 		return m.enterConfirm(prompt, cmdRebase(m.repo, *wt, false), "Rebasing "+wt.Name+"…"), nil
-	case bindingRefresh, bindingRefreshMenu:
+	case bindingRefresh:
 		if !m.spinnerActive {
 			m.loading = true
 			m.refreshing = true

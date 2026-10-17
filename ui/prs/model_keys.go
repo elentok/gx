@@ -7,15 +7,14 @@ import (
 )
 
 const (
-	bindingPRsHelp        keys.BindingID = "help"
-	bindingPRsBack        keys.BindingID = "back"
-	bindingPRsDown        keys.BindingID = "down"
-	bindingPRsUp          keys.BindingID = "up"
-	bindingPRsOpen        keys.BindingID = "open"
-	bindingPRsRefresh     keys.BindingID = "refresh"
-	bindingPRsRefreshMenu keys.BindingID = "refresh-menu"
-	bindingPRsToggleAll   keys.BindingID = "toggle-all-repos"
-	bindingPRsComments    keys.BindingID = "comments"
+	bindingPRsHelp      keys.BindingID = "help"
+	bindingPRsBack      keys.BindingID = "back"
+	bindingPRsDown      keys.BindingID = "down"
+	bindingPRsUp        keys.BindingID = "up"
+	bindingPRsOpen      keys.BindingID = "open"
+	bindingPRsRefresh   keys.BindingID = "refresh"
+	bindingPRsToggleAll keys.BindingID = "toggle-all-repos"
+	bindingPRsComments  keys.BindingID = "comments"
 )
 
 // newPRsManager builds the key manager for the PRs tab.
@@ -31,7 +30,6 @@ func newPRsManager() keys.Manager {
 		{ID: bindingPRsOpen, Seq: []string{"enter"}, Categories: []string{"Navigation"}, Title: "open in browser"},
 		{ID: bindingPRsOpen, Seq: []string{"o"}, Categories: []string{}, Title: ""},
 		{ID: bindingPRsRefresh, Seq: []string{"R"}, Categories: []string{"Other"}, Title: "refresh"},
-		{ID: bindingPRsRefreshMenu, Seq: []string{"m", "r"}, Categories: []string{"Global"}, Title: "refresh"},
 		{ID: bindingPRsToggleAll, Seq: []string{"a"}, Categories: []string{"Other"}, Title: "toggle all-repos scope"},
 		{ID: bindingPRsComments, Seq: []string{"c"}, Categories: []string{"Other"}, Title: "comments"},
 	})
@@ -52,7 +50,7 @@ func (m Model) dispatchBinding(id keys.BindingID, _ tea.KeyPressMsg) (tea.Model,
 		return m.navigateSelection(-1), nil
 	case bindingPRsOpen:
 		return m, m.cmdOpenSelected()
-	case bindingPRsRefresh, bindingPRsRefreshMenu:
+	case bindingPRsRefresh:
 		return m, tea.Batch(notify.Success("refreshed"), m.cmdLoad())
 	case bindingPRsToggleAll:
 		m.allRepos = !m.allRepos

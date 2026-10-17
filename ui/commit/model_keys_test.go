@@ -222,7 +222,7 @@ func TestDispatchBindingAmendOpensConfirm(t *testing.T) {
 	}
 }
 
-func TestDispatchBindingRefreshMenuSendsNotify(t *testing.T) {
+func TestRefreshKeySendsNotify(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\n")
 	testutil.CommitAll(t, repo, "base")
@@ -230,12 +230,16 @@ func TestDispatchBindingRefreshMenuSendsNotify(t *testing.T) {
 	m := newTestModel(repo, "HEAD")
 	m.ready = true
 
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	m = updated.(Model)
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
-	m = updated.(Model)
-
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	if cmd == nil {
-		t.Fatal("m+r should return a notify command")
+		t.Fatal("R should return a notify command")
+	}
+}
+
+func TestMIsNotAChordPrefix(t *testing.T) {
+	for _, b := range newCommitManager().Bindings() {
+		if len(b.Seq) > 1 && b.Seq[0] == "m" {
+			t.Errorf("unexpected m chord %v", b.Seq)
+		}
 	}
 }

@@ -653,7 +653,7 @@ _only when the page is stale_ (`loadedEpoch < repo epoch`). Exposed by each cach
 for it, it preserves maximum view state (e.g. status uses `refreshPreserveScroll`). This replaces
 the previous unconditional reload-on-every-activation.
 
-**Manual reload** — a user-initiated reload via the `R` key (and status `m r`). Louder than
+**Manual reload** — a user-initiated reload via the `R` key. Louder than
 auto-reload only in that it flashes a "refreshed" notification; like auto-reload it preserves scroll
 position and expand/collapse state. It is also the escape hatch for changes made _outside_ gx
 (external terminal git commands), which do not bump the repo epoch.

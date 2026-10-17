@@ -569,8 +569,8 @@ func TestMouseWheelScrollsPRList(t *testing.T) {
 
 func TestMouseWheelWithHelpOpenScrollsHelpNotList(t *testing.T) {
 	extraBindings := make([]keys.Binding, 0, 40)
-	for range 40 {
-		extraBindings = append(extraBindings, keys.Binding{Seq: []string{"x"}, Categories: []string{"Extra"}, Title: "extra binding"})
+	for i := range 40 {
+		extraBindings = append(extraBindings, keys.Binding{ID: keys.BindingID(fmt.Sprintf("extra-%d", i)), Seq: []string{fmt.Sprintf("x%d", i)}, Categories: []string{"Extra"}, Title: fmt.Sprintf("extra binding %d", i)})
 	}
 	m := NewModel("/repo", ui.Settings{}, keys.New(extraBindings))
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 8})
@@ -763,18 +763,25 @@ func TestNewModelWithScopeStartsAllRepos(t *testing.T) {
 	}
 }
 
-func TestRefreshMenuChordTriggersRefresh(t *testing.T) {
+func TestRefreshKeyTriggersRefresh(t *testing.T) {
 	m := NewModel("/repo", ui.Settings{}, keys.Manager{})
 	m = sendModel(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	m = sendModel(m, tea.KeyPressMsg{Code: 'm', Text: "m"})
-	_, cmd := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'R', Text: "R"})
 	if cmd == nil {
-		t.Fatal("expected a refresh cmd from m r")
+		t.Fatal("expected a refresh cmd from R")
 	}
 	sawOpen, sawClosed := containsMsgTypes(resolveMsgs(cmd))
 	if !sawOpen || !sawClosed {
-		t.Fatalf("expected m r to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
+		t.Fatalf("expected R to refresh both sections, sawOpen=%v sawClosed=%v", sawOpen, sawClosed)
+	}
+}
+
+func TestMIsNotAChordPrefix(t *testing.T) {
+	for _, b := range newPRsManager().Bindings() {
+		if len(b.Seq) > 1 && b.Seq[0] == "m" {
+			t.Errorf("unexpected m chord %v", b.Seq)
+		}
 	}
 }
 

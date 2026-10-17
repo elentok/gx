@@ -62,7 +62,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsReplaceQueue, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
 		{ID: bindingTicketsAddToQueue, Seq: []string{"a"}, Categories: []string{"Navigation"}, Title: "add to queue"},
-		{ID: bindingTicketsDrainReplace, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "drain epic"},
+		{ID: bindingTicketsDrainReplace, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "drain queue"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingTicketsToggleProjectScope, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "cwd project / all projects"},
