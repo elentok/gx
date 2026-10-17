@@ -100,11 +100,8 @@ type Model struct {
 
 	confirm confirm.Model
 
-	// actionsMenu backs the "m"-triggered suggested-actions menu on an epic
-	// row (see actions_menu.go).
-	actionsMenu actionsMenuModel
 	// ticketMenu is the "m"-triggered Context menu on a ticket row (see
-	// ticket_menu.go).
+	// ticket_menu.go) or an epic row (epic_menu.go).
 	ticketMenu contextmenu.Menu[ticketTarget]
 	// ticketMenuPending is the ticket path "m" is resolving the menu for;
 	// Esc or moving the selection forgets it, so a late result is dropped.
@@ -159,7 +156,7 @@ func (m Model) KeyManager() keys.Manager { return m.keys }
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m Model) InputFocused() bool {
-	if m.help.InputFocused() || m.ticketMenu.IsOpen || m.actionsMenu.IsOpen {
+	if m.help.InputFocused() || m.ticketMenu.IsOpen {
 		return true
 	}
 	_, ok := m.activeInputSearch()
@@ -170,7 +167,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.ticketMenu.IsOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen || m.watch.open
+	return m.help.IsOpen || m.ticketMenu.IsOpen || m.confirm.IsOpen || m.watch.open
 }
 
 func (m Model) Init() tea.Cmd {
@@ -272,6 +269,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ticketMenuPickMsg:
 		return m.handleTicketMenuPick(msg)
 
+	case epicMenuPickMsg:
+		return m.handleEpicMenuPick(msg)
+
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd
@@ -288,9 +288,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ticketMenu, cmd = m.ticketMenu.Update(msg)
 			return m, cmd
 		}
-		if m.actionsMenu.IsOpen {
-			return m.handleActionsMenuKey(msg)
-		}
 		if m.confirm.IsOpen {
 			return m.handleConfirmUpdate(msg)
 		}
@@ -305,7 +302,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.width, m.height)
 			return m, cmd
 		}
-		if m.actionsMenu.IsOpen || m.watch.open {
+		if m.watch.open {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -483,8 +480,6 @@ func (m Model) View() tea.View {
 	content := m.normalView()
 	if m.ticketMenu.IsOpen {
 		content = ui.OverlayCenter(content, m.ticketMenu.View(), m.width, m.height)
-	} else if m.actionsMenu.IsOpen {
-		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

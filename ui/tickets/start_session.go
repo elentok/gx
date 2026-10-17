@@ -9,7 +9,7 @@ import (
 )
 
 // actionStartSession hands a map epic or one of its open tickets to the
-// Agents tab's create form. Handled by handleActionsMenuKey;
+// Agents tab's create form. Handled by dispatchMenuAction;
 // starting a session writes no ticket status.
 const actionStartSession = "start-session"
 

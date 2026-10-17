@@ -6,7 +6,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -14,8 +13,6 @@ import (
 // `gx server epics merge`. Its menu result carries the epic address as
 // EpicName.
 const actionMerge = "merge"
-
-var mergeMenuItem = components.MenuItem{Label: "merge", Value: actionMerge}
 
 // cmdEpicMerge asks the server to merge epic ("project:epic") and toasts the
 // outcome: a direct land, the forked merge ticket, a park, or the refusal.

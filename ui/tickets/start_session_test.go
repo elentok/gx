@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,8 +11,8 @@ import (
 	"github.com/elentok/gx/ui/contextmenu"
 )
 
-func menuHasStartSession(m actionsMenuModel) bool {
-	return m.IsOpen && slices.Contains(itemValues(m.state.Items), actionStartSession)
+func menuHasStartSession(m Model) bool {
+	return m.ticketMenu.IsOpen && strings.Contains(m.ticketMenu.View(), startSessionMenuItem.Label)
 }
 
 func selectTicketByAddress(t *testing.T, m *Model, address string) {
@@ -56,19 +57,15 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 		}
 	}
 
-	selectEpicRow(t, &m, "gx:loop")
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	if menuHasStartSession(updated.(Model).actionsMenu) {
+	if menuHasStartSession(openEpicMenuOn(t, m, "gx:loop")) {
 		t.Error("start session offered on a loop epic")
 	}
-	selectEpicRow(t, &m, "gx:map")
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	if !menuHasStartSession(updated.(Model).actionsMenu) {
+	if !menuHasStartSession(openEpicMenuOn(t, m, "gx:map")) {
 		t.Error("start session not offered on a map epic")
 	}
 }
 
-func TestStartSession_CompletedMapEpicKeepsItsMergeAction(t *testing.T) {
+func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
 	m := withState(newServerModel(t), server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:done-map/01", Title: "Done", Status: "done", EpicIsMap: true},
 	}})
@@ -76,20 +73,25 @@ func TestStartSession_CompletedMapEpicKeepsItsMergeAction(t *testing.T) {
 	m = updated.(Model)
 	setCollapsedSection(&m, sectionCompleteMaps, false)
 	selectEpicRow(t, &m, "gx:done-map")
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	got := updated.(Model).actionsMenu
-	if want := []string{actionStartSession, actionMerge}; !slices.Equal(itemValues(got.state.Items), want) {
-		t.Errorf("items = %v, want %v", itemValues(got.state.Items), want)
+	r, _ := m.selectedRow()
+	items := epicMenuItems(epicMenuInput{epic: m.epicAt(r)})
+	var suggested []string
+	for _, it := range items {
+		if it.Group == contextmenu.Suggested {
+			suggested = append(suggested, it.Label)
+		}
+	}
+	if want := []string{startSessionMenuItem.Label, "Merge"}; !slices.Equal(suggested, want) {
+		t.Errorf("suggested = %v, want %v", suggested, want)
 	}
 }
 
-func TestStartSession_HiddenWithoutAServer(t *testing.T) {
+func TestStartSession_DimWithoutAServer(t *testing.T) {
 	m := startSessionModel(t)
 	m.serverAPI = nil
-	selectEpicRow(t, &m, "gx:map")
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	if menuHasStartSession(updated.(Model).actionsMenu) {
-		t.Error("start session offered on a map epic with no server")
+	m = openEpicMenuOn(t, m, "gx:map")
+	if _, cmd := chooseTicketMenuItem(t, m, "Start session"); cmd != nil {
+		t.Error("start session ran on a map epic with no server")
 	}
 }
 
@@ -106,10 +108,7 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 		m := startSessionModel(t).WithServer(fakeServerAPI{calls: &calls})
 		var cmd tea.Cmd
 		if tc.epicRow {
-			selectEpicRow(t, &m, tc.address)
-			updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-			// Start session… is the first item.
-			_, cmd = updated.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			_, cmd = chooseTicketMenuItem(t, openEpicMenuOn(t, m, tc.address), "Start session")
 		} else {
 			selectTicketByAddress(t, &m, tc.address)
 			_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), "Start session")

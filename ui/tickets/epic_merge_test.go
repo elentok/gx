@@ -9,38 +9,22 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
 
-func menuHasMerge(m actionsMenuModel) bool {
-	return m.IsOpen && slices.ContainsFunc(m.state.Items, func(it components.MenuItem) bool { return it.Value == actionMerge })
-}
-
-// chooseMerge moves the open menu's cursor onto "merge" and accepts it,
-// returning the toast the merge cmd resolves to.
-func chooseMerge(t *testing.T, update func(tea.Msg) tea.Cmd, menu actionsMenuModel) notify.NotifyMsg {
+// openEpicMenuOn selects the epic row name and presses "m".
+func openEpicMenuOn(t *testing.T, m Model, name string) Model {
 	t.Helper()
-	for i, it := range menu.state.Items {
-		if it.Value == actionMerge {
-			for range i {
-				update(tea.KeyPressMsg{Code: tea.KeyDown})
-			}
-			break
-		}
+	selectEpicRow(t, &m, name)
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
+	m = updated.(Model)
+	if !m.ticketMenu.IsOpen {
+		t.Fatalf("m on epic %s opened no menu", name)
 	}
-	cmd := update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatal("choosing merge issued no cmd")
-	}
-	msg, ok := cmd().(notify.NotifyMsg)
-	if !ok {
-		t.Fatalf("merge cmd = %T, want a toast", msg)
-	}
-	return msg
+	return m
 }
 
-func TestEpicMerge_TicketsTabOffersMergeOnCompleteUnmergedEpicOnly(t *testing.T) {
+func TestEpicMerge_TicketsTabMergesCompleteUnmergedEpicByAddress(t *testing.T) {
 	var calls []string
 	api := fakeServerAPI{calls: &calls, mergeRes: server.QueueResult{MergeTicket: "gx:alpha/02"}}
 	m := withState(newServerModel(t).WithServer(api), server.Snapshot{Tickets: []server.TicketInfo{
@@ -51,31 +35,19 @@ func TestEpicMerge_TicketsTabOffersMergeOnCompleteUnmergedEpicOnly(t *testing.T)
 	m = updated.(Model)
 	setCollapsedSection(&m, sectionComplete, false)
 
-	selectEpicRow(t, &m, "gx:beta")
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	if updated.(Model).actionsMenu.IsOpen {
-		t.Error("menu opened on an open epic")
+	open := openEpicMenuOn(t, m, "gx:beta")
+	if _, cmd := chooseTicketMenuItem(t, open, "Merge"); cmd != nil {
+		t.Error("merge ran on an open epic")
 	}
 
-	ticketRow, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	if r, ok := ticketRow.(Model).selectedRow(); !ok || r.isEpic() {
-		t.Fatalf("selected row = %+v, want gx:beta/01", r)
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Merge")
+	if cmd == nil {
+		t.Fatal("choosing merge issued no cmd")
 	}
-	if got := pressMenuKey(t, ticketRow.(Model)); menuHasMerge(got.actionsMenu) {
-		t.Error("merge offered on a ticket row")
+	toast, ok := cmd().(notify.NotifyMsg)
+	if !ok {
+		t.Fatalf("merge cmd = %T, want a toast", toast)
 	}
-
-	selectEpicRow(t, &m, "gx:alpha")
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	m = updated.(Model)
-	if !menuHasMerge(m.actionsMenu) {
-		t.Fatalf("menu = %+v, want a merge item", m.actionsMenu)
-	}
-	toast := chooseMerge(t, func(msg tea.Msg) tea.Cmd {
-		next, cmd := m.Update(msg)
-		m = next.(Model)
-		return cmd
-	}, m.actionsMenu)
 	if !slices.Equal(calls, []string{"merge gx:alpha"}) {
 		t.Errorf("calls = %v, want [merge gx:alpha]", calls)
 	}
@@ -84,9 +56,8 @@ func TestEpicMerge_TicketsTabOffersMergeOnCompleteUnmergedEpicOnly(t *testing.T)
 	}
 }
 
-func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithNoMergeItem(t *testing.T) {
-	api := fakeServerAPI{calls: &[]string{}}
-	m := withState(newServerModel(t).WithServer(api), server.Snapshot{Tickets: []server.TicketInfo{
+func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithMergeDim(t *testing.T) {
+	m := withState(newServerModel(t).WithServer(fakeServerAPI{calls: &[]string{}}), server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done", EpicMergedAt: time.Now()},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -96,9 +67,8 @@ func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithNoMergeItem(t *testing
 	}
 	setCollapsedSection(&m, sectionMerged, false)
 
-	selectEpicRow(t, &m, "gx:alpha")
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-	if menuHasMerge(updated.(Model).actionsMenu) {
-		t.Error("merge offered on a merged epic")
+	m = openEpicMenuOn(t, m, "gx:alpha")
+	if view := m.ticketMenu.View(); !strings.Contains(view, alreadyMerged) {
+		t.Errorf("view lacks %q:\n%s", alreadyMerged, view)
 	}
 }

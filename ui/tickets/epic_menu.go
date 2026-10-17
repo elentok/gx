@@ -1,0 +1,177 @@
+package tickets
+
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/notify"
+	"github.com/elentok/gx/ui/terminalrun"
+)
+
+// epicMenuPickMsg carries an epic Context menu pick back to Update. status is
+// set for a Status pick.
+type epicMenuPickMsg struct {
+	target ticketTarget
+	action string
+	status schema.Status
+}
+
+const (
+	ticketsNotDone = "tickets not done"
+	alreadyMerged  = "already merged"
+	actionCheckAll = "check-all"
+	actionEditEpic = "edit-epic"
+	actionYankEpic = "yank-epic"
+)
+
+var epicDirectStatuses = []schema.Status{schema.StatusDraft, schema.StatusOpen}
+
+// epicMenuInput is what epicMenuItems reads from an epic row.
+type epicMenuInput struct {
+	epic tickets.Epic
+	// branch is the branch the epic merges into; "" while the snapshot does
+	// not carry it.
+	branch       string
+	serverReason string
+	archived     bool
+}
+
+// epicMenuItems lists every action for an epic, in the shape of
+// ticketMenuItems: an action that applies is Suggested, one that doesn't is
+// dim with the reason.
+func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
+	item := func(label, key string, group contextmenu.Group, disabled string, msg epicMenuPickMsg) contextmenu.Item[ticketTarget] {
+		return contextmenu.Item[ticketTarget]{
+			Label: label, Key: key, Group: group, Disabled: disabled,
+			Run: func(t ticketTarget) tea.Cmd {
+				msg := msg
+				msg.target = t
+				return func() tea.Msg { return msg }
+			},
+		}
+	}
+	pick := func(label, key, action string, group contextmenu.Group, disabled string) contextmenu.Item[ticketTarget] {
+		return item(label, key, group, disabled, epicMenuPickMsg{action: action})
+	}
+	epic := in.epic
+
+	var items []contextmenu.Item[ticketTarget]
+	if epic.IsMap {
+		items = append(items, pick(startSessionMenuItem.Label, "", actionStartSession, contextmenu.Suggested, in.serverReason))
+	}
+	mergeWhy := firstReason(reasonIf(!epic.AllDone(), ticketsNotDone), reasonIf(!epic.MergedAt.IsZero(), alreadyMerged))
+	mergeGroup := contextmenu.Server
+	if mergeWhy == "" {
+		mergeGroup = contextmenu.Suggested
+	}
+	mergeLabel := "Merge"
+	if in.branch != "" {
+		mergeLabel += " into " + in.branch
+	}
+	items = append(items, pick(mergeLabel, "", actionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy)))
+
+	current := schema.Status(strings.ToLower(strings.TrimSpace(epic.Status)))
+	for _, status := range epicDirectStatuses {
+		items = append(items, item("Set "+string(status), "", contextmenu.Status,
+			reasonIf(status == current, "already "+string(status)), epicMenuPickMsg{status: status}))
+	}
+
+	items = append(items,
+		pick("Check all", "", actionCheckAll, contextmenu.Queue, ""),
+		pick("Edit ticket.md", "e e", actionEditEpic, contextmenu.EditCopy, ""),
+		pick("Yank", "y y", actionYankEpic, contextmenu.EditCopy, ""))
+
+	if in.archived {
+		for i, it := range items {
+			if it.Group != contextmenu.EditCopy {
+				items[i].Disabled = archivedText
+			}
+		}
+	}
+	return items
+}
+
+// openEpicMenu opens the Context menu on epic. Nothing in it needs liveness,
+// so it opens at once.
+func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
+	in := epicMenuInput{
+		epic:         epic,
+		serverReason: serverReason(m.serverAPI, m.link),
+		archived:     archived,
+	}
+	// In server mode Name is the "project:epic" address the merge and start
+	// session want; Path is what the selection is matched against.
+	target := ticketTarget{address: epic.Path, epicName: epic.Name}
+	m.ticketMenu = m.ticketMenu.Open(target, fmt.Sprintf("Epic %q", epic.Name), epicMenuItems(in))
+	return m
+}
+
+// selectedEpic is the selected epic row's epic; ok is false off an epic row.
+func (m Model) selectedEpic() (tickets.Epic, bool) {
+	r, ok := m.selectedRow()
+	if !ok || !r.isEpic() {
+		return tickets.Epic{}, false
+	}
+	return m.epicAt(r), true
+}
+
+// handleEpicMenuPick runs a pick only while its epic is still the selected
+// row; the edit and yank picks work on the selection.
+func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
+	epic, ok := m.selectedEpic()
+	if !ok || epic.Path != msg.target.address {
+		return m, nil
+	}
+	if msg.status != "" {
+		return m, cmdApplyEpicStatus(m.settings.TicketStore, epic, msg.status)
+	}
+	switch msg.action {
+	case actionCheckAll:
+		eligible := eligibleEpicTickets(epic)
+		paths := make([]string, len(eligible))
+		for i, t := range eligible {
+			paths[i] = t.Path
+		}
+		m.setPathsChecked(paths, true)
+		return m, nil
+	case actionEditEpic:
+		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
+	case actionYankEpic:
+		return m, m.yankTicketSummary()
+	}
+	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+}
+
+// epicFile is epic's ticket.md: resolved by address under store in server
+// mode, else from its directory.
+func epicFile(store string, epic tickets.Epic) (string, error) {
+	if project, name, ok := tickets.ParseEpicAddress(epic.Path); ok {
+		return tickets.EpicTicketMDPath(filepath.Join(store, project), project, name)
+	}
+	if path, ok := epicTicketMDPath(epic); ok {
+		return path, nil
+	}
+	return "", fmt.Errorf("epic %s has no ticket.md", epic.Name)
+}
+
+// cmdApplyEpicStatus is an Author write to the epic's own file; the store
+// watch carries it to a running server.
+func cmdApplyEpicStatus(store string, epic tickets.Epic, status schema.Status) tea.Cmd {
+	return func() tea.Msg {
+		file, err := epicFile(store, epic)
+		if err == nil {
+			s := string(status)
+			err = tickets.UpdateEpicFields(file, tickets.EpicUpdate{Status: &s})
+		}
+		if err != nil {
+			return notify.Error(err.Error())()
+		}
+		return statusChangedMsg{}
+	}
+}
