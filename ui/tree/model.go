@@ -49,6 +49,8 @@ type Model[T any] struct {
 	list         list.Model
 	visibleH     int
 	isSelectable IsSelectableFunc[T]
+	hovered      int
+	hovering     bool
 
 	search search.Model
 	keys   keys.Manager
@@ -160,6 +162,23 @@ func (m Model[T]) SelectedIndex() int {
 func (m *Model[T]) SetSelectedIndex(index int) {
 	m.list.SetSelected(index, len(m.entries))
 	m.list.EnsureSelectionVisibleLines(len(m.entries), m.entryLineHeight, m.visibleH)
+}
+
+// HoveredIndex is the entry under the mouse, or ok false when there is none.
+func (m Model[T]) HoveredIndex() (int, bool) {
+	return m.hovered, m.hovering
+}
+
+// SetHoveredIndex puts the hover on entry index, or clears it when ok is
+// false, and reports whether that changed it. The hover never touches the
+// selection.
+func (m *Model[T]) SetHoveredIndex(index int, ok bool) bool {
+	if !ok {
+		index = 0
+	}
+	changed := index != m.hovered || ok != m.hovering
+	m.hovered, m.hovering = index, ok
+	return changed
 }
 
 // SelectAtBodyLine resolves bodyLine — a tree-body-relative line (0 = the

@@ -162,6 +162,7 @@ func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nm.ticketMenuPending != nm.selectedQueuePath() {
 		nm.ticketMenuPending = ""
 	}
+	nm.refreshQueueHover(msg)
 	nm.syncQueuePreviewViewport()
 	return nm, cmd
 }
@@ -206,6 +207,8 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m.handleQueueMouseWheel(msg)
+	case tea.MouseMotionMsg:
+		return m.handleQueueMouseMotion(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 	case answerEditorFinishedMsg:

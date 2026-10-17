@@ -187,6 +187,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if nm.ticketMenuPending != nm.selectedTicketPath() {
 		nm.ticketMenuPending = ""
 	}
+	nm.refreshHover(msg)
 	nm.syncPreviewViewport()
 	return nm, cmd
 }
@@ -323,6 +324,9 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m.handleMouseWheel(msg)
+
+	case tea.MouseMotionMsg:
+		return m.handleMouseMotion(msg)
 
 	case statusChangedMsg:
 		return m.handleStatusChanged()
@@ -495,7 +499,7 @@ func scratchDirFor(worktreeRoot string) string {
 
 func (m Model) View() tea.View {
 	if !m.ready {
-		return ui.NewMainView("\n  Initializing…")
+		return newHoverView("\n  Initializing…")
 	}
 	content := m.normalView()
 	if m.ticketMenu.IsOpen {
@@ -522,7 +526,7 @@ func (m Model) View() tea.View {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 		}
 	}
-	return ui.NewMainView(content)
+	return newHoverView(content)
 }
 
 // activeInputSearch returns whichever of the sidebar's or preview's search

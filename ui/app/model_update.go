@@ -60,7 +60,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		pageMsg, onPage := toPageMouse(mouse)
 		if !onPage {
-			return m, notifyCmd
+			// A hover page still sees motion onto the chrome, to clear its highlight.
+			motion, isMotion := mouse.(tea.MouseMotionMsg)
+			if _, hover := m.activePage().model.(ui.HoverPage); !isMotion || !hover {
+				return m, notifyCmd
+			}
+			motion.Y -= ui.ChromeRows
+			pageMsg = motion
 		}
 		msg = pageMsg
 	}

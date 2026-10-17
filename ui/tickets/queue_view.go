@@ -16,7 +16,7 @@ import (
 
 func (m QueueModel) View() tea.View {
 	if !m.ready {
-		return ui.NewMainView("\n  Initializing…")
+		return newHoverView("\n  Initializing…")
 	}
 	if m.loaded {
 		// m.checked can change between Update calls with no queueEpicsLoadedMsg/
@@ -64,7 +64,7 @@ func (m QueueModel) View() tea.View {
 			content = ui.OverlayBottomRight(content, ui.RenderChordOverlay(prefix[0], hints), m.width, m.height)
 		}
 	}
-	return ui.NewMainView(content)
+	return newHoverView(content)
 }
 
 // queueBody renders the Queue tab's panel body: the run-state banner

@@ -165,22 +165,26 @@ func (m Model[T]) renderEntryLines(index int, entry Entry[T], opts RenderOpts[T]
 	if strings.TrimSpace(meta) == "" {
 		sep = ""
 	}
+	hovered := !selected && m.hovering && index == m.hovered
 	lines := make([]string, 0, entry.lineCount())
-	lines = append(lines, m.styleEntryLine(mark+indent+meta+sep+name, selected, faint, opts))
+	lines = append(lines, m.styleEntryLine(mark+indent+meta+sep+name, selected, hovered, faint, opts))
 	for _, body := range entry.Body {
-		lines = append(lines, m.styleEntryLine(mark+indent+colorStyle.Render(body), selected, faint, opts))
+		lines = append(lines, m.styleEntryLine(mark+indent+colorStyle.Render(body), selected, hovered, faint, opts))
 	}
 	return lines
 }
 
-// styleEntryLine applies the selection/width styling shared by an entry's
-// primary line and its Body continuation lines.
-func (m Model[T]) styleEntryLine(line string, selected, faint bool, opts RenderOpts[T]) string {
+// styleEntryLine applies the selection/hover/width styling shared by an
+// entry's primary line and its Body continuation lines.
+func (m Model[T]) styleEntryLine(line string, selected, hovered, faint bool, opts RenderOpts[T]) string {
 	if selected && !faint {
 		line = lipgloss.NewStyle().Bold(true).Render(line)
 	}
 	if selected && opts.Active && line != "" {
 		line = ui.RenderRowHighlight(line)
+	}
+	if hovered && line != "" {
+		line = ui.RenderRowHover(line)
 	}
 	if opts.Width > 0 {
 		line = ansi.Truncate(line, opts.Width-2, "")

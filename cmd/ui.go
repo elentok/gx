@@ -63,7 +63,7 @@ func runWorktrees(_ string) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }
@@ -108,7 +108,7 @@ func runStatus(target string) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }
@@ -146,7 +146,7 @@ func runLog(opts LogOptions) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }
@@ -184,7 +184,7 @@ func runShow(ref string) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }
@@ -222,7 +222,7 @@ func runStash() error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }
@@ -260,7 +260,7 @@ func runPRs(allRepos bool) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }
@@ -287,7 +287,7 @@ func runTab(tab nav.TabID) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
 	_, err = p.Run()
 	return err
 }

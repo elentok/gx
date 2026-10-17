@@ -86,6 +86,15 @@ func RenderRowHighlight(text string) string {
 	return RenderRowWithBackground(text, ColorSurface)
 }
 
+// ColorHover sits between ColorBase and ColorSurface so the row under the
+// mouse reads weaker than the selected one.
+var ColorHover = lipgloss.Color("#272738")
+
+// RenderRowHover applies the faint background of the row under the mouse.
+func RenderRowHover(text string) string {
+	return RenderRowWithBackground(text, ColorHover)
+}
+
 // RenderRowWithBackground applies an arbitrary background color and re-applies
 // it after nested ANSI resets so per-cell foreground colors stay visible.
 func RenderRowWithBackground(text string, bg color.Color) string {
