@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 
 	logui "github.com/elentok/gx/ui/log"
-	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 
 	tea "charm.land/bubbletea/v2"
 )
