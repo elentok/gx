@@ -16,28 +16,36 @@ const serverNotRunning = "server not running"
 // resume the ticket.
 const answerSavedNeedsServer = "answer saved — resuming needs the server"
 
-// dispatchMenuAction runs the "m" menu actions both tabs share, keyed by the
-// row's address (result.Path). Orchestration writes go only through the
-// server; Answer… is the one local edit. ok is false for any other action,
-// which the tab dispatches itself.
-func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings, result actionsMenuResult) (tea.Cmd, bool) {
+// dispatchMenuAction runs an accepted "m" menu action for either tab, keyed by
+// the row's address (result.Path). Orchestration writes go only through the
+// server; Answer… is the one local edit.
+func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
 	switch result.Action {
 	case actionResume, actionUnmuteReopen, serverVerbPark, serverVerbCancel, serverVerbRelaunch:
-		return cmdServerWrite(api, result.Action, result.Path), true
+		return cmdServerWrite(api, result.Action, result.Path)
 	case actionMerge:
 		if api == nil {
-			return notify.Warning(serverNotRunning), true
+			return notify.Warning(serverNotRunning)
 		}
-		return cmdEpicMerge(api, result.EpicName), true
+		return cmdEpicMerge(api, result.EpicName)
 	case actionAnswer:
 		file, _ := resolveTicketPath(settings.TicketStore, result.Path)
 		var resume tea.Cmd
 		if api != nil {
 			resume = cmdServerResumeAnswered(api, result.Path)
 		}
-		return cmdAnswerThen(worktreeRoot, settings, file, resume), true
+		return cmdAnswerThen(worktreeRoot, settings, file, resume)
+	case actionStartSession:
+		return startSessionCmd(result.Path)
+	case actionInvestigate:
+		return cmdLaunchInvestigate(worktreeRoot, result.EpicName, result.TicketID)
+	case actionTranscript:
+		file, address := resolveTicketPath(settings.TicketStore, result.Path)
+		return cmdTranscript(file, address, width)
+	case actionWatch:
+		return cmdServerWatch(api, result.Path)
 	}
-	return nil, false
+	return nil
 }
 
 // cmdServerResumeAnswered pings the server about the answer just written, then

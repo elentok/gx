@@ -20,8 +20,8 @@ func TestSuggestedActionItems_NeedsAnswer_NoMutes_ResumeAndInvestigate(t *testin
 
 func TestSuggestedActionItems_HerdrDown_HidesHerdrOnlyItems(t *testing.T) {
 	t.Parallel()
-	items := suggestedActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true, false, true)
-	want := []string{actionAnswer, actionResume, actionTranscript}
+	items := statusActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true)
+	want := []string{actionAnswer, actionResume}
 	if got := itemValues(items); !slices.Equal(got, want) {
 		t.Errorf("items = %v, want %v", got, want)
 	}
@@ -30,37 +30,12 @@ func TestSuggestedActionItems_HerdrDown_HidesHerdrOnlyItems(t *testing.T) {
 	}
 }
 
-func TestSuggestedActionItems_WatchOnlyWhileLive(t *testing.T) {
+func TestSuggestedActionItems_NoBadgeWithoutStatusActions(t *testing.T) {
 	t.Parallel()
-	cases := []struct {
-		name                            string
-		paneLive, nativeLive, herdrDown bool
-		want                            bool
-	}{
-		{"nothing live", false, false, false, false},
-		{"herdr pane live", true, false, false, true},
-		{"native agent live", false, true, false, true},
-		{"native agent live, herdr down", false, true, true, true},
-	}
-	for _, status := range []tickets.RenderedStatus{tickets.StatusClaimed, tickets.StatusNeedsAnswer} {
-		for _, c := range cases {
-			items := itemValues(suggestedActionItems(status, tickets.Ticket{}, c.paneLive, c.nativeLive, c.herdrDown))
-			if got := slices.Contains(items, actionWatch); got != c.want {
-				t.Errorf("%v, %s: items = %v, want Watch %v", status, c.name, items, c.want)
-			}
+	for _, status := range []tickets.RenderedStatus{tickets.StatusClaimed, tickets.StatusDone} {
+		if ticketHasSuggestedActions(status, tickets.Ticket{}, false) {
+			t.Errorf("a %v ticket carries a badge, want none", status)
 		}
-	}
-}
-
-func TestSuggestedActionItems_WatchBeforeTranscript_NoBadge(t *testing.T) {
-	t.Parallel()
-	items := suggestedActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true, false, false)
-	want := []string{actionAnswer, actionResume, actionInvestigate, actionWatch, actionTranscript}
-	if got := itemValues(items); !slices.Equal(got, want) {
-		t.Errorf("items = %v, want %v", got, want)
-	}
-	if ticketHasSuggestedActions(tickets.StatusClaimed, tickets.Ticket{}, false) {
-		t.Error("a claimed ticket carries a badge, want none: Watch alone must not add one")
 	}
 }
 

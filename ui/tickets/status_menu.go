@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -26,28 +27,32 @@ func (m Model) applyStatusChange(status schema.Status) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	epic := m.epicAt(r)
-	ticket := epic.Tickets[r.ticketIdx]
-	file, address := resolveTicketPath(m.settings.TicketStore, ticket.Path)
+	return m, statusChangeCmd(m.serverAPI, m.settings.TicketStore, epic, epic.Tickets[r.ticketIdx], status)
+}
+
+// statusChangeCmd is applyStatusChange's guarded write for any tab's row.
+func statusChangeCmd(api ServerAPI, store string, epic tickets.Epic, ticket tickets.Ticket, status schema.Status) tea.Cmd {
+	file, address := resolveTicketPath(store, ticket.Path)
 
 	if status == schema.StatusOpen {
 		if err := checkTicketBodyBeforeOpen(file); err != nil {
-			return m, notify.Error(err.Error())
+			return notify.Error(err.Error())
 		}
 	}
 	if status == schema.StatusDone {
 		// ADR 0030: a map epic's tickets never land, so a person closes them;
 		// a loop epic's done comes only from the server's landing.
 		if !epic.IsMap {
-			return m, notify.Error(doneIsSetByServer)
+			return notify.Error(doneIsSetByServer)
 		}
 		if unresolved := epic.UnresolvedBlockers(ticket); len(unresolved) > 0 {
-			return m, notify.Error(fmt.Sprintf(
+			return notify.Error(fmt.Sprintf(
 				"%s has unresolved blocked_by (%s); refusing to mark done",
 				ticket.Path, strings.Join(unresolved, ", "),
 			))
 		}
 	}
-	return m, cmdApplyTicketStatus(m.serverAPI, file, address, status)
+	return cmdApplyTicketStatus(api, file, address, status)
 }
 
 // doneIsSetByServer refuses Set done on a loop-epic ticket.

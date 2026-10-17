@@ -3,7 +3,6 @@ package tickets
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/sessionlookup"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -36,22 +34,6 @@ func writeTranscriptTicket(t *testing.T, sessionIDs string) string {
 		t.Fatal(err)
 	}
 	return path
-}
-
-func TestSuggestedActionItems_TranscriptAlwaysListed(t *testing.T) {
-	t.Parallel()
-	statuses := []tickets.RenderedStatus{tickets.StatusOpen, tickets.StatusDone, tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusError}
-	for _, status := range statuses {
-		for _, native := range []bool{false, true} {
-			items := suggestedActionItems(status, tickets.Ticket{}, false, native, false)
-			if !slices.Contains(itemValues(items), actionTranscript) {
-				t.Errorf("status %v native %v: items = %v, want %q", status, native, itemValues(items), actionTranscript)
-			}
-		}
-	}
-	if ticketHasSuggestedActions(tickets.StatusDone, tickets.Ticket{}, false) {
-		t.Error("a done ticket carries a badge, want none: Transcript alone must not add one")
-	}
 }
 
 func TestTranscript_RendersLatestSessionInModal(t *testing.T) {

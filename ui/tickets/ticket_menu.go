@@ -35,6 +35,8 @@ type ticketMenuInput struct {
 	archived             bool
 	// serverReason is why orchestration writes are off; empty when usable.
 	serverReason string
+	// onQueue adds the Queue group, which only the Queue tab offers.
+	onQueue, hasProposal bool
 }
 
 const (
@@ -45,7 +47,10 @@ const (
 	herdrDownText  = "herdr not running"
 	noAgentLog     = "no agent log"
 	archivedText   = "archived"
+	noProposal     = "no recovery proposal"
 )
+
+const actionApprove = "approve"
 
 // ticketMenuItems lists every action for a ticket. An action shown under
 // Suggested is not repeated in its own group; one that doesn't apply is dim
@@ -112,13 +117,17 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	if !unmute {
 		items = append(items, server("Unmute & Reopen", "", actionUnmuteReopen, notMuted))
 	}
-
 	watchable := in.nativeLive || (in.paneLive && !in.herdrDown)
 	items = append(items,
 		pick("Watch", "", actionWatch, contextmenu.Agent, reasonIf(!watchable, noAgentLog)),
 		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""))
 	if !investigateSuggested(in.rendered) {
 		items = append(items, pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
+	}
+
+	if in.onQueue {
+		items = append(items, pick("Approve recovery proposal", "A", actionApprove, contextmenu.Queue,
+			firstReason(in.serverReason, reasonIf(!in.hasProposal, noProposal))))
 	}
 
 	for _, e := range ticketMenuEdits {
@@ -160,18 +169,18 @@ var ticketMenuEdits = []struct {
 	{"Edit file (tab)", "e t", "edit-tab", terminalrun.Tab},
 }
 
-// runTicketMenuEditCopy runs an Edit/copy pick through its chord's handler,
+// ticketMenuEditCopy runs an Edit/copy pick through the tab's chord handlers,
 // so the menu and the chord can't drift; handled is false for other picks.
-func (m Model) runTicketMenuEditCopy(action string) (cmd tea.Cmd, handled bool) {
+func ticketMenuEditCopy(action string, yankSummary, yankFilePath func() tea.Cmd, edit func(terminalrun.SplitType) tea.Cmd) (cmd tea.Cmd, handled bool) {
 	switch action {
 	case actionYankSummary:
-		return m.yankTicketSummary(), true
+		return yankSummary(), true
 	case actionYankFilePath:
-		return m.yankTicketFilePath(), true
+		return yankFilePath(), true
 	}
 	for _, e := range ticketMenuEdits {
 		if e.action == action {
-			return m.cmdEditSelectedFile(e.split), true
+			return edit(e.split), true
 		}
 	}
 	return nil, false
@@ -197,11 +206,11 @@ func firstReason(reasons ...string) string {
 
 // serverReason is why orchestration writes are off right now; empty when the
 // server takes them.
-func (m Model) serverReason() string {
-	if m.serverAPI == nil || m.link == ServerLinkDown {
+func serverReason(api ServerAPI, link ServerLink) string {
+	if api == nil || link == ServerLinkDown {
 		return serverNotRunning
 	}
-	return m.link.disabledReason()
+	return link.disabledReason()
 }
 
 // ticketMenuReadyMsg carries a ticket's Context menu whose agent liveness was
@@ -212,43 +221,63 @@ type ticketMenuReadyMsg struct {
 	items  []contextmenu.Item[ticketTarget]
 }
 
-// openTicketMenu resolves liveness in a Cmd (it shells out to ps), so the
-// menu opens once the result comes back.
-func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived bool) (tea.Model, tea.Cmd) {
-	// A row's Path is its address and its epic is "project:epic"; the herdr
-	// launches want the bare epic.
-	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
-	target := ticketTarget{address: ticket.Path, epicName: epicName, ticketID: ticket.DisplayNumber()}
-	in := ticketMenuInput{
+// newTicketMenuInput is what both tabs read from a ticket row when "m" is
+// pressed; liveness is left to cmdTicketMenu.
+func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool, serverReason string) ticketMenuInput {
+	return ticketMenuInput{
 		rendered:     epic.RenderedStatus(ticket),
 		ticket:       ticket,
 		isMap:        epic.IsMap,
-		herdrDown:    m.settings.HerdrUnavailable,
-		archived:     archived,
-		serverReason: m.serverReason(),
+		herdrDown:    herdrDown,
+		serverReason: serverReason,
 	}
-	prompt := fmt.Sprintf("Ticket %q", ticket.Title)
-	m.ticketMenuPending = ticket.Path
-	return m, func() tea.Msg {
-		if m.serverAPI != nil {
-			it, live := m.serverIteration(ticket.Path)
-			in.paneLive = live && it.Tab != ""
-		}
-		in.nativeLive = nativeAgentLive(ticket.Path)
+}
+
+// cmdTicketMenu resolves liveness in a Cmd (it shells out to ps), so the menu
+// opens once the result comes back.
+func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
+	address := in.ticket.Path
+	// A row's Path is its address and its epic is "project:epic"; the herdr
+	// launches want the bare epic.
+	epicName, _, _ := tickets.SplitTrailerValue(address)
+	target := ticketTarget{address: address, epicName: epicName, ticketID: in.ticket.DisplayNumber()}
+	prompt := fmt.Sprintf("Ticket %q", in.ticket.Title)
+	return func() tea.Msg {
+		it, live := serverIteration(api, address)
+		in.paneLive = live && it.Tab != ""
+		in.nativeLive = nativeAgentLive(address)
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in)}
 	}
 }
 
-// handleTicketMenuReady opens the menu only for the request still pending:
-// the user may have moved on, or opened another overlay, while ps ran.
+// ticketMenuReadyApplies reports whether a resolved menu may open: the user
+// may have moved on, or opened another overlay, while ps ran.
+func ticketMenuReadyApplies(msg ticketMenuReadyMsg, pending, selected string, modalOpen bool) bool {
+	address := msg.target.address
+	return pending == address && selected == address && !modalOpen
+}
+
+func (t ticketTarget) result(action string) actionsMenuResult {
+	return actionsMenuResult{
+		Done: true, Accepted: true,
+		Path: t.address, EpicName: t.epicName, TicketID: t.ticketID,
+		Action: action,
+	}
+}
+
+func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived bool) (tea.Model, tea.Cmd) {
+	in := newTicketMenuInput(epic, ticket, m.settings.HerdrUnavailable, serverReason(m.serverAPI, m.link))
+	in.archived = archived
+	m.ticketMenuPending = ticket.Path
+	return m, cmdTicketMenu(m.serverAPI, in)
+}
+
 func (m Model) handleTicketMenuReady(msg ticketMenuReadyMsg) Model {
 	pending := m.ticketMenuPending
 	m.ticketMenuPending = ""
-	address := msg.target.address
-	if pending != address || m.selectedTicketPath() != address || m.ModalOpen() {
-		return m
+	if ticketMenuReadyApplies(msg, pending, m.selectedTicketPath(), m.ModalOpen()) {
+		m.ticketMenu = m.ticketMenu.Open(msg.target, msg.prompt, msg.items)
 	}
-	m.ticketMenu = m.ticketMenu.Open(msg.target, msg.prompt, msg.items)
 	return m
 }
 
@@ -261,12 +290,8 @@ func (m Model) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) 
 	if msg.status != "" {
 		return m.applyStatusChange(msg.status)
 	}
-	if cmd, ok := m.runTicketMenuEditCopy(msg.action); ok {
+	if cmd, ok := ticketMenuEditCopy(msg.action, m.yankTicketSummary, m.yankTicketFilePath, m.cmdEditSelectedFile); ok {
 		return m, cmd
 	}
-	return m.runMenuAction(actionsMenuResult{
-		Done: true, Accepted: true,
-		Path: msg.target.address, EpicName: msg.target.epicName, TicketID: msg.target.ticketID,
-		Action: msg.action,
-	})
+	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }

@@ -23,7 +23,7 @@ const (
 
 // actionInvestigate opens a new herdr tab and launches a fresh
 // gx-investigate session for the ticket (see cmdLaunchInvestigate), for any
-// status signaling a problem (see suggestedActionItems).
+// status signaling a problem (see statusActionItems).
 const actionInvestigate = "investigate"
 
 // investigateSkill is the skill cmdLaunchInvestigate's prompt invokes.
@@ -40,30 +40,16 @@ const actionUnmuteReopen = serverVerbUnmute
 // cmdAnswerThen).
 const actionAnswer = "answer"
 
-// suggestedActionItems returns ticket's suggested-action menu items, given
-// its rendered status. The answer items only apply to needs-answer;
-// investigate is whitelisted to the statuses that signal an
-// actual problem (needs-answer, needs-repair, error) rather than excluding
-// the healthy ones — Open/Claimed/Done are healthy, but so are Blocked
-// (waiting on a dependency), Draft (not yet offered to an agent) and
-// WaitingForChildren (own work already done), none of which have a live or
-// stalled session worth investigating. Whitelisting also fails closed for
-// any status added to the enum later, instead of showing the badge by
+// statusActionItems are the actions that earn a row the badge. The answer
+// items only apply to needs-answer; investigate is whitelisted to the
+// statuses that signal an actual problem (needs-answer, needs-repair, error)
+// rather than excluding the healthy ones — Open/Claimed/Done are healthy, but
+// so are Blocked (waiting on a dependency), Draft (not yet offered to an
+// agent) and WaitingForChildren (own work already done), none of which have a
+// live or stalled session worth investigating. Whitelisting also fails closed
+// for any status added to the enum later, instead of showing the badge by
 // default. herdrDown (ui.Settings.HerdrUnavailable) drops Investigate, whose
 // launch opens a herdr tab.
-//
-// Watch and Transcript close every list; they are not status actions, so
-// they never count toward the badge (whose per-row liveness lookups would be
-// wasteful). Watch is listed only while the agent is live: nativeLive for a
-// native runner, paneLive for a herdr pane, which herdrDown hides.
-func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, paneLive, nativeLive, herdrDown bool) []components.MenuItem {
-	items := statusActionItems(status, ticket, herdrDown)
-	if nativeLive || (paneLive && !herdrDown) {
-		items = append(items, components.MenuItem{Label: "Watch", Value: actionWatch})
-	}
-	return append(items, components.MenuItem{Label: "Transcript", Value: actionTranscript})
-}
-
 func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) []components.MenuItem {
 	var items []components.MenuItem
 	if answerSuggested(status) {

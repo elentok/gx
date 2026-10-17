@@ -139,29 +139,5 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if !result.Done || !result.Accepted {
 		return m, nil
 	}
-	return m.runMenuAction(result)
-}
-
-// runMenuAction runs an accepted action from either menu.
-func (m Model) runMenuAction(result actionsMenuResult) (tea.Model, tea.Cmd) {
-	if cmd, ok := dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, result); ok {
-		return m, cmd
-	}
-	if result.Action == actionStartSession {
-		return m, startSessionCmd(result.Path)
-	}
-	if result.Action == actionInvestigate {
-		return m, cmdLaunchInvestigate(m.worktreeRoot, result.EpicName, result.TicketID)
-	}
-	if result.Action == actionTranscript {
-		file, err := ticketFile(m.settings.TicketStore, result.Path)
-		if err != nil {
-			return m, notify.Error("transcript: " + err.Error())
-		}
-		return m, cmdTranscript(file, result.Path, m.width)
-	}
-	if result.Action == actionWatch {
-		return m, m.cmdServerWatch(result.Path)
-	}
-	return m, nil
+	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, result)
 }

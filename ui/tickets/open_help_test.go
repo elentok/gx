@@ -83,15 +83,15 @@ func TestOpenHelp_QueueOpensHelpFromSearchInputWithoutTyping(t *testing.T) {
 	}
 }
 
-func TestOpenHelp_QueueIgnoredWhileActionsMenuOpen(t *testing.T) {
+func TestOpenHelp_QueueIgnoredWhileTicketMenuOpen(t *testing.T) {
 	t.Parallel()
 	m := NewQueueModel(t.TempDir(), ui.Settings{}, keys.Manager{})
-	m.actionsMenu.IsOpen = true
+	m.ticketMenu.IsOpen = true
 	if !m.ModalOpen() {
-		t.Fatal("the actions menu does not count as a modal")
+		t.Fatal("the ticket menu does not count as a modal")
 	}
 	updated, _ := m.Update(nav.OpenHelp()())
 	if updated.(QueueModel).help.IsOpen {
-		t.Fatal("OpenHelp opened help over the actions menu")
+		t.Fatal("OpenHelp opened help over the ticket menu")
 	}
 }

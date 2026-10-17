@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -64,14 +65,13 @@ type QueueModel struct {
 	// render even when nothing changed.
 	entriesCache *queueEntriesCache
 
-	// actionsMenu backs the "m"-triggered suggested-actions menu (see
-	// queue_actions_menu.go), mirroring the Tickets tab's own
-	// Model.actionsMenu — a deliberate, narrow exception to this tab's
-	// otherwise read-only selection (ticket 08).
-	actionsMenu  actionsMenuModel
-	watch        watchModal
-	runningEpics map[string]bool
-	paused       bool
+	// ticketMenu and ticketMenuPending mirror the Tickets tab's own (see
+	// queue_ticket_menu.go).
+	ticketMenu        contextmenu.Menu[ticketTarget]
+	ticketMenuPending string
+	watch             watchModal
+	runningEpics      map[string]bool
+	paused            bool
 
 	// search backs "/"-triggered filtering over buildQueueEntries, mirroring
 	// the Tickets tab's own m.search (see ui/tickets/search.go).
@@ -159,6 +159,9 @@ type queueSpinnerRestartMsg struct{}
 func (m QueueModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(QueueModel)
+	if nm.selectedQueuePath() != m.selectedQueuePath() {
+		nm.ticketMenuPending = ""
+	}
 	nm.syncQueuePreviewViewport()
 	return nm, cmd
 }
@@ -212,6 +215,10 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case watchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, nil
+	case ticketMenuReadyMsg:
+		return m.handleTicketMenuReady(msg), nil
+	case ticketMenuPickMsg:
+		return m.handleTicketMenuPick(msg)
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
 			var cmd tea.Cmd
@@ -223,11 +230,16 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
+		if m.ticketMenu.IsOpen {
+			var cmd tea.Cmd
+			m.ticketMenu, cmd = m.ticketMenu.Update(msg)
+			return m, cmd
+		}
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
 		}
-		if m.actionsMenu.IsOpen {
-			return m.handleQueueActionsMenuKey(msg)
+		if msg.String() == "esc" {
+			m.ticketMenuPending = ""
 		}
 		if m.focus == focusPreview {
 			return m.handleQueuePreviewKey(msg)
@@ -244,7 +256,12 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleQueueKey(msg)
 	case tea.MouseClickMsg:
-		if m.actionsMenu.IsOpen || m.watch.open {
+		if m.ticketMenu.IsOpen {
+			var cmd tea.Cmd
+			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.width, m.height)
+			return m, cmd
+		}
+		if m.watch.open {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -379,7 +396,7 @@ const (
 // bindingQueueSelectLast, bindingQueuePreviewBottom, bindingQueueReload,
 // bindingQueuePauseResume, bindingQueueClearChecked,
 // bindingQueueClearDoneChecked, bindingQueueDelete, and
-// bindingQueueSuggestedActions were previously handled by a raw
+// bindingQueueTicketMenu were previously handled by a raw
 // msg.String() switch with no keys.Manager entry, so they never appeared in
 // the "?" help modal (help.BuildSections only sees this tab's own km, the
 // tree's bindings, and the app-wide extraKeys). Registering them here fixes
@@ -392,7 +409,7 @@ const (
 	bindingQueueClearChecked     keys.BindingID = "clear-checked"
 	bindingQueueClearDoneChecked keys.BindingID = "clear-done-checked"
 	bindingQueueDelete           keys.BindingID = "delete"
-	bindingQueueSuggestedActions keys.BindingID = "suggested-actions"
+	bindingQueueTicketMenu       keys.BindingID = "ticket-menu"
 	bindingQueueStartServer      keys.BindingID = "start-server"
 	bindingQueueApprove          keys.BindingID = "approve-proposal"
 )
@@ -420,7 +437,7 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueClearChecked, Seq: []string{"C"}, Categories: []string{"Other"}, Title: "clear checked"},
 		{ID: bindingQueueClearDoneChecked, Seq: []string{"c"}, Categories: []string{"Other"}, Title: "clear completed checked"},
 		{ID: bindingQueueDelete, Seq: []string{"x"}, Categories: []string{"Other"}, Title: "delete"},
-		{ID: bindingQueueSuggestedActions, Seq: []string{"m"}, Categories: []string{"Other"}, Title: "suggested actions"},
+		{ID: bindingQueueTicketMenu, Seq: []string{"m"}, Categories: []string{"Other"}, Title: "ticket actions"},
 		{ID: bindingQueueStartServer, Seq: []string{"s"}, Categories: []string{"Other"}, Title: "start server (when down)"},
 		{ID: bindingQueueApprove, Seq: []string{"A"}, Categories: []string{"Other"}, Title: "approve recovery proposal"},
 	})
@@ -497,8 +514,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, notify.Warning(serverNotRunning)
 			}
 			return m.handleServerDeleteKey()
-		case bindingQueueSuggestedActions:
-			return m.handleQueueSuggestedActionsKey()
+		case bindingQueueTicketMenu:
+			return m.handleQueueTicketMenuKey()
 		case bindingQueueApprove:
 			return m.handleServerApproveKey()
 		case bindingQueueStartServer:

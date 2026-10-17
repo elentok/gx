@@ -6,34 +6,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
-
-// findIterationTab is a package-level seam so tests can fake herdr. Any lookup
-// failure reads as "no live tab": a transient herdr hiccup must only demote the
-// menu to its pane-gone variant, never block it.
-var findIterationTab = func(epicName, identifier string) (herdr.Tab, bool) {
-	workspaceID, err := herdr.FindWorkspace(epicName)
-	if err != nil || workspaceID == "" {
-		return herdr.Tab{}, false
-	}
-	tab, found, err := herdrrunner.FindTab(herdr.TabList, workspaceID, ralphloop.IterationLabel(epicName, identifier))
-	return tab, found && err == nil
-}
-
-// ticketPaneLive reports whether a ticket's iteration pane still exists,
-// which gates "Watch". Only called when the menu opens, never per rendered
-// row.
-func ticketPaneLive(epicName, identifier string) bool {
-	_, live := findIterationTab(epicName, identifier)
-	return live
-}
 
 // answerEditorFinishedMsg reports an "Answer…" editor launch. splitApp is set
 // when the editor went into a split/tab: that message fires as soon as the
@@ -101,19 +78,6 @@ func handleAnswerEditorFinished(c confirm.Model, msg answerEditorFinishedMsg) (c
 		DefaultYes: true,
 		AcceptCmd:  cmdAnswerThen(msg.worktreeRoot, msg.settings, msg.path, msg.resume),
 	}), nil
-}
-
-func cmdFocusPane(epicName, identifier string) tea.Cmd {
-	return func() tea.Msg {
-		tab, live := findIterationTab(epicName, identifier)
-		if !live {
-			return notify.Warning("the agent is no longer live")()
-		}
-		if _, err := herdr.TabFocus(tab.TabID); err != nil {
-			return notify.Error("focus pane: " + err.Error())()
-		}
-		return nil
-	}
 }
 
 // needsAnswerSection returns text from the "## Needs Answer" heading up to

@@ -20,8 +20,11 @@ var focusIterationTab = func(tabID string) error {
 }
 
 // serverIteration is address's live iteration from the server's iterations read.
-func (m Model) serverIteration(address string) (server.IterationInfo, bool) {
-	list, err := m.serverAPI.Iterations(context.Background())
+func serverIteration(api ServerAPI, address string) (server.IterationInfo, bool) {
+	if api == nil {
+		return server.IterationInfo{}, false
+	}
+	list, err := api.Iterations(context.Background())
 	if err != nil {
 		return server.IterationInfo{}, false
 	}
@@ -57,9 +60,9 @@ func resolveTicketPath(store, path string) (file, address string) {
 
 // cmdServerWatch opens a live native agent's log, else focuses the iteration
 // tab the iterations read names.
-func (m Model) cmdServerWatch(address string) tea.Cmd {
+func cmdServerWatch(api ServerAPI, address string) tea.Cmd {
 	// Liveness shells out to ps, so it is resolved inside the Cmd.
-	watch, focus := cmdWatchAgent(address), m.cmdServerFocusPane(address)
+	watch, focus := cmdWatchAgent(address), cmdServerFocusPane(api, address)
 	return func() tea.Msg {
 		if nativeAgentLive(address) {
 			return watch()
@@ -68,9 +71,9 @@ func (m Model) cmdServerWatch(address string) tea.Cmd {
 	}
 }
 
-func (m Model) cmdServerFocusPane(address string) tea.Cmd {
+func cmdServerFocusPane(api ServerAPI, address string) tea.Cmd {
 	return func() tea.Msg {
-		it, live := m.serverIteration(address)
+		it, live := serverIteration(api, address)
 		if !live || it.Tab == "" {
 			return notify.Warning("the agent is no longer live")()
 		}
