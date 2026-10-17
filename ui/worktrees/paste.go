@@ -24,7 +24,7 @@ type pasteResultMsg struct {
 // swallows every other binding.
 var pasteModeBindings = []keymgr.Binding{
 	{ID: "paste", Seq: []string{"p"}, Title: "paste"},
-	{ID: "paste-cancel", Seq: []string{"esc"}, Title: "cancel"},
+	{ID: "paste-cancel", Seq: []string{"esc"}, Title: "cancel", Display: "esc/q"},
 }
 
 func pasteModeHelpSection() help.KeySection {

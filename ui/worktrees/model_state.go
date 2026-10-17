@@ -135,11 +135,12 @@ type Model struct {
 // New creates a new worktrees page model. activeWorktreePath is the path of the
 // worktree the user is currently in (empty if launched from the bare repo root).
 func New(repo git.Repo, activeWorktreePath string) Model {
-	return NewWithSettings(repo, activeWorktreePath, ui.Settings{})
+	return NewWithSettings(repo, activeWorktreePath, ui.Settings{}, keymgr.Manager{})
 }
 
 // NewWithSettings creates a new worktrees page model with explicit settings.
-func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Settings) Model {
+// extraKeys (the app shell's bindings) are listed in help only.
+func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Settings, extraKeys keymgr.Manager) Model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	km := newWorktreesManager()
@@ -156,7 +157,7 @@ func NewWithSettings(repo git.Repo, activeWorktreePath string, settings ui.Setti
 		loading:            true,
 		confirm:            confirm.New(),
 		pull:               pull.New(),
-		helpModel:          help.NewModel(append(help.BuildSections(km), pasteModeHelpSection())),
+		helpModel:          help.NewModel(append(help.BuildSections(km, extraKeys), pasteModeHelpSection())),
 		keyManager:         km,
 		search:             search.NewModel(),
 		spinner:            sp,

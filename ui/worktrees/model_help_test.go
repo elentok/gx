@@ -1,10 +1,13 @@
 package worktrees
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
+	keymgr "github.com/elentok/gx/ui/keys"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -43,4 +46,19 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	if m.mode != modeNormal {
 		t.Fatalf("expected modeNormal after closing help, got %v", m.mode)
 	}
+}
+
+func TestHelpListsExtraAppBindings(t *testing.T) {
+	t.Parallel()
+	app := keymgr.New([]keymgr.Binding{
+		{ID: "app-switch-view", Seq: []string{"ctrl+o"}, Categories: []string{"App"}, Title: "switch view"},
+	})
+	m := NewWithSettings(git.Repo{}, "", ui.Settings{}, app)
+
+	for _, s := range m.helpModel.KeySections {
+		if s.Title == "App" && slices.ContainsFunc(s.Bindings, func(b keymgr.Binding) bool { return b.Keys() == "ctrl+o" }) {
+			return
+		}
+	}
+	t.Fatalf("help sections %+v lack App ctrl+o", m.helpModel.KeySections)
 }

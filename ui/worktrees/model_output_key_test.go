@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui"
+	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 
 	tea "charm.land/bubbletea/v2"
@@ -143,7 +144,7 @@ func TestGLIsNotHandledByWorktreesView(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true})
+	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true}, keymgr.Manager{})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
@@ -170,7 +171,7 @@ func TestEnterNavigatesToLogWhenNavigationEnabled(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true})
+	m := NewWithSettings(*repo, "", ui.Settings{EnableNavigation: true}, keymgr.Manager{})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
@@ -198,7 +199,7 @@ func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalHerdr, HerdrUnavailable: true})
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalHerdr, HerdrUnavailable: true}, keymgr.Manager{})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)
@@ -218,7 +219,7 @@ func TestOEntersTerminalMenuMode(t *testing.T) {
 		t.Fatalf("FindRepo: %v", err)
 	}
 
-	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalTmux})
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalTmux}, keymgr.Manager{})
 	m.ready = true
 	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
 	resizeTable(&m.table, 100, 10)

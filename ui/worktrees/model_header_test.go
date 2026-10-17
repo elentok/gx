@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 
@@ -58,6 +59,14 @@ func TestWorktreesHeaderShowsPasteChipAndSource(t *testing.T) {
 		if !strings.Contains(header, want) {
 			t.Fatalf("header %q missing %q", header, want)
 		}
+	}
+}
+
+func TestWorktreesPasteChipMatchesVisualChip(t *testing.T) {
+	t.Parallel()
+	m := withPaste(headerTestModel(120))
+	if want := ui.RenderChip("PASTE", ui.ColorBlue); !strings.Contains(m.normalView(), want) {
+		t.Fatalf("header lacks the shared chip %q", want)
 	}
 }
 
@@ -141,7 +150,7 @@ func TestEnteringPasteModeNotifiesTheKeys(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected a notification command")
 	}
-	want := notify.NotifyMsg{Kind: notify.KindInfo, Message: "p paste · esc cancel"}
+	want := notify.NotifyMsg{Kind: notify.KindInfo, Message: "p paste · esc/q cancel"}
 	if got := cmd(); got != want {
 		t.Fatalf("notification = %#v, want %#v", got, want)
 	}
@@ -158,7 +167,7 @@ func TestHelpHasPasteModeSection(t *testing.T) {
 		for _, b := range s.Bindings {
 			got = append(got, b.Keys()+" "+b.Title)
 		}
-		if strings.Join(got, ", ") != "p paste, esc cancel" {
+		if strings.Join(got, ", ") != "p paste, esc/q cancel" {
 			t.Fatalf("paste section = %v", got)
 		}
 		return

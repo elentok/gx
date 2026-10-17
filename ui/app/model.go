@@ -309,7 +309,7 @@ func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 	default:
 		return historyEntry{
 			viewState: nav.ViewState{Tab: nav.TabWorktrees},
-			model:     worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s),
+			model:     worktrees.NewWithSettings(m.repo, m.settings.ActiveWorktreePath, s, keys.New(Bindings())),
 		}
 	}
 }

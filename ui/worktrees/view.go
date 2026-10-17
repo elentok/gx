@@ -178,7 +178,7 @@ func (m Model) headerStatus(avail int, bg color.Color) string {
 	var fixed, text string
 	switch {
 	case m.mode == modePaste && m.clipboard != nil:
-		fixed = ui.RenderBadge("PASTE", ui.BadgeVariantBlue, false, true)
+		fixed = ui.RenderChip("PASTE", ui.ColorBlue)
 		text = fmt.Sprintf("%d files from %s", len(m.clipboard.files), m.clipboard.srcName)
 	case m.spinnerActive:
 		fixed = dim.Render(strings.TrimSpace(m.spinner.View()))
