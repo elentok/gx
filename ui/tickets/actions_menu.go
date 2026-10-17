@@ -5,7 +5,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
@@ -88,21 +87,17 @@ func (m actionsMenuModel) View() string {
 	)
 }
 
-// actionsMenuReadyMsg carries a suggested-actions menu whose agent liveness
-// was resolved off the Update goroutine.
-type actionsMenuReadyMsg struct {
-	path, epicName, ticketID, prompt string
-	items                            []components.MenuItem
-}
-
-// handleSuggestedActionsKey applies the "m" keymap: opens the suggested-
-// actions menu for the selected ticket row, whatever its status. Liveness
-// shells out to ps, so the menu opens once a Cmd has resolved it.
+// handleSuggestedActionsKey applies the "m" keymap: opens the Context menu
+// for the selected ticket row whatever its status, or the suggested-actions
+// menu for a server-mode epic row.
 func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 	r, ok := m.selectedRow()
 	// Epic actions are server-only: only server-mode epic names carry the
 	// "project:" prefix startSessionCmd and the merge need.
 	if ok && r.isEpic() && m.serverAPI != nil && !r.archived {
+		if reason := m.link.disabledReason(); reason != "" {
+			return m, notify.Info("disabled: " + reason)
+		}
 		epic := m.epicAt(r)
 		var items []components.MenuItem
 		if epic.IsMap {
@@ -122,36 +117,7 @@ func (m Model) handleSuggestedActionsKey() (tea.Model, tea.Cmd) {
 		return m, notify.Info("select a ticket to see its suggested actions")
 	}
 	epic := m.epicAt(r)
-	ticket := epic.Tickets[r.ticketIdx]
-	status := epic.RenderedStatus(ticket)
-	// A row's Path is its address and its epic is "project:epic"; the herdr
-	// launches want the bare epic.
-	epicName, _, _ := tickets.SplitTrailerValue(ticket.Path)
-	prompt := fmt.Sprintf("Suggested actions for %q:", ticket.Title)
-	herdrUnavailable := m.settings.HerdrUnavailable
-	startSession := epic.IsMap && status == tickets.StatusOpen
-	m.actionsMenuPending = ticket.Path
-	return m, func() tea.Msg {
-		it, live := m.serverIteration(ticket.Path)
-		paneLive := live && it.Tab != ""
-		items := suggestedActionItems(status, ticket, paneLive, nativeAgentLive(ticket.Path), herdrUnavailable)
-		if startSession {
-			items = append([]components.MenuItem{startSessionMenuItem}, items...)
-		}
-		return actionsMenuReadyMsg{path: ticket.Path, epicName: epicName, ticketID: ticket.DisplayNumber(), prompt: prompt, items: items}
-	}
-}
-
-// handleActionsMenuReady opens the menu only for the request still pending:
-// the user may have moved on, or opened another overlay, while ps ran.
-func (m Model) handleActionsMenuReady(msg actionsMenuReadyMsg) Model {
-	pending := m.actionsMenuPending
-	m.actionsMenuPending = ""
-	if pending != msg.path || m.selectedTicketPath() != msg.path || m.ModalOpen() {
-		return m
-	}
-	m.actionsMenu = m.actionsMenu.Open(msg.path, msg.epicName, msg.ticketID, msg.prompt, msg.items)
-	return m
+	return m.openTicketMenu(epic, epic.Tickets[r.ticketIdx])
 }
 
 // selectedTicketPath is the selected ticket row's path, or "" off a ticket.
@@ -173,6 +139,11 @@ func (m Model) handleActionsMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if !result.Done || !result.Accepted {
 		return m, nil
 	}
+	return m.runMenuAction(result)
+}
+
+// runMenuAction runs an accepted action from either menu.
+func (m Model) runMenuAction(result actionsMenuResult) (tea.Model, tea.Cmd) {
 	if cmd, ok := dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, result); ok {
 		return m, cmd
 	}

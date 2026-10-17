@@ -9,73 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/tickets/schema"
-	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/notify"
 )
-
-// statusMenuLabels renders each schema.Status's menu label. Kept separate
-// from the enum's on-disk spelling so a future rename only has to touch this
-// table.
-var statusMenuLabels = map[schema.Status]string{
-	schema.StatusOpen:        "open",
-	schema.StatusClaimed:     "claimed",
-	schema.StatusNeedsAnswer: "needs-answer",
-	schema.StatusNeedsRepair: "needs-repair",
-	schema.StatusDraft:       "draft",
-	schema.StatusDone:        "done",
-}
-
-// handleChangeStatusKey applies the "s" keymap: opens a status menu for the
-// selected ticket row. An epic row (nothing to re-status) or an
-// already-terminal selection is a no-op with a toast rather than opening an
-// empty menu.
-func (m Model) handleChangeStatusKey() (tea.Model, tea.Cmd) {
-	r, ok := m.selectedRow()
-	if !ok || r.isEpic() {
-		return m, notify.Info("select a ticket to change its status")
-	}
-	epic := m.epicAt(r)
-	ticket := epic.Tickets[r.ticketIdx]
-	menu := newServerStatusMenu(ticket, epic.RenderedStatus(ticket))
-	if len(menu.Items) == 0 {
-		return m, notify.Info("no status changes available for this ticket right now")
-	}
-	m.statusMenu = menu
-	m.statusMenuOpen = true
-	return m, nil
-}
-
-// handleStatusMenuKey drives the open status menu: navigation/cancel is
-// components.UpdateMenu's generic filter/ctrl+n/ctrl+p/enter/esc handling, so accepting an
-// item re-resolves the selected row (rather than trusting a path captured at
-// open time) — nothing can move the sidebar selection while a modal owns key
-// input, so re-deriving it here is exactly as safe as capturing it up front,
-// without a second field to keep in sync.
-func (m Model) handleStatusMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	next, decided, accepted, handled := components.UpdateMenu(msg, m.statusMenu)
-	if !handled {
-		return m, nil
-	}
-	m.statusMenu = next
-	if !decided {
-		return m, nil
-	}
-	m.statusMenuOpen = false
-	if !accepted {
-		return m, nil
-	}
-	item, _ := m.statusMenu.Selected()
-	value := item.Value
-	if verb, isServer := strings.CutPrefix(value, serverMenuValuePrefix); isServer {
-		r, ok := m.selectedRow()
-		if !ok || r.isEpic() {
-			return m, nil
-		}
-		return m, cmdServerWrite(m.serverAPI, verb, m.epicAt(r).Tickets[r.ticketIdx].Path)
-	}
-	return m.applyStatusChange(schema.Status(value))
-}
 
 // applyStatusChange writes status to the selected row's ticket through
 // schema.UpdateTicket, mirroring `gx tickets set`'s own guards (cmd/
@@ -163,23 +98,4 @@ func (m Model) handleStatusChanged() (tea.Model, tea.Cmd) {
 		return m, m.cmdLoadDisk()
 	}
 	return m, nil
-}
-
-func (m Model) statusMenuView() string {
-	prompt := "Choose a status:"
-	if r, ok := m.selectedRow(); ok && !r.isEpic() {
-		ticket := m.epicAt(r).Tickets[r.ticketIdx]
-		prompt = fmt.Sprintf("Choose a status for %q:", ticket.Title)
-	}
-	return components.RenderMenuModal(
-		"Change Status",
-		prompt,
-		m.statusMenu,
-		"",
-		ui.ColorBorder,
-		ui.ColorBlue,
-		ui.ColorSubtle,
-		ui.ColorText,
-		48,
-	)
 }

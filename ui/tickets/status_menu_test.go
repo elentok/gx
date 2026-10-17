@@ -1,19 +1,10 @@
 package tickets
 
 import (
-	"os"
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
-	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/components"
-	"github.com/elentok/gx/ui/keys"
 )
-
-func sPress() tea.KeyPressMsg {
-	return tea.KeyPressMsg{Code: 's', Text: "s"}
-}
 
 // selectTicketRow moves the sidebar selection onto the first visible ticket
 // row.
@@ -31,74 +22,10 @@ func selectTicketRow(t *testing.T, m Model) Model {
 	return m
 }
 
-func TestModel_ChangeStatusKeyDismissibleWithoutWriting(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-first-ticket.md", "Status: needs-answer\n\nBody.\n")
-	path := ticketPath(root, "my-epic", "01-first-ticket.md")
-	before, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-	m = selectTicketRow(t, m)
-
-	updated, _ = m.Update(sPress())
-	m = updated.(Model)
-
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape, Text: "esc"})
-	m = updated.(Model)
-	if m.statusMenuOpen {
-		t.Fatalf("expected menu closed after esc")
-	}
-	if cmd != nil {
-		t.Fatalf("expected no command from dismissing the menu")
-	}
-
-	after, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(before) != string(after) {
-		t.Fatalf("expected no write from dismissing the menu, before:\n%s\nafter:\n%s", before, after)
-	}
-}
-
 func menuValues(menu components.MenuState) []string {
 	values := make([]string, len(menu.Items))
 	for i, item := range menu.Items {
 		values[i] = item.Value
 	}
 	return values
-}
-
-func assertSameSet(t *testing.T, got, want []string) {
-	t.Helper()
-	if len(got) != len(want) {
-		t.Fatalf("got %v, want %v", got, want)
-	}
-	seen := map[string]bool{}
-	for _, v := range got {
-		seen[v] = true
-	}
-	for _, v := range want {
-		if !seen[v] {
-			t.Fatalf("got %v, want %v (missing %q)", got, want, v)
-		}
-	}
-}
-
-func cursorTo(t *testing.T, m *Model, value string) {
-	t.Helper()
-	for i, item := range m.statusMenu.Items {
-		if item.Value == value {
-			m.statusMenu.Cursor = i
-			return
-		}
-	}
-	t.Fatalf("value %q not found in menu items %+v", value, m.statusMenu.Items)
 }

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui/contextmenu"
 )
 
 func menuHasStartSession(m actionsMenuModel) bool {
@@ -46,7 +47,11 @@ func TestStartSession_OfferedOnMapEpicAndItsOpenTicketsOnly(t *testing.T) {
 		want    bool
 	}{{"gx:map/01", true}, {"gx:map/02", false}, {"gx:loop/01", false}} {
 		selectTicketByAddress(t, &m, tc.address)
-		if got := menuHasStartSession(pressMenuKey(t, m).actionsMenu); got != tc.want {
+		_, ready := requestTicketMenu(t, m)
+		got := slices.ContainsFunc(ready.items, func(it contextmenu.Item[ticketTarget]) bool {
+			return it.Label == startSessionMenuItem.Label
+		})
+		if got != tc.want {
 			t.Errorf("%s: start session offered = %v, want %v", tc.address, got, tc.want)
 		}
 	}
@@ -99,16 +104,16 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 	} {
 		var calls []string
 		m := startSessionModel(t).WithServer(fakeServerAPI{calls: &calls})
+		var cmd tea.Cmd
 		if tc.epicRow {
 			selectEpicRow(t, &m, tc.address)
 			updated, _ := m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
-			m = updated.(Model)
+			// Start session… is the first item.
+			_, cmd = updated.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		} else {
 			selectTicketByAddress(t, &m, tc.address)
-			m = pressMenuKey(t, m)
+			_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), "Start session")
 		}
-		// Start session… is the first item.
-		_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 		if cmd == nil {
 			t.Fatalf("%s: choosing start session issued no cmd", tc.address)
 		}

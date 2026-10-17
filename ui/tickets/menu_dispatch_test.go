@@ -47,15 +47,6 @@ func chooseQueueAction(t *testing.T, m QueueModel, value string) tea.Cmd {
 	}, value)
 }
 
-func chooseTicketsAction(t *testing.T, m Model, value string) tea.Cmd {
-	t.Helper()
-	return chooseAction(t, m.actionsMenu.state, func(msg tea.Msg) tea.Cmd {
-		next, cmd := m.Update(msg)
-		m = next.(Model)
-		return cmd
-	}, value)
-}
-
 func queueWithTicket(m QueueModel, status string, mutes []schema.MuteRecord) QueueModel {
 	m.epics[0].Tickets[0].Status = status
 	m.epics[0].Tickets[0].Mutes = mutes
@@ -80,25 +71,6 @@ func TestQueueMenu_UnmuteByAddress(t *testing.T) {
 	chooseQueueAction(t, m, actionUnmuteReopen)()
 	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
-	}
-}
-
-func TestTicketsMenu_UnmuteByAddress(t *testing.T) {
-	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
-	items := statusActionItems(tickets.StatusNeedsRepair, tickets.Ticket{Mutes: muted}, true)
-	m.actionsMenu = m.actionsMenu.Open("gx:alpha/01", "gx:alpha", "01", "", items)
-	chooseTicketsAction(t, m, actionUnmuteReopen)()
-	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
-		t.Fatalf("calls = %v", calls)
-	}
-}
-
-func TestStatusMenu_UnparkIsLabeledResume(t *testing.T) {
-	menu := newServerStatusMenu(tickets.Ticket{Status: "needs-repair"}, tickets.StatusNeedsRepair)
-	i := slices.Index(menuValues(menu), serverMenuValuePrefix+serverVerbUnpark)
-	if i < 0 || menu.Items[i].Label != resumeLabel {
-		t.Fatalf("items = %+v, want unpark labeled %q", menu.Items, resumeLabel)
 	}
 }
 
@@ -145,13 +117,6 @@ func TestQueueMenu_NoServer_WritesNothing(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestTicketsMenu_NoServer_ResumeMakesNoCall(t *testing.T) {
-	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
-	items := statusActionItems(tickets.StatusNeedsAnswer, tickets.Ticket{}, true)
-	m.actionsMenu = m.actionsMenu.Open("gx:alpha/01", "gx:alpha", "01", "", items)
-	assertServerNotRunning(t, chooseTicketsAction(t, m, actionResume))
 }
 
 func TestTicketsTab_NoServer_AnswerSavesThenNeedsServer(t *testing.T) {

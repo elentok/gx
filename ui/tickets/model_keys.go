@@ -29,7 +29,6 @@ const (
 	bindingTicketsSelectFirst        keys.BindingID = "select-first"
 	bindingTicketsSelectLast         keys.BindingID = "select-last"
 	bindingTicketsPreviewBottom      keys.BindingID = "preview-bottom"
-	bindingTicketsChangeStatus       keys.BindingID = "change-status"
 	bindingTicketsSuggestedActions   keys.BindingID = "suggested-actions"
 	bindingTicketsYankSummary        keys.BindingID = "yank-summary"
 	bindingTicketsYankFilePath       keys.BindingID = "yank-file-path"
@@ -43,7 +42,6 @@ var archivedBlockedBindings = map[keys.BindingID]bool{
 	bindingTicketsAddToQueue:       true,
 	bindingTicketsDrainReplace:     true,
 	bindingTicketsToggleCheck:      true,
-	bindingTicketsChangeStatus:     true,
 	bindingTicketsSuggestedActions: true,
 }
 
@@ -72,8 +70,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsSelectFirst, Seq: []string{"g", "g"}, Categories: []string{"Navigation"}, Title: "first row"},
 		{ID: bindingTicketsSelectLast, Seq: []string{"G"}, Categories: []string{"Navigation"}, Title: "last row"},
 		{ID: bindingTicketsPreviewBottom, Seq: []string{"b"}, Categories: []string{"Navigation"}, Title: "preview bottom"},
-		{ID: bindingTicketsChangeStatus, Seq: []string{"s"}, Categories: []string{"Navigation"}, Title: "change status"},
-		{ID: bindingTicketsSuggestedActions, Seq: []string{"m"}, Categories: []string{"Navigation"}, Title: "suggested actions"},
+		{ID: bindingTicketsSuggestedActions, Seq: []string{"m"}, Categories: []string{"Navigation"}, Title: "actions"},
 		// y-prefix chords
 		{ID: bindingTicketsYankSummary, Seq: []string{"y", "y"}, Categories: []string{"Yank"}, Title: "yank epic - ticket"},
 		{ID: bindingTicketsYankFilePath, Seq: []string{"y", "f"}, Categories: []string{"Yank"}, Title: "yank file path"},
@@ -163,8 +160,6 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.selectLastRow()
 		case bindingTicketsPreviewBottom:
 			m.previewVP.GotoBottom()
-		case bindingTicketsChangeStatus:
-			return m.handleChangeStatusKey()
 		case bindingTicketsSuggestedActions:
 			return m.handleSuggestedActionsKey()
 		case bindingTicketsYankSummary:

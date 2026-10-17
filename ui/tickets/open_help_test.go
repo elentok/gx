@@ -56,10 +56,10 @@ func TestOpenHelp_TicketsEndsPreviewSearch(t *testing.T) {
 func TestOpenHelp_TicketsIgnoredWhileModalOpen(t *testing.T) {
 	t.Parallel()
 	m := NewModel(t.TempDir(), ui.Settings{}, keys.New(nil))
-	m.statusMenuOpen = true
+	m.ticketMenu = m.ticketMenu.Open(ticketTarget{}, "", nil)
 	updated, _ := m.Update(nav.OpenHelp()())
 	if updated.(Model).help.IsOpen {
-		t.Fatal("OpenHelp opened help over the status menu")
+		t.Fatal("OpenHelp opened help over the context menu")
 	}
 }
 

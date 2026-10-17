@@ -22,7 +22,7 @@ const answerSavedNeedsServer = "answer saved — resuming needs the server"
 // which the tab dispatches itself.
 func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings, result actionsMenuResult) (tea.Cmd, bool) {
 	switch result.Action {
-	case actionResume, actionUnmuteReopen:
+	case actionResume, actionUnmuteReopen, serverVerbPark, serverVerbCancel, serverVerbRelaunch:
 		return cmdServerWrite(api, result.Action, result.Path), true
 	case actionMerge:
 		if api == nil {

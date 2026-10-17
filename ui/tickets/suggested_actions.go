@@ -11,8 +11,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// actionResume is the server's unpark, under the one "Resume" label the "m"
-// and "s" menus share. The "m" menu offers it for the park kind the server
+// actionResume is the server's unpark, under the one "Resume" label every
+// menu shares. The "m" menu offers it for the park kind the server
 // can't safely auto-clear — an announce-and-stop (zero-commit) park's
 // live-but-idle pane looks identical to an answered gate park, so a person
 // confirms it explicitly here instead.
@@ -66,18 +66,32 @@ func suggestedActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, 
 
 func statusActionItems(status tickets.RenderedStatus, ticket tickets.Ticket, herdrDown bool) []components.MenuItem {
 	var items []components.MenuItem
-	if status == tickets.StatusNeedsAnswer {
+	if answerSuggested(status) {
 		items = append(items,
 			components.MenuItem{Label: "Answer…", Value: actionAnswer},
 			components.MenuItem{Label: resumeLabel, Value: actionResume})
 	}
-	if !herdrDown && (status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError) {
+	if !herdrDown && investigateSuggested(status) {
 		items = append(items, components.MenuItem{Label: "Investigate", Value: actionInvestigate})
 	}
-	if len(ticket.Mutes) > 0 {
+	if unmuteSuggested(ticket) {
 		items = append(items, components.MenuItem{Label: "Unmute & Reopen", Value: actionUnmuteReopen})
 	}
 	return items
+}
+
+// answerSuggested, investigateSuggested and unmuteSuggested decide the
+// Suggested actions for both menus and the row badge, so they cannot drift.
+func answerSuggested(status tickets.RenderedStatus) bool {
+	return status == tickets.StatusNeedsAnswer
+}
+
+func investigateSuggested(status tickets.RenderedStatus) bool {
+	return status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError
+}
+
+func unmuteSuggested(ticket tickets.Ticket) bool {
+	return len(ticket.Mutes) > 0
 }
 
 // ticketHasSuggestedActions reports whether ticket's row should carry the

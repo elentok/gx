@@ -337,55 +337,28 @@ func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
 	}
 }
 
-// Seam D: the "s" menu lists the server actions for a ticket's state and
-// issues the chosen one; "enter" on a parked row issues unpark.
-func TestServerMode_StatusMenuAndEnterUnpark(t *testing.T) {
+// Seam D: "enter" on a parked row issues unpark.
+func TestServerMode_EnterUnparksAParkedRow(t *testing.T) {
 	var calls []string
-	api := fakeServerAPI{calls: &calls}
-	m := newServerModel(t).WithServer(api)
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:alpha/02", Title: "Second", Status: "needs-repair"},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
 
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
-	m = updated.(Model)
-	if got, want := menuValues(m.statusMenu), []string{"draft", "done", "server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
-		t.Fatalf("open ticket menu = %v, want %v", got, want)
-	}
-	for range 2 {
-		updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
-		m = updated.(Model)
-	}
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = updated.(Model)
-	if msg, ok := cmd().(serverWriteMsg); !ok || msg.problem != "" {
-		t.Fatalf("park result = %+v", msg)
-	}
-
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
-	m = updated.(Model)
-	if got, want := menuValues(m.statusMenu), []string{"open", "draft", "done", "server:unpark", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
-		t.Fatalf("parked ticket menu = %v, want %v", got, want)
-	}
-	m.statusMenuOpen = false
-
-	_, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("enter on a parked row issued nothing")
 	}
 	cmd()
-	if want := []string{"park gx:alpha/01", "unpark gx:alpha/02"}; !slices.Equal(calls, want) {
+	if want := []string{"unpark gx:alpha/02"}; !slices.Equal(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
 }
 
-// In server mode a row's Path is the ticket's address, so the "s" menu's
-// direct statuses and the edit chords must reach the ticket's file instead.
+// In server mode a row's Path is the ticket's address, so the menu's status
+// writes and the edit chords must reach the ticket's file instead.
 func serverModelWithTicketFile(t *testing.T) (Model, string) {
 	t.Helper()
 	return serverModelWithStoreTicket(t, fakeServerAPI{}, false)
@@ -404,30 +377,6 @@ func serverModelWithStoreTicket(t *testing.T, api fakeServerAPI, isMap bool) (Mo
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return selectTicketRow(t, updated.(Model)), file
-}
-
-func TestServerMode_StatusMenuOffersDirectStatusesAndWritesTheFile(t *testing.T) {
-	m, file := serverModelWithStoreTicket(t, fakeServerAPI{}, true)
-
-	updated, _ := m.Update(tea.KeyPressMsg{Code: 's', Text: "s"})
-	m = updated.(Model)
-	if got, want := menuValues(m.statusMenu), []string{"open", "done", "server:park", "server:cancel", "server:relaunch"}; !slices.Equal(got, want) {
-		t.Fatalf("draft ticket menu = %v, want %v", got, want)
-	}
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
-	m = updated.(Model)
-	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatal("choosing done issued nothing")
-	}
-	cmd()
-	raw, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket file = %s, want status: done", raw)
-	}
 }
 
 func TestServerMode_EditTargetIsTheTicketFile(t *testing.T) {
@@ -479,12 +428,12 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 		}})
 		updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 		m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
-		if !m.actionsMenu.IsOpen {
+		if !m.ticketMenu.IsOpen {
 			t.Errorf("status %s: menu closed, want open", status)
 		}
 
 		updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
-		if updated.(Model).actionsMenu.IsOpen {
+		if updated.(Model).ticketMenu.IsOpen {
 			t.Errorf("status %s: menu still open after esc", status)
 		}
 	}
@@ -500,24 +449,13 @@ func TestServerMode_WatchJumpsToPaneAndResume(t *testing.T) {
 
 	var calls []string
 	api := fakeServerAPI{calls: &calls, iterations: []server.IterationInfo{{Address: "gx:alpha/01", Pane: "p1", Tab: "t1"}}}
-	m := openAnswerMenu(t, api)
-	if got, want := menuValues(m.actionsMenu.state), []string{actionAnswer, actionResume, actionInvestigate, actionWatch, actionTranscript}; !slices.Equal(got, want) {
-		t.Fatalf("menu = %v, want %v", got, want)
-	}
-
-	updated := tea.Model(m)
-	for range 3 {
-		updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	}
-	updated, cmd := updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m, cmd := chooseTicketMenuItem(t, openAnswerMenu(t, api), "Watch")
 	cmd()
 	if !slices.Equal(focused, []string{"t1"}) {
 		t.Fatalf("focused = %v", focused)
 	}
 
-	m = pressMenuKey(t, updated.(Model))
-	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	updated, cmd = updated.(Model).Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), resumeLabel)
 	if msg, ok := cmd().(serverWriteMsg); !ok || msg.verb != serverVerbUnpark {
 		t.Fatalf("resume result = %+v", msg)
 	}
@@ -531,8 +469,8 @@ func TestServerMode_WatchJumpsToPaneAndResume(t *testing.T) {
 func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
 	var calls []string
 	m := openAnswerMenu(t, fakeServerAPI{calls: &calls})
-	if got := menuValues(m.actionsMenu.state)[0]; got != actionAnswer {
-		t.Fatalf("first item = %q", got)
+	if view := m.ticketMenu.View(); !strings.Contains(view, "Answer…") {
+		t.Fatalf("menu lacks Answer…:\n%s", view)
 	}
 	store := t.TempDir()
 	dir := filepath.Join(store, "gx", "alpha", "issues")

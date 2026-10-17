@@ -58,7 +58,6 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 	checkedBefore := len(m.checked)
 
 	presses := []tea.KeyPressMsg{
-		{Code: 's', Text: "s"},
 		{Code: 'r', Text: "r"},
 		{Code: 'a', Text: "a"},
 		{Code: 'D', Text: "D"},

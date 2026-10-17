@@ -38,7 +38,7 @@ func TestServerLink_ServerKeysDisabledWithReason(t *testing.T) {
 	}
 	for _, tc := range cases {
 		m, _ := withLink(loadedModelWithTicket(t), tc.link)
-		for _, key := range []string{"s", "r", "a", "D", "m"} {
+		for _, key := range []string{"r", "a", "D"} {
 			updated, cmd := m.Update(tea.KeyPressMsg{Code: rune(key[0]), Text: key})
 			m = updated.(Model)
 			if cmd == nil {

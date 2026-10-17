@@ -13,8 +13,8 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -100,18 +100,15 @@ type Model struct {
 
 	confirm confirm.Model
 
-	// statusMenuOpen/statusMenu back the "s"-triggered change-status menu (see
-	// status_menu.go): built fresh from the selected row each time "s" opens it.
-	statusMenuOpen bool
-	statusMenu     components.MenuState
-
-	// actionsMenu backs the "m"-triggered suggested-actions menu (see
-	// actions_menu.go/suggested_actions.go): built fresh from the selected
-	// row's rendered status each time "m" opens it.
+	// actionsMenu backs the "m"-triggered suggested-actions menu on an epic
+	// row (see actions_menu.go).
 	actionsMenu actionsMenuModel
-	// actionsMenuPending is the ticket path "m" is resolving the menu for;
+	// ticketMenu is the "m"-triggered Context menu on a ticket row (see
+	// ticket_menu.go).
+	ticketMenu contextmenu.Menu[ticketTarget]
+	// ticketMenuPending is the ticket path "m" is resolving the menu for;
 	// Esc or moving the selection forgets it, so a late result is dropped.
-	actionsMenuPending string
+	ticketMenuPending string
 
 	// watch backs the Watch agent modal (watch_agent.go).
 	watch watchModal
@@ -162,7 +159,7 @@ func (m Model) KeyManager() keys.Manager { return m.keys }
 // shell's digit-based tab-jump mnemonics (see ui/app's inputFocuser
 // duck-type) stay routed to the search query instead of switching tabs.
 func (m Model) InputFocused() bool {
-	if m.help.InputFocused() || m.statusMenuOpen || m.actionsMenu.IsOpen {
+	if m.help.InputFocused() || m.ticketMenu.IsOpen || m.actionsMenu.IsOpen {
 		return true
 	}
 	_, ok := m.activeInputSearch()
@@ -173,7 +170,7 @@ func (m Model) InputFocused() bool {
 // shell (see ui/app's modalOpener duck-type) blocks tab-switch keys and
 // routes them here instead while it's up.
 func (m Model) ModalOpen() bool {
-	return m.help.IsOpen || m.statusMenuOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen || m.watch.open
+	return m.help.IsOpen || m.ticketMenu.IsOpen || m.actionsMenu.IsOpen || m.confirm.IsOpen || m.watch.open
 }
 
 func (m Model) Init() tea.Cmd {
@@ -191,7 +188,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.updateInner(msg)
 	nm := next.(Model)
 	if nm.selectedTicketPath() != m.selectedTicketPath() {
-		nm.actionsMenuPending = ""
+		nm.ticketMenuPending = ""
 	}
 	nm.syncPreviewViewport()
 	return nm, cmd
@@ -269,8 +266,11 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, nil
 
-	case actionsMenuReadyMsg:
-		return m.handleActionsMenuReady(msg), nil
+	case ticketMenuReadyMsg:
+		return m.handleTicketMenuReady(msg), nil
+
+	case ticketMenuPickMsg:
+		return m.handleTicketMenuPick(msg)
 
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {
@@ -283,8 +283,10 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watch, cmd = m.watch.Update(msg)
 			return m, cmd
 		}
-		if m.statusMenuOpen {
-			return m.handleStatusMenuKey(msg)
+		if m.ticketMenu.IsOpen {
+			var cmd tea.Cmd
+			m.ticketMenu, cmd = m.ticketMenu.Update(msg)
+			return m, cmd
 		}
 		if m.actionsMenu.IsOpen {
 			return m.handleActionsMenuKey(msg)
@@ -293,12 +295,17 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleConfirmUpdate(msg)
 		}
 		if msg.String() == "esc" {
-			m.actionsMenuPending = ""
+			m.ticketMenuPending = ""
 		}
 		return m.handleKey(msg)
 
 	case tea.MouseClickMsg:
-		if m.statusMenuOpen || m.actionsMenu.IsOpen || m.watch.open {
+		if m.ticketMenu.IsOpen {
+			var cmd tea.Cmd
+			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.width, m.height)
+			return m, cmd
+		}
+		if m.actionsMenu.IsOpen || m.watch.open {
 			return m, nil
 		}
 		if m.confirm.IsOpen {
@@ -474,8 +481,8 @@ func (m Model) View() tea.View {
 		return ui.NewMainView("\n  Initializing…")
 	}
 	content := m.normalView()
-	if m.statusMenuOpen {
-		content = ui.OverlayCenter(content, m.statusMenuView(), m.width, m.height)
+	if m.ticketMenu.IsOpen {
+		content = ui.OverlayCenter(content, m.ticketMenu.View(), m.width, m.height)
 	} else if m.actionsMenu.IsOpen {
 		content = ui.OverlayCenter(content, m.actionsMenu.View(), m.width, m.height)
 	} else if m.confirm.IsOpen {
