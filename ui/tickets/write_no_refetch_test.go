@@ -25,6 +25,7 @@ func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 	for name, msg := range map[string]tea.Msg{
 		"enqueue": serverEnqueuedMsg{added: 1},
 		"replace": serverReplacedMsg{count: 1},
+		"epic":    epicQueuedMsg{queued: 1},
 		"action":  serverDoneMsg{ok: "parked"},
 	} {
 		_, cmd := m.Update(msg)

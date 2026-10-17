@@ -1,8 +1,10 @@
 package tickets
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -23,11 +25,13 @@ type epicMenuPickMsg struct {
 }
 
 const (
-	ticketsNotDone = "tickets not done"
-	alreadyMerged  = "already merged"
-	actionCheckAll = "check-all"
-	actionEditEpic = "edit-epic"
-	actionYankEpic = "yank-epic"
+	ticketsNotDone  = "tickets not done"
+	alreadyMerged   = "already merged"
+	nothingToQueue  = "nothing to queue"
+	actionCheckAll  = "check-all"
+	actionQueueEpic = "queue-epic"
+	actionEditEpic  = "edit-epic"
+	actionYankEpic  = "yank-epic"
 )
 
 var epicDirectStatuses = []schema.Status{schema.StatusDraft, schema.StatusOpen}
@@ -36,7 +40,9 @@ var epicDirectStatuses = []schema.Status{schema.StatusDraft, schema.StatusOpen}
 type epicMenuInput struct {
 	epic tickets.Epic
 	// branch is the branch the epic merges into; "" when unknown.
-	branch       string
+	branch string
+	// queueable is what Add epic to queue would send.
+	queueable    []string
 	serverReason string
 	archived     bool
 }
@@ -82,6 +88,8 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	}
 
 	items = append(items,
+		pick("Add epic to queue", "", actionQueueEpic, contextmenu.Queue,
+			firstReason(in.serverReason, reasonIf(len(in.queueable) == 0, nothingToQueue))),
 		pick("Check all", "", actionCheckAll, contextmenu.Queue, ""),
 		pick("Edit ticket.md", "e e", actionEditEpic, contextmenu.EditCopy, ""),
 		pick("Yank", "y y", actionYankEpic, contextmenu.EditCopy, ""))
@@ -102,6 +110,7 @@ func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
 	in := epicMenuInput{
 		epic:         epic,
 		branch:       epic.MergeTarget,
+		queueable:    m.queueableAddresses(epic),
 		serverReason: serverReason(m.serverAPI, m.link),
 		archived:     archived,
 	}
@@ -140,12 +149,63 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 		}
 		m.setPathsChecked(paths, true)
 		return m, nil
+	case actionQueueEpic:
+		return m, cmdQueueEpic(m.serverAPI, m.queueableAddresses(epic))
 	case actionEditEpic:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case actionYankEpic:
 		return m, m.yankTicketSummary()
 	}
 	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+}
+
+// queueableAddresses is every open, not-yet-queued ticket of epic in ticket
+// order. It goes by the frontmatter status, not the rendered one, so blocked
+// tickets are sent and the server decides on them.
+func (m Model) queueableAddresses(epic tickets.Epic) []string {
+	var addrs []string
+	for _, t := range epic.Tickets {
+		open := schema.Status(strings.ToLower(strings.TrimSpace(t.Status))) == schema.StatusOpen
+		if open && !slices.Contains(m.vm.Queue, t.Path) {
+			addrs = append(addrs, t.Path)
+		}
+	}
+	return addrs
+}
+
+// epicQueuedMsg reports a finished Add epic to queue: how many tickets the
+// server took and the refusals as "address: reason".
+type epicQueuedMsg struct {
+	queued   int
+	refusals []string
+}
+
+func (msg epicQueuedMsg) toast() tea.Cmd {
+	text := fmt.Sprintf("queued %d, refused %d", msg.queued, len(msg.refusals))
+	if len(msg.refusals) == 0 {
+		return notify.Success(text)
+	}
+	return notify.Warning(text + " (" + strings.Join(msg.refusals, "; ") + ")")
+}
+
+// cmdQueueEpic sends one queue-add per address, carrying on past refusals so
+// one blocked ticket doesn't keep the rest out.
+func cmdQueueEpic(api ServerAPI, addrs []string) tea.Cmd {
+	return func() tea.Msg {
+		var out epicQueuedMsg
+		for _, addr := range addrs {
+			res, err := api.QueueAdd(context.Background(), addr, string(serverEnqueueDefaultAgent))
+			switch {
+			case err != nil:
+				out.refusals = append(out.refusals, addr+": "+err.Error())
+			case res.Refused:
+				out.refusals = append(out.refusals, addr+": "+res.Message)
+			default:
+				out.queued++
+			}
+		}
+		return out
+	}
 }
 
 // epicFile is epic's ticket.md: resolved by address under store in server

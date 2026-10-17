@@ -21,6 +21,8 @@ import (
 
 type fakeServerAPI struct {
 	adds *[]server.QueueItem
+	// addRes is what QueueAdd returns per address.
+	addRes map[string]server.QueueResult
 	// calls records the ticket write verbs as "verb address" and the
 	// maintenance verbs by name.
 	calls *[]string
@@ -83,7 +85,7 @@ func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (serve
 	if f.adds != nil {
 		*f.adds = append(*f.adds, server.QueueItem{Address: address, Agent: agent})
 	}
-	return server.QueueResult{}, nil
+	return f.addRes[address], nil
 }
 
 func (f fakeServerAPI) TicketPark(_ context.Context, address, _ string) (server.QueueResult, error) {

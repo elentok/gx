@@ -242,6 +242,9 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		}
 		return m, note, true
 
+	case epicQueuedMsg:
+		return m, msg.toast(), true
+
 	case serverReplacedMsg:
 		if msg.problem != "" {
 			return m, notify.Error("replace refused: " + msg.problem), true
