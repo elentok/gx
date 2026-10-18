@@ -53,8 +53,11 @@ const (
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships
 // with the final wire codes.
 const (
-	LaunchFailed     Type = "launch-failed"
-	Reclaimed        Type = "reclaimed"
+	LaunchFailed Type = "launch-failed"
+	Reclaimed    Type = "reclaimed"
+	// ClaimReopened is a claim a restarted server found dead and empty, so it
+	// cleared the iteration and reopened the ticket instead of parking it.
+	ClaimReopened    Type = "claim-reopened"
 	HerdrUnavailable Type = "herdr-unavailable"
 	HerdrAvailable   Type = "herdr-available"
 	Submitted        Type = "submitted"

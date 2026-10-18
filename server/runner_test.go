@@ -717,6 +717,15 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 // handle. It returns the worktree path and the ticket file.
 func leaveIteration(t *testing.T, h *servertest.Harness, store, repo string) (string, string) {
 	t.Helper()
+	return leaveIterationWith(t, h, store, repo, func(wtPath string) {
+		testutil.WriteFile(t, wtPath, "agent.txt", "work")
+		testutil.CommitAll(t, wtPath, "agent work")
+	})
+}
+
+// leaveIterationWith is leaveIteration with work as what the agent did in its worktree.
+func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo string, work func(wtPath string)) (string, string) {
+	t.Helper()
 	epics, err := tickets.Load(filepath.Join(store, "proj"))
 	if err != nil {
 		t.Fatal(err)
@@ -731,8 +740,7 @@ func leaveIteration(t *testing.T, h *servertest.Harness, store, repo string) (st
 	if err != nil {
 		t.Fatal(err)
 	}
-	testutil.WriteFile(t, wt.Path, "agent.txt", "work")
-	testutil.CommitAll(t, wt.Path, "agent work")
+	work(wt.Path)
 	handle, err := json.Marshal([]map[string]string{{
 		"address": "proj:epic-a/01", "agent": "claude", "pane": "p1", "tab": "t1", "root": "proj:epic-a",
 		"repo": repo, "workspace": "w1", "base": wt.Base(), "ticket_path": tk.Path,

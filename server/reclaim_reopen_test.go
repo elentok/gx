@@ -1,0 +1,93 @@
+package server_test
+
+import (
+	"os"
+	"path/filepath"
+	"slices"
+	"testing"
+
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets/schema"
+)
+
+// restartDead leaves an iteration whose agent is gone after a restart: herdr
+// knows no such agent, or the headless runner reports it died. work is what
+// the agent did in its worktree. It returns the store, repo, worktree and ticket.
+func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath string)) (string, string, string, string) {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	var opts []func(*server.Config)
+	if headless {
+		fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictDied}
+		opts = append(opts, func(c *server.Config) {
+			c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
+		})
+	}
+	h := servertest.StartWithStore(t, store, opts...)
+	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, func(p string) { work(t, p) })
+	if headless {
+		asHeadlessRun(t, h)
+	}
+	h.Restart(t)
+	return store, repo, wtPath, ticketPath
+}
+
+func noWork(*testing.T, string) {}
+
+func commitAgentWork(t *testing.T, wtPath string) {
+	testutil.WriteFile(t, wtPath, "agent.txt", "work")
+	testutil.CommitAll(t, wtPath, "agent work")
+}
+
+func editAgentWork(t *testing.T, wtPath string) {
+	testutil.WriteFile(t, wtPath, "agent.txt", "work")
+}
+
+func runnerShapes(t *testing.T, test func(t *testing.T, headless bool)) {
+	t.Run("herdr", func(t *testing.T) { test(t, false) })
+	t.Run("headless", func(t *testing.T) { test(t, true) })
+}
+
+func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
+	runnerShapes(t, func(t *testing.T, headless bool) {
+		store, repo, wtPath, ticketPath := restartDead(t, headless, noWork)
+		waitStatus(t, ticketPath, schema.StatusOpen)
+		logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.ClaimReopened) }) {
+			t.Errorf("run log lacks claim-reopened: %v", logged)
+		}
+		if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
+			t.Errorf("worktree still there: %v", err)
+		}
+		if _, err := git.RevParse(repo, "ralph-loop/epic-a-item-01"); err == nil {
+			t.Error("iteration branch still there")
+		}
+	})
+}
+
+func TestReclaim_DeadClaimWithWorkParks(t *testing.T) {
+	for name, work := range map[string]func(*testing.T, string){"commit": commitAgentWork, "edit": editAgentWork} {
+		t.Run(name, func(t *testing.T) {
+			runnerShapes(t, func(t *testing.T, headless bool) {
+				_, _, wtPath, ticketPath := restartDead(t, headless, work)
+				waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+				if _, err := os.Stat(wtPath); err != nil {
+					t.Errorf("worktree gone: %v", err)
+				}
+			})
+		})
+	}
+}

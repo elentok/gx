@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
@@ -308,9 +309,10 @@ func (s *Server) Runs() []Run {
 }
 
 // reclaimRuns takes over every persisted iteration that is still alive: its
-// agent is known to herdr and its worktree exists. It asks nothing, so a
-// restart is invisible to running work. Handles that no longer match are left
-// out of the registry.
+// agent is known to its runner and its worktree exists. It asks nothing, so a
+// restart is invisible to running work. A dead agent that left nothing behind
+// is reopened; any other handle that no longer matches is parked and left out
+// of the registry.
 func (s *Server) reclaimRuns() {
 	for _, t := range s.savedRuns {
 		err := s.reclaim(t)
@@ -365,7 +367,8 @@ func (s *Server) parkUnreclaimed(t trackedRun, cause error) {
 
 // reclaimHeadless takes over a headless iteration: a live agent keeps running
 // on the adopted session, a finished one lands as if it had just finished, and
-// one that died with the server down parks needs-repair with its dir kept.
+// one that died with the server down is reopened when it left nothing behind,
+// else parks needs-repair with its dir kept.
 func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
@@ -380,6 +383,9 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 		return fmt.Errorf("%w: reattach %s: %v", errHandleMismatch, t.Address, err)
 	}
 	if verdict == nativerunner.VerdictDied {
+		if reopened, err := s.reopenEmptyClaim(t); err != nil || reopened {
+			return err
+		}
 		dir, _, err := s.projectOf(addr.Project)
 		if err != nil {
 			return err
@@ -410,7 +416,9 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 }
 
 // reclaim goes through the runner that started t, whatever runner is
-// configured now: a herdr run under a headless server is still herdr's.
+// configured now: a herdr run under a headless server is still herdr's. An
+// unavailable runner can't say whether the agent is gone, so only an agent
+// the runner reports gone is ever reopened.
 func (s *Server) reclaim(t trackedRun) error {
 	name := t.Runner
 	if name == "" {
@@ -428,6 +436,11 @@ func (s *Server) reclaim(t trackedRun) error {
 	}
 	label := iterationLabel(t.Address)
 	agent, err := herdr.AgentGet(label)
+	if err != nil || agent.PaneID == "" {
+		if reopened, err := s.reopenEmptyClaim(t); err != nil || reopened {
+			return err
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
 	}
@@ -452,8 +465,88 @@ func (s *Server) reclaim(t trackedRun) error {
 	return nil
 }
 
-// resume rebuilds the iteration a persisted handle stands for.
+// resume rebuilds the iteration a persisted handle stands for, whose worktree
+// must still exist.
 func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
+	one, wt, mode, err := s.resolveRun(t)
+	if err != nil {
+		return one, wt, mode, err
+	}
+	if _, err := os.Stat(wt.Path); err != nil {
+		return one, wt, mode, fmt.Errorf("%w: worktree: %v", errHandleMismatch, err)
+	}
+	return one, wt, mode, nil
+}
+
+// reopenEmptyClaim reopens the ticket of a gone agent that left nothing behind
+// (no commits past base, no edits), clearing its worktree and branch. It
+// reports false, touching nothing, when the iteration holds or may hold work.
+func (s *Server) reopenEmptyClaim(t trackedRun) (bool, error) {
+	one, wt, mode, err := s.resolveRun(t)
+	if err != nil {
+		return false, err
+	}
+	empty, err := iterationEmpty(mode, wt, t.Repo, t.Base)
+	if err != nil || !empty {
+		return false, err
+	}
+	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
+	if err != nil {
+		return false, err
+	}
+	dir, _, err := s.projectOf(addr.Project)
+	if err != nil {
+		return false, err
+	}
+	if err := mode.discard(ralphloop.DefaultDeps(), one, wt); err != nil {
+		return false, err
+	}
+	const reason = "agent gone, no commits, no edits"
+	if err := tickets.Reset(t.TicketPath, time.Now(), "reopened automatically after restart: "+reason); err != nil {
+		return false, err
+	}
+	if err := ralphloop.AppendEvent(dir, addr.Epic, ralphloop.Event{
+		Type: string(events.ClaimReopened), Ticket: addr.ID, Address: t.Address, Reason: reason,
+	}); err != nil {
+		s.log.Warn("log claim-reopened", "ticket", t.Address, "err", err)
+	}
+	s.log.Info("reopened empty claim", "ticket", t.Address)
+	s.events.publish(EventTicketChanged, t.Address)
+	return true, nil
+}
+
+// iterationEmpty reports whether an iteration provably holds no work. A
+// directory the ticket doesn't own, or a detached worktree's commits, can't be
+// measured, so those count as holding work unless the worktree is gone.
+func iterationEmpty(mode iterationMode, wt ralphloop.IterationWorktree, repo, base string) (bool, error) {
+	if mode.feature || mode.scratchDir != "" {
+		return false, nil
+	}
+	_, statErr := os.Stat(wt.Path)
+	if statErr == nil {
+		changes, err := git.UncommittedChanges(wt.Path)
+		if err != nil || len(changes) > 0 {
+			return false, err
+		}
+	}
+	if wt.Branch == "" {
+		return statErr != nil, nil
+	}
+	if _, err := git.RevParse(repo, wt.Branch); errors.Is(err, git.ErrRefNotFound) {
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+	if base == "" {
+		return false, nil
+	}
+	commits, err := git.CommitsBetween(git.Repo{Root: repo}, base, wt.Branch)
+	return len(commits) == 0, err
+}
+
+// resolveRun rebuilds the iteration a persisted handle stands for, whether or
+// not its worktree is still on disk.
+func (s *Server) resolveRun(t trackedRun) (ralphloop.OneIteration, ralphloop.IterationWorktree, iterationMode, error) {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return ralphloop.OneIteration{}, ralphloop.IterationWorktree{}, iterationMode{}, err
@@ -482,11 +575,5 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 	one.Sink = s.finishSink(addr, one.Ticket.Path)
 	mode := s.iterationModeFor(addr, one.Ticket)
 	wt, err := mode.resume(ralphloop.DefaultDeps(), one, t.Base)
-	if err != nil {
-		return one, wt, mode, err
-	}
-	if _, err := os.Stat(wt.Path); err != nil {
-		return one, wt, mode, fmt.Errorf("%w: worktree: %v", errHandleMismatch, err)
-	}
-	return one, wt, mode, nil
+	return one, wt, mode, err
 }
