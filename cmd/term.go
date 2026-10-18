@@ -124,7 +124,11 @@ func runTerm(args []string, f termFlags, d deps) error {
 		if !isShell {
 			launchProg, launchArgs = terminalrun.WrapRun(program, pargs)
 		}
-		_, err := launchInSplit(cwd, terminal, splitType, launchProg, launchArgs)
+		var opts []terminalrun.LaunchOption
+		if isShell {
+			opts = append(opts, terminalrun.AsShell())
+		}
+		_, err := launchInSplit(cwd, terminal, splitType, launchProg, launchArgs, opts...)
 		return err
 	}
 

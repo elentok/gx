@@ -69,11 +69,11 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		case "session":
 			return m, cmdTmuxNewSession(name, path)
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalTmux, terminalrun.HSplit, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalTmux, terminalrun.VSplit, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalTmux, terminalrun.Tab, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalTmux, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalKittyRemote:
 		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
@@ -82,11 +82,11 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		case "session":
 			return m, cmdKittySession(sessName, path)
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalKittyRemote, terminalrun.HSplit, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalKittyRemote, terminalrun.VSplit, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalKittyRemote, terminalrun.Tab, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalKittyRemote, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalHerdr:
 		repoName := filepath.Base(m.repo.LinkedWorktreeDir())
@@ -95,11 +95,11 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		case "session":
 			return m, cmdHerdrSession(sessName, path)
 		case "hsplit":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalHerdr, terminalrun.HSplit, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.HSplit, shell, done)
 		case "vsplit":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalHerdr, terminalrun.VSplit, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.VSplit, shell, done)
 		case "tab":
-			return m, terminalrun.CommandWithSplitBare(path, ui.TerminalHerdr, terminalrun.Tab, shell, nil, done)
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.Tab, shell, done)
 		}
 	case ui.TerminalKitty:
 		return m, notify.Info("enable kitty remote control for this to work")

@@ -54,6 +54,7 @@ type capturedLaunch struct {
 	splitType terminalrun.SplitType
 	program   string
 	args      []string
+	shell     bool
 }
 
 // capturedExec records the arguments passed to the in-place exec-replace seam.
@@ -71,8 +72,8 @@ func withSeams(t *testing.T) (*capturedLaunch, *capturedExec) {
 	var l capturedLaunch
 	var e capturedExec
 	prevLaunch, prevExec := launchInSplit, execReplace
-	launchInSplit = func(cwd string, terminal ui.Terminal, st terminalrun.SplitType, program string, args []string) (string, error) {
-		l = capturedLaunch{called: true, cwd: cwd, terminal: terminal, splitType: st, program: program, args: args}
+	launchInSplit = func(cwd string, terminal ui.Terminal, st terminalrun.SplitType, program string, args []string, opts ...terminalrun.LaunchOption) (string, error) {
+		l = capturedLaunch{called: true, cwd: cwd, terminal: terminal, splitType: st, program: program, args: args, shell: len(opts) > 0}
 		return "", nil
 	}
 	execReplace = func(program string, args []string, cwd string) error {
@@ -119,6 +120,9 @@ func TestRunTerm_SplitWrapsExplicitCommand(t *testing.T) {
 	if l.program == "" {
 		t.Fatal("expected non-empty gx program path for wrapped command")
 	}
+	if l.shell {
+		t.Fatal("explicit command must not be launched as a shell")
+	}
 }
 
 func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
@@ -146,6 +150,9 @@ func TestRunTerm_NoCommandLaunchesShellBare(t *testing.T) {
 	}
 	if len(l.args) != 0 {
 		t.Fatalf("args = %#v, want empty (bare shell)", l.args)
+	}
+	if !l.shell {
+		t.Fatal("no-command launch must use the shell option")
 	}
 }
 

@@ -340,6 +340,36 @@ func TestLaunchSplit_KittyErrorIncludesCommandAndOutput(t *testing.T) {
 	}
 }
 
+// A shell launch must run the exact command vector the bare launch ran.
+func TestCommandWithSplitShell_MatchesBareLaunch(t *testing.T) {
+	type call struct {
+		name string
+		args []string
+	}
+	capture := func(cmd tea.Cmd) []call {
+		var calls []call
+		prev := runCommand
+		runCommand = func(name string, args ...string) ([]byte, error) {
+			calls = append(calls, call{name, args})
+			return nil, nil
+		}
+		defer func() { runCommand = prev }()
+		cmd()
+		return calls
+	}
+	done := func(err error, splitApp string) tea.Msg { return nil }
+
+	for _, terminal := range []ui.Terminal{ui.TerminalTmux, ui.TerminalKittyRemote} {
+		for _, st := range []SplitType{HSplit, VSplit, Tab} {
+			bare := capture(CommandWithSplitBare("/wt", terminal, st, "/bin/fish", nil, done))
+			shell := capture(CommandWithSplitShell("/wt", terminal, st, "/bin/fish", done))
+			if len(shell) == 0 || !reflect.DeepEqual(shell, bare) {
+				t.Errorf("terminal %v split %v: shell calls = %#v, want %#v", terminal, st, shell, bare)
+			}
+		}
+	}
+}
+
 func TestCommandWithSplitBare_ReturnsCmd(t *testing.T) {
 	doneFn := func(err error, splitApp string) tea.Msg { return nil }
 	cmd := CommandWithSplitBare("/tmp", ui.TerminalPlain, InPlace, "fish", nil, doneFn)

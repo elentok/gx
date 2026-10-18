@@ -146,13 +146,39 @@ func commandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType Split
 	return notify.Warning("split not supported for this terminal")
 }
 
+// CommandWithSplitShell opens the user's shell (bare, no `gx run` wrapper) in
+// the requested split type. Callers say so explicitly instead of passing $SHELL
+// as an ordinary program, so a backend that opens a shell on its own can skip
+// typing it. Today every backend runs shell as the program.
+func CommandWithSplitShell(worktreeRoot string, terminal ui.Terminal, splitType SplitType, shell string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+	return commandWithSplit(worktreeRoot, terminal, splitType, shell, nil, done)
+}
+
+// LaunchOption tweaks a Launch call.
+type LaunchOption func(*launchOptions)
+
+type launchOptions struct {
+	shell bool
+}
+
+// AsShell marks the launched program as the user's interactive shell.
+func AsShell() LaunchOption {
+	return func(o *launchOptions) { o.shell = true }
+}
+
 // Launch synchronously launches program (with args) into the requested
 // split/tab and returns the short app label ("tmux"/"kitty") plus any launch
 // error. It is the entry point for callers outside Bubbletea (the `gx term`
 // CLI), running the same per-terminal logic the TUI drives through
 // CommandWithSplit. splitType must not be InPlace, and terminal must satisfy
 // CanSplit(); the caller owns the in-place / non-splittable fallback.
-func Launch(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string) (string, error) {
+func Launch(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, opts ...LaunchOption) (string, error) {
+	var o launchOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	// o.shell is not consumed yet: every backend runs program as given.
+	_ = o
 	return launchSplit(worktreeRoot, terminal, splitType, program, args)
 }
 
