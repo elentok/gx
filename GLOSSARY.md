@@ -217,9 +217,11 @@ path (only writing `status: done` if landing succeeds). Not "promote", which alr
 unrelated things in this repo (`draft` → `open`, and an epic entering `MaxConcurrentEpics`'s
 auto-promotion queue). An agent's report can start a landing; it can never conclude one — the
 commit count and the cherry-pick are what conclude it. See ADR 0019. A **late finish** is a
-`finished` report that arrives after gx already parked the ticket `zero-commit`; gx adopts it while
-the ticket is still parked and either has commits (it lands) or reported commitless (it closes
-`done` with nothing to land), the same as an on-time one.
+`finished` report that arrives after gx already parked the ticket because its agent stopped without
+reporting (`zero-commit`, or a merge ticket's `merge-unreported`); gx adopts it while the ticket is
+still parked and either has commits (it lands), reported commitless (it closes `done` with nothing
+to land), or is a merge ticket whose merge checks pass (it closes `done`), the same as an on-time
+one.
 
 **Park reason** — the first non-empty line after a parked ticket's `## Needs Answer` or `## Needs
 Repair` heading, with markdown markers stripped and ellipsised for display. What the Queue row
@@ -244,6 +246,11 @@ agent read-only and act on it with one-shot prompt, interrupt and answer verbs. 
 
 **Session** — one agent hosted by an agent runner, identified by its label. Replaces herdr's
 tab, pane and workspace triple as what ralph-loop holds on to. _Avoid_: "pane", "tab" outside herdr.
+
+**Stale holder** — a leftover agent that holds a ticket's label when gx launches for that ticket:
+no live run tracks it, and it is idle or done. gx closes it and launches fresh; it never adopts it.
+A leftover agent that is still working is not a stale holder: the ticket parks and a person or the
+investigate agent decides. _Avoid_: zombie, orphan pane.
 
 **Interactive session** — a session a person starts and types into from the Agents tab, rather than
 one the loop launches for an iteration. `gx server` keeps it alive while no TUI is open. _Avoid_:
@@ -378,10 +385,15 @@ re-adopt, "has a pane".
 **Base** / **Target** — a ticket's **base** is the branch its work starts from; its **target** is
 the branch it lands on. Only `base:` is declared (a branch or a ticket address); the target is
 derived (a child's is its parent's branch, a top-level ticket's is trunk) and is none for a
-commitless ticket. The resolved base is recorded at claim as read-only `resolved_base`. `gx merge`
-takes `target`, not `base`.
+commitless ticket. An epic has one base and one target, taken from its **Root ticket**: it lands
+on trunk, or on its blocker's branch until that branch reaches trunk. The resolved base is
+recorded at claim as read-only `resolved_base`. `gx merge` takes `target`, not `base`.
 Not the Context menu's **Target** (the focused item); where both could be meant, name the
 branch itself (e.g. "merges into main").
+
+**Root ticket** — an epic's lowest-numbered ticket, whatever its status. The epic's **Base** and
+**Target** come from it and from the epic's own `base:` and `blocked_by`; another ticket's `base:`
+moves only where that ticket starts. _Avoid_: first ticket.
 
 **Trunk** — the branch a project's top-level tickets land on: `main`, `develop`, a release branch.
 Set per project; detected from the repo when unset. A top-level ticket's **Target** is trunk.
