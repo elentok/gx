@@ -196,6 +196,10 @@ type Config struct {
 	// prompt to go Working; zero means DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration
 
+	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
+	// DefaultCompactRewaitTimeout.
+	CompactRewaitTimeout time.Duration
+
 	// TCPAddr, when set, adds a loopback-only TCP listener serving the same
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string

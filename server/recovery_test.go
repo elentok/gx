@@ -159,13 +159,13 @@ func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, 
 	})
 	var mu sync.Mutex
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		typed = append(typed, argv[3])
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1"}}, herdrfake.Identities{}, promptErr
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "working", "state_change_seq": 2}}, herdrfake.Identities{}, promptErr
 	})
 	h.Herdr.Register("tab", "close", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		mu.Lock()
@@ -210,7 +210,8 @@ func TestRecovery_StalledPromptIsRetypedInFullByR5(t *testing.T) {
 }
 
 func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
-	applied, typed, closed := parkStalledLaunch(t, errors.New("agent_prompt_stalled"))
+	// Not a stall: herdrrunner nudge-retries a stalled prompt.
+	applied, typed, closed := parkStalledLaunch(t, errors.New("pane is gone"))
 	if applied.Reason != "R5" || applied.Outcome == "ok" {
 		t.Errorf("applied = %+v, want a failed R5", applied)
 	}
@@ -232,6 +233,9 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Default()
+		// herdrrunner re-polls a timed-out wait until its deadline; one poll
+		// has to outlast this.
+		c.CompactRewaitTimeout = time.Nanosecond
 	})
 	var mu sync.Mutex
 	// After the test the pane is gone, so the watch a nudge starts on it ends.
@@ -241,7 +245,7 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 		if gone.Load() {
 			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		if gone.Load() {
@@ -258,7 +262,7 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 		mu.Lock()
 		defer mu.Unlock()
 		typed = append(typed, argv[3])
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "working", "state_change_seq": 2}}, herdrfake.Identities{}, nil
 	})
 	dir := filepath.Join(store, "proj")
 	for _, ev := range []ralphloop.Event{

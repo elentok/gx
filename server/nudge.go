@@ -9,7 +9,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -66,7 +65,7 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		address := ref.addr.String()
-		if s.herdr.isUnavailable() {
+		if r, err := s.iterationRunner(ref.addr); err == nil && r.Name() == runnerHerdr && s.herdr.isUnavailable() {
 			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
 		}
 		if res, refused := s.budgetRefusal(); refused {
@@ -80,20 +79,19 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 		if !s.nudges.allow(address, now) {
 			return refusal(ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
 		}
-		label, _, _ := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, "")
-		if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: label, Text: text}); err != nil {
+		if err := it.runner.Prompt(it.session, text); err != nil {
 			return QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}
 		err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
 			Time: now, Type: string(events.Nudged), Ticket: ref.addr.ID, Address: address,
-			Pane: it.Pane, Text: text,
+			Pane: it.info.Pane, Text: text,
 		})
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("logging nudge of %s: %w", address, err)
 		}
 		s.events.publish(EventTicketNudged, address)
 		if !s.registry.has(address) {
-			s.watchNudgedPane(ref, it, label)
+			s.watchNudgedPane(ref, it)
 		}
 		return QueueResult{}, nil
 	})
@@ -110,17 +108,12 @@ const (
 // parked ticket's pane, as recovery's R7 nudges): until it settles it counts
 // as a run, so the budget meters it and the hard limit stops it. It is never
 // finished or landed; the parked ticket stays with whoever handles the park.
-func (s *Server) watchNudgedPane(ref ticketRef, it IterationInfo, label string) {
+func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 	t := trackedRun{
-		Run: Run{Address: ref.addr.String(), Runner: runnerHerdr,
-			Session: agentrunner.Session{Label: label, ID: it.Pane, SessionID: it.Session}},
+		Run:  Run{Address: ref.addr.String(), Runner: it.runner.Name(), Session: it.session},
 		Root: ref.root().String(), TicketPath: ref.ticket.Path, StartedAt: time.Now(), Watched: true,
 	}
-	r, err := s.runnerOf(t.Run)
-	if err != nil {
-		s.log.Warn("watch nudged pane", "ticket", t.Address, "err", err)
-		return
-	}
+	r := it.runner
 	s.registry.put(t)
 	s.goSettle(func() {
 		defer s.registry.deleteWatched(t)

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -43,44 +44,62 @@ func (s *Server) iterations(w http.ResponseWriter, _ *http.Request) {
 			continue
 		}
 		if it, ok := s.liveIteration(t.Address); ok {
-			list = append(list, it)
+			list = append(list, it.info)
 		}
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Address < list[j].Address })
 	writeJSON(w, list)
 }
 
-// liveIteration resolves a claimed ticket's iteration. It is not live when
-// herdr knows no agent under the iteration's label.
-func (s *Server) liveIteration(address string) (IterationInfo, bool) {
+// liveIter is a live iteration with the runner and session hosting it.
+type liveIter struct {
+	info    IterationInfo
+	runner  agentrunner.Runner
+	session agentrunner.Session
+}
+
+// liveIteration resolves a claimed ticket's iteration through the run's
+// runner. It is live when that runner finds the label and the session has not
+// exited; blocked is live.
+func (s *Server) liveIteration(address string) (liveIter, bool) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
-		return IterationInfo{}, false
+		return liveIter{}, false
 	}
-	worktreeDir := s.worktreeDir(a.Project)
-	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, worktreeDir)
-	agent, err := herdr.AgentGet(label)
-	if err != nil || agent.PaneID == "" {
-		return IterationInfo{}, false
+	runner, sess, ok, err := s.liveSession(a)
+	if err != nil || !ok || sess.ID == "" {
+		return liveIter{}, false
 	}
-	it := IterationInfo{
-		Address: address, Pane: agent.PaneID, Tab: agent.TabID,
-		Worktree: worktree, Branch: branch, Session: agent.AgentSession,
+	st, err := runner.Status(sess)
+	// herdr's done is a finished turn resting in its pane, not an exit.
+	if err != nil || (st.State == agentrunner.StateDone && runner.Name() != runnerHerdr) {
+		return liveIter{}, false
+	}
+	if sess.SessionID == "" {
+		sess.SessionID = st.SessionID
+	}
+	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
+	it := IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID}
+	if runner.Name() == runnerHerdr {
+		it.Pane = sess.ID
+		if agent, err := herdr.AgentGet(label); err == nil {
+			it.Tab = agent.TabID
+		}
 	}
 	if run, ok := s.registry.runOf(address); ok {
 		it.Agent = run.Agent
 	}
 	// Base and transcript are best effort: a missing git worktree or session
-	// leaves them empty rather than hiding a live pane.
+	// leaves them empty rather than hiding a live iteration.
 	if base, err := git.MergeBase(worktree, branch, a.Epic); err == nil {
 		it.Base = base
 	}
-	if agent.AgentSession != "" {
-		if p, err := transcript.Path(worktree, agent.AgentSession); err == nil {
+	if sess.SessionID != "" {
+		if p, err := transcript.Path(worktree, sess.SessionID); err == nil {
 			it.Transcript = p
 		}
 	}
-	return it, true
+	return liveIter{info: it, runner: runner, session: sess}, true
 }
 
 // worktreeDir is where the project's repo keeps its linked worktrees.

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
@@ -514,24 +515,31 @@ func (s *Server) recoveryClosePane(req QueueRequest, _ recovery.Call) (QueueResu
 		if !live {
 			return QueueResult{}, nil
 		}
-		if err := herdr.TabClose(it.Tab); err != nil {
+		if err := it.runner.Stop(it.session); err != nil {
 			return QueueResult{}, fmt.Errorf("close pane of %s: %w", ref.addr, err)
+		}
+		if err := agentrunner.Cleanup(it.runner, it.session.Label); err != nil {
+			return QueueResult{}, fmt.Errorf("clean up %s: %w", ref.addr, err)
 		}
 		return QueueResult{}, nil
 	})
 }
 
-// compactRewaitTimeoutMs is R7's one extended wait, well past the loop's own
-// compaction wait so a slow compaction can still finish inside it.
-const compactRewaitTimeoutMs = 15 * 60 * 1000
+// DefaultCompactRewaitTimeout is R7's one extended wait, well past the loop's
+// own compaction wait so a slow compaction can still finish inside it.
+const DefaultCompactRewaitTimeout = 15 * time.Minute
 
 func (s *Server) recoveryWait(req QueueRequest, _ recovery.Call) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
-		if _, live := s.liveIteration(ref.addr.String()); !live {
+		it, live := s.liveIteration(ref.addr.String())
+		if !live {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
-		label, _, _ := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, "")
-		if _, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: label, Until: []string{"idle", "done"}, TimeoutMs: compactRewaitTimeoutMs}); err != nil {
+		timeout := s.cfg.CompactRewaitTimeout
+		if timeout == 0 {
+			timeout = DefaultCompactRewaitTimeout
+		}
+		if _, err := it.runner.Wait(it.session, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, timeout); err != nil {
 			return QueueResult{}, fmt.Errorf("wait for %s: %w", ref.addr, err)
 		}
 		return QueueResult{}, nil

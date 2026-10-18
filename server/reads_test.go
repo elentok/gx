@@ -132,7 +132,7 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 	}
 	h := servertest.StartWithStore(t, store)
 	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if argv[2] != "epic-a-iter-01" {
+		if argv[2] != "epic-a-iter-01" && argv[2] != "pane-1" {
 			return nil, herdrfake.Identities{}, errors.New("agent not found")
 		}
 		return map[string]any{"agent": map[string]any{

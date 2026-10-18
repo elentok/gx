@@ -36,16 +36,16 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	var mu sync.Mutex
 	var typed []string
 	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if argv[2] != "epic-a-iter-01" {
+		if argv[2] != "epic-a-iter-01" && argv[2] != "pane-1" {
 			return nil, herdrfake.Identities{}, errors.New("agent not found")
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		typed = append(typed, argv[2]+": "+argv[3])
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1"}}, herdrfake.Identities{}, nil
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "working", "state_change_seq": 2}}, herdrfake.Identities{}, nil
 	})
 	ctx := context.Background()
 
@@ -54,7 +54,7 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
 	mu.Lock()
-	if len(typed) != 1 || typed[0] != "epic-a-iter-01: please continue" {
+	if len(typed) != 1 || typed[0] != "pane-1: please continue" {
 		t.Errorf("typed = %v", typed)
 	}
 	mu.Unlock()

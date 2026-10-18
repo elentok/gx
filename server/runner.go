@@ -1078,17 +1078,22 @@ func (s *Server) runnerOf(run Run) (agentrunner.Runner, error) {
 // hosting it: a tracked run's own runner, else the configured one (a parked
 // ticket's agent can outlive its run).
 func (s *Server) liveSession(addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
-	runner := s.runnerFor(addr.Project)
-	if run, ok := s.registry.runOf(addr.String()); ok {
-		r, err := s.runnerOf(run)
-		if err != nil {
-			return nil, agentrunner.Session{}, false, err
-		}
-		runner = r
+	runner, err := s.iterationRunner(addr)
+	if err != nil {
+		return nil, agentrunner.Session{}, false, err
 	}
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
 	sess, ok, err := runner.Find(label)
 	return runner, sess, ok, err
+}
+
+// iterationRunner is the runner hosting address's iteration: a tracked run's
+// own runner, else the configured one.
+func (s *Server) iterationRunner(addr tickets.Address) (agentrunner.Runner, error) {
+	if run, ok := s.registry.runOf(addr.String()); ok {
+		return s.runnerOf(run)
+	}
+	return s.runnerFor(addr.Project), nil
 }
 
 func (s *Server) runnerNamed(name, project string) agentrunner.Runner {

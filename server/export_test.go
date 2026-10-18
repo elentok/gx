@@ -127,6 +127,12 @@ func (s *Server) ClaimNext() { s.claimNext() }
 // RecoverAsync is recoverAsync for a failure the test raises itself.
 func (s *Server) RecoverAsync(f recovery.Failure) { s.recoverAsync(f) }
 
+// RecoveryDo calls one server verb the way a remedy does.
+func (s *Server) RecoveryDo(c recovery.Call) (recovery.Result, error) { return recoveryVerbs{s}.Do(c) }
+
+// RunOf is the tracked run of address, watched ones included.
+func (s *Server) RunOf(address string) (Run, bool) { return s.registry.runOf(address) }
+
 // WatchGates runs one gate watchdog pass as of now.
 func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 
