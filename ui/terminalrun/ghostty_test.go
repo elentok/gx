@@ -91,6 +91,28 @@ func TestLaunchSplit_GhosttyVersionGate(t *testing.T) {
 	}
 }
 
+func TestCheckGhosttySplits_Hints(t *testing.T) {
+	tests := []struct{ version, want string }{
+		{"", "Ghostty unknown has no AppleScript splits (needs 1.3.0 or later)"},
+		{"junk", `Ghostty "junk" (unparsable) has no AppleScript splits (needs 1.3.0 or later)`},
+		{"1.2.3", "Ghostty 1.2.3 has no AppleScript splits (needs 1.3.0 or later)"},
+		{"1.3.0", ""},
+	}
+	for _, tt := range tests {
+		err := CheckGhosttySplits(tt.version)
+		if tt.want == "" {
+			if err != nil {
+				t.Errorf("%q: err = %v", tt.version, err)
+			}
+			continue
+		}
+		var fb *FallbackError
+		if !errors.As(err, &fb) || fb.Hint != tt.want {
+			t.Errorf("%q: err = %v, want %q", tt.version, err, tt.want)
+		}
+	}
+}
+
 func TestLaunchSplit_GhosttyFailureHints(t *testing.T) {
 	tests := []struct {
 		name     string

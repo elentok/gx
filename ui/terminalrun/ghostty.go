@@ -49,10 +49,30 @@ func runOsaScript(script string, argv ...string) ([]byte, error) {
 // TERM_PROGRAM_VERSION supports AppleScript splits (>= 1.3.0). It returns a
 // *FallbackError when it does not. There is no upper bound.
 func CheckGhosttySplits(version string) error {
-	if v, ok := parseVersion(version); ok && !versionBefore(v, [3]int{1, 3, 0}) {
+	if v, ok := parseVersion(version); ok && !versionBefore(v, ghosttyMinVersion) {
 		return nil
 	}
-	return &FallbackError{Hint: fmt.Sprintf("Ghostty %s has no AppleScript splits (needs 1.3.0 or later)", version)}
+	label, _ := DescribeGhosttyVersion(version)
+	return &FallbackError{Hint: fmt.Sprintf("Ghostty %s has no AppleScript splits (needs %s or later)", label, GhosttyMinVersion)}
+}
+
+// GhosttyMinVersion is the first Ghostty release with AppleScript splits.
+const GhosttyMinVersion = "1.3.0"
+
+var ghosttyMinVersion = [3]int{1, 3, 0}
+
+// DescribeGhosttyVersion returns a printable label for a TERM_PROGRAM_VERSION
+// and whether it is a parsable version below the minimum. Empty and
+// unparsable values are never reported as below it.
+func DescribeGhosttyVersion(version string) (label string, belowMin bool) {
+	if version == "" {
+		return "unknown", false
+	}
+	v, ok := parseVersion(version)
+	if !ok {
+		return fmt.Sprintf("%q (unparsable)", version), false
+	}
+	return version, versionBefore(v, ghosttyMinVersion)
 }
 
 // parseVersion reads a leading MAJOR.MINOR.PATCH, ignoring a -… or +… suffix.

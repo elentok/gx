@@ -250,10 +250,14 @@ func printDoctorRuntime(w io.Writer, getenv func(string) string, goos string) {
 	fmt.Fprintf(w, "  TERM_PROGRAM_VERSION=%q\n", getenv("TERM_PROGRAM_VERSION"))
 	if terminal == ui.TerminalGhostty {
 		version := getenv("TERM_PROGRAM_VERSION")
-		if terminalrun.CheckGhosttySplits(version) == nil {
-			fmt.Fprintf(w, "  ghostty version: %s ok\n", version)
-		} else {
-			fmt.Fprintf(w, "  ghostty version: %s < 1.3.0, splits run in place\n", version)
+		label, belowMin := terminalrun.DescribeGhosttyVersion(version)
+		switch {
+		case terminalrun.CheckGhosttySplits(version) == nil:
+			fmt.Fprintf(w, "  ghostty version: %s ok\n", label)
+		case belowMin:
+			fmt.Fprintf(w, "  ghostty version: %s < %s, splits run in place\n", label, terminalrun.GhosttyMinVersion)
+		default:
+			fmt.Fprintf(w, "  ghostty version: %s, splits run in place\n", label)
 		}
 	}
 	fmt.Fprintln(w)

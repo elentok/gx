@@ -58,6 +58,8 @@ func TestDoctor_RuntimeGhosttyLines(t *testing.T) {
 	for version, want := range map[string]string{
 		"1.3.0": "ghostty version: 1.3.0 ok",
 		"1.2.3": "ghostty version: 1.2.3 < 1.3.0, splits run in place",
+		"":      "ghostty version: unknown, splits run in place",
+		"junk":  `ghostty version: "junk" (unparsable), splits run in place`,
 	} {
 		var out bytes.Buffer
 		printDoctorRuntime(&out, func(k string) string {
