@@ -241,3 +241,16 @@ looking at when you found it:
 
 When unsure which of the first two applies, ask: would this bug still exist if the epic you were
 investigating had never been authored? If yes, it's a tooling bug — `gx-follow-up`, not the epic.
+
+### Final report
+
+Whatever you published (or didn't), end with a report in this fixed shape. Keep long detail in the
+published ticket; the report stays scannable but complete. Use full addresses
+(`<project:epic/NN>`), never a bare `/02`.
+
+1. **Verdict and root cause** — one or two lines.
+2. **Evidence** — the log lines, commits and `file:line` references the diagnosis rests on.
+3. **Examined** — the tickets (full addresses) and sessions you looked at.
+4. **Actions taken** — each repair verb run (land, reset, unpark), with its result. Say "none" if none.
+5. **Filed** — every address written: research ticket, follow-ups, seen-again entries. Say "none" if none.
+6. **Next** — one line: what the person should do now.
