@@ -147,9 +147,10 @@ this is the only rule; unattended mode is below.
 
 ## Unattended mode
 
-An investigate ticket (`type: investigate`) runs this skill with no human in the session. Its prompt
-begins `Matched catalog entry: …` and names the entry. Everything above (background, state,
-diagnosis) applies unchanged; only the writes differ.
+**You are unattended if your args name a ticket of `type: investigate` or `type: diagnose`.** Check
+with `gx tickets show <addr>`; don't key on the prompt's shape. An investigate prompt usually
+begins `Matched catalog entry: …`, but may begin with just the address. No human is in the
+session. Everything above (background, state, diagnosis) applies unchanged; only the writes differ.
 
 <unattended-verbs>
 
@@ -165,9 +166,15 @@ diagnosis) applies unchanged; only the writes differ.
 
 - **Entry matched** → diagnose, then apply only the entry's verbs against the failed ticket (the
   investigate ticket's `parent`). Report at the action, as above.
-- **`No catalog entry matched`** → report the diagnosis and park the failed ticket. Do nothing else;
+- **`No catalog entry matched`** → write the diagnosis to `## Findings` on your own ticket, report
+  it, and park the failed ticket. Do nothing else;
   propose any other command in the report for a human to run.
-- Never wait for a go-ahead, and never ask: an unattended session has no one to answer.
+- Never wait for a go-ahead, and never ask: an unattended session has no one to answer. Never end
+  with an offer ("say go and I'll…", "want me to file this?"). Do the allowed action, or name the
+  command for a human in the report.
+- **Write the diagnosis into your own ticket** before the finish report, so it outlives the pane:
+  `gx tickets section <your-addr> Findings -` with the final report (see Final report) on stdin.
+  Do this in every unattended ending, including `No catalog entry matched`.
 - **Last step, always:** report on _your own_ ticket (not the failed one):
   `gx tickets set <your-addr> --iteration-status finished --commitless true`. Do it after the
   action, including when you only parked the failed ticket or filed a follow-up. Without it the
@@ -245,7 +252,8 @@ investigating had never been authored? If yes, it's a tooling bug — `gx-follow
 ### Final report
 
 Whatever you published (or didn't), end with a report in this fixed shape. Keep long detail in the
-published ticket; the report stays scannable but complete. Use full addresses
+published ticket; the report stays scannable but complete. Unattended, the report is also the
+`## Findings` section of your own ticket, and it ends at item 6: no offers or questions. Use full addresses
 (`<project:epic/NN>`), never a bare `/02`.
 
 1. **Verdict and root cause** — one or two lines.
