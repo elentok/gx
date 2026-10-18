@@ -146,7 +146,9 @@ A comment quoting a measured value duplicates it, and duplicates drift - stale f
 
 ## Other notes
 
-Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams.
+Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams. Every declared seam needs a
+real assertion; if one cannot be observed, park `needs-answer` naming the seam instead of finishing
+(see "When only a person can answer").
 
 Run typechecking regularly and single test files regularly. At the end, test only the packages you
 touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.

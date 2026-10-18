@@ -44,6 +44,13 @@ means agreed in the ticket, not negotiated live:
   interface, and which seams should we test?" if the ticket's declared seams seem wrong or
   incomplete, and update the ticket with the corrected seams before writing tests against them.
 
+**Every declared seam needs a real assertion.** A seam that is only partly covered (e.g. one of
+three named backends, or one of three actions) counts as a gap. A weak check such as `cmd != nil`
+or "did not error" does not cover a seam that names specific behavior. If you find a seam cannot be
+observed (e.g. the code returns an opaque `tea.Cmd`), do not skip it and finish. Commit what is
+green, then park the ticket `needs-answer`: the `## Needs Answer` section names the seam and why it
+cannot be observed, so the ticket author can approve a different seam.
+
 You can't test everything — agreeing the seams up front (in the ticket) is how testing effort lands
 on the critical paths and complex logic instead of every edge case.
 
