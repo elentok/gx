@@ -279,17 +279,29 @@ func (p iterationParams) logLaunchFailed(label string, attempt int, kind events.
 	})
 }
 
+// logPromptNudged appends one prompt-nudged event for a nudge decision.
+func (p iterationParams) logPromptNudged(label string, attempt int, decision string) {
+	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
+		Type:    string(events.PromptNudged),
+		Ticket:  p.Ticket.Identifier,
+		Label:   label,
+		Attempt: attempt,
+		Reason:  decision,
+	})
+}
+
 // startAndPrompt starts a session and sends its initial prompt. A prompt the
 // agent never picks up (ErrNotDelivered) points at a bad session rather than a
 // slow agent, so it gets exactly one fresh session before parking as
 // agent_prompt_stalled. Any other prompt error (e.g. ErrNotReady on a blocked
 // agent) returns with the session still live, for the blocked-pane park.
-// onFail is called for every failed attempt, to log launch-failed.
+// onFail is called for every failed attempt, to log launch-failed, and
+// onNudge for every nudge decision the runner made on the prompt.
 //
 // A label already live before Start means Start adopted our own earlier
 // session (e.g. a second gx process racing the same ticket): that one is
 // returned unprompted with Adopted set, since it may be mid-turn.
-func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error)) (launched, error) {
+func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onFail func(attempt int, kind events.Kind, err error), onNudge func(attempt int, decision string)) (launched, error) {
 	_, adopted, err := r.Find(opts.Label)
 	if err != nil {
 		// Not fatal: Start still runs, it just can't be an adoption.
@@ -313,7 +325,7 @@ func startAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt 
 		if err != nil {
 			log.Printf("reading %s status before initial prompt: %v", opts.Label, err)
 		}
-		err = r.Prompt(s, prompt)
+		err = agentrunner.PromptNudged(r, s, prompt, func(decision string) { onNudge(attempt, decision) })
 		if !errors.Is(err, agentrunner.ErrNotDelivered) {
 			return launched{Session: s, Baseline: status.Turn}, withDoctorHint(err)
 		}
@@ -339,8 +351,8 @@ func withDoctorHint(err error) error {
 
 // StartAndPrompt is startAndPrompt for callers outside the loop (the server's
 // launch): same retry on an undelivered prompt, no launch-failed events.
-func StartAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string) (agentrunner.Session, error) {
-	l, err := startAndPrompt(r, opts, prompt, func(int, events.Kind, error) {})
+func StartAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string)) (agentrunner.Session, error) {
+	l, err := startAndPrompt(r, opts, prompt, func(int, events.Kind, error) {}, onNudge)
 	return l.Session, err
 }
 

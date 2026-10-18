@@ -1082,7 +1082,20 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, t tickets.T
 		Kind:  agentrunner.Kind(agent),
 		Args:  ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", "", extraDirs...),
 		Env:   s.settings.Load().TabEnv,
-	}, launchPrompt(agent, skill, note, ticket.String()))
+	}, launchPrompt(agent, skill, note, ticket.String()), func(attempt int, decision string) {
+		dir, err := s.projectDir(ticket.Project)
+		if err != nil {
+			return
+		}
+		_ = ralphloop.AppendEvent(dir, ticket.Epic, ralphloop.Event{
+			Type:    string(events.PromptNudged),
+			Ticket:  ticket.ID,
+			Address: ticket.String(),
+			Label:   label,
+			Attempt: attempt,
+			Reason:  decision,
+		})
+	})
 	if err != nil {
 		return Run{}, err
 	}

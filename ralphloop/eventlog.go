@@ -104,7 +104,7 @@ type Event struct {
 	// Kind (failure and recovery events) is the closed-enum cause from the
 	// events package; required on the types events.KindRequired names.
 	Kind string `json:"kind,omitempty"`
-	// Label is the iteration label (launch-failed events).
+	// Label is the iteration label (launch-failed and prompt-nudged events).
 	Label string `json:"label,omitempty"`
 	// Address is the ticket's canonical address ("project:epic/06"), filled by
 	// logEvent from Ticket when empty.

@@ -20,7 +20,7 @@ func startAndPromptFake(t *testing.T, r *runnerfake.Runner) (agentrunner.Session
 	var fails []launchFail
 	l, err := startAndPrompt(r, agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}, "/go", func(attempt int, kind events.Kind, _ error) {
 		fails = append(fails, launchFail{attempt, kind})
-	})
+	}, func(int, string) {})
 	return l.Session, err, fails
 }
 

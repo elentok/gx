@@ -30,11 +30,32 @@ var ErrStuckSubmission = errors.New("submission never reached the pane")
 // caller's deadline.
 var ErrStartTimeout = errors.New("timed out waiting for agent to start")
 
+// NudgeDecision is what PromptWithNudge did about a submit the agent didn't
+// pick up. Its values are written to the run log as is.
+type NudgeDecision string
+
+const (
+	NudgeEnter   NudgeDecision = "enter"
+	NudgeRetype  NudgeDecision = "retype"
+	NudgeStuck   NudgeDecision = "stuck"
+	NudgeTimeout NudgeDecision = "timeout"
+)
+
+// ReportDecisions adapts agentrunner.Nudger's onNudge to PromptWithNudge's
+// report; nil stays nil.
+func ReportDecisions(onNudge func(string)) func(NudgeDecision) {
+	if onNudge == nil {
+		return nil
+	}
+	return func(d NudgeDecision) { onNudge(string(d)) }
+}
+
 // Prompter is what PromptWithNudge needs from a runner. Submit types text and
-// presses Enter. WaitStart reports false, not an error, when timeout elapses
-// with no turn started; an error aborts the prompt.
+// presses Enter. Clear empties the input box. WaitStart reports false, not an
+// error, when timeout elapses with no turn started; an error aborts the prompt.
 type Prompter interface {
 	Submit(text string) error
+	Clear() error
 	SendEnter() error
 	WaitStart(timeout time.Duration) (bool, error)
 	Screen() (string, error)
@@ -44,9 +65,13 @@ type Prompter interface {
 // around a submission that lands without being sent (seen in production).
 // After each attempt that doesn't start, it compares the screen with the one
 // before: if it changed, the text likely landed unsent, so it presses a bare
-// Enter; if not, the text never arrived, so it retypes it in full. A zero
-// deadline means none; otherwise every wait is capped to what remains of it.
-func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time, now func() time.Time) error {
+// Enter; if not, the text never arrived, so it clears the input and retypes
+// it in full. A zero deadline means none; otherwise every wait is capped to
+// what remains of it. report, if not nil, hears every decision.
+func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time, now func() time.Time, report func(NudgeDecision)) error {
+	if report == nil {
+		report = func(NudgeDecision) {}
+	}
 	grace := func() (time.Duration, bool) {
 		if deadline.IsZero() {
 			return caps.Grace, true
@@ -57,6 +82,7 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 
 	timeout, ok := grace()
 	if !ok {
+		report(NudgeTimeout)
 		return fmt.Errorf("%w: overall deadline exceeded", ErrStartTimeout)
 	}
 
@@ -79,14 +105,24 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 
 		if unchanged {
 			if retypes >= caps.Retypes {
+				report(NudgeStuck)
 				return fmt.Errorf("%w after %d retries", ErrStuckSubmission, retypes)
 			}
 			retypes++
+			report(NudgeRetype)
+			// Partial text the screen didn't show would otherwise prefix the
+			// retype.
+			if err = p.Clear(); err != nil {
+				return fmt.Errorf("clearing input before retype: %w", err)
+			}
 			if err = p.Submit(text); err != nil {
 				return err
 			}
-		} else if err = p.SendEnter(); err != nil {
-			return fmt.Errorf("nudging stuck submission: %w", err)
+		} else {
+			report(NudgeEnter)
+			if err = p.SendEnter(); err != nil {
+				return fmt.Errorf("nudging stuck submission: %w", err)
+			}
 		}
 		started, err = p.WaitStart(timeout)
 	}
@@ -94,6 +130,7 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 		return err
 	}
 	if !started {
+		report(NudgeTimeout)
 		return ErrStartTimeout
 	}
 	return nil

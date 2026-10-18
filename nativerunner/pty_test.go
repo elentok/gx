@@ -251,8 +251,8 @@ func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "do it\r" + "\r" + "do it\r"; string(in) != want {
-		t.Errorf("keys typed = %q; want submit, one nudge, one retype: %q", in, want)
+	if want := "do it\r" + "\r" + "\x15do it\r"; string(in) != want {
+		t.Errorf("keys typed = %q; want submit, one nudge, one cleared retype: %q", in, want)
 	}
 }
 

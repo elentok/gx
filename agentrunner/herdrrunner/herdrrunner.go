@@ -46,6 +46,7 @@ type Runner struct {
 
 var _ agentrunner.Runner = (*Runner)(nil)
 var _ agentrunner.HealthChecker = (*Runner)(nil)
+var _ agentrunner.Nudger = (*Runner)(nil)
 
 // New gates on Claude transcript background tasks, unless the home directory
 // can't be found.
@@ -101,6 +102,10 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 }
 
 func (r *Runner) Prompt(s agentrunner.Session, text string) error {
+	return r.PromptNudged(s, text, nil)
+}
+
+func (r *Runner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
 	st, err := r.status(s)
 	if err != nil {
 		return err
@@ -118,7 +123,7 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 		// decide when compaction has really finished.
 		until = append(until, "blocked", "idle", "done")
 	}
-	prompt := promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now)
+	prompt := promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {

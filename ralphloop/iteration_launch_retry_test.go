@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -73,6 +74,46 @@ func launchFailedEvents(t *testing.T, scratchDir string) []Event {
 		}
 	}
 	return failed
+}
+
+// nudgingRunner reports decisions on every PromptNudged, as herdr and pty do
+// on a launch prompt the agent didn't pick up at once.
+type nudgingRunner struct {
+	agentrunner.Runner
+	decisions []string
+}
+
+func (n nudgingRunner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
+	for _, d := range n.decisions {
+		onNudge(d)
+	}
+	return n.Prompt(s, text)
+}
+
+func TestRunIteration_LogsEveryNudgeDecision(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	d.Runner = nudgingRunner{Runner: d.Runner, decisions: []string{"retype", "enter"}}
+
+	scratchDir := runLaunchEpic(t, d, false)
+
+	evs, _, err := ReadEvents(scratchDir, launchEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, ev := range evs {
+		if ev.Type != string(events.PromptNudged) {
+			continue
+		}
+		if ev.Ticket != "01" || ev.Label != launchLabel || ev.Attempt != 1 {
+			t.Errorf("prompt-nudged event = %+v, want ticket 01, label %s, attempt 1", ev, launchLabel)
+		}
+		got = append(got, ev.Reason)
+	}
+	if want := []string{"retype", "enter"}; !slices.Equal(got, want) {
+		t.Fatalf("prompt-nudged reasons = %v, want %v", got, want)
+	}
 }
 
 func TestRunIteration_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
@@ -187,7 +228,7 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	r := fakeRunner(d)
 	r.SetStartErr(launchLabel, fmt.Errorf("%w: pid_status_v1", agentrunner.ErrMissingCapability))
 
-	_, err := StartAndPrompt(r, agentrunner.StartOptions{Label: launchLabel}, "/go")
+	_, err := StartAndPrompt(r, agentrunner.StartOptions{Label: launchLabel}, "/go", func(int, string) {})
 
 	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "gx claude doctor") {
 		t.Errorf("StartAndPrompt = %v, want ErrMissingCapability with the doctor hint", err)

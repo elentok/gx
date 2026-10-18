@@ -150,6 +150,22 @@ type Cleaner interface {
 	Cleanup(label string) error
 }
 
+// Nudger is implemented by runners whose Prompt nudges a prompt the agent
+// didn't pick up (herdr, pty). onNudge hears each decision
+// (claudeui.NudgeDecision).
+type Nudger interface {
+	PromptNudged(s Session, text string, onNudge func(decision string)) error
+}
+
+// PromptNudged is r.Prompt reporting nudge decisions to onNudge; a runner
+// that never nudges just prompts.
+func PromptNudged(r Runner, s Session, text string, onNudge func(decision string)) error {
+	if n, ok := r.(Nudger); ok {
+		return n.PromptNudged(s, text, onNudge)
+	}
+	return r.Prompt(s, text)
+}
+
 // Cleanup drops label's leftovers when r keeps any; otherwise it is a no-op.
 func Cleanup(r Runner, label string) error {
 	if c, ok := r.(Cleaner); ok {

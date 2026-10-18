@@ -2,6 +2,7 @@ package claudeui
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -10,17 +11,25 @@ import (
 // order (false once exhausted); screens scripts Screen's answers in order (the
 // last one repeats). Every WaitStart advances clock by the timeout it was given.
 type fakePrompter struct {
-	clock    time.Time
-	starts   []bool
-	screens  []string
-	calls    []string
-	timeouts []time.Duration
+	clock     time.Time
+	starts    []bool
+	screens   []string
+	calls     []string
+	timeouts  []time.Duration
+	decisions []NudgeDecision
 }
 
 func (f *fakePrompter) Submit(text string) error {
 	f.calls = append(f.calls, "submit:"+text)
 	return nil
 }
+
+func (f *fakePrompter) Clear() error {
+	f.calls = append(f.calls, "clear")
+	return nil
+}
+
+func (f *fakePrompter) report(d NudgeDecision) { f.decisions = append(f.decisions, d) }
 
 func (f *fakePrompter) SendEnter() error {
 	f.calls = append(f.calls, "enter")
@@ -63,54 +72,73 @@ func assertCalls(t *testing.T, got []string, want ...string) {
 
 func TestPromptWithNudge_StartSeenAtOnce(t *testing.T) {
 	f := &fakePrompter{starts: []bool{true}, screens: []string{"a"}}
-	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now); err != nil {
+	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report); err != nil {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait")
+	assertDecisions(t, f.decisions)
 }
 
 func TestPromptWithNudge_ChangedScreen_NudgesWithEnter(t *testing.T) {
 	f := &fakePrompter{starts: []bool{false, true}, screens: []string{"before", "typed"}}
-	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now); err != nil {
+	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report); err != nil {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait")
+	assertDecisions(t, f.decisions, NudgeEnter)
 }
 
-func TestPromptWithNudge_UnchangedScreen_Retypes(t *testing.T) {
+func TestPromptWithNudge_UnchangedScreen_ClearsThenRetypes(t *testing.T) {
 	f := &fakePrompter{starts: []bool{false, true}, screens: []string{"empty"}}
-	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now); err != nil {
+	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report); err != nil {
 		t.Fatalf("PromptWithNudge() error = %v", err)
 	}
-	assertCalls(t, f.calls, "submit:hi", "wait", "submit:hi", "wait")
+	assertCalls(t, f.calls, "submit:hi", "wait", "clear", "submit:hi", "wait")
+	assertDecisions(t, f.decisions, NudgeRetype)
 }
 
 func TestPromptWithNudge_RetypeCap_ReturnsStuckSubmission(t *testing.T) {
 	f := &fakePrompter{screens: []string{"empty"}}
-	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now)
+	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
 	if !errors.Is(err, ErrStuckSubmission) {
 		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
 	}
-	assertCalls(t, f.calls, "submit:hi", "wait", "submit:hi", "wait", "submit:hi", "wait")
+	assertCalls(t, f.calls, "submit:hi", "wait", "clear", "submit:hi", "wait", "clear", "submit:hi", "wait")
+	assertDecisions(t, f.decisions, NudgeRetype, NudgeRetype, NudgeStuck)
 }
 
 func TestPromptWithNudge_NudgeCap_ReturnsStartTimeout(t *testing.T) {
 	f := &fakePrompter{screens: []string{"1", "2", "3", "4", "5"}}
-	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now)
+	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
 	if !errors.Is(err, ErrStartTimeout) || errors.Is(err, ErrStuckSubmission) {
 		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout only", err)
 	}
 	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "enter", "wait", "enter", "wait")
+	assertDecisions(t, f.decisions, NudgeEnter, NudgeEnter, NudgeEnter, NudgeTimeout)
+}
+
+func TestPromptWithNudge_NilReport(t *testing.T) {
+	f := &fakePrompter{screens: []string{"empty"}}
+	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, nil); !errors.Is(err, ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	}
+}
+
+func assertDecisions(t *testing.T, got []NudgeDecision, want ...NudgeDecision) {
+	t.Helper()
+	if !slices.Equal(got, want) {
+		t.Fatalf("decisions = %v, want %v", got, want)
+	}
 }
 
 func TestPromptWithNudge_CallerCaps(t *testing.T) {
 	caps := NudgeCaps{Grace: time.Second, Nudges: 2, Retypes: 1}
 	f := &fakePrompter{screens: []string{"empty", "typed", "typed"}}
-	err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now)
+	err := PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report)
 	if !errors.Is(err, ErrStartTimeout) {
 		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
 	}
-	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "submit:hi", "wait")
+	assertCalls(t, f.calls, "submit:hi", "wait", "enter", "wait", "clear", "submit:hi", "wait")
 	for _, got := range f.timeouts {
 		if got != caps.Grace {
 			t.Fatalf("WaitStart timeouts = %v, want %v each", f.timeouts, caps.Grace)
@@ -118,17 +146,17 @@ func TestPromptWithNudge_CallerCaps(t *testing.T) {
 	}
 
 	f = &fakePrompter{screens: []string{"empty"}}
-	err = PromptWithNudge(f, "hi", caps, time.Time{}, f.now)
+	err = PromptWithNudge(f, "hi", caps, time.Time{}, f.now, f.report)
 	if !errors.Is(err, ErrStuckSubmission) {
 		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
 	}
-	assertCalls(t, f.calls, "submit:hi", "wait", "submit:hi", "wait")
+	assertCalls(t, f.calls, "submit:hi", "wait", "clear", "submit:hi", "wait")
 }
 
 func TestPromptWithNudge_HonoursDeadline(t *testing.T) {
 	f := &fakePrompter{screens: []string{"1", "2", "3", "4"}}
 	deadline := f.clock.Add(DefaultNudgeCaps.Grace + 5*time.Second)
-	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, deadline, f.now)
+	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, deadline, f.now, f.report)
 	if !errors.Is(err, ErrStartTimeout) {
 		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
 	}
@@ -140,9 +168,10 @@ func TestPromptWithNudge_HonoursDeadline(t *testing.T) {
 
 func TestPromptWithNudge_ExpiredDeadline_NeverSubmits(t *testing.T) {
 	f := &fakePrompter{screens: []string{"a"}}
-	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, f.clock.Add(-time.Second), f.now)
+	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, f.clock.Add(-time.Second), f.now, f.report)
 	if !errors.Is(err, ErrStartTimeout) {
 		t.Fatalf("PromptWithNudge() error = %v, want ErrStartTimeout", err)
 	}
 	assertCalls(t, f.calls)
+	assertDecisions(t, f.decisions, NudgeTimeout)
 }

@@ -45,6 +45,9 @@ const (
 	TicketReset                Type = "ticket-reset"
 	// Nudged is text typed into a live iteration pane through the server.
 	Nudged Type = "nudged"
+	// PromptNudged is one step a runner took on a launch prompt the agent
+	// didn't pick up; its reason is a claudeui.NudgeDecision.
+	PromptNudged Type = "prompt-nudged"
 )
 
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships

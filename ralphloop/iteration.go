@@ -85,6 +85,8 @@ func runIteration(d Deps, p iterationParams) error {
 		Args:  agentArgs(p.Agent, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
 	}, prompt, func(attempt int, kind events.Kind, err error) {
 		p.logLaunchFailed(label, attempt, kind, err)
+	}, func(attempt int, decision string) {
+		p.logPromptNudged(label, attempt, decision)
 	})
 	var launchFail *launchFailure
 	if errors.As(err, &launchFail) {
@@ -994,6 +996,8 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		Args:  agentArgs(p.Agent, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
 	}, prompt, func(attempt int, kind events.Kind, err error) {
 		p.logLaunchFailed(label, attempt, kind, err)
+	}, func(attempt int, decision string) {
+		p.logPromptNudged(label, attempt, decision)
 	})
 	var launchFail *launchFailure
 	if errors.As(err, &launchFail) {

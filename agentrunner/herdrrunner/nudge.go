@@ -17,13 +17,15 @@ import (
 // seen), then waits, without nudging, for opts.Until. Both phases share one
 // deadline from opts.TimeoutMs, so a slow completion like "/compact" gets
 // what's left of it rather than the grace window. opts.TimeoutMs <= 0 means
-// no deadline: start waits stay bounded, completion waits unbounded.
+// no deadline: start waits stay bounded, completion waits unbounded. report
+// may be nil.
 func promptWithNudge(
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
 	read func(target string, opts herdr.AgentReadOptions) (string, error),
 	now func() time.Time,
+	report func(claudeui.NudgeDecision),
 ) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 	return func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
 		if !opts.Wait {
@@ -41,7 +43,7 @@ func promptWithNudge(
 			p.startUntil = append([]string{"working"}, p.startUntil...)
 		}
 
-		if err := claudeui.PromptWithNudge(p, opts.Text, claudeui.DefaultNudgeCaps, deadline, now); err != nil {
+		if err := claudeui.PromptWithNudge(p, opts.Text, claudeui.DefaultNudgeCaps, deadline, now, report); err != nil {
 			return p.agent, p.wrapErr(err)
 		}
 		if slices.Contains(opts.Until, p.agent.AgentStatus) {
@@ -80,6 +82,12 @@ func (p *herdrPrompter) Submit(text string) error {
 	p.opts.Text = text
 	p.pending = true
 	return nil
+}
+
+// Clear presses Ctrl+U: unlike Esc or Ctrl+C it can't interrupt a turn that
+// started unseen.
+func (p *herdrPrompter) Clear() error {
+	return p.sendKeys(p.opts.Target, "ctrl+u")
 }
 
 func (p *herdrPrompter) SendEnter() error {

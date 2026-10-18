@@ -244,8 +244,8 @@ func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
 		return agentrunner.Session{}, VerdictDied, nil
 	}
 	ss := &ptySession{
-		session:   agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
-		epic:      meta.Epic,
+		session:     agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
+		epic:        meta.Epic,
 		holder:      holder,
 		holderPID:   meta.HolderPID,
 		claudePID:   meta.PID,
@@ -566,9 +566,15 @@ func (p *Pty) List(epic string) ([]agentrunner.Session, error) {
 	return out, nil
 }
 
+var _ agentrunner.Nudger = (*Pty)(nil)
+
 // Prompt types text plus Enter and returns once Turn moved past its value
 // before, nudging and retyping through claudeui.PromptWithNudge.
 func (p *Pty) Prompt(s agentrunner.Session, text string) error {
+	return p.PromptNudged(s, text, nil)
+}
+
+func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
 	ss, err := p.live(s)
 	if err != nil {
 		return err
@@ -586,7 +592,7 @@ func (p *Pty) Prompt(s agentrunner.Session, text string) error {
 	// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
 	// would hold a stuck prompt for minutes before the loop hears of it.
 	caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
-	err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now)
+	err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, claudeui.ReportDecisions(onNudge))
 	if errors.Is(err, claudeui.ErrStuckSubmission) || errors.Is(err, claudeui.ErrStartTimeout) {
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
@@ -607,6 +613,9 @@ func (pr *ptyPrompter) Submit(text string) error {
 	}
 	return pr.SendEnter()
 }
+
+// Clear presses Ctrl+U, as herdr's does.
+func (pr *ptyPrompter) Clear() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\x15")) }
 
 func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
 
