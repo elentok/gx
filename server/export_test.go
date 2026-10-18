@@ -136,6 +136,31 @@ func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(proje
 // RecoveredCount is recoveredCount for tests.
 func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }
 
+// HoldTrunkLock takes the project's trunk lock the way a land does, until
+// release runs.
+func (s *Server) HoldTrunkLock(project, trunk string) (release func(), err error) {
+	_, repo, err := s.projectOf(project)
+	if err != nil {
+		return nil, err
+	}
+	return s.trunkLocks.lock(repo, trunk), nil
+}
+
+// CompleteRootIfDone runs the all-done check of address's root as if its
+// iteration had just settled.
+func (s *Server) CompleteRootIfDone(address string) error {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return err
+	}
+	_, t, ok := s.freshTicket(addr)
+	if !ok {
+		return errors.New("no ticket " + address)
+	}
+	s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
+	return nil
+}
+
 // LockedTrunks lists the trunks any land has locked so far, in any repo.
 func (s *Server) LockedTrunks() []string {
 	s.trunkLocks.mu.Lock()
