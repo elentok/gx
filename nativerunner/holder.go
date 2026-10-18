@@ -177,8 +177,8 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, &programStatus{ptmx: ptmx, watcher: watcher}, &srv.changes), ptmx)
 	}()
 
-	waitErr := cmd.Wait()
-	srv.exitCode = cmd.ProcessState.ExitCode()
+	exitCode, waitErr := waitChild(cmd.Process.Pid)
+	srv.exitCode = exitCode
 	close(srv.exited)
 	holderAfterExit()
 	// The holder keeps its own tty fd open until now: on macOS the child's
@@ -194,8 +194,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	case <-time.After(holderDrainTimeout):
 	}
 
-	var exit *exec.ExitError
-	if waitErr != nil && !errors.As(waitErr, &exit) {
+	if waitErr != nil {
 		return waitErr
 	}
 	if err := os.WriteFile(filepath.Join(dir, ScreenFile), []byte(strings.Join(scr.Rows(), "\n")+"\n"), 0o644); err != nil {
@@ -207,6 +206,30 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// ExitCode is -1 for a child killed by a signal.
 	code := strconv.Itoa(srv.exitCode)
 	return os.WriteFile(filepath.Join(dir, ExitCodeFile), []byte(code+"\n"), 0o644)
+}
+
+// waitChild waits for the child pid to exit and returns its exit code, -1 for
+// a child killed by a signal. It resumes the child each time it stops: the
+// child leads its own session with no shell to fg it, so a ctrl+z would
+// leave it stopped for good.
+func waitChild(pid int) (int, error) {
+	for {
+		var ws syscall.WaitStatus
+		_, err := syscall.Wait4(pid, &ws, syscall.WUNTRACED, nil)
+		if errors.Is(err, syscall.EINTR) {
+			continue
+		}
+		if err != nil {
+			return -1, err
+		}
+		// On BSD, Go reports a SIGSTOP stop as Continued, not Stopped.
+		// Without WCONTINUED, Wait4 never reports a real continue.
+		if ws.Stopped() || ws.Continued() {
+			_ = syscall.Kill(-pid, syscall.SIGCONT)
+			continue
+		}
+		return ws.ExitStatus(), nil
+	}
 }
 
 // terminalEnv is env with the TERM and COLORTERM of the holder's screen, the

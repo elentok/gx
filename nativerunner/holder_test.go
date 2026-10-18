@@ -123,6 +123,23 @@ func TestHolder_PTYIsWide(t *testing.T) {
 	}
 }
 
+// A child that suspends itself, as claude does on ctrl+z, has no shell to
+// fg it, so the holder resumes it.
+func TestHolder_ResumesASuspendedChild(t *testing.T) {
+	dir := shortTempDir(t)
+	if err := nativerunner.RunHolder(dir, []string{"sh", "-c", "kill -STOP $$; echo resumed"}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, nativerunner.RawLogFile))
+	if !strings.Contains(string(raw), "resumed") {
+		t.Errorf("raw.log = %q; want the child to run on after it stopped", raw)
+	}
+	code, _ := os.ReadFile(filepath.Join(dir, nativerunner.ExitCodeFile))
+	if strings.TrimSpace(string(code)) != "0" {
+		t.Errorf("exit code = %q; want 0", code)
+	}
+}
+
 // probeChild probes for OSC 7501, prints the reply it reads (ESC as E, BEL as
 // B), then reports a question and clears.
 const probeChild = `stty -icanon -echo min 1; printf '\033]7501;?\007'
