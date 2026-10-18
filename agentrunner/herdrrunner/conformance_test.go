@@ -325,3 +325,26 @@ func TestStop_ReportsAFailedTabLookup(t *testing.T) {
 		t.Fatal("Stop = nil, want the lookup error")
 	}
 }
+
+// An agent herdr shows idle but a background task keeps working answers every
+// wait at once; Wait must not re-ask at its 20ms pace, since each round spawns
+// herdr twice and parses the transcript (a busy loop for the task's lifetime).
+func TestWait_BackgroundTaskPollsSlowly(t *testing.T) {
+	r, _, s := startAgent(t, "claude", nil)
+	probes := 0
+	r.BackgroundTasks = func(agentrunner.Session) bool {
+		probes++
+		return true
+	}
+	now := time.Now()
+	r.Now = func() time.Time { return now }
+	r.Sleep = func(d time.Duration) { now = now.Add(d) }
+
+	_, err := r.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, 10*time.Second)
+	if !errors.Is(err, agentrunner.ErrTimeout) {
+		t.Fatalf("Wait = %v, want ErrTimeout", err)
+	}
+	if probes > 10 {
+		t.Fatalf("probed background tasks %d times in 10s, want at most 10", probes)
+	}
+}

@@ -22,6 +22,11 @@ import (
 // timeout before the caller's own deadline.
 const pollInterval = 20 * time.Millisecond
 
+// backgroundTaskPollInterval spaces Wait's rounds while a background task
+// overrides herdr's idle: herdr answers each wait at once then, so the pace is
+// all that stops a busy loop of herdr spawns and transcript reads.
+const backgroundTaskPollInterval = 2 * time.Second
+
 type Runner struct {
 	// BackgroundTasks reports whether the agent behind s still has a
 	// background task running. herdr shows such an agent idle, but the task
@@ -192,12 +197,14 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 		if err != nil && !IsPollTimeout(err) {
 			return agentrunner.Status{}, mapNotFound(err)
 		}
+		pause := pollInterval
 		if err == nil {
 			// herdr's state can still be overridden by a background task.
 			st, err := r.status(s)
 			if err != nil || slices.Contains(states, st.State) {
 				return st, err
 			}
+			pause = backgroundTaskPollInterval
 		}
 		if !now().Before(deadline) {
 			st, err := r.status(s)
@@ -206,7 +213,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 			}
 			return st, agentrunner.ErrTimeout
 		}
-		sleep(min(pollInterval, remaining))
+		sleep(min(pause, deadline.Sub(now())))
 	}
 }
 
