@@ -42,18 +42,19 @@ const (
 	// EventRootParked streams when a finished root cannot fast-forward onto its target.
 	EventRootParked = "root-parked"
 
-	implementSkill  = "gx-implement"
-	codeReviewSkill = "gx-code-review"
-	oneOffSkill     = "gx-one-off"
-	evolveSkill     = "gx-evolve"
-	diagnoseSkill   = "gx-investigate"
+	implementSkill   = "gx-implement"
+	codeReviewSkill  = "gx-code-review"
+	oneOffSkill      = "gx-one-off"
+	evolveSkill      = "gx-evolve"
+	investigateSkill = "gx-investigate"
 	// mergeSkill carries its flag: the prompt appends the ticket address to it.
 	mergeSkill = "gx-merge --ticket"
 )
 
 // launchSkill is the skill an agent starts under: code-review tickets get their
-// own, since gx-implement would ask them for commits, and prompt tickets (the
-// one-offs) get one that keeps the TDD rules out of the way.
+// own, since gx-implement would ask them for commits, prompt tickets (the
+// one-offs) get one that keeps the TDD rules out of the way, and investigate
+// and diagnose tickets run gx-investigate's unattended mode.
 func launchSkill(t tickets.Ticket) string {
 	switch {
 	case t.IsCodeReview():
@@ -62,8 +63,8 @@ func launchSkill(t tickets.Ticket) string {
 		return oneOffSkill
 	case t.Type == string(schema.TypeEvolve):
 		return evolveSkill
-	case t.Type == string(schema.TypeDiagnose):
-		return diagnoseSkill
+	case t.Type == string(schema.TypeInvestigate), t.Type == string(schema.TypeDiagnose):
+		return investigateSkill
 	case t.Type == string(schema.TypeMerge):
 		return mergeSkill
 	}
