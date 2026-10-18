@@ -985,6 +985,10 @@ func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
 				}
 			}
 			got := strings.Join(*start, " ")
+			epicDir := "--add-dir " + filepath.Join(store, "proj", "epic-a")
+			if has := strings.Contains(got, epicDir); has != (tc.agent == "codex") {
+				t.Errorf("%s present = %v in %q", epicDir, has, got)
+			}
 			for _, dir := range []string{filepath.Join(store, "gx", "follow-ups"), filepath.Join(store, "gx")} {
 				if has := strings.Contains(got, "--add-dir "+dir); has != tc.wantExtra {
 					t.Errorf("--add-dir %s present = %v, want %v in %q", dir, has, tc.wantExtra, got)

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -432,9 +433,10 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	}
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
+	ac := s.agentConfig(queued.Project, agent)
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
-		Sink: s.finishSink(ticket, t.Path),
+		Model: ac.Model, Effort: ac.Effort, Sink: s.finishSink(ticket, t.Path),
 	}
 	deps := s.depsFor(ticket.Project)
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
@@ -617,7 +619,7 @@ func (s *Server) prepareAndLaunch(
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
-	run, err := s.launch(deps, ticket, one.Ticket, launchSkill(one.Ticket), investigatePrompt(one.Ticket), wt.Path, one.Agent)
+	run, err := s.launch(deps, ticket, *one, wt.Path)
 	if err != nil {
 		if derr := mode.discard(deps, *one, wt); derr != nil {
 			err = errors.Join(err, fmt.Errorf("discard worktree: %w", derr))
@@ -675,6 +677,8 @@ func (s *Server) settleRun(rc runContext, err error) {
 			return
 		}
 		defer s.lands.end()
+		ac := s.agentConfig(addr.Project, one.Agent)
+		one.Model, one.Effort = cmp.Or(run.Model, ac.Model), cmp.Or(run.Effort, ac.Effort)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
@@ -1138,7 +1142,26 @@ func (s *Server) evolveDirs(ticket tickets.Address) []string {
 	return dirs
 }
 
-func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, t tickets.Ticket, skill, note, cwd string, agent ralphloop.AgentKind) (Run, error) {
+// agentConfig is agent's model and effort for project: config agents.* with
+// the project's overrides on top.
+func (s *Server) agentConfig(project string, agent ralphloop.AgentKind) config.AgentConfig {
+	set := s.settings.Load()
+	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex}}
+	if dir, err := s.projectDir(project); err == nil {
+		if pf, err := config.ReadProjectFile(dir); err == nil {
+			cfg = cfg.WithProject(pf)
+		}
+	}
+	if agent == ralphloop.AgentCodex {
+		return cfg.Agents.Codex
+	}
+	return cfg.Agents.Claude
+}
+
+// launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the
+// project dir where the epic's tickets live.
+func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (Run, error) {
+	t, agent := one.Ticket, one.Agent
 	var extraDirs []string
 	if t.Type == string(schema.TypeEvolve) {
 		extraDirs = s.evolveDirs(ticket)
@@ -1150,9 +1173,9 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, t tickets.T
 		Epic:  ticket.Epic,
 		Cwd:   cwd,
 		Kind:  agentrunner.Kind(agent),
-		Args:  ralphloop.AgentArgs(agent, s.cfg.TicketStore, ticket.Epic, "", "", extraDirs...),
+		Args:  ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 		Env:   s.settings.Load().TabEnv,
-	}, launchPrompt(agent, skill, note, ticket.String()), func(attempt int, decision string) {
+	}, launchPrompt(agent, launchSkill(t), investigatePrompt(t), ticket.String()), func(attempt int, decision string) {
 		dir, err := s.projectDir(ticket.Project)
 		if err != nil {
 			return
@@ -1169,6 +1192,6 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, t tickets.T
 	if err != nil {
 		return Run{}, err
 	}
-	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session}
+	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
 }

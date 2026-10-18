@@ -16,6 +16,7 @@ type session struct {
 	agentrunner.Session
 	epic      string
 	cwd       string
+	args      []string
 	status    agentrunner.Status
 	promptErr error
 	answerErr error
@@ -126,6 +127,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 		Session: agentrunner.Session{Label: opts.Label, ID: id, SessionID: sessionID},
 		epic:    opts.Epic,
 		cwd:     opts.Cwd,
+		args:    slices.Clone(opts.Args),
 	}
 	ss.status = agentrunner.Status{State: agentrunner.StateIdle, SessionID: ss.SessionID}
 	r.sessions = append(r.sessions, ss)
@@ -399,6 +401,17 @@ func (r *Runner) Prompts(label string) []string {
 	defer r.mu.Unlock()
 	if ss := r.history[label]; ss != nil {
 		return slices.Clone(ss.prompts)
+	}
+	return nil
+}
+
+// Args returns the launch args of the latest session started with label,
+// including a stopped one.
+func (r *Runner) Args(label string) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ss := r.history[label]; ss != nil {
+		return slices.Clone(ss.args)
 	}
 	return nil
 }

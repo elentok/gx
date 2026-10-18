@@ -175,6 +175,8 @@ func changedKeys(old, next Settings) []string {
 		{"agents.banners.enabled", old.AgentsBanners, next.AgentsBanners},
 		{"agents.sounds", old.AgentsSounds, next.AgentsSounds},
 		{"agents.claude-args", old.AgentsClaudeArgs, next.AgentsClaudeArgs},
+		{"agents.claude", old.AgentsClaude, next.AgentsClaude},
+		{"agents.codex", old.AgentsCodex, next.AgentsCodex},
 	}
 	var keys []string
 	for _, f := range fields {

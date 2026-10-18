@@ -107,6 +107,11 @@ type Settings struct {
 
 	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
 	CPUWatchdog config.CPUWatchdogConfig
+
+	// AgentsClaude and AgentsCodex are the global model and effort of config
+	// agents.*, before a project's overrides.
+	AgentsClaude config.AgentConfig
+	AgentsCodex  config.AgentConfig
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -136,6 +141,8 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		AgentsSounds:              cfg.Agents.Sounds,
 		AgentsClaudeArgs:          cfg.Agents.ClaudeArgs,
 		CPUWatchdog:               cfg.CPUWatchdog,
+		AgentsClaude:              cfg.Agents.Claude,
+		AgentsCodex:               cfg.Agents.Codex,
 	}
 }
 

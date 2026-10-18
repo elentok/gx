@@ -41,6 +41,10 @@ type OneIteration struct {
 	// LeafBase is the identifier of the unlanded sibling whose iteration branch
 	// the ticket starts from; "" starts it at the feature tip.
 	LeafBase string
+	// Model and Effort are what the ticket's conflict-resolution agent starts
+	// under; empty leaves the agent's own default.
+	Model  string
+	Effort string
 	// Sink hears the finish path's events; nil hears nothing.
 	Sink EventSink
 }
@@ -138,6 +142,8 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		FeatureWorktree: w.featureWorktree,
 		FeatureBranch:   o.Epic,
 		Agent:           o.Agent,
+		Model:           o.Model,
+		Effort:          o.Effort,
 		Skill:           defaultWorkerSkill,
 		Ticket:          o.Ticket,
 		ScratchDir:      o.ScratchDir,
@@ -266,7 +272,7 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 	lp := landQueueParams{
 		WorkspaceID: p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
 		FeatureWorktree: p.FeatureWorktree, FeatureBranch: p.FeatureBranch, Agent: p.Agent,
-		Skill: p.Skill, ScratchDir: p.ScratchDir, WorktreeLock: p.WorktreeLock,
+		Model: p.Model, Effort: p.Effort, Skill: p.Skill, ScratchDir: p.ScratchDir, WorktreeLock: p.WorktreeLock,
 		SmartZone: p.SmartZone, Gate: p.Gate, Sink: p.Sink,
 	}
 	r := landOne(d, lp, built.job)

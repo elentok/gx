@@ -34,6 +34,10 @@ type Run struct {
 	// Runner names the agentrunner hosting Session, e.g. "herdr".
 	Runner  string              `json:"runner"`
 	Session agentrunner.Session `json:"session"`
+	// Model and Effort are what the agent launched under; a conflict on its
+	// land inherits them. Empty when the launch named none.
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 // runnerHerdr is the Runner of every launch until the server launches
