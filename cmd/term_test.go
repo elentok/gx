@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"bytes"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
