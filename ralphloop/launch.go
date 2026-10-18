@@ -350,8 +350,10 @@ func withDoctorHint(err error) error {
 }
 
 // StartAndPrompt is startAndPrompt for callers outside the loop (the server's
-// launch): same retry on an undelivered prompt, no launch-failed events.
+// launch): same retry on an undelivered prompt, no launch-failed events. It
+// never adopts a holder of the label (ADR 0039).
 func StartAndPrompt(r agentrunner.Runner, opts agentrunner.StartOptions, prompt string, onNudge func(attempt int, decision string)) (agentrunner.Session, error) {
+	opts.NoAdopt = true
 	l, err := startAndPrompt(r, opts, prompt, func(int, events.Kind, error) {}, onNudge)
 	return l.Session, err
 }

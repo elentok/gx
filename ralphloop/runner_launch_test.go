@@ -83,6 +83,22 @@ func TestStartAndPrompt_LabelTakenIsNameTaken(t *testing.T) {
 	}
 }
 
+func TestStartAndPrompt_ServerLaunchNeverAdopts(t *testing.T) {
+	r := runnerfake.NewRunner()
+	r.Adopt = true
+	opts := agentrunner.StartOptions{Label: "it-01", Epic: "epic", Cwd: "/wt"}
+	holder, err := r.Start(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := StartAndPrompt(r, opts, "/go", func(int, string) {}); !errors.Is(err, agentrunner.ErrLabelTaken) {
+		t.Fatalf("err = %v, want ErrLabelTaken", err)
+	}
+	if got := r.Prompts("it-01"); len(got) != 0 {
+		t.Fatalf("holder %v prompted: %v", holder, got)
+	}
+}
+
 func TestStartAndPrompt_NotReadyKeepsSessionForBlockedPark(t *testing.T) {
 	r := runnerfake.NewRunner()
 	r.FailNextPrompts("it-01", 1, agentrunner.ErrNotReady)

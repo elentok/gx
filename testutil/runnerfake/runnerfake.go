@@ -112,7 +112,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	}
 	for _, ss := range r.sessions {
 		if ss.Label == opts.Label {
-			if r.Adopt && ss.cwd == opts.Cwd {
+			if r.Adopt && !opts.NoAdopt && ss.cwd == opts.Cwd {
 				return ss.Session, nil
 			}
 			return agentrunner.Session{}, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, opts.Label)

@@ -53,11 +53,13 @@ const (
 )
 
 // RecoverStart decides how to go on after AgentStart(name) in pane, launched
-// in cwd, failed with err. Errors it can't recover from come back wrapped in
+// in cwd, failed with err. It adopts a same-cwd holder of name only when
+// adopt is set. Errors it can't recover from come back wrapped in
 // agentrunner.ErrLabelTaken or ErrNotReady where one applies.
 func RecoverStart(
 	err error,
 	name, cwd, pane string,
+	adopt bool,
 	explain func(target string) (herdr.AgentExplainResult, error),
 	sendKeys func(target string, keys ...string) error,
 ) (StartRecovery, error) {
@@ -65,7 +67,7 @@ func RecoverStart(
 	var notReady *herdr.AgentNotReadyError
 	switch {
 	case errors.As(err, &taken):
-		if taken.CandidateCwd != "" && taken.CandidateCwd == cwd {
+		if adopt && taken.CandidateCwd != "" && taken.CandidateCwd == cwd {
 			return StartAdopt, nil
 		}
 		return 0, fmt.Errorf("%w: %w", agentrunner.ErrLabelTaken, err)

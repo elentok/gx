@@ -47,6 +47,9 @@ type StartOptions struct {
 	Kind Kind
 	Args []string
 	Env  []string
+	// NoAdopt makes a live session with the label ErrLabelTaken whatever its
+	// cwd, so the launch always gets a fresh agent and prompt.
+	NoAdopt bool
 }
 
 type Status struct {

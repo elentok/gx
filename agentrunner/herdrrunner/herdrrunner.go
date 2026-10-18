@@ -72,7 +72,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 	agent, err := herdr.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
 	adopted := false
 	if err != nil {
-		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, herdr.AgentExplain, herdr.AgentSendKeys)
+		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, !opts.NoAdopt, herdr.AgentExplain, herdr.AgentSendKeys)
 		if recovery != StartResume {
 			_ = herdr.TabClose(tab.TabID)
 		}
