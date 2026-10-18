@@ -410,7 +410,8 @@ plumbing.
 ### Recovery through the run's runner
 
 - `Server.liveIteration` uses the runner named by the run's runs.json `runner`: `Find(label)`
-  succeeds and `Status` is not `done`; `blocked` is live.
+  succeeds; `blocked` is live. A herdr pane in `done` also counts as live (the agent finished its turn
+  but the pane is still there), as gx:server-recovery-impl/09a decided.
 - `IterationInfo` for headless fills `Session`, `Worktree`, `Branch`, `Base`, `Transcript`; `Pane`
   and `Tab` stay empty, no placeholders. The TUI already gates focus on `Tab != ""`; the CLI prints
   an empty pane cell.
@@ -446,7 +447,7 @@ plumbing.
   run's model and effort, so an adopted late finish lands under the launch model.
 - The shared park write refuses a `done` ticket and logs the refusal. This covers
   `markNeedsRepairWithReason`, the ralphloop park and `Server.parkTicket`.
-- Codex `--add-dir` in the server launch gets the project dir, not the store root.
+- Codex `--add-dir` in the server launch gets the project's ticket scratch dir joined with the epic name, the same as the in-process loop.
 - No per-epic land queue. Each finish lands itself under the land lock. `landDeferCap` stays at 70
   minutes. The server keeps landing each ticket from its own finish (it never had the in-process
   loop's lowest-first queue); the in-process loop is unchanged.
