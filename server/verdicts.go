@@ -48,6 +48,17 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 			return Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}
 		}
 		return s.scheduleVerdict(e, t, addr)
+	case "blocked":
+		// The scheduler's reason lists only Blocked by: tokens, so a fork child
+		// held by its parent alone would explain as blocked by nothing.
+		if !e.ParentDone(t) {
+			parent := "parent " + string(*t.Parent)
+			if d.Reason == "" {
+				d.Reason = parent
+			} else {
+				d.Reason += ", " + parent
+			}
+		}
 	}
 	return Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Reason}
 }

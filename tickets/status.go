@@ -150,7 +150,7 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(e.UnresolvedBlockers(t)) > 0 || !e.parentDone(t) {
+	if len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
 		return StatusBlocked
 	}
 	return base
@@ -159,7 +159,7 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // parkedOnInvestigation reports whether t is parked while an investigate child
 // of it is still unfinished: it renders as waiting for that child. An
 // investigate ticket is the one fork child that works on a parked parent, so
-// parentDone never holds it back.
+// ParentDone never holds it back.
 func (e Epic) parkedOnInvestigation(t Ticket, base RenderedStatus) bool {
 	if base != StatusNeedsRepair && base != StatusNeedsAnswer {
 		return false
@@ -172,7 +172,7 @@ func (e Epic) parkedOnInvestigation(t Ticket, base RenderedStatus) bool {
 	return false
 }
 
-// parentDone reports whether t's Parent ticket (see Ticket.Parent) has
+// ParentDone reports whether t's Parent ticket (see Ticket.Parent) has
 // landed its own work — Parent's raw Status alone, via IsDone, never its
 // fork subtree. This is the implicit edge every fork child carries on its
 // parent: recursing into the subtree here (as Blocking does for explicit
@@ -182,7 +182,7 @@ func (e Epic) parkedOnInvestigation(t Ticket, base RenderedStatus) bool {
 // it has nothing to wait on. A parent in needs-answer or needs-repair, like
 // any non-done status, holds the child; a commitless-done parent still has
 // Status: done (see ticket 08), so it releases the child same as any other.
-func (e Epic) parentDone(t Ticket) bool {
+func (e Epic) ParentDone(t Ticket) bool {
 	if t.Parent == nil || t.Type == string(schema.TypeInvestigate) {
 		return true
 	}

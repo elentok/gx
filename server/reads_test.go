@@ -98,6 +98,26 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 	}
 }
 
+func TestExplain_ForkChildNamesItsUndoneParent(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "blocker", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "parent", "")
+	issues := filepath.Join(store, "proj", "epic-a", "issues")
+	body := "---\nid: \"02a\"\nstatus: open\ntype: implement\nparent: \"02\"\nblocked_by: [\"01\"]\n---\n\n# child\n"
+	if err := os.WriteFile(filepath.Join(issues, "02a-child.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	ex, err := h.Client.Explain(context.Background(), "proj:epic-a/02a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ex.Verdict != "blocked" || ex.Reason != "01, parent 02" {
+		t.Errorf("explain = %+v, want blocked by \"01, parent 02\"", ex)
+	}
+}
+
 func TestReads_IterationsAndQueue(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

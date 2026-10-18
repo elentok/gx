@@ -196,7 +196,7 @@ func (g *projectGraph) waitTargets(blocker string) []string {
 
 // buildWait fills g.wait. A ref to Y makes t wait on Y and on Y's whole fork
 // subtree (see Blocking), and every fork child waits on its parent (see
-// parentDone), so the wait graph is: blocked_by edges expanded over the named
+// ParentDone), so the wait graph is: blocked_by edges expanded over the named
 // ticket's subtree (or a whole epic's tickets), plus child→parent edges. That
 // is what makes A↔B, a ticket blocked by its own ancestor, and one blocked by
 // its own descendant all deadlocks. An epic's own blocked_by hangs off its
