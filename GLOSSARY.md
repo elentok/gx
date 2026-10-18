@@ -634,7 +634,7 @@ filetree updates under the user). The exception is a **mutation** run this way �
 which reports its outcome like every other mutation: `notify.Success("committed")` plus the
 repo-mutated signal. Errors always surface loudly.
 
-**Split launch** — the program opens in a tmux/kitty split and the TUI keeps running beside it. Here
+**Split launch** — the program opens in a split (tmux, kitty with remote control, herdr, or Ghostty on macOS 1.3.0+) and the TUI keeps running beside it. Here
 a toast (`"opened <app> split: …"`) _is_ shown, because it is the only signal that the program
 launched and where it went.
 
