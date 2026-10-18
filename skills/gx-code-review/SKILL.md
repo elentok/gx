@@ -24,11 +24,7 @@ about the tickets it opens is recorded on this ticket.
 Before starting, run `gx tickets validate <addr>` on the ticket you're about to claim. If it fails,
 stop and fix the ticket's frontmatter before doing anything else.
 
-## 1. Claim the ticket
-
-`gx tickets set <addr> --status claimed`, same as gx-implement.
-
-## 2. Resolve the epic diff and its spec
+## 1. Resolve the epic diff and its spec
 
 - The epic slug is the middle part of the ticket address (`project:<epic-slug>/NN`). Read the ticket
   with `gx tickets show <addr>` and the epic's other tickets by address too
@@ -50,7 +46,7 @@ stop and fix the ticket's frontmatter before doing anything else.
   tickets that recorded one there). Join them into one short list, each line prefixed with its
   ticket address. If there are none, the list is empty.
 
-## 3. Read the configured review skills
+## 2. Read the configured review skills
 
 `gx config show` prints the effective config as JSON; read `.skills["code-review"]`. If the list is
 empty or the field is absent, fall back to a single-element list: `["thermo-nuclear-code-quality-review"]`.
@@ -65,7 +61,7 @@ If any name resolves to no file, don't review with a partial list. Follow
 (which names didn't resolve, and the two paths tried for each) and `## Handoff`, report
 `--iteration-status needs-answer`, and exit.
 
-## 4. Run both axes as independent parallel subagents
+## 3. Run both axes as independent parallel subagents
 
 Send **one message** carrying every `Agent` tool call — one per configured skill name, plus the one
 Spec call below (`general-purpose` subagents, run in the foreground since the next step needs every
@@ -73,21 +69,21 @@ result back before it can start). Running them in the same message is what makes
 independent instead of serialized, and it is what puts the Spec axis alongside the quality passes
 rather than after them.
 
-Every subagent gets the fixed point, the diff command, and the commit list from step 2 — each one has
+Every subagent gets the fixed point, the diff command, and the commit list from step 1 — each one has
 read/git access to the worktree, so it runs the diff itself.
 
 **Quality subagents** (one per configured skill) also get:
 
-- The `SKILL.md` path resolved in step 3, with the instruction to Read it and follow it against that
+- The `SKILL.md` path resolved in step 2, with the instruction to Read it and follow it against that
   diff.
 - The brief: "Report findings as a list — file, line/hunk, summary, severity, suggested fix. Under
   500 words."
 
 **Spec subagent** (exactly one, whatever the configured skill list holds) also gets:
 
-- The path of the spec resolved in step 2 — `docs/specs/<epic-slug>.md` (or the legacy `spec.md`), or
+- The path of the spec resolved in step 1 — `docs/specs/<epic-slug>.md` (or the legacy `spec.md`), or
   the list of ticket addresses that stand in for it.
-- The known spec deviations list from step 2, with: "These narrowings were deliberate. Don't report
+- The known spec deviations list from step 1, with: "These narrowings were deliberate. Don't report
   them as missing or wrong; only report one if the diff contradicts what the deviation says."
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
@@ -96,7 +92,7 @@ read/git access to the worktree, so it runs the diff itself.
 
 Collect every subagent's raw findings verbatim; don't summarize or filter them yourself here.
 
-## 5. Triage with a higher-tier consultant
+## 4. Triage with a higher-tier consultant
 
 Once every review subagent has returned, start **one** fresh-context, read-only consultant subagent
 (same pattern as `~/.dotfiles/core/ai/skills/consult`'s consultant-selection step: request the
@@ -104,7 +100,7 @@ highest available Opus model — `model: "opus"` on the `Agent` tool call).
 
 Brief it with every subagent's raw findings joined into one list, each labeled by the axis and skill
 that produced it (`Quality / <skill-name>`, or `Spec`), plus the epic's ticket list for context (what
-already shipped, what the epic was for) and the known spec deviations list from step 2. Ask it to:
+already shipped, what the epic was for) and the known spec deviations list from step 1. Ask it to:
 
 - Treat a finding that only restates a known spec deviation as **rejected** (reason: deliberate
   deviation, with the ticket address).
@@ -123,7 +119,7 @@ already shipped, what the epic was for) and the known spec deviations list from 
 
 The consultant only advises: it must not edit anything. Its output is the input to steps 6 and 7.
 
-## 6. Turn approved findings into tickets
+## 5. Turn approved findings into tickets
 
 For every finding the consultant approved, call the `gx-to-tickets` skill, targeting the current
 epic, with the approved findings (one ticket per independent finding, grouped when several findings
@@ -137,7 +133,7 @@ extra guard is needed here to avoid a duplicate.
 
 If the consultant approved zero findings, skip this step entirely; there's nothing to publish.
 
-## 7. File deferred findings as follow-ups
+## 6. File deferred findings as follow-ups
 
 For each deferred group, call the `gx-follow-up` skill, `unattended`, passing the consultant's target
 and category, and the group as the finding. Its Source names this epic and this code-review ticket's
@@ -146,16 +142,16 @@ against an archived one. Note the address it reports for each group.
 
 If the consultant deferred zero findings, skip this step.
 
-## 8. Close out
+## 7. Close out
 
-- For every ticket `gx-to-tickets` created in step 6, `gx tickets set <new-ticket-addr> --parent
+- For every ticket `gx-to-tickets` created in step 5, `gx tickets set <new-ticket-addr> --parent
   <this-ticket-id>` — this is what makes the new ticket a scheduling/UI child of this one (the
   scheduler's scope resolution and the Queue tab's tree nesting both walk the child's own `parent:`
   field, the only edge there is; nothing is recorded on this ticket). Do this before the next step,
   since a running epic's scheduler may pick up the new tickets as soon as they're published.
 - Write the ticket body (append under the existing sections, don't replace them) with three parts:
-  - **Raw findings**, per axis and reviewer skill, verbatim from step 4.
-  - **Consultant triage**, verbatim from step 5.
+  - **Raw findings**, per axis and reviewer skill, verbatim from step 3.
+  - **Consultant triage**, verbatim from step 4.
   - **Final disposition** of each finding: the fix ticket it became; for a deferred finding, the
     follow-up it became, was appended to, or was dropped against; or why it was rejected.
 - `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits
