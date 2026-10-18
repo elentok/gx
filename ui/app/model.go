@@ -150,7 +150,7 @@ func (m Model) View() tea.View {
 	}
 	content = m.withChrome(content)
 	if m.keyPrefix != "" {
-		hints := hintsForPrefix(m.keyPrefix)
+		hints := m.hintsForPrefix(m.keyPrefix)
 		if source, ok := m.activePage().model.(ui.ChordHintSource); ok {
 			km := source.KeyManager()
 			hints = append(hints, ui.ChordBindingsFromHints(km.HintsForPrefix(m.keyPrefix))...)

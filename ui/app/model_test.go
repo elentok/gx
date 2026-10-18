@@ -270,6 +270,29 @@ func TestSwitchLastMsgReturnsToTheTabLeft(t *testing.T) {
 	}
 }
 
+func TestLeaderOSwitchesToTheLastTabOutsideAgents(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
+		ActiveWorktreePath: repoDir,
+	})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	updated, cmd := updated.(Model).Update(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
+	if cmd != nil || updated.(Model).keyPrefix != "ctrl+a" {
+		t.Fatalf("expected ctrl+a to start the leader, prefix=%q", updated.(Model).keyPrefix)
+	}
+	_, cmd = updated.(Model).Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd == nil || !nav.IsSwitchLast(cmd()) {
+		t.Fatal("expected leader o to ask for the last tab")
+	}
+}
+
 func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

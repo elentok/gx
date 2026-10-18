@@ -2,7 +2,9 @@ package app
 
 import (
 	"path/filepath"
+	"slices"
 
+	"github.com/elentok/gx/config"
 	logui "github.com/elentok/gx/ui/log"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
@@ -158,6 +160,18 @@ func onPageDeactivatedCmd(model tea.Model) tea.Cmd {
 // handleShellChordKey returns (newModel, cmd, handled) where handled indicates the key was consumed.
 func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 	key := msg.String()
+	if m.isLeader(m.keyPrefix) {
+		m.keyPrefix = ""
+		if key == "o" {
+			return m, nav.SwitchLast(), true
+		}
+		return m, nil, true
+	}
+	// The Agents tab runs its own leader, with more actions.
+	if m.isLeader(key) && m.navState.ActiveTab() != nav.TabAgents {
+		m.keyPrefix = key
+		return m, nil, true
+	}
 	if m.keyPrefix == "g" {
 		m.keyPrefix = ""
 		switch key {
@@ -235,6 +249,16 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		return next, cmd, true
 	}
 	return m, nil, false
+}
+
+// isLeader reports whether key is one of the Agents tab's leader keys, which
+// the other tabs take too.
+func (m Model) isLeader(key string) bool {
+	leaders := m.settings.Agents.LeaderKey
+	if len(leaders) == 0 {
+		leaders = []string{config.DefaultLeaderKey}
+	}
+	return slices.Contains(leaders, key)
 }
 
 func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {

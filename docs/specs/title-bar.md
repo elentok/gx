@@ -48,6 +48,8 @@ A quiet title row at the top replaces the tab bar and every page footer:
 - **Focus the agents sidebar:** `ctrl+q` in the agents terminal moves focus to the sidebar in one
   key, without the leader. It is configurable, like the leader key. `ctrl+a tab` keeps working.
 - Number keys `1`-`8` and the `g` chords keep working exactly as today.
+- **Last active tab:** the leader then `o` (`ctrl+a o`) switches back to the tab the last switch
+  left, in every tab. Outside the Agents tab `o` is the leader's only action.
 - Details that used to sit in the bar move to the help dialog: server pid and state detail, the gx
   version (already there), and the split app (herdr / tmux / kitty).
 - Page state that lived in footers moves into panel headers: status diff options into the focused
