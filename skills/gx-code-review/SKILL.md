@@ -44,6 +44,11 @@ stop and fix the ticket's frontmatter before doing anything else.
   spec: every other ticket in the epic except this code-review ticket, each read in full with
   `gx tickets show <addr>`. Either way the
   spec resolves — the Spec axis always runs.
+- Collect the **known spec deviations**: read each of this epic's other tickets with
+  `gx tickets show <addr>` (only this epic's; skip this code-review ticket) and gather the bullets
+  under its `## Spec deviations` section (also check `## Comments` and handoff notes for older
+  tickets that recorded one there). Join them into one short list, each line prefixed with its
+  ticket address. If there are none, the list is empty.
 
 ## 3. Read the configured review skills
 
@@ -82,6 +87,8 @@ read/git access to the worktree, so it runs the diff itself.
 
 - The path of the spec resolved in step 2 — `docs/specs/<epic-slug>.md` (or the legacy `spec.md`), or
   the list of ticket addresses that stand in for it.
+- The known spec deviations list from step 2, with: "These narrowings were deliberate. Don't report
+  them as missing or wrong; only report one if the diff contradicts what the deviation says."
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour
   in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where
   the implementation looks wrong. Quote the spec line — or the ticket address and line — for each
@@ -97,7 +104,10 @@ highest available Opus model — `model: "opus"` on the `Agent` tool call).
 
 Brief it with every subagent's raw findings joined into one list, each labeled by the axis and skill
 that produced it (`Quality / <skill-name>`, or `Spec`), plus the epic's ticket list for context (what
-already shipped, what the epic was for). Ask it to:
+already shipped, what the epic was for) and the known spec deviations list from step 2. Ask it to:
+
+- Treat a finding that only restates a known spec deviation as **rejected** (reason: deliberate
+  deviation, with the ticket address).
 
 - Consolidate duplicate findings raised by more than one reviewer, across axes as well as within one.
 - Read the two axes against each other: a quality finding on code the Spec axis flags as scope creep

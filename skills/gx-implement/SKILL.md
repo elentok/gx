@@ -123,6 +123,14 @@ interactive prompt. Commit whatever is green first, then write the `## Needs Ans
 the same ticket resumes once a person answers, and the resuming agent retires both sections into
 `## Comments` before continuing.
 
+## Record deliberate spec deviations
+
+If you deliberately narrow, skip or change something the spec or ticket asked for, record it in a
+`## Spec deviations` section of the ticket body (`gx tickets section <addr> "Spec deviations"
+<content|->`). One bullet per deviation: what the spec said, what you did instead, and why.
+[gx-code-review](../gx-code-review/SKILL.md) collects these so its reviewers don't report a known
+narrowing as a bug. Only deliberate decisions belong here — not bugs or unfinished work.
+
 ## Comments: fewer, and no numbers in them
 
 A comment quoting a measured value duplicates it, and duplicates drift - stale figures ship.
