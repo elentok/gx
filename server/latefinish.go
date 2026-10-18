@@ -35,26 +35,54 @@ type lateFinish struct {
 // each adoption once.
 type inFlight struct {
 	mu sync.Mutex
-	m  map[string]bool
+	m  map[string]chan struct{}
 }
 
 func (f *inFlight) start(key string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.m[key] {
+	if f.m[key] != nil {
 		return false
 	}
 	if f.m == nil {
-		f.m = map[string]bool{}
+		f.m = map[string]chan struct{}{}
 	}
-	f.m[key] = true
+	f.m[key] = make(chan struct{})
 	return true
 }
 
 func (f *inFlight) end(key string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	close(f.m[key])
 	delete(f.m, key)
+}
+
+// running is closed when key's work ends; nil when none runs.
+func (f *inFlight) running(key string) <-chan struct{} {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.m[key]
+}
+
+// adoptFirst is unpark's and relaunch's late-finish check: it adopts a match
+// itself, or waits out the adoption a rescan already started, and reports
+// whether the ticket ended adopted.
+func (s *Server) adoptFirst(dir string, addr tickets.Address, path string) bool {
+	lf, ok := lateFinishOf(dir, addr, path)
+	if !ok {
+		return false
+	}
+	key := addr.String()
+	if s.lateFinishes.start(key) {
+		defer s.lateFinishes.end(key)
+		return s.adoptLateFinish(lf)
+	}
+	if done := s.lateFinishes.running(key); done != nil {
+		<-done
+	}
+	t, err := schema.ParseTicket(path)
+	return err == nil && t.Status == schema.StatusDone
 }
 
 // scanLateFinishes adopts every late finish in the store. It is a finish, not
@@ -78,7 +106,7 @@ func (s *Server) scanLateFinishes() {
 				}
 				s.goSettle(func() {
 					defer s.lateFinishes.end(addr.String())
-					s.adoptLateFinish(lf)
+					_ = s.adoptLateFinish(lf)
 				})
 			}
 		}
@@ -107,7 +135,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 // commit with no commitless report, or none at all, stays parked. A merge
 // ticket closes once its finish checks pass, and stays parked until then, so
 // a later rescan retries after a person fixes the epic.
-func (s *Server) adoptLateFinish(lf lateFinish) {
+func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	addr := lf.addr
 	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
 	if lf.park.Label != "" {
@@ -120,55 +148,55 @@ func (s *Server) adoptLateFinish(lf lateFinish) {
 	runner := s.runnerForRun(run)
 	if runner == nil {
 		s.log.Warn("late finish: runner unavailable", "ticket", addr, "runner", lf.park.Runner)
-		return
+		return false
 	}
 	_, repo, err := s.projectOf(addr.Project)
 	if err != nil {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
-		return
+		return false
 	}
 	base, _ := git.MergeBase(worktree, branch, addr.Epic)
 	one, wt, mode, err := s.resolveRun(trackedRun{Run: run, Repo: repo, Base: base, TicketPath: lf.path})
 	if err != nil {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
-		return
+		return false
 	}
 	// Only a merge ticket runs in the feature worktree, and only it parks merge-unreported.
 	if mode.feature != (lf.park.Kind == string(events.MergeUnreported)) {
-		return
+		return false
 	}
 	deps := s.depsWith(runner)
 	ahead := 0
 	if !mode.commitless && !mode.feature {
 		if ahead, err = deps.CommitsAhead(wt.Path, wt.Base(), wt.Branch); err != nil || (ahead == 0 && !lf.commitless) {
-			return
+			return false
 		}
 	}
 	pane := ""
 	if sess, ok, err := runner.Find(label); err == nil && ok {
 		if err := ralphloop.WaitIterationFinished(deps, one, wt, sess); err != nil {
 			s.log.Warn("late finish: wait", "ticket", addr, "err", err)
-			return
+			return false
 		}
 		pane = sess.ID
 	}
 	// A person may have unparked or re-parked it while the agent settled.
 	if _, ok := lateFinishOf(lf.dir, addr, lf.path); !ok {
-		return
+		return false
 	}
 	// A failing check here would re-park iteration-error, which is never adopted.
 	if mode.feature {
 		target, err := mode.target()
 		if err != nil {
 			s.log.Warn("late finish: merge target", "ticket", addr, "err", err)
-			return
+			return false
 		}
 		if _, fault, err := ralphloop.MergeFinishFault(deps, one, wt.Path, target); err != nil || fault != "" {
-			return
+			return false
 		}
 	}
 	if !s.lands.begin() {
-		return
+		return false
 	}
 	defer s.lands.end()
 	ac := s.agentConfig(addr.Project, one.Agent)
@@ -179,12 +207,12 @@ func (s *Server) adoptLateFinish(lf lateFinish) {
 			s.log.Warn("late finish: park failed finish", "ticket", addr, "err", perr)
 		}
 		s.events.publish(EventIterationFailed, addr.String())
-		return
+		return false
 	}
 	if !out.Landed {
 		s.log.Warn("late finish re-parked", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
 		s.events.publish(EventIterationParked, addr.String())
-		return
+		return false
 	}
 	sha, outcome := "", "closed commitless"
 	if mode.feature {
@@ -200,5 +228,36 @@ func (s *Server) adoptLateFinish(lf lateFinish) {
 	})
 	s.events.publish(EventTicketDone, addr.String())
 	s.stampRetro(addr, lf.path, false)
+	s.cancelUnstartedInvestigations(lf.dir, addr)
 	s.kickRunner()
+	return true
+}
+
+// cancelUnstartedInvestigations cancels the adopted ticket's investigate
+// children that have not been claimed yet; a running one finishes its report.
+func (s *Server) cancelUnstartedInvestigations(dir string, addr tickets.Address) {
+	epics, err := tickets.LoadResolved(addr.Project, dir)
+	if err != nil {
+		s.log.Warn("late finish: load investigations", "ticket", addr, "err", err)
+		return
+	}
+	for _, e := range epics {
+		if filepath.Base(e.Path) != addr.Epic {
+			continue
+		}
+		forks := e.ForkParents()
+		for _, t := range e.Tickets {
+			parent, ok := forks.Of(t)
+			if !ok || parent.Identifier != addr.ID || t.Type != string(schema.TypeInvestigate) || t.Status != string(schema.StatusOpen) {
+				continue
+			}
+			if err := ralphloop.CancelWithResolution(t.Path, "late finish adopted"); err != nil {
+				s.log.Warn("late finish: cancel investigation", "ticket", t.Identifier, "err", err)
+				continue
+			}
+			child := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
+			s.stampRetro(child, t.Path, true)
+			s.events.publish(EventTicketCancelled, child.String())
+		}
+	}
 }

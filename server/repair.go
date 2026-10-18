@@ -220,6 +220,13 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
+	if _, t, err := repair.FindEpicTicket(epicPath, id); err == nil {
+		dir := filepath.Dir(epicPath)
+		addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}
+		if s.adoptFirst(dir, addr, t.Path) {
+			return repairOK(repair.UnparkResult{Ticket: id, Status: repair.UnparkAdopted})
+		}
+	}
 	res, err := repair.Unpark(epicPath, id, time.Now())
 	if err != nil {
 		return repairRefusal(err), nil

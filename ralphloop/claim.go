@@ -156,6 +156,15 @@ func SetStatus(path, value string) error {
 	})
 }
 
+// CancelWithResolution cancels the ticket at path and records why under its
+// "## Resolution" section.
+func CancelWithResolution(path, resolution string) error {
+	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+		t.Status = schema.StatusCancelled
+		*body = schema.SetSection(*body, "Resolution", resolution)
+	})
+}
+
 // updateTicket reads path's frontmatter ticket, applies mutate to it, and
 // writes the result back via schema.MarshalTicket, leaving the body
 // untouched. The write goes through writeFileAtomic so a concurrent reader

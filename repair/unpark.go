@@ -14,6 +14,10 @@ type UnparkResult struct {
 	Status string `json:"status"`
 }
 
+// UnparkAdopted is the Status of an unpark the server answered by adopting
+// the agent's late finish instead of reopening the ticket.
+const UnparkAdopted = "adopted"
+
 // Unpark reopens the needs-answer ticket id in the epic at epicPath, retiring
 // its Needs Answer section into Comments. It is the same write the
 // tickets/queue tabs' suggested-actions menu performs.

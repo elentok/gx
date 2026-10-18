@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -215,6 +216,55 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 				}
 				if n := p.stops(); n != 0 {
 					t.Errorf("runner stopped %d times, want none", n)
+				}
+			})
+		})
+	}
+}
+
+// unpark and relaunch adopt a late finish before acting, launch nothing, and
+// cancel only the investigation that has not started.
+func TestLateFinish_UnparkAndRelaunchAdoptFirst(t *testing.T) {
+	for _, verb := range []string{"unpark", "relaunch"} {
+		t.Run(verb, func(t *testing.T) {
+			runnerShapes(t, func(t *testing.T, headless bool) {
+				p := parkZeroCommit(t, headless)
+				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "02", "unstarted", servertest.TicketOpts{Type: "investigate", Parent: "01"})
+				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
+				commitAgentWork(t, p.wtPath)
+				// No rescan ping: the verb itself must run the check.
+				if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
+					t.Fatal(err)
+				}
+				ctx := context.Background()
+				if verb == "unpark" {
+					res, err := p.h.Client.Repair(ctx, "unpark", server.RepairRequest{Address: "proj:epic-a/01"})
+					if err != nil || res.Refused || !strings.Contains(string(res.Data), `"adopted"`) {
+						t.Fatalf("unpark = %+v (data %s), %v; want adopted", res, res.Data, err)
+					}
+				} else if res, err := p.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+					t.Fatalf("relaunch = %+v, %v", res, err)
+				}
+				if tk, err := schema.ParseTicket(p.ticketPath); err != nil || tk.Status != schema.StatusDone {
+					t.Fatalf("after %s: status = %v, %v; want done", verb, tk.Status, err)
+				}
+				if reason := p.adopted(t); !strings.Contains(reason, "landed ") {
+					t.Errorf("reason = %q, want landed", reason)
+				}
+				unstarted := filepath.Join(p.store, "proj/epic-a/issues/02-unstarted.md")
+				if tk, err := schema.ParseTicket(unstarted); err != nil || tk.Status != schema.StatusCancelled {
+					t.Errorf("unstarted investigation status = %v, %v; want cancelled", tk.Status, err)
+				}
+				if body, err := os.ReadFile(unstarted); err != nil || !strings.Contains(string(body), "## Resolution\n\nlate finish adopted") {
+					t.Errorf("unstarted investigation body lacks the resolution (%v):\n%s", err, body)
+				}
+				if tk, err := schema.ParseTicket(filepath.Join(p.store, "proj/epic-a/issues/03-running.md")); err != nil || tk.Status == schema.StatusCancelled {
+					t.Errorf("running investigation status = %v, %v; want left alone", tk.Status, err)
+				}
+				// A launch would reclaim it.
+				time.Sleep(300 * time.Millisecond)
+				if tk, err := schema.ParseTicket(p.ticketPath); err != nil || tk.Status != schema.StatusDone {
+					t.Errorf("status = %v, %v; want still done", tk.Status, err)
 				}
 			})
 		})

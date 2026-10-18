@@ -137,11 +137,15 @@ func (s *Server) ticketUnmute(req QueueRequest) (QueueResult, error) {
 // ticketRelaunch starts a fresh iteration of a ticket outside the queue order,
 // under the agent it is queued with (claude otherwise). An idle or done
 // leftover pane is left to the launch, which closes a stale label holder. A
-// person's relaunch logs human-relaunch, which resets the recovery budget.
+// person's relaunch logs human-relaunch, which resets the recovery budget. A
+// late finish is adopted instead, with no launch.
 func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+		}
+		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
+			return QueueResult{}, nil
 		}
 		if s.herdr.isUnavailable() {
 			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
