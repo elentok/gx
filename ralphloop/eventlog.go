@@ -109,6 +109,10 @@ type Event struct {
 	// Runner (park events) names the agentrunner that hosted the agent: a park
 	// drops the runs.json entry, so late-finish adoption finds the agent here.
 	Runner string `json:"runner,omitempty"`
+	// Model and Effort (park events) are what the agent launched under, so an
+	// adopted late finish lands under the launch model, not the project default.
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 	// Address is the ticket's canonical address ("project:epic/06"), filled by
 	// logEvent from Ticket when empty.
 	Address string `json:"address,omitempty"`

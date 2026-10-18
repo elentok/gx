@@ -441,7 +441,9 @@ plumbing.
   `noopEventSink`.
 - `alreadyApplied` drops trailer-only proof. Trailer present but neither the recorded SHA nor a
   patch-id matches → park `needs-repair` / `ambiguous-land` with a reason naming the SHAs.
-- The conflict agent's model and effort come from the parent ticket's run, else the project default.
+- Every server launch takes the project's `agents.*` model and effort (hot-reloaded). A conflict agent
+  uses the parent ticket's run model and effort instead, else that default. The park event records the
+  run's model and effort, so an adopted late finish lands under the launch model.
 - The shared park write refuses a `done` ticket and logs the refusal. This covers
   `markNeedsRepairWithReason`, the ralphloop park and `Server.parkTicket`.
 - Codex `--add-dir` in the server launch gets the project dir, not the store root.

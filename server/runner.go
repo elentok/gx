@@ -434,10 +434,10 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	}
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
-	ac := s.agentConfig(queued.Project, agent)
+	model, effort := s.runAgentConfig(queued.Project, agent, Run{})
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
-		Model: ac.Model, Effort: ac.Effort, Sink: s.finishSink(ticket, t.Path),
+		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path),
 	}
 	deps := s.depsFor(ticket.Project)
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
@@ -697,8 +697,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			return
 		}
 		defer s.lands.end()
-		ac := s.agentConfig(addr.Project, one.Agent)
-		one.Model, one.Effort = cmp.Or(run.Model, ac.Model), cmp.Or(run.Effort, ac.Effort)
+		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
@@ -1211,6 +1210,14 @@ func (s *Server) agentConfig(project string, agent ralphloop.AgentKind) config.A
 		return cfg.Agents.Codex
 	}
 	return cfg.Agents.Claude
+}
+
+// runAgentConfig is the model and effort run's agent launched under, else
+// the project's agents.* config. Every launch, finish and adoption resolves
+// them here.
+func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run Run) (model, effort string) {
+	ac := s.agentConfig(project, agent)
+	return cmp.Or(run.Model, ac.Model), cmp.Or(run.Effort, ac.Effort)
 }
 
 // launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the

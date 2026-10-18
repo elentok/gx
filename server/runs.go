@@ -43,7 +43,7 @@ type Run struct {
 // parkEvent is the run's agent context on its park event: the park drops the
 // runs.json entry, so late-finish adoption finds the runner from here.
 func (r Run) parkEvent() ralphloop.Event {
-	return ralphloop.Event{Agent: ralphloop.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID}
+	return ralphloop.Event{Agent: ralphloop.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID, Model: r.Model, Effort: r.Effort}
 }
 
 // runnerHerdr is the Runner of every launch until the server launches

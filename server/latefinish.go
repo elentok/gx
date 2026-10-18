@@ -144,6 +144,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	run := Run{
 		Address: addr.String(), Agent: string(lf.park.Agent), Runner: lf.park.Runner,
 		Session: agentrunner.Session{Label: label, SessionID: lf.park.AgentSession},
+		Model:   lf.park.Model, Effort: lf.park.Effort,
 	}
 	runner := s.runnerForRun(run)
 	if runner == nil {
@@ -199,8 +200,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	defer s.lands.end()
-	ac := s.agentConfig(addr.Project, one.Agent)
-	one.Model, one.Effort = ac.Model, ac.Effort
+	one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
 	out, err := mode.finish(deps, one, wt, pane)
 	if err != nil {
 		if perr := s.parkTicket(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
