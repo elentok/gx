@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.34.4 - 2026-10-18
+
+- Added a CPU watchdog. The server and each TUI watch their own CPU use (self and children). When usage stays above the threshold, they save a CPU profile, a goroutine dump and a summary under the state dir's `cpu-spikes/`. In evolve maintainer mode, the server files a commitless one-off ticket at the front of the queue to find the cause, at most once per cooldown. TUIs report spikes through `POST /v1/cpu-spike` (`gx server cpu-spike`).
+  - Added a commitless, top-level-only `diagnose` ticket type that launches gx-investigate. CPU-spike tickets use it.
+- Changed the title row to show the queue status: a mode icon (running, paused, draining), a progress bar and the done/total epic count. The bar is hidden first on narrow screens. With nerd fonts, the agents count shows a robot icon.
+- Added `<leader> o` to switch back to the last active tab, from any tab.
+- Added `gx agent link <ticket-address>`, so an agent can set its own session's ticket. gx-design sessions are now marked with a magnify icon on the Agents tab.
+- Changed the Context menu to open next to its row (below it, or above it when there's no room). A click outside the menu now closes it.
+- Improved server recovery (the server-recovery spec):
+  - A restarted server now reopens an empty dead claim (no agent, no commits, clean worktree) instead of parking it. It also sees runs that were still launching. Herdr reclaim reopens a claim only when the runner says the agent is gone.
+  - Launches never adopt a pane that already holds the agent's label. A stale idle or done holder is closed and the launch retried once. Otherwise the ticket parks `needs-repair` / `agent_name_taken`.
+  - Late-finish adoption: when an agent reports finished after its ticket was parked with zero commits, the server lands the ticket or closes it. Unpark and relaunch adopt a late finish first.
+  - The background-task gate is released on an idle agent through the runner. With a dirty worktree and commits ahead, the ticket parks and names the dirty files.
+  - A trailer-only landing (neither the recorded SHA nor matching patches) now parks `needs-repair` / `ambiguous-land` instead of counting as landed. Finish outcomes always have a kind and a reason.
+  - Park writes never overwrite a done ticket.
+  - Park events now record the run's runner, label and session.
+  - Recovery actions (relaunch, cancel, close-pane, nudge, reset) go through the run's own runner. A human relaunch resets the recovery budget. `repair.Reset` closes an idle or done pane.
+  - Land decides under the trunk lock and sends notices and the retro after unlocking. Every epic caller takes the epic's refs from its root ticket.
+  - The conflict agent inherits the run's model and effort. Codex `--add-dir` now gets the project dir.
+  - Prompt nudges clear the input before each retype, and each nudge decision is logged.
+  - Native runner stops re-check the pid and session before signaling, and wait at most one more grace period.
+  - `explain` names a fork child's undone parent. `land` accepts a zero-commit park that has commits.
+  - Unstarted investigate tickets are cancelled.
+- Fixed investigate tickets launching under gx-implement instead of gx-investigate.
+- Fixed the TUI using about 50% CPU while a queue ran. The queue status was being computed on every render.
+- Fixed the herdr runner polling every 20ms while a background task kept the agent from going idle. It now backs off to 2s.
+- Fixed ctrl+z in the Agents tab stopping claude for good. The holder now resumes a child that suspends itself.
+- Fixed sessions being marked Exited at server startup. The server now restores sessions before it starts serving.
+
 ## v0.34.3 - 2026-10-18
 
 - Fixed the server snapshot spawning hundreds of git processes. Each snapshot used to run about 210 git commands (3 per epic) to find merge targets, so one server event could start about 1000 processes and make the UI lag. Snapshots now take about 0.03s instead of about 1s.
