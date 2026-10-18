@@ -1,7 +1,9 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
+	"log"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets/schema"
@@ -25,6 +27,10 @@ type parkRequest struct {
 	// AlreadyDone skips the ticket write of a manual-land whose ticket was
 	// already done.
 	AlreadyDone bool
+	// ReparkDone lets a needs-repair park overwrite a done ticket, for the one
+	// caller whose finding is that the done itself is false (its commits never
+	// landed). Every other park on a done ticket is refused.
+	ReparkDone bool
 }
 
 // isParkType reports whether t is an event type a park writes for a person to
@@ -66,7 +72,7 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch req.Type {
 	case events.NeedsRepair:
-		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair)
+		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair, req.ReparkDone)
 	case events.NeedsAnswer:
 		// A blocked pane's question lives only in the pane, so its ticket gets a
 		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
@@ -81,6 +87,12 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 		}
 	default:
 		writeErr = fmt.Errorf("park: unsupported type %q", req.Type)
+	}
+	// A park event on a done ticket would mislead recovery, which reads the
+	// latest park reason from the run log.
+	if errors.Is(writeErr, ErrParkDone) {
+		log.Printf("ralphloop: refused %s park of %s/%s (%s): ticket is done", req.Type, req.EpicName, req.Ticket, req.Kind)
+		return reason, writeErr
 	}
 	if writeErr != nil {
 		reason = fmt.Sprintf("%s (also failed marking %s: %v)", reason, req.Type, writeErr)

@@ -1,7 +1,9 @@
 package ralphloop
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -82,6 +84,47 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 	}
 	if calls := sink.snapshot(); len(calls) != 1 || calls[0] != "TicketNeedsHuman" {
 		t.Errorf("sink calls = %v, want one TicketNeedsHuman", calls)
+	}
+}
+
+// A park write on a done ticket is refused under the ticket lock: nothing is
+// written, no event is appended, no one is notified, and the refusal is logged.
+// Not parallel: it captures the process-wide log output.
+func TestPark_RefusesDoneTicket(t *testing.T) {
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	// One kind per park writer: needs-repair, stubbed and bare needs-answer.
+	for _, kind := range []events.Kind{events.IterationError, events.BlockedPane, events.ZeroCommit} {
+		t.Run(string(kind), func(t *testing.T) {
+			logged.Reset()
+			content := "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# A\n"
+			scratchDir := writeEpic(t, "my-epic", map[string]string{"01-a.md": content})
+			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			sink := &recordingSink{}
+
+			_, err := park(sink, parkRequest{
+				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
+				Type: kind.ParkType(), Kind: kind, Reason: "late", Repair: schema.NeedsRepairState{Label: "l"},
+			})
+
+			if !errors.Is(err, ErrParkDone) {
+				t.Fatalf("err = %v, want ErrParkDone", err)
+			}
+			if raw, _ := os.ReadFile(path); string(raw) != content {
+				t.Errorf("ticket rewritten:\n%s", raw)
+			}
+			if evs, _, _ := ReadEvents(scratchDir, "my-epic"); len(evs) != 0 {
+				t.Errorf("events = %+v, want none", evs)
+			}
+			if calls := sink.snapshot(); len(calls) != 0 {
+				t.Errorf("sink calls = %v, want none", calls)
+			}
+			if !strings.Contains(logged.String(), "01") || !strings.Contains(logged.String(), "done") {
+				t.Errorf("log = %q, want a refusal naming the ticket", logged.String())
+			}
+		})
 	}
 }
 

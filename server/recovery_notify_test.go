@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -201,6 +202,35 @@ func TestRecoveryNotify_RecoveredParkSendsNothingAndIsCounted(t *testing.T) {
 	}
 	if n := server.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 1 {
 		t.Errorf("recovered count = %d, want 1", n)
+	}
+}
+
+// A park racing a land finds the ticket done: the park is refused and logged,
+// and no chat message or recovery follows. The caller sees no error, since a
+// done ticket has nothing left to park.
+func TestRecoveryNotify_ParkOfDoneTicketIsRefusedAndLogged(t *testing.T) {
+	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error {
+		t.Error("recovery ran for a refused park")
+		return nil
+	})
+	path := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
+	if err := schema.UpdateTicket(path, func(tk *schema.Ticket) { tk.Status = schema.StatusDone }); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		t.Fatalf("ParkTicket = %v, want nil", err)
+	}
+	time.Sleep(1500 * time.Millisecond) // a wrongly sent message would show by now
+	if got := parkMessages(sent()); len(got) != 0 {
+		t.Errorf("a refused park sent %v", got)
+	}
+	raw, _ := os.ReadFile(path)
+	if tk, err := schema.ParseTicketFromRaw(string(raw), path); err != nil || tk.Status != schema.StatusDone {
+		t.Errorf("ticket = %+v (%v), want still done", tk, err)
+	}
+	log, _ := os.ReadFile(server.LogPath(h.StateDir))
+	if !strings.Contains(string(log), "proj:epic-a/01") || !strings.Contains(string(log), "done") {
+		t.Errorf("server log has no refusal for proj:epic-a/01:\n%s", log)
 	}
 }
 

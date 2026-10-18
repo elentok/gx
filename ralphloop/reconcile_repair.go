@@ -130,6 +130,7 @@ func markDoneTicketUnrecoverable(sink EventSink, paths reconcilePaths, featureBr
 		Kind:       events.AmbiguousLand,
 		Reason:     reason,
 		Repair:     state,
+		ReparkDone: true,
 	}); err != nil {
 		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}

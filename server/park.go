@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -12,9 +13,13 @@ import (
 
 // parkTicket is the one way the server parks a ticket: the write, the
 // EventTicketParked event and the chat message all come from the same kind and
-// reason, so the three cannot disagree.
+// reason, so the three cannot disagree. A park that finds the ticket done (it
+// lost a race with a land) is not an error to the caller: nothing is left to park.
 func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string) error {
-	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason); err != nil {
+	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason); errors.Is(err, ralphloop.ErrParkDone) {
+		s.log.Warn("park refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
+		return nil
+	} else if err != nil {
 		return err
 	}
 	s.events.publish(EventTicketParked, addr.String())

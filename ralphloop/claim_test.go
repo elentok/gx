@@ -284,7 +284,7 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	if err := Claim(path); err != nil {
 		t.Fatalf("first Claim: %v", err)
 	}
-	if err := markNeedsRepairWithReason(path, "second failure", schema.ParkKind(events.IterationError), schema.NeedsRepairState{}); err != nil {
+	if err := markNeedsRepairWithReason(path, "second failure", schema.ParkKind(events.IterationError), schema.NeedsRepairState{}, false); err != nil {
 		t.Fatalf("markNeedsRepairWithReason: %v", err)
 	}
 	if err := Claim(path); err != nil {

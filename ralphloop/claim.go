@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,9 +63,26 @@ func MarkBuiltAwaitingLand(path string) error {
 // stamping parkKind so a later reader can tell which of the three producers
 // parked it.
 func markNeedsAnswer(path string, parkKind schema.ParkKind) error {
-	return updateTicket(path, func(t *schema.Ticket) {
+	return parkWrite(path, false, func(t *schema.Ticket, _ *string) {
 		t.Status = schema.StatusNeedsAnswer
 		t.ParkKind = parkKind
+	})
+}
+
+// ErrParkDone is returned by a park write on a ticket that is already done.
+var ErrParkDone = errors.New("refusing to park a done ticket")
+
+// parkWrite is the shared park write: a done ticket is refused and left
+// untouched, unless reparkDone says the done itself is what needs repair. The
+// check sits under the ticket lock so a land racing the park cannot slip a
+// done between check and write.
+func parkWrite(path string, reparkDone bool, mutate func(*schema.Ticket, *string)) error {
+	return rewriteTicket(path, false, func(t *schema.Ticket, body *string) error {
+		if t.Status == schema.StatusDone && !reparkDone {
+			return ErrParkDone
+		}
+		mutate(t, body)
+		return nil
 	})
 }
 
@@ -77,7 +95,7 @@ func markNeedsAnswer(path string, parkKind schema.ParkKind) error {
 // it there, and the stub just gives them (and the TUI's auto-scroll)
 // something to find.
 func markNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkKind) error {
-	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+	return parkWrite(path, false, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusNeedsAnswer
 		t.ParkKind = parkKind
 		*body += fmt.Sprintf("\n## Needs Answer\n\n%s\n", reason)
@@ -90,12 +108,12 @@ func markNeedsAnswerWithReasonAndStub(path, reason string, parkKind schema.ParkK
 // full failure is readable by opening the ticket file even when the live
 // UI's status subtext truncates it. Fails without writing anything if reason
 // is empty — see FormatNeedsRepairBody's write-conditional validation.
-func markNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, state schema.NeedsRepairState) error {
+func markNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, state schema.NeedsRepairState, reparkDone bool) error {
 	section, err := schema.FormatNeedsRepairBody(reason, state)
 	if err != nil {
 		return err
 	}
-	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+	return parkWrite(path, reparkDone, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusNeedsRepair
 		t.ParkKind = parkKind
 		*body += section
@@ -153,7 +171,10 @@ func updateTicket(path string, mutate func(*schema.Ticket)) error {
 // need to rewrite the ticket's markdown body (e.g. appending a note),
 // leaving the same atomic-write/torn-read guarantees.
 func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) error {
-	return rewriteTicket(path, false, mutate)
+	return rewriteTicket(path, false, func(t *schema.Ticket, body *string) error {
+		mutate(t, body)
+		return nil
+	})
 }
 
 // MarkChildDone differs from MarkDone for a conflict-resolution child gx
@@ -164,16 +185,17 @@ func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) err
 // Any other invalid field is still an error and nothing is written, since
 // writing it back would make the next Load fail on the child.
 func MarkChildDone(path string) error {
-	return rewriteTicket(path, true, func(t *schema.Ticket, _ *string) {
+	return rewriteTicket(path, true, func(t *schema.Ticket, _ *string) error {
 		t.Status = schema.StatusDone
+		return nil
 	})
 }
 
 // rewriteTicket applies mutate under the ticket lock and writes the result
-// atomically. With repair, an invalid status is tolerated on read (mutate is
-// expected to fix it) and the ticket is validated after mutate; otherwise the
-// ticket must already be valid.
-func rewriteTicket(path string, repair bool, mutate func(*schema.Ticket, *string)) error {
+// atomically; an error from mutate writes nothing. With repair, an invalid
+// status is tolerated on read (mutate is expected to fix it) and the ticket is
+// validated after mutate; otherwise the ticket must already be valid.
+func rewriteTicket(path string, repair bool, mutate func(*schema.Ticket, *string) error) error {
 	unlock, err := schema.LockTicket(path)
 	if err != nil {
 		return err
@@ -197,7 +219,9 @@ func rewriteTicket(path string, repair bool, mutate func(*schema.Ticket, *string
 	}
 	body := schema.ParseBody(string(raw))
 
-	mutate(&t, &body)
+	if err := mutate(&t, &body); err != nil {
+		return err
+	}
 
 	if repair {
 		if err := schema.Validate(t); err != nil {
