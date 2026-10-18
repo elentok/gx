@@ -27,8 +27,10 @@ const (
 	Done      Name = "done"
 )
 
-// The built-in sounds are CC0 from Kenney's Interface Sounds pack, converted
-// to AAC because afplay cannot play Ogg Vorbis.
+// The built-in attention sound is CC0 from Kenney's Interface Sounds pack,
+// converted to AAC because afplay cannot play Ogg Vorbis. The done sound is a
+// synthesized soft sine chime (D5 -> G5, peak -10 dB); regenerate it with
+// `uv run sound/gen_done.py`.
 //
 //go:embed sounds/*.m4a
 var builtins embed.FS
