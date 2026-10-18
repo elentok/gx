@@ -3,11 +3,13 @@ package server_test
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -96,7 +98,77 @@ func TestMergeFinish_SelfReportedNeedsAnswerParksNeedsAnswer(t *testing.T) {
 
 func TestMergeFinish_AgentStoppingWithoutAReportParksNeedsRepair(t *testing.T) {
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "" })
-	assertParked(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "without reporting")
+	assertParked(t, f, tk, schema.StatusNeedsRepair, events.MergeUnreported, "without reporting")
+}
+
+// reportMergeFinishedLate is the parked merge agent reporting finished after
+// its park, and the store rescan that follows.
+func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
+	t.Helper()
+	var park ralphloop.Event
+	waitFor(t, func() bool {
+		var ok bool
+		park, ok = ralphloop.LatestParkEvent(filepath.Join(f.store, "proj"), schedEpic, "01")
+		return ok
+	})
+	if err := schema.UpdateTicket(f.ticketFile(t, "01"), func(tk *schema.Ticket) {
+		tk.IterationStatus = schema.IterationStatusFinished
+		tk.FinishedAt = park.Time.Add(time.Second)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.h.Client.TicketChanged(context.Background(), "proj:"+schedEpic+"/01"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func lateFinishReason(t *testing.T, f *schedFixture) (string, bool) {
+	t.Helper()
+	hist, err := f.h.Client.History(context.Background(), "proj:"+schedEpic+"/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range hist.Events {
+		if e.Type == string(events.LateFinishAdopted) {
+			return e.Reason, true
+		}
+	}
+	return "", false
+}
+
+func TestLateFinish_MergeUnreportedClosesDoneOnceChecksPass(t *testing.T) {
+	f, _ := runMergeTicket(t, func(*schedFixture, string) string { return "" })
+	reportMergeFinishedLate(t, f)
+	waitStatus(t, f.ticketFile(t, "01"), schema.StatusDone)
+	var reason string
+	waitFor(t, func() bool {
+		var ok bool
+		reason, ok = lateFinishReason(t, f)
+		return ok
+	})
+	if !strings.Contains(reason, "closed merge") {
+		t.Errorf("reason = %q, want closed merge", reason)
+	}
+	f.assertFeatureKept(t, "late finish")
+}
+
+func TestLateFinish_MergeUnreportedStaysParkedWhileChecksFail(t *testing.T) {
+	f, _ := runMergeTicket(t, func(f *schedFixture, _ string) string {
+		advanceTrunk(t, f, "trunk.txt", "moved on")
+		return ""
+	})
+	reportMergeFinishedLate(t, f)
+	time.Sleep(300 * time.Millisecond)
+	tk, err := schema.ParseTicket(f.ticketFile(t, "01"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKindMergeUnreported {
+		t.Errorf("ticket = %s/%s, want needs-repair/merge-unreported", tk.Status, tk.ParkKind)
+	}
+	if reason, ok := lateFinishReason(t, f); ok {
+		t.Errorf("history has late-finish-adopted: %s", reason)
+	}
 }
 
 func TestMergeFinish_BudgetKillParksBudgetKilled(t *testing.T) {

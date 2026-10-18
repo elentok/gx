@@ -138,6 +138,9 @@ const (
 	DirtyTrunk Kind = "dirty-trunk"
 	// LandError is a root land that failed for any reason no other kind names.
 	LandError Kind = "land-error"
+	// MergeUnreported is a merge agent that stopped without reporting finished
+	// or needs-answer. Unlike the other merge faults, a late finish adopts it.
+	MergeUnreported Kind = "merge-unreported"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -155,7 +158,7 @@ var kinds = map[Kind]bool{
 	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
 	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
 	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
-	TrunkMissing: true, DirtyTrunk: true, LandError: true,
+	TrunkMissing: true, DirtyTrunk: true, LandError: true, MergeUnreported: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

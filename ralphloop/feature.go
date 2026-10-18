@@ -54,20 +54,20 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 		return FinishOutcome{}, err
 	}
 	if !adopted {
-		fault, err := mergeFinishFault(d, o, w.Path, target)
+		kind, fault, err := MergeFinishFault(d, o, w.Path, target)
 		if err != nil {
 			return FinishOutcome{}, err
 		}
 		if fault != "" {
 			reason, err := park(p.Sink, parkRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
-				Type: events.NeedsRepair, Kind: events.IterationError, Reason: fault,
+				Type: events.NeedsRepair, Kind: kind, Reason: fault,
 				Event: p.agentEvent(pane, sessionID, w.Path),
 			})
 			if err != nil {
 				return FinishOutcome{}, fmt.Errorf("marking ticket needs-repair: %w", err)
 			}
-			return FinishOutcome{Status: schema.StatusNeedsRepair, Kind: events.IterationError, Reason: reason}, nil
+			return FinishOutcome{Status: schema.StatusNeedsRepair, Kind: kind, Reason: reason}, nil
 		}
 		if adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID); err != nil {
 			return FinishOutcome{}, err
@@ -89,28 +89,29 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 	return parkedOutcome(o, t), nil
 }
 
-// mergeFinishFault is why a merge ticket cannot be done, "" when it can.
-func mergeFinishFault(d Deps, o OneIteration, dir, target string) (string, error) {
+// MergeFinishFault is why a merge ticket cannot be done and the kind it parks
+// with, "" when it can be done.
+func MergeFinishFault(d Deps, o OneIteration, dir, target string) (events.Kind, string, error) {
 	t, err := schema.ParseTicket(o.Ticket.Path)
 	if err != nil {
-		return "", fmt.Errorf("reading ticket %s for its finish check: %w", o.Ticket.Path, err)
+		return "", "", fmt.Errorf("reading ticket %s for its finish check: %w", o.Ticket.Path, err)
 	}
 	if t.IterationStatus != schema.IterationStatusFinished {
-		return "merge agent stopped without reporting finished or needs-answer", nil
+		return events.MergeUnreported, "merge agent stopped without reporting finished or needs-answer", nil
 	}
 	rebasing, err := d.RebaseInProgress(dir)
 	if err != nil {
-		return "", fmt.Errorf("checking for a rebase in %s: %w", dir, err)
+		return "", "", fmt.Errorf("checking for a rebase in %s: %w", dir, err)
 	}
 	if rebasing {
-		return fmt.Sprintf("merge agent reported finished with a rebase still in progress in %s; finish or abort it", dir), nil
+		return events.IterationError, fmt.Sprintf("merge agent reported finished with a rebase still in progress in %s; finish or abort it", dir), nil
 	}
 	ok, err := d.IsAncestor(dir, target, o.Epic)
 	if err != nil {
-		return "", fmt.Errorf("checking %s is an ancestor of %s: %w", target, o.Epic, err)
+		return "", "", fmt.Errorf("checking %s is an ancestor of %s: %w", target, o.Epic, err)
 	}
 	if !ok {
-		return fmt.Sprintf("merge agent reported finished but %s is not an ancestor of %s; rebase it onto %s", target, o.Epic, target), nil
+		return events.IterationError, fmt.Sprintf("merge agent reported finished but %s is not an ancestor of %s; rebase it onto %s", target, o.Epic, target), nil
 	}
-	return "", nil
+	return "", "", nil
 }

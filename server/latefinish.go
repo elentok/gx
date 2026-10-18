@@ -14,7 +14,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// lateFinish is a zero-commit park whose agent reported finished after it.
+// adoptablePark reports whether a late finish can adopt a park of this status
+// and kind: a zero-commit one, or a merge agent's unreported stop.
+func adoptablePark(status schema.Status, kind schema.ParkKind) bool {
+	return status == schema.StatusNeedsAnswer && kind == schema.ParkKindZeroCommit ||
+		status == schema.StatusNeedsRepair && kind == schema.ParkKindMergeUnreported
+}
+
+// lateFinish is an adoptable park whose agent reported finished after it.
 type lateFinish struct {
 	dir        string
 	addr       tickets.Address
@@ -61,7 +68,7 @@ func (s *Server) scanLateFinishes() {
 		epics, _ := s.idx.epicsOf(dir)
 		for _, e := range epics {
 			for _, t := range e.Tickets {
-				if t.Status != string(schema.StatusNeedsAnswer) || t.ParkKind != schema.ParkKindZeroCommit {
+				if !adoptablePark(schema.Status(t.Status), t.ParkKind) {
 					continue
 				}
 				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(e.Path), ID: t.Identifier}
@@ -79,18 +86,16 @@ func (s *Server) scanLateFinishes() {
 }
 
 // lateFinishOf reports whether the ticket is untouched since its latest park,
-// a zero-commit one, and its agent reported finished after that park. Only
+// an adoptable one, and its agent reported finished after that park. Only
 // status and park kind are compared: a person who unparked, reset or re-parked
 // it changed one of them.
 func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bool) {
 	t, err := schema.ParseTicket(path)
-	if err != nil || t.Status != schema.StatusNeedsAnswer || t.ParkKind != schema.ParkKindZeroCommit ||
-		t.IterationStatus != schema.IterationStatusFinished {
+	if err != nil || !adoptablePark(t.Status, t.ParkKind) || t.IterationStatus != schema.IterationStatusFinished {
 		return lateFinish{}, false
 	}
 	park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
-	if !ok || events.Type(park.Type) != events.NeedsAnswer || events.Kind(park.Kind) != events.ZeroCommit ||
-		!t.FinishedAt.After(park.Time) {
+	if !ok || park.Type != string(t.Status) || park.Kind != string(t.ParkKind) || !t.FinishedAt.After(park.Time) {
 		return lateFinish{}, false
 	}
 	return lateFinish{dir: dir, addr: addr, path: path, park: park, finishedAt: t.FinishedAt, commitless: t.IsCommitless()}, true
@@ -99,7 +104,9 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 // adoptLateFinish lands a late finish with commits, or closes a commitless one
 // with none, through the iteration's own finish path. The park dropped the
 // runs.json entry, so the runner and label come from the park event. A late
-// commit with no commitless report, or none at all, stays parked.
+// commit with no commitless report, or none at all, stays parked. A merge
+// ticket closes once its finish checks pass, and stays parked until then, so
+// a later rescan retries after a person fixes the epic.
 func (s *Server) adoptLateFinish(lf lateFinish) {
 	addr := lf.addr
 	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
@@ -126,13 +133,13 @@ func (s *Server) adoptLateFinish(lf lateFinish) {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
 		return
 	}
-	// Merge tickets run in the feature worktree and park other kinds.
-	if mode.feature {
+	// Only a merge ticket runs in the feature worktree, and only it parks merge-unreported.
+	if mode.feature != (lf.park.Kind == string(events.MergeUnreported)) {
 		return
 	}
 	deps := s.depsWith(runner)
 	ahead := 0
-	if !mode.commitless {
+	if !mode.commitless && !mode.feature {
 		if ahead, err = deps.CommitsAhead(wt.Path, wt.Base(), wt.Branch); err != nil || (ahead == 0 && !lf.commitless) {
 			return
 		}
@@ -148,6 +155,17 @@ func (s *Server) adoptLateFinish(lf lateFinish) {
 	// A person may have unparked or re-parked it while the agent settled.
 	if _, ok := lateFinishOf(lf.dir, addr, lf.path); !ok {
 		return
+	}
+	// A failing check here would re-park iteration-error, which is never adopted.
+	if mode.feature {
+		target, err := mode.target()
+		if err != nil {
+			s.log.Warn("late finish: merge target", "ticket", addr, "err", err)
+			return
+		}
+		if _, fault, err := ralphloop.MergeFinishFault(deps, one, wt.Path, target); err != nil || fault != "" {
+			return
+		}
 	}
 	if !s.lands.begin() {
 		return
@@ -169,7 +187,9 @@ func (s *Server) adoptLateFinish(lf lateFinish) {
 		return
 	}
 	sha, outcome := "", "closed commitless"
-	if ahead > 0 {
+	if mode.feature {
+		outcome = "closed merge"
+	} else if ahead > 0 {
 		sha = ralphloop.LatestLandedSHA(lf.dir, addr.Epic, addr.ID)
 		outcome = "landed " + sha
 	}

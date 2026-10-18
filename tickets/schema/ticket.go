@@ -193,6 +193,8 @@ const (
 	ParkKindBlockedPane  ParkKind = ParkKind(events.BlockedPane)
 	ParkKindSelfReported ParkKind = ParkKind(events.SelfReported)
 	ParkKindZeroCommit   ParkKind = ParkKind(events.ZeroCommit)
+	// ParkKindMergeUnreported is the one needs-repair kind late-finish adoption reads.
+	ParkKindMergeUnreported ParkKind = ParkKind(events.MergeUnreported)
 )
 
 // Valid reports whether k is an events kind or the empty "absent" value.
