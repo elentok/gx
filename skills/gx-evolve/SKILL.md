@@ -95,13 +95,25 @@ The skill decides the outcome (file, seen again, regression or drop) and prints 
 Append to the ticket body with `gx tickets section <addr> <heading> -`; don't replace its existing
 sections. No repo file.
 
-- **Result** — never empty. State how many findings were filed, how many were seen-again, and
-  which were rejected; for a clean epic, say so and why (e.g. "no ticket flagged").
+- **Result** — never empty. It is the one message a person reads, so it has a fixed, short shape
+  (detail belongs in the other sections):
+  1. A headline with counts: `3 new · 5 seen again · 6 not filed · 10 flagged unread`.
+  2. Headed groups, **New follow-ups**, **Seen again**, **Not filed**, **Coverage**, one item per
+     line: the full address, then a short title. Never a bare `/02`; omit empty groups.
+  3. **Not filed** is the findings the triage did not file (never "Rejected"), grouped by reason
+     (out of scope / weak evidence / contradicts design), one short reason per item. No triage
+     ids (J4…); those belong in **Final disposition**.
+  4. **Coverage** is last and holds the run stats (tickets, deep-read cap, tickets read). Make
+     flagged-but-unread tickets stand out: it means the review was partial.
+  5. End with one **Next** line, always present, e.g. "triage gx:follow-ups/23–25", "raise the
+     deep-read cap and re-run", or "nothing to do" when nothing was filed.
+
+  For a clean epic, say so and why (e.g. "no ticket flagged").
 - **Flag table** — the step 2 table.
 - **Raw findings** — the subagent reports, verbatim, per ticket.
 - **Consultant triage** — verbatim from step 5.
 - **Final disposition** — per finding: which follow-up it became, which it was appended to, which
-  archived ticket it was dropped against, or why it was rejected.
+  archived ticket it was dropped against, or why it was not filed (with its triage id).
 
 ## 8. Close out
 
