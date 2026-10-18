@@ -243,6 +243,7 @@ func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
 	target := ticketTarget{address: address, epicName: epicName, ticketID: in.ticket.DisplayNumber()}
 	prompt := fmt.Sprintf("Ticket %q", in.ticket.Title)
 	return func() tea.Msg {
+		api := snapshotIterations(api)
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
 		in.watchReason = watchReason(api, agentAddress(address, target.ticketID))

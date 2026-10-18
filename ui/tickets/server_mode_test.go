@@ -394,6 +394,28 @@ func (f fakeServerAPI) Iterations(context.Context) ([]server.IterationInfo, erro
 	return f.iterations, nil
 }
 
+type countingIterationsAPI struct {
+	fakeServerAPI
+	calls *int
+}
+
+func (c countingIterationsAPI) Iterations(ctx context.Context) ([]server.IterationInfo, error) {
+	*c.calls++
+	return c.fakeServerAPI.Iterations(ctx)
+}
+
+func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
+	calls := 0
+	api := countingIterationsAPI{fakeServerAPI: fakeServerAPI{}, calls: &calls}
+	in := newTicketMenuInput(gxtickets.Epic{}, gxtickets.Ticket{Path: "gx:alpha/01", Title: "First"}, false, "")
+
+	cmdTicketMenu(api, in)()
+
+	if calls != 1 {
+		t.Errorf("Iterations calls = %d, want 1", calls)
+	}
+}
+
 func (f fakeServerAPI) TicketChanged(_ context.Context, address string) error {
 	f.record("changed " + address)
 	return nil

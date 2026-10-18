@@ -19,6 +19,28 @@ var focusIterationTab = func(tabID string) error {
 	return err
 }
 
+// iterationsSnapshot is a ServerAPI whose Iterations read is answered from one
+// earlier fetch, so a caller that looks up several things in a row hits the
+// server once.
+type iterationsSnapshot struct {
+	ServerAPI
+	list []server.IterationInfo
+	err  error
+}
+
+func (s iterationsSnapshot) Iterations(context.Context) ([]server.IterationInfo, error) {
+	return s.list, s.err
+}
+
+// snapshotIterations fetches api's iterations once. Nil stays nil: no server.
+func snapshotIterations(api ServerAPI) ServerAPI {
+	if api == nil {
+		return nil
+	}
+	list, err := api.Iterations(context.Background())
+	return iterationsSnapshot{ServerAPI: api, list: list, err: err}
+}
+
 // serverIteration is address's live iteration from the server's iterations read.
 func serverIteration(api ServerAPI, address string) (server.IterationInfo, bool) {
 	if api == nil {
