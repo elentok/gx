@@ -77,7 +77,7 @@ func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo 
 	if id == "" {
 		return landDecision{}, errors.New("fork manual merge ticket for " + root.String())
 	}
-	return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}}, nil
+	return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}, nil
 }
 
 // lowestTicket is the epic's Root ticket: the lowest-numbered one, whatever

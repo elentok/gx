@@ -774,47 +774,81 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 // result; notices and the retro go after unlock, so claiming elsewhere never
 // waits on them.
 //
-// Without refs there is no target to lock: an epic that would land parks the
-// way landRoot does, and one that would not (auto-ff-merge off) completes
-// without git work, so it needs no lock.
+// Without refs there is no target, so the land locks the epic itself: landEpic
+// parks it the way landRoot does, and two finishes still can't both stamp.
 func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
 	_, _, target, err := s.epicRefs(root.Project, epics, one.Epic, repo)
-	var d landDecision
-	switch {
-	case err == nil:
-		unlock := s.trunkLocks.lock(repo, target)
-		d = s.landEpic(root, one, repo, epics, e, target, false)
-		unlock()
-	case s.autoFFMerge(root.Project) || hasManualMergeTicket(e):
-		reason, kind := s.refsFailed(root.Project, one.Epic, err)
-		first := tickets.LoadEpicTicketMD(e.Path).CompletedAt.IsZero()
-		s.stampEpic(root, e.Path, "completed_at")
-		d = parkDecision(first, reason, kind)
-	default:
-		d = s.landEpic(root, one, repo, epics, e, target, false)
+	lockKey := target
+	if err != nil {
+		lockKey = "epic:" + root.String()
 	}
+	unlock := s.trunkLocks.lock(repo, lockKey)
+	d := s.landEpic(root, one, repo, epics, e, target, false)
+	unlock()
 	s.actOnLand(root, one, dir, e, d)
 }
 
-// landDecision is what landEpic decided under the trunk lock, for its caller
-// to act on after unlock. sendNotice and submitRetro are set only for the
-// caller that first stamped completed_at or merged_at: that keeps both
-// once-only without holding the lock around them.
+// landOutcome is how a land ended; the zero value is a refusal with nothing
+// to act on.
+type landOutcome int
+
+const (
+	outcomeNone landOutcome = iota
+	// outcomeMerged: the epic landed (or had nothing to land) and was dequeued.
+	outcomeMerged
+	// outcomeCompleted: all-done with auto-ff-merge off; the branch is left alone.
+	outcomeCompleted
+	outcomeParked
+	// outcomeMergeTicket: a non-ff forked a merge ticket; the root stays queued.
+	outcomeMergeTicket
+	// outcomeAlreadyMerged: merged elsewhere and already dequeued.
+	outcomeAlreadyMerged
+)
+
+// landDecision is what landEpic decided under the lock, for its caller to act
+// on after unlock. first is set only for the caller that made the
+// completed_at or merged_at stamp transition: that keeps the retro and the
+// epic notice once-only without holding the lock around them.
 type landDecision struct {
-	result      QueueResult
-	completed   bool
-	sendNotice  bool
-	submitRetro bool
+	result  QueueResult
+	outcome landOutcome
+	first   bool
 }
 
-// parkDecision parks the root. A park with a kind waits on a person's fix, so
-// its chat notice goes every time; a needs-rebase park is the epic's outcome
-// and speaks only when its completed_at stamp is new.
+// completed reports whether the root left the queue as a final outcome.
+func (d landDecision) completed() bool {
+	return d.outcome == outcomeMerged || d.outcome == outcomeCompleted
+}
+
+// sendNotice: a merge always speaks, as an epic merged elsewhere notifies with
+// its dequeue. A park with a kind waits on a person's fix, so its chat notice
+// goes every time; a needs-rebase park and a completion are the epic's outcome
+// and speak only when their stamp is new.
+func (d landDecision) sendNotice() bool {
+	switch d.outcome {
+	case outcomeMerged:
+		return true
+	case outcomeCompleted:
+		return d.first
+	case outcomeParked:
+		return d.result.ParkKind != "" || d.first
+	}
+	return false
+}
+
+func (d landDecision) submitRetro() bool {
+	switch d.outcome {
+	case outcomeMerged, outcomeCompleted, outcomeParked, outcomeAlreadyMerged:
+		return d.first
+	}
+	return false
+}
+
 func parkDecision(first bool, reason string, kind events.Kind) landDecision {
 	return landDecision{
-		result:      QueueResult{Parked: true, ParkKind: string(kind), Message: reason},
-		sendNotice:  kind != "" || first,
-		submitRetro: first,
+		result:  QueueResult{Parked: true, ParkKind: string(kind), Message: reason},
+		outcome: outcomeParked,
+		first:   first,
 	}
 }
 
@@ -842,7 +876,7 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string,
 		// The ticket is never manual, even under force: it counts against the cap.
 		if reason != "" && kind == "" {
 			if id := s.forkMergeTicket(root, e, target, false); id != "" {
-				return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}}
+				return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}
 			}
 		}
 		if reason != "" {
@@ -855,7 +889,10 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string,
 		s.stampEpic(root, e.Path, "completed_at")
 		merged = false
 	}
-	d := landDecision{result: QueueResult{Merged: merged}, submitRetro: first}
+	d := landDecision{result: QueueResult{Merged: merged}, outcome: outcomeCompleted, first: first}
+	if merged {
+		d.outcome = outcomeMerged
+	}
 	removed, err := s.queued.removeRoot(root)
 	if err != nil {
 		s.log.Warn("dequeue completed root", "root", root, "err", err)
@@ -864,10 +901,8 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string,
 	}
 	// An epic merged elsewhere notifies with the dequeue, so a double land sends one.
 	if already && !removed {
-		return d
+		d.outcome = outcomeAlreadyMerged
 	}
-	d.completed = true
-	d.sendNotice = merged || first
 	return d
 }
 
@@ -876,14 +911,14 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string,
 func (s *Server) actOnLand(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d landDecision) QueueResult {
 	if d.result.Parked {
 		s.parkRoot(root, one, dir, e, d)
-	} else if d.sendNotice {
+	} else if d.sendNotice() {
 		s.notifyEpicOutcome(root.Project, dir, one, e, d.result.Merged)
 	}
-	if d.submitRetro {
+	if d.submitRetro() {
 		s.submitRetro(root, dir, e)
 	}
 	// Last, so a watcher of root-completed sees the retro already filed.
-	if d.completed {
+	if d.completed() {
 		s.events.publish(EventRootCompleted, root.String())
 	}
 	return d.result
@@ -896,7 +931,7 @@ func (s *Server) parkRoot(root rootRef, one ralphloop.OneIteration, dir string, 
 	reason, kind := d.result.Message, d.result.ParkKind
 	s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: kind, Level: EventLevelWarning, Message: reason})
 	s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
-	if !d.sendNotice {
+	if !d.sendNotice() {
 		return
 	}
 	if s.chat.Enabled() {
