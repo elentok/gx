@@ -308,7 +308,7 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		if m.ticketMenu.IsOpen {
 			var cmd tea.Cmd
-			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.width, m.height)
+			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
 		if m.watch.open {
@@ -507,7 +507,7 @@ func (m Model) View() tea.View {
 	}
 	content := m.normalView()
 	if m.ticketMenu.IsOpen {
-		content = ui.OverlayCenter(content, m.ticketMenu.View(), m.width, m.height)
+		content = m.ticketMenu.Overlay(content, m.menuAnchor(), m.width, m.height)
 	} else if m.confirm.IsOpen {
 		content = ui.OverlayCenter(content, m.confirm.View(m.width), m.width, m.height)
 	}

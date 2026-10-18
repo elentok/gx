@@ -129,6 +129,21 @@ func (m Model) openMenu() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// menuAnchor is the selected session's sidebar row, under the panel's
+// header line; the zero Anchor (a centered menu) while the sidebar is
+// hidden.
+func (m Model) menuAnchor() contextmenu.Anchor {
+	if !m.sidebarOnScreen() {
+		return contextmenu.Anchor{}
+	}
+	for i, r := range m.visibleRows() {
+		if r.session == m.cursor {
+			return contextmenu.Anchor{X: 1, Y: 1 + i, H: 1}
+		}
+	}
+	return contextmenu.Anchor{}
+}
+
 func (m Model) updateMenuKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.menu, cmd = m.menu.Update(msg)

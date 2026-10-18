@@ -206,6 +206,20 @@ func (m Model[T]) EntryAtBodyLine(bodyLine int) (int, bool) {
 	return idx, true
 }
 
+// SelectedBodyLine is EntryAtBodyLine's inverse for the selection: the body
+// line the selected entry starts on and how many lines it spans. ok is false
+// when the selection is scrolled above the viewport.
+func (m Model[T]) SelectedBodyLine() (line, height int, ok bool) {
+	sel := m.list.Selected()
+	if sel < m.list.Offset() || sel >= len(m.entries) {
+		return 0, 0, false
+	}
+	for i := m.list.Offset(); i < sel; i++ {
+		line += m.entryLineHeight(i)
+	}
+	return line, m.entryLineHeight(sel), true
+}
+
 // entryLineHeight is m.entries' list.LineHeight: it reports how many
 // physical lines entry i occupies (see Entry.Body), defaulting to 1 for an
 // out-of-range index.

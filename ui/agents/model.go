@@ -394,7 +394,7 @@ func (m Model) render() string {
 		out = ui.OverlayCenter(out, m.renderCreate(), m.width, m.height)
 	}
 	if m.menu.IsOpen {
-		out = ui.OverlayCenter(out, m.menu.View(), m.width, m.height)
+		out = m.menu.Overlay(out, m.menuAnchor(), m.width, m.height)
 	}
 	if m.confirm.IsOpen {
 		out = ui.OverlayCenter(out, m.confirm.View(m.width), m.width, m.height)

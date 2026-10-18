@@ -835,3 +835,21 @@ func TestRenderLines_DepthIndentsRows(t *testing.T) {
 		t.Fatalf("child line = %q, want indented prefix", got)
 	}
 }
+
+// TestSelectedBodyLine_MixedHeights is SelectAtBodyLine's inverse: the
+// selection's first body line and span, counting multi-line entries above it.
+func TestSelectedBodyLine_MixedHeights(t *testing.T) {
+	m := NewModel[int]()
+	m.SetEntries([]Entry[int]{
+		{ID: "a", Body: []string{"a2", "a3"}}, // lines 0-2
+		{ID: "b", Body: []string{"b2"}},       // lines 3-4
+		{ID: "c"},                             // line 5
+	})
+	for _, tc := range []struct{ sel, line, h int }{{0, 0, 3}, {1, 3, 2}, {2, 5, 1}} {
+		m.SetSelectedIndex(tc.sel)
+		line, h, ok := m.SelectedBodyLine()
+		if !ok || line != tc.line || h != tc.h {
+			t.Fatalf("sel=%d: got (%d,%d,%v) want (%d,%d,true)", tc.sel, line, h, ok, tc.line, tc.h)
+		}
+	}
+}

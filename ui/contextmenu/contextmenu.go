@@ -121,14 +121,20 @@ func (m Menu[T]) step(dir int) int {
 	return max(0, min(m.cursor+dir, len(m.visible())-1))
 }
 
-// Update handles keys and left clicks while the menu is open. Clicks are in
-// the frame View renders into (0,0 = its top-left); see UpdateMouse for
-// screen coordinates.
+// Update handles keys and clicks while the menu is open: a left click runs
+// the item under it, and any click outside the frame closes the menu. Clicks
+// are in the frame View renders into (0,0 = its top-left); see UpdateMouse
+// for screen coordinates.
 func (m Menu[T]) Update(msg tea.Msg) (Menu[T], tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		return m.updateKey(msg)
 	case tea.MouseClickMsg:
+		view := m.View()
+		if msg.X < 0 || msg.Y < 0 || msg.X >= lipgloss.Width(view) || msg.Y >= lipgloss.Height(view) {
+			m.IsOpen = false
+			return m, nil
+		}
 		if msg.Button != tea.MouseLeft {
 			return m, nil
 		}
@@ -139,11 +145,50 @@ func (m Menu[T]) Update(msg tea.Msg) (Menu[T], tea.Cmd) {
 	return m, nil
 }
 
-// UpdateMouse hit-tests a screen-coordinate click against View placed with
-// ui.OverlayCenter on a screenW x screenH screen.
-func (m Menu[T]) UpdateMouse(msg tea.MouseClickMsg, screenW, screenH int) (Menu[T], tea.Cmd) {
+// Anchor is the Target's rows on screen: the menu's left edge sits at X, and
+// it opens on the lines next to Y..Y+H-1. The zero Anchor (H 0) means the
+// Target isn't on screen, and the menu centers.
+type Anchor struct {
+	X, Y, H int
+}
+
+// Origin is where Overlay places a w x h menu on a screenW x screenH screen:
+// just below the anchor, else just above it. When neither side fits, it
+// takes the roomier side and shifts onto the anchor until it fits, covering
+// the Target rather than clipping the menu (the title still names it).
+func Origin(a Anchor, w, h, screenW, screenH int) (x, y int) {
+	if a.H <= 0 {
+		return ui.OverlayCenterOrigin(w, h, screenW, screenH)
+	}
+	x = max(0, min(a.X, screenW-w))
+	below := a.Y + a.H
+	switch {
+	case below+h <= screenH:
+		return x, below
+	case a.Y-h >= 0:
+		return x, a.Y - h
+	case screenH-below >= a.Y:
+		return x, max(0, screenH-h)
+	default:
+		return x, 0
+	}
+}
+
+func (m Menu[T]) origin(a Anchor, screenW, screenH int) (x, y int) {
 	view := m.View()
-	ox, oy := ui.OverlayCenterOrigin(lipgloss.Width(view), lipgloss.Height(view), screenW, screenH)
+	return Origin(a, lipgloss.Width(view), lipgloss.Height(view), screenW, screenH)
+}
+
+// Overlay draws the menu over bg next to the anchor (see Origin).
+func (m Menu[T]) Overlay(bg string, a Anchor, screenW, screenH int) string {
+	x, y := m.origin(a, screenW, screenH)
+	return ui.PlaceOverlay(bg, m.View(), x, y)
+}
+
+// UpdateMouse hit-tests a screen-coordinate click against the menu Overlay
+// draws with the same anchor and screen size.
+func (m Menu[T]) UpdateMouse(msg tea.MouseClickMsg, a Anchor, screenW, screenH int) (Menu[T], tea.Cmd) {
+	ox, oy := m.origin(a, screenW, screenH)
 	msg.X -= ox
 	msg.Y -= oy
 	return m.Update(msg)

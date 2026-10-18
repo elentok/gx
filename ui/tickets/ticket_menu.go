@@ -283,6 +283,26 @@ func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived
 	return m, cmdTicketMenu(m.serverAPI, in)
 }
 
+// menuAnchor is the selected sidebar row on screen, under the panel's
+// header line, for the Context menu to open next to.
+func (m Model) menuAnchor() contextmenu.Anchor {
+	line, h, ok := m.sidebarTree.SelectedBodyLine()
+	if !ok {
+		return contextmenu.Anchor{}
+	}
+	return contextmenu.Anchor{X: 1, Y: 1 + line, H: h}
+}
+
+// menuAnchor is the selected queue row on screen, under the panel's header
+// line and the queue header, for the Context menu to open next to.
+func (m QueueModel) menuAnchor() contextmenu.Anchor {
+	line, h, ok := m.queueTree.SelectedBodyLine()
+	if !ok {
+		return contextmenu.Anchor{}
+	}
+	return contextmenu.Anchor{X: 1, Y: 1 + queueHeaderReservedLines + line, H: h}
+}
+
 func (m Model) handleTicketMenuReady(msg ticketMenuReadyMsg) Model {
 	pending := m.ticketMenuPending
 	m.ticketMenuPending = ""

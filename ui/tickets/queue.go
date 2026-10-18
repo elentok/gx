@@ -267,7 +267,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		if m.ticketMenu.IsOpen {
 			var cmd tea.Cmd
-			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.width, m.height)
+			m.ticketMenu, cmd = m.ticketMenu.UpdateMouse(msg, m.menuAnchor(), m.width, m.height)
 			return m, cmd
 		}
 		if m.watch.open {

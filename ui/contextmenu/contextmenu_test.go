@@ -236,3 +236,65 @@ func TestClickRunsEnabledItem(t *testing.T) {
 	_, cmd = m.Update(tea.MouseClickMsg{Button: tea.MouseLeft, Y: lineOf(t, m, "Watch")})
 	wantRan(t, cmd, "Watch@gx:epic/01")
 }
+
+func TestOriginPlacesNextToAnchor(t *testing.T) {
+	const w, h = 10, 5
+	for _, tc := range []struct {
+		name         string
+		a            Anchor
+		screenW      int
+		screenH      int
+		wantX, wantY int
+	}{
+		{"below", Anchor{X: 1, Y: 2, H: 1}, 80, 20, 1, 3},
+		{"below a multi-line row", Anchor{X: 1, Y: 2, H: 3}, 80, 20, 1, 5},
+		{"above when below is short", Anchor{X: 1, Y: 16, H: 1}, 80, 20, 1, 11},
+		{"neither: roomier below, pinned to bottom", Anchor{X: 1, Y: 2, H: 1}, 80, 6, 1, 1},
+		{"neither: roomier above, pinned to top", Anchor{X: 1, Y: 4, H: 1}, 80, 6, 1, 0},
+		{"clamped to the right edge", Anchor{X: 75, Y: 2, H: 1}, 80, 20, 70, 3},
+		{"zero anchor centers", Anchor{}, 80, 20, 35, 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			x, y := Origin(tc.a, w, h, tc.screenW, tc.screenH)
+			if x != tc.wantX || y != tc.wantY {
+				t.Fatalf("got (%d,%d) want (%d,%d)", x, y, tc.wantX, tc.wantY)
+			}
+		})
+	}
+}
+
+func TestUpdateMouseHitsAnchoredMenu(t *testing.T) {
+	m := open(item("Start", Suggested))
+	a := Anchor{X: 4, Y: 2, H: 1}
+	// The menu opens on line 3; its first item is listTop+1 lines down (the
+	// group header comes first), one cell inside the left edge.
+	click := tea.MouseClickMsg{X: 4 + 2, Y: 3 + listTop + 1, Button: tea.MouseLeft}
+	m, cmd := m.UpdateMouse(click, a, 80, 40)
+	if cmd == nil || m.IsOpen {
+		t.Fatalf("click on the anchored item did not run it")
+	}
+	if got := cmd(); got != ran("Start@gx:epic/01") {
+		t.Fatalf("ran %v", got)
+	}
+}
+
+func TestClickOutsideCloses(t *testing.T) {
+	a := Anchor{X: 4, Y: 2, H: 1}
+	for _, tc := range []struct {
+		name string
+		x, y int
+		btn  tea.MouseButton
+	}{
+		{"above", 6, 1, tea.MouseLeft},
+		{"left", 0, 3 + listTop + 1, tea.MouseLeft},
+		{"right, on an item's line", 4 + width + 2, 3 + listTop + 1, tea.MouseLeft},
+		{"right button", 6, 1, tea.MouseRight},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, cmd := open(item("Start", Suggested)).UpdateMouse(tea.MouseClickMsg{X: tc.x, Y: tc.y, Button: tc.btn}, a, 80, 40)
+			if m.IsOpen || cmd != nil {
+				t.Fatalf("open=%v cmd=%v, want closed with no command", m.IsOpen, cmd != nil)
+			}
+		})
+	}
+}
