@@ -122,7 +122,7 @@ process, skipping its step 5 (quiz the user) since this runs unattended — publ
 breakdown directly, same as any other unattended `gx-to-tickets` run.
 
 `gx-to-tickets` already skips appending a trailing `type: code-review` ticket when the target epic
-has one (ticket 07's update) — this epic does, namely the ticket this skill is running as — so no
+has one — this epic does, namely the ticket this skill is running as — so no
 extra guard is needed here to avoid a duplicate.
 
 If the consultant approved zero findings, skip this step entirely; there's nothing to publish.

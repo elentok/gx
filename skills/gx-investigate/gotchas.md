@@ -1,8 +1,9 @@
 # gx-investigate gotchas
 
-Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append one line + a pointer
-to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
-— don't re-explain what the linked commit/ticket already documents.
+Running list of previously-diagnosed gx/ralph-loop bugs, newest first. Append one line + the
+fixing commit whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed — don't
+re-explain what the linked commit already documents. Never cite a ticket or epic: they get
+archived and renumbered, and the tracker isn't on every machine.
 
 - **A blocking `TaskOutput`/`TaskStop` retrieval never resolves the background-task gate, stalling
   a ticket `claimed` ("implementing...") until the 2h aged-out cap.**
@@ -12,14 +13,13 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   {retrieval_status, task: {task_id, ...}}` (nested); one that calls `TaskStop` to kill it outright
   gets `toolUseResult: {task_id, message, ...}` (flat) — two more shapes, neither producing a
   `task-notification` line, so the marker reads `outstanding-fresh` forever even though the agent
-  plainly saw the result (or killed the task itself) and finished for real. Found live: `idle-
-  cost/01` (`TaskOutput` shape — commit landed, worktree clean, pane idle, `run-log.jsonl` shows
-  only `background-task-gate-held`, no release) and `idle-cost/09` (`TaskStop` shape, same
-  symptom, found right after the `TaskOutput` fix landed — proof there wasn't just one gap).
+  plainly saw the result (or killed the task itself) and finished for real. Found live twice: the
+  `TaskOutput` shape (commit landed, worktree clean, pane idle, `run-log.jsonl` shows only
+  `background-task-gate-held`, no release) and the `TaskStop` shape (same symptom, found right
+  after the `TaskOutput` fix landed — proof there wasn't just one gap).
   Distinct failure mode from the entry below (that one resolves too eagerly; this one never
   resolves at all) in the same new gate. Fixed same session, in two passes:
-  `ReadBackgroundTasks` now matches all three shapes. See
-  `follow-ups/issues/12-taskoutput-retrieval-never-resolves-background-task-gate.md`. If a fourth
+  `ReadBackgroundTasks` now matches all three shapes. If a fourth
   stuck ticket turns up, check for yet another `toolUseResult` shape before assuming this is fully
   closed — nothing so far has enumerated every way an agent can learn a background task ended.
 - **`background-task-gate-released` is treated as full-turn completion, parking the ticket
@@ -29,30 +29,26 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   status. Its callers (`waitforfinish.go:143-166`, `iteration.go:240-243`) log the finish event and
   fall straight into `finishIteration`'s commit count with no re-check that the pane is still idle;
   if the agent resumes real work once it sees the background task's result (the normal case), the
-  park fires anyway. Found live: `idle-cost` tickets `03` and `06`, both parked right after a gate
-  release; `03` (manually resumed from the Queue menu) then produced a genuine commit 7 minutes
-  later in the same session/pane. Recovery: resume from the Queue menu, don't clear to `open` — the
+  park fires anyway. Found live on two tickets, both parked right after a gate release; one
+  (manually resumed from the Queue menu) then produced a genuine commit 7 minutes later in the
+  same session/pane. Recovery: resume from the Queue menu, don't clear to `open` — the
   session is intact, not stalled. `background_task.go`/the gate wiring landed 2026-08-13
   (`d583e908`, `05489e3e`). Fixed same session: `waitForBackgroundTasks` now re-runs
   `confirmFinished` once a gate it actually held releases, and both call sites loop again instead
-  of finishing if that recheck finds the pane busy. See
-  `follow-ups/issues/11-background-task-gate-release-skips-pane-recheck.md`.
+  of finishing if that recheck finds the pane busy.
 - **A parked (needs-answer/needs-repair, no commits) outcome also fires a spurious "done"
   notification with `0s · 0 tok · $0.00`.** `ralphloop/loop.go`'s main scheduling loop (~line
   759-817) only early-exits on `r.built`/`r.parkedOnChild`; a plain park falls through to
   `completed++`/`sink.IterationFinished` anyway, alongside the correct `TicketNeedsHuman` message
   fired earlier in `iteration.go`/`waitforfinish.go`. Reads as "ticket X needed an answer, then
-  completed anyway" in the same notification batch. Diagnosed via `blf`'s `power-improvements`
-  ticket `05`, `run-log.jsonl` batch at `2026-08-14T22:41:45+03:00`; not yet fixed. See
-  `follow-ups/issues/09-parked-outcome-still-fires-iteration-finished.md`.
+  completed anyway" in the same notification batch. Not fixed as of this entry.
 - **Draining a paused epic run hangs silently — indistinguishable from a drain still waiting on a
   long in-flight ticket.** `Gate.Drain()` doesn't wake a run parked in `waitForResume`, so a drain
   requested against a paused epic never completes: the run still shows `running`, no
   `DrainComplete` notification ever fires, and drain-then-replace never launches — no error or log
   line marks the difference from an in-flight ticket the drain is legitimately still waiting on.
-  Recovery: resume the epic and it exits immediately. Not fixed as of this entry — see ticket `01`
-  of `drain-queue-fixes`; drop this entry once `01` lands. See
-  `drain-queue-fixes/issues/01-*.md`.
+  Recovery: resume the epic and it exits immediately. Not fixed as of this entry; drop it once the
+  fix lands.
 - **Telegram ticket-completion notifications silently drop almost every time (unescaped `.` in
   cost).** `formatCost` (`ralphloop/notification_text.go`) renders `"$1.23"` and
   `iterationFinishedText` splices it unescaped into the counts line `message()` sends — `.` is a
@@ -61,17 +57,15 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   of "got epic-start and every iteration-started, never a single completion" (those carry no
   cost, so they go through fine). Fixed by escaping the assembled counts/detail strings in
   `iterationFinishedText`/`epicCompleteText`; regression covered by
-  `ralphloop/full_epic_notifications_e2e_test.go`. See
-  `follow-ups/issues/07-iteration-finished-cost-decimal-unescaped-markdownv2.md`.
+  `ralphloop/full_epic_notifications_e2e_test.go`.
 - **Telegram batch notifications silently drop whenever ≥2 messages coalesce into one flush.**
   `renderBatch` (`ralphloop/chat_eventsink.go:244-253`) joins each already-escaped queued
   message with a raw `"\n---\n"` separator — `-` is a reserved MarkdownV2 char
   (`telegramMarkdownV2SpecialChars`), so any batch with 2+ distinct messages 400s on send;
   single-message batches (no separator) go through fine, so the drop is intermittent, not total.
   Same failure shape as the `epicCompleteText` `(s)` gotcha below, in the newer batch-join path.
-  Found live: `tickets-tree`'s 2026-08-13 re-run, 19/26 telegram `notify_kind: batch` sends
-  400'd; the 7 that succeeded matched exactly the 7 notifications the user reported receiving.
-  Not fixed. See `follow-ups/issues/06-batch-notification-separator-unescaped-markdownv2.md`.
+  Found live: in one run 19/26 telegram `notify_kind: batch` sends 400'd; the 7 that succeeded
+  matched exactly the 7 notifications the user reported receiving. Not fixed as of this entry.
 - **Nudge-retry exhaustion on the initial `herdr agent wait --until working` launch step leaves a
   ticket `needs-repair` with a live, never-prompted pane leaked.** `promptWithNudge`
   (`ralphloop/deps.go:483-568`) only resends bare Enter, never the actual prompt text, across its
@@ -79,13 +73,12 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   reaches `working` before all 3 exhaust, no prompt content was ever delivered, and the created
   pane/tab is left alive with an empty prompt box — `loop.go`'s generic `r.err != nil` catch-all
   (`ralphloop/loop.go:732-752`) marks the ticket `needs-repair` with no `iteration-started`
-  logged and no cleanup of the orphaned pane. Found live: `fix-spinner/04`, pane `w2A:p5`
-  confirmed idle at Claude Code's fresh welcome screen ~2min after launch. Fixed:
+  logged and no cleanup of the orphaned pane. Found live: the pane sat idle at Claude Code's
+  fresh welcome screen ~2min after launch. Fixed:
   `promptWithNudge` now diffs a pane-text snapshot per attempt and retypes the full prompt (capped
   by `promptMaxRetypes`) instead of nudging when nothing changed, returning `errStuckSubmission`
   once retypes are exhausted; `runIteration` retries once against a fresh pane on that error and
-  closes whichever pane it finally gives up on. See
-  `follow-ups/issues/05-launch-nudge-exhaustion-leaks-live-pane-research.md`.
+  closes whichever pane it finally gives up on.
 - **Reclaiming an already-live pane via `reattachIteration` logs no `iteration-started`, so the
   Queue spinner and the epic's "N parked" count both go stale.** `resumeReattachable`
   (`ralphloop/loop.go:409-411`) routes a reclaim of a ticket with a still-live tab/pane through
@@ -96,21 +89,19 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   `IterationStarted`/`TicketReattached`/`IterationPaused` events, never recomputing from ticket
   status directly — so a ticket can sit `claimed` with `gx` genuinely still polling it (confirmed
   live via the `herdr agent wait` process) while the UI shows no spinner and the epic title stays
-  stuck at a stale parked count. Found live: `model-config/04a`, same stalled pane as the entry
-  below, retried 3x. The parked-count half went away when the cutover deleted the loop registry;
-  re-check the spinner half against the server before relying on it. See
-  `follow-ups/issues/04-reattach-reclaim-skips-sink-events.md`.
+  stuck at a stale parked count. Found live on the same stalled pane as the entry below, retried
+  3x. The parked-count half went away when the cutover deleted the loop registry; re-check the
+  spinner half against the server before relying on it.
 - **`attachToLiveAgent` treats a permanently-stalled idle pane as "already finished," parking a
   second ticket zero-commit with no real work attempted.** A ticket that already leaked a pane/tab
-  from a failed launch (the `04a1` gotcha below) can, on reclaim, collide (`agent_name_taken`) with
+  from a failed launch (the `agent_prompt_stalled` gotcha below) can, on reclaim, collide (`agent_name_taken`) with
   that same leaked agent name; `attachToLiveAgent` (`ralphloop/launch.go:283-301`) reattaches to it
   and, since its status is `idle`, logs `iteration-started`/`-finished` back-to-back with no
   `AgentPrompt`/`waitForFinish` ever run — `promptWithNudge`'s stall-retry never gets a chance.
   `finishIteration` then parks the ticket `needs-answer`/`park_kind: zero-commit` against the
   *new*, unused tab, while the actually-stalled agent sits untouched in the *old* leaked one — two
-  live tabs end up under one label. Found live: `model-config/04a`, session id on the ticket
-  matched the *original* `04a1` stall session (`state_change_seq` unchanged since). Not fixed. See
-  `follow-ups/issues/03-attach-to-live-agent-treats-stalled-idle-as-finished.md`.
+  live tabs end up under one label. Found live: the session id on the ticket matched the
+  *original* stalled session (`state_change_seq` unchanged since). Not fixed as of this entry.
 - **A `herdr agent prompt agent_prompt_stalled` error leaves a ticket `needs-repair` with no
   `iteration-started` ever logged, and the retry code that exists doesn't cover it.**
   `iteration-started` is logged only after `AgentPrompt` succeeds (`ralphloop/launch.go:242-263`);
@@ -123,7 +114,7 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   but reclaim leaks a second herdr tab (`TabCreate` has no collision detection) since the failed
   launch never cleaned up its own pane. Fixed by widening `isPollTimeout` to also match
   `agent_prompt_stalled`/"no observed state change" (`ralphloop/waitforfinish.go:1127-1136`); the
-  pane/tab-leak-on-reclaim part is still open. See `model-config/issues/04a1-*.md`.
+  pane/tab-leak-on-reclaim part is still open.
 - **`type: code-review` tickets always stall on `needs-answer` (`park_kind: zero-commit`)
   under ralph-loop.** `gx-implement/SKILL.md` told the agent to "follow the gx-code-review
   skill instead," which the agent read as invoking the Skill tool — but `gx-code-review` sets
@@ -134,48 +125,44 @@ to the fixing commit or ticket whenever a bug diagnosed via [gx-investigate](SKI
   off from inside a `gx-implement` session, since the harness starting a session with the
   command already resolved isn't blocked by `disable-model-invocation` the way an in-session
   Skill-tool call is. `gx-implement/SKILL.md` keeps a short note for the manual-invocation edge
-  case only. See `follow-ups/issues/02-code-review-skill-invocation-research.md`.
+  case only.
 - **Every ticket in an epic lands in `needs-repair` on first claim, whole epic parks.**
   `ralphloop/labels.go`'s `iterLabel` (`epicName + "-iter-" + identifier`, no length cap) is used
   verbatim as the herdr agent name; epic slugs of 25+ chars push double-digit-ticket labels past
   herdr's 32-char `invalid_agent_name` limit, and herdr's error isn't special-cased the way
   `agent_name_taken` is, so it falls into the generic non-fatal `needs-repair` path and every
-  ticket fails identically. Found live: `notification-throttle-impl` (27-char slug), tickets `01`,
-  `02`, `09` all rejected on `notification-throttle-impl-iter-01`/`-02`/`-09` (34 chars). Not fixed.
-  See `notification-throttle-impl/issues/11-agent-name-too-long-research.md`.
-- **`conflict-lifecycle/02` forked 4 times (`02a`→`02a1`→`02a2`→`02a3`) despite `gx-to-tickets`
+  ticket fails identically. Found live: a 27-char slug gave 34-char labels, and every ticket was
+  rejected. Not fixed as of this entry.
+- **A ticket forked 4 times (`02a`→`02a1`→`02a2`→`02a3`) despite `gx-to-tickets`
   already having the rules to catch it.** The ticket named 3 independent variants (SKILL.md's
   "variant fan-out" rule, N>couple should split) whose tests landed across 4 different files each
   needing its own precedent read (SKILL.md's "explore/implement split," currently gated on
   "touches test/e2e coverage" as a whole-ticket judgment rather than a file-count trigger) —
-  neither rule fired. Not fixed; diagnosis + suggested SKILL.md trigger tightening in
-  `conflict-lifecycle/issues/07-ticket-02-fanout-splits-research.md`.
+  neither rule fired. Not fixed as of this entry; the fix direction is a file-count trigger for
+  the explore/implement split.
 
 - **A smart-zone `/compact` gets cancelled by gx's own finish-up prompt when herdr reports the pane
   idle/done during compaction.** `waitForCompactionSignal` (`ralphloop/waitforfinish.go`) returns
   success on *any* non-error `AgentWait`, consulting the transcript's compaction-boundary count only
   on a wait *timeout* past `smartZoneCompactTimeoutMs` (5 min) — so a prematurely-idle pane bypasses
   the very signal `compactSignalUnconfirmed` had just used to prove compaction hadn't finished, and
-  the finish-up prompt lands as queued input that aborts the compaction. Found live:
-  `lifecycle-refactor` iter-13c — whole compact+finish-up contract completing in 4.5s, second breach
-  reporting identical occupancy (132603), exactly one `compact_boundary` in the session and it
-  belongs to the *second* `/compact`. Not fixed. See
-  `lifecycle-refactor/issues/15-smart-zone-compact-cancelled-by-finishup-prompt-research.md`.
+  the finish-up prompt lands as queued input that aborts the compaction. Found live: the whole
+  compact+finish-up contract completed in 4.5s, the second breach reported identical occupancy,
+  and the session's only `compact_boundary` belonged to the *second* `/compact`. Not fixed as of
+  this entry.
 
 - **`agent_pane_busy` on `herdr agent start` puts a ticket into `needs-repair` with no
   `iteration-started` logged at all.** `--pane` is herdr's own `RootPaneID` from `tab create`, not
   allocated/pooled by gx (`ralphloop/iteration.go:56-66` → `herdr/tab.go:30-52` →
   `launch.go:76,220-225`); two tickets launching concurrently under `MaxParallel` can race inside
   herdr's own pane allocator (external binary, no gx-side mutex around the herdr CLI calls). Not a
-  gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim. Found
-  live: `lifecycle-refactor` ticket `05`. See the `lifecycle-refactor` epic's ticket-05
-  herdr-pane-busy research ticket (filed under the status's retired name).
+  gx-source bug; unstick by clearing the ticket back to `open` for the scheduler to reclaim.
 
 Older entries below describe a `children` frontmatter field that no longer exists: fork descendants
 are now derived from `parent` alone (see [gx-local-tracker.md](../gx-local-tracker.md)). They are
 kept as history of what the code did at the time, not as a description of today's schema.
 
-- **The `lifecycle-refactor` + `lifecycle-contract` epics made five of the bugs below
+- **The lifecycle refactor and schema contraction made five of the bugs below
   unrepresentable rather than fixed — read them as history, and don't port their defenses forward.**
   The old model recorded a fork twice (`children` on the original, `parent` on the descendant) and
   gave each fork child a `blocked_by` naming its own parent. Both writes are gone: `parent` on the
@@ -196,17 +183,14 @@ kept as history of what the code did at the time, not as a description of today'
   start* — that was `children` written without `parent`; with `children` gone there is no second
   edge to write instead of the one the scheduler reads. Mis-parented data is now just a
   differently-shaped acyclic graph, not a case the resolver defends against, so a `parent` that
-  points at the wrong ticket shows up as wrong nesting rather than as a silent deadlock. See
-  `lifecycle-refactor/issues/03-*.md` for the deleted tests and the reason each went, and
-  `lifecycle-contract/issues/01-*.md` for the schema contraction.
+  points at the wrong ticket shows up as wrong nesting rather than as a silent deadlock.
 - **The mid-flight-fork placeholder fix above only closed one of three ways a `blocked_by` chain
-  could still start early.** Follow-up consult (Opus, read-only) on the same `06b`/`06c` incident
-  found: (1) `fullyDone`'s descendant walk trusted the then-existing children list, a field
+  could still start early.** Follow-up consult (Opus, read-only) on the same incident found: (1) `fullyDone`'s descendant walk trusted the then-existing children list, a field
   `gx tickets add --parent` never wrote to the parent — a missed or partial write of it silently
   dropped a real subtree from the check. (2) The fork-sibling exclusion (then `isSelfOrForkSiblingOrDescendant`,
   keyed on shared `Parent`) discounted a blocker's own open child as "family" whenever mis-parented
   data (a child's `Parent` written as the fork root instead of its direct parent — the exact shape
-  the earlier `01a`/`01b` deadlock entry below documents) made it share the blocked ticket's
+  the fork-parent deadlock entry below documents) made it share the blocked ticket's
   `Parent`, even for a token naming a *direct*, non-inherited blocker. (3) The `visiting` cycle
   guard was a permanent memo, never unwound, so re-checking the same ticket a second time within
   one resolution (e.g. two `blocked_by` tokens sharing a descendant) could wrongly reuse a stale
@@ -237,35 +221,34 @@ kept as history of what the code did at the time, not as a description of today'
   placeholder, e.g. `06c` forked off `06` with `Blocked by: [06b]`) never passes through
   `claimNext`'s claim-time blocker check, so nothing ever verified its own declared blocker.
   Anything blocked on that placeholder (e.g. `06c1`, `Blocked by: [06c]`) trusted `06c.status ==
-  done` at face value and started immediately. Found live in `tickets-tree`: `06c1` started within
+  done` at face value and started immediately. Found live: `06c1` started within
   200ms of `06b1` (`06b`'s own fork chain, which `06c` was supposed to wait on) — before `06b`'s
   chain had done any real work. Fixed: `fullyDone` now also calls into the same
   `unresolvedBlockers` walk for `t` itself (shared `visiting` cycle-guard across both), so a
   blocker is only "fully done" once its own `Blocked by:` chain is genuinely resolved too, not
   just its status field. Regression test:
   `TestEpic_UnresolvedBlockers_TransitiveThroughPrematurelyDoneForkPlaceholder` in
-  `tickets/status_test.go`. See `tickets-tree/issues/13-epic-run-stalled-two-finished-iterations-undetected.md`.
+  `tickets/status_test.go`.
 - **`gx tickets add --parent <id>` allocates the correct lettered ID but never writes `parent` into
   the new ticket's own frontmatter.** `cmd/tickets_add.go`'s `runTicketsAdd` only used `parent` to
   compute the new ID via `tickets.NextTicketID`; the stub `schema.Ticket{}` literal never set
   `stub.Parent`, despite `gx-local-tracker.md`'s "Mid-flight forking" section documenting this
   command as the one that sets `parent` "at creation." Every forked ticket created the documented
   way silently lost its `parent` link — the same shape the code-review-scoping gotcha below already
-  flagged as scheduler/Queue-tab-invisible. Found live: `drain-queue`'s `02a1` (forked off `02a` for
-  deferred test coverage) had no `parent` field despite the agent running `gx tickets add
-  drain-queue --parent 02a --slug ...` exactly as documented. Fixed by setting `stub.Parent` when
-  `parent != ""` before marshaling (`cmd/tickets_add.go`), regression test
-  `TestRunTicketsAdd_WritesParentFrontmatter`; `02a1` backfilled via `gx tickets set --parent 02a`.
-  See `drain-queue/issues/04-tickets-add-parent-not-written-research.md`.
+  flagged as scheduler/Queue-tab-invisible. Found live: a forked ticket had no `parent` field
+  despite the agent running `gx tickets add <epic> --parent <id> --slug ...` exactly as
+  documented. Fixed by setting `stub.Parent` when `parent != ""` before marshaling
+  (`cmd/tickets_add.go`), regression test `TestRunTicketsAdd_WritesParentFrontmatter`; backfill an
+  affected ticket via `gx tickets set --parent <id>`.
 
 - **Telegram epic-complete notifications always fail with HTTP 400; ticket-finished ones work
   fine.** `ralphloop/notification_text.go`'s `epicCompleteText` hardcodes a literal `(s)` (from "N
   ticket(s) landed in...") straight into the MarkdownV2 text without routing it through
   `s.escape`, unlike every other template in that file. `(`/`)` are reserved MarkdownV2 chars
   (`telegramMarkdownV2SpecialChars`), so Telegram's `sendMessage` rejects the whole message with
-  400 every single time — this isn't the transient-network issue `notifications-fix/01`'s retry
-  fix addressed; retries don't help a deterministically-malformed message. Confirmed via
-  `.scratch/fork-term/run-log.jsonl`: the run's `iteration-finished` sends all logged
+  400 every single time — this isn't the transient-network issue the send-retry fix addressed;
+  retries don't help a deterministically-malformed message. Confirmed via the epic's
+  `run-log.jsonl`: the run's `iteration-finished` sends all logged
   `notification-sent`, the one `epic-complete` send logged `notification-failed reason: "send
   failed with status 400"`. Slack is unaffected (`escapeSlackMrkdwn` doesn't touch parens). Fixed
   by dropping the literal parenthetical ("N tickets landed in..."), same commit as this entry.
@@ -279,11 +262,9 @@ kept as history of what the code did at the time, not as a description of today'
   not root, so Y doesn't read as X's sibling. Net effect: X can never be considered to unblock
   anything until Y (which can't start until X finishes) is also done — a self-deadlock hiding
   behind a `blocked_by` token that looks resolved (the named ticket really is `done`). Found live
-  in `drain-queue`'s `01`→`01a`→`01b` chain and `tickets-tree`'s `03b`→`03b1`→`03b2`,
-  `06b`→`06b1`→`06b2`, `06c`→`06c1`→`06c2` (four separate forks, same shape — this looks
-  systemic to whatever produced these tickets, not a one-off typo). Inert copies of the same
-  malformed shape (already-`done` chains, so harmless) also exist at `tickets-tree`'s
-  `02d`→`02e` and `06`→`06c`. Two-part fix: (1) data — corrected the four live tickets'
+  in four separate fork chains across two epics, same shape — this looks systemic to whatever
+  produced these tickets, not a one-off typo. Inert copies of the same malformed shape
+  (already-`done` chains, so harmless) also existed. Two-part fix: (1) data — corrected the four live tickets'
   children/`parent:` links to match (each root listed only its direct fork; the intermediate ticket
   listed the grandchild); (2) source —
   `tickets/status.go`'s `isSelfOrForkSibling` (renamed `isSelfOrForkSiblingOrDescendant`) now
@@ -305,9 +286,8 @@ kept as history of what the code did at the time, not as a description of today'
   `gx-merge` run, confirmed via `notification-failed` "context deadline exceeded" entries in
   `run-log.jsonl` with the send goroutine running to completion (ruling out the process-exit race
   theory for that run). Also found: the failed-send `reason` string leaks the Telegram bot token
-  into `run-log.jsonl` verbatim (Go's `*url.Error` includes the request URL). See
-  `notifications-fix/issues/01-telegram-notification-failures-research.md` (retry fix) and
-  `notifications-fix/issues/02-redact-bot-token-from-run-log.md` (token leak); neither fixed yet.
+  into `run-log.jsonl` verbatim (Go's `*url.Error` includes the request URL). The send retry was
+  fixed later (see the epic-complete entry above); the token leak was not fixed as of this entry.
 - **Spurious "iterN paused" / `agent_name_taken` notification for a ticket that then finishes
   fine.** A parent ticket doing a mid-flight fork (e.g. `06` → `06b`) can still be actively
   authoring the child ticket's file (full-content `Write`, not `gx tickets set`) *after* the
@@ -322,8 +302,7 @@ kept as history of what the code did at the time, not as a description of today'
   the original iteration finishes normally afterward (its `done` write overwrites the spurious
   `needs-repair`), but the underlying race — two unsynchronized writers (ralph-loop's
   `Claim()`/`SetStatus()` vs. an agent's raw file `Write`) sharing one ticket file with no locking
-  — is real and not yet fixed. Diagnosed via bugs-03 iter-06b/2026-08-08 run-log.jsonl (lines
-  56–69); no fix ticket filed yet.
+  — is real and not yet fixed.
 - **A ticket `blocked_by` on a specific mid-flight-fork sibling isn't actually enforced.**
   `tickets/status.go`'s `UnresolvedBlockers`/`isSelfOrForkSibling` excludes any candidate blocker
   sharing the checked ticket's `Parent` — meant to stop a ticket deadlocking on its own *inherited*
@@ -331,26 +310,25 @@ kept as history of what the code did at the time, not as a description of today'
   keyed only on `Parent` equality, not on which token is being resolved, so it also swallows a
   direct sibling dependency (`02c` declaring `blocked_by: [02b]`): `02b`'s real status is never
   checked, `02c` reads as immediately unblocked. No scheduler-side race — `ralphloop.claimNext`
-  reloads fresh per claim. Diagnosed via `tickets-tree` epic, ticket `02c`'s `needs-answer`; see
-  `tickets-tree/issues/08-blocked-by-split-sibling-not-enforced-research.md` (not fixed yet).
+  reloads fresh per claim. Not fixed as of this entry.
 - **A stuck `claimed` ticket had no recovery path but hand-run git.** Commits often already landed with a stale status, and the unpark gesture existed but was hidden in the `m` menu. Now `gx tickets land|verify|reset|unpark` plus this skill's recovery section; see `docs/specs/ticket-land-recovery.md`.
-- **Ticket sits `claimed` with `background-task-gate-held`, agent idle, code uncommitted.** The `/gx-implement` prompt arrived as `"\n/gx-implement …"`, so Claude Code (seen on 2.1.290) did not expand the slash command; the agent worked without the skill and never committed. A stray backgrounded Bash call then held the finish gate. See `follow-ups/issues/18-slash-prompt-leading-newline-not-expanded.md` (not fixed yet).
-- **Ticket parked `zero-commit` but the agent commits minutes later.** The background-task gate treats any transcript line containing the task id as "resolved", including the agent's own `tail .../<id>.output`/`Read`/`Monitor`. Monitor waits are not gated either. See `follow-ups/issues/19-background-gate-released-by-task-id-mention.md` (not fixed yet).
-- **Server stopped while starting tickets → they come back `needs-repair` (`kind: handle-mismatch`, herdr `agent_not_found`), some with no leftovers at all.** No commits, so `gx server tickets reset gx:<epic>/<id> --reason ...` is the recovery. See `follow-ups/issues/22-server-stop-leaves-inflight-tickets-needs-repair.md` (not fixed yet).
-- **Notification `🛑 needs repair: iteration ended without landing the ticket` (blank kind), ticket still `claimed` with `iteration_status: finished`.** The land conflicted (`gx server tickets land` → `outcome: conflicted`, `UU` files in the feature worktree) and the conflict outcome is swallowed instead of reported. Resolve in the feature worktree, then `land --continue`/`--abort`. See `follow-ups/issues/23-land-conflict-park-sends-blank-kind-notification.md` (not fixed yet).
-- **Large epic (~50+ tickets) fails on its first claim: `logging scheduler scan: event line is N bytes, over the 4096 cap`.** `events.Fit` can't shorten `Scan`, and `claimNext` treats the log error as fatal, stranding the ticket `claimed`. See `follow-ups/issues/20-scheduler-scan-over-line-cap-fails-epic.md`. Fixed: `logSchedulerScan` splits a pass across lines sharing one `time`; a failed scan log is debug-only.
-- **`paused-rate-limit` right as an agent finishes, "resets" = the pane's `done H:MM PM`, pause lasts ~3h.** A near-limit warning matches the detector, the token is the first clock time in the pane, and it's read as UTC. Restarting gx to escape it can then re-land a conflict-resolved ticket and fail the epic. See `follow-ups/issues/21-false-rate-limit-pause-and-restart-relanding.md` (not fixed yet).
-- **Server names the herdr agent after the queue item id, not the ticket id (`server/runner.go` `launch`, `addr.ID`).** Every ticket from queue item `01` gets `…-iter-01`; a second ticket collides (`agent_name_taken`) and restart reclaim finds a handle mismatch. Fixed in `5c4a4c59`: `launch` now takes the ticket address. See `follow-ups/issues/23-server-agent-name-uses-queue-item-id-not-ticket-id.md`.
+- **Ticket sits `claimed` with `background-task-gate-held`, agent idle, code uncommitted.** The `/gx-implement` prompt arrived as `"\n/gx-implement …"`, so Claude Code (seen on 2.1.290) did not expand the slash command; the agent worked without the skill and never committed. A stray backgrounded Bash call then held the finish gate. Not fixed as of this entry.
+- **Ticket parked `zero-commit` but the agent commits minutes later.** The background-task gate treats any transcript line containing the task id as "resolved", including the agent's own `tail .../<id>.output`/`Read`/`Monitor`. Monitor waits are not gated either. Assistant-line mentions were fixed later (see the `WaitIterationFinished` entries below); Monitor waits were not gated as of this entry.
+- **Server stopped while starting tickets → they come back `needs-repair` (`kind: handle-mismatch`, herdr `agent_not_found`), some with no leftovers at all.** No commits, so `gx server tickets reset gx:<epic>/<id> --reason ...` is the recovery. Not fixed as of this entry.
+- **Notification `🛑 needs repair: iteration ended without landing the ticket` (blank kind), ticket still `claimed` with `iteration_status: finished`.** The land conflicted (`gx server tickets land` → `outcome: conflicted`, `UU` files in the feature worktree) and the conflict outcome is swallowed instead of reported. Resolve in the feature worktree, then `land --continue`/`--abort`. Not fixed as of this entry.
+- **Large epic (~50+ tickets) fails on its first claim: `logging scheduler scan: event line is N bytes, over the 4096 cap`.** `events.Fit` can't shorten `Scan`, and `claimNext` treats the log error as fatal, stranding the ticket `claimed`. Fixed: `logSchedulerScan` splits a pass across lines sharing one `time`; a failed scan log is debug-only.
+- **`paused-rate-limit` right as an agent finishes, "resets" = the pane's `done H:MM PM`, pause lasts ~3h.** A near-limit warning matches the detector, the token is the first clock time in the pane, and it's read as UTC. Restarting gx to escape it can then re-land a conflict-resolved ticket and fail the epic. Not fixed as of this entry.
+- **Server names the herdr agent after the queue item id, not the ticket id (`server/runner.go` `launch`, `addr.ID`).** Every ticket from queue item `01` gets `…-iter-01`; a second ticket collides (`agent_name_taken`) and restart reclaim finds a handle mismatch. Fixed in `5c4a4c59`: `launch` now takes the ticket address.
 - **Server parks tickets that are not stuck: `zero-commit` needs-answer while the agent waits on a background test run, and `needs-repair` "land deferred: land lock held" while another landing holds the lock.** `server/runner.go` `finishRun` took the first idle as a finish and failed on a deferred land; the in-process loop debounces, gates on background tasks and retries. Fixed in `ab11215b` (`ralphloop.WaitIterationFinished`, `landBuilt` retry). To recover an old false park: `gx server tickets park <addr> --reason …` (gets it to `needs-repair`; `tickets set` refuses that status), then `gx server tickets land`; a conflict leaves a cherry-pick in the feature worktree, so resolve, `git cherry-pick --continue`, then `land --continue`.
-- **Server parks zero-commit although `WaitIterationFinished` is in place: the background-task gate saw the task as resolved.** `transcript.ReadBackgroundTasks` resolved a task when its id appeared on *any* later line, including the agent's own `Monitor`/`Read` of `…/tasks/<id>.output`. Assistant lines no longer resolve (fix in the `transcript:` commit after `2c6d0ea9`). Ticket 36's false park; recover with set `needs-repair` + `gx server tickets land`.
-- **Server parks `needs-answer` / `zero-commit` while an async subagent is still working.** The agent launched an async Agent and idled; the subagent's own background run produced an interim `task-notification` ("the result below may be interim"). The gate had no Agent marker, and an interim notice would have resolved one anyway. Fixed: `agentId` from an `async_launched` result is a marker, and interim notices don't resolve it. See `follow-ups-2026-10-11/issues/10-interim-subagent-notification-parks-zero-commit.md`.
-- **Server-mode Queue tab: a parent shows `waiting-for-children` but no children, and every fork in the epic is gone (Tickets tab is fine).** `ticketFromInfo` parses `27a1` as `Number: 0`, so parent/blocker lookups miss, `PlanWaves` returns `StuckPlanError`, and the Queue falls back to queue items only. Only while a multi-level fork (`NNaN`) is open. See `follow-ups/issues/27-server-queue-drops-forks-on-multilevel-fork-id.md`. Fixed in `f5b8780d`.
-- **Server parks a ticket `needs-answer` / `zero-commit` right when the agent hits "You've hit your session limit".** The server finish path has no rate-limit detection; the agent's later commitless/finished self-report is never adopted, and `land`/`unpark` don't fit a commitless ticket. See `follow-ups/issues/28-server-parks-zero-commit-on-session-limit.md` (not fixed yet).
-- **"No notification when a ticket completes" in server mode.** `ServerChat` has no per-ticket done message; `finishRun` only calls `notifyResult`, which is one-off `notify: true` only. Parks, epic-complete and server notices still send. See `follow-ups/issues/29-server-sends-no-ticket-done-notification.md`. Fixed in `ea107c0e`.
-- **Queue tab stops auto-updating; `R` updates it.** Fixed by the `tui-server-stream-impl` epic: the Queue tab has no loop of its own, the app shell owns the server stream and, while the server is down, the store watch and probe loop. Before the fix its 2s poll tick was delivered only to the active tab, so the loop died on the first tick while another tab was open. If you see this on a build with that epic, the shell's stream or probe loop is the suspect, not the tab. See `follow-ups/issues/40-queue-tab-poll-loop-dies-on-tab-switch.md`.
-- **Forked `implement` ticket with `base:` parks `needs-answer`: can't close commitless.** `set --commitless true` trips the "base: not allowed on a commitless ticket" validation, and `set` can't clear `base`. See `follow-ups/issues/41-fork-placeholder-cannot-close-commitless-with-base.md` (not fixed yet).
-- **Queue tab `m` → Resume/Answer fails in server mode with "acquiring ticket lock at gx:epic/NN.lock".** Server-mode rows carry the address as `Path`, and the Queue menu still calls the local file writers; the Tickets tab routes through `serverAnswerActionCmd`. Workaround: use the Tickets tab, or `gx server tickets unpark <addr>`. See `follow-ups/issues/42-queue-tab-menu-writes-use-address-as-file-path.md` (not fixed yet).
-- **Ticket parks `zero-commit` while an async subagent is still working.** The background-task gate has no marker for async Agent launches (`isAsync`/`agentId`), and a subagent that waits on its own background run sends an *interim* "completed" task-notification; the parent idles and gx parks. Recovery: let the agent finish and commit, then `gx server tickets park <addr> --reason …` (gets it to `needs-repair`; `tickets set` can't) + `gx server tickets land`. See `follow-ups/issues/43-interim-subagent-notification-parks-zero-commit.md` (not fixed yet).
-- **A fork child marked "do this LAST" in its body runs in parallel with its siblings and parks `needs-answer`.** Fork instructions never say to put sibling ordering in `blocked_by`, and `gx tickets add` has no `--blocked-by`. See `follow-ups/issues/44-fork-siblings-ordering-only-in-prose.md` (not fixed yet).
-- **Epic finishes but no "epic done" notification, and its tickets stay in `gx server queue items`.** A done ticket with a cross-epic `blocked_by` renders `error` under plain `tickets.Load` (`BlockedByErr` beats `status`), so `completeRootIfDone`'s `AllDone` is never true. See `follow-ups/issues/46-epic-with-cross-epic-blocker-never-completes.md` (not fixed yet).
-- **Merge (or any) ticket parks while the agent waits on a background test run, though the TaskOutput/TaskStop-only fix is in.** Claude Code now writes `api-request-blob` lines that echo the agent's own assistant message; the gate only skips `type: assistant`, and `reportsOnTasks` defaults to true without a tool_result, so a `cat …/tasks/<id>.output` echo resolves the task. Found on `queue-tab-actions-impl/30`. See `gx:follow-ups/12` (not fixed yet).
+- **Server parks zero-commit although `WaitIterationFinished` is in place: the background-task gate saw the task as resolved.** `transcript.ReadBackgroundTasks` resolved a task when its id appeared on *any* later line, including the agent's own `Monitor`/`Read` of `…/tasks/<id>.output`. Assistant lines no longer resolve (fix in the `transcript:` commit after `2c6d0ea9`). Recover with set `needs-repair` + `gx server tickets land`.
+- **Server parks `needs-answer` / `zero-commit` while an async subagent is still working.** The agent launched an async Agent and idled; the subagent's own background run produced an interim `task-notification` ("the result below may be interim"). The gate had no Agent marker, and an interim notice would have resolved one anyway. Fixed: `agentId` from an `async_launched` result is a marker, and interim notices don't resolve it.
+- **Server-mode Queue tab: a parent shows `waiting-for-children` but no children, and every fork in the epic is gone (Tickets tab is fine).** `ticketFromInfo` parses `27a1` as `Number: 0`, so parent/blocker lookups miss, `PlanWaves` returns `StuckPlanError`, and the Queue falls back to queue items only. Only while a multi-level fork (`NNaN`) is open. Fixed in `f5b8780d`.
+- **Server parks a ticket `needs-answer` / `zero-commit` right when the agent hits "You've hit your session limit".** The server finish path has no rate-limit detection; the agent's later commitless/finished self-report is never adopted, and `land`/`unpark` don't fit a commitless ticket. Not fixed as of this entry.
+- **"No notification when a ticket completes" in server mode.** `ServerChat` has no per-ticket done message; `finishRun` only calls `notifyResult`, which is one-off `notify: true` only. Parks, epic-complete and server notices still send. Fixed in `ea107c0e`.
+- **Queue tab stops auto-updating; `R` updates it.** Fixed by the TUI server-stream rework: the Queue tab has no loop of its own, the app shell owns the server stream and, while the server is down, the store watch and probe loop. Before the fix its 2s poll tick was delivered only to the active tab, so the loop died on the first tick while another tab was open. If you see this on a build with that rework, the shell's stream or probe loop is the suspect, not the tab.
+- **Forked `implement` ticket with `base:` parks `needs-answer`: can't close commitless.** `set --commitless true` trips the "base: not allowed on a commitless ticket" validation, and `set` can't clear `base`. Not fixed as of this entry.
+- **Queue tab `m` → Resume/Answer fails in server mode with "acquiring ticket lock at gx:epic/NN.lock".** Server-mode rows carry the address as `Path`, and the Queue menu still calls the local file writers; the Tickets tab routes through `serverAnswerActionCmd`. Workaround: use the Tickets tab, or `gx server tickets unpark <addr>`. Not fixed as of this entry.
+- **Ticket parks `zero-commit` while an async subagent is still working.** The background-task gate has no marker for async Agent launches (`isAsync`/`agentId`), and a subagent that waits on its own background run sends an *interim* "completed" task-notification; the parent idles and gx parks. Recovery: let the agent finish and commit, then `gx server tickets park <addr> --reason …` (gets it to `needs-repair`; `tickets set` can't) + `gx server tickets land`. Fixed later (see the async-subagent entry above).
+- **A fork child marked "do this LAST" in its body runs in parallel with its siblings and parks `needs-answer`.** Fork instructions never say to put sibling ordering in `blocked_by`, and `gx tickets add` has no `--blocked-by`. Not fixed as of this entry.
+- **Epic finishes but no "epic done" notification, and its tickets stay in `gx server queue items`.** A done ticket with a cross-epic `blocked_by` renders `error` under plain `tickets.Load` (`BlockedByErr` beats `status`), so `completeRootIfDone`'s `AllDone` is never true. Not fixed as of this entry.
+- **Merge (or any) ticket parks while the agent waits on a background test run, though the TaskOutput/TaskStop-only fix is in.** Claude Code now writes `api-request-blob` lines that echo the agent's own assistant message; the gate only skips `type: assistant`, and `reportsOnTasks` defaults to true without a tool_result, so a `cat …/tasks/<id>.output` echo resolves the task. Not fixed as of this entry.

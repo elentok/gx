@@ -125,11 +125,13 @@ entry to gotchas.md only if the fix has landed.
 ## Known gotchas
 
 [gotchas.md](gotchas.md) is a running list of previously-diagnosed bugs, one line each, pointing at
-the commit or ticket that fixed them. Check it before starting — the report in front of you may
-already be solved.
+the commit that fixed them. Check it before starting — the report in front of you may already be
+solved.
 
-After you diagnose (and, elsewhere, fix) a bug through this process, append one line + a pointer
-to gotchas.md yourself. Don't re-explain what the linked commit/ticket already documents.
+After you diagnose (and, elsewhere, fix) a bug through this process, append one line + the fixing
+commit to gotchas.md yourself. Don't re-explain what the linked commit already documents. Never
+cite a ticket: tickets get archived and renumbered, and the tracker isn't on every machine. For a
+bug that isn't fixed yet, the line itself carries the symptom, cause and recovery.
 
 ## Recovering a stuck ticket
 
@@ -222,15 +224,14 @@ looking at when you found it:
   and a suggested fix direction. A follow-up fix ticket can then `blocked_by` it.
 - **Bug is in gx/ralph-loop tooling itself** (scheduler, a skill's own instructions, herdr
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
-  for — file it as a follow-up in `gx:follow-ups` instead, even though you found it investigating a
+  for — file it with the `gx-follow-up` skill instead, even though you found it investigating a
   specific epic. Don't clutter that epic's own issue list with a finding about gx itself.
-  - File it with the `gx-follow-up` skill, target `gx` (and `unattended` when running unattended).
-    Name the epic/investigation in Source and put log lines and ticket IDs in Evidence. A
-    follow-up fix ticket can then `blocked_by` it.
+  - Target `gx` (and `unattended` when running unattended); the skill decides where it lands.
+    Name the epic/investigation in Source and put log lines and ticket IDs in Evidence.
   - This is scoped to diagnosis tickets filed by this skill only — other "file into whatever epic
     is active" call sites (code-review fix tickets, spec-review follow-ups) are untouched.
 - **No epic in scope at all** (a one-off question, nothing under the tracker root) — report the
   diagnosis directly instead of publishing anything.
 
 When unsure which of the first two applies, ask: would this bug still exist if the epic you were
-investigating had never been authored? If yes, it's a tooling bug — `follow-ups`, not the epic.
+investigating had never been authored? If yes, it's a tooling bug — `gx-follow-up`, not the epic.

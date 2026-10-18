@@ -39,7 +39,7 @@ lines can still blow the budget once you add:
   variant typically needs its own wiring and its own test assertion — treat N independent variants
   the same as threading a large file N times, and split by variant group if N is more than a couple.
   This is not optional when the variants also land in different test files (see next bullet) — that
-  conjunction, not variant count alone, is what blows a budget: `conflict-lifecycle/02` named 3
+  conjunction, not variant count alone, is what blows a budget: one past ticket named 3
   variants sharing one root cause and forked 4 times before landing, because the variant count alone
   didn't trigger a split.
 - **Test-file fan-out.** Count how many *distinct existing test files* the ticket's Test Seams will
