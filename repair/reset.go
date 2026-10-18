@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -71,8 +72,10 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 		return ResetResult{}, err
 	}
 	epicName := filepath.Base(filepath.Clean(in.EpicPath))
-	if _, alive := ralphloop.FindIterationSession(d, epicName, t.Identifier); alive {
-		return ResetResult{}, &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("an agent is still alive for ticket %s; stop it first", in.ID)}
+	if sess, alive := ralphloop.FindIterationSession(d, epicName, t.Identifier); alive {
+		if err := closeIdleSession(d.Runner, sess, in.ID); err != nil {
+			return ResetResult{}, err
+		}
 	}
 
 	wtDir, err := d.WorktreeDir(in.Cwd)
@@ -103,6 +106,20 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 		return ResetResult{}, fmt.Errorf("logging ticket-reset: %w", err)
 	}
 	return res, nil
+}
+
+// closeIdleSession stops an idle or done agent: it is a leftover pane, and
+// leaving it would make the next launch hit its label. A working agent, or
+// one whose state is unknown, refuses.
+func closeIdleSession(r agentrunner.Runner, s agentrunner.Session, id string) error {
+	st, err := r.Status(s)
+	if err != nil || (st.State != agentrunner.StateIdle && st.State != agentrunner.StateDone) {
+		return &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("an agent is still alive for ticket %s; stop it first", id)}
+	}
+	if err := r.Stop(s); err != nil {
+		return fmt.Errorf("closing the %s agent of ticket %s: %w", st.State, id, err)
+	}
+	return nil
 }
 
 // clearIteration removes the iteration worktree, then sets the branch aside

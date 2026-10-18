@@ -194,11 +194,25 @@ func (s *Server) repairReset(req RepairRequest) (RepairResult, error) {
 	res, err := repair.Reset(repair.ResetInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
 		DeleteBranch: req.DeleteBranch, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
-	}, ralphloop.DefaultDeps())
+	}, s.resetDeps(req.Address))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
 	return repairOK(res)
+}
+
+// resetDeps talks to the runner hosting address's iteration, so reset sees
+// and closes the agent where it actually runs. A direct reset has no server
+// runner and keeps the default.
+func (s *Server) resetDeps(address string) ralphloop.Deps {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if s.cfg.Runner == nil || err != nil {
+		return ralphloop.DefaultDeps()
+	}
+	// An unavailable runner is nil, which reports no session, as for an
+	// unreachable host.
+	runner, _ := s.iterationRunner(addr)
+	return s.depsWith(runner)
 }
 
 func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
