@@ -79,7 +79,9 @@ type SessionInfo struct {
 	Dir     string `json:"dir"`
 	Harness string `json:"harness"`
 	// Ticket is the Session ticket's address.
-	Ticket          string        `json:"ticket,omitempty"`
+	Ticket string `json:"ticket,omitempty"`
+	// Design marks a session whose ticket is on a map epic: a gx-design run.
+	Design          bool          `json:"design,omitempty"`
 	Status          SessionStatus `json:"status"`
 	StatusChangedAt time.Time     `json:"status_changed_at"`
 	// Exit is how an Exited session ended.
@@ -120,6 +122,13 @@ type MarkActionableRequest struct {
 	ID     string   `json:"id"`
 	Reason string   `json:"reason"`
 	Action []string `json:"action,omitempty"`
+}
+
+// LinkSessionRequest is the body of `gx agent link`: the caller's session
+// and its Session ticket's address.
+type LinkSessionRequest struct {
+	ID     string `json:"id"`
+	Ticket string `json:"ticket"`
 }
 
 // CreateSessionRequest is the body of a session create. Cols and Rows are the
@@ -172,6 +181,7 @@ type sessionMeta struct {
 	// is never replaced.
 	AutoName bool   `json:"auto_name,omitempty"`
 	Ticket   string `json:"ticket,omitempty"`
+	Design   bool   `json:"design,omitempty"`
 	// FirstPrompt waits for the first Idle; it is cleared once typed or on
 	// exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`
@@ -205,6 +215,7 @@ func (m sessionMeta) info() SessionInfo {
 		Dir:             m.Dir,
 		Harness:         m.Harness,
 		Ticket:          m.Ticket,
+		Design:          m.Design,
 		Status:          m.Status,
 		StatusChangedAt: m.StatusChangedAt,
 		Exit:            m.Exit,
@@ -307,6 +318,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		MadeWorktree:   req.Worktree != "",
 		Name:           req.Name,
 		Ticket:         req.Ticket,
+		Design:         req.Ticket != "" && s.onMapEpic(req.Ticket),
 		FirstPrompt:    req.Prompt,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),

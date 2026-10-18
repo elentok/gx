@@ -417,6 +417,14 @@ func (c *Client) MarkSessionActionable(ctx context.Context, req server.MarkActio
 	return res, err
 }
 
+// LinkSession sets an agent's Session ticket. A refusal is a result (Refused
+// set), not an error.
+func (c *Client) LinkSession(ctx context.Context, req server.LinkSessionRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/link", req, &res)
+	return res, err
+}
+
 // ReportFocus sends a TUI's focus report. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) ReportFocus(ctx context.Context, req server.FocusReport) (server.SessionResult, error) {

@@ -28,6 +28,7 @@ var (
 	styleBackground    = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 	styleUnreadMark    = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 	styleActionable    = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	styleDesign        = lipgloss.NewStyle().Foreground(ui.ColorMauve)
 
 	styleStarting    = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	styleWorking     = lipgloss.NewStyle().Foreground(ui.ColorBlue)
@@ -84,7 +85,7 @@ func (m Model) sidebarRows(innerW int) []sidebarRow {
 			header := styleProjectHeader.Render(icons.FolderClosed + " " + s.Project)
 			rows = append(rows, sidebarRow{text: header, session: -1})
 		}
-		row := fit(" "+m.statusIcon(s, icons)+" "+sessionLabel(s), innerW-markSlotsWidth) + " " + marks(s, icons)
+		row := fit(" "+m.statusIcon(s, icons)+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + marks(s, icons)
 		if i == m.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
@@ -222,14 +223,17 @@ func (m Model) statusIcon(s server.SessionInfo, icons ui.IconSet) string {
 	return " "
 }
 
-// sessionLabel is the name (bold when Unread), the teal +bg while a
-// background task runs, and the Session ticket.
-func sessionLabel(s server.SessionInfo) string {
+// sessionLabel is the Design mark, the name (bold when Unread), the teal +bg
+// while a background task runs, and the Session ticket.
+func sessionLabel(s server.SessionInfo, icons ui.IconSet) string {
 	style := styleNameRead
 	if s.Unread.Unread {
 		style = styleNameUnread
 	}
 	label := style.Render(displayName(s))
+	if s.Design {
+		label = styleDesign.Render(icons.DesignSession) + " " + label
+	}
 	if s.Status.State == server.SessionWorking && s.Status.Background {
 		label += styleBackground.Render(" +bg")
 	}

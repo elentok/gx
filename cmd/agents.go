@@ -57,17 +57,54 @@ func newAgentActionableCmd() *cobra.Command {
 // runAgentActionable sends req, or, with no session id or no server, prints a
 // note and succeeds, so skills can call it unconditionally.
 func runAgentActionable(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.MarkActionableRequest) error {
-	if req.ID == "" {
-		_, err := fmt.Fprintf(w, "not in a gx session (%s unset); nothing marked\n", nativerunner.AgentSessionEnv)
+	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "marked", func(cl *apiclient.Client) (server.SessionResult, error) {
+		return cl.MarkSessionActionable(ctx, req)
+	})
+}
+
+// newAgentLinkCmd is `gx agent link`: the calling agent sets its own
+// session's Session ticket.
+func newAgentLinkCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "link <ticket-address>",
+		Short: "set this gx session's ticket (a map epic's marks it a design session); outside one, do nothing",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			req := server.LinkSessionRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Ticket: args[0]}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runAgentLink(ctx, serverClient, c.OutOrStdout(), jsonOut, req)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+// runAgentLink sends req, or, with no session id or no server, prints a note
+// and succeeds, so skills can call it unconditionally.
+func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.LinkSessionRequest) error {
+	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "linked", func(cl *apiclient.Client) (server.SessionResult, error) {
+		return cl.LinkSession(ctx, req)
+	})
+}
+
+// runAgentSelfWrite is a write an agent makes on its own session id; with no
+// id or no server it prints "nothing <done>" and succeeds.
+func runAgentSelfWrite(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id, done string, write func(*apiclient.Client) (server.SessionResult, error)) error {
+	if id == "" {
+		_, err := fmt.Fprintf(w, "not in a gx session (%s unset); nothing %s\n", nativerunner.AgentSessionEnv, done)
 		return err
 	}
 	cl, err := client()
 	if err != nil {
 		return err
 	}
-	res, err := cl.MarkSessionActionable(ctx, req)
+	res, err := write(cl)
 	if apiclient.IsNotRunning(err) {
-		_, err := fmt.Fprintln(w, "gx server not running; nothing marked")
+		_, err := fmt.Fprintf(w, "gx server not running; nothing %s\n", done)
 		return err
 	}
 	return printSessionResult(w, jsonOut, res, err)

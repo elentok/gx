@@ -77,6 +77,9 @@ type IconSet struct {
 	// SessionLive marks a Tickets-tab row whose epic or ticket a live
 	// interactive session is linked to.
 	SessionLive string
+	// DesignSession marks an Agents-tab session linked to a map epic: a
+	// gx-design run.
+	DesignSession string
 
 	// Server* draw the title row's server indicator, one role per connection
 	// state. The nerd set uses one server glyph for all, told apart by color.
@@ -139,6 +142,7 @@ func Icons(useNerdFont bool) IconSet {
 			AgentExited:   "x",
 			Unread:        "+",
 			SessionLive:   ">",
+			DesignSession: "D",
 
 			ServerUp:               "●",
 			ServerDown:             "○",
@@ -198,6 +202,7 @@ func Icons(useNerdFont bool) IconSet {
 		AgentExited:   "",
 		Unread:        "●",
 		SessionLive:   "\uf120",
+		DesignSession: "\U000f0349",
 
 		ServerUp:               "\uf233",
 		ServerDown:             "\uf233",

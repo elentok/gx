@@ -132,6 +132,37 @@ func TestAgentActionable_NoServerInSession(t *testing.T) {
 	}
 }
 
+func TestAgentLink(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	created, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || created.Session == nil {
+		t.Fatalf("create = %+v, %v", created, err)
+	}
+	client := func() (*apiclient.Client, error) { return h.Client, nil }
+
+	var out bytes.Buffer
+	if err := runAgentLink(ctx, client, &out, true, server.LinkSessionRequest{ID: created.Session.ID, Ticket: "auth/03"}); err != nil {
+		t.Fatal(err)
+	}
+	var res server.SessionResult
+	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+		t.Fatalf("output %q: %v", out.String(), err)
+	}
+	if res.Refused || res.Session == nil || res.Session.Ticket != "proj:auth/03" {
+		t.Errorf("link = %s, want the ticket qualified with the project", out.String())
+	}
+
+	out.Reset()
+	noServer := func() (*apiclient.Client, error) {
+		t.Error("outside a session the server was called")
+		return h.Client, nil
+	}
+	if err := runAgentLink(ctx, noServer, &out, false, server.LinkSessionRequest{Ticket: "x"}); err != nil || out.Len() == 0 {
+		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
+	}
+}
+
 func TestAgentsStopAndRemove_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()

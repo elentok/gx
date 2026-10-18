@@ -19,6 +19,7 @@ func TestIcons_TicketNerdFontCodepoints(t *testing.T) {
 		{"TicketPaused", icons.TicketPaused, '\uf28c'},
 		{"SuggestedAction", icons.SuggestedAction, '\uf0e7'},
 		{"SessionLive", icons.SessionLive, '\uf120'},
+		{"DesignSession", icons.DesignSession, '\U000f0349'},
 	}
 	for _, c := range cases {
 		if got := []rune(c.got); len(got) != 1 || got[0] != c.want {

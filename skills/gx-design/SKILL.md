@@ -38,6 +38,9 @@ normally.
 
 ## Detecting the next step
 
+First run `gx agent link <project:epic>` (the ticket address, when given one). The Agents tab then
+marks the session as a design run. Outside a gx session it prints a note and does nothing.
+
 Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the first match.
 
 1. **No map epic** (`gx tickets epics --maps` doesn't list it) → follow wayfinder's "Chart the map"

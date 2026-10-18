@@ -19,7 +19,7 @@ import (
 var update = flag.Bool("update", false, "rewrite the golden files")
 
 // fixtureSessions interleaves projects so grouping is exercised, and covers
-// every status, both marks, +bg and a Session ticket.
+// every status, both marks, +bg, a Session ticket and a Design session.
 func fixtureSessions() []server.SessionInfo {
 	return []server.SessionInfo{
 		{ID: "s1", Name: "fix login", Project: "gx", Ticket: "gx:auth/03",
@@ -28,7 +28,8 @@ func fixtureSessions() []server.SessionInfo {
 		{ID: "s2", Name: "nvim", Project: "dotfiles",
 			Status: server.SessionStatus{State: server.SessionExited}, Exit: server.SessionExitCrashed,
 			Actionable: server.SessionActionable{Reason: "crashed"}},
-		{ID: "s3", Name: "docs", Project: "gx", Status: server.SessionStatus{State: server.SessionIdle}},
+		{ID: "s3", Name: "docs", Project: "gx", Ticket: "gx:map/01", Design: true,
+			Status: server.SessionStatus{State: server.SessionIdle}},
 		{ID: "s4", Name: "review", Project: "gx", Status: server.SessionStatus{State: server.SessionBlocked},
 			Unread: server.SessionUnread{Unread: true}},
 		{ID: "s5", Name: "zsh", Project: "dotfiles",
