@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/ui"
 	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -208,6 +209,69 @@ func TestOHidesTerminalMenuWhenHerdrUnavailable(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
 	if got := updated.(Model).mode; got == modeTerminalMenu {
 		t.Fatalf("o entered the terminal menu with herdr unavailable")
+	}
+}
+
+func TestOOnPlainShowsMoreOptionsInfo(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalPlain}, keymgr.Manager{})
+	m.ready = true
+	m.worktrees = []git.Worktree{{Name: "main", Path: filepath.Join(repoDir, "main"), Branch: repo.Trunk}}
+	resizeTable(&m.table, 100, 10)
+	m.table.SetRows(m.buildRows())
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: 'o', Text: "o"})
+	if cmd == nil {
+		t.Fatalf("expected an info notification")
+	}
+	msg, ok := cmd().(notify.NotifyMsg)
+	if !ok || msg.Message != "use tmux, kitty, herdr or ghostty for more options" {
+		t.Fatalf("got %#v, want the ghostty-aware info string", msg)
+	}
+}
+
+func TestTerminalMenuItemsHideSessionOnGhosttyOnly(t *testing.T) {
+	t.Parallel()
+	values := func(term ui.Terminal) []string {
+		var out []string
+		for _, it := range terminalMenuItems(term) {
+			out = append(out, it.Value)
+		}
+		return out
+	}
+	if got := strings.Join(values(ui.TerminalGhostty), ","); got != "hsplit,vsplit,tab" {
+		t.Errorf("ghostty items = %q", got)
+	}
+	for _, term := range []ui.Terminal{ui.TerminalTmux, ui.TerminalKittyRemote, ui.TerminalHerdr} {
+		if got := strings.Join(values(term), ","); got != "session,hsplit,vsplit,tab" {
+			t.Errorf("%v items = %q", term, got)
+		}
+	}
+}
+
+func TestGhosttyTerminalMenuActionsUseSplitShell(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempBareRepoWithWorktrees(t, "feature-a")
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+	m := NewWithSettings(*repo, "", ui.Settings{Terminal: ui.TerminalGhostty}, keymgr.Manager{})
+	m = m.enterTerminalMenuFor("main", filepath.Join(repoDir, "main"))
+	if len(m.terminalMenu.Items) != 3 {
+		t.Fatalf("expected 3 ghostty items, got %d", len(m.terminalMenu.Items))
+	}
+	for _, action := range []string{"hsplit", "vsplit", "tab"} {
+		_, cmd := m.executeTerminalAction(action)
+		if cmd == nil {
+			t.Errorf("%s: expected a command", action)
+		}
 	}
 }
 

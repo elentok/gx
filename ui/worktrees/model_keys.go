@@ -220,7 +220,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		return m, nil
 	case bindingOpenTerminal:
 		if m.settings.Terminal == ui.TerminalPlain || m.herdrTerminalDown() {
-			return m, notify.Info("use tmux or kitty for more options")
+			return m, notify.Info(moreOptionsInfo)
 		}
 		wt := m.cursorWorktree()
 		if wt != nil {

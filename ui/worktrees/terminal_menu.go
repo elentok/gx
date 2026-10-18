@@ -12,13 +12,21 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func terminalMenuItems() []components.MenuItem {
-	return []components.MenuItem{
-		{Label: "session", Value: "session", Detail: "new or jump to existing"},
+// moreOptionsInfo is shown when the terminal has no menu to offer.
+const moreOptionsInfo = "use tmux, kitty, herdr or ghostty for more options"
+
+// terminalMenuItems hides "session" on Ghostty, which has no session concept.
+func terminalMenuItems(terminal ui.Terminal) []components.MenuItem {
+	items := []components.MenuItem{
 		{Label: "hsplit", Value: "hsplit", Detail: "horizontal split (stacked, top/bottom)"},
 		{Label: "vsplit", Value: "vsplit", Detail: "vertical split (side-by-side)"},
 		{Label: "tab", Value: "tab", Detail: "new tab"},
 	}
+	if terminal == ui.TerminalGhostty {
+		return items
+	}
+	session := components.MenuItem{Label: "session", Value: "session", Detail: "new or jump to existing"}
+	return append([]components.MenuItem{session}, items...)
 }
 
 // herdrTerminalDown reports a herdr terminal whose herdr is missing or
@@ -32,7 +40,7 @@ func (m Model) enterTerminalMenuFor(name, path string) Model {
 	m.openTargetName = name
 	m.openTargetPath = path
 	m.terminalMenu = components.MenuState{
-		Items:  terminalMenuItems(),
+		Items:  terminalMenuItems(m.settings.Terminal),
 		Cursor: 0,
 	}
 	return m
@@ -101,10 +109,19 @@ func (m Model) executeTerminalAction(action string) (Model, tea.Cmd) {
 		case "tab":
 			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalHerdr, terminalrun.Tab, shell, done)
 		}
+	case ui.TerminalGhostty:
+		switch action {
+		case "hsplit":
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.HSplit, shell, done)
+		case "vsplit":
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.VSplit, shell, done)
+		case "tab":
+			return m, terminalrun.CommandWithSplitShell(path, ui.TerminalGhostty, terminalrun.Tab, shell, done)
+		}
 	case ui.TerminalKitty:
 		return m, notify.Info("enable kitty remote control for this to work")
 	default:
-		return m, notify.Info("use tmux, kitty or herdr for more options")
+		return m, notify.Info(moreOptionsInfo)
 	}
 	return m, nil
 }
