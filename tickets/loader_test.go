@@ -381,3 +381,63 @@ func TestLoad_TicketMDKindMapMakesAMapEpic(t *testing.T) {
 		t.Errorf("plain epic: IsMap=%v Body=%q", p.IsMap, p.Body)
 	}
 }
+
+func TestLoad_SkipsReadingUnchangedTicketFiles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cache-epic", "issues", "01-first.md")
+	writeFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
+	old := time.Now().Add(-time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	reads := 0
+	orig := readTicketFile
+	readTicketFile = func(p string) ([]byte, error) { reads++; return orig(p) }
+	t.Cleanup(func() { readTicketFile = orig })
+
+	status := func() string {
+		epics, err := Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return epics[0].Tickets[0].Status
+	}
+
+	if got := status(); got != "open" || reads != 1 {
+		t.Fatalf("first load: status=%q reads=%d, want open/1", got, reads)
+	}
+	if got := status(); got != "open" || reads != 1 {
+		t.Fatalf("unchanged reload: status=%q reads=%d, want open/1", got, reads)
+	}
+
+	// "open" -> "done" keeps the size, so only the mtime tells it changed.
+	writeFile(t, path, "---\nid: \"01\"\nstatus: done\ntype: implement\n---\nBody.\n")
+	changed := old.Add(time.Minute)
+	if err := os.Chtimes(path, changed, changed); err != nil {
+		t.Fatal(err)
+	}
+	if got := status(); got != "done" || reads != 2 {
+		t.Fatalf("edited reload: status=%q reads=%d, want done/2", got, reads)
+	}
+}
+
+func TestLoad_DoesNotTrustRecentlyModifiedTicketFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cache-epic", "issues", "01-first.md")
+	writeFile(t, path, "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n")
+
+	reads := 0
+	orig := readTicketFile
+	readTicketFile = func(p string) ([]byte, error) { reads++; return orig(p) }
+	t.Cleanup(func() { readTicketFile = orig })
+
+	for range 2 {
+		if _, err := Load(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if reads != 2 {
+		t.Fatalf("reads = %d, want 2: a file modified moments before caching must be re-read", reads)
+	}
+}

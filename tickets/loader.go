@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -63,58 +65,118 @@ func loadEpic(scratchDir, name string) Epic {
 		}
 
 		ticketPath := filepath.Join(issuesDir, issueEntry.Name())
-		ticket := Ticket{
-			Number:     number,
-			Identifier: identifier,
-			Title:      title,
-			Path:       ticketPath,
-		}
-
-		raw, err := os.ReadFile(ticketPath)
-		if err != nil {
-			ticket.ReadErr = err.Error()
-			epic.Tickets = append(epic.Tickets, ticket)
-			continue
-		}
-
-		parsed, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
-		if err != nil {
-			ticket.ReadErr = err.Error()
-			epic.Tickets = append(epic.Tickets, ticket)
-			continue
-		}
-
-		ticket.Type = string(parsed.Type)
-		ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
-		ticket.Parent = idToStringPtr(parsed.Parent)
-		ticket.Status = string(parsed.Status)
-		ticket.Body = schema.ParseBody(string(raw))
-		if heading := headingTitle(ticket.Body, identifier); heading != "" {
-			ticket.Title = heading
-		}
-		ticket.ActualContextWindow = parsed.ActualContextWindow
-		ticket.ExpectedContextWindow = parsed.ExpectedContextWindow
-		ticket.ElapsedTime = parsed.ElapsedTime
-		ticket.ActualCost = parsed.ActualCost
-		ticket.Compactions = parsed.Compactions
-		ticket.Commitless = parsed.IsCommitless()
-		ticket.Category = string(parsed.Category)
-		ticket.ExportedAt = parsed.ExportedAt
-		ticket.Notify = parsed.Notify
-		ticket.Manual = parsed.Manual
-		ticket.NoRecover = parsed.NoRecover
-		ticket.Unique = parsed.Unique
-		ticket.ParkKind = parsed.ParkKind
-		ticket.Mutes = parsed.Mutes
-		ticket.Base = parsed.Base
-		ticket.ResolvedBase = parsed.ResolvedBase
-		epic.Tickets = append(epic.Tickets, ticket)
+		epic.Tickets = append(epic.Tickets, loadTicketCached(ticketPath, number, identifier, title))
 	}
 
 	epic.quarantineInvalidParents()
 	epic.flagDanglingBlockers()
 
 	return epic
+}
+
+type ticketCacheEntry struct {
+	modTime  time.Time
+	size     int64
+	cachedAt time.Time
+	ticket   Ticket
+}
+
+var (
+	ticketCacheMu sync.Mutex
+	ticketCache   = map[string]ticketCacheEntry{}
+	// readTicketFile is a seam so tests can count real reads.
+	readTicketFile = os.ReadFile
+)
+
+// ticketCacheRacy is how recent a file's mtime may be, relative to when it
+// was cached, before the entry is not trusted: a same-size edit inside the
+// filesystem's mtime granularity would otherwise look unchanged.
+const ticketCacheRacy = 2 * time.Second
+
+// loadTicketCached returns the parsed ticket at path, skipping the read and
+// parse when its mtime and size match the last load. The file stays the truth:
+// any stat difference, or a file modified too close to the cache time, reloads.
+func loadTicketCached(path string, number int, identifier, title string) Ticket {
+	info, statErr := os.Stat(path)
+	if statErr != nil {
+		return loadTicketFile(path, number, identifier, title)
+	}
+
+	ticketCacheMu.Lock()
+	entry, ok := ticketCache[path]
+	ticketCacheMu.Unlock()
+	if ok && entry.size == info.Size() && entry.modTime.Equal(info.ModTime()) &&
+		entry.cachedAt.Sub(entry.modTime) > ticketCacheRacy {
+		return cloneTicket(entry.ticket)
+	}
+
+	ticket := loadTicketFile(path, number, identifier, title)
+	ticketCacheMu.Lock()
+	ticketCache[path] = ticketCacheEntry{
+		modTime:  info.ModTime(),
+		size:     info.Size(),
+		cachedAt: time.Now(),
+		ticket:   cloneTicket(ticket),
+	}
+	ticketCacheMu.Unlock()
+	return ticket
+}
+
+func cloneTicket(t Ticket) Ticket {
+	t.BlockedBy = slices.Clone(t.BlockedBy)
+	t.Mutes = slices.Clone(t.Mutes)
+	if t.Parent != nil {
+		p := *t.Parent
+		t.Parent = &p
+	}
+	return t
+}
+
+func loadTicketFile(ticketPath string, number int, identifier, title string) Ticket {
+	ticket := Ticket{
+		Number:     number,
+		Identifier: identifier,
+		Title:      title,
+		Path:       ticketPath,
+	}
+
+	raw, err := readTicketFile(ticketPath)
+	if err != nil {
+		ticket.ReadErr = err.Error()
+		return ticket
+	}
+
+	parsed, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	if err != nil {
+		ticket.ReadErr = err.Error()
+		return ticket
+	}
+
+	ticket.Type = string(parsed.Type)
+	ticket.BlockedBy = idsToStrings(parsed.BlockedBy)
+	ticket.Parent = idToStringPtr(parsed.Parent)
+	ticket.Status = string(parsed.Status)
+	ticket.Body = schema.ParseBody(string(raw))
+	if heading := headingTitle(ticket.Body, identifier); heading != "" {
+		ticket.Title = heading
+	}
+	ticket.ActualContextWindow = parsed.ActualContextWindow
+	ticket.ExpectedContextWindow = parsed.ExpectedContextWindow
+	ticket.ElapsedTime = parsed.ElapsedTime
+	ticket.ActualCost = parsed.ActualCost
+	ticket.Compactions = parsed.Compactions
+	ticket.Commitless = parsed.IsCommitless()
+	ticket.Category = string(parsed.Category)
+	ticket.ExportedAt = parsed.ExportedAt
+	ticket.Notify = parsed.Notify
+	ticket.Manual = parsed.Manual
+	ticket.NoRecover = parsed.NoRecover
+	ticket.Unique = parsed.Unique
+	ticket.ParkKind = parsed.ParkKind
+	ticket.Mutes = parsed.Mutes
+	ticket.Base = parsed.Base
+	ticket.ResolvedBase = parsed.ResolvedBase
+	return ticket
 }
 
 // parseTicketFilename splits a "NN[suffix]-<slug>.md" filename into its
