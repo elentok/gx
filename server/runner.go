@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -459,7 +460,11 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		s.registry.delete(ticketAddr)
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
-		if perr := s.parkTicket(dir, ticket, t.Path, events.IterationError, "launch failed: "+err.Error()); perr != nil {
+		kind, reason := events.IterationError, "launch failed: "+err.Error()
+		if taken := (*nameTakenError)(nil); errors.As(err, &taken) {
+			kind, reason = events.AgentNameTaken, "agent name taken: "+taken.reason
+		}
+		if perr := s.parkTicket(dir, ticket, t.Path, kind, reason); perr != nil {
 			err = errors.Join(err, fmt.Errorf("park: %w", perr))
 		}
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
@@ -1180,30 +1185,99 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	}
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
-	session, err := ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
-		Label: label,
-		Epic:  ticket.Epic,
-		Cwd:   cwd,
-		Kind:  agentrunner.Kind(agent),
-		Args:  ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
-		Env:   s.settings.Load().TabEnv,
-	}, launchPrompt(agent, launchSkill(t), investigatePrompt(t), ticket.String()), func(attempt int, decision string) {
-		dir, err := s.projectDir(ticket.Project)
-		if err != nil {
-			return
-		}
-		_ = ralphloop.AppendEvent(dir, ticket.Epic, ralphloop.Event{
-			Type:    string(events.PromptNudged),
-			Ticket:  ticket.ID,
-			Address: ticket.String(),
-			Label:   label,
-			Attempt: attempt,
-			Reason:  decision,
+	start := func() (agentrunner.Session, error) {
+		return ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
+			Label: label,
+			Epic:  ticket.Epic,
+			Cwd:   cwd,
+			Kind:  agentrunner.Kind(agent),
+			Args:  ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
+			Env:   s.settings.Load().TabEnv,
+		}, launchPrompt(agent, launchSkill(t), investigatePrompt(t), ticket.String()), func(attempt int, decision string) {
+			s.logEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
-	})
+	}
+	session, err := start()
+	if errors.Is(err, agentrunner.ErrLabelTaken) {
+		if h := s.labelHolder(deps.Runner, ticket, label, err); h.stale {
+			if serr := deps.Runner.Stop(h.Session); serr != nil {
+				s.log.Warn("close stale holder", "ticket", ticket.String(), "pane", h.ID, "err", serr)
+			} else {
+				s.logEvent(ticket, ralphloop.Event{Type: string(events.StalePaneClosed), Label: label, Pane: h.ID, Cwd: h.cwd, Reason: string(h.State)})
+				session, err = start()
+			}
+		}
+	}
+	if errors.Is(err, agentrunner.ErrLabelTaken) {
+		taken := &nameTakenError{reason: s.labelHolder(deps.Runner, ticket, label, err).describe(), err: err}
+		s.logEvent(ticket, ralphloop.Event{Type: string(events.LaunchFailed), Kind: string(events.AgentNameTaken), Label: label, Reason: taken.Error()})
+		return Run{}, taken
+	}
 	if err != nil {
 		return Run{}, err
 	}
 	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
+}
+
+// logEvent appends ev to ticket's run log, best effort.
+func (s *Server) logEvent(ticket tickets.Address, ev ralphloop.Event) {
+	dir, err := s.projectDir(ticket.Project)
+	if err != nil {
+		return
+	}
+	ev.Ticket, ev.Address = ticket.ID, ticket.String()
+	_ = ralphloop.AppendEvent(dir, ticket.Epic, ev)
+}
+
+// nameTakenError is a launch whose label a holder gx may not close still
+// has; reason names that holder.
+type nameTakenError struct {
+	reason string
+	err    error
+}
+
+func (e *nameTakenError) Error() string { return e.err.Error() + ": " + e.reason }
+func (e *nameTakenError) Unwrap() error { return e.err }
+
+// labelHolder is the live session holding a launch's label.
+type labelHolder struct {
+	agentrunner.Session
+	agentrunner.Status
+	cwd   string
+	found bool
+	// stale: no other run tracks it and it is not mid-turn, so nothing is
+	// lost by closing it.
+	stale bool
+}
+
+func (h labelHolder) describe() string {
+	if !h.found {
+		return "holder not found"
+	}
+	return fmt.Sprintf("held by pane %s (cwd %s, status %s)", h.ID, cmp.Or(h.cwd, "unknown"), h.State)
+}
+
+// labelHolder finds who holds label after Start failed with takenErr. Only
+// herdr's error says the holder's cwd. The launching ticket's own registry
+// entry has no session yet, so it never counts as tracking the holder.
+func (s *Server) labelHolder(r agentrunner.Runner, ticket tickets.Address, label string, takenErr error) labelHolder {
+	var h labelHolder
+	var taken *herdr.AgentNameTakenError
+	if errors.As(takenErr, &taken) {
+		h.cwd = taken.CandidateCwd
+	}
+	sess, ok, err := r.Find(label)
+	if err != nil || !ok {
+		return h
+	}
+	h.Session, h.found = sess, true
+	if h.Status, err = r.Status(sess); err != nil {
+		return h
+	}
+	tracked := slices.ContainsFunc(s.registry.list(), func(t trackedRun) bool {
+		return t.Address != ticket.String() && (t.Session.Label == sess.Label || (sess.ID != "" && t.Session.ID == sess.ID))
+	})
+	h.stale = !tracked && (h.State == agentrunner.StateIdle || h.State == agentrunner.StateDone)
+	return h
 }

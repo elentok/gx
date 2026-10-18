@@ -57,7 +57,10 @@ const (
 	Reclaimed    Type = "reclaimed"
 	// ClaimReopened is a claim a restarted server found dead and empty, so it
 	// cleared the iteration and reopened the ticket instead of parking it.
-	ClaimReopened    Type = "claim-reopened"
+	ClaimReopened Type = "claim-reopened"
+	// StalePaneClosed is a launch that found its label held by a pane no run
+	// tracks and not mid-turn, so it closed that pane and retried.
+	StalePaneClosed  Type = "stale-pane-closed"
 	HerdrUnavailable Type = "herdr-unavailable"
 	HerdrAvailable   Type = "herdr-available"
 	Submitted        Type = "submitted"
