@@ -41,6 +41,15 @@ type OneIteration struct {
 	// LeafBase is the identifier of the unlanded sibling whose iteration branch
 	// the ticket starts from; "" starts it at the feature tip.
 	LeafBase string
+	// Sink hears the finish path's events; nil hears nothing.
+	Sink EventSink
+}
+
+func (o OneIteration) sink() EventSink {
+	if o.Sink == nil {
+		return noopEventSink{}
+	}
+	return o.Sink
 }
 
 // IterationWorktree is what PrepareIteration made for one ticket.
@@ -135,7 +144,7 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		WorktreeLock:    &worktreeLock,
 		SmartZone:       defaultSmartZone,
 		Gate:            NewGate(),
-		Sink:            noopEventSink{},
+		Sink:            o.sink(),
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
 	err := finishIteration(d, p, w.Path, pane, w.base, w.Branch, sessionID)
@@ -212,7 +221,7 @@ const landDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.Mi
 // finish, and the ticket is parked zero-commit before the agent commits.
 func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	until := runnerFinishStates
-	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: noopEventSink{}}
+	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink()}
 	elapsedMs := 0
 	for {
 		if _, err := d.Runner.Wait(s, until, smartZonePollMs*time.Millisecond); err != nil {

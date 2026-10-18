@@ -169,6 +169,46 @@ func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, tick
 	}
 }
 
+// FinishSink is the EventSink the server's finish path reports through for
+// one ticket. It forwards only what the server cannot see from the outcome: a
+// conflict resolution starting, and the resolution child parking. The ticket's
+// own park is dropped, since the server notifies it from the outcome.
+func (c *ServerChat) FinishSink(project string, override *ServerChatConfig, epic, ticketPath, ticketID string, counts func() EpicCounts) EventSink {
+	return finishSink{c: c, project: project, override: override, epic: epic, ticketPath: ticketPath, ticketID: ticketID, counts: counts}
+}
+
+type finishSink struct {
+	noopEventSink
+	c                          *ServerChat
+	project                    string
+	override                   *ServerChatConfig
+	epic, ticketPath, ticketID string
+	counts                     func() EpicCounts
+}
+
+func (f finishSink) ConflictResolutionStarted(identifier string) {
+	if f.c == nil {
+		return
+	}
+	for _, s := range f.c.projectSinks(f.override) {
+		body := s.style.conflictResolutionStartedText(f.project+"/"+f.epic, identifier)
+		s.sendIn(s.style.chatStyle.Bold(f.project), body, notifyKindConflictStarted, f.ticketPath, identifier)
+	}
+}
+
+func (f finishSink) TicketNeedsHuman(identifier, _, status, reason string) {
+	if f.c == nil || identifier == f.ticketID {
+		return
+	}
+	counts := f.counts()
+	// The child's path never reaches the sink, so a mute lands on the epic.
+	source := epicSource(f.project + "/" + f.epic)
+	for _, s := range f.c.projectSinks(f.override) {
+		body := s.style.ticketNeedsHumanText(identifier, f.project+"/"+f.epic, status, reason, counts)
+		s.sendIn(s.style.chatStyle.Bold(f.project), body, notifyKindTicketNeedsHuman, source, identifier)
+	}
+}
+
 // Escalated notifies that recovery gave a failure up to a person. detail names
 // the failure, why recovery stopped, the matched entry and the report.
 func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic, ticketPath, identifier, detail string) {

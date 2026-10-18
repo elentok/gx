@@ -420,6 +420,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
+		Sink: s.finishSink(ticket, t.Path),
 	}
 	deps := s.depsFor(ticket.Project)
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)

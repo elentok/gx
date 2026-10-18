@@ -473,6 +473,7 @@ func (s *Server) resume(t trackedRun) (ralphloop.OneIteration, ralphloop.Iterati
 	if one.Ticket.Path == "" {
 		return one, ralphloop.IterationWorktree{}, iterationMode{}, errors.New("ticket gone")
 	}
+	one.Sink = s.finishSink(addr, one.Ticket.Path)
 	mode := s.iterationModeFor(addr, one.Ticket)
 	wt, err := mode.resume(ralphloop.DefaultDeps(), one, t.Base)
 	if err != nil {

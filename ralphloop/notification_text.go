@@ -160,6 +160,17 @@ func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason s
 	return s.chatStyle.Message(emoji, headline, "", detail, s.identityLine(epicName, identifier))
 }
 
+// conflictResolutionStartedText renders the "an agent took over a land
+// conflict" notification:
+//
+//	🔀 *resolving land conflict*
+//
+//	An agent is resolving the cherry-pick conflict
+//	[gx] {epic}/{ticket}
+func (s mrkdwnStyle) conflictResolutionStartedText(epicName, ticketIdentifier string) chatmarkup.Text {
+	return s.chatStyle.Message("🔀", "resolving land conflict", "", "An agent is resolving the cherry-pick conflict", s.identityLine(epicName, ticketIdentifier))
+}
+
 // epicParkedText renders the "epic parked" notification — the run is still
 // alive (unlike epicCompleteText) with every pane recoverable, waiting on a
 // person to clear one of the named tickets:

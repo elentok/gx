@@ -46,7 +46,7 @@ func ResumeFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Ticket: o.Ticket,
-		ScratchDir: o.ScratchDir, Sink: noopEventSink{},
+		ScratchDir: o.ScratchDir, Sink: o.sink(),
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
 	adopted, err := adoptNeedsAnswerReport(p, w.Path, pane, sessionID)

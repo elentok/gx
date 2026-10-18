@@ -58,6 +58,39 @@ func TestLandBuilt_UnresolvedConflictParksParentAsLandConflict(t *testing.T) {
 	}
 }
 
+// The server's finish sink tells chat a conflict resolution started and that
+// its child parked, but leaves the parent's own park to the server.
+func TestLandBuilt_FinishSinkSendsConflictStartAndChildParkOnly(t *testing.T) {
+	t.Parallel()
+	d, p, built, ticketPath := serverLandFixture(t)
+	picked := false
+	d.CherryPickRange = func(string, string, string) error { picked = true; return &fakeConflictErr{} }
+	d.CherryPickInProgress = func(string) (bool, error) { return picked, nil }
+	srv, reqs := fakeSlackServer(t, 200)
+	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
+	p.Sink = c.FinishSink("alpha", nil, "epic", ticketPath, "01", func() EpicCounts { return EpicCounts{Total: 2} })
+
+	if err := landBuilt(d, p, built); err != nil {
+		t.Fatalf("landBuilt() error = %v", err)
+	}
+	c.Close()
+
+	got := reqs()
+	if len(got) != 1 {
+		t.Fatalf("got %d sends, want one batch", len(got))
+	}
+	text := got[0].Text
+	if !strings.Contains(text, "resolving land conflict") {
+		t.Errorf("missing the conflict-started message:\n%s", text)
+	}
+	if n := strings.Count(text, "needs repair"); n != 1 || !strings.Contains(text, "epic/01a") {
+		t.Errorf("want exactly the child's park (01a), got %d needs-repair messages:\n%s", n, text)
+	}
+	if strings.Contains(text, "land conflict not resolved") {
+		t.Errorf("parent's own park reached chat; the server already notifies it:\n%s", text)
+	}
+}
+
 // A cherry-pick in progress that no iteration branch holds is a person's work:
 // the land refuses instead of aborting it.
 func TestLandBuilt_ForeignCherryPickIsNotAborted(t *testing.T) {

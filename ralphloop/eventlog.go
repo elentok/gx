@@ -33,6 +33,7 @@ const (
 	notifyKindEpicParked        = "epic-parked"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
 	notifyKindEpicFailed        = "epic-failed"
+	notifyKindConflictStarted   = "conflict-resolution-started"
 	// notifyKindMuted/notifyKindGloballyMuted tag the gate's own
 	// edge-triggered "muting this"/"globally muted" notice (see
 	// chatEventSink.send) — distinct from the live event that tripped the

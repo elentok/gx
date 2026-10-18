@@ -38,6 +38,14 @@ func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events
 	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, fmt.Sprintf("%s: %s", kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 
+// finishSink carries the finish path's chat-worthy events the outcome cannot
+// show: a land conflict's resolution starting, and its child parking.
+func (s *Server) finishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink {
+	return s.chat.FinishSink(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() ralphloop.EpicCounts {
+		return s.epicCounts(addr.Project, addr.Epic)
+	})
+}
+
 // epicCounts tallies the epic from disk, fresh: a park has just rewritten a
 // ticket, so the scanned view may not have it yet. Zero when the epic cannot be read.
 func (s *Server) epicCounts(project, epic string) ralphloop.EpicCounts {
