@@ -60,6 +60,9 @@ type Deps struct {
 	RevParse     func(dir, ref string) (string, error)
 	MergeBase    func(dir, refA, refB string) (string, error)
 	CommitsAhead func(dir, fromExclusive, toRef string) (int, error)
+	// UncommittedChanges lists dir's dirty files, for a zero-commit park's
+	// reason.
+	UncommittedChanges func(dir string) ([]git.Change, error)
 	// CommitSubjects lists fromExclusive..toRef's subjects, oldest first, so
 	// startup reconciliation can tell an interrupted landing's commits from
 	// anything else that reached the feature branch.
@@ -219,6 +222,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RevParse:             git.RevParse,
 		MergeBase:            git.MergeBase,
 		CommitsAhead:         git.CommitsAhead,
+		UncommittedChanges:   git.UncommittedChanges,
 		CommitSubjects:       git.CommitSubjects,
 		UnreachableCommits:   git.UnreachableCommits,
 		CherryPickRange:      git.CherryPickRange,
@@ -226,7 +230,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		AbortCherryPick:      git.AbortCherryPick,
 		IsAncestor:           git.IsAncestor,
 		RebaseInProgress:     git.RebaseInProgress,
-		PatchesApplied:     git.PatchesApplied,
+		PatchesApplied:       git.PatchesApplied,
 		AppendTrailers:       git.AppendTrailers,
 		TrailerMap:           git.TrailerMap,
 		WorktreeExists:       worktreeExists,

@@ -405,7 +405,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 			// The agent finished without landing any commits: leave the worktree/
 			// tab in place for inspection instead of silently marking done or
 			// retrying, and let the scheduler move on to other unblocked tickets.
-			if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no commits landed", pane, sessionID, path); err != nil {
+			if _, err := p.parkNeedsAnswer(events.ZeroCommit, zeroCommitReason(d, path), pane, sessionID, path); err != nil {
 				return fmt.Errorf("marking ticket needs-answer: %w", err)
 			}
 			return nil
@@ -433,6 +433,21 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		pane:      pane,
 		path:      path,
 	}}
+}
+
+// zeroCommitReason is the zero-commit park's reason. It names a dirty worktree,
+// since uncommitted work there is what a person most needs to know; a status
+// that cannot be read keeps the plain reason.
+func zeroCommitReason(d Deps, path string) string {
+	const reason = "no commits landed"
+	if d.UncommittedChanges == nil {
+		return reason
+	}
+	dirty, err := d.UncommittedChanges(path)
+	if err != nil || len(dirty) == 0 {
+		return reason
+	}
+	return fmt.Sprintf("%s; worktree has uncommitted changes (%d files)", reason, len(dirty))
 }
 
 // unexecutedToolCallCorrection is the corrective prompt sent to a pane whose

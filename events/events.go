@@ -122,7 +122,8 @@ const (
 	// ancestor its ID allows.
 	ParentDefect Kind = "parent-defect"
 	// BackgroundTaskGate is a finish held on a background task. The loop logs
-	// the hold kind-less; the failure recovery raises from it carries this.
+	// the hold kind-less; the failure recovery raises from it carries this, and
+	// so does R10's park of a dirty worktree with commits ahead.
 	BackgroundTaskGate Kind = "background-task-gate"
 	// StrandedCommits is a commitless ticket that committed on its detached
 	// worktree anyway; the worktree stays until a person lands or drops them.
@@ -172,12 +173,13 @@ func (k Kind) Valid() bool { return kinds[k] }
 // person; every other kind parks needs-repair.
 var kindNeedsAnswer = map[Kind]bool{
 	ZeroCommit: true, BlockedPane: true, SelfReported: true, AmbiguousBase: true, StrandedCommits: true,
+	BackgroundTaskGate: true,
 }
 
 // kindNeedsStub lists the kinds whose question lives nowhere in the ticket, so
 // the park writes a "## Needs Answer" stub carrying the reason. Ticket-answered
 // kinds (zero-commit, self-reported) stay bare.
-var kindNeedsStub = map[Kind]bool{BlockedPane: true, AmbiguousBase: true, StrandedCommits: true}
+var kindNeedsStub = map[Kind]bool{BlockedPane: true, AmbiguousBase: true, StrandedCommits: true, BackgroundTaskGate: true}
 
 // ParkType is the event type a park of this kind writes.
 func (k Kind) ParkType() Type {

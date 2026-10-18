@@ -99,9 +99,11 @@ type runRegistry struct {
 	path string
 	log  *slog.Logger
 	runs map[string]trackedRun
-	// released are the runs whose background-task gate recovery forced open.
-	// In memory only: a reclaimed run starts with its gate closed again.
-	released map[string]bool
+	// released are the runs whose background-task gate recovery forced open,
+	// each with the park reason its finish writes instead of landing ("" lets
+	// the finish run). In memory only: a reclaimed run starts with its gate
+	// closed again.
+	released map[string]string
 	// budgetStops are the runs the budget hard limit is stopping, true once
 	// one path has parked it budget-killed. In memory only.
 	budgetStops map[string]bool
@@ -234,13 +236,20 @@ func (r *runRegistry) tracked(address string) (trackedRun, bool) {
 	return t, ok
 }
 
-func (r *runRegistry) releaseGate(address string) {
+func (r *runRegistry) releaseGate(address, park string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.released == nil {
-		r.released = map[string]bool{}
+		r.released = map[string]string{}
 	}
-	r.released[address] = true
+	r.released[address] = park
+}
+
+// gatePark is the park reason release-gate left for the run at address.
+func (r *runRegistry) gatePark(address string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.released[address]
 }
 
 // gateReleased is the Deps.GateReleased hook of the run at address.
@@ -248,7 +257,8 @@ func (r *runRegistry) gateReleased(address string) func() bool {
 	return func() bool {
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		return r.released[address]
+		_, ok := r.released[address]
+		return ok
 	}
 }
 

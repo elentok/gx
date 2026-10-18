@@ -568,7 +568,7 @@ func TestR8MatchesOnlyARateLimitPauseThatResets(t *testing.T) {
 	}
 }
 
-func TestDefaultR10LaunchesDisabledAsAMediumRule(t *testing.T) {
+func TestDefaultR10LaunchesEnabledAsAMediumRule(t *testing.T) {
 	var r10 []Entry
 	for _, e := range Default().Entries {
 		if e.ID == "R10" {
@@ -579,16 +579,28 @@ func TestDefaultR10LaunchesDisabledAsAMediumRule(t *testing.T) {
 		t.Fatalf("R10 entries = %v, want one", r10)
 	}
 	e := r10[0]
-	if e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"release-gate", "finish"}) || e.Remedy == nil {
-		t.Fatalf("R10 = %+v, want disabled medium rule with release-gate, finish", e)
+	if !e.Enabled || e.Executor != ExecutorRule || e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"release-gate", "finish"}) || e.Remedy == nil {
+		t.Fatalf("R10 = %+v, want enabled medium rule with release-gate, finish", e)
 	}
 	held := []Event{{Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: "background task t1"}}
-	if _, ok := Default().Match(held); ok {
-		t.Error("R10 must not match while disabled")
+	if got, ok := Default().Match(held); !ok || got.ID != "R10" {
+		t.Errorf("held gate matched (%q, %v), want R10", got.ID, ok)
 	}
 }
 
-func TestR10RemedyReleasesThenFinishesAndNeverParks(t *testing.T) {
+func TestR10NeverMatchesItsOwnPark(t *testing.T) {
+	park := Event{Type: events.NeedsAnswer, Kind: events.BackgroundTaskGate, Reason: "dirty worktree"}
+	held := Event{Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate}
+	if got, ok := Default().Match([]Event{held, park}); ok {
+		t.Errorf("R10's own park matched %q", got.ID)
+	}
+	f := Failure{Address: "p:e/01", Type: events.BackgroundTaskGate.ParkType(), Kind: events.BackgroundTaskGate}
+	if f.Triggers() {
+		t.Errorf("R10's own park %+v triggers recovery", f)
+	}
+}
+
+func TestR10RemedyReleasesThenFinishes(t *testing.T) {
 	e := Entry{}
 	for _, c := range Default().Entries {
 		if c.ID == "R10" {

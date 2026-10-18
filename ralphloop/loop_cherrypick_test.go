@@ -648,6 +648,33 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 	}
 }
 
+func TestRun_ZeroCommitIteration_ReasonNamesADirtyWorktree(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		dirty []git.Change
+		want  string
+	}{
+		{"clean", nil, "no commits landed"},
+		{"dirty", []git.Change{{Path: "a"}, {Path: "b"}, {Path: "c"}}, "no commits landed; worktree has uncommitted changes (3 files)"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			scratchDir := writeEpic(t, "epic", map[string]string{
+				"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+			})
+			d, _, _ := fakeDeps()
+			d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
+			d.UncommittedChanges = func(string) ([]git.Change, error) { return tc.dirty, nil }
+			sink := &recordingSink{}
+			runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+			if len(sink.ticketNeedsHumanCalls) != 1 || sink.ticketNeedsHumanCalls[0][3] != tc.want {
+				t.Errorf("TicketNeedsHuman calls = %v, want one with reason %q", sink.ticketNeedsHumanCalls, tc.want)
+			}
+		})
+	}
+}
+
 func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{

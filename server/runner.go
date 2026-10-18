@@ -685,6 +685,9 @@ func (s *Server) settleRun(rc runContext, err error) {
 		return
 	}
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
+	if s.parkReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
+		return
+	}
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next

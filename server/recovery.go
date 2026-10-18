@@ -1,17 +1,18 @@
 package server
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
@@ -552,42 +553,79 @@ func (s *Server) recoveryWait(req QueueRequest, _ recovery.Call) (QueueResult, e
 // Refusal reasons of release-gate and finish.
 const (
 	ReasonAgentBusy      = "agent-busy"
-	ReasonWorktreeDirty  = "worktree-dirty"
-	ReasonNoCommitsAhead = "no-commits-ahead"
 	ReasonFinishTimedOut = "finish-timed-out"
 )
 
+// agentState is the run's agent state, read fresh through the run's runner.
+// idle is true for an agent that is not working: idle, or done.
+func (s *Server) agentState(addr tickets.Address) (state agentrunner.State, idle bool, err error) {
+	runner, sess, ok, err := s.liveSession(addr)
+	if err != nil || !ok {
+		return "", false, cmp.Or(err, fmt.Errorf("no agent for %s", addr))
+	}
+	st, err := runner.Status(sess)
+	if err != nil {
+		return "", false, err
+	}
+	return st.State, st.State == agentrunner.StateIdle || st.State == agentrunner.StateDone, nil
+}
+
+// recoveryReleaseGate releases a held gate on an idle agent. Zero commits and
+// a clean worktree with commits ahead both let the finish run as it would:
+// parked zero-commit, or landed. A dirty worktree with commits ahead must not
+// land unfinished work, so its finish parks background-task-gate instead.
 func (s *Server) recoveryReleaseGate(req QueueRequest, _ recovery.Call) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		run, ok := s.registry.tracked(ref.addr.String())
 		if !ok {
 			return refusal(ReasonIterationNotLive, "no live iteration for "+ref.addr.String()), nil
 		}
-		label, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.worktreeDir(ref.addr.Project))
-		agent, err := herdr.AgentGet(label)
+		state, idle, err := s.agentState(ref.addr)
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("read agent of %s: %w", ref.addr, err)
 		}
-		if agent.AgentStatus != "idle" && agent.AgentStatus != "done" {
-			return refusal(ReasonAgentBusy, ref.addr.String()+" agent is "+agent.AgentStatus), nil
+		if !idle {
+			return refusal(ReasonAgentBusy, ref.addr.String()+" agent is "+string(state)), nil
 		}
-		staged, unstaged, untracked, err := git.WorktreeStatusSummary(worktree)
-		if err != nil {
-			return QueueResult{}, fmt.Errorf("status of %s: %w", worktree, err)
-		}
-		if staged+unstaged+untracked > 0 {
-			return refusal(ReasonWorktreeDirty, worktree+" has uncommitted changes"), nil
-		}
+		_, _, worktree := ralphloop.IterationIdentity(ref.addr.Epic, ref.addr.ID, s.worktreeDir(ref.addr.Project))
 		ahead, err := git.CommitsAhead(worktree, run.Base, "HEAD")
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("commits ahead in %s: %w", worktree, err)
 		}
-		if ahead < 1 {
-			return refusal(ReasonNoCommitsAhead, worktree+" has no commits ahead of its base"), nil
+		park := ""
+		if ahead > 0 {
+			dirty, err := git.UncommittedChanges(worktree)
+			if err != nil {
+				return QueueResult{}, fmt.Errorf("status of %s: %w", worktree, err)
+			}
+			if len(dirty) > 0 {
+				park = gateParkReason(dirty)
+			}
 		}
-		s.registry.releaseGate(ref.addr.String())
+		s.registry.releaseGate(ref.addr.String(), park)
 		return QueueResult{}, nil
 	})
+}
+
+func gateParkReason(dirty []git.Change) string {
+	paths := make([]string, len(dirty))
+	for i, c := range dirty {
+		paths[i] = c.Path
+	}
+	return "background-task gate released on an idle agent, but the worktree has uncommitted changes: " + strings.Join(paths, ", ")
+}
+
+// parkReleasedGate writes the park release-gate left for a run in place of its
+// finish, leaving worktree and pane for a person. False when there is none.
+func (s *Server) parkReleasedGate(scratchDir string, addr tickets.Address, ticketPath string, run Run) bool {
+	reason := s.registry.gatePark(addr.String())
+	if reason == "" {
+		return false
+	}
+	if err := s.parkTicket(scratchDir, addr, ticketPath, events.BackgroundTaskGate, reason, run); err != nil {
+		s.log.Error("park released gate", "ticket", addr.String(), "err", err)
+	}
+	return true
 }
 
 // finishWaitTimeout bounds Finish: a released gate's finish only re-checks

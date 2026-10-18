@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
@@ -986,57 +988,74 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 	})
 }
 
-// raiseGateHeld raises a held background-task gate on ticket 01 against a
-// catalog with R10 enabled. The iteration has a real worktree, shaped by
-// prepare, and a pane reporting status. It stands in for the loop's finish by
-// dropping the run once the gate is released, and returns R10's applied event
-// plus the escalation, if any.
-func raiseGateHeld(t *testing.T, status string, prepare func(worktree string)) (applied ralphloop.Event, escalated *ralphloop.Event) {
+// iterationAgent is a runner answering to name that hosts ticket 01's
+// iteration agent in state.
+func iterationAgent(t *testing.T, name string, state agentrunner.State) (renamedFake, agentrunner.Session) {
+	t.Helper()
+	fake := newRenamedFake(name, nativerunner.VerdictLive)
+	sess, err := fake.Start(agentrunner.StartOptions{Label: holderLabel})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake.SetState(holderLabel, state, "")
+	return fake, sess
+}
+
+// gateRaise is what raiseGateHeld saw once R10 was done.
+type gateRaise struct {
+	applied   ralphloop.Event
+	escalated *ralphloop.Event
+	log       []ralphloop.Event
+	ticket    string
+	worktree  string
+}
+
+// raiseGateHeld raises a held background-task gate on ticket 01 with the
+// default catalog. The iteration has a real worktree, shaped by prepare, and an
+// agent in state on a runner answering to runner. It stands in for the loop's
+// finish by settling the run once the gate is released.
+func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare func(worktree string)) gateRaise {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	cat := recovery.Default()
-	for i := range cat.Entries {
-		if cat.Entries[i].ID == "R10" {
-			cat.Entries[i].Enabled = true
-		}
-	}
+	fake, sess := iterationAgent(t, runner, state)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Recovery = cat
-	})
-	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": status}}, herdrfake.Identities{}, nil
+		c.Recovery = recovery.Default()
+		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
 	})
 	_, branch, worktree := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
 	testutil.MustGitExported(t, repo, "worktree", "add", "-b", branch, worktree)
 	prepare(worktree)
 
 	const addr = "proj:epic-a/01"
-	h.Server.PutRunFrom("proj:epic-a", server.Run{Address: addr}, "main")
+	h.Server.PutRunFrom("proj:epic-a", server.Run{Address: addr, Runner: runner, Session: sess}, "main")
 	dir := filepath.Join(store, "proj")
 	held := ralphloop.Event{Type: string(events.BackgroundTaskGateHeld), Ticket: "01", Reason: "background task task-1"}
 	if err := ralphloop.AppendEvent(dir, "epic-a", held); err != nil {
 		t.Fatal(err)
 	}
 	h.Server.RecoverAsync(recovery.Failure{Address: addr, Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate, Reason: held.Reason})
+	var got gateRaise
 	waitFor(t, func() bool {
 		if h.Server.GateReleased(addr) {
-			h.Server.DropRun(addr)
+			h.Server.SettleReleasedRun(addr)
 		}
-		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
+		got.log, _, _ = ralphloop.ReadEvents(dir, "epic-a")
 		var done bool
-		for i, ev := range log {
+		for i, ev := range got.log {
 			switch events.Type(ev.Type) {
 			case events.RecoveryApplied:
-				applied, done = ev, ev.Outcome == "ok"
+				got.applied, done = ev, ev.Outcome == "ok"
 			case events.RecoveryEscalated:
-				escalated, done = &log[i], true
+				got.escalated, done = &got.log[i], true
 			}
 		}
 		return done
 	})
-	return applied, escalated
+	data, _ := os.ReadFile(filepath.Join(dir, "epic-a", "issues", "01-first.md"))
+	got.ticket, got.worktree = string(data), worktree
+	return got
 }
 
 func commitInWorktree(t *testing.T) func(string) {
@@ -1046,37 +1065,67 @@ func commitInWorktree(t *testing.T) func(string) {
 	}
 }
 
-func TestRecovery_HeldGateWithCommittedIdleWorkIsReleasedAndFinishedByR10(t *testing.T) {
-	applied, escalated := raiseGateHeld(t, "idle", commitInWorktree(t))
-	if applied.Reason != "R10" || applied.Outcome != "ok" {
-		t.Errorf("applied = %+v, want R10 ok", applied)
-	}
-	if escalated != nil {
-		t.Errorf("escalated = %+v after a finished release", *escalated)
+func dirtyAfter(t *testing.T, prepare func(string)) func(string) {
+	return func(worktree string) {
+		prepare(worktree)
+		testutil.WriteFile(t, worktree, "stray.txt", "uncommitted")
 	}
 }
 
-func TestRecovery_HeldGateThatCannotBeReleasedEscalatesWithoutAPark(t *testing.T) {
-	for _, tc := range []struct {
-		name, status, reason string
-		prepare              func(*testing.T) func(string)
-	}{
-		{"busy pane", "working", server.ReasonAgentBusy, commitInWorktree},
-		{"dirty worktree", "idle", server.ReasonWorktreeDirty, func(t *testing.T) func(string) {
-			return func(worktree string) {
-				commitInWorktree(t)(worktree)
-				testutil.WriteFile(t, worktree, "stray.txt", "uncommitted")
+// R10 releases the gate on an idle agent whether or not the worktree has
+// commits: the finish then lands them or parks zero-commit on its own.
+func TestRecovery_R10ReleasesAnIdleAgentsGateAndLetsTheFinishRun(t *testing.T) {
+	for _, runner := range []string{"herdr", "headless"} {
+		for _, tc := range []struct {
+			name    string
+			prepare func(string)
+		}{
+			{"commits on a clean worktree", commitInWorktree(t)},
+			{"no commits on a clean worktree", func(string) {}},
+			{"no commits on a dirty worktree", dirtyAfter(t, func(string) {})},
+		} {
+			t.Run(runner+"/"+tc.name, func(t *testing.T) {
+				got := raiseGateHeld(t, runner, agentrunner.StateIdle, tc.prepare)
+				if got.applied.Reason != "R10" || got.applied.Outcome != "ok" || got.escalated != nil {
+					t.Errorf("applied = %+v, escalated = %v; want R10 ok", got.applied, got.escalated)
+				}
+				if strings.Contains(got.ticket, "background-task-gate") {
+					t.Errorf("R10 parked a finish it should have let run:\n%s", got.ticket)
+				}
+			})
+		}
+	}
+}
+
+func TestRecovery_R10ParksADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
+	for _, runner := range []string{"herdr", "headless"} {
+		t.Run(runner, func(t *testing.T) {
+			got := raiseGateHeld(t, runner, agentrunner.StateIdle, dirtyAfter(t, commitInWorktree(t)))
+			if got.applied.Reason != "R10" || got.applied.Outcome != "ok" {
+				t.Errorf("applied = %+v, want R10 ok", got.applied)
 			}
-		}},
-		{"no commits ahead", "idle", server.ReasonNoCommitsAhead, func(*testing.T) func(string) { return func(string) {} }},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			applied, escalated := raiseGateHeld(t, tc.status, tc.prepare(t))
-			if applied.Reason != "R10" || !strings.Contains(applied.Outcome, tc.reason) {
-				t.Errorf("applied = %+v, want a failed R10 naming %s", applied, tc.reason)
+			if !strings.Contains(got.ticket, "status: needs-answer") || !strings.Contains(got.ticket, "park_kind: background-task-gate") || !strings.Contains(got.ticket, "stray.txt") {
+				t.Errorf("ticket not parked background-task-gate naming the dirty file:\n%s", got.ticket)
 			}
-			if escalated == nil || escalated.Reason != "R10" || escalated.Outcome != applied.Outcome {
-				t.Errorf("escalated = %v, want R10 with the applied outcome %q", escalated, applied.Outcome)
+			if _, err := os.Stat(filepath.Join(got.worktree, "stray.txt")); err != nil {
+				t.Errorf("worktree not left: %v", err)
+			}
+			if n := len(ofType(got.log, events.RecoveryApplied)); n != 1 {
+				t.Errorf("recoveries = %d, want R10's one: its own park must not re-match", n)
+			}
+		})
+	}
+}
+
+func TestRecovery_R10LeavesABusyAgentsGateAndEscalates(t *testing.T) {
+	for _, runner := range []string{"herdr", "headless"} {
+		t.Run(runner, func(t *testing.T) {
+			got := raiseGateHeld(t, runner, agentrunner.StateWorking, commitInWorktree(t))
+			if got.applied.Reason != "R10" || !strings.Contains(got.applied.Outcome, server.ReasonAgentBusy) {
+				t.Errorf("applied = %+v, want a failed R10 naming %s", got.applied, server.ReasonAgentBusy)
+			}
+			if got.escalated == nil || got.escalated.Reason != "R10" {
+				t.Errorf("escalated = %v, want R10", got.escalated)
 			}
 		})
 	}
@@ -1282,19 +1331,18 @@ func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
 	}
 }
 
-// watchHeldGate seeds ticket 01's run log, puts its run in the registry with a
-// pane reporting status, and runs one watchdog pass an hour after the start.
-// It returns a counter of the gate's recovery-applied events on 01 and a rerun.
-func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applied func() int, pass func()) {
+// watchHeldGate seeds ticket 01's run log, puts its run in the registry with an
+// agent in state, and runs one watchdog pass an hour after the start. It
+// returns a counter of the gate's recovery-applied events on 01 and a rerun.
+func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Event) (applied func() int, pass func()) {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	fake, sess := iterationAgent(t, "headless", state)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Default()
-	})
-	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": status}}, herdrfake.Identities{}, nil
+		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
 	})
 	dir := filepath.Join(store, "proj")
 	for _, ev := range seed {
@@ -1303,7 +1351,7 @@ func watchHeldGate(t *testing.T, status string, seed ...ralphloop.Event) (applie
 			t.Fatal(err)
 		}
 	}
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "headless", Session: sess})
 	pass = func() { h.Server.WatchGates(gateWatchStart.Add(time.Hour)) }
 	applied = func() int {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
@@ -1344,8 +1392,9 @@ func TestGateWatch_HeldGateOnAnIdlePaneIsRaisedOnce(t *testing.T) {
 
 func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 	for _, tc := range []struct {
-		name, status string
-		seed         []ralphloop.Event
+		name   string
+		status agentrunner.State
+		seed   []ralphloop.Event
 	}{
 		{"busy pane", "working", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute)}},
 		{"released gate", "idle", []ralphloop.Event{gateEvent(events.BackgroundTaskGateHeld, time.Minute), gateEvent(events.BackgroundTaskGateReleased, 2*time.Minute)}},

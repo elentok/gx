@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
@@ -43,8 +42,7 @@ func (s *Server) keepGatesWatched(ctx context.Context) {
 }
 
 // watchGates raises each live run whose latest iteration holds a background
-// task gate past the quiet period while its pane is idle. R10 ships disabled,
-// so for now the raise matches nothing and goes to an investigation.
+// task gate past the quiet period while its agent is idle, for R10.
 func (s *Server) watchGates(now time.Time) {
 	if s.gatesRaised == nil {
 		s.gatesRaised = map[gateHold]bool{}
@@ -62,9 +60,7 @@ func (s *Server) watchGates(now time.Time) {
 		if s.gatesRaised[hold] {
 			continue
 		}
-		label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
-		agent, err := herdr.AgentGet(label)
-		if err != nil || (agent.AgentStatus != "idle" && agent.AgentStatus != "done") {
+		if _, idle, err := s.agentState(addr); err != nil || !idle {
 			continue
 		}
 		s.gatesRaised[hold] = true

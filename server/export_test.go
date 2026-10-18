@@ -122,6 +122,17 @@ func (s *Server) GateReleased(address string) bool { return s.registry.gateRelea
 // DropRun forgets a run the way its finish does.
 func (s *Server) DropRun(address string) { s.registry.delete(address) }
 
+// SettleReleasedRun stands in for the finish of a run whose gate was released:
+// the park release-gate left, if any, then the run is dropped.
+func (s *Server) SettleReleasedRun(address string) {
+	addr, _ := tickets.ParseAddress(address, tickets.AddressContext{})
+	dir := filepath.Join(s.cfg.TicketStore, addr.Project)
+	if run, ok := s.registry.runOf(address); ok {
+		s.parkReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
+	}
+	s.registry.delete(address)
+}
+
 // ClaimNext runs one claim pass now.
 func (s *Server) ClaimNext() { s.claimNext() }
 
