@@ -70,7 +70,7 @@ func RecoverStart(
 		if adopt && taken.CandidateCwd != "" && taken.CandidateCwd == cwd {
 			return StartAdopt, nil
 		}
-		return 0, fmt.Errorf("%w: %w", agentrunner.ErrLabelTaken, err)
+		return 0, &agentrunner.LabelTakenError{HolderCwd: taken.CandidateCwd, Err: err}
 	case errors.As(err, &notReady):
 		// Only the trust_directory dialog is answered: gx raised it by
 		// launching in a new directory. Any other dialog is not ours to answer.

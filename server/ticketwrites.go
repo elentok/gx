@@ -112,10 +112,9 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		run, _ := s.registry.tracked(ref.addr.String())
-		if err := ralphloop.Park(ref.projectDir, ref.addr.Epic, ref.addr.ID, ref.ticket.Path, events.ManualPark, reason, run.parkEvent()); err != nil {
+		if err := s.parkTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.ManualPark, reason, run.Run); err != nil {
 			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
 		}
-		s.events.publish(EventTicketParked, ref.addr.String())
 		return QueueResult{}, nil
 	})
 }
@@ -249,7 +248,7 @@ func (s *Server) settleLive(addrs []tickets.Address, stop bool, blocks func(agen
 // so it is never killed without --stop.
 func isWorking(r agentrunner.Runner, sess agentrunner.Session) bool {
 	st, err := r.Status(sess)
-	return err != nil || (st.State != agentrunner.StateIdle && st.State != agentrunner.StateDone)
+	return err != nil || !st.Waiting()
 }
 
 // cancelTargets is the ticket plus its fork descendants that are not terminal.

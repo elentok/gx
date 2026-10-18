@@ -98,11 +98,9 @@ type runRegistry struct {
 	path string
 	log  *slog.Logger
 	runs map[string]trackedRun
-	// released are the runs whose background-task gate recovery forced open,
-	// each with the park reason its finish writes instead of landing ("" lets
-	// the finish run). In memory only: a reclaimed run starts with its gate
-	// closed again.
-	released map[string]string
+	// released are the runs whose background-task gate recovery forced open.
+	// In memory only: a reclaimed run starts with its gate closed again.
+	released map[string]gateRelease
 	// budgetStops are the runs the budget hard limit is stopping, true once
 	// one path has parked it budget-killed. In memory only.
 	budgetStops map[string]bool
@@ -235,20 +233,27 @@ func (r *runRegistry) tracked(address string) (trackedRun, bool) {
 	return t, ok
 }
 
+// gateRelease is what recovery left on a run whose gate it forced open.
+type gateRelease struct {
+	// park is the reason the run's finish parks with instead of landing; ""
+	// lets the finish run.
+	park string
+}
+
 func (r *runRegistry) releaseGate(address, park string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.released == nil {
-		r.released = map[string]string{}
+		r.released = map[string]gateRelease{}
 	}
-	r.released[address] = park
+	r.released[address] = gateRelease{park: park}
 }
 
 // gatePark is the park reason release-gate left for the run at address.
 func (r *runRegistry) gatePark(address string) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.released[address]
+	return r.released[address].park
 }
 
 // gateReleased is the Deps.GateReleased hook of the run at address.
@@ -477,7 +482,7 @@ func (s *Server) reclaim(t trackedRun) error {
 		if err != nil {
 			return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
 		}
-		if st.State == agentrunner.StateIdle || st.State == agentrunner.StateDone {
+		if st.Waiting() {
 			return s.stopLaunching(t, runner, session, string(st.State))
 		}
 	}

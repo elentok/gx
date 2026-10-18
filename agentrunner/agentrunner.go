@@ -64,6 +64,23 @@ type Status struct {
 	BlockedReason string
 }
 
+// Waiting is an agent that is not working: idle, or done.
+func (s Status) Waiting() bool {
+	return s.State == StateIdle || s.State == StateDone
+}
+
+// LabelTakenError is ErrLabelTaken with the holder's cwd, when the host says
+// it. Err is the host's own failure.
+type LabelTakenError struct {
+	HolderCwd string
+	Err       error
+}
+
+func (e *LabelTakenError) Error() string { return ErrLabelTaken.Error() + ": " + e.Err.Error() }
+func (e *LabelTakenError) Unwrap() []error {
+	return []error{ErrLabelTaken, e.Err}
+}
+
 type Decision string
 
 const (

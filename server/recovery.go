@@ -567,7 +567,7 @@ func (s *Server) agentState(addr tickets.Address) (state agentrunner.State, idle
 	if err != nil {
 		return "", false, err
 	}
-	return st.State, st.State == agentrunner.StateIdle || st.State == agentrunner.StateDone, nil
+	return st.State, st.Waiting(), nil
 }
 
 // recoveryReleaseGate releases a held gate on an idle agent. Zero commits and
