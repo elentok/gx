@@ -68,7 +68,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 
 	var items []contextmenu.Item[ticketTarget]
 	if epic.IsMap {
-		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, in.serverReason))
+		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
 	}
 	mergeWhy := firstReason(reasonIf(!epic.AllDone(), ticketsNotDone), reasonIf(!epic.MergedAt.IsZero(), alreadyMerged))
 	mergeGroup := contextmenu.Server

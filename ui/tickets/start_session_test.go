@@ -86,12 +86,12 @@ func TestStartSession_CompletedMapEpicSuggestsStartAndMerge(t *testing.T) {
 	}
 }
 
-func TestStartSession_DimWithoutAServer(t *testing.T) {
+func TestStartSession_RunsWithoutAServer(t *testing.T) {
 	m := startSessionModel(t)
 	m.serverAPI = nil
 	m = openEpicMenuOn(t, m, "gx:map")
-	if _, cmd := chooseTicketMenuItem(t, m, "Start session"); cmd != nil {
-		t.Error("start session ran on a map epic with no server")
+	if _, cmd := chooseTicketMenuItem(t, m, "Start session"); cmd == nil {
+		t.Error("start session issued nothing on a map epic with no server")
 	}
 }
 
