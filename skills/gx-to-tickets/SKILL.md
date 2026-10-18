@@ -159,6 +159,23 @@ or test name. If no automated seam is appropriate for a ticket (pure documentati
 split, exploratory research), write an explicit `none` entry with the rationale — never leave the
 section silent.
 
+### 4b. Write each implement ticket's "Where to look" map
+
+Every `type: implement` ticket must carry a `## Where to look` section. You already have this from
+the planning pass; the implementing agent starts cold and otherwise spends many turns (and often a
+context overrun) rediscovering it, then misses shared fixtures and fails the full suite late.
+
+- **Entry points**: `file:func` where the change starts.
+- **Test helpers**: the existing helpers and fakes for each named seam (not just "the server with
+  runnerfake" — name the helper and the file it lives in).
+- **Shared contract**: callers, tests and fixtures that depend on a contract the ticket changes, and
+  which side of a package split (e.g. `server/` vs `ralphloop/`) each call site sits on.
+- **Regression data**: inline any transcript or fixture the ticket relies on. Never point at another
+  ticket for it.
+
+If no map applies, write an explicit `none — <rationale>`, as with test seams. Code-review fix
+tickets are out of scope here.
+
 ### 5. Quiz the user
 
 Present the proposed breakdown as a numbered list. For each ticket, show:
@@ -238,6 +255,14 @@ implementation list.
 
 (Or, when no automated seam applies: `none — <rationale>`.)
 
+## Where to look
+
+- Entry points: `file:func` ...
+- Test helpers: ...
+- Shared contract (callers, tests, fixtures): ...
+
+(Or: `none — <rationale>`.)
+
 ## Acceptance criteria
 
 - [ ] Acceptance criterion 1
@@ -258,7 +283,8 @@ empty ticket is schedulable. Without `--body`, the stub lands
 the descendant alone; a ticket published from a plan or spec has no `parent` and records nothing
 about the tickets that follow it.
 
-Avoid specific file paths or code snippets in the body — they go stale fast. Exception: if a
-prototype produced a snippet that encodes a decision more precisely than prose can (state machine,
+Avoid specific file paths or code snippets in the body — they go stale fast. Exceptions: the
+`## Where to look` section, which exists to name them, and a
+snippet from a prototype. If a prototype produced a snippet that encodes a decision more precisely than prose can (state machine,
 reducer, schema, type shape), inline it and note briefly that it came from a prototype. Trim to the
 decision-rich parts — not a working demo, just the important bits.
