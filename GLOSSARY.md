@@ -201,7 +201,10 @@ herdr's field in the one file that holds both. See ADR 0019.
 path (only writing `status: done` if landing succeeds). Not "promote", which already names two
 unrelated things in this repo (`draft` → `open`, and an epic entering `MaxConcurrentEpics`'s
 auto-promotion queue). An agent's report can start a landing; it can never conclude one — the
-commit count and the cherry-pick are what conclude it. See ADR 0019.
+commit count and the cherry-pick are what conclude it. See ADR 0019. A **late finish** is a
+`finished` report that arrives after gx already parked the ticket `zero-commit`; gx adopts it while
+the ticket is still parked and either has commits (it lands) or reported commitless (it closes
+`done` with nothing to land), the same as an on-time one.
 
 **Park reason** — the first non-empty line after a parked ticket's `## Needs Answer` or `## Needs
 Repair` heading, with markdown markers stripped and ellipsised for display. What the Queue row
