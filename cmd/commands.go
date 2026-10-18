@@ -399,6 +399,9 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 	}
 	sectionCmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
+	// Content is free text that often starts with "-" (a markdown list), so
+	// flags must come before the positional args.
+	sectionCmd.Flags().SetInterspersed(false)
 	cmd.AddCommand(sectionCmd)
 	var moveSlug string
 	var moveDryRun, moveJSON bool

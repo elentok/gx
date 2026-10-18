@@ -91,6 +91,18 @@ func TestExecute_TicketsSection_CrossProject(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsSection_ContentStartingWithDash(t *testing.T) {
+	repo, project := setupShowProject(t)
+	path := setupOtherProject(t, project)
+
+	if _, err := runIn(t, repo, "tickets", "section", "theirs:epic/03", "Notes", "- first\n- second"); err != nil {
+		t.Fatalf("section: %v", err)
+	}
+	if got, _ := os.ReadFile(path); !strings.Contains(string(got), "## Notes\n\n- first\n- second") {
+		t.Errorf("list content not written:\n%s", got)
+	}
+}
+
 func TestExecute_TicketsSetAndSection_UnknownProjectRefusedWritesNothing(t *testing.T) {
 	repo, project := setupShowProject(t)
 	path := setupOtherProject(t, project)
