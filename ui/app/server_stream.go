@@ -27,6 +27,10 @@ type serverStatePage interface {
 type serverStream struct {
 	vm     viewmodel.State
 	loaded bool // a snapshot has been applied
+	// queue is vm's queue status, kept by setVM: working it out walks every
+	// epic, too slow to redo on each render.
+	queue   ticketsui.QueueStatus
+	queueOK bool
 
 	// snapshotting coalesces re-snapshot requests; gen drops a snapshot reply
 	// that a link-down (or a newer request) has outdated.
@@ -48,6 +52,12 @@ type serverStream struct {
 	streamCtx    context.Context
 	streamStop   context.CancelFunc
 	streamEvents <-chan server.Event
+}
+
+// setVM replaces the shared state and its queue status.
+func (s *serverStream) setVM(vm viewmodel.State) {
+	s.vm = vm
+	s.queue, s.queueOK = ticketsui.QueueStatusOf(vm)
 }
 
 type streamSnapshotMsg struct {
@@ -213,7 +223,7 @@ func (m Model) onSnapshotErr(err error) (Model, tea.Cmd) {
 func (m Model) onSnapshot(snap server.Snapshot) (Model, tea.Cmd) {
 	m.stream.snapshotFailing = false
 	firstLoad := !m.stream.loaded
-	m.stream.vm = m.stream.vm.ApplySnapshot(snap)
+	m.stream.setVM(m.stream.vm.ApplySnapshot(snap))
 	m.stream.loaded = true
 
 	var cmds []tea.Cmd
@@ -297,9 +307,9 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.events != m.stream.streamEvents {
 			return m, nil, true
 		}
-		var effect viewmodel.Effect
 		seqBefore := m.stream.vm.Seq
-		m.stream.vm, effect = m.stream.vm.Reduce(msg.ev)
+		vm, effect := m.stream.vm.Reduce(msg.ev)
+		m.stream.setVM(vm)
 		var cmds []tea.Cmd
 		if msg.ev.Seq > seqBefore+1 {
 			// A gap: what was missed is unknowable, so the re-snapshot must
@@ -344,7 +354,7 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.err != nil {
 			return m, nil, true
 		}
-		m.stream.vm = m.stream.vm.SetQueue(msg.items)
+		m.stream.setVM(m.stream.vm.SetQueue(msg.items))
 		m, deliver := m.deliverServerState()
 		return m, deliver, true
 	}

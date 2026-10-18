@@ -155,8 +155,8 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 	}
 
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
-	if q, ok := ticketsui.QueueStatusOf(m.stream.vm); ok {
-		right = append(right, queueSegments(q, icons, shape.queueBar)...)
+	if m.stream.queueOK {
+		right = append(right, queueSegments(m.stream.queue, icons, shape.queueBar)...)
 	}
 	if n := m.stream.vm.ActionableCount(); n > 0 {
 		right = append(right, titleSegment{icons.Agents, titleAgentsWord}, sp, titleSegment{strconv.Itoa(n), titleAgentsCount}, sp)

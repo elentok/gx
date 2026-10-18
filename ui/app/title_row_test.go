@@ -222,6 +222,7 @@ func withQueue(m Model, mode string, running bool) Model {
 	}
 	m.stream.vm.Queue = []string{"gx:alpha/04", "gx:alpha/05"}
 	m.stream.vm.Mode = mode
+	m.stream.setVM(m.stream.vm)
 	return m
 }
 
