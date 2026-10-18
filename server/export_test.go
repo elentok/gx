@@ -61,7 +61,7 @@ func (s *Server) ParkAs(address string, kind events.Kind, reason string) error {
 	if err != nil || !ok {
 		return errors.Join(err, errors.New("no ticket "+address))
 	}
-	return s.parkTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason)
+	return s.parkTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, Run{})
 }
 
 // SetCostOf swaps how an iteration's cost is read.
@@ -107,7 +107,7 @@ func (s *Server) PutRunAt(root string, r Run, at time.Time) {
 func (s *Server) ParkTicket(project, epic, id string, kind events.Kind, reason string) error {
 	dir := filepath.Join(s.cfg.TicketStore, project)
 	path := filepath.Join(dir, epic, "issues", id+"-first.md")
-	return s.parkTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason)
+	return s.parkTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, Run{})
 }
 
 // PutRunFrom is PutRun with the base the iteration branched from.

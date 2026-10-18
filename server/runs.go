@@ -41,6 +41,12 @@ type Run struct {
 	Effort string `json:"effort,omitempty"`
 }
 
+// parkEvent is the run's agent context on its park event: the park drops the
+// runs.json entry, so late-finish adoption finds the runner from here.
+func (r Run) parkEvent() ralphloop.Event {
+	return ralphloop.Event{Agent: ralphloop.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID}
+}
+
 // runnerHerdr is the Runner of every launch until the server launches
 // through agentrunner, and of any run an older server saved.
 const runnerHerdr = "herdr"
@@ -363,7 +369,7 @@ func (s *Server) parkUnreclaimed(t trackedRun, cause error) {
 	if err == nil {
 		var dir string
 		if dir, _, err = s.projectOf(addr.Project); err == nil {
-			err = s.parkTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error())
+			err = s.parkTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error(), t.Run)
 		}
 	}
 	if err != nil {
@@ -400,7 +406,7 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 		if err != nil {
 			return err
 		}
-		return s.parkTicket(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied)
+		return s.parkTicket(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied, t.Run)
 	}
 	one, wt, mode, err := s.resume(t)
 	if err != nil {

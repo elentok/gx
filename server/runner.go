@@ -421,7 +421,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := s.parkTicket(dir, ticket, t.Path, events.AmbiguousBase, reason); perr != nil {
+		if perr := s.parkTicket(dir, ticket, t.Path, events.AmbiguousBase, reason, Run{}); perr != nil {
 			return false, fmt.Errorf("park %s: %w", ticketAddr, perr)
 		}
 		return false, nil
@@ -464,7 +464,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		if taken := (*nameTakenError)(nil); errors.As(err, &taken) {
 			kind, reason = events.AgentNameTaken, "agent name taken: "+taken.reason
 		}
-		if perr := s.parkTicket(dir, ticket, t.Path, kind, reason); perr != nil {
+		if perr := s.parkTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
 			err = errors.Join(err, fmt.Errorf("park: %w", perr))
 		}
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
@@ -701,7 +701,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
 		// Park it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := s.parkTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error()); perr != nil {
+		if perr := s.parkTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
 			s.log.Warn("park failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		s.events.publish(EventIterationFailed, ticketAddr)

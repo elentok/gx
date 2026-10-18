@@ -70,6 +70,12 @@ func (h *headlessFake) Prune(maxAge time.Duration, _ time.Time, parked func(stri
 // asHeadlessRun rewrites the staged handle as a headless run on the fake runner.
 func asHeadlessRun(t *testing.T, h *servertest.Harness) {
 	t.Helper()
+	stampRun(t, h, "fake", agentrunner.Session{Label: "epic-a-iter-01", ID: "p1"})
+}
+
+// stampRun rewrites the staged handle's runner and session.
+func stampRun(t *testing.T, h *servertest.Harness, runner string, session agentrunner.Session) {
+	t.Helper()
 	path := filepath.Join(h.StateDir, "runs.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -79,8 +85,8 @@ func asHeadlessRun(t *testing.T, h *servertest.Harness) {
 	if err := json.Unmarshal(data, &runs); err != nil {
 		t.Fatal(err)
 	}
-	runs[0]["runner"] = "fake"
-	runs[0]["session"] = agentrunner.Session{Label: "epic-a-iter-01", ID: "p1"}
+	runs[0]["runner"] = runner
+	runs[0]["session"] = session
 	delete(runs[0], "pane")
 	if data, err = json.Marshal(runs); err != nil {
 		t.Fatal(err)
@@ -174,7 +180,7 @@ func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsParked(t *testing.T) {
 	if err := ralphloop.Claim(ticket); err != nil {
 		t.Fatal(err)
 	}
-	if err := ralphloop.Park(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck"); err != nil {
+	if err := ralphloop.Park(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck", ralphloop.Event{}); err != nil {
 		t.Fatal(err)
 	}
 	fake := &headlessFake{Runner: runnerfake.NewRunner()}

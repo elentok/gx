@@ -35,11 +35,18 @@ func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath str
 	}
 	h := servertest.StartWithStore(t, store, opts...)
 	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, func(p string) { work(t, p) })
-	if headless {
-		asHeadlessRun(t, h)
-	}
+	stampRun(t, h, runnerOf(headless), deadSession)
 	h.Restart(t)
 	return store, repo, wtPath, ticketPath
+}
+
+var deadSession = agentrunner.Session{Label: "epic-a-iter-01", ID: "p1", SessionID: "sess-1"}
+
+func runnerOf(headless bool) string {
+	if headless {
+		return "fake"
+	}
+	return "herdr"
 }
 
 func noWork(*testing.T, string) {}
@@ -78,15 +85,35 @@ func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
 	})
 }
 
+// assertParkRecordsRun checks the park event names the run's runner, label and
+// session: late-finish adoption reads them after the park drops runs.json.
+func assertParkRecordsRun(t *testing.T, store, runner string, session agentrunner.Session) {
+	t.Helper()
+	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.NeedsRepair) })
+	if i < 0 {
+		t.Fatalf("run log lacks a park: %v", logged)
+	}
+	got := logged[i]
+	if got.Runner != runner || got.Label != session.Label || got.AgentSession != session.SessionID {
+		t.Errorf("park event runner/label/session = %q/%q/%q, want %q/%q/%q",
+			got.Runner, got.Label, got.AgentSession, runner, session.Label, session.SessionID)
+	}
+}
+
 func TestReclaim_DeadClaimWithWorkParks(t *testing.T) {
 	for name, work := range map[string]func(*testing.T, string){"commit": commitAgentWork, "edit": editAgentWork} {
 		t.Run(name, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
-				_, _, wtPath, ticketPath := restartDead(t, headless, work)
+				store, _, wtPath, ticketPath := restartDead(t, headless, work)
 				waitStatus(t, ticketPath, schema.StatusNeedsRepair)
 				if _, err := os.Stat(wtPath); err != nil {
 					t.Errorf("worktree gone: %v", err)
 				}
+				assertParkRecordsRun(t, store, runnerOf(headless), deadSession)
 			})
 		})
 	}

@@ -559,7 +559,7 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 	if closeErr == nil {
 		closeErr = r.Stop(t.Session)
 	}
-	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached")
+	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached", t.Run)
 	return errors.Join(closeErr, parkErr)
 }
 

@@ -109,7 +109,8 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
-		if err := ralphloop.Park(ref.projectDir, ref.addr.Epic, ref.addr.ID, ref.ticket.Path, events.ManualPark, reason); err != nil {
+		run, _ := s.registry.tracked(ref.addr.String())
+		if err := ralphloop.Park(ref.projectDir, ref.addr.Epic, ref.addr.ID, ref.ticket.Path, events.ManualPark, reason, run.parkEvent()); err != nil {
 			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
 		}
 		s.events.publish(EventTicketParked, ref.addr.String())

@@ -21,7 +21,7 @@ type parkRequest struct {
 	Reason     string
 	// Repair is rendered into the ticket's "## Needs Repair" section.
 	Repair schema.NeedsRepairState
-	// Event carries optional agent context (pane, session, cwd) merged
+	// Event carries optional agent context (runner, label, pane, session, cwd) merged
 	// into the appended event; park overwrites its type, ticket, kind and reason.
 	Event Event
 	// AlreadyDone skips the ticket write of a manual-land whose ticket was
@@ -51,11 +51,12 @@ func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone boo
 
 // Park parks the ticket through the park path: one status write, one event and
 // no live notification. The event type and the reason stub come from the kind.
-// A blank reason is refused before anything is written.
-func Park(scratchDir, epicName, ticket, path string, kind events.Kind, reason string) error {
+// A blank reason is refused before anything is written. ev carries the run's
+// agent context onto the event, as parkRequest.Event does.
+func Park(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev Event) error {
 	_, err := park(noopEventSink{}, parkRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: kind.ParkType(), Kind: kind, Reason: reason,
+		Type: kind.ParkType(), Kind: kind, Reason: reason, Event: ev,
 	})
 	return err
 }

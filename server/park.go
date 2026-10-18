@@ -15,8 +15,9 @@ import (
 // EventTicketParked event and the chat message all come from the same kind and
 // reason, so the three cannot disagree. A park that finds the ticket done (it
 // lost a race with a land) is not an error to the caller: nothing is left to park.
-func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string) error {
-	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason); errors.Is(err, ralphloop.ErrParkDone) {
+// run is the parked run, zero when none launched.
+func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run Run) error {
+	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.parkEvent()); errors.Is(err, ralphloop.ErrParkDone) {
 		s.log.Warn("park refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
 		return nil
 	} else if err != nil {

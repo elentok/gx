@@ -216,7 +216,7 @@ func TestPark_DerivesTypeAndStubFromKind(t *testing.T) {
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
-			if err := Park(scratchDir, "my-epic", "01", path, c.kind, "the-reason"); err != nil {
+			if err := Park(scratchDir, "my-epic", "01", path, c.kind, "the-reason", Event{}); err != nil {
 				t.Fatal(err)
 			}
 			got := mustParse(t, path)
