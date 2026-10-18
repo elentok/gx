@@ -97,6 +97,26 @@ func refFiles(store string, refs ...string) []string {
 	return files
 }
 
+// RefsStamp changes whenever a branch in repo moves, is created or is deleted,
+// or any of extra changes. A git ref update replaces its file through a rename,
+// so the refs/heads directories' mtimes catch it without stat-ing every
+// branch. ok false (an unreadable layout) means the caller must not cache on it.
+func RefsStamp(repo string, extra ...string) (stamp string, ok bool) {
+	store, ok := refStore(repo)
+	if !ok {
+		return "", false
+	}
+	files := append(refFiles(store, "HEAD", "refs/remotes/origin/HEAD"), extra...)
+	var dirs []string
+	_ = filepath.WalkDir(filepath.Join(store, "refs", "heads"), func(p string, d os.DirEntry, err error) error {
+		if err == nil && d.IsDir() {
+			dirs = append(dirs, p)
+		}
+		return nil
+	})
+	return statStamp(append(files, dirs...)), true
+}
+
 // remoteDefaultBranch is git.RemoteDefaultBranch, cached on the refs it reads.
 func remoteDefaultBranch(repo string) string {
 	store, ok := refStore(repo)

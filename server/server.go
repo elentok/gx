@@ -276,6 +276,7 @@ type Server struct {
 	refused        refusals
 	lands          landGuard
 	trunkLocks     trunkLocks
+	mergeTargets   mergeTargetCache
 	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 	landedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts       verdictLog

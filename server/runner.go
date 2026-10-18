@@ -539,7 +539,7 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 		// landed on a trunk that isn't there.
 		return derived, derived, nil
 	}
-	ref := retargetIfLanded(derived, trunk, func(a, d string) (bool, error) { return git.IsAncestor(repo, a, d) })
+	ref := retargetIfLanded(derived, trunk, func(a, d string) (bool, error) { return gitIsAncestor(repo, a, d) })
 	return ref, ref, nil
 }
 

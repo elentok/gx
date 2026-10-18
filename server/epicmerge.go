@@ -3,10 +3,13 @@ package server
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -121,11 +124,51 @@ func (s *Server) epicMergeTarget(a tickets.Address) string {
 	if i < 0 || epics[i].IsMap || !epics[i].AllDone() || !epics[i].MergedAt.IsZero() {
 		return ""
 	}
+	// The target is a function of the loaded epics (a new scan is a new slice),
+	// project.json and the repo's refs, so those make the cache stamp.
+	stamp, cacheable := tickets.RefsStamp(repo, filepath.Join(dir, config.ProjectFileName))
+	stamp += fmt.Sprintf("%p", &epics[0])
+	if cacheable {
+		if target, hit := s.mergeTargets.get(a, stamp); hit {
+			return target
+		}
+	}
 	_, _, target, err := s.epicRefs(a.Project, epics, a.Epic, repo)
 	if err != nil {
 		return ""
 	}
+	if cacheable {
+		s.mergeTargets.put(a, stamp, target)
+	}
 	return target
+}
+
+// gitIsAncestor is swapped in tests to count git calls.
+var gitIsAncestor = git.IsAncestor
+
+// mergeTargetCache holds each epic's last merge target. Errors aren't stored,
+// so a failing resolve retries on the next snapshot.
+type mergeTargetCache struct {
+	mu sync.Mutex
+	m  map[tickets.Address]mergeTargetEntry
+}
+
+type mergeTargetEntry struct{ stamp, target string }
+
+func (c *mergeTargetCache) get(a tickets.Address, stamp string) (string, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.m[a]
+	return e.target, ok && e.stamp == stamp
+}
+
+func (c *mergeTargetCache) put(a tickets.Address, stamp, target string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.m == nil {
+		c.m = map[tickets.Address]mergeTargetEntry{}
+	}
+	c.m[a] = mergeTargetEntry{stamp: stamp, target: target}
 }
 
 // epicMergeRefusal is the refusal for a manual merge of e, nil when it may go.
