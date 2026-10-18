@@ -33,7 +33,7 @@ type ticketYAML struct {
 	SessionIDs            []string     `yaml:"session_ids,omitempty"`
 	IterationStatus       string       `yaml:"iteration_status,omitempty"`
 	FinishedAt            time.Time    `yaml:"finished_at,omitempty"`
-	ParkKind             string       `yaml:"park_kind,omitempty"`
+	ParkKind              string       `yaml:"park_kind,omitempty"`
 	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
 	Base                  string       `yaml:"base,omitempty"`
 	ResolvedBase          string       `yaml:"resolved_base,omitempty"`
@@ -76,7 +76,7 @@ func (w ticketYAML) toTicket() Ticket {
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       IterationStatus(w.IterationStatus),
 		FinishedAt:            w.FinishedAt,
-		ParkKind:             ParkKind(w.ParkKind),
+		ParkKind:              ParkKind(w.ParkKind),
 		Mutes:                 copyMutes(w.Mutes),
 		Base:                  w.Base,
 		ResolvedBase:          w.ResolvedBase,
@@ -108,7 +108,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
 		FinishedAt:            t.FinishedAt,
-		ParkKind:             string(t.ParkKind),
+		ParkKind:              string(t.ParkKind),
 		Mutes:                 copyMutes(t.Mutes),
 		Base:                  t.Base,
 		ResolvedBase:          t.ResolvedBase,

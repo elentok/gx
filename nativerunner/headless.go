@@ -232,7 +232,7 @@ func newSession(meta Meta, stdin *os.File) *headlessSession {
 		exited:   make(chan struct{}),
 		tailed:   make(chan struct{}),
 		track:    tracker{sessionID: meta.SessionID},
-		changed: make(chan struct{}),
+		changed:  make(chan struct{}),
 	}
 }
 
