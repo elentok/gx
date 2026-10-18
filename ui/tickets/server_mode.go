@@ -36,7 +36,7 @@ type ServerAPI interface {
 	BudgetOverride(ctx context.Context) (server.BudgetResult, error)
 	TicketPark(ctx context.Context, address, reason string) (server.QueueResult, error)
 	TicketCancel(ctx context.Context, address string, stop bool) (server.QueueResult, error)
-	TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error)
+	TicketRelaunch(ctx context.Context, address string, stop bool) (server.QueueResult, error)
 	TicketUnmute(ctx context.Context, address string) (server.QueueResult, error)
 	TicketApprove(ctx context.Context, address string) (server.QueueResult, error)
 	EpicMerge(ctx context.Context, address string) (server.QueueResult, error)

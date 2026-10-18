@@ -394,12 +394,15 @@ func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Eve
 // manual land has since cleared is a failed recovery; otherwise the per-kind
 // and per-ticket caps apply. An investigation or a parent backfill remedies
 // nothing the next park could be a re-failure of, so only the caps see them.
+// A person's relaunch starts the budget over.
 func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 	var applied int
 	perKind := map[string]int{}
 	var last *ralphloop.Event
 	for i, ev := range log {
 		switch events.Type(ev.Type) {
+		case events.HumanRelaunch:
+			applied, perKind, last = 0, map[string]int{}, nil
 		case events.RecoveryApplied:
 			applied++
 			perKind[ev.Kind]++

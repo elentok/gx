@@ -160,7 +160,7 @@ func TestRelaunch_StartsAFreshIterationOfAParkedTicket(t *testing.T) {
 	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("park = %+v, %v", res, err)
 	}
-	res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01")
+	res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false)
 	if err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
 	}

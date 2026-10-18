@@ -56,7 +56,7 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 		case serverVerbCancel:
 			res, err = api.TicketCancel(ctx, address, true)
 		case serverVerbRelaunch:
-			res, err = api.TicketRelaunch(ctx, address)
+			res, err = api.TicketRelaunch(ctx, address, false)
 		case serverVerbUnmute:
 			res, err = api.TicketUnmute(ctx, address)
 		case serverVerbUnpark:

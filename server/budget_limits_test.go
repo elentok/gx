@@ -36,7 +36,7 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	}
 	h.Server.RecordSpend("spent", 6)
 
-	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01"); err != nil || !res.Refused || res.Reason != server.ReasonBudgetLimit {
+	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || !res.Refused || res.Reason != server.ReasonBudgetLimit {
 		t.Errorf("relaunch = %+v, %v; want refusal %s", res, err, server.ReasonBudgetLimit)
 	}
 	if len(*start) != 0 {

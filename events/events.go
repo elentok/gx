@@ -60,7 +60,10 @@ const (
 	ClaimReopened Type = "claim-reopened"
 	// StalePaneClosed is a launch that found its label held by a pane no run
 	// tracks and not mid-turn, so it closed that pane and retried.
-	StalePaneClosed  Type = "stale-pane-closed"
+	StalePaneClosed Type = "stale-pane-closed"
+	// HumanRelaunch is a relaunch a person asked for; recovery's budget
+	// counts only what came after the latest one.
+	HumanRelaunch    Type = "human-relaunch"
 	HerdrUnavailable Type = "herdr-unavailable"
 	HerdrAvailable   Type = "herdr-available"
 	Submitted        Type = "submitted"

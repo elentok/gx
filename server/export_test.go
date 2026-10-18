@@ -15,6 +15,7 @@ import (
 
 var (
 	RecoveryState  = recoveryState
+	GuardRailStop  = guardRailStop
 	HardGraceTitle = hardGraceTitle
 )
 

@@ -7,7 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -133,7 +135,9 @@ func (s *Server) ticketUnmute(req QueueRequest) (QueueResult, error) {
 }
 
 // ticketRelaunch starts a fresh iteration of a ticket outside the queue order,
-// under the agent it is queued with (claude otherwise).
+// under the agent it is queued with (claude otherwise). An idle or done
+// leftover pane is left to the launch, which closes a stale label holder. A
+// person's relaunch logs human-relaunch, which resets the recovery budget.
 func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
@@ -144,6 +148,17 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		}
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
+		}
+		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, isWorking); refused || err != nil {
+			return res, err
+		}
+		if req.actor != recovery.ActorRecovery {
+			err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
+				Time: time.Now(), Type: string(events.HumanRelaunch), Ticket: ref.addr.ID, Address: ref.addr.String(),
+			})
+			if err != nil {
+				return QueueResult{}, fmt.Errorf("logging relaunch of %s: %w", ref.addr, err)
+			}
 		}
 		epics, err := tickets.LoadResolved(ref.addr.Project, ref.projectDir)
 		if err != nil {
@@ -176,23 +191,13 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		targets := cancelTargets(ref)
-		var live []Run
-		for _, t := range targets {
-			if run, ok := s.registry.runOf(ref.address(t)); ok {
-				live = append(live, run)
-			}
+		addrs := make([]tickets.Address, len(targets))
+		for i, t := range targets {
+			addrs[i] = tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}
 		}
-		if len(live) > 0 && !req.Stop {
-			return refusal(ReasonTicketLive, live[0].Address+" has a live pane; use --stop"), nil
-		}
-		for _, run := range live {
-			r, err := s.runnerOf(run)
-			if err == nil {
-				err = r.Stop(run.Session)
-			}
-			if err != nil {
-				return QueueResult{}, fmt.Errorf("stop %s: %w", run.Address, err)
-			}
+		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
+		if res, refused, err := s.settleLive(addrs, req.Stop, anyLive); refused || err != nil {
+			return res, err
 		}
 		for _, t := range targets {
 			if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
@@ -203,6 +208,44 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 		}
 		return QueueResult{}, nil
 	})
+}
+
+// settleLive is relaunch's and cancel's one view of live agents: liveSession,
+// so a leftover pane outside the registry counts too. A live session that
+// blocks refuses ticket-live unless stop, which stops every blocking session
+// through its runner first.
+func (s *Server) settleLive(addrs []tickets.Address, stop bool, blocks func(agentrunner.Runner, agentrunner.Session) bool) (QueueResult, bool, error) {
+	type live struct {
+		addr   tickets.Address
+		runner agentrunner.Runner
+		sess   agentrunner.Session
+	}
+	var found []live
+	for _, a := range addrs {
+		r, sess, ok, err := s.liveSession(a)
+		if err != nil {
+			return QueueResult{}, false, fmt.Errorf("find the live session of %s: %w", a, err)
+		}
+		if ok && blocks(r, sess) {
+			found = append(found, live{a, r, sess})
+		}
+	}
+	if len(found) > 0 && !stop {
+		return refusal(ReasonTicketLive, found[0].addr.String()+" has a live pane; use --stop"), true, nil
+	}
+	for _, l := range found {
+		if err := l.runner.Stop(l.sess); err != nil {
+			return QueueResult{}, false, fmt.Errorf("stop %s: %w", l.addr, err)
+		}
+	}
+	return QueueResult{}, false, nil
+}
+
+// isWorking is a session not idle or done; an unknown state counts as working,
+// so it is never killed without --stop.
+func isWorking(r agentrunner.Runner, sess agentrunner.Session) bool {
+	st, err := r.Status(sess)
+	return err != nil || (st.State != agentrunner.StateIdle && st.State != agentrunner.StateDone)
 }
 
 // cancelTargets is the ticket plus its fork descendants that are not terminal.

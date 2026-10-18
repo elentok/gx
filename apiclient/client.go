@@ -279,9 +279,10 @@ func (c *Client) TicketApprove(ctx context.Context, address string) (server.Queu
 	return c.queueWriteTo(ctx, "/v1/tickets/approve", server.QueueRequest{Address: address})
 }
 
-// TicketRelaunch starts a fresh iteration of a ticket.
-func (c *Client) TicketRelaunch(ctx context.Context, address string) (server.QueueResult, error) {
-	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address})
+// TicketRelaunch starts a fresh iteration of a ticket; stop lets it stop a
+// working leftover pane first.
+func (c *Client) TicketRelaunch(ctx context.Context, address string, stop bool) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address, Stop: stop})
 }
 
 // EpicMerge triggers a manual merge of an epic address: a direct land

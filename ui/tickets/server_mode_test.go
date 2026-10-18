@@ -98,7 +98,7 @@ func (f fakeServerAPI) TicketCancel(_ context.Context, address string, _ bool) (
 	return server.QueueResult{}, nil
 }
 
-func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketRelaunch(_ context.Context, address string, _ bool) (server.QueueResult, error) {
 	f.record("relaunch " + address)
 	return server.QueueResult{}, nil
 }
