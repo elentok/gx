@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.34.3 - 2026-10-18
+
+- Fixed the server snapshot spawning hundreds of git processes. Each snapshot used to run about 210 git commands (3 per epic) to find merge targets, so one server event could start about 1000 processes and make the UI lag. Snapshots now take about 0.03s instead of about 1s.
+  - The epic merge target is now only filled for epics that can be merged (all done, not merged, not a map).
+  - The git reads behind the trunk lookup are cached. A repo change still applies at once.
+  - The TUI now debounces event-triggered re-snapshots (100ms) and re-runs once after an in-flight snapshot instead of dropping the request.
+- Changed the Context menu look. Dim rows use the overlay color, and the cursor can land on them, with the reason shown in a footer line. The menu also has rule headers, the title in the border, a cursor bar, a filter line and a one-line hint.
+- Fixed `?` not opening help on the Agents sidebar. The shared help dialog is now titled "Help" on every tab (it was "Keybindings").
+
 ## v0.34.2 - 2026-10-18
 
 - Added one shared Context menu (`m`) on the Tickets, Queue and Agents tabs. It replaces the separate per-tab menus.
