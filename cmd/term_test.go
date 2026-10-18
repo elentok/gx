@@ -283,6 +283,24 @@ func TestRunTerm_KittyWithoutRemotePrintsHint(t *testing.T) {
 	}
 }
 
+func TestRunTerm_GoosReachesDetection(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
+	l, _ := withSeams(t)
+	d := deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return "/wd", nil },
+		getenv: envFunc(map[string]string{"TERM_PROGRAM": "ghostty"}),
+		goos:   "darwin",
+	}
+	if err := execute([]string{"term", "--right", "lazygit"}, d); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !l.called || l.terminal != ui.TerminalGhostty {
+		t.Fatalf("expected ghostty split launch, got called=%v terminal=%v", l.called, l.terminal)
+	}
+}
+
 func TestRunTerm_KittyRemoteUsesSplit(t *testing.T) {
 	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
 	l, _ := withSeams(t)

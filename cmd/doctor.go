@@ -75,7 +75,7 @@ func runDoctor(args []string, d deps) error {
 		}
 	}
 
-	printDoctorRuntime(d.stdout, getenv)
+	printDoctorRuntime(d.stdout, getenv, d.goos)
 
 	if len(issues) == 0 {
 		fmt.Fprintln(d.stdout, "No issues found.")
@@ -198,8 +198,8 @@ func findRepoWithFallback(dir string) (*git.Repo, error) {
 	return repo, nil
 }
 
-func printDoctorRuntime(w io.Writer, getenv func(string) string) {
-	terminal := ui.DetectTerminalFrom(getenv)
+func printDoctorRuntime(w io.Writer, getenv func(string) string, goos string) {
+	terminal := ui.DetectTerminalFor(getenv, goos)
 	label := terminal.String()
 	if label == "" {
 		label = "plain"

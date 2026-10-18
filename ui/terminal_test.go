@@ -61,6 +61,39 @@ func TestDetectTerminalFrom(t *testing.T) {
 	}
 }
 
+func TestDetectTerminalFor_Ghostty(t *testing.T) {
+	cases := []struct {
+		name string
+		env  map[string]string
+		goos string
+		want Terminal
+	}{
+		{"darwin", map[string]string{"TERM_PROGRAM": "ghostty"}, "darwin", TerminalGhostty},
+		{"linux", map[string]string{"TERM_PROGRAM": "ghostty"}, "linux", TerminalPlain},
+		{"tmux wins", map[string]string{"TERM_PROGRAM": "ghostty", "TMUX": "x"}, "darwin", TerminalTmux},
+		{"kitty wins", map[string]string{"TERM_PROGRAM": "ghostty", "KITTY_WINDOW_ID": "1"}, "darwin", TerminalKitty},
+		{"kitty remote wins", map[string]string{"TERM_PROGRAM": "ghostty", "KITTY_LISTEN_ON": "u"}, "darwin", TerminalKittyRemote},
+		{"herdr wins", map[string]string{"TERM_PROGRAM": "ghostty", "HERDR_ENV": "1"}, "darwin", TerminalHerdr},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := DetectTerminalFor(func(k string) string { return c.env[k] }, c.goos)
+			if got != c.want {
+				t.Errorf("got %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestTerminal_GhosttyStringAndCanSplit(t *testing.T) {
+	if got := TerminalGhostty.String(); got != "ghostty" {
+		t.Errorf("String() = %q", got)
+	}
+	if !TerminalGhostty.CanSplit() {
+		t.Error("expected TerminalGhostty.CanSplit()=true")
+	}
+}
+
 func TestTerminal_String(t *testing.T) {
 	cases := []struct {
 		t    Terminal

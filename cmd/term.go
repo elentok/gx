@@ -117,7 +117,7 @@ func runTerm(args []string, f termFlags, d deps) error {
 	// An explicit command is wrapped so a failure keeps the pane open.
 	program, pargs, isShell := resolveProgram(args, d)
 
-	terminal := ui.DetectTerminalFrom(d.getenv)
+	terminal := ui.DetectTerminalFor(d.getenv, d.goos)
 
 	if splitType != terminalrun.InPlace && terminal.CanSplit() {
 		launchProg, launchArgs := program, pargs

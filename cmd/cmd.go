@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
@@ -43,7 +44,8 @@ type deps struct {
 	initConfig           func() (string, error)
 	loadConfig           func() (config.Config, error)
 	getenv               func(string) string
-	userHomeDir          func() (string, error)
+	goos                 string
+	userHomeDir         func() (string, error)
 	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
 	stdinIsTerminal      func() bool
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
@@ -85,6 +87,7 @@ func defaultDeps() deps {
 		initConfig:           config.Init,
 		loadConfig:           config.Load,
 		getenv:               os.Getenv,
+		goos:                 runtime.GOOS,
 		userHomeDir:          os.UserHomeDir,
 		runEditor:            runEditorCommand,
 		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
