@@ -257,6 +257,18 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 			// retry — not a failure of this land itself.
 			return outcome{ticket: job.ticket, parkedOnChild: true, childReason: err.Error()}
 		}
+		var amb *ambiguousLandError
+		if errors.As(err, &amb) {
+			// Parked, not failed: callers then see it via isParked / the ticket.
+			if _, perr := park(p.Sink, parkRequest{
+				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
+				Type: events.NeedsRepair, Kind: events.AmbiguousLand, Reason: amb.Error(),
+				Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},
+			}); perr != nil {
+				return outcome{ticket: job.ticket, err: perr}
+			}
+			return outcome{ticket: job.ticket}
+		}
 		return outcome{ticket: job.ticket, err: err}
 	}
 	p.logTicketEventSHA(string(events.CherryPicked), job.pane, job.sessionID, job.path, "", landedSHA)

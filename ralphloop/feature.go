@@ -86,7 +86,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 	if t.Status == schema.StatusDone {
 		return FinishOutcome{Landed: true}, nil
 	}
-	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
+	return parkedOutcome(o, t), nil
 }
 
 // mergeFinishFault is why a merge ticket cannot be done, "" when it can.

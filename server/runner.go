@@ -674,13 +674,9 @@ func (s *Server) settleRun(rc runContext, err error) {
 	}
 	if !out.Landed {
 		// The finish path already wrote the park; tell a person its own reason.
-		reason := out.Reason
-		if reason == "" {
-			reason = "iteration ended without landing the ticket"
-		}
 		s.events.publish(EventIterationParked, ticketAddr)
-		if !s.holdParkForRecovery(addr, one.Ticket.Path, out.Kind, reason) {
-			s.notifyPark(addr, one.Ticket.Path, out.Kind, reason)
+		if !s.holdParkForRecovery(addr, one.Ticket.Path, out.Kind, out.Reason) {
+			s.notifyPark(addr, one.Ticket.Path, out.Kind, out.Reason)
 		}
 		return
 	}

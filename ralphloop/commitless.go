@@ -101,7 +101,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 	if t.Status == schema.StatusDone {
 		return FinishOutcome{Landed: true}, nil
 	}
-	return FinishOutcome{Status: t.Status, Kind: events.Kind(t.ParkKind)}, nil
+	return parkedOutcome(o, t), nil
 }
 
 // parkStrandedCommits parks the ticket when w is a detached worktree whose HEAD

@@ -164,13 +164,26 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 	if t.Status == schema.StatusDone {
 		return FinishOutcome{Landed: true}, nil
 	}
-	kind := events.Kind(t.ParkKind)
 	// A ticket that neither landed nor parked is stuck with nobody told why;
 	// fail the finish so the caller parks it with a reason.
-	if (t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusNeedsRepair) || !kind.Valid() {
-		return FinishOutcome{}, fmt.Errorf("iteration ended with the ticket %s and no park recorded (kind %q)", t.Status, kind)
+	if t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusNeedsRepair {
+		return FinishOutcome{}, fmt.Errorf("iteration ended with the ticket %s and no park recorded", t.Status)
 	}
-	return FinishOutcome{Status: t.Status, Kind: kind, Reason: latestParkReason(o.ScratchDir, o.Epic, o.Ticket.Identifier)}, nil
+	return parkedOutcome(o, t), nil
+}
+
+// parkedOutcome is the outcome of a finish that left t parked. Kind is never
+// blank and Reason never empty, so a person is always told something true.
+func parkedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
+	kind := events.Kind(t.ParkKind)
+	if kind == "" {
+		kind = events.IterationError
+	}
+	reason := latestParkReason(o.ScratchDir, o.Epic, o.Ticket.Identifier)
+	if reason == "" {
+		reason = "the run log had no park reason; see " + RunLogPath(o.ScratchDir, o.Epic)
+	}
+	return FinishOutcome{Status: t.Status, Kind: kind, Reason: reason}
 }
 
 // latestParkReason is the reason of the ticket's most recent park event, or ""

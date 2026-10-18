@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -106,15 +107,35 @@ func TestLandTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
 	}
 }
 
-func TestLandTicket_TrailerRung_DetectsAlreadyApplied(t *testing.T) {
+func TestLandTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
+	_, lp := landFixture(t, false)
+	lp.RecordedSHA = "recorded"
+	d := landDepsFor(testDeps())
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
+	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
+	d.LandedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
+
+	res, err := LandTicket(d, lp)
+	var amb *ambiguousLandError
+	if !errors.As(err, &amb) {
+		t.Fatalf("LandTicket = (%+v, %v), want an ambiguous-land error", res, err)
+	}
+	for _, want := range []string{"03", "main", "recorded", lp.SourceRange.Base, lp.SourceRange.Tip} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("reason %q does not name %q", err.Error(), want)
+		}
+	}
+}
+
+func TestLandTicket_TrailerOnlyWithoutRecordedSHA_SaysNone(t *testing.T) {
 	_, lp := landFixture(t, false)
 	d := landDepsFor(testDeps())
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
 	d.LandedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
-	res, err := LandTicket(d, lp)
-	if err != nil || res.Outcome != AlreadyApplied {
-		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+	_, err := LandTicket(d, lp)
+	if err == nil || !strings.Contains(err.Error(), "recorded SHA none") {
+		t.Fatalf("LandTicket err = %v, want it to say recorded SHA none", err)
 	}
 }
 

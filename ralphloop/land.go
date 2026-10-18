@@ -127,12 +127,31 @@ func pickRange(d LandDeps, lp LandParams) (LandOutcome, error) {
 	return Landed, nil
 }
 
-// alreadyApplied is the three-rung evidence ladder: recorded-SHA
-// reachability, then patch-equivalence, then the ticket trailer. Each later
-// rung covers a rewrite the earlier ones cannot see (a rebase changes hashes;
-// a manually re-resolved conflict also changes patch-ids, but never the
-// commit message). An unreadable trailer history is inconclusive, not an
-// error: the pick itself still guards against a double landing.
+// ambiguousLandError is a ticket whose trailer is on the feature branch while
+// neither its recorded SHA nor its patches are: something landed under its
+// name, but nothing proves it was these commits. Its Error is the park reason.
+type ambiguousLandError struct {
+	TicketID      string
+	FeatureBranch string
+	RecordedSHA   string
+	SourceRange   SourceRange
+}
+
+func (e *ambiguousLandError) Error() string {
+	recorded := e.RecordedSHA
+	if recorded == "" {
+		recorded = "none"
+	}
+	return fmt.Sprintf("ticket %s has a landed trailer on %s, but neither its recorded SHA %s nor the patches of %s..%s are there; check by hand whether it really landed",
+		e.TicketID, e.FeatureBranch, recorded, e.SourceRange.Base, e.SourceRange.Tip)
+}
+
+// alreadyApplied is the evidence ladder: recorded-SHA reachability, then
+// patch-equivalence. A ticket trailer with neither is an ambiguousLandError,
+// not proof: a re-resolved conflict and a different commit reusing the ticket
+// trailer look the same, and picking again could land it twice. An unreadable
+// trailer history is inconclusive, not an error: the pick itself still guards
+// against a double landing.
 func alreadyApplied(d LandDeps, lp LandParams) (bool, error) {
 	if lp.RecordedSHA != "" {
 		reachable, err := d.IsAncestor(lp.FeatureWorktree, lp.RecordedSHA, lp.FeatureBranch)
@@ -151,10 +170,10 @@ func alreadyApplied(d LandDeps, lp LandParams) (bool, error) {
 		return true, nil
 	}
 	landed, err := d.LandedTickets(lp.FeatureWorktree, lp.FeatureBranch)
-	if err != nil {
+	if err != nil || !landed[lp.TicketID] {
 		return false, nil
 	}
-	return landed[lp.TicketID], nil
+	return false, &ambiguousLandError{TicketID: lp.TicketID, FeatureBranch: lp.FeatureBranch, RecordedSHA: lp.RecordedSHA, SourceRange: lp.SourceRange}
 }
 
 // stampAppliedMetrics fills in the ticket's frontmatter metrics when commits
