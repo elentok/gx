@@ -187,14 +187,16 @@ gx term --here ls        # run in the current terminal (exec-replace)
 gx term --cwd /some/dir lazygit
 ```
 
-Directions are named by visual outcome (`--right`/`--below`/`--tab`/`--here`), so the same flag produces the same layout on tmux and kitty (which use opposite `hsplit`/`vsplit` conventions internally). `--below` is the default. Splits need tmux, kitty with remote control enabled, herdr, or Ghostty on macOS (1.3.0+); on a plain terminal (or kitty without remote control) the command runs in place instead, so the same invocation works everywhere.
+Directions are named by visual outcome (`--right`/`--below`/`--tab`/`--here`), so the same flag produces the same layout on tmux and kitty (which use opposite `hsplit`/`vsplit` conventions internally). `--below` is the default. Splits need tmux, kitty with remote control enabled, herdr, or Ghostty on macOS (1.3.0+); on a plain terminal (or kitty without remote control) the command runs in place instead. So does Ghostty older than 1.3.0, or Ghostty when Automation permission is denied or `macos-applescript` is off. This way the same invocation works everywhere.
 
 Ghostty is detected from `TERM_PROGRAM=ghostty` and driven through AppleScript:
 
 - Ghostty needs `macos-applescript = true` in its config.
 - macOS asks for Automation permission the first time gx controls Ghostty. Allow it.
 - If a split fails, gx prints a short hint. Run `gx doctor --check-ghostty` for a live, read-only probe.
-- On Linux, Ghostty is treated as a plain terminal. An explicit command keeps its pane open if it fails; a bare shell does not. With no command, `gx term` opens `$SHELL`.
+- On Linux, Ghostty is treated as a plain terminal.
+
+An explicit command keeps its pane open if it fails; a bare shell does not. With no command, `gx term` opens `$SHELL`.
 
 The headline use case is launching things from neovim. For example, open lazygit in a split below the editor:
 
