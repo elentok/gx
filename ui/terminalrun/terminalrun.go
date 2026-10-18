@@ -2,6 +2,7 @@ package terminalrun
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -105,6 +106,13 @@ func Command(worktreeRoot string, terminal ui.Terminal, program string, args []s
 			return done(err, "herdr")
 		}
 	}
+	if terminal == ui.TerminalGhostty {
+		return splitCmd(worktreeRoot, terminal, HSplit, program, args, false, done)
+	}
+	return inPlaceCmd(worktreeRoot, program, args, done)
+}
+
+func inPlaceCmd(worktreeRoot, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
 	c := exec.Command(program, args...)
 	c.Dir = worktreeRoot
 	return tea.ExecProcess(c, func(err error) tea.Msg {
@@ -112,35 +120,42 @@ func Command(worktreeRoot string, terminal ui.Terminal, program string, args []s
 	})
 }
 
+// splitCmd runs the split launch off the UI thread. A *FallbackError (nothing
+// opened) becomes a warning toast plus an in-place takeover of the same
+// program; any other error goes to done, since a split may already be open.
+func splitCmd(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, shell bool, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		splitApp, err := launchSplitAs(worktreeRoot, terminal, splitType, program, args, shell)
+		var fb *FallbackError
+		if errors.As(err, &fb) {
+			return tea.Batch(notify.Warning(fb.Hint), inPlaceCmd(worktreeRoot, program, args, done))()
+		}
+		return done(err, splitApp)
+	}
+}
+
 // CommandWithSplit launches a command into the requested split type, wrapped in
 // `gx run` so a failure keeps the pane open. Use CommandWithSplitBare for
 // interactive shells, which should not be wrapped.
 func CommandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
 	program, args = WrapRun(program, args)
-	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, done)
+	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, false, done)
 }
 
 // CommandWithSplitBare launches program into the requested split type without
 // the `gx run` wrapper — for interactive shells, where a non-zero exit is
 // normal and a "press Enter" prompt would be meaningless.
 func CommandWithSplitBare(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
-	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, done)
+	return commandWithSplit(worktreeRoot, terminal, splitType, program, args, false, done)
 }
 
-func commandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
+func commandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, shell bool, done func(err error, splitApp string) tea.Msg) tea.Cmd {
 	if splitType == InPlace {
-		c := exec.Command(program, args...)
-		c.Dir = worktreeRoot
-		return tea.ExecProcess(c, func(err error) tea.Msg {
-			return done(err, "")
-		})
+		return inPlaceCmd(worktreeRoot, program, args, done)
 	}
 
 	if terminal.CanSplit() {
-		return func() tea.Msg {
-			splitApp, err := launchSplit(worktreeRoot, terminal, splitType, program, args)
-			return done(err, splitApp)
-		}
+		return splitCmd(worktreeRoot, terminal, splitType, program, args, shell, done)
 	}
 
 	return notify.Warning("split not supported for this terminal")
@@ -151,7 +166,7 @@ func commandWithSplit(worktreeRoot string, terminal ui.Terminal, splitType Split
 // as an ordinary program, so a backend that opens a shell on its own can skip
 // typing it. Today every backend runs shell as the program.
 func CommandWithSplitShell(worktreeRoot string, terminal ui.Terminal, splitType SplitType, shell string, done func(err error, splitApp string) tea.Msg) tea.Cmd {
-	return commandWithSplit(worktreeRoot, terminal, splitType, shell, nil, done)
+	return commandWithSplit(worktreeRoot, terminal, splitType, shell, nil, true, done)
 }
 
 // LaunchOption tweaks a Launch call.
@@ -177,9 +192,7 @@ func Launch(worktreeRoot string, terminal ui.Terminal, splitType SplitType, prog
 	for _, opt := range opts {
 		opt(&o)
 	}
-	// o.shell is not consumed yet: every backend runs program as given.
-	_ = o
-	return launchSplit(worktreeRoot, terminal, splitType, program, args)
+	return launchSplitAs(worktreeRoot, terminal, splitType, program, args, o.shell)
 }
 
 // launchSplit builds the tmux/kitty argument vector for splitType and runs it,
@@ -187,7 +200,15 @@ func Launch(worktreeRoot string, terminal ui.Terminal, splitType SplitType, prog
 // command and its output. It is synchronous; the TUI wraps it in a tea.Cmd
 // closure and the CLI calls it directly.
 func launchSplit(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string) (string, error) {
+	return launchSplitAs(worktreeRoot, terminal, splitType, program, args, false)
+}
+
+// launchSplitAs is launchSplit with the shell flag: on Ghostty a shell launch
+// types nothing, every other backend runs program as given.
+func launchSplitAs(worktreeRoot string, terminal ui.Terminal, splitType SplitType, program string, args []string, shell bool) (string, error) {
 	switch terminal {
+	case ui.TerminalGhostty:
+		return "ghostty", launchGhostty(worktreeRoot, splitType, program, args, shell, os.Getenv("TERM_PROGRAM_VERSION"))
 	case ui.TerminalTmux:
 		var tmuxArgs []string
 		switch splitType {
