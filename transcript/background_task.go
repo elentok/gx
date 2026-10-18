@@ -92,25 +92,41 @@ type backgroundTaskLine struct {
 	} `json:"toolUseResult"`
 }
 
-// reportsOnTasks reports whether a non-assistant line is the CLI reporting on
-// a task. A tool_result counts only from TaskOutput or TaskStop: any other
-// tool (a Read or Monitor of the task's .output file) can echo the id in a
-// path while the task still runs.
+// reportsOnTasks reports whether a line is the CLI reporting on a task. It is
+// an allowlist: any other line type, including ones the CLI adds later, can
+// echo the id (an api-request-blob replaying the agent's own `cat` of the
+// task's .output file) while the task still runs. A tool_result counts only
+// from TaskOutput or TaskStop, for the same reason.
 func (l backgroundTaskLine) reportsOnTasks() bool {
-	var m struct {
-		Content []struct {
-			Type string `json:"type"`
-		} `json:"content"`
+	switch l.Type {
+	case "queue-operation", "attachment":
+		return true
+	case "user":
+	default:
+		return false
 	}
-	// String content (a task-notification) fails to unmarshal: not a tool_result.
-	if json.Unmarshal(l.Message, &m) == nil {
-		for _, c := range m.Content {
-			if c.Type == "tool_result" {
-				return l.ToolUseResult.RetrievalStatus != "" || l.ToolUseResult.StoppedTaskID != ""
-			}
+	var m struct {
+		Content json.RawMessage `json:"content"`
+	}
+	if json.Unmarshal(l.Message, &m) != nil {
+		return false
+	}
+	var text string
+	if json.Unmarshal(m.Content, &text) == nil {
+		return strings.Contains(text, "<task-notification>")
+	}
+	var items []struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(m.Content, &items) != nil {
+		return false
+	}
+	for _, c := range items {
+		if c.Type == "tool_result" {
+			return l.ToolUseResult.RetrievalStatus != "" || l.ToolUseResult.StoppedTaskID != ""
 		}
 	}
-	return true
+	return false
 }
 
 // interimNotificationNote marks a task-notification for a subagent that ended
@@ -220,12 +236,10 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			continue
 		}
 
-		// The agent's own tool calls name its task (a Monitor on the output
-		// path, say) without the task having finished: only what the CLI
-		// reports back can resolve it. A report on an already-resolved task
+		// A report on an already-resolved task
 		// (its notification after a TaskOutput read) still wakes the agent,
 		// so it re-arms AwaitingTurnEnd too.
-		if entry.Type != "assistant" && entry.reportsOnTasks() && !strings.Contains(raw, interimNotificationNote) {
+		if entry.reportsOnTasks() && !strings.Contains(raw, interimNotificationNote) {
 			for _, taskID := range order {
 				m := markers[taskID]
 				if containsTaskIDToken(raw, taskID) {

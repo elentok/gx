@@ -17,7 +17,7 @@ func startMarker(taskID string, at time.Time) string {
 }
 
 func notification(taskID string, at time.Time) string {
-	return `{"isSidechain":false,"timestamp":"` + at.Format(time.RFC3339Nano) + `","message":{"content":"<task-id>` + taskID + `</task-id>"}}`
+	return `{"isSidechain":false,"type":"user","timestamp":"` + at.Format(time.RFC3339Nano) + `","message":{"content":"<task-notification><task-id>` + taskID + `</task-id></task-notification>"}}`
 }
 
 func TestBackgroundTasks(t *testing.T) {

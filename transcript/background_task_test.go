@@ -7,21 +7,21 @@ import (
 )
 
 func startMarkerLine(taskID, toolUseID, timestamp string) string {
-	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"` + toolUseID + `","type":"tool_result","content":"...","is_error":false}]},"toolUseResult":{"stdout":"","backgroundTaskId":"` + taskID + `"}}`
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"` + toolUseID + `","type":"tool_result","content":"...","is_error":false}]},"toolUseResult":{"stdout":"","backgroundTaskId":"` + taskID + `"}}`
 }
 
 func sidechainStartMarkerLine(taskID, toolUseID, timestamp string) string {
-	return `{"isSidechain":true,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"` + toolUseID + `","type":"tool_result","content":"...","is_error":false}]},"toolUseResult":{"stdout":"","backgroundTaskId":"` + taskID + `"}}`
+	return `{"isSidechain":true,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"` + toolUseID + `","type":"tool_result","content":"...","is_error":false}]},"toolUseResult":{"stdout":"","backgroundTaskId":"` + taskID + `"}}`
 }
 
 func notificationLine(taskID, toolUseID, status, timestamp string) string {
 	content := "<task-notification>\\n<task-id>" + taskID + "</task-id>\\n<tool-use-id>" + toolUseID + "</tool-use-id>\\n<status>" + status + "</status>\\n</task-notification>"
-	return `{"isSidechain":false,"timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
 }
 
 func sidechainNotificationLine(taskID, toolUseID, status, timestamp string) string {
 	content := "<task-notification>\\n<task-id>" + taskID + "</task-id>\\n<tool-use-id>" + toolUseID + "</tool-use-id>\\n<status>" + status + "</status>\\n</task-notification>"
-	return `{"isSidechain":true,"timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
+	return `{"isSidechain":true,"type":"user","timestamp":"` + timestamp + `","origin":{"kind":"task-notification"},"message":{"content":"` + content + `"}}`
 }
 
 // taskOutputLine mirrors the tool_result a blocking TaskOutput call gets:
@@ -29,7 +29,7 @@ func sidechainNotificationLine(taskID, toolUseID, status, timestamp string) stri
 // notification is ever queued once the tool retrieves the result directly).
 func taskOutputLine(taskID, timestamp string) string {
 	content := "<retrieval_status>success</retrieval_status>\\n\\n<task_id>" + taskID + "</task_id>\\n\\n<status>completed</status>"
-	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-out","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"retrieval_status":"success","task":{"task_id":"` + taskID + `","status":"completed"}}}`
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-out","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"retrieval_status":"success","task":{"task_id":"` + taskID + `","status":"completed"}}}`
 }
 
 // taskStopLine mirrors the tool_result a TaskStop call gets: a flat
@@ -37,7 +37,7 @@ func taskOutputLine(taskID, timestamp string) string {
 // task-notification entry of its own either.
 func taskStopLine(taskID, timestamp string) string {
 	content := `{\"message\":\"Successfully stopped task: ` + taskID + `\",\"task_id\":\"` + taskID + `\"}`
-	return `{"isSidechain":false,"timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-stop","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"message":"Successfully stopped task: ` + taskID + `","task_id":"` + taskID + `"}}`
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","message":{"content":[{"tool_use_id":"tool-stop","type":"tool_result","content":"` + content + `"}]},"toolUseResult":{"message":"Successfully stopped task: ` + taskID + `","task_id":"` + taskID + `"}}`
 }
 
 // queueOperationAttachmentLine mirrors the queue-operation/attachment shape
@@ -45,7 +45,7 @@ func taskStopLine(taskID, timestamp string) string {
 // task-notification, nor a TaskOutput/TaskStop tool_result — the task id
 // only ever shows up embedded in an attachment payload.
 func queueOperationAttachmentLine(taskID, timestamp string) string {
-	return `{"isSidechain":false,"timestamp":"` + timestamp + `","type":"queue-operation","operation":"attachment","attachment":{"taskId":"` + taskID + `","kind":"background-task-result"}}`
+	return `{"isSidechain":false,"type":"user","timestamp":"` + timestamp + `","type":"queue-operation","operation":"attachment","attachment":{"taskId":"` + taskID + `","kind":"background-task-result"}}`
 }
 
 const capDuration = 2 * time.Hour
@@ -180,7 +180,7 @@ func TestReadBackgroundTasks_OrphanNotificationIgnoredAndDoesNotAffectOtherMarke
 func TestReadBackgroundTasks_MatchesOnTaskIDEvenWithoutToolUseIDCorroboration(t *testing.T) {
 	path := writeTranscript(t,
 		startMarkerLine("task-1", "tool-1", "2026-08-12T15:00:00.000000000Z"),
-		`{"isSidechain":false,"timestamp":"2026-08-12T15:05:00.000000000Z","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>task-1</task-id>\n<status>completed</status>\n</task-notification>"}}`,
+		`{"isSidechain":false,"type":"user","timestamp":"2026-08-12T15:05:00.000000000Z","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>task-1</task-id>\n<status>completed</status>\n</task-notification>"}}`,
 	)
 
 	reading, err := ReadBackgroundTasks(path, capDuration, readAt)
@@ -203,7 +203,70 @@ func TestReadBackgroundTasks_ResolvedViaQueueOperationAttachment(t *testing.T) {
 		t.Fatalf("ReadBackgroundTasks() error = %v", err)
 	}
 	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
-		t.Errorf("Markers = %+v, want one resolved marker: an unrecognized queue-operation/attachment shape still resolves by id-substring match", reading.Markers)
+		t.Errorf("Markers = %+v, want one resolved marker: a queue-operation line resolves by id-substring match whatever its payload shape", reading.Markers)
+	}
+}
+
+// The queue-tab-actions-impl/30 incident shape: the harness echoes the agent's
+// own `cat` of the task's .output file (and its tool_result) as
+// api-request-blob lines with no timestamp, then the agent ends its turn to wait.
+func blobIncidentLines() []string {
+	return []string{
+		startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"),
+		`{"type":"api-request-blob","timestamp":null,"message":{"content":[{"type":"text","text":"checking"},{"type":"tool_use","name":"Bash","input":{"command":"cat /private/tmp/claude-501/x/tasks/task-1.output"}}]}}`,
+		`{"type":"api-request-blob","timestamp":null,"message":{"content":[{"tool_use_id":"tool-cat","type":"tool_result","content":"/private/tmp/claude-501/x/tasks/task-1.output: still running"}]}}`,
+		assistantLine("end_turn", "2026-08-12T17:00:10.000000000Z"),
+	}
+}
+
+func TestReadBackgroundTasks_BlobEchoesDoNotResolve(t *testing.T) {
+	reading, err := ReadBackgroundTasks(writeTranscript(t, blobIncidentLines()...), capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskOutstandingFresh {
+		t.Errorf("Markers = %+v, want task-1 outstanding-fresh", reading.Markers)
+	}
+}
+
+func TestReadBackgroundTasks_QueueOperationAndNotificationAfterBlobEchoesResolve(t *testing.T) {
+	lines := append(blobIncidentLines(),
+		`{"type":"queue-operation","operation":"enqueue","timestamp":"2026-08-12T17:05:00.000000000Z","content":"<task-notification>\n<task-id>task-1</task-id>\n<status>completed</status>\n</task-notification>"}`,
+		notificationLine("task-1", "tool-1", "completed", "2026-08-12T17:05:01.000000000Z"),
+	)
+	reading, err := ReadBackgroundTasks(writeTranscript(t, lines...), capDuration, readAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reading.Markers) != 1 || reading.Markers[0].Status != BackgroundTaskResolved {
+		t.Errorf("Markers = %+v, want task-1 resolved", reading.Markers)
+	}
+	if !reading.AwaitingTurnEnd {
+		t.Error("AwaitingTurnEnd = false, want true")
+	}
+}
+
+func TestReadBackgroundTasks_OnlyAllowlistedLinesResolve(t *testing.T) {
+	notice := `"<task-notification>\n<task-id>task-1</task-id>\n<status>completed</status>\n</task-notification>"`
+	for _, tc := range []struct {
+		name string
+		line string
+		want BackgroundTaskStatus
+	}{
+		{"attachment", `{"type":"attachment","timestamp":"2026-08-12T17:05:00.000000000Z","attachment":{"taskId":"task-1"}}`, BackgroundTaskResolved},
+		{"system", `{"type":"system","timestamp":"2026-08-12T17:05:00.000000000Z","content":` + notice + `}`, BackgroundTaskOutstandingFresh},
+		{"unknown type", `{"type":"future-line","timestamp":"2026-08-12T17:05:00.000000000Z","message":{"content":` + notice + `}}`, BackgroundTaskOutstandingFresh},
+		{"no type", `{"timestamp":"2026-08-12T17:05:00.000000000Z","message":{"content":` + notice + `}}`, BackgroundTaskOutstandingFresh},
+		{"user string without a notification", `{"type":"user","timestamp":"2026-08-12T17:05:00.000000000Z","message":{"content":"is task-1 done?"}}`, BackgroundTaskOutstandingFresh},
+	} {
+		path := writeTranscript(t, startMarkerLine("task-1", "tool-1", "2026-08-12T17:00:00.000000000Z"), tc.line)
+		reading, err := ReadBackgroundTasks(path, capDuration, readAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(reading.Markers) != 1 || reading.Markers[0].Status != tc.want {
+			t.Errorf("%s: Markers = %+v, want task-1 %s", tc.name, reading.Markers, tc.want)
+		}
 	}
 }
 
