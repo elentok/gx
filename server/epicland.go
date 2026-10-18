@@ -366,4 +366,3 @@ func changedFiles(changes []git.Change) string {
 	}
 	return list
 }
-
