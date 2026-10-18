@@ -168,10 +168,16 @@ diagnosis) applies unchanged; only the writes differ.
 - **`No catalog entry matched`** → report the diagnosis and park the failed ticket. Do nothing else;
   propose any other command in the report for a human to run.
 - Never wait for a go-ahead, and never ask: an unattended session has no one to answer.
+- **Last step, always:** report on _your own_ ticket (not the failed one):
+  `gx tickets set <your-addr> --iteration-status finished --commitless true`. Do it after the
+  action, including when you only parked the failed ticket or filed a follow-up. Without it the
+  server finds no report and parks your ticket `zero-commit` ("no result reported"), which spawns
+  another investigate ticket.
 
 A diagnose ticket (`type: diagnose`) is unattended too, with no catalog entry: it grants no
 repair verbs at all, only filing via the `gx-follow-up` skill. It is about gx itself, not a
-parked ticket, so there is no ticket to park.
+parked ticket, so there is no ticket to park. It ends the same way: after filing, report
+`gx tickets set <your-addr> --iteration-status finished --commitless true`.
 
 Attended mode (`m` → Investigate opens an interactive tab, not a ticket) keeps the human go-ahead
 exactly as before.
