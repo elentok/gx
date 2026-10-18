@@ -63,11 +63,15 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 		return LandResult{}, "", &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("the agent session for ticket %s exists; stop it or pass --ignore-live-tab", in.ID)}
 	}
 
-	wtDir, err := d.WorktreeDir(in.Cwd)
+	featurePath, err := featureWorktree(d, in.Cwd, epic)
 	if err != nil {
 		return LandResult{}, "", err
 	}
-	featurePath := filepath.Join(wtDir, epic)
+	if parsed.Status == schema.StatusNeedsAnswer {
+		if err := checkRecoverable(d, featurePath, epic, t.Identifier); err != nil {
+			return LandResult{}, "", err
+		}
+	}
 	rng, err := landSourceRange(in, d, featurePath, epic, t.Identifier)
 	if err != nil {
 		return LandResult{}, "", err
@@ -203,11 +207,10 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	if marker == nil || marker.Ticket != in.ID {
 		return LandResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", in.ID)}
 	}
-	wtDir, err := d.WorktreeDir(in.Cwd)
+	featurePath, err := featureWorktree(d, in.Cwd, epic)
 	if err != nil {
 		return LandResult{}, "", err
 	}
-	featurePath := filepath.Join(wtDir, epic)
 	inProgress, err := d.CherryPickInProgress(featurePath)
 	if err != nil {
 		return LandResult{}, "", fmt.Errorf("checking cherry-pick state: %w", err)
@@ -273,16 +276,58 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	return out, fmt.Sprintf("%s: %s (%s)", EpicTicketLabel(in.EpicPath, in.ID), out.Outcome, res.SHA), nil
 }
 
+// featureWorktree is the epic's feature worktree in cwd's repo. Without one
+// the caller is in the wrong repo, which must not read as a missing branch.
+func featureWorktree(d ralphloop.Deps, cwd, epic string) (string, error) {
+	if wtDir, err := d.WorktreeDir(cwd); err == nil {
+		featurePath := filepath.Join(wtDir, epic)
+		if _, err := d.RevParse(featurePath, "HEAD"); err == nil {
+			return featurePath, nil
+		}
+	}
+	return "", &RefusalError{Reason: ReasonWrongRepo, Message: fmt.Sprintf("wrong repo, run from the repo holding epic %s (%s has no %s worktree)", epic, cwd, epic)}
+}
+
 // checkLandable applies the status and commitless rules. Commitless is the
-// explicit flag only, never the type-derived notion.
+// explicit flag only, never the type-derived notion. A needs-answer ticket
+// lands only as a zero-commit park, a late commit that came with no finish.
 func checkLandable(id string, t schema.Ticket) error {
-	switch t.Status {
-	case schema.StatusDone, schema.StatusClaimed, schema.StatusNeedsRepair:
+	switch {
+	case t.Status == schema.StatusDone, t.Status == schema.StatusClaimed, t.Status == schema.StatusNeedsRepair:
+	case t.Status == schema.StatusNeedsAnswer && (t.ParkKind == "" || t.ParkKind == schema.ParkKindZeroCommit):
 	default:
-		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; land accepts only done, claimed or needs-repair", id, t.Status)}
+		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; land accepts only done, claimed, needs-repair or a zero-commit needs-answer", id, describeStatus(t))}
 	}
 	if t.Commitless {
 		return &RefusalError{Reason: ReasonCommitless, Message: fmt.Sprintf("ticket %s is flagged commitless; there is nothing to land", id)}
+	}
+	return nil
+}
+
+func describeStatus(t schema.Ticket) string {
+	if t.Status == schema.StatusNeedsAnswer && t.ParkKind != "" {
+		return fmt.Sprintf("%s (%s)", t.Status, t.ParkKind)
+	}
+	return string(t.Status)
+}
+
+// checkRecoverable is verify's recoverable test: the iteration branch exists
+// and has commits past its merge-base with the feature branch.
+func checkRecoverable(d ralphloop.Deps, featurePath, epic, identifier string) error {
+	branch := ralphloop.IterationBranch(epic, identifier)
+	if _, err := d.RevParse(featurePath, branch); err != nil {
+		return &RefusalError{Reason: ReasonIterationBranchMissing, Message: fmt.Sprintf("no iteration branch %s; commits not recoverable", branch)}
+	}
+	base, err := d.MergeBase(featurePath, branch, epic)
+	if err != nil {
+		return fmt.Errorf("resolving merge-base of %s and %s: %w", branch, epic, err)
+	}
+	ahead, err := d.CommitsAhead(featurePath, base, branch)
+	if err != nil {
+		return fmt.Errorf("counting commits on %s: %w", branch, err)
+	}
+	if ahead == 0 {
+		return &RefusalError{Reason: ReasonNotRecoverable, Message: fmt.Sprintf("%s has no commits past %s; nothing to land", branch, epic)}
 	}
 	return nil
 }

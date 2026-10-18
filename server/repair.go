@@ -93,8 +93,8 @@ func repairOK(v any) (RepairResult, error) {
 
 // epicTarget resolves a request's address to the epic's directory and the
 // ticket id (empty for an epic-only address) and the directory the verb runs
-// in: the caller's, else the project's repo.
-func (s *Server) epicTarget(req RepairRequest, needID bool) (epicPath, id, cwd string, err error) {
+// in: the caller's, else the project's repo (preferProject flips that order).
+func (s *Server) epicTarget(req RepairRequest, needID, preferProject bool) (epicPath, id, cwd string, err error) {
 	raw, id, hasID := strings.Cut(req.Address, "/")
 	if hasID || needID {
 		a, perr := tickets.ParseAddress(req.Address, tickets.AddressContext{})
@@ -116,7 +116,7 @@ func (s *Server) epicTarget(req RepairRequest, needID bool) (epicPath, id, cwd s
 			continue
 		}
 		cwd = req.Cwd
-		if cwd == "" {
+		if cwd == "" || preferProject {
 			if _, repo, err := s.projectOf(project); err == nil {
 				cwd = repo
 			}
@@ -130,7 +130,7 @@ func (s *Server) repairLand(req RepairRequest) (RepairResult, error) {
 	if repair.IsGuardedBranch(req.Branch) {
 		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to land from a ralph-loop/* working directory (%s); run from outside the iteration worktree", req.Branch)}), nil
 	}
-	epicPath, id, cwd, err := s.epicTarget(req, true)
+	epicPath, id, cwd, err := s.epicTarget(req, true, true)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -187,7 +187,7 @@ func (s *Server) freshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket
 }
 
 func (s *Server) repairReset(req RepairRequest) (RepairResult, error) {
-	epicPath, id, cwd, err := s.epicTarget(req, true)
+	epicPath, id, cwd, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -202,7 +202,7 @@ func (s *Server) repairReset(req RepairRequest) (RepairResult, error) {
 }
 
 func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
-	epicPath, id, _, err := s.epicTarget(req, true)
+	epicPath, id, _, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -214,7 +214,7 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 }
 
 func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {
-	epicPath, id, cwd, err := s.epicTarget(req, false)
+	epicPath, id, cwd, err := s.epicTarget(req, false, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
