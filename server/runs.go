@@ -318,9 +318,7 @@ func (s *Server) reclaimRuns() {
 			continue
 		}
 		s.log.Info("not reclaiming iteration", "ticket", t.Address, "reason", err)
-		if errors.Is(err, errHandleMismatch) {
-			s.parkMismatch(t, err)
-		}
+		s.parkUnreclaimed(t, err)
 	}
 	s.savedRuns = nil
 }
@@ -346,18 +344,22 @@ func (s *Server) logDrainingRunners() {
 // errHandleMismatch marks a persisted handle whose pane, agent or worktree is gone.
 var errHandleMismatch = errors.New("handle mismatch")
 
-// parkMismatch parks the ticket of a handle that cannot be reclaimed, so a
+// parkUnreclaimed parks the ticket of a handle that cannot be reclaimed, so a
 // person sees it instead of it staying claimed forever.
-func (s *Server) parkMismatch(t trackedRun, cause error) {
+func (s *Server) parkUnreclaimed(t trackedRun, cause error) {
+	kind := events.IterationError
+	if errors.Is(cause, errHandleMismatch) {
+		kind = events.HandleMismatch
+	}
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err == nil {
 		var dir string
 		if dir, _, err = s.projectOf(addr.Project); err == nil {
-			err = s.parkTicket(dir, addr, t.TicketPath, events.HandleMismatch, "cannot reclaim iteration after restart: "+cause.Error())
+			err = s.parkTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error())
 		}
 	}
 	if err != nil {
-		s.log.Warn("park handle mismatch", "ticket", t.Address, "err", err)
+		s.log.Warn("park unreclaimed iteration", "ticket", t.Address, "err", err)
 	}
 }
 

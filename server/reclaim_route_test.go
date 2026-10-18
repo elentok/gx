@@ -121,6 +121,30 @@ func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) 
 	waitStatus(t, ticketPath, schema.StatusDone)
 }
 
+func TestReclaim_NonMismatchErrorParksNeedsRepairWithItsReason(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+	registerLiveAgent(h)
+	_, ticketPath := leaveIteration(t, h, store, repo)
+	path := filepath.Join(h.StateDir, "runs.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), `"root":"proj:epic-a"`, `"root":"corrupt"`, 1))
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.Restart(t)
+	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+	body, _ := os.ReadFile(ticketPath)
+	if !strings.Contains(string(body), `invalid root "corrupt"`) {
+		t.Errorf("ticket lacks the reclaim error in its reason:\n%s", body)
+	}
+}
+
 func TestReclaim_UnavailableRunnerParksNeedsRepairNamingIt(t *testing.T) {
 	_, ticketPath := restartUnder(t, "pty", newRenamedFake("headless", nativerunner.VerdictLive), nil)
 	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
