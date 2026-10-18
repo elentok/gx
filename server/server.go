@@ -602,6 +602,9 @@ func (s *Server) Serve(ctx context.Context) error {
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	// Armed before the socket serves, so no save after startup goes unseen.
 	s.startConfigWatch(freshCtx)
+	// Before the socket serves, so a session created at startup is never
+	// taken for one whose holder died while the server was down.
+	s.restoreSessions()
 	errc := make(chan error, 2)
 	lns := []net.Listener{s.ln}
 	if s.tcp != nil {
@@ -612,7 +615,6 @@ func (s *Server) Serve(ctx context.Context) error {
 	}
 	s.recoverLands()
 	s.reclaimRuns()
-	s.restoreSessions()
 	s.logDrainingRunners()
 	s.pruneAgentLogs(time.Now())
 	s.scanParentDefects()

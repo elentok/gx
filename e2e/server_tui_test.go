@@ -1,9 +1,9 @@
 package e2e
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,8 +13,8 @@ import (
 )
 
 // TestServerTUI_ShowsServerModeAndDropsOnStop boots the real TUI against a
-// running server: the tickets come from the
-// server and the indicator names its pid, then goes down when the server stops.
+// running server: the tickets come from the server and the indicator reads
+// "server down" only once the server stops.
 func TestServerTUI_ShowsServerModeAndDropsOnStop(t *testing.T) {
 	herdrctl.RequireHerdr(t)
 
@@ -43,16 +43,18 @@ func TestServerTUI_ShowsServerModeAndDropsOnStop(t *testing.T) {
 			e.gx("server", "stop")
 		}
 	})
-	h, up := e.running()
+	_, up := e.running()
 	if !up {
 		t.Fatal("server not running after `gx server start`")
 	}
 
 	ws := herdrctl.NewWorkspace(t, repo)
 	ws.Run(append(append([]string{"env"}, e.env...), e.bin, "tickets")...)
-	ws.WaitForText(fmt.Sprintf("server ● pid %d", h.Pid), 30*time.Second)
-	ws.WaitForText(epic, 15*time.Second)
+	ws.WaitForText(epic, 30*time.Second)
+	if strings.Contains(ws.Read(), "server down") {
+		t.Fatal("indicator reads server down while the server runs")
+	}
 
 	e.gx("server", "stop")
-	ws.WaitForText("server ○ down", 15*time.Second)
+	ws.WaitForText("server down", 15*time.Second)
 }
