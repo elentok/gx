@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -83,6 +85,34 @@ func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
 			t.Error("iteration branch still there")
 		}
 	})
+}
+
+func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return nil, herdrfake.Identities{}, errors.New(`{"error":{"code":"internal","message":"herdr hiccup"}}`)
+	})
+	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, func(string) {})
+	stampRun(t, h, "herdr", deadSession)
+	h.Restart(t)
+
+	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Errorf("worktree gone: %v", err)
+	}
+	if _, err := git.RevParse(repo, "ralph-loop/epic-a-item-01"); err != nil {
+		t.Errorf("iteration branch gone: %v", err)
+	}
+	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.ClaimReopened) }) {
+		t.Errorf("run log has claim-reopened: %v", logged)
+	}
 }
 
 // assertParkRecordsRun checks the park event names the run's runner, label and

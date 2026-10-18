@@ -16,7 +16,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -462,20 +461,25 @@ func (s *Server) reclaim(t trackedRun) error {
 		return s.reclaimHeadless(t, runner)
 	}
 	label := iterationLabel(t.Address)
-	agent, err := herdr.AgentGet(label)
-	if err != nil || agent.PaneID == "" {
+	session, found, err := runner.Find(label)
+	if err != nil {
+		// A lookup that failed says nothing about whether the agent is gone.
+		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
+	}
+	if !found || session.ID == "" {
 		if reopened, err := s.reopenEmptyClaim(t); err != nil || reopened {
 			return err
 		}
-	}
-	if err != nil {
-		return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
-	}
-	if agent.PaneID == "" {
 		return fmt.Errorf("%w: no pane", errHandleMismatch)
 	}
-	if t.State == runLaunching && (agent.AgentStatus == "idle" || agent.AgentStatus == "done") {
-		return s.stopLaunching(t, runner, agentrunner.Session{Label: label, ID: agent.PaneID}, agent.AgentStatus)
+	if t.State == runLaunching {
+		st, err := runner.Status(session)
+		if err != nil {
+			return fmt.Errorf("%w: agent %s: %v", errHandleMismatch, t.Address, err)
+		}
+		if st.State == agentrunner.StateIdle || st.State == agentrunner.StateDone {
+			return s.stopLaunching(t, runner, session, string(st.State))
+		}
 	}
 	one, wt, mode, err := s.resume(t)
 	if err != nil {
@@ -486,7 +490,7 @@ func (s *Server) reclaim(t trackedRun) error {
 		return err
 	}
 	t.Runner = runnerHerdr
-	t.Session = agentrunner.Session{Label: label, ID: agent.PaneID, SessionID: t.Session.SessionID}
+	t.Session = agentrunner.Session{Label: label, ID: session.ID, SessionID: t.Session.SessionID}
 	t.State = ""
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
