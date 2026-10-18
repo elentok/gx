@@ -46,7 +46,7 @@ type deps struct {
 	loadConfig           func() (config.Config, error)
 	getenv               func(string) string
 	goos                 string
-	userHomeDir         func() (string, error)
+	userHomeDir          func() (string, error)
 	runEditor            func(editor, path string, in io.Reader, out, err io.Writer) error
 	stdinIsTerminal      func() bool
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
