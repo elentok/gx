@@ -46,28 +46,38 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 		return QueueResult{}, err
 	}
 	one := ralphloop.OneIteration{Epic: a.Epic, Ticket: first}
-	defer s.trunkLocks.lock(repo, target)()
-	if r := epicMergeRefusal(root, e, repo); r != nil {
-		return *r, nil
-	}
-	branch := "refs/heads/" + a.Epic
-	if err := s.ensureFeatureWorktree(a.Project, a.Epic, repo); err != nil {
+	unlock := s.trunkLocks.lock(repo, target)
+	d, err := s.epicMergeLocked(root, one, repo, epics, e, target)
+	unlock()
+	if err != nil {
 		return QueueResult{}, err
+	}
+	return s.actOnLand(root, one, dir, e, d), nil
+}
+
+// epicMergeLocked is epicMerge's work under the trunk lock; the caller acts on
+// the decision after unlock.
+func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string) (landDecision, error) {
+	if r := epicMergeRefusal(root, e, repo); r != nil {
+		return landDecision{result: *r}, nil
+	}
+	if err := s.ensureFeatureWorktree(root.Project, root.Epic, repo); err != nil {
+		return landDecision{}, err
 	}
 	// Queued first, so a park of the land below or of the merge ticket's shows.
-	if err := s.ensureRootQueued(root, first); err != nil {
-		return QueueResult{}, err
+	if err := s.ensureRootQueued(root, one.Ticket); err != nil {
+		return landDecision{}, err
 	}
-	if ff, err := git.IsAncestor(repo, target, branch); err != nil {
-		return QueueResult{}, err
+	if ff, err := git.IsAncestor(repo, target, "refs/heads/"+root.Epic); err != nil {
+		return landDecision{}, err
 	} else if ff {
-		return s.landEpic(root, one, dir, repo, epics, e, target, true), nil
+		return s.landEpic(root, one, repo, epics, e, target, true), nil
 	}
 	id := s.forkMergeTicket(root, e, target, true)
 	if id == "" {
-		return QueueResult{}, errors.New("fork manual merge ticket for " + root.String())
+		return landDecision{}, errors.New("fork manual merge ticket for " + root.String())
 	}
-	return QueueResult{MergeTicket: tickets.Address{Project: a.Project, Epic: a.Epic, ID: id}.String()}, nil
+	return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}}, nil
 }
 
 // lowestTicket is the epic's Root ticket: the lowest-numbered one, whatever

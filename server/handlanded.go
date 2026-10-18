@@ -47,9 +47,10 @@ func (s *Server) stampHandLanded() {
 }
 
 // stampIfLanded stamps merged_at on e once its branch is an ancestor of its
-// target, and dequeues its root if one is still queued (a root park). It holds
-// the trunk's lock and re-reads the stamp, so a server land racing it sends
-// the only notice.
+// target, and dequeues its root if one is still queued (a root park). It
+// re-reads the stamp under the trunk's lock, so a server land racing it sends
+// the only notice. A held lock skips this tick: a poll never queues behind a
+// land, and the next tick checks again.
 func (s *Server) stampIfLanded(root rootRef, epics []tickets.Epic, e tickets.Epic) {
 	dir, repo, err := s.projectOf(root.Project)
 	if err != nil {
@@ -59,24 +60,36 @@ func (s *Server) stampIfLanded(root rootRef, epics []tickets.Epic, e tickets.Epi
 	if err != nil {
 		return
 	}
-	defer s.trunkLocks.lock(repo, target)()
-	if !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
+	unlock, ok := s.trunkLocks.tryLock(repo, target)
+	if !ok {
 		return
 	}
+	removed := s.stampLanded(root, e, repo, target)
+	unlock()
+	if removed {
+		s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: t}, e, true)
+	}
+}
+
+// stampLanded is stampIfLanded under the trunk lock. It reports whether it
+// dequeued the root, the one case that sends a notice.
+func (s *Server) stampLanded(root rootRef, e tickets.Epic, repo, target string) (removed bool) {
+	if !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
+		return false
+	}
 	if landed, err := s.landedProbe(repo, "refs/heads/"+e.Name, target); err != nil || !landed {
-		return
+		return false
 	}
 	s.stampEpic(root, e.Path, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)
 	removed, err := s.queued.removeRoot(root)
 	if err != nil {
 		s.log.Warn("dequeue merged root", "root", root, "err", err)
-		return
+		return false
 	}
-	if !removed {
-		return
+	if removed {
+		s.events.publish(EventQueueChanged, root.String())
+		s.events.publish(EventRootCompleted, root.String())
 	}
-	s.events.publish(EventQueueChanged, root.String())
-	s.events.publish(EventRootCompleted, root.String())
-	s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: t}, e, true)
+	return removed
 }
