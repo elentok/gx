@@ -145,7 +145,12 @@ A comment quoting a measured value duplicates it, and duplicates drift - stale f
 
 Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams.
 
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
+Run typechecking regularly and single test files regularly. At the end, test only the packages you
+touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.
+
+Tests in `server/` take over 120s, the Bash default timeout. Start them with `run_in_background`
+up front, then wait for the completion notice. Don't poll with Monitor or Workflow, and don't start
+a second run of the same suite while one is going.
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 
