@@ -105,6 +105,20 @@ const watchTickInterval = 200 * time.Millisecond
 // (and its tail closed) instead of feeding the current one.
 var watchGen atomic.Int64
 
+// watchState is where a Watch modal is in its life; the header reads it.
+type watchState int
+
+const (
+	// watchStatic is a transcript: nothing follows and no state is shown.
+	watchStatic watchState = iota
+	// watchLive follows the agent's log.
+	watchLive
+	// watchNotLiveAtOpen is a Watch whose agent had already ended when it opened.
+	watchNotLiveAtOpen
+	// watchEnded is a live Watch whose agent ended while it was open.
+	watchEnded
+)
+
 // watchLoadedMsg carries the rendered log a Watch or Transcript action read.
 type watchLoadedMsg struct {
 	title string
@@ -112,10 +126,8 @@ type watchLoadedMsg struct {
 	// step, when set, loads the content delta away (`[` -1, `]` +1), or
 	// returns nil past an end.
 	step func(delta int) tea.Cmd
-	// live marks a Watch: the header shows live, or "not live" when ended
-	// already holds at open.
-	live  bool
-	ended bool
+	// state is watchStatic for a transcript, else a Watch's state at open.
+	state watchState
 	// tail, when set, is stepped once per tick for new lines.
 	tail *agentlog.Tail
 }
@@ -136,9 +148,7 @@ type watchModal struct {
 	open     bool
 	title    string
 	step     func(delta int) tea.Cmd
-	live     bool
-	notLive  bool
-	ended    bool
+	state    watchState
 	tail     *agentlog.Tail
 	gen      int64
 	lines    []string
@@ -153,7 +163,7 @@ func (w watchModal) Open(msg watchLoadedMsg, width, height int) watchModal {
 	vp := viewport.New(viewport.WithWidth(watchContentWidth(width)), viewport.WithHeight(vpH))
 	vp.SetContent(strings.Join(msg.lines, "\n"))
 	vp.GotoBottom()
-	w = watchModal{open: true, title: msg.title, step: msg.step, live: msg.live, notLive: msg.ended, tail: msg.tail, lines: msg.lines, vp: vp}
+	w = watchModal{open: true, title: msg.title, step: msg.step, state: msg.state, tail: msg.tail, lines: msg.lines, vp: vp}
 	if w.tail != nil {
 		w.gen = watchGen.Add(1)
 	}
@@ -188,7 +198,7 @@ func (w watchModal) Step(msg watchStepMsg) (watchModal, tea.Cmd) {
 		return w, notify.Error("watch: " + msg.err.Error())
 	}
 	if msg.ended {
-		w.ended, w.tail = true, nil
+		w.state, w.tail = watchEnded, nil
 		return w, nil
 	}
 	return w, w.tick()
@@ -248,12 +258,12 @@ func (w watchModal) Update(msg tea.KeyPressMsg) (watchModal, tea.Cmd) {
 
 func (w watchModal) View() string {
 	title := w.title
-	switch {
-	case w.live && w.notLive:
+	switch w.state {
+	case watchNotLiveAtOpen:
 		title += " · not live"
-	case w.live && w.ended:
+	case watchEnded:
 		title += " · agent ended"
-	case w.live:
+	case watchLive:
 		title += " · live"
 	}
 	hint := ui.HintDismiss()
@@ -276,7 +286,7 @@ func cmdWatchAgent(api ServerAPI, address string) tea.Cmd {
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}
-		msg := watchLoadedMsg{title: "Agent " + address, live: true}
+		msg := watchLoadedMsg{title: "Agent " + address, state: watchLive}
 		tail, err := agentlog.OpenTail(log, nil)
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
@@ -286,8 +296,9 @@ func cmdWatchAgent(api ServerAPI, address string) tea.Cmd {
 			tail.Close()
 			return notify.Error("watch: " + err.Error())()
 		}
-		msg.lines, msg.ended = lines[max(len(lines)-maxWatchLines, 0):], ended
+		msg.lines = lines[max(len(lines)-maxWatchLines, 0):]
 		if ended {
+			msg.state = watchNotLiveAtOpen
 			tail.Close()
 		} else {
 			msg.tail = tail
