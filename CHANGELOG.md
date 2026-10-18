@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.34.2 - 2026-10-18
+
+- Added one shared Context menu (`m`) on the Tickets, Queue and Agents tabs. It replaces the separate per-tab menus.
+  - It lists every action for the focused ticket, epic or session. Suggested actions come first, then named groups (Agent, Edit/copy, Queue). Actions that can't run stay listed but dim, with the reason shown. Each item shows its direct key.
+  - A right click on a list row selects it and opens the menu.
+  - The ticket menu now opens on archived rows. Status changes moved into it, and the Tickets tab's `s` status menu is gone.
+  - Added an epic Context menu on the Tickets and Queue tabs, with "Add epic to queue", Set draft/Set open and Check all. Queue epic headers can now be selected.
+  - The Queue tab's ticket menu adds "Approve recovery proposal" (`A`).
+  - The Agents tab session menu now uses the shared menu.
+- Changed orchestration actions (Resume, Unmute & Reopen, epic Merge) to always go through the server by address. With no server they show "server not running" instead of editing ticket files. "Resume (I answered)" and the unpark action are merged into one "Resume". Added `gx server tickets unmute`.
+- Changed Watch to a live modal that follows a headless, PTY or herdr agent's conversation as it happens. Watch works without a server, and an ended agent opens as "not live". The herdr pane jump moved to its own "Go to pane" item.
+- Added a hover highlight on the list row under the mouse on the Tickets, Queue and Agents tabs. Hovering never moves the selection.
+- Changed the Tickets tab so every epic starts collapsed, and the preview shows each epic's `ticket.md` body.
+- Renamed the `D` key title to "drain queue". Removed the `m r` refresh chord from the Worktrees, Status, Commit and PRs tabs. Use `R` instead.
+- Added `--blocked-by`, `--type`, `--expected-context-window`, `--commitless` and `--category` flags to `gx tickets add`.
+- Changed `gx tickets validate` to show only the addressed ticket's warnings, plus a count of the others (use `--all` to see everything).
+- Fixed the Queue tab menu, which treated a server-mode row's address as a file path for Transcript, Answer, status writes and Watch.
+- Fixed tickets parked with zero commits when the agent read a background task's output before the task finished.
+- Fixed code-review quality agents falling back to a manual review when the review skill can't be model-invoked.
+- Fixed a drained claude exit being reported as "holder failed".
+- Fixed epic-level `blocked_by` errors on finished tickets.
+- Fixed copy-mode positions in the agent terminal shifting when the scrollback trims.
+- Fixed session banners and sounds that kept running after close.
+- Fixed mark read, mark actionable and stop reporting success when the session meta couldn't be read or saved.
+- Fixed help so it ends a focused search on every page before it opens.
+- Fixed a click in the agent terminal so it now focuses the terminal.
+- Fixed `edit-config` deleting its temp file after an invalid save without a TTY.
+- Fixed `gx-cleanup` deleting a branch before removing its worktree.
+
 ## v0.34.1 - 2026-10-17
 
 - Replaced the bottom tab bar with a top title row.
