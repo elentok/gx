@@ -46,6 +46,7 @@ const (
 	codeReviewSkill = "gx-code-review"
 	oneOffSkill     = "gx-one-off"
 	evolveSkill     = "gx-evolve"
+	diagnoseSkill   = "gx-investigate"
 	// mergeSkill carries its flag: the prompt appends the ticket address to it.
 	mergeSkill = "gx-merge --ticket"
 )
@@ -61,6 +62,8 @@ func launchSkill(t tickets.Ticket) string {
 		return oneOffSkill
 	case t.Type == string(schema.TypeEvolve):
 		return evolveSkill
+	case t.Type == string(schema.TypeDiagnose):
+		return diagnoseSkill
 	case t.Type == string(schema.TypeMerge):
 		return mergeSkill
 	}

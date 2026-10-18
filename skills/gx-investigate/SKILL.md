@@ -3,7 +3,7 @@ name: gx-investigate
 description:
   Investigate a reported gx/ralph-loop bug — tickets stuck in the queue, wrong scheduling
   decisions, ticket status or Queue-tab state that looks wrong, a stalled or misbehaving agent
-  session. Gives the ralph-loop background and the log/state-file inventory needed to diagnose
+  session, or gx itself (server or TUI) using too much CPU. Gives the ralph-loop background and the log/state-file inventory needed to diagnose
   from evidence instead of guessing. Never edits product code; may repair ralph-loop state (land,
   reset, unpark a stuck ticket) with the human's explicit go-ahead. Publishes findings as a research
   ticket or a report.
@@ -85,6 +85,43 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
    (`ralphloop/loop.go`, `scope.go`, `schedule.go`, `tickets/status.go`) — this file is a map, not
    a substitute for reading the code the bug is in.
 
+## CPU spikes
+
+A `type: diagnose` ticket whose prompt starts `CPU spike in gx <server|tui>` comes from the
+cpu-watchdog: that process stayed above `cpu-watchdog.threshold-percent` of one core for
+`cpu-watchdog.sustain`. The prompt names the evidence dir (under `<state dir>/cpu-spikes/`), which
+holds:
+
+- `summary.md`: one row per 10s sample, **self** (gx's own Go code) vs **children** (subprocesses
+  that exited in that interval: `herdr`, `git`, …).
+- `cpu.pprof`: a 20s CPU profile taken right after the spike fired. Symbols are embedded, so no
+  binary is needed: `go tool pprof -top -cum <dir>/cpu.pprof`, then `-list '<func regexp>'` on the
+  hot functions. `-top` sorts by own time, `-cum` by time including callees.
+- `goroutines.txt`: every goroutine's stack at the same moment.
+
+Read the split first; it decides where to look:
+
+1. **Self is high** → the profile shows the code. Typical gx shapes: a loop that rereads or hashes
+   every ticket file (`server/index.go` `scanStore`), a TUI render that recomputes derived state
+   on each frame instead of on each change, a ticker or poll with a too-short interval, JSON
+   (de)serialization of a large snapshot per event.
+2. **Children is high** → the profile shows little; the cost is processes gx starts. Look in
+   `goroutines.txt` for goroutines sitting in `os/exec` (`(*Cmd).Wait`, `forkExec`) and walk up to
+   the gx loop that starts them. Typical shape: a wait/poll loop around `herdr agent wait` or
+   `herdr agent get` whose sleep is skipped when herdr answers at once (fixed once in
+   `agentrunner/herdrrunner` `Wait`), or a `git` call per ticket per tick.
+3. **Profile empty or missing** → `summary.md` lists any capture error. The spike may have ended
+   before profiling started; say so and use the goroutine dump alone.
+
+Confirm the hypothesis against the source (file:line). Check the queue state at spike time only
+when the loop depends on it (how many agents ran, which were waiting): `gx server status` and the
+run logs, as in "Where state lives".
+
+A diagnose ticket runs unattended (see below). File the cause and a fix direction with the
+`gx-follow-up` skill, target `gx`, `unattended`: Source names the spike's evidence dir, Evidence
+gives the profile lines or goroutine stacks and the file:line of the loop. Then add a one-line
+entry to gotchas.md only if the fix has landed.
+
 ## Known gotchas
 
 [gotchas.md](gotchas.md) is a running list of previously-diagnosed bugs, one line each, pointing at
@@ -129,6 +166,10 @@ diagnosis) applies unchanged; only the writes differ.
 - **`No catalog entry matched`** → report the diagnosis and park the failed ticket. Do nothing else;
   propose any other command in the report for a human to run.
 - Never wait for a go-ahead, and never ask: an unattended session has no one to answer.
+
+A diagnose ticket (`type: diagnose`) is unattended too, with no catalog entry: it grants no
+repair verbs at all, only filing via the `gx-follow-up` skill. It is about gx itself, not a
+parked ticket, so there is no ticket to park.
 
 Attended mode (`m` → Investigate opens an interactive tab, not a ticket) keeps the human go-ahead
 exactly as before.

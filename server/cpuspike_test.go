@@ -54,7 +54,7 @@ func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 		t.Fatalf("issues = %v, want one", issues)
 	}
 	body, _ := os.ReadFile(issues[0])
-	for _, want := range []string{"gx tui (pid 42)", "24% of a core", "/evidence/cpu.pprof", "20s"} {
+	for _, want := range []string{"type: diagnose", "gx tui (pid 42)", "24% of a core", "/evidence/cpu.pprof", "20s"} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("ticket lacks %q:\n%s", want, body)
 		}

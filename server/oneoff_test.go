@@ -283,8 +283,9 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 func TestOneOff_RefusesBadTypes(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	for name, req := range map[string]server.OneOffRequest{
-		"unknown type":      {Prompt: "x", Cwd: repo, Type: "research"},
-		"evolve and commit": {Prompt: "x", Cwd: repo, Type: "evolve", Commits: true},
+		"unknown type":        {Prompt: "x", Cwd: repo, Type: "research"},
+		"evolve and commit":   {Prompt: "x", Cwd: repo, Type: "evolve", Commits: true},
+		"diagnose and commit": {Prompt: "x", Cwd: repo, Type: "diagnose", Commits: true},
 	} {
 		res, err := h.Client.OneOff(context.Background(), req)
 		if err != nil || !res.Refused || res.Reason != server.ReasonBadType {

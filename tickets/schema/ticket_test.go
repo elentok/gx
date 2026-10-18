@@ -218,3 +218,19 @@ func TestValidate_NonSelfReferencingParentIsValid(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestValidate_DiagnoseIsTopLevelAndCommitless(t *testing.T) {
+	tk := validTicket()
+	tk.Type = TypeDiagnose
+	if err := Validate(tk); err != nil {
+		t.Fatalf("top-level diagnose: %v", err)
+	}
+	if !tk.IsCommitless() {
+		t.Error("IsCommitless = false, want true")
+	}
+	parent := TicketID("01")
+	tk.Parent = &parent
+	if err := Validate(tk); err == nil {
+		t.Fatal("diagnose with a parent validated, want an error")
+	}
+}

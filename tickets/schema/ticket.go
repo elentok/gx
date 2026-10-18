@@ -112,6 +112,9 @@ const (
 	// TypeMerge rebases an epic's feature branch onto its target, in the feature
 	// worktree itself; the commits it makes land with the epic, not as its own.
 	TypeMerge TicketType = "merge"
+	// TypeDiagnose is a commitless, top-level-only run of gx-investigate on gx
+	// itself, filed by the server (a CPU spike) rather than by recovery.
+	TypeDiagnose TicketType = "diagnose"
 )
 
 var validTypes = map[TicketType]bool{
@@ -125,6 +128,7 @@ var validTypes = map[TicketType]bool{
 	TypeInvestigate:        true,
 	TypeEvolve:             true,
 	TypeMerge:              true,
+	TypeDiagnose:           true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -295,7 +299,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
@@ -349,6 +353,9 @@ func Validate(t Ticket) error {
 	}
 	if t.Type == TypeEvolve && t.Parent != nil {
 		errs = append(errs, fmt.Errorf("parent: an evolve ticket is top-level only, got parent %q", *t.Parent))
+	}
+	if t.Type == TypeDiagnose && t.Parent != nil {
+		errs = append(errs, fmt.Errorf("parent: a diagnose ticket is top-level only, got parent %q", *t.Parent))
 	}
 	if t.Base != "" && t.IsCommitless() {
 		errs = append(errs, fmt.Errorf("base: not allowed on a commitless ticket (it has no branch to base)"))

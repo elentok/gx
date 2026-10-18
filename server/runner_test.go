@@ -175,6 +175,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 		{"prompt", "$gx-one-off proj:epic-a/01"},
 		{"implement", "$gx-implement proj:epic-a/01"},
 		{"evolve", "$gx-evolve proj:epic-a/01"},
+		{"diagnose", "$gx-investigate proj:epic-a/01"},
 	} {
 		t.Run(tc.typ, func(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)

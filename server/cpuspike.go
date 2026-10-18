@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/cpuwatch"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // CPUSpikeDir is where the server and every TUI write CPU spike evidence.
@@ -53,8 +54,8 @@ func (s *Server) keepCPUWatched(ctx context.Context) {
 	w.Run(ctx)
 }
 
-// cpuSpike logs a spike and, in evolve maintainer mode, files a ticket in the
-// gx project for an agent to find its cause. The cooldown and the one-off's
+// cpuSpike logs a spike and, in evolve maintainer mode, files a diagnose ticket
+// in the gx project: gx-investigate finds the cause. The cooldown and the one-off's
 // dedupe key keep a busy gx from filing more than one at a time.
 func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) CPUSpikeResult {
 	s.log.Warn("cpu spike", "source", sp.Source, "pid", sp.PID, "avg_percent", avgCPU(sp.Samples), "evidence", sp.Dir)
@@ -76,6 +77,7 @@ func (s *Server) cpuSpike(sp cpuwatch.Spike, now time.Time) CPUSpikeResult {
 	res, err := s.oneOff(OneOffRequest{
 		Prompt:  cpuSpikePrompt(sp, set.CPUWatchdog),
 		Project: OutboxProject,
+		Type:    string(schema.TypeDiagnose),
 		Name:    "cpu-spike-" + sp.Source + "-" + now.Format("20060102-1504"),
 		Unique:  "cpu-spike:" + sp.Source,
 		Front:   true,
@@ -104,7 +106,7 @@ func cpuSpikePrompt(sp cpuwatch.Spike, c config.CPUWatchdogConfig) string {
 	if n := float64(len(sp.Samples)); n > 0 {
 		self, children = self/n, children/n
 	}
-	fmt.Fprintf(&b, "Investigate a CPU spike in gx %s (pid %d", sp.Source, sp.PID)
+	fmt.Fprintf(&b, "CPU spike in gx %s (pid %d", sp.Source, sp.PID)
 	if sp.Build != "" {
 		fmt.Fprintf(&b, ", build %s", sp.Build)
 	}
@@ -116,8 +118,7 @@ func cpuSpikePrompt(sp cpuwatch.Spike, c config.CPUWatchdogConfig) string {
 		fmt.Fprintf(&b, "Evidence in %s:\n\n", sp.Dir)
 		fmt.Fprintf(&b, "- summary.md: the samples\n- cpu.pprof: a CPU profile (`go tool pprof -top %s`)\n- goroutines.txt: every goroutine's stack during the spike\n\n", filepath.Join(sp.Dir, "cpu.pprof"))
 	}
-	b.WriteString("Subprocess CPU (herdr, git, ...) does not show in the profile: look for loops that start processes.\n\n")
-	b.WriteString("Find the cause and report it with file:line references. This ticket is commitless: put the fix in a follow-up ticket (`gx tickets add --parent`) instead of committing here.")
+	b.WriteString("Follow the skill's \"CPU spikes\" section.")
 	return b.String()
 }
 

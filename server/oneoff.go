@@ -50,8 +50,8 @@ type OneOffRequest struct {
 	Cwd   string `json:"cwd,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Agent string `json:"agent,omitempty"`
-	// Type is the ticket type: "prompt" (default) or "evolve", which is commitless
-	// by design and so cannot be combined with Commits.
+	// Type is the ticket type: "prompt" (default), "evolve" or "diagnose"; the
+	// last two are commitless by design and so cannot be combined with Commits.
 	Type string `json:"type,omitempty"`
 	// Commits makes the ticket type implement (prompt otherwise); a project without a VCS refuses it.
 	Commits bool `json:"commits,omitempty"`
@@ -206,11 +206,11 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 		if req.Commits {
 			typ = schema.TypeImplement
 		}
-	case schema.TypeEvolve:
+	case schema.TypeEvolve, schema.TypeDiagnose:
 		if req.Commits {
-			return oneOffRefusal(ReasonBadType, "an evolve ticket is commitless: --commits does not apply"), nil
+			return oneOffRefusal(ReasonBadType, "a "+req.Type+" ticket is commitless: --commits does not apply"), nil
 		}
-		typ = schema.TypeEvolve
+		typ = schema.TicketType(req.Type)
 	default:
 		return oneOffRefusal(ReasonBadType, "type "+req.Type+" is not supported by a one-off"), nil
 	}
