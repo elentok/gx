@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"bytes"
 	"reflect"
 	"strings"
@@ -350,5 +351,86 @@ func TestRunTerm_ConflictingDirectionsError(t *testing.T) {
 	err := execute([]string{"term", "--right", "--tab", "lazygit"}, d)
 	if err == nil || !strings.Contains(err.Error(), "mutually exclusive") {
 		t.Fatalf("expected mutually-exclusive error, got: %v", err)
+	}
+}
+
+func ghosttyDeps(stderr *bytes.Buffer) deps {
+	return deps{
+		stdout: bytes.NewBuffer(nil),
+		stderr: stderr,
+		getwd:  func() (string, error) { return "/wd", nil },
+		getenv: envFunc(map[string]string{"TERM_PROGRAM": "ghostty"}),
+		goos:   "darwin",
+	}
+}
+
+func TestRunTerm_GhosttyFallbackErrorRunsInPlace(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
+	_, e := withSeams(t)
+	launchInSplit = func(string, ui.Terminal, terminalrun.SplitType, string, []string, ...terminalrun.LaunchOption) (string, error) {
+		return "", &terminalrun.FallbackError{Hint: "Ghostty: set macos-applescript = true in your Ghostty config"}
+	}
+	var stderr bytes.Buffer
+
+	if err := execute([]string{"term", "--right", "ls"}, ghosttyDeps(&stderr)); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !e.called || e.program != "ls" {
+		t.Fatalf("expected in-place exec of ls, got %+v", e)
+	}
+	want := "gx: Ghostty: set macos-applescript = true in your Ghostty config — running in place.\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestRunTerm_GhosttyPlainErrorDoesNotExecReplace(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
+	_, e := withSeams(t)
+	launchInSplit = func(string, ui.Terminal, terminalrun.SplitType, string, []string, ...terminalrun.LaunchOption) (string, error) {
+		return "", errors.New("boom")
+	}
+	var stderr bytes.Buffer
+
+	err := execute([]string{"term", "--tab", "ls"}, ghosttyDeps(&stderr))
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("err = %v, want boom", err)
+	}
+	if e.called {
+		t.Fatal("plain error must not exec-replace")
+	}
+	if strings.Contains(stderr.String(), "running in place") {
+		t.Fatalf("unexpected hint on stderr: %q", stderr.String())
+	}
+}
+
+func TestRunTerm_GhosttySuccessNeitherHintNorExec(t *testing.T) {
+	// not parallel: shares package-level launchInSplit/execReplace seam vars with other TestRunTerm_* tests via withSeams
+	l, e := withSeams(t)
+	var stderr bytes.Buffer
+
+	if err := execute([]string{"term", "--below"}, ghosttyDeps(&stderr)); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !l.called || l.terminal != ui.TerminalGhostty {
+		t.Fatalf("expected ghostty launch, got %+v", l)
+	}
+	if e.called || stderr.Len() != 0 {
+		t.Fatalf("expected no exec/stderr, got exec=%v stderr=%q", e.called, stderr.String())
+	}
+}
+
+func TestTermHelpNamesAllBackends(t *testing.T) {
+	t.Parallel()
+	c := newTermCmd(deps{})
+	for _, s := range []string{c.Short, c.Long} {
+		for _, b := range []string{"tmux", "kitty", "herdr", "ghostty"} {
+			if !strings.Contains(strings.ToLower(s), b) {
+				t.Errorf("help %q missing %q", s, b)
+			}
+		}
+	}
+	if !strings.Contains(c.Long, "remote control") || !strings.Contains(c.Long, "1.3.0") {
+		t.Errorf("long help missing kitty remote control / ghostty version note")
 	}
 }

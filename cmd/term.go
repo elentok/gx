@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -48,12 +49,13 @@ func newTermCmd(d deps) *cobra.Command {
 	var f termFlags
 	cmd := &cobra.Command{
 		Use:   "term [command...]",
-		Short: "launch a command (or shell) into a tmux/kitty split, tab, or in place",
-		Long: `Launch a command into a tmux/kitty split or tab, falling back to running
-in place when no multiplexer is available.
+		Short: "launch a command (or shell) into a tmux/kitty/herdr/ghostty split, tab, or in place",
+		Long: `Launch a command into a tmux, kitty, herdr or Ghostty split or tab, falling
+back to running in place when none is available.
 
 With no command, opens your $SHELL. Directions (--right/--below/--tab) work on
-tmux and kitty (with remote control); elsewhere the command runs in place.
+tmux, kitty (with remote control), herdr and Ghostty (macOS, 1.3.0+); elsewhere
+the command runs in place.
 
   gx term                  # shell, split below (default)
   gx term --below nvim     # nvim in a split below
@@ -129,6 +131,11 @@ func runTerm(args []string, f termFlags, d deps) error {
 			opts = append(opts, terminalrun.AsShell())
 		}
 		_, err := launchInSplit(cwd, terminal, splitType, launchProg, launchArgs, opts...)
+		var fb *terminalrun.FallbackError
+		if errors.As(err, &fb) {
+			fmt.Fprintf(d.stderr, "gx: %s — running in place.\n", fb.Hint)
+			return execReplace(program, pargs, cwd)
+		}
 		return err
 	}
 
