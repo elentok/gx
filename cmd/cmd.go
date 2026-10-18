@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/terminalrun"
 
 	"github.com/spf13/cobra"
 )
@@ -54,6 +55,7 @@ type deps struct {
 	skillsAgentRoots     func() ([]string, error)
 	skillsManifestPath   func() (string, error)
 	explainAgent         func(target string) (herdr.AgentExplainResult, error)
+	probeGhostty         func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 }
@@ -97,6 +99,7 @@ func defaultDeps() deps {
 		skillsAgentRoots:     defaultSkillsAgentRoots,
 		skillsManifestPath:   defaultSkillsManifestPath,
 		explainAgent:         herdr.AgentExplain,
+		probeGhostty:         terminalrun.ProbeGhostty,
 	}
 }
 

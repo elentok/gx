@@ -555,8 +555,12 @@ func newRunCmd(d deps) *cobra.Command {
 
 func newDoctorCmd(d deps) *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor [--fix] [--pause] [--check-blocked-form <target>]",
+		Use:   "doctor [--fix] [--pause] [--check-blocked-form <target>] [--check-ghostty]",
 		Short: "check the repo for common configuration issues",
+		Long: `Check the repo for common configuration issues.
+
+--check-ghostty runs instead of the repo checks and probes Ghostty's AppleScript
+interface. It may show a macOS Automation prompt.`,
 		// runDoctor does its own flag parsing.
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, args []string) error {

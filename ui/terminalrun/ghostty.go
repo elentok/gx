@@ -118,6 +118,16 @@ func launchGhostty(worktreeRoot string, splitType SplitType, program string, arg
 	return nil
 }
 
+// ProbeGhostty checks that Ghostty's AppleScript interface answers, using the
+// same hints as a real launch. It may trigger a macOS Automation prompt.
+func ProbeGhostty() error {
+	out, err := runOsaScript(`tell application "Ghostty" to count windows`)
+	if err != nil {
+		return classifyGhosttyFailure(string(out), err)
+	}
+	return nil
+}
+
 // classifyGhosttyFailure maps osascript output to a hint. Only the codes that
 // can't have opened a split become a *FallbackError.
 func classifyGhosttyFailure(out string, err error) error {

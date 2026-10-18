@@ -12,18 +12,22 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/terminalrun"
 )
 
 func runDoctor(args []string, d deps) error {
 	var fix bool
 	var pause bool
 	var blockedFormTarget string
+	var checkGhostty bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--fix":
 			fix = true
 		case "--pause":
 			pause = true
+		case "--check-ghostty":
+			checkGhostty = true
 		case "--check-blocked-form":
 			i++
 			if i >= len(args) {
@@ -42,6 +46,9 @@ func runDoctor(args []string, d deps) error {
 	getenv := d.getenv
 	if getenv == nil {
 		getenv = os.Getenv
+	}
+	if checkGhostty {
+		return runDoctorGhosttyCheck(d, getenv)
 	}
 	stdin := d.stdin
 	if stdin == nil {
@@ -166,6 +173,35 @@ func runDoctorBlockedFormCheck(target string, d deps) error {
 	return nil
 }
 
+// runDoctorGhosttyCheck is the opt-in Ghostty AppleScript probe. It is never
+// part of plain `gx doctor` because the probe may show a macOS Automation
+// prompt.
+func runDoctorGhosttyCheck(d deps, getenv func(string) string) error {
+	terminal := ui.DetectTerminalFor(getenv, d.goos)
+	if terminal != ui.TerminalGhostty {
+		label := terminal.String()
+		if label == "" {
+			label = "plain"
+		}
+		fmt.Fprintf(d.stdout, "SKIP: terminal is %s, not ghostty\n", label)
+		return nil
+	}
+	if err := terminalrun.CheckGhosttySplits(getenv("TERM_PROGRAM_VERSION")); err != nil {
+		fmt.Fprintf(d.stdout, "FAIL: %v\n", err)
+		return fmt.Errorf("ghostty check failed: %w", err)
+	}
+	probe := d.probeGhostty
+	if probe == nil {
+		probe = terminalrun.ProbeGhostty
+	}
+	if err := probe(); err != nil {
+		fmt.Fprintf(d.stdout, "FAIL: %v\n", err)
+		return fmt.Errorf("ghostty check failed: %w", err)
+	}
+	fmt.Fprintln(d.stdout, "PASS: Ghostty AppleScript reachable")
+	return nil
+}
+
 // checkTrunk reports a missing trunk or unreadable project.json for cwd's
 // project. It never offers a fix: picking a branch is the owner's call.
 func checkTrunk(cwd, repoRoot string) *git.Issue {
@@ -209,7 +245,18 @@ func printDoctorRuntime(w io.Writer, getenv func(string) string, goos string) {
 	fmt.Fprintf(w, "  TMUX=%q\n", getenv("TMUX"))
 	fmt.Fprintf(w, "  KITTY_WINDOW_ID=%q\n", getenv("KITTY_WINDOW_ID"))
 	fmt.Fprintf(w, "  KITTY_LISTEN_ON=%q\n", getenv("KITTY_LISTEN_ON"))
-	fmt.Fprintf(w, "  HERDR_ENV=%q\n\n", getenv("HERDR_ENV"))
+	fmt.Fprintf(w, "  HERDR_ENV=%q\n", getenv("HERDR_ENV"))
+	fmt.Fprintf(w, "  TERM_PROGRAM=%q\n", getenv("TERM_PROGRAM"))
+	fmt.Fprintf(w, "  TERM_PROGRAM_VERSION=%q\n", getenv("TERM_PROGRAM_VERSION"))
+	if terminal == ui.TerminalGhostty {
+		version := getenv("TERM_PROGRAM_VERSION")
+		if terminalrun.CheckGhosttySplits(version) == nil {
+			fmt.Fprintf(w, "  ghostty version: %s ok\n", version)
+		} else {
+			fmt.Fprintf(w, "  ghostty version: %s < 1.3.0, splits run in place\n", version)
+		}
+	}
+	fmt.Fprintln(w)
 }
 
 func pauseDoctor(stdout io.Writer, stdin io.Reader) {
