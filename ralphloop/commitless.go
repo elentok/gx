@@ -65,8 +65,8 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 // away; the tab always closes once the ticket is done.
 func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
-		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Ticket: o.Ticket,
-		ScratchDir: o.ScratchDir, Sink: o.sink(),
+		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
+		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(),
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
 	stranded, err := parkStrandedCommits(d, p, w, pane, sessionID)

@@ -26,6 +26,10 @@ type iterationParams struct {
 	FeatureWorktree string
 	FeatureBranch   string
 	Agent           AgentKind
+	// Runner and Label name the agentrunner and iteration label hosting the
+	// agent, recorded on the server finish path's park events.
+	Runner string
+	Label  string
 	// Model and Effort are the resolved per-agent config the launched agent
 	// process starts under (see RunOptions.Agents); empty omits that one
 	// flag from the launch argv.
@@ -89,6 +93,11 @@ func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd, 
 		StartEvent:  startEvent,
 		FinishEvent: finishEvent,
 	}
+}
+
+// agentEvent is the park event fields naming the iteration's agent.
+func (p iterationParams) agentEvent(pane, sessionID, cwd string) Event {
+	return Event{Agent: p.Agent, Runner: p.Runner, Label: p.Label, Pane: pane, AgentSession: sessionID, Cwd: cwd}
 }
 
 // logTicketEvent appends eventType to p's run-log with p's ticket number

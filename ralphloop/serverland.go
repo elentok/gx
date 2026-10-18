@@ -142,6 +142,8 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		FeatureWorktree: w.featureWorktree,
 		FeatureBranch:   o.Epic,
 		Agent:           o.Agent,
+		Runner:          runnerName(d),
+		Label:           w.Label,
 		Model:           o.Model,
 		Effort:          o.Effort,
 		Skill:           defaultWorkerSkill,
@@ -205,6 +207,14 @@ func latestParkReason(scratchDir, epic, ticket string) string {
 		}
 	}
 	return ""
+}
+
+// runnerName names d's runner, "" when it has none.
+func runnerName(d Deps) string {
+	if d.Runner == nil {
+		return ""
+	}
+	return d.Runner.Name()
 }
 
 // recordLiveSession reads the native session of the agent still running under
@@ -303,6 +313,7 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.NeedsRepair, Kind: events.LandConflict, Reason: reason,
 			Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
+			Event:  p.agentEvent(built.job.pane, built.job.sessionID, built.job.path),
 		})
 		return err
 	}

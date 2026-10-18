@@ -87,16 +87,16 @@ func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
 
 // assertParkRecordsRun checks the park event names the run's runner, label and
 // session: late-finish adoption reads them after the park drops runs.json.
-func assertParkRecordsRun(t *testing.T, store, runner string, session agentrunner.Session) {
+func assertParkRecordsRun(t *testing.T, store string, park events.Type, runner string, session agentrunner.Session) {
 	t.Helper()
-	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	i := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.NeedsRepair) })
-	if i < 0 {
-		t.Fatalf("run log lacks a park: %v", logged)
-	}
+	// The park writes the ticket's status before its run-log event.
+	var logged []ralphloop.Event
+	var i int
+	waitFor(t, func() bool {
+		logged, _, _ = ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+		i = slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(park) })
+		return i >= 0
+	})
 	got := logged[i]
 	if got.Runner != runner || got.Label != session.Label || got.AgentSession != session.SessionID {
 		t.Errorf("park event runner/label/session = %q/%q/%q, want %q/%q/%q",
@@ -113,7 +113,7 @@ func TestReclaim_DeadClaimWithWorkParks(t *testing.T) {
 				if _, err := os.Stat(wtPath); err != nil {
 					t.Errorf("worktree gone: %v", err)
 				}
-				assertParkRecordsRun(t, store, runnerOf(headless), deadSession)
+				assertParkRecordsRun(t, store, events.NeedsRepair, runnerOf(headless), deadSession)
 			})
 		})
 	}

@@ -45,8 +45,8 @@ func ResumeFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 // needs-repair. The feature worktree always stays.
 func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target string) (FinishOutcome, error) {
 	p := iterationParams{
-		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Ticket: o.Ticket,
-		ScratchDir: o.ScratchDir, Sink: o.sink(),
+		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
+		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(),
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
 	adopted, err := adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
@@ -62,7 +62,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 			reason, err := park(p.Sink, parkRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.NeedsRepair, Kind: events.IterationError, Reason: fault,
-				Event: Event{Agent: p.Agent, Pane: pane, AgentSession: sessionID, Cwd: w.Path},
+				Event: p.agentEvent(pane, sessionID, w.Path),
 			})
 			if err != nil {
 				return FinishOutcome{}, fmt.Errorf("marking ticket needs-repair: %w", err)

@@ -574,7 +574,7 @@ func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, session
 	return park(p.Sink, parkRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 		Type: events.NeedsAnswer, Kind: kind, Reason: reason,
-		Event: Event{Agent: p.Agent, Pane: pane, AgentSession: sessionID, Cwd: cwd},
+		Event: p.agentEvent(pane, sessionID, cwd),
 	})
 }
 
