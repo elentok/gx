@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -70,21 +72,47 @@ func (s *Server) keepFresh(ctx context.Context) {
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
 	var debounce <-chan time.Time
+	var walk bool
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			s.rescan()
-		case <-events:
+		case ev := <-events:
+			relevant, dir := storeEventKind(ev)
+			if !relevant {
+				continue
+			}
+			walk = walk || dir
 			if debounce == nil {
 				debounce = time.After(watchDebounce)
 			}
 		case <-debounce:
 			debounce = nil
-			s.rescan()
+			s.rescanTree(walk)
+			walk = false
 		}
 	}
+}
+
+// storeEventKind says whether an event can change the ticket index, and whether
+// it is a directory appearing (which needs a re-walk to be watched). Appends to
+// run-log.jsonl and other non-ticket files fire constantly and change nothing.
+func storeEventKind(ev fsnotify.Event) (relevant, newDir bool) {
+	// ".md" also matches fsutil.WriteFileAtomic's "<name>.md.tmp-*": kqueue can
+	// report the rename that lands a ticket under the temp name only.
+	if strings.Contains(filepath.Base(ev.Name), ".md") {
+		return true, false
+	}
+	if ev.Has(fsnotify.Create) {
+		fi, err := os.Stat(ev.Name)
+		isDir := err == nil && fi.IsDir()
+		return isDir, isDir
+	}
+	// A removed or renamed directory has no way to be told from a file now;
+	// extensionless names are directories in the store layout.
+	return ev.Has(fsnotify.Remove|fsnotify.Rename) && filepath.Ext(ev.Name) == "", false
 }
 
 // ChangedRequest is the body of POST /v1/tickets/changed: a direct write's
@@ -107,7 +135,13 @@ func (s *Server) ticketChanged(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) rescan() {
-	if rewatch := s.rewatch.Load(); rewatch != nil {
+	s.rescanTree(true)
+}
+
+// rescanTree re-reads the store; walk also re-adds directories to the watch,
+// which only a directory creation or the backstop poll needs.
+func (s *Server) rescanTree(walk bool) {
+	if rewatch := s.rewatch.Load(); walk && rewatch != nil {
 		(*rewatch)() // pick up directories created since the last scan
 	}
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {

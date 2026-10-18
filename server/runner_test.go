@@ -591,16 +591,15 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 		if snap, err = h.Client.Snapshot(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if len(snap.Pending) == 2 && snap.Pending[1].Verdict == server.VerdictConcurrencyCap {
+		// The claim reaches the index after the watch debounce, so the first row
+		// reads claimed a moment after the cap shows up.
+		if len(snap.Pending) == 2 && snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == server.VerdictConcurrencyCap {
 			break
 		}
 		if ctx.Err() != nil {
-			t.Fatalf("pending = %+v, want the second root at the cap", snap.Pending)
+			t.Fatalf("pending = %+v, want the first root claimed and the second at the cap", snap.Pending)
 		}
 		time.Sleep(10 * time.Millisecond)
-	}
-	if got := snap.Pending[0].Verdict; got != "claimed" {
-		t.Errorf("first pending verdict = %q, want claimed", got)
 	}
 	evs, err := h.Client.Events(ctx, snap.Seq)
 	if err != nil {
