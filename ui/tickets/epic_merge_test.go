@@ -68,7 +68,7 @@ func TestEpicMerge_ServerModeMergedEpicSitsUnderMergedWithMergeDim(t *testing.T)
 	setCollapsedSection(&m, sectionMerged, false)
 
 	m = openEpicMenuOn(t, m, "gx:alpha")
-	if view := m.ticketMenu.View(); !strings.Contains(view, alreadyMerged) {
-		t.Errorf("view lacks %q:\n%s", alreadyMerged, view)
+	if !menuHasReason(m, alreadyMerged) {
+		t.Errorf("open menu has no item dim for %q", alreadyMerged)
 	}
 }

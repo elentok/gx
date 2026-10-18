@@ -61,11 +61,12 @@ func wantRan(t *testing.T, cmd tea.Cmd, want string) {
 	}
 }
 
-// viewLines is the plain text of each View line, trimmed of frame and space.
+// viewLines is the plain text of each View line, trimmed of frame, rules,
+// cursor bar and space.
 func viewLines(m Menu[string]) []string {
 	var out []string
 	for _, l := range strings.Split(ansi.Strip(m.View()), "\n") {
-		out = append(out, strings.Trim(l, "│ "))
+		out = append(out, strings.Trim(l, "│─▌ "))
 	}
 	return out
 }
@@ -123,23 +124,31 @@ func TestPrintableKeysAreFilterText(t *testing.T) {
 	}
 }
 
-func TestCursorSkipsDimItems(t *testing.T) {
+func TestCursorOpensOnFirstEnabledAndStepsOntoDimItems(t *testing.T) {
 	m := open(dim("Resume", Suggested, "no pane"), item("Open", Status), dim("Done", Status, "already done"), item("Watch", Agent))
 	if _, cmd := press(m, enter); cmd == nil {
 		t.Fatal("cursor should open on the first enabled item")
 	}
 	for _, tc := range []struct {
 		keys []tea.KeyPressMsg
-		want string
+		want string // "" = cursor on a dim item, enter does nothing
 	}{
 		{nil, "Open"},
-		{[]tea.KeyPressMsg{down}, "Watch"},
+		{[]tea.KeyPressMsg{down}, ""},
 		{[]tea.KeyPressMsg{ctrlN, ctrlN}, "Watch"},
+		{[]tea.KeyPressMsg{down, down, down}, "Watch"},
 		{[]tea.KeyPressMsg{down, up}, "Open"},
-		{[]tea.KeyPressMsg{down, ctrlP, ctrlP}, "Open"},
+		{[]tea.KeyPressMsg{up}, ""},
+		{[]tea.KeyPressMsg{up, ctrlP}, ""},
 	} {
 		next, _ := press(m, tc.keys...)
 		_, cmd := press(next, enter)
+		if tc.want == "" {
+			if cmd != nil {
+				t.Errorf("keys %v: enter on a dim item ran a command", tc.keys)
+			}
+			continue
+		}
 		wantRan(t, cmd, tc.want+"@gx:epic/01")
 	}
 }
@@ -173,20 +182,30 @@ func TestGroupsRenderInOrderAndEmptyOnesDrop(t *testing.T) {
 	}
 }
 
-func TestDimItemShowsReasonInPlaceOfKey(t *testing.T) {
+func TestDimItemShowsReasonOnlyUnderTheCursor(t *testing.T) {
 	m := open(Item[string]{Label: "Resume", Key: "r r", Group: Suggested}, Item[string]{Label: "Watch", Key: "w", Group: Agent, Disabled: "no agent"})
 	lines := viewLines(m)
 	if l := lines[lineOf(t, m, "Resume")]; !strings.HasSuffix(l, "r r") {
 		t.Fatalf("enabled row %q lacks key", l)
 	}
-	if l := lines[lineOf(t, m, "Watch")]; !strings.HasSuffix(l, "no agent") || strings.Contains(l, " w") {
-		t.Fatalf("dim row %q should show reason, not key", l)
+	if l := lines[lineOf(t, m, "Watch")]; l != "Watch" {
+		t.Fatalf("dim row %q should show neither key nor reason", l)
+	}
+	if strings.Contains(ansi.Strip(m.View()), "no agent") {
+		t.Fatalf("reason shown with the cursor elsewhere:\n%s", m.View())
+	}
+	height := len(lines)
+
+	m, _ = press(m, down)
+	lineOf(t, m, "Watch: no agent")
+	if got := len(viewLines(m)); got != height {
+		t.Fatalf("height %d with the reason, want %d", got, height)
 	}
 }
 
 func TestTitleAndPromptNameTarget(t *testing.T) {
 	view := ansi.Strip(open(item("Resume", Suggested)).View())
-	if !strings.Contains(view, "Actions") || !strings.Contains(view, "Fix the widget") {
+	if first := strings.SplitN(view, "\n", 2)[0]; !strings.Contains(first, "Actions · Fix the widget") {
 		t.Fatalf("view:\n%s", view)
 	}
 }

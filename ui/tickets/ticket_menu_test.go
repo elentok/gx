@@ -62,6 +62,11 @@ func itemByLabel(t *testing.T, items []contextmenu.Item[ticketTarget], label str
 	return items[i]
 }
 
+// menuHasReason reports whether an item of the open menu is dim for reason.
+func menuHasReason(m Model, reason string) bool {
+	return slices.ContainsFunc(m.ticketMenu.Items(), func(it contextmenu.Item[ticketTarget]) bool { return it.Disabled == reason })
+}
+
 func itemLabels(items []contextmenu.Item[ticketTarget]) []string {
 	labels := make([]string, len(items))
 	for i, it := range items {
@@ -193,8 +198,8 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 			}
 			updated, _ := m.Update(ready)
 			m = updated.(Model)
-			if view := m.ticketMenu.View(); !strings.Contains(view, serverNotRunning) {
-				t.Errorf("view lacks %q:\n%s", serverNotRunning, view)
+			if !menuHasReason(m, serverNotRunning) {
+				t.Errorf("open menu has no item dim for %q", serverNotRunning)
 			}
 
 			before, _ := os.ReadFile(file)

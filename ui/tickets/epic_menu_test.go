@@ -76,12 +76,12 @@ func TestEpicMenu_CheckAllChecksEveryTicket(t *testing.T) {
 
 func TestEpicMenu_MergeDimReasons(t *testing.T) {
 	m, _ := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
-	if view := openEpicMenuOn(t, m, "gx:alpha").ticketMenu.View(); !strings.Contains(view, ticketsNotDone) {
-		t.Errorf("view lacks %q:\n%s", ticketsNotDone, view)
+	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), ticketsNotDone) {
+		t.Errorf("open menu has no item dim for %q", ticketsNotDone)
 	}
 	m.serverAPI = nil
-	if view := openEpicMenuOn(t, m, "gx:alpha").ticketMenu.View(); !strings.Contains(view, serverNotRunning) {
-		t.Errorf("view lacks %q:\n%s", serverNotRunning, view)
+	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), serverNotRunning) {
+		t.Errorf("open menu has no item dim for %q", serverNotRunning)
 	}
 }
 
@@ -95,11 +95,12 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 		{Address: "gx:alpha/01", Title: "A", Status: "open", EpicStatus: "draft", EpicMergeTarget: "main"},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	view := openEpicMenuOn(t, updated.(Model), "gx:alpha").ticketMenu.View()
-	for _, want := range []string{"Merge into main", "already draft"} {
-		if !strings.Contains(view, want) {
-			t.Errorf("view lacks %q:\n%s", want, view)
-		}
+	m = openEpicMenuOn(t, updated.(Model), "gx:alpha")
+	if view := m.ticketMenu.View(); !strings.Contains(view, "Merge into main") {
+		t.Errorf("view lacks %q:\n%s", "Merge into main", view)
+	}
+	if !menuHasReason(m, "already draft") {
+		t.Errorf("open menu has no item dim for %q", "already draft")
 	}
 }
 

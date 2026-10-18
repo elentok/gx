@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -214,7 +215,7 @@ func TestActions_RunActionWithoutAnActionSaysSo(t *testing.T) {
 func menuRow(t *testing.T, m Model, label string) string {
 	t.Helper()
 	for line := range strings.SplitSeq(ansi.Strip(m.menu.View()), "\n") {
-		if strings.Contains(line, "  "+label+" ") {
+		if strings.Contains(line, " "+label+" ") {
 			return line
 		}
 	}
@@ -245,6 +246,16 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 				t.Fatal("m did not open the menu")
 			}
 			for label, hint := range tc.want {
+				i := slices.IndexFunc(m.menu.Items(), func(it contextmenu.Item[server.SessionInfo]) bool { return it.Label == label })
+				if i < 0 {
+					t.Fatalf("no %q item", label)
+				}
+				if why := m.menu.Items()[i].Disabled; why != "" {
+					if why != hint {
+						t.Errorf("%s dim for %q, want %q", label, why, hint)
+					}
+					continue
+				}
 				if row := menuRow(t, m, label); !strings.HasSuffix(strings.TrimRight(row, " │"), " "+hint) {
 					t.Errorf("%s row = %q, want it to end in %q", label, row, hint)
 				}

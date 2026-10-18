@@ -7,12 +7,12 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ui"
-	"github.com/elentok/gx/ui/components"
 )
 
 // Group places an item under a header; groups render in declaration order.
@@ -42,7 +42,7 @@ type Item[T any] struct {
 	Label    string
 	Key      string // direct-key hint, e.g. "e e"; display only
 	Group    Group
-	Disabled string // non-empty = dim, shown in place of Key
+	Disabled string // non-empty = dim; shown under the list while selected
 	Run      func(T) tea.Cmd
 }
 
@@ -52,6 +52,23 @@ const (
 	// inner fits a row inside the frame whether or not width counts the
 	// border and padding, so a row never wraps and click rows stay aligned.
 	inner = width - 4
+	// listTop is the View line of the list's first row: top border (with
+	// the title), filter line, blank.
+	listTop = 3
+)
+
+var (
+	hint = ui.RenderInlineBindings(
+		key.NewBinding(key.WithHelp("↑/↓", "move")),
+		key.NewBinding(key.WithHelp("type", "filter")),
+		key.NewBinding(key.WithHelp("enter", "run")),
+		key.NewBinding(key.WithHelp("esc", "close")),
+	)
+	dimStyle    = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
+	keyStyle    = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	markerStyle = lipgloss.NewStyle().Foreground(ui.ColorBlue)
+	headerStyle = lipgloss.NewStyle().Foreground(ui.ColorMauve).Bold(true)
+	ruleStyle   = lipgloss.NewStyle().Foreground(ui.ColorBorder)
 )
 
 // Menu is an embeddable Context menu over Target type T. cursor indexes
@@ -78,6 +95,9 @@ func (m Menu[T]) Open(target T, prompt string, items []Item[T]) Menu[T] {
 	return m
 }
 
+// Items is the open menu's items in group order, filter aside.
+func (m Menu[T]) Items() []Item[T] { return m.items }
+
 func (m Menu[T]) visible() []Item[T] {
 	if m.filter == "" {
 		return m.items
@@ -95,16 +115,10 @@ func (m Menu[T]) firstEnabled() int {
 	return max(0, slices.IndexFunc(m.visible(), func(it Item[T]) bool { return it.Disabled == "" }))
 }
 
-// step moves the cursor by dir to the next enabled item; it stays put when
-// there is none that way.
+// step moves the cursor by dir, landing on dim items too so their reason
+// shows; it stays put at either end.
 func (m Menu[T]) step(dir int) int {
-	visible := m.visible()
-	for i := m.cursor + dir; i >= 0 && i < len(visible); i += dir {
-		if visible[i].Disabled == "" {
-			return i
-		}
-	}
-	return m.cursor
+	return max(0, min(m.cursor+dir, len(m.visible())-1))
 }
 
 // Update handles keys and left clicks while the menu is open. Clicks are in
@@ -194,19 +208,10 @@ func rows[T any](visible []Item[T]) []row {
 	return out
 }
 
-// listTop is the View line of the list's first row: top border, title,
-// blank, prompt, blank and, while filtering, the filter line.
-func (m Menu[T]) listTop() int {
-	if m.filter != "" {
-		return 6
-	}
-	return 5
-}
-
 // hitRow maps a View line to a visible item; false off an item row.
 func (m Menu[T]) hitRow(y int) (int, bool) {
 	rs := rows(m.visible())
-	i := y - m.listTop()
+	i := y - listTop
 	if i < 0 || i >= len(rs) || rs[i].item < 0 {
 		return 0, false
 	}
@@ -215,46 +220,67 @@ func (m Menu[T]) hitRow(y int) (int, bool) {
 
 func (m Menu[T]) View() string {
 	visible := m.visible()
-	var lines []string
+	filter := dimStyle.Render("filter…")
 	if m.filter != "" {
-		lines = append(lines, ui.StyleDim.Render("filter: ")+m.filter)
+		filter = m.filter
 	}
+	lines := []string{markerStyle.Render("› ") + filter, ""}
 	if len(visible) == 0 {
-		lines = append(lines, ui.StyleDim.Render("  no matching actions"))
+		lines = append(lines, dimStyle.Render("  no matching actions"))
 	}
 	for _, r := range rows(visible) {
 		if r.item < 0 {
-			lines = append(lines, ui.StyleMuted.Render(r.group.String()))
+			lines = append(lines, renderHeader(r.group))
 			continue
 		}
 		lines = append(lines, m.renderItem(visible[r.item], r.item == m.cursor))
 	}
+	// The reason line is always there, blank on enabled items, so the frame
+	// keeps its height as the cursor moves.
+	reason := ""
+	if m.cursor < len(visible) && visible[m.cursor].Disabled != "" {
+		it := visible[m.cursor]
+		reason = ui.StyleMuted.Render(ansi.Truncate(it.Label+": "+it.Disabled, inner, "…"))
+	}
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:       title,
-		Body:        ansi.Truncate(m.prompt, inner, "…") + "\n\n" + strings.Join(lines, "\n"),
-		Hint:        components.MenuHint,
-		Width:       width,
-		BorderColor: ui.ColorBorder,
-		TitleColor:  ui.ColorBlue,
-		HintColor:   ui.ColorSubtle,
+		Title:         ansi.Truncate(title+" · "+m.prompt, inner-2, "…"),
+		TitleInBorder: true,
+		Body:          strings.Join(lines, "\n"),
+		Hint:          reason + "\n" + hint,
+		Width:         width,
+		BorderColor:   ui.ColorBorder,
+		TitleColor:    ui.ColorBlue,
+		HintColor:     ui.ColorSubtle,
 	})
 }
 
-// renderItem lays out "  Label ... key" at exactly inner cells; a dim item
-// shows its reason where the key would be.
+// renderHeader draws "── Group ───…" across exactly inner cells.
+func renderHeader(g Group) string {
+	name := " " + g.String() + " "
+	return ruleStyle.Render("──") + headerStyle.Render(name) +
+		ruleStyle.Render(strings.Repeat("─", inner-2-ansi.StringWidth(name)))
+}
+
+// renderItem lays out "  Label ... key" at exactly inner cells, with a bar
+// marking the cursor. A dim item drops its key; its reason shows under the
+// list instead.
 func (m Menu[T]) renderItem(it Item[T], selected bool) string {
-	label, hint := "  "+it.Label, it.Key
-	if it.Disabled != "" {
-		hint = it.Disabled
+	dim := it.Disabled != ""
+	key := ""
+	if !dim {
+		key = ansi.Truncate(it.Key, inner/2, "…")
 	}
-	hint = ansi.Truncate(hint, inner/2, "…")
-	label = ansi.Truncate(label, inner-ansi.StringWidth(hint)-1, "…")
-	gap := strings.Repeat(" ", inner-ansi.StringWidth(label)-ansi.StringWidth(hint))
-	if it.Disabled != "" {
-		label = ui.StyleDim.Render(label)
+	label := ansi.Truncate(it.Label, inner-2-ansi.StringWidth(key)-1, "…")
+	gap := strings.Repeat(" ", inner-2-ansi.StringWidth(label)-ansi.StringWidth(key))
+	marker := "  "
+	if selected {
+		marker = markerStyle.Render("▌ ")
 	}
-	line := label + gap + ui.StyleDim.Render(hint)
-	if selected && it.Disabled == "" {
+	if dim {
+		label = dimStyle.Render(label)
+	}
+	line := marker + label + gap + keyStyle.Render(key)
+	if selected {
 		line = ui.RenderRowHighlight(line)
 	}
 	return line
