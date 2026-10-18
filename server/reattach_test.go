@@ -30,8 +30,16 @@ type headlessFake struct {
 
 	mu        sync.Mutex
 	cleaned   []string
+	stopped   []string
 	retention time.Duration
 	parked    map[string]bool
+}
+
+func (h *headlessFake) Stop(s agentrunner.Session) error {
+	h.mu.Lock()
+	h.stopped = append(h.stopped, s.ID)
+	h.mu.Unlock()
+	return h.Runner.Stop(s)
 }
 
 func (h *headlessFake) Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error) {

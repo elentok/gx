@@ -45,6 +45,9 @@ type Run struct {
 // through agentrunner, and of any run an older server saved.
 const runnerHerdr = "herdr"
 
+// runLaunching is the State of a run whose agent may not be started or prompted yet.
+const runLaunching = "launching"
+
 // savedRun reads runs.json, including files written before Run held a
 // Session: those carried the herdr pane at the top level instead.
 type savedRun struct {
@@ -73,6 +76,9 @@ type trackedRun struct {
 	// StartedAt is when the claim launched; it survives a restart with the
 	// registry file. Zero for a run an older server recorded.
 	StartedAt time.Time `json:"started_at,omitzero"`
+	// State is runLaunching from the claim until the agent has started and
+	// been prompted, so a crash in between leaves a handle reclaim can see.
+	State string `json:"state,omitempty"`
 	// Watched marks a pane a nudge set working again after its run ended
 	// (see watchNudgedPane): it is metered and budget-stopped like a run, but
 	// never finished, and never saved, so a restart cannot reclaim it.
@@ -382,6 +388,10 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 	if err != nil {
 		return fmt.Errorf("%w: reattach %s: %v", errHandleMismatch, t.Address, err)
 	}
+	if verdict == nativerunner.VerdictFinished && t.State == runLaunching {
+		// Never settle it: the agent may have finished without ever being prompted.
+		return s.stopLaunching(t, runner, session, "finished")
+	}
 	if verdict == nativerunner.VerdictDied {
 		if reopened, err := s.reopenEmptyClaim(t); err != nil || reopened {
 			return err
@@ -403,6 +413,7 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 	if verdict == nativerunner.VerdictLive {
 		t.Session = session
 	}
+	t.State = ""
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
@@ -447,6 +458,9 @@ func (s *Server) reclaim(t trackedRun) error {
 	if agent.PaneID == "" {
 		return fmt.Errorf("%w: no pane", errHandleMismatch)
 	}
+	if t.State == runLaunching && (agent.AgentStatus == "idle" || agent.AgentStatus == "done") {
+		return s.stopLaunching(t, runner, agentrunner.Session{Label: label, ID: agent.PaneID}, agent.AgentStatus)
+	}
 	one, wt, mode, err := s.resume(t)
 	if err != nil {
 		return err
@@ -457,12 +471,26 @@ func (s *Server) reclaim(t trackedRun) error {
 	}
 	t.Runner = runnerHerdr
 	t.Session = agentrunner.Session{Label: label, ID: agent.PaneID, SessionID: t.Session.SessionID}
+	t.State = ""
 	s.registry.put(t)
 	s.events.publish(EventReclaimed, t.Address)
 	deps := s.depsWith(runner)
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
+}
+
+// stopLaunching closes the agent of a launch the server died in, which is
+// waiting rather than working, so it may never have been prompted; then the
+// claim reopens if it is empty.
+func (s *Server) stopLaunching(t trackedRun, runner agentrunner.Runner, session agentrunner.Session, status string) error {
+	if err := runner.Stop(session); err != nil {
+		return fmt.Errorf("stop launching agent: %w", err)
+	}
+	if reopened, err := s.reopenEmptyClaim(t); err != nil || reopened {
+		return err
+	}
+	return fmt.Errorf("%w: launching agent %s", errHandleMismatch, status)
 }
 
 // resume rebuilds the iteration a persisted handle stands for, whose worktree

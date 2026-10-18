@@ -39,7 +39,9 @@ type verdictLog struct {
 
 // verdictOf is the full explain for one stored ticket.
 func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Address) Explanation {
-	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, t.Status == "claimed", false)
+	// A launch is tracked before the index may have reread its claim.
+	claimed := t.Status == "claimed" || s.registry.has(addr.String())
+	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
 	case "stalled":
 		return Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Status} // needs-answer, needs-repair or draft

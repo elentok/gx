@@ -446,8 +446,17 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 			return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 		}
 	}
-	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, mode)
+	entry := trackedRun{
+		Run:  Run{Address: ticketAddr, Agent: string(agent), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
+		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runLaunching,
+	}
+	s.registry.put(entry)
+	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, mode, func(wt ralphloop.IterationWorktree) {
+		entry.Workspace, entry.Base = one.WorkspaceID, wt.Base()
+		s.registry.put(entry)
+	})
 	if err != nil {
+		s.registry.delete(ticketAddr)
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
 		if perr := s.parkTicket(dir, ticket, t.Path, events.IterationError, "launch failed: "+err.Error()); perr != nil {
@@ -457,7 +466,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
 	s.registry.put(trackedRun{
-		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: time.Now(),
+		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })
@@ -612,13 +621,16 @@ func (s *Server) commitlessRef(addr tickets.Address, t tickets.Ticket, repo stri
 
 // prepareAndLaunch gives the ticket somewhere to run, then launches the agent
 // in it. A launch that fails takes that back out so a retry starts clean.
+// prepared sees the worktree before the agent starts.
 func (s *Server) prepareAndLaunch(
 	deps ralphloop.Deps, one *ralphloop.OneIteration, ticket tickets.Address, mode iterationMode,
+	prepared func(ralphloop.IterationWorktree),
 ) (Run, ralphloop.IterationWorktree, error) {
 	wt, err := mode.prepare(deps, *one)
 	if err != nil {
 		return Run{}, ralphloop.IterationWorktree{}, err
 	}
+	prepared(wt)
 	run, err := s.launch(deps, ticket, *one, wt.Path)
 	if err != nil {
 		if derr := mode.discard(deps, *one, wt); derr != nil {

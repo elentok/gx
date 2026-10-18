@@ -515,7 +515,13 @@ func (s *Server) killForBudget(now time.Time) int {
 	if grace <= 0 {
 		grace = defaultBudgetKillGrace
 	}
-	runs := s.registry.list()
+	var runs []trackedRun
+	for _, t := range s.registry.list() {
+		// A launch has no session to interrupt yet; a later check stops it once it runs.
+		if t.State != runLaunching {
+			runs = append(runs, t)
+		}
+	}
 	for _, t := range runs {
 		s.registry.markBudgetStop(t.Address)
 		r, err := s.runnerOf(t.Run)
