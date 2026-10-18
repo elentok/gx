@@ -200,7 +200,7 @@ func renderToolResult(b exportBlock) string {
 
 	body := strings.Join(lines, "\n")
 	if truncated {
-		body += "\n... (truncated)"
+		body += "\n... (exporter truncated)"
 	}
 
 	return fmt.Sprintf("%s\n```\n%s\n```", prefix, body)

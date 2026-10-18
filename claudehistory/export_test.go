@@ -118,7 +118,7 @@ func TestExportMarkdownToolResultTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "... (truncated)") {
+	if !strings.Contains(out, "... (exporter truncated)") {
 		t.Errorf("expected truncation marker\ngot:\n%s", out)
 	}
 }

@@ -51,7 +51,10 @@ user may prefer a fork.
 Then, while working:
 
 - **Read a file once.** After an `Edit` succeeds the file in context is current - never re-read to
-  verify. Repeat reads are the largest leak.
+  verify. Repeat reads are the largest leak. The one exception: re-read the exact range (`offset`/
+  `limit`) after an `Edit` fails with `String to replace not found`.
+- **Never edit code you have not read, and copy indentation exactly from the Read.** Don't guess
+  tabs or spaces.
 - **Never read source through a shell command** (`cat`, `sed -n`, `head`, `tail`). Same tokens as a
   direct file read, no benefit.
 - **Prefer the project's LSP tooling to grepping**. A references lookup answers in 3 lines what a
