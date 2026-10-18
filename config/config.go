@@ -64,6 +64,7 @@ type Config struct {
 	TicketStore           TicketStoreConfig    `json:"ticket-store"`
 	Server                ServerConfig         `json:"server"`
 	Recovery              RecoveryConfig       `json:"recovery"`
+	CPUWatchdog           CPUWatchdogConfig    `json:"cpu-watchdog"`
 	// AgentRunner is auto, herdr, headless or pty. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
 	AgentRunner string `json:"agent-runner"`
@@ -123,6 +124,7 @@ func Default() Config {
 		TicketStore:           DefaultTicketStoreConfig(),
 		Server:                ServerConfig{WatchConfig: true},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
+		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		AgentRunner:           "auto",
 		Evolve:                EvolveOff,
 		EvolveDeepReadCap:     DefaultEvolveDeepReadCap,
@@ -240,6 +242,12 @@ func Parse(data []byte) (Config, error) {
 			FollowUps  *string  `json:"follow-ups"`
 			NotifyHold *string  `json:"notify-hold"`
 		} `json:"recovery"`
+		CPUWatchdog *struct {
+			Enabled          *bool    `json:"enabled"`
+			ThresholdPercent *float64 `json:"threshold-percent"`
+			Sustain          *string  `json:"sustain"`
+			Cooldown         *string  `json:"cooldown"`
+		} `json:"cpu-watchdog"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse: %w", err)
@@ -407,6 +415,24 @@ func Parse(data []byte) (Config, error) {
 		if raw.Recovery.NotifyHold != nil {
 			if d, err := time.ParseDuration(*raw.Recovery.NotifyHold); err == nil && d > 0 {
 				cfg.Recovery.NotifyHold = d
+			}
+		}
+	}
+	if w := raw.CPUWatchdog; w != nil {
+		if w.Enabled != nil {
+			cfg.CPUWatchdog.Enabled = *w.Enabled
+		}
+		if w.ThresholdPercent != nil && *w.ThresholdPercent > 0 {
+			cfg.CPUWatchdog.ThresholdPercent = *w.ThresholdPercent
+		}
+		if w.Sustain != nil {
+			if d, err := time.ParseDuration(*w.Sustain); err == nil && d > 0 {
+				cfg.CPUWatchdog.Sustain = d
+			}
+		}
+		if w.Cooldown != nil {
+			if d, err := time.ParseDuration(*w.Cooldown); err == nil && d >= 0 {
+				cfg.CPUWatchdog.Cooldown = d
 			}
 		}
 	}

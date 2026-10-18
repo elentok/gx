@@ -982,3 +982,38 @@ func TestParseServerWatchConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadCPUWatchdog(t *testing.T) {
+	def := DefaultCPUWatchdogConfig()
+	for _, tc := range []struct {
+		name, json string
+		want       CPUWatchdogConfig
+	}{
+		{"absent", `{}`, def},
+		{"set", `{"cpu-watchdog":{"enabled":false,"threshold-percent":40,"sustain":"5m","cooldown":"1h"}}`,
+			CPUWatchdogConfig{ThresholdPercent: 40, Sustain: 5 * time.Minute, Cooldown: time.Hour}},
+		{"invalid", `{"cpu-watchdog":{"threshold-percent":-1,"sustain":"soon","cooldown":"later"}}`, def},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			prev := userConfigDirFn
+			userConfigDirFn = func() (string, error) { return tmp, nil }
+			t.Cleanup(func() { userConfigDirFn = prev })
+			dir := filepath.Join(tmp, "gx")
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatalf("MkdirAll: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(tc.json), 0644); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.CPUWatchdog != tc.want {
+				t.Fatalf("CPUWatchdog = %+v, want %+v", cfg.CPUWatchdog, tc.want)
+			}
+		})
+	}
+}

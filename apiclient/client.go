@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/server"
 )
 
@@ -232,6 +233,13 @@ func (c *Client) QueueAdd(ctx context.Context, address, agent string) (server.Qu
 func (c *Client) OneOff(ctx context.Context, req server.OneOffRequest) (server.OneOffResult, error) {
 	var res server.OneOffResult
 	err := c.post(ctx, "/v1/oneoff", req, &res)
+	return res, err
+}
+
+// CPUSpike reports a TUI's CPU spike; the server decides whether to file a ticket.
+func (c *Client) CPUSpike(ctx context.Context, spike cpuwatch.Spike) (server.CPUSpikeResult, error) {
+	var res server.CPUSpikeResult
+	err := c.post(ctx, "/v1/cpu-spike", spike, &res)
 	return res, err
 }
 

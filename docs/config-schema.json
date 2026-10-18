@@ -292,6 +292,33 @@
         }
       }
     },
+    "cpu-watchdog": {
+      "type": "object",
+      "description": "gx watches its own CPU use (the server and each TUI). A sustained spike captures a CPU profile and goroutine dump under the state dir's cpu-spikes/ and, in evolve maintainer mode, files a ticket in the gx project for an agent to find the cause.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Turns the watchdog on. Default: true."
+        },
+        "threshold-percent": {
+          "type": "number",
+          "default": 15,
+          "description": "CPU use, in percent of one core and counting subprocesses, that counts as high. Non-positive values keep the default. Default: 15."
+        },
+        "sustain": {
+          "type": "string",
+          "default": "1m",
+          "description": "Go duration string for how long the use must stay high before a spike fires. Default: \"1m\"."
+        },
+        "cooldown": {
+          "type": "string",
+          "default": "6h",
+          "description": "Go duration string for the least time between two filed tickets. Default: \"6h\"."
+        }
+      }
+    },
     "subscription": {
       "type": "object",
       "description": "Subscription extra-usage safety check.",

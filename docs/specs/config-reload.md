@@ -185,6 +185,7 @@ Reloadable settings, with the moment each new value takes effect:
 | `server.auto-merge-epic` | Next epic completion. |
 | `evolve` | Next decision that reads the evolve mode. Still validated by the parse step. |
 | `recovery.enabled`, `recovery.disabled`, `recovery.follow-ups`, `recovery.notify-hold` | The catalog is rebuilt from the new values. Applies to the next failure matched. A park hold already running keeps the notify-hold it started with. |
+| `cpu-watchdog.*` | The server's next CPU sample and next spike. A TUI reads it only at start. |
 | `subscription.suppress-extra-usage-warning` | Next extra-usage check (enqueue, snapshot). |
 | `server.watch-config` (new) | Starts or stops the watcher at the end of this reload. The reload never stops the watcher synchronously: it cancels the watcher's own context, and the watcher goroutine exits after the current reload returns. So a watcher-triggered reload that turns the flag off cannot deadlock waiting for itself. Turning the flag on starts a fresh watcher. |
 

@@ -1,15 +1,20 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/cli/confirm"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/cpuwatch"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/app"
@@ -63,9 +68,7 @@ func runWorktrees(_ string) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 func runStatus(target string) error {
@@ -108,9 +111,7 @@ func runStatus(target string) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 func runLog(opts LogOptions) error {
@@ -146,9 +147,7 @@ func runLog(opts LogOptions) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 func runShow(ref string) error {
@@ -184,9 +183,7 @@ func runShow(ref string) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 func runStash() error {
@@ -222,9 +219,7 @@ func runStash() error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 func runPRs(allRepos bool) error {
@@ -260,9 +255,7 @@ func runPRs(allRepos bool) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 // runTab opens the TUI on tab (`gx tickets`, `gx agents`).
@@ -287,9 +280,7 @@ func runTab(tab nav.TabID) error {
 		Server:             serverDeps(),
 		Settings:           settingsFromConfig(cfg),
 	})
-	p := tea.NewProgram(m, tea.WithFilter(app.FilterMotion))
-	_, err = p.Run()
-	return err
+	return runApp(m, cfg)
 }
 
 // tabTarget finds the repo and worktree root tab opens on from cwd. The
@@ -380,4 +371,29 @@ func resolveStatusTargetPath(worktreeRoot, cwd, target string) (string, error) {
 		return "", fmt.Errorf("status target %q is outside worktree root %s", target, worktreeRoot)
 	}
 	return filepath.ToSlash(rel), nil
+}
+
+// runApp runs the TUI with a CPU watchdog beside it: a spike is captured here
+// and reported to the server, which decides whether to file a ticket.
+func runApp(m tea.Model, cfg config.Config) error {
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	if stateDir, err := config.StateDir(); err == nil {
+		w := &cpuwatch.Watcher{
+			Config: server.CPUWatchConfig(cfg.CPUWatchdog),
+			Source: "tui",
+			Build:  getVersion(),
+			Dir:    server.CPUSpikeDir(stateDir),
+			Report: func(spike cpuwatch.Spike) {
+				// No server means nobody to file the ticket; the evidence stays on disk.
+				cl := apiclient.New(server.SocketPath(stateDir))
+				reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				defer cancel()
+				_, _ = cl.CPUSpike(reqCtx, spike)
+			},
+		}
+		go w.Run(ctx)
+	}
+	_, err := tea.NewProgram(m, tea.WithFilter(app.FilterMotion)).Run()
+	return err
 }

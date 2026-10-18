@@ -104,6 +104,9 @@ type Settings struct {
 	AgentsBanners       bool
 	AgentsSounds        config.AgentsSoundsConfig
 	AgentsClaudeArgs    []string
+
+	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
+	CPUWatchdog config.CPUWatchdogConfig
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -132,6 +135,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		AgentsBanners:             cfg.Agents.Banners.Enabled,
 		AgentsSounds:              cfg.Agents.Sounds,
 		AgentsClaudeArgs:          cfg.Agents.ClaudeArgs,
+		CPUWatchdog:               cfg.CPUWatchdog,
 	}
 }
 
@@ -221,6 +225,8 @@ type Server struct {
 	settings atomic.Pointer[Settings]
 	reloadMu sync.Mutex // serializes config reloads
 	reloads  reloadHistory
+	// cpuSpikes holds the CPU ticket cooldown.
+	cpuSpikes cpuSpikes
 	// storeCommits is nil until the store commit loop starts; guarded by
 	// reloadMu so a reload racing the start is never lost.
 	storeCommits *storecommit.Loop
@@ -446,6 +452,7 @@ var routeTable = []struct {
 	{"GET /v1/queue/items", (*Server).queueItems},
 	{"POST /v1/queue/add", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueAdd)(w, r) }},
 	{"POST /v1/oneoff", (*Server).oneOffHandler},
+	{"POST /v1/cpu-spike", (*Server).cpuSpikeWrite},
 	{"POST /v1/queue/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueRemove)(w, r) }},
 	{"POST /v1/queue/move", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueMove)(w, r) }},
 	{"POST /v1/queue/replace", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueReplace)(w, r) }},
@@ -637,6 +644,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(budgetDone); s.keepBudgetPolled(freshCtx) }()
 	gatesDone := make(chan struct{})
 	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
+	cpuDone := make(chan struct{})
+	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
 	var err error
 	select {
 	case <-ctx.Done():
@@ -661,6 +670,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-pruneDone
 	<-budgetDone
 	<-gatesDone
+	<-cpuDone
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()
 	s.stopHardGrace()
