@@ -251,6 +251,17 @@ func TestLeader_DigitSwitchesTab(t *testing.T) {
 	}
 }
 
+func TestLeader_OSwitchesToTheLastTab(t *testing.T) {
+	m, a := focusedTerminal(t)
+	_, cmd := leaderThen(t, m, letter("o"))
+	if cmd == nil || !nav.IsSwitchLast(cmd()) {
+		t.Fatal("leader o did not ask for the last tab")
+	}
+	if len(a.keys) != 0 {
+		t.Fatalf("sent %+v, want nothing", a.keys)
+	}
+}
+
 var ctrlO = tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
 
 func TestLeader_CtrlOOpensTheSwitcherSendingNothing(t *testing.T) {

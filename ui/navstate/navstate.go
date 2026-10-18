@@ -9,6 +9,7 @@ import (
 type State struct {
 	activeTab          nav.TabID
 	liveTab            nav.TabID
+	lastTab            nav.TabID
 	history            []nav.ViewState
 	lastViewStateByTab map[nav.TabID]nav.ViewState
 	defaultWorktree    string
@@ -26,6 +27,9 @@ func NewState(defaultWorktreePath string) State {
 func (s State) ActiveTab() nav.TabID    { return s.activeTab }
 func (s State) LiveTab() nav.TabID      { return s.liveTab }
 func (s *State) SetLiveTab(t nav.TabID) { s.liveTab = t }
+
+// LastTab is the tab a Switch last left; empty before the first one.
+func (s State) LastTab() nav.TabID { return s.lastTab }
 func (s State) LastViewStateForTab(tab nav.TabID) nav.ViewState {
 	return s.lastViewStateByTab[tab]
 }
@@ -97,6 +101,9 @@ func (s *State) Switch(vs nav.ViewState) nav.ViewState {
 	}
 	tabVS.FocusSubject = vs.FocusSubject
 
+	if s.liveTab != tabVS.Tab {
+		s.lastTab = s.liveTab
+	}
 	s.history = nil
 	s.liveTab = tabVS.Tab
 	s.activeTab = tabVS.Tab

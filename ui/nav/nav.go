@@ -75,6 +75,8 @@ type switchMsg struct {
 
 type openSwitcherMsg struct{}
 
+type switchLastMsg struct{}
+
 type backMsg struct{}
 
 // forceQuitMsg is ctrl+c's "quit right now, regardless of nav depth" signal —
@@ -108,6 +110,18 @@ func OpenSwitcher() tea.Cmd {
 
 func IsOpenSwitcher(msg tea.Msg) bool {
 	_, ok := msg.(openSwitcherMsg)
+	return ok
+}
+
+// SwitchLast asks the app to switch back to the tab the last switch left.
+func SwitchLast() tea.Cmd {
+	return func() tea.Msg {
+		return switchLastMsg{}
+	}
+}
+
+func IsSwitchLast(msg tea.Msg) bool {
+	_, ok := msg.(switchLastMsg)
 	return ok
 }
 

@@ -35,6 +35,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"z"}, Title: "toggle AFK"},
 	{Seq: []string{"tab"}, Title: "switch focus"},
 	{Seq: []string{"1-8"}, Title: "switch gx tab"},
+	{Seq: []string{"o"}, Title: "last active tab"},
 	{Seq: []string{"ctrl+o"}, Title: "switch view"},
 	{Seq: []string{"q"}, Title: "leave tab"},
 	{Seq: []string{"?"}, Title: "help"},
@@ -170,6 +171,8 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "q":
 		return m, nav.Back()
+	case "o":
+		return m, nav.SwitchLast()
 	case "ctrl+o":
 		return m, nav.OpenSwitcher()
 	case "?":

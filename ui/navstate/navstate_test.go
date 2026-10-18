@@ -330,3 +330,23 @@ func TestOpenPropagatesViewOptionsToPushedEntry(t *testing.T) {
 		t.Fatalf("expected FilterEndLine 20, got %d", tabVS.FilterEndLine)
 	}
 }
+
+func TestSwitchRemembersTheTabItLeft(t *testing.T) {
+	s := newState()
+	s.SetInitialTab(nav.ViewState{Tab: nav.TabQueue})
+	if s.LastTab() != "" {
+		t.Fatalf("LastTab before any switch = %q, want empty", s.LastTab())
+	}
+	s.Switch(nav.ViewState{Tab: nav.TabAgents})
+	if s.LastTab() != nav.TabQueue {
+		t.Fatalf("LastTab = %q, want queue", s.LastTab())
+	}
+	s.Switch(nav.ViewState{Tab: nav.TabAgents})
+	if s.LastTab() != nav.TabQueue {
+		t.Fatalf("LastTab after switching to the same tab = %q, want queue", s.LastTab())
+	}
+	s.Switch(nav.ViewState{Tab: nav.TabQueue})
+	if s.LastTab() != nav.TabAgents {
+		t.Fatalf("LastTab = %q, want agents", s.LastTab())
+	}
+}

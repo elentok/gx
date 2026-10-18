@@ -242,6 +242,34 @@ func TestSwitchMsgChangesTabWithoutHistory(t *testing.T) {
 	}
 }
 
+func TestSwitchLastMsgReturnsToTheTabLeft(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
+		ActiveWorktreePath: repoDir,
+	})
+	if _, cmd := m.Update(nav.SwitchLast()()); cmd == nil {
+		t.Fatal("expected a notice when there is no last tab")
+	}
+
+	updated, _ := m.Update(nav.Switch(nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: repoDir})())
+	updated, _ = updated.(Model).Update(nav.SwitchLast()())
+	m = updated.(Model)
+	if m.navState.ActiveTab() != nav.TabWorktrees {
+		t.Fatalf("expected active tab worktrees, got %q", m.navState.ActiveTab())
+	}
+	updated, _ = m.Update(nav.SwitchLast()())
+	if tab := updated.(Model).navState.ActiveTab(); tab != nav.TabStatus {
+		t.Fatalf("expected active tab status, got %q", tab)
+	}
+}
+
 func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

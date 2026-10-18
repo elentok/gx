@@ -102,6 +102,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, notifyCmd
 	}
 
+	if nav.IsSwitchLast(msg) {
+		last := m.navState.LastTab()
+		if last == "" {
+			return m, tea.Batch(notifyCmd, notify.Info("no previous tab"))
+		}
+		msg = nav.Switch(nav.ViewState{Tab: last})()
+	}
 	if vs, ok := nav.IsSwitch(msg); ok {
 		type modalOpener interface{ ModalOpen() bool }
 		active := m.activePage().model
