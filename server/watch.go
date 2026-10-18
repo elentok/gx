@@ -114,6 +114,7 @@ func (s *Server) rescan() {
 		s.log.Warn("rescan ticket store", "err", err)
 	}
 	s.scanParentDefects()
+	s.scanLateFinishes()
 }
 
 // WatchTree adds every directory under root. fsnotify is not recursive, and

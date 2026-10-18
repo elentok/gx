@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
@@ -355,6 +356,12 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 			value, _ := c.Flags().GetString(f.flag)
 			f.apply(t, value)
 			changed = append(changed, fmt.Sprintf("%s=%s", f.field, value))
+		}
+		if c.Flags().Changed("iteration-status") {
+			t.FinishedAt = time.Time{}
+			if t.IterationStatus == schema.IterationStatusFinished {
+				t.FinishedAt = time.Now().UTC()
+			}
 		}
 	})
 	if err != nil {

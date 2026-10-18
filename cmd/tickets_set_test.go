@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
@@ -428,6 +429,34 @@ func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "iteration_status: finished") {
 		t.Errorf("ticket file = %q, want iteration_status: finished written", string(raw))
+	}
+}
+
+// Late-finish adoption compares finished_at with the park time, so only a
+// finished report stamps it and any other report clears it.
+func TestExecute_TicketsSet_IterationStatusStampsFinishedAt(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "04b-ticket.md")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+
+	before := time.Now().Add(-time.Second)
+	if err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d); err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+	got, err := schema.ParseTicket(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.FinishedAt.Before(before) {
+		t.Errorf("FinishedAt = %v, want stamped now", got.FinishedAt)
+	}
+
+	if err := execute([]string{"tickets", "set", path, "--iteration-status=working"}, d); err != nil {
+		t.Fatalf("execute tickets set: %v", err)
+	}
+	if got, _ = schema.ParseTicket(path); !got.FinishedAt.IsZero() {
+		t.Errorf("FinishedAt = %v after working, want cleared", got.FinishedAt)
 	}
 }
 

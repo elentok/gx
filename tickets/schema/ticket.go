@@ -255,6 +255,11 @@ type Ticket struct {
 	// the IterationStatus type doc). Never checked by Validate: the enum rule
 	// is enforced only by the CLI write path that sets it.
 	IterationStatus IterationStatus
+	// FinishedAt is when the agent last reported IterationStatus finished
+	// through `tickets set`, so late-finish adoption can tell a report made
+	// after a park from one already on file. gx's own finished write
+	// (MarkBuiltAwaitingLand) leaves it alone.
+	FinishedAt time.Time
 	// ParkKind records which needs-answer producer parked this ticket (see
 	// the ParkKind type doc). Never checked by Validate, same as
 	// IterationStatus.

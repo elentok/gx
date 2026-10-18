@@ -197,16 +197,33 @@ func parkedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
 // latestParkReason is the reason of the ticket's most recent park event, or ""
 // when the run log has none.
 func latestParkReason(scratchDir, epic, ticket string) string {
+	ev, _ := LatestParkEvent(scratchDir, epic, ticket)
+	return ev.Reason
+}
+
+// LatestParkEvent is the ticket's most recent park event; false when the run
+// log has none.
+func LatestParkEvent(scratchDir, epic, ticket string) (Event, bool) {
 	evs, ok, err := ReadEvents(scratchDir, epic)
 	if err != nil || !ok {
-		return ""
+		return Event{}, false
 	}
 	for i := len(evs) - 1; i >= 0; i-- {
 		if evs[i].Ticket == ticket && isParkType(events.Type(evs[i].Type)) {
-			return evs[i].Reason
+			return evs[i], true
 		}
 	}
-	return ""
+	return Event{}, false
+}
+
+// LatestLandedSHA is the SHA of the ticket's most recent cherry-pick, "" when
+// none was logged.
+func LatestLandedSHA(scratchDir, epic, ticket string) string {
+	evs, _, err := ReadEvents(scratchDir, epic)
+	if err != nil {
+		return ""
+	}
+	return latestCherryPickedSHA(evs, ticket)
 }
 
 // runnerName names d's runner, "" when it has none.

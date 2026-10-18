@@ -252,22 +252,23 @@ type Server struct {
 	log         *slog.Logger
 	idx         *index
 
-	queued      *queueStore
-	pause       *pauseState
-	afk         *afkState
-	ledger      *budgetLedger
-	budgetNotes budgetNotes
-	hardGrace   hardGrace
-	extraUsage  extraUsageNotes
-	costOf      func(IterationInfo) (float64, bool) // swapped in tests
-	events      *broker
-	herdr       herdrWatch
-	parkFold    parkFold
-	parkHold    recoveryHold
-	defectScan  sync.Mutex
-	deadlocks   deadlocks
-	gatesRaised map[gateHold]bool      // touched only by the gate watchdog
-	rewatch     atomic.Pointer[func()] // set by keepFresh when the watch is active; read by every rescan caller
+	queued       *queueStore
+	pause        *pauseState
+	afk          *afkState
+	ledger       *budgetLedger
+	budgetNotes  budgetNotes
+	hardGrace    hardGrace
+	extraUsage   extraUsageNotes
+	costOf       func(IterationInfo) (float64, bool) // swapped in tests
+	events       *broker
+	herdr        herdrWatch
+	parkFold     parkFold
+	parkHold     recoveryHold
+	defectScan   sync.Mutex
+	lateFinishes inFlight
+	deadlocks    deadlocks
+	gatesRaised  map[gateHold]bool      // touched only by the gate watchdog
+	rewatch      atomic.Pointer[func()] // set by keepFresh when the watch is active; read by every rescan caller
 
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry       *runRegistry

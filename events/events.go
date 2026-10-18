@@ -63,12 +63,15 @@ const (
 	StalePaneClosed Type = "stale-pane-closed"
 	// HumanRelaunch is a relaunch a person asked for; recovery's budget
 	// counts only what came after the latest one.
-	HumanRelaunch    Type = "human-relaunch"
-	HerdrUnavailable Type = "herdr-unavailable"
-	HerdrAvailable   Type = "herdr-available"
-	Submitted        Type = "submitted"
-	SubmitRefused    Type = "submit-refused"
-	Deadlocked       Type = "deadlocked"
+	HumanRelaunch Type = "human-relaunch"
+	// LateFinishAdopted is a zero-commit park whose agent reported finished
+	// after it, which the server then landed or closed.
+	LateFinishAdopted Type = "late-finish-adopted"
+	HerdrUnavailable  Type = "herdr-unavailable"
+	HerdrAvailable    Type = "herdr-available"
+	Submitted         Type = "submitted"
+	SubmitRefused     Type = "submit-refused"
+	Deadlocked        Type = "deadlocked"
 	// TicketGraphDefect is a ticket file whose graph fields contradict its ID,
 	// found by a scan of the epic's issue files rather than by a run.
 	TicketGraphDefect Type = "ticket-graph-defect"
