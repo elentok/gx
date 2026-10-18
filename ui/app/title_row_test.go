@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -204,5 +205,56 @@ func assertGolden(t *testing.T, name, text string) {
 	}
 	if text != string(want) {
 		t.Errorf("render mismatch (run with -update to accept)\ngot:\n%s\nwant:\n%s", ansi.Strip(text), ansi.Strip(string(want)))
+	}
+}
+
+// withQueue gives m an epic of seven tickets, three done, the fourth claimed;
+// running decides whether the server holds a run for the claimed one.
+func withQueue(m Model, mode string, running bool) Model {
+	statuses := []string{"done", "done", "done", "claimed", "open", "open", "open"}
+	m.stream.vm.Tickets = nil
+	for i, st := range statuses {
+		info := server.TicketInfo{Address: fmt.Sprintf("gx:alpha/%02d", i+1), Title: "t", Status: st}
+		if st == "claimed" && running {
+			info.ClaimedAt = time.Now()
+		}
+		m.stream.vm.Tickets = append(m.stream.vm.Tickets, info)
+	}
+	m.stream.vm.Queue = []string{"gx:alpha/04", "gx:alpha/05"}
+	m.stream.vm.Mode = mode
+	return m
+}
+
+func TestTitleRow_QueueStatus(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		mode    string
+		running bool
+		want    string
+	}{
+		{"running", server.ModeRunning, true, "▶ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"paused", server.ModePaused, false, "‖ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"draining", server.ModeDraining, true, "↓ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"queued but idle", server.ModeRunning, false, "gx › worktrees ▾ agents 2 ● ? help"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			m := withQueue(titleModel(t, false, 120, connUp, 2), tc.mode, tc.running)
+			got := strings.Join(strings.Fields(titleText(m)), " ")
+			if !strings.HasSuffix(got, tc.want) {
+				t.Errorf("title = %q, want it to end with %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTitleRow_QueueBarDropsFirst(t *testing.T) {
+	t.Parallel()
+	m := withQueue(titleModel(t, false, 44, connUp, 2), server.ModeRunning, true)
+	got := strings.Join(strings.Fields(titleText(m)), " ")
+	if want := "gx › worktrees ▾ ▶ 3/7 agents 2 ● ?"; got != want {
+		t.Errorf("title = %q, want %q", got, want)
 	}
 }

@@ -6,7 +6,9 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
 var (
@@ -20,7 +22,13 @@ var (
 
 	titleAgentsWord  = titleBgStyle.Foreground(ui.ColorOverlay)
 	titleAgentsCount = titleBgStyle.Foreground(ui.ColorRed).Bold(true)
+
+	titleQueueCount   = titleBgStyle.Foreground(ui.ColorSubtle)
+	titleQueueBarRest = titleBgStyle.Foreground(ui.ColorSurface1)
 )
+
+// queueBarCells is how many cells the title row's queue progress bar spans.
+const queueBarCells = 7
 
 // span is a half-open column range [start, end) on the title row.
 type span struct{ start, end int }
@@ -80,12 +88,15 @@ type titleShape struct {
 	words     serverWords
 	brand     bool
 	caret     bool
+	queueBar  bool
 }
 
 // titleDropOrder runs widest to narrowest; the first shape that fits wins.
-// The agents count and the server icon are in every shape.
+// The queue icon and count, the agents count and the server icon are in every
+// shape.
 var titleDropOrder = []titleShape{
-	{brand: true, caret: true},
+	{brand: true, caret: true, queueBar: true},
+	{shortHelp: true, brand: true, caret: true, queueBar: true},
 	{shortHelp: true, brand: true, caret: true},
 	{shortHelp: true, words: serverWordsShort, brand: true, caret: true},
 	{shortHelp: true, words: serverWordsNone, brand: true, caret: true},
@@ -143,10 +154,14 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 		left = append(left, sp, titleSegment{"▾", titleCaretStyle})
 	}
 
-	if n := m.stream.vm.ActionableCount(); n > 0 {
-		right = append(right, titleSegment{"agents", titleAgentsWord}, sp, titleSegment{strconv.Itoa(n), titleAgentsCount}, sp)
+	icons := ui.Icons(m.settings.UseNerdFontIcons)
+	if q, ok := ticketsui.QueueStatusOf(m.stream.vm); ok {
+		right = append(right, queueSegments(q, icons, shape.queueBar)...)
 	}
-	if b, ok := m.serverConn().badge(ui.Icons(m.settings.UseNerdFontIcons)); ok {
+	if n := m.stream.vm.ActionableCount(); n > 0 {
+		right = append(right, titleSegment{icons.Agents, titleAgentsWord}, sp, titleSegment{strconv.Itoa(n), titleAgentsCount}, sp)
+	}
+	if b, ok := m.serverConn().badge(icons); ok {
 		style := titleBgStyle.Foreground(b.color)
 		right = append(right, titleSegment{b.icon, style}, sp)
 		if words := b.words(shape.words); words != "" {
@@ -159,6 +174,29 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 	}
 	right = append(append(right, help...), sp)
 	return left, right, segmentsWidth(help)
+}
+
+// queueSegments draws the queue status: a mode icon, a progress bar when bar is
+// set and the done/total count, with a trailing space.
+func queueSegments(q ticketsui.QueueStatus, icons ui.IconSet, bar bool) []titleSegment {
+	icon, color := icons.QueueRunning, ui.ColorGreen
+	switch q.Mode {
+	case server.ModePaused:
+		icon, color = icons.QueuePaused, ui.ColorYellow
+	case server.ModeDraining:
+		icon, color = icons.QueueDraining, ui.ColorOrange
+	}
+	sp := titleSegment{" ", titleBgStyle}
+	segs := []titleSegment{{icon, titleBgStyle.Foreground(color)}, sp}
+	if bar {
+		filled := q.Done * queueBarCells / max(q.Total, 1)
+		segs = append(segs,
+			titleSegment{strings.Repeat("▰", filled), titleBgStyle.Foreground(color)},
+			titleSegment{strings.Repeat("▱", queueBarCells-filled), titleQueueBarRest},
+			sp)
+	}
+	count := strconv.Itoa(q.Done) + "/" + strconv.Itoa(q.Total)
+	return append(segs, titleSegment{count, titleQueueCount}, sp)
 }
 
 func (s span) clip(width int) span {

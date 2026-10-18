@@ -96,15 +96,10 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	running := map[string]bool{}
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
-			if epic.RenderedStatus(t) != gxtickets.StatusClaimed {
+			if !serverRunning(epic, t, m.serverClaimedAt) {
 				continue
 			}
-			// No claim time means the server holds no run for it: a person
-			// claimed it (a grilling session, say), so nothing is implementing.
-			seen, ok := m.serverClaimedAt[t.Path]
-			if !ok || seen.IsZero() {
-				continue
-			}
+			seen := m.serverClaimedAt[t.Path]
 			if live[epic.Name] == nil {
 				live[epic.Name] = map[string]liveTicketState{}
 			}
