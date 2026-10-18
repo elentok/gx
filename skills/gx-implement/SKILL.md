@@ -152,6 +152,11 @@ Tests in `server/` take over 120s, the Bash default timeout. Start them with `ru
 up front, then wait for the completion notice. Don't poll with Monitor or Workflow, and don't start
 a second run of the same suite while one is going.
 
+Before every commit, and before `--iteration-status finished`: run `gofmt -l` on the changed `.go`
+files only (e.g. `gofmt -l $(git diff --name-only HEAD -- '*.go')`; add `--cached`/new files as
+needed). The output must be empty — fix with `gofmt -w` on those files. Then run `/verify`. Never
+run `gofmt -l .`: files on main that are already unformatted are out of scope. No goimports.
+
 Claiming already writes `status: claimed` for you — never write it yourself.
 
 Once done, run `gx tickets set <addr> --iteration-status finished`. This report can only _start_ a
