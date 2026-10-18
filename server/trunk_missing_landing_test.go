@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,6 +43,9 @@ func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T)
 	if waitForChat(chatCount, "trunk-missing: project") == 0 {
 		t.Errorf("no root park with reason trunk-missing reached chat")
 	}
+	if slices.Contains(f.h.Server.LockedTrunks(), "") {
+		t.Errorf("a land locked on an empty target")
+	}
 }
 
 func TestTrunkMissingAtLanding_AutoMergeOffIsNotParked(t *testing.T) {
@@ -50,5 +54,8 @@ func TestTrunkMissingAtLanding_AutoMergeOffIsNotParked(t *testing.T) {
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket not done:\n%s", body)
+	}
+	if slices.Contains(f.h.Server.LockedTrunks(), "") {
+		t.Errorf("a land locked on an empty target")
 	}
 }

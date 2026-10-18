@@ -55,11 +55,7 @@ func (s *Server) stampIfLanded(root rootRef, epics []tickets.Epic, e tickets.Epi
 	if err != nil {
 		return
 	}
-	var t tickets.Ticket
-	if len(e.Tickets) > 0 {
-		t = e.Tickets[0]
-	}
-	_, target, err := s.rootRefs(root.Project, epics, e.Name, t, repo)
+	t, _, target, err := s.epicRefs(root.Project, epics, e.Name, repo)
 	if err != nil {
 		return
 	}

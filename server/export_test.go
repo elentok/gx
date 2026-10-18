@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/events"
@@ -134,3 +135,15 @@ func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(proje
 
 // RecoveredCount is recoveredCount for tests.
 func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }
+
+// LockedTrunks lists the trunks any land has locked so far, in any repo.
+func (s *Server) LockedTrunks() []string {
+	s.trunkLocks.mu.Lock()
+	defer s.trunkLocks.mu.Unlock()
+	var trunks []string
+	for key := range s.trunkLocks.locks {
+		_, trunk, _ := strings.Cut(key, "\x00")
+		trunks = append(trunks, trunk)
+	}
+	return trunks
+}

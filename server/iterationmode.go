@@ -31,7 +31,7 @@ type iterationMode struct {
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	typ := schema.TicketType(t.Type)
 	if typ == schema.TypeMerge {
-		return iterationMode{feature: true, target: func() (string, error) { return s.landTarget(addr, t) }}
+		return iterationMode{feature: true, target: func() (string, error) { return s.landTarget(addr) }}
 	}
 	m := iterationMode{commitless: addr.Project == ScratchProject || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {

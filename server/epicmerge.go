@@ -41,12 +41,11 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	if e.IsMap {
 		return refusal(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand"), nil
 	}
-	first := lowestTicket(e)
-	one := ralphloop.OneIteration{Epic: a.Epic, Ticket: first}
-	_, target, err := s.rootRefs(a.Project, epics, a.Epic, first, repo)
+	first, _, target, err := s.epicRefs(a.Project, epics, a.Epic, repo)
 	if err != nil {
 		return QueueResult{}, err
 	}
+	one := ralphloop.OneIteration{Epic: a.Epic, Ticket: first}
 	defer s.trunkLocks.lock(repo, target)()
 	if r := epicMergeRefusal(root, e, repo); r != nil {
 		return *r, nil
@@ -71,7 +70,8 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	return QueueResult{MergeTicket: tickets.Address{Project: a.Project, Epic: a.Epic, ID: id}.String()}, nil
 }
 
-// lowestTicket is the ticket an epic's root refs are worked out from.
+// lowestTicket is the epic's Root ticket: the lowest-numbered one, whatever
+// its status, cancelled included.
 func lowestTicket(e tickets.Epic) tickets.Ticket {
 	return slices.MinFunc(e.Tickets, func(x, y tickets.Ticket) int {
 		return cmp.Or(cmp.Compare(x.Number, y.Number), cmp.Compare(x.Identifier, y.Identifier))
@@ -111,7 +111,7 @@ func (s *Server) epicMergeTarget(a tickets.Address) string {
 	if i < 0 || epics[i].IsMap || !epics[i].AllDone() || !epics[i].MergedAt.IsZero() {
 		return ""
 	}
-	_, target, err := s.rootRefs(a.Project, epics, a.Epic, lowestTicket(epics[i]), repo)
+	_, _, target, err := s.epicRefs(a.Project, epics, a.Epic, repo)
 	if err != nil {
 		return ""
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -447,7 +448,8 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 }
 
 // resolveBase derives where t starts from. ref is the branch the root epic's
-// feature branch is created from, with its "ref@sha" claim stamp; leaf is the
+// feature branch is created from (the epic's refs, not t's), with its
+// "ref@sha" claim stamp; leaf is the
 // unlanded sibling whose branch t starts from instead of the feature tip. A
 // commitless ticket reads at the feature tip, so everything comes back empty.
 func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (ref, stamp, leaf string, err error) {
@@ -457,7 +459,7 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	if leaf, err = tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); err != nil {
 		return "", "", "", err
 	}
-	ref, _, err = s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
+	_, ref, _, err = s.epicRefs(addr.Project, epics, addr.Epic, repo)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -532,8 +534,19 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 	return ref, ref, nil
 }
 
-// landTarget is the target of the root epic addr's ticket t belongs to.
-func (s *Server) landTarget(addr tickets.Address, t tickets.Ticket) (string, error) {
+// epicRefs is rootRefs for epic's Root ticket, the one ticket every caller
+// that means "the epic's refs" agrees on, so they all lock the same key. A
+// non-root ticket's base: never moves where the epic starts or lands.
+func (s *Server) epicRefs(project string, epics []tickets.Epic, epic, repo string) (root tickets.Ticket, base, target string, err error) {
+	if i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic }); i >= 0 && len(epics[i].Tickets) > 0 {
+		root = lowestTicket(epics[i])
+	}
+	base, target, err = s.rootRefs(project, epics, epic, root, repo)
+	return root, base, target, err
+}
+
+// landTarget is the target of the root epic addr belongs to.
+func (s *Server) landTarget(addr tickets.Address) (string, error) {
 	dir, repo, err := s.projectOf(addr.Project)
 	if err != nil {
 		return "", err
@@ -542,7 +555,7 @@ func (s *Server) landTarget(addr tickets.Address, t tickets.Ticket) (string, err
 	if err != nil {
 		return "", err
 	}
-	_, target, err := s.rootRefs(addr.Project, epics, addr.Epic, t, repo)
+	_, _, target, err := s.epicRefs(addr.Project, epics, addr.Epic, repo)
 	return target, err
 }
 
@@ -725,9 +738,21 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 // holds its trunk's lock, so a second land into that trunk sees the first one's
 // result. An epic already merged does no git work: its notice goes out only
 // with the dequeue, so a double land sends one.
+//
+// Without refs there is no target to lock: an epic that would land parks the
+// way landRoot does, and one that would not (auto-ff-merge off) completes
+// without git work, so it needs no lock.
 func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
-	_, target, _ := s.rootRefs(root.Project, epics, one.Epic, one.Ticket, repo)
-	defer s.trunkLocks.lock(repo, target)()
+	_, _, target, err := s.epicRefs(root.Project, epics, one.Epic, repo)
+	switch {
+	case err == nil:
+		defer s.trunkLocks.lock(repo, target)()
+	case s.autoFFMerge(root.Project) || hasManualMergeTicket(e):
+		reason, kind := s.refsFailed(root.Project, one.Epic, err)
+		s.stampEpic(root, e.Path, "completed_at")
+		s.parkRoot(root, one, dir, e, reason, kind)
+		return
+	}
 	s.landEpic(root, one, dir, repo, epics, e, target, false)
 }
 
@@ -758,18 +783,7 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo st
 		}
 		if reason != "" {
 			s.stampEpic(root, e.Path, "completed_at")
-			s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: string(kind), Level: EventLevelWarning, Message: reason})
-			s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
-			if s.chat.Enabled() {
-				s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
-			}
-			// Only a needs-rebase park, the one without a kind, is the
-			// epic's outcome; any other park waits on a person's fix and then lands.
-			if kind == "" {
-				s.notifyEpicOutcome(project, dir, one, e, false)
-			}
-			s.submitRetro(root, dir, e)
-			return QueueResult{Parked: true, ParkKind: string(kind), Message: reason}
+			return s.parkRoot(root, one, dir, e, reason, kind)
 		}
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 	default:
@@ -789,6 +803,24 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, dir, repo st
 	s.events.publish(EventRootCompleted, root.String())
 	s.notifyEpicOutcome(project, dir, one, e, merged)
 	return QueueResult{Merged: merged}
+}
+
+// parkRoot parks the all-done root of e for reason; kind names the cause,
+// empty for a needs-rebase park.
+func (s *Server) parkRoot(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, reason string, kind events.Kind) QueueResult {
+	project := root.Project
+	s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: string(kind), Level: EventLevelWarning, Message: reason})
+	s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
+	if s.chat.Enabled() {
+		s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
+	}
+	// Only a needs-rebase park, the one without a kind, is the
+	// epic's outcome; any other park waits on a person's fix and then lands.
+	if kind == "" {
+		s.notifyEpicOutcome(project, dir, one, e, false)
+	}
+	s.submitRetro(root, dir, e)
+	return QueueResult{Parked: true, ParkKind: string(kind), Message: reason}
 }
 
 // notifyEpicOutcome sends the epic-level notice. A one-off skips it.
@@ -861,7 +893,7 @@ func (s *Server) nothingToLand(project string, epics []tickets.Epic, one ralphlo
 	if _, err := git.RevParse(repo, branch); err != nil {
 		return errors.Is(err, git.ErrRefNotFound)
 	}
-	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repo)
+	_, _, target, err := s.epicRefs(project, epics, one.Epic, repo)
 	if err != nil {
 		return false
 	}
@@ -874,25 +906,17 @@ func (s *Server) nothingToLand(project string, epics []tickets.Epic, one ralphlo
 // names the park's cause, empty for a needs-rebase one. Every error parks the
 // root: one left all-done in the queue looks stuck.
 func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, kind events.Kind) {
-	landFailed := func(err error) (string, events.Kind) {
-		return fmt.Sprintf("land failed: %v; fix it, then run gx server epics merge %s:%s", err, project, one.Epic), events.LandError
-	}
-	_, target, err := s.rootRefs(project, epics, one.Epic, one.Ticket, repoDir)
-	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
-		// Nothing lands; the project stops claiming until a person fixes trunk.
-		s.enterTrunkMissing(project, err.Error())
-		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, one.Epic), events.TrunkMissing
-	}
+	_, _, target, err := s.epicRefs(project, epics, one.Epic, repoDir)
 	if err != nil {
-		return landFailed(err)
+		return s.refsFailed(project, one.Epic, err)
 	}
 	info, err := git.IdentifyDir(repoDir)
 	if err != nil {
-		return landFailed(err)
+		return landFailed(project, one.Epic, err)
 	}
 	worktrees, err := git.ListWorktrees(info.Repo)
 	if err != nil {
-		return landFailed(err)
+		return landFailed(project, one.Epic, err)
 	}
 	needsRebase := fmt.Sprintf("needs rebase: %s onto %s; run gx server epics merge %s:%s", one.Epic, target, project, one.Epic)
 	out, err := s.mergeInto(info.Repo, worktrees, one.Epic, target)
@@ -910,12 +934,27 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 					target, dir, changedFiles(changes), project, one.Epic), events.DirtyTrunk
 			}
 		}
-		return landFailed(err)
+		return landFailed(project, one.Epic, err)
 	}
 	if out.Merged {
 		return "", ""
 	}
 	return needsRebase, ""
+}
+
+// refsFailed is the park reason and kind for an epic whose refs can't be
+// worked out.
+func (s *Server) refsFailed(project, epic string, err error) (string, events.Kind) {
+	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
+		// Nothing lands; the project stops claiming until a person fixes trunk.
+		s.enterTrunkMissing(project, err.Error())
+		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, epic), events.TrunkMissing
+	}
+	return landFailed(project, epic, err)
+}
+
+func landFailed(project, epic string, err error) (string, events.Kind) {
+	return fmt.Sprintf("land failed: %v; fix it, then run gx server epics merge %s:%s", err, project, epic), events.LandError
 }
 
 // maxReasonFiles caps the files a dirty-trunk reason lists.

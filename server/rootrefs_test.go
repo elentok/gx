@@ -7,9 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -101,6 +103,59 @@ func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
 			}
 		})
 	}
+}
+
+// rootLowestEpics is epic b whose file order and finish order both differ
+// from its numbers: the cancelled 01, stacked on a, is the Root ticket; 02
+// and 03 carry a base: of their own that targets trunk.
+func rootLowestEpics() []tickets.Epic {
+	return []tickets.Epic{
+		{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}},
+		{Name: "b", Tickets: []tickets.Ticket{
+			{Number: 3, Identifier: "03", Status: "done", Base: "release-1.2"},
+			{Number: 1, Identifier: "01", Status: "cancelled", BlockedBy: []string{"a/01"}},
+			{Number: 2, Identifier: "02", Status: "open", Base: "release-1.2"},
+		}},
+	}
+}
+
+func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
+	s, repo := rootRefsFixture(t)
+	epics := rootLowestEpics()
+	finished, claimed := epics[1].Tickets[0], epics[1].Tickets[2]
+
+	root, base, target, err := s.epicRefs("proj", epics, "b", repo)
+	if err != nil || root.Identifier != "01" || base != "a" || target != "a" {
+		t.Fatalf("epicRefs = (%s, %q, %q, %v), want (01, a, a)", root.Identifier, base, target, err)
+	}
+	ref, stamp, _, err := s.resolveBase(tickets.Address{Project: "proj", Epic: "b", ID: "02"}, claimed, repo, epics)
+	if want := "a@" + revParse(t, repo, "a"); err != nil || ref != "a" || stamp != want {
+		t.Errorf("resolveBase = (%q, %q, %v), want (a, %s)", ref, stamp, err, want)
+	}
+	// b holds only a's work: landed on the root's target a, not on trunk.
+	runGit(t, repo, "branch", "b", "a")
+	if !s.nothingToLand("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
+		t.Errorf("nothingToLand = false, want b already on its target a")
+	}
+}
+
+func TestResolveBase_ExistingFeatureBranchKeepsItsBase(t *testing.T) {
+	s, repo := rootRefsFixture(t)
+	runGit(t, repo, "branch", "b", "main")
+	epics := rootLowestEpics()
+	_, stamp, _, err := s.resolveBase(tickets.Address{Project: "proj", Epic: "b", ID: "02"}, epics[1].Tickets[2], repo, epics)
+	if want := "a@" + revParse(t, repo, "main"); err != nil || stamp != want {
+		t.Errorf("stamp = %q, %v, want %s", stamp, err, want)
+	}
+}
+
+func revParse(t *testing.T, repo, ref string) string {
+	t.Helper()
+	out, err := exec.Command("git", "-C", repo, "rev-parse", ref).Output()
+	if err != nil {
+		t.Fatalf("rev-parse %s: %v", ref, err)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func TestRootRefs_MissingTrunkFailsOnlyARootTargetingTrunk(t *testing.T) {
