@@ -98,7 +98,9 @@ func (s *Server) fillEpicMergeTargets(list []TicketInfo) {
 }
 
 // epicMergeTarget is "" when the target can't be worked out: the menu then
-// just says "Merge".
+// just says "Merge". It is also "" for an epic whose Merge is dimmed (tickets
+// not done, already merged): every snapshot runs this per epic, and only a
+// mergeable epic is worth its git calls.
 func (s *Server) epicMergeTarget(a tickets.Address) string {
 	dir, repo, err := s.projectOf(a.Project)
 	if err != nil {
@@ -106,7 +108,7 @@ func (s *Server) epicMergeTarget(a tickets.Address) string {
 	}
 	epics, _ := s.idx.epicsOf(dir)
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == a.Epic })
-	if i < 0 || epics[i].IsMap || len(epics[i].Tickets) == 0 {
+	if i < 0 || epics[i].IsMap || !epics[i].AllDone() || !epics[i].MergedAt.IsZero() {
 		return ""
 	}
 	_, target, err := s.rootRefs(a.Project, epics, a.Epic, lowestTicket(epics[i]), repo)

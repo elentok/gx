@@ -685,6 +685,51 @@ func TestServerStream_EventResnapshotKeepsStreamAndQueue(t *testing.T) {
 	}
 }
 
+// A burst of events (an agent's ticket writes, a new session) costs the server
+// one snapshot, not one per event.
+func TestServerStream_EventBurstResnapshotsOnce(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	before, _ := f.fetches()
+
+	f.mu.Lock()
+	f.seq = 15 // the server's snapshot is as new as its last event
+	f.mu.Unlock()
+	for seq := uint64(11); seq <= 15; seq++ {
+		f.stream(0).ch <- server.Event{Seq: seq, Type: server.EventIterationStarted, Address: "gx:alpha/01"}
+	}
+	h.pump()
+
+	if after, _ := f.fetches(); after-before != 1 {
+		t.Errorf("snapshots = %d, want 1", after-before)
+	}
+	if h.m.stream.vm.Seq != 15 {
+		t.Errorf("seq = %d, want 15", h.m.stream.vm.Seq)
+	}
+}
+
+// An event's re-snapshot that comes due while another snapshot is in flight
+// runs once that one lands: the one in flight may predate the event.
+func TestServerStream_ResnapshotDueDuringFlightRunsAfterIt(t *testing.T) {
+	h, f := newStreamHarness(t)
+	h.probeUp()
+	before, _ := f.fetches()
+
+	h.m.stream.snapshotting = true
+	h.m.stream.resnapshotPending = true
+	h.send(resnapshotTickMsg{})
+	h.pump()
+	if after, _ := f.fetches(); after != before {
+		t.Fatalf("snapshots while one is in flight = %d, want 0", after-before)
+	}
+
+	h.send(streamSnapshotMsg{gen: h.m.stream.gen, snap: server.Snapshot{Seq: 10}})
+	h.pump()
+	if after, _ := f.fetches(); after-before != 1 {
+		t.Errorf("snapshots after the in-flight one landed = %d, want 1", after-before)
+	}
+}
+
 func TestServerStream_QueueChangedRefetchesQueueOnce(t *testing.T) {
 	h, f := newStreamHarness(t)
 	h.probeUp()

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -36,6 +37,11 @@ type serverStream struct {
 	snapshotFailing bool
 	// queueRequested: R asked for the queue order along with the snapshot.
 	queueRequested bool
+	// resnapshotPending: an event asked for a re-snapshot and its debounce
+	// tick is armed. resnapshotDue: the tick fired while a snapshot was in
+	// flight, so another runs once that one lands.
+	resnapshotPending bool
+	resnapshotDue     bool
 
 	// streamCtx is set from the moment a subscription is requested, so a
 	// non-nil value means "a stream is live or being opened".
@@ -70,6 +76,14 @@ type streamQueueMsg struct {
 	items []server.QueueItem
 	err   error
 }
+
+// resnapshotTickMsg ends an event re-snapshot's debounce.
+type resnapshotTickMsg struct{}
+
+// resnapshotDebounce gathers a burst of events (an agent's ticket writes, a
+// new session) into one snapshot: every open TUI re-snapshots on each event,
+// and a snapshot is not cheap for the server.
+const resnapshotDebounce = 100 * time.Millisecond
 
 // streamWanted: the link is up (or read-only), no snapshot is in flight, and
 // either no stream is live or being set up, or the last snapshot failed. The
@@ -119,6 +133,7 @@ func (m Model) onLinkChange(prev ticketsui.ServerLink) (Model, tea.Cmd) {
 		cmds = append(cmds, watch)
 		m = m.cancelStream()
 		m.stream.snapshotting = false
+		m.stream.resnapshotPending, m.stream.resnapshotDue = false, false
 		m.stream.gen++ // outdate an in-flight snapshot
 	} else {
 		m = m.stopStoreWatch()
@@ -171,10 +186,9 @@ func (m Model) cmdStreamQueue() tea.Cmd {
 
 func (m Model) streamEffects(e viewmodel.Effect) (Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	if e&viewmodel.EffectResnapshot != 0 {
-		var cmd tea.Cmd
-		m, cmd = m.startSnapshot()
-		cmds = append(cmds, cmd)
+	if e&viewmodel.EffectResnapshot != 0 && !m.stream.resnapshotPending {
+		m.stream.resnapshotPending = true
+		cmds = append(cmds, tea.Tick(resnapshotDebounce, func(time.Time) tea.Msg { return resnapshotTickMsg{} }))
 	}
 	if e&viewmodel.EffectRefetchQueue != 0 {
 		cmds = append(cmds, m.cmdStreamQueue())
@@ -241,12 +255,32 @@ func (m Model) updateServerStream(msg tea.Msg) (Model, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.stream.snapshotting = false
+		due := m.stream.resnapshotDue
+		m.stream.resnapshotDue = false
 		if msg.err != nil {
+			// The probe tick's retry covers whatever was due.
 			m, cmd := m.onSnapshotErr(msg.err)
 			return m, cmd, true
 		}
 		m, cmd := m.onSnapshot(msg.snap)
+		if due {
+			var again tea.Cmd
+			m, again = m.startSnapshot()
+			cmd = tea.Batch(cmd, again)
+		}
 		return m, cmd, true
+
+	case resnapshotTickMsg:
+		m.stream.resnapshotPending = false
+		switch {
+		case m.serverConn().State == ServerDown:
+		case m.stream.snapshotting:
+			m.stream.resnapshotDue = true
+		default:
+			m, cmd := m.startSnapshot()
+			return m, cmd, true
+		}
+		return m, nil, true
 
 	case streamSubscribedMsg:
 		if msg.ctx != m.stream.streamCtx {

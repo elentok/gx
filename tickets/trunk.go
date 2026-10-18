@@ -48,6 +48,8 @@ func (e *ErrTrunkMissing) Error() string {
 // Trunk resolves projectDir's trunk in repoRoot: project.json's trunk, else
 // the repo's detected default. project.json is read on every call, never
 // cached, so an edit applies at once; a detected value is never written back.
+// The git reads are cached on the ref files they depend on (trunk_cache.go),
+// so a repo edit applies at once too.
 func Trunk(projectDir, repoRoot string) (string, error) {
 	pf, err := config.ReadProjectFile(projectDir)
 	if err != nil {
@@ -56,7 +58,7 @@ func Trunk(projectDir, repoRoot string) (string, error) {
 	if pf.Trunk != nil && *pf.Trunk != "" {
 		return checkTrunk(&ErrTrunkMissing{Project: ProjectName(projectDir), Repo: repoRoot, Trunk: *pf.Trunk, FromProjectFile: true})
 	}
-	return checkTrunk(&ErrTrunkMissing{Project: ProjectName(projectDir), Repo: repoRoot, Trunk: git.RemoteDefaultBranch(repoRoot)})
+	return checkTrunk(&ErrTrunkMissing{Project: ProjectName(projectDir), Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 }
 
 // TrunkFor resolves the trunk of dir's repo. A repo no project registers uses
@@ -84,7 +86,7 @@ func OpenRepo(dir string) (*git.Repo, error) {
 func trunkForRoot(repoRoot string) (string, error) {
 	projectDir, err := rootForRepo(repoRoot)
 	if errors.Is(err, ErrNoProject) {
-		return checkTrunk(&ErrTrunkMissing{Repo: repoRoot, Trunk: git.RemoteDefaultBranch(repoRoot)})
+		return checkTrunk(&ErrTrunkMissing{Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 	}
 	if err != nil {
 		return "", err
@@ -96,13 +98,13 @@ func trunkForRoot(repoRoot string) (string, error) {
 // else candidate itself filled in as the error.
 func checkTrunk(candidate *ErrTrunkMissing) (string, error) {
 	trunk := candidate.Trunk
-	if !git.ValidBranchName(trunk) {
+	if !validBranchName(trunk) {
 		candidate.Invalid = true
 		return "", candidate
 	}
-	if git.RefExists(candidate.Repo, "refs/heads/"+trunk) {
+	if refExists(candidate.Repo, "refs/heads/"+trunk) {
 		return trunk, nil
 	}
-	candidate.RemoteOnly = git.RefExists(candidate.Repo, "refs/remotes/origin/"+trunk)
+	candidate.RemoteOnly = refExists(candidate.Repo, "refs/remotes/origin/"+trunk)
 	return "", candidate
 }

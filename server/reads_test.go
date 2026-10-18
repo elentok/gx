@@ -258,8 +258,9 @@ func TestSnapshot_CarriesTheEpicsMapKind(t *testing.T) {
 
 func TestSnapshot_CarriesTheEpicsMergeTargetAndStatus(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	done := servertest.TicketOpts{Status: "done"}
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", done)
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", done)
 	servertest.SetProjectTrunk(t, store, "proj", repo, "main")
 	epicMD := filepath.Join(store, "proj", "epic-a", "ticket.md")
 	if err := os.WriteFile(epicMD, []byte("---\nstatus: draft\n---\n"), 0o644); err != nil {
@@ -277,6 +278,35 @@ func TestSnapshot_CarriesTheEpicsMergeTargetAndStatus(t *testing.T) {
 	for _, ti := range snap.Tickets {
 		if ti.EpicMergeTarget != "main" || ti.EpicStatus != "draft" {
 			t.Errorf("%s: merge target %q, status %q, want main and draft", ti.Address, ti.EpicMergeTarget, ti.EpicStatus)
+		}
+	}
+}
+
+// The target only labels a Merge that can run, and each one costs git calls,
+// so an epic with open tickets or already merged gets none.
+func TestSnapshot_LeavesTheMergeTargetOffEpicsThatCantMerge(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	done := servertest.TicketOpts{Status: "done"}
+	servertest.WriteTicketWith(t, store, "proj", "open-epic", "01", "first", done)
+	servertest.WriteTicket(t, store, "proj", "open-epic", "02", "second", "")
+	servertest.WriteTicketWith(t, store, "proj", "merged-epic", "01", "first", done)
+	servertest.SetProjectTrunk(t, store, "proj", repo, "main")
+	epicMD := filepath.Join(store, "proj", "merged-epic", "ticket.md")
+	if err := os.WriteFile(epicMD, []byte("---\nmerged_at: 2026-10-01T10:00:00Z\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snap.Tickets) != 3 {
+		t.Fatalf("tickets = %+v, want 3", snap.Tickets)
+	}
+	for _, ti := range snap.Tickets {
+		if ti.EpicMergeTarget != "" {
+			t.Errorf("%s: merge target %q, want none", ti.Address, ti.EpicMergeTarget)
 		}
 	}
 }
