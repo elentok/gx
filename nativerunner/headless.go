@@ -59,7 +59,8 @@ type headlessSession struct {
 	session agentrunner.Session
 	epic    string
 	// pid leads claude's process group (setsid).
-	pid int
+	pid      int
+	pidStart string
 	// stdin is the FIFO's write end. The server is its only writer;
 	// writeMu keeps a large prompt and an interrupt from interleaving.
 	stdin   *os.File
@@ -118,7 +119,7 @@ func (h *Headless) Start(opts agentrunner.StartOptions) (agentrunner.Session, er
 
 	// Input waits in the FIFO until claude reads it, so the agent can take a
 	// prompt as soon as it is launched.
-	ss := newSession(opts.Label, opts.Epic, sessionID, pid, files.stdin)
+	ss := newSession(meta, files.stdin)
 	go func() {
 		_ = cmd.Wait()
 		close(ss.exited)
@@ -221,15 +222,16 @@ func (h *Headless) spawn(opts agentrunner.StartOptions, sessionID string, f agen
 	return cmd, nil
 }
 
-func newSession(label, epic, sessionID string, pid int, stdin *os.File) *headlessSession {
+func newSession(meta Meta, stdin *os.File) *headlessSession {
 	return &headlessSession{
-		session: agentrunner.Session{Label: label, ID: label, SessionID: sessionID},
-		epic:    epic,
-		pid:     pid,
-		stdin:   stdin,
-		exited:  make(chan struct{}),
-		tailed:  make(chan struct{}),
-		track:   tracker{sessionID: sessionID},
+		session:  agentrunner.Session{Label: meta.Label, ID: meta.Label, SessionID: meta.SessionID},
+		epic:     meta.Epic,
+		pid:      meta.PID,
+		pidStart: meta.PIDStart,
+		stdin:    stdin,
+		exited:   make(chan struct{}),
+		tailed:   make(chan struct{}),
+		track:    tracker{sessionID: meta.SessionID},
 		changed: make(chan struct{}),
 	}
 }
@@ -493,8 +495,8 @@ func (h *Headless) Stop(s agentrunner.Session) error {
 		_, _ = h.Wait(s, []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone}, grace)
 	}
 
-	pgid := -ss.pid
-	_ = syscall.Kill(pgid, syscall.SIGTERM)
+	procs := h.procs()
+	signalGroup(procs, ss.pid, ss.pidStart, ss.session.SessionID, syscall.SIGTERM)
 	grace := h.StopGrace
 	if grace <= 0 {
 		grace = 5 * time.Second
@@ -502,8 +504,13 @@ func (h *Headless) Stop(s agentrunner.Session) error {
 	select {
 	case <-ss.exited:
 	case <-time.After(grace):
-		_ = syscall.Kill(pgid, syscall.SIGKILL)
-		<-ss.exited
+		signalGroup(procs, ss.pid, ss.pidStart, ss.session.SessionID, syscall.SIGKILL)
+		if err := awaitExit(ss.exited, grace, ss.pid); err != nil {
+			h.mu.Lock()
+			ss.stopped = false
+			h.mu.Unlock()
+			return err
+		}
 	}
 	<-ss.tailed
 	ss.stdin.Close()

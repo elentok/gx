@@ -65,6 +65,9 @@ type ptySession struct {
 	holder    *HolderClient
 	holderPID int
 	claudePID int
+	// The start times meta.json records; blank until launch records them.
+	holderStart string
+	claudeStart string
 	// exited closes once the holder process is gone.
 	exited  chan struct{}
 	stopped bool
@@ -109,7 +112,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 		close(ss.exited)
 	}()
 	if err := p.launch(ss, dir, opts.Cwd); err != nil {
-		killSessions(ss.claudePID, ss.holderPID)
+		killLaunch(ss.claudePID, ss.holderPID)
 		<-ss.exited
 		return agentrunner.Session{}, err
 	}
@@ -157,6 +160,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 	if err := RecordLaunch(procs, dir, &meta); err != nil {
 		return err
 	}
+	ss.holderStart, ss.claudeStart = meta.HolderPIDStart, meta.PIDStart
 	var nextTrustKey time.Time
 	for {
 		claude, _, err := ss.holder.Status()
@@ -242,10 +246,12 @@ func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
 	ss := &ptySession{
 		session:   agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
 		epic:      meta.Epic,
-		holder:    holder,
-		holderPID: meta.HolderPID,
-		claudePID: meta.PID,
-		exited:    make(chan struct{}),
+		holder:      holder,
+		holderPID:   meta.HolderPID,
+		claudePID:   meta.PID,
+		holderStart: meta.HolderPIDStart,
+		claudeStart: meta.PIDStart,
+		exited:      make(chan struct{}),
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -362,13 +368,22 @@ func ptyLaunchArgs(extra []string) []string {
 	}, extra...)
 }
 
-// killSessions SIGKILLs each nonzero pid's whole session.
-func killSessions(pids ...int) {
+// killLaunch SIGKILLs each nonzero pid's whole session unchecked. Only a
+// failed launch uses it: meta.json may not hold the start times yet.
+func killLaunch(pids ...int) {
 	for _, pid := range pids {
 		if pid > 0 {
 			_ = syscall.Kill(-pid, syscall.SIGKILL)
 		}
 	}
+}
+
+// killSessions SIGKILLs claude's and the holder's whole sessions, each pid
+// re-checked by signalGroup first.
+func (p *Pty) killSessions(ss *ptySession) {
+	procs := orPS(p.Procs)
+	signalGroup(procs, ss.claudePID, ss.claudeStart, ss.session.SessionID, syscall.SIGKILL)
+	signalGroup(procs, ss.holderPID, ss.holderStart, ss.session.SessionID, syscall.SIGKILL)
 }
 
 func (p *Pty) reserve(label string) error {
@@ -485,14 +500,20 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		// Longer than the holder's own grace for claude, plus its drain.
 		grace = 2 * holderStopGrace
 	}
+	wait := grace
 	if ss.holder.Stop() != nil {
-		grace = 0
+		wait = 0
 	}
 	select {
 	case <-ss.exited:
-	case <-time.After(grace):
-		killSessions(ss.claudePID, ss.holderPID)
-		<-ss.exited
+	case <-time.After(wait):
+		p.killSessions(ss)
+		if err := awaitExit(ss.exited, grace, ss.holderPID); err != nil {
+			p.mu.Lock()
+			ss.stopped = false
+			p.mu.Unlock()
+			return err
+		}
 	}
 
 	p.mu.Lock()
@@ -502,8 +523,24 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 }
 
 // Cleanup removes label's holder.sock, which a crashed holder leaves behind.
+// It never kills: while the holder may still run, it fails and keeps the
+// socket.
 func (p *Pty) Cleanup(label string) error {
-	return removeAll(filepath.Join(p.Root, label), layouts[ptyRunnerName].transient)
+	dir := filepath.Join(p.Root, label)
+	meta, err := readMeta(dir)
+	if err != nil && !errors.Is(err, agentrunner.ErrNotFound) {
+		return err
+	}
+	if err == nil {
+		live, err := pidAlive(orPS(p.Procs), meta.HolderPID, meta.HolderPIDStart, meta.SessionID)
+		if err != nil {
+			return fmt.Errorf("cleanup %s: holder pid %d: %w", label, meta.HolderPID, err)
+		}
+		if live {
+			return fmt.Errorf("cleanup %s: holder pid %d still runs", label, meta.HolderPID)
+		}
+	}
+	return removeAll(dir, layouts[ptyRunnerName].transient)
 }
 
 func (p *Pty) Find(label string) (agentrunner.Session, bool, error) {

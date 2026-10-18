@@ -585,7 +585,8 @@ func (h *harness) pid(t *testing.T) int {
 	return meta.PID
 }
 
-// blockingProcs holds Start inside its post-launch process lookup.
+// blockingProcs holds Start inside its post-launch process lookup. The real
+// lookup stamps meta, so Stop's re-check matches it.
 type blockingProcs struct {
 	entered chan struct{}
 	release chan struct{}
@@ -594,7 +595,7 @@ type blockingProcs struct {
 func (b blockingProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
 	close(b.entered)
 	<-b.release
-	return nativerunner.Process{Start: "x"}, true, nil
+	return nativerunner.PS.Lookup(pid)
 }
 
 func TestHeadless_StatusDoesNotBlockOnAStartInProgress(t *testing.T) {

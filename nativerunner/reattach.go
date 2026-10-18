@@ -71,7 +71,9 @@ func (h *Headless) Reattach(label string) (agentrunner.Session, Verdict, error) 
 	if err != nil {
 		return agentrunner.Session{}, 0, err
 	}
-	ss := newSession(label, meta.Epic, meta.SessionID, meta.PID, stdin)
+	// The session is keyed by the label it was reattached under.
+	meta.Label = label
+	ss := newSession(meta, stdin)
 	ss.track = track
 	go h.watchExit(ss, meta)
 	h.follow(ss, out, offset)
