@@ -521,7 +521,7 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	}
 
 	content := m.View().Content
-	if !strings.Contains(content, "Keybindings") {
+	if !strings.Contains(content, "Help") {
 		t.Fatalf("expected help overlay with Keybindings title, got:\n%s", content)
 	}
 }

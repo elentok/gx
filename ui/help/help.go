@@ -89,7 +89,7 @@ func (m Model) View() string {
 	}
 
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
-		Title:      "Keybindings",
+		Title:      "Help",
 		RightTitle: m.rightTitle(),
 		Body:       m.bodyWithScrollbar(),
 		Hint:       m.hint(),

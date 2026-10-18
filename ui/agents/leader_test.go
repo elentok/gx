@@ -324,6 +324,15 @@ func TestLeader_QGoesBack(t *testing.T) {
 	}
 }
 
+func TestSidebar_QuestionMarkOpensHelp(t *testing.T) {
+	m, _ := attachModel(t, &fakeHolders{attaches: map[string]*fakeAttach{}})
+	m.terminalFocused = false
+	m = update1(t, m, letter("?"))
+	if !m.help.IsOpen || !strings.Contains(plainView(m), "Help") {
+		t.Fatal("? on the sidebar did not open help")
+	}
+}
+
 func TestLeader_ToggleSidebarAndHelp(t *testing.T) {
 	m, _ := attachModel(t, &fakeHolders{attaches: map[string]*fakeAttach{}})
 	m, _ = leaderThen(t, m, letter("b"))
@@ -331,7 +340,7 @@ func TestLeader_ToggleSidebarAndHelp(t *testing.T) {
 		t.Fatal("leader b did not hide the sidebar")
 	}
 	m, _ = leaderThen(t, m, letter("?"))
-	if !m.help.IsOpen || !strings.Contains(plainView(m), "Keybindings") {
+	if !m.help.IsOpen || !strings.Contains(plainView(m), "Help") {
 		t.Fatal("leader ? did not open help")
 	}
 	m = update1(t, m, esc)

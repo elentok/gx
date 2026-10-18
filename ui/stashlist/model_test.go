@@ -54,7 +54,7 @@ func TestQuestionMarkOpensHelpOverlay(t *testing.T) {
 	}
 
 	content := m.View().Content
-	if !strings.Contains(content, "Keybindings") {
+	if !strings.Contains(content, "Help") {
 		t.Fatalf("expected help overlay with Keybindings title, got:\n%s", content)
 	}
 	for _, want := range []string{"apply stash", "pop stash", "drop stash", "create stash"} {

@@ -36,6 +36,7 @@ var (
 	keyResume        = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resume session"))
 	keyRunAction     = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "run action"))
 	keyMenu          = key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "session menu"))
+	keyHelp          = key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help"))
 )
 
 type pageActivatedMsg struct{}
@@ -289,6 +290,8 @@ func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.runActionSelected()
 	case key.Matches(msg, keyMenu):
 		return m.openMenu()
+	case key.Matches(msg, keyHelp):
+		return m.openHelp(), nil
 	default:
 		return m, nil
 	}

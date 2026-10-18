@@ -53,6 +53,7 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"a"}, Title: "run action"},
 	{Seq: []string{"m"}, Title: "session menu"},
 	{Seq: []string{"b"}, Title: "toggle sidebar"},
+	{Seq: []string{"?"}, Title: "help"},
 }
 
 func (m Model) leaderKeys() []string {
