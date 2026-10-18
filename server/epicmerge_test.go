@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 // ticketFiles is every epic's ticket.md and ticket file in the store, by path.
@@ -80,6 +81,21 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	}
 	if len(after) != len(before) {
 		t.Errorf("ticket files = %d, want %d", len(after), len(before))
+	}
+}
+
+func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, servertest.Prompt, string) {})
+	servertest.WriteTicketWith(t, f.store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
+	f.h.Server.Rescan()
+
+	res, err := f.h.Client.EpicMerge(context.Background(), "proj:research")
+	if err != nil || res.Refused || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want merged", res, err)
+	}
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", "research"))
+	if md.MergedAt.IsZero() {
+		t.Error("epic has no merged_at")
 	}
 }
 

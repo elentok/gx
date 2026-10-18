@@ -229,6 +229,8 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	s.events.publish(EventTicketDone, addr.String())
 	s.stampRetro(addr, lf.path, false)
 	s.cancelUnstartedInvestigations(lf.dir, addr)
+	// The adopted ticket may be the epic's last; settleRun would have completed it.
+	s.completeRootIfDone(rootOf(addr), one)
 	s.kickRunner()
 	return true
 }

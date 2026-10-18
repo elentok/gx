@@ -64,6 +64,10 @@ func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo 
 	if r := epicMergeRefusal(root, e, repo); r != nil {
 		return landDecision{result: *r}, nil
 	}
+	// No branch (a commitless epic): nothing to land, so landEpic only stamps it.
+	if !git.RefExists(repo, "refs/heads/"+root.Epic) {
+		return s.landEpic(root, one, repo, epics, e, target, true), nil
+	}
 	if err := s.ensureFeatureWorktree(root.Project, root.Epic, repo); err != nil {
 		return landDecision{}, err
 	}
@@ -183,12 +187,17 @@ func epicMergeRefusal(root rootRef, e tickets.Epic, repo string) *QueueResult {
 		r = refusal(ReasonMergePending, root.String()+" already has a merge ticket pending")
 	case !ralphloop.AllDone(e):
 		r = refusal(ReasonNotComplete, root.String()+" has tickets that are not done")
-	case !git.RefExists(repo, "refs/heads/"+root.Epic):
+	// A commitless epic never makes a branch: landEpic stamps it merged.
+	case !allCommitless(e) && !git.RefExists(repo, "refs/heads/"+root.Epic):
 		r = refusal(ReasonBranchMissing, "no branch "+root.Epic+" in "+repo)
 	default:
 		return nil
 	}
 	return &r
+}
+
+func allCommitless(e tickets.Epic) bool {
+	return slices.IndexFunc(e.Tickets, func(t tickets.Ticket) bool { return !t.Commitless }) < 0
 }
 
 func pendingMerge(e tickets.Epic, t tickets.Ticket) bool {

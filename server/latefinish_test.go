@@ -189,6 +189,12 @@ func TestLateFinish_ClosesCommitless(t *testing.T) {
 		if reason := p.adopted(t); !strings.Contains(reason, "closed commitless") {
 			t.Errorf("reason = %q, want closed commitless", reason)
 		}
+		// 01 is the epic's last ticket, so the adoption completes the epic.
+		epicMD := filepath.Join(p.store, "proj/epic-a/ticket.md")
+		waitFor(t, func() bool {
+			b, err := os.ReadFile(epicMD)
+			return err == nil && strings.Contains(string(b), "merged_at:") && strings.Contains(string(b), "completed_at:")
+		})
 	})
 }
 
