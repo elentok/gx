@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -23,9 +24,9 @@ func assertOnlyToast(t *testing.T, name string, cmd tea.Cmd) {
 func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 	m := newServerModel(t)
 	for name, msg := range map[string]tea.Msg{
-		"enqueue": serverEnqueuedMsg{added: 1},
+		"enqueue": serverEnqueuedMsg{problem: "gx:a/01: refused"},
 		"replace": serverReplacedMsg{count: 1},
-		"epic":    epicQueuedMsg{queued: 1},
+		"epic":    epicQueuedMsg{refusals: []string{"gx:a/01: refused"}},
 		"action":  serverDoneMsg{ok: "parked"},
 	} {
 		_, cmd := m.Update(msg)
@@ -60,5 +61,29 @@ func TestWrites_QueueTabOnlyToasts(t *testing.T) {
 	} {
 		_, cmd := m.Update(msg)
 		assertOnlyToast(t, name, cmd)
+	}
+}
+
+// Seam: a successful add (single or epic) toasts and switches to the Queue
+// tab; a total failure only toasts.
+func TestWrites_AddToQueueSwitchesToQueueTab(t *testing.T) {
+	m := newServerModel(t)
+	for name, msg := range map[string]tea.Msg{
+		"enqueue": serverEnqueuedMsg{added: 1},
+		"epic":    epicQueuedMsg{queued: 2},
+	} {
+		_, cmd := m.Update(msg)
+		if cmd == nil {
+			t.Fatalf("%s: no command", name)
+		}
+		var switched bool
+		for _, c := range cmd().(tea.BatchMsg) {
+			if vs, ok := nav.IsSwitch(c()); ok && vs.Tab == nav.TabQueue {
+				switched = true
+			}
+		}
+		if !switched {
+			t.Errorf("%s: did not switch to the Queue tab", name)
+		}
 	}
 }

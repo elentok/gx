@@ -16,6 +16,7 @@ import (
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/confirm"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/tree"
 	"github.com/elentok/gx/viewmodel"
@@ -174,6 +175,15 @@ func (m Model) cmdServerEnqueue(addrs []string, agent string) tea.Cmd {
 	}
 }
 
+// showQueueIfAdded follows an add-to-queue toast with a switch to the Queue
+// tab, so the new item is on screen. A total failure stays on the Tickets tab.
+func showQueueIfAdded(added int, toast tea.Cmd) tea.Cmd {
+	if added == 0 {
+		return toast
+	}
+	return tea.Batch(toast, nav.Switch(nav.ViewState{Tab: nav.TabQueue}))
+}
+
 // ResnapshotRequestedMsg asks the app shell, which owns the server stream, for
 // a fresh snapshot (the tab's "R" and the reloads after a write).
 type ResnapshotRequestedMsg struct{}
@@ -240,10 +250,10 @@ func (m Model) updateServer(msg tea.Msg) (Model, tea.Cmd, bool) {
 		if msg.problem != "" {
 			note = notify.Error(fmt.Sprintf("enqueued %d, stopped at %s", msg.added, msg.problem))
 		}
-		return m, note, true
+		return m, showQueueIfAdded(msg.added, note), true
 
 	case epicQueuedMsg:
-		return m, msg.toast(), true
+		return m, showQueueIfAdded(msg.queued, msg.toast()), true
 
 	case serverReplacedMsg:
 		if msg.problem != "" {

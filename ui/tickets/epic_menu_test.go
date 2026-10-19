@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/viewmodel"
 )
@@ -141,9 +142,23 @@ func TestEpicMenu_AddEpicToQueueAddsOpenUnqueuedTicketsInOrder(t *testing.T) {
 	if want := []string{"gx:alpha/03", "gx:alpha/07"}; !slices.Equal(got, want) {
 		t.Errorf("queue-adds = %v, want %v", got, want)
 	}
-	toast, ok := toastCmd().(notify.NotifyMsg)
-	if want := "queued 1, refused 1 (gx:alpha/07: blocked by gx:alpha/02)"; !ok || toast.Message != want {
+	var toast notify.NotifyMsg
+	var switched bool
+	for _, c := range toastCmd().(tea.BatchMsg) {
+		switch r := c().(type) {
+		case notify.NotifyMsg:
+			toast = r
+		default:
+			if vs, ok := nav.IsSwitch(r); ok && vs.Tab == nav.TabQueue {
+				switched = true
+			}
+		}
+	}
+	if want := "queued 1, refused 1 (gx:alpha/07: blocked by gx:alpha/02)"; toast.Message != want {
 		t.Errorf("toast = %#v, want %q", toast, want)
+	}
+	if !switched {
+		t.Error("did not switch to the Queue tab")
 	}
 }
 
