@@ -112,6 +112,14 @@ type ServerConfig struct {
 	WatchConfig bool `json:"watch-config"`
 	// RecentlyFinished is how many completed epics the snapshot's history lists.
 	RecentlyFinished int `json:"recently-finished"`
+	// Web configures the read-only web UI listener.
+	Web WebConfig `json:"web"`
+}
+
+// WebConfig configures the web UI listener.
+type WebConfig struct {
+	// Listen is the host:port to serve the web UI on; empty means off.
+	Listen string `json:"listen"`
 }
 
 // DefaultRecentlyFinished is the RecentlyFinished when none is configured.
@@ -255,6 +263,9 @@ func Parse(data []byte) (Config, error) {
 			WatchConfig  *bool    `json:"watch-config"`
 
 			RecentlyFinished *int `json:"recently-finished"`
+			Web              *struct {
+				Listen *string `json:"listen"`
+			} `json:"web"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
 		RunnerWait        *string `json:"runner-wait"`
@@ -413,6 +424,9 @@ func Parse(data []byte) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.RecentlyFinished != nil && *raw.Server.RecentlyFinished >= 0 {
 		cfg.Server.RecentlyFinished = *raw.Server.RecentlyFinished
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.Listen != nil {
+		cfg.Server.Web.Listen = *raw.Server.Web.Listen
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

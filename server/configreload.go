@@ -198,6 +198,9 @@ func (s *Server) startupOnlyChanges(cfg config.Config) []string {
 	if cfg.Server.TCPListen != (s.cfg.TCPAddr != "") {
 		keys = append(keys, "server.tcp-listen")
 	}
+	if cfg.Server.Web.Listen != s.cfg.WebAddr {
+		keys = append(keys, "server.web.listen")
+	}
 	if runnerChoice(cfg.AgentRunner) != runnerChoice(s.cfg.AgentRunner) {
 		keys = append(keys, "agent-runner")
 	}

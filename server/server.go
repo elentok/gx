@@ -50,6 +50,10 @@ type Handshake struct {
 	Pid        int    `json:"pid"`
 	// TCPAddr is the loopback address of the opt-in TCP listener; empty when off.
 	TCPAddr string `json:"tcp_addr,omitempty"`
+	// WebURL is the base URL of the web listener; empty when it is off or failed to bind.
+	WebURL string `json:"web_url,omitempty"`
+	// WebError is why the web listener failed to bind; empty otherwise.
+	WebError string `json:"web_error,omitempty"`
 	// HerdrUnavailable is set while herdr isn't answering, so a client can say
 	// why nothing starts.
 	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
@@ -233,6 +237,10 @@ type Config struct {
 	// handler as the socket. No auth: loopback is the only protection.
 	TCPAddr string
 
+	// WebAddr, when set, adds a separate read-only HTTP listener for the web UI.
+	// A bind failure is reported in the handshake and never stops the server.
+	WebAddr string
+
 	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
 	ExtraUsageCheck func() subscription.State
 
@@ -287,6 +295,9 @@ type Server struct {
 	ln          net.Listener
 	tcp         net.Listener // nil unless Config.TCPAddr is set
 	http        *http.Server
+	web         net.Listener // nil unless Config.WebAddr is set and bound
+	webHTTP     *http.Server
+	webErr      string // why the web bind failed
 	logf        *rotatingFile
 	log         *slog.Logger
 	idx         *index
@@ -474,6 +485,7 @@ func New(cfg Config) (*Server, error) {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
 	}
 	s.http = &http.Server{Handler: mux}
+	s.bindWeb()
 	// A down herdr never stops the server; it is reported and retried.
 	s.checkHerdr()
 	return s, nil
@@ -669,7 +681,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), HerdrUnavailable: s.herdr.isUnavailable()})
+	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr, HerdrUnavailable: s.herdr.isUnavailable()})
 }
 
 // DefaultLandStopTimeout is how long a stop waits for a land in flight.
@@ -687,13 +699,21 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Before the socket serves, so a session created at startup is never
 	// taken for one whose holder died while the server was down.
 	s.restoreSessions()
-	errc := make(chan error, 2)
+	errc := make(chan error, 3)
 	lns := []net.Listener{s.ln}
 	if s.tcp != nil {
 		lns = append(lns, s.tcp)
 	}
 	for _, ln := range lns {
 		go func() { errc <- s.http.Serve(ln) }()
+	}
+	shutdown := func() error { return s.http.Shutdown(context.Background()) }
+	if s.web != nil {
+		shutdown = func() error {
+			return errors.Join(s.http.Shutdown(context.Background()), s.webHTTP.Shutdown(context.Background()))
+		}
+		lns = append(lns, s.web)
+		go func() { errc <- s.webHTTP.Serve(s.web) }()
 	}
 	s.recoverLands()
 	s.reclaimRuns()
@@ -724,7 +744,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		s.events.close() // open streams would otherwise hold Shutdown
-		err = s.http.Shutdown(context.Background())
+		err = shutdown()
 		for range lns {
 			<-errc
 		}
@@ -732,7 +752,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		if errors.Is(err, http.ErrServerClosed) {
 			err = nil
 		}
-		_ = s.http.Shutdown(context.Background())
+		_ = shutdown()
 	}
 	// Stop claiming, let a land in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.

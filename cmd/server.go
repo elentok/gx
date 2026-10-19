@@ -160,7 +160,7 @@ func runServer(ctx context.Context) error {
 		}
 	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
-		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, LogLevel: logLevel})
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel})
 	if err != nil {
 		return err
 	}
@@ -295,6 +295,12 @@ func statusWarnings(n apiclient.Negotiation, storePath string) []string {
 	var out []string
 	if n.TCPAddr != "" {
 		out = append(out, fmt.Sprintf("TCP listener is on (%s): any local process can use the API, no auth", n.TCPAddr))
+	}
+	if n.WebURL != "" {
+		out = append(out, fmt.Sprintf("web UI is on (%s): no auth", n.WebURL))
+	}
+	if n.WebError != "" {
+		out = append(out, "web UI listener failed to bind: "+n.WebError)
 	}
 	if n.Hint != "" {
 		out = append(out, n.Hint)
