@@ -57,7 +57,16 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    "Next:" line.
 4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read `to-spec` and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
-   not full ticket bodies.
+   not full ticket bodies. The spec is where the map's gaps first show, so tell the subagent to sort
+   every fact the map never decided:
+   - **Implementer's choice** (a name, a config key, an internal marker): the spec says the
+     implementer picks it, and moves on.
+   - **Design question** (behaviour, scope, parity, which runners or harnesses it covers): the
+     subagent writes no spec and returns the questions instead.
+
+   If it returns any design question, file each as a `grilling` map ticket (Map epics → Child
+   ticket) and stop, without chaining: the next run matches step 3 and resumes the map. Write the
+   spec only on a run that returns none. A spec never carries open design questions to the review.
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
    `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none.
@@ -92,6 +101,8 @@ Review the spec against the map it came from and its own template, not in the ab
 - Does anything creep past the map's `## Out of scope` or the Destination's boundary?
 - What did the spec silently assume that the map never decided?
 - What holes remain, or what question does the spec raise but not answer?
+- Does Further Notes hold an open design question? Each one is a finding: step 4 should have sent
+  it back to the map.
 
 ## After every run
 
