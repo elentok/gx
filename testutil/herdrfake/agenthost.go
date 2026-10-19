@@ -209,7 +209,8 @@ func (s *State) SetAgentStatus(name, status, rule string) error {
 
 // StallAgent makes every later prompt to the agent named name fail with
 // herdr's agent_prompt_stalled error, as for a submission that never reaches
-// the pane. It also ignores Ctrl+C, so an interrupted turn never ends.
+// the pane. It also ignores Ctrl+C and Esc, so an interrupted turn never ends
+// and a dialog stays open.
 func (s *State) StallAgent(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -308,8 +309,9 @@ func (s *State) deliverKeys(a *Agent, keys []string) (quit bool) {
 	for _, key := range keys {
 		a.Keys = append(a.Keys, key)
 		switch {
-		case a.Stalled && key == "ctrl+c":
-			// A stalled agent stays busy through an interrupt.
+		case a.Stalled && (key == "ctrl+c" || key == "esc"):
+			// A stalled agent stays busy through an interrupt and keeps its
+			// dialog open on Esc.
 		case a.Status == "blocked" && key == "esc":
 			a.setStatus("idle", "")
 		case a.Status == "blocked" && key == "ctrl+c" && codex:

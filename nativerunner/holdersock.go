@@ -223,10 +223,13 @@ func (h *holderServer) denyReason(reason string) error {
 	if h.pid == nil {
 		return errors.New("deny-reason needs claude's pid status")
 	}
+	// A second deny-reason would press its own Esc into the first one's step.
+	if !h.denying.CompareAndSwap(false, true) {
+		return ErrHolderDenyBusy
+	}
 	h.pid.Hold()
 	defer h.pid.Release()
 	// Attach input waits for the step's bytes; terminal replies do not.
-	h.denying.Store(true)
 	h.scr.HoldInput()
 	defer func() {
 		h.denying.Store(false)

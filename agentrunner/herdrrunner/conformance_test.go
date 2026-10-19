@@ -51,6 +51,23 @@ func TestConformance(t *testing.T) {
 			Block: func(t *testing.T, s agentrunner.Session, reason string) {
 				setStatus(t, s, "blocked", reason)
 			},
+			BlockOnDialog: func(t *testing.T, s agentrunner.Session, permission bool) {
+				rule := "input_needed"
+				if permission {
+					rule = "permission_prompt"
+				}
+				setStatus(t, s, "blocked", rule)
+			},
+			LastPrompt: func(t *testing.T, s agentrunner.Session) string {
+				got, err := state.Received(s.Label)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(got) == 0 {
+					return ""
+				}
+				return got[len(got)-1]
+			},
 			RateLimit: func(t *testing.T, s agentrunner.Session, resetAt time.Time) {
 				if err := state.SetPaneText(s.Label, "You've hit your session limit · resets "+resetAt.Format("3:04pm")); err != nil {
 					t.Fatal(err)
@@ -94,6 +111,9 @@ func TestConformance(t *testing.T) {
 				}
 			},
 			Restart: func(t *testing.T) agentrunner.Runner { return newRunner() },
+			Skip: map[string]string{
+				"OtherDialogAllowRefused": "herdr Answer does not tell permission prompts from other dialogs",
+			},
 		}
 	})
 }
@@ -402,5 +422,63 @@ func TestWait_BackgroundTaskPollsSlowly(t *testing.T) {
 	}
 	if probes > 10 {
 		t.Fatalf("probed background tasks %d times in 10s, want at most 10", probes)
+	}
+}
+
+func denyWithReason(t *testing.T, kind agentrunner.Kind) {
+	t.Helper()
+	r, state, s := startAgent(t, kind, nil)
+	if err := state.SetAgentStatus(s.Label, "blocked", "permission_prompt"); err != nil {
+		t.Fatal(err)
+	}
+	const reason = "use rg"
+	if err := r.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: reason}); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := state.Keys(s.Label)
+	if !slices.Equal(keys, []string{"esc"}) {
+		t.Fatalf("keys = %v, want only esc: the reason is never dialog keys", keys)
+	}
+	got, _ := state.Received(s.Label)
+	if !slices.Equal(got, []string{reason}) {
+		t.Fatalf("prompts = %v, want the reason once", got)
+	}
+	if st, err := r.Status(s); err != nil || st.State != agentrunner.StateWorking {
+		t.Fatalf("Status after the deny = %+v, %v; want the hold gone and the agent working", st, err)
+	}
+}
+
+func TestAnswer_DenyWithReasonEscThenPrompt(t *testing.T) {
+	denyWithReason(t, "claude")
+}
+
+func TestAnswer_DenyWithReasonEscThenPromptCodex(t *testing.T) {
+	denyWithReason(t, "codex")
+}
+
+// A dialog that stays open through Esc leaves the reason unsent: the error says
+// so, the hold is gone and the session still takes verbs.
+func TestAnswer_DenyWithReasonFailureAfterEscIsNotDelivered(t *testing.T) {
+	r, state, s := startAgent(t, "claude", nil)
+	r.N = 50 * time.Millisecond
+	if err := state.StallAgent(s.Label); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SetAgentStatus(s.Label, "blocked", "permission_prompt"); err != nil {
+		t.Fatal(err)
+	}
+	err := r.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"})
+	if !errors.Is(err, agentrunner.ErrNotDelivered) || !strings.Contains(err.Error(), "denied, but the reason was not delivered") {
+		t.Fatalf("Answer err = %v, want ErrNotDelivered saying the reason was not delivered", err)
+	}
+	if got, _ := state.Received(s.Label); len(got) != 0 {
+		t.Fatalf("prompts = %v, want none", got)
+	}
+	// The hold ended with the error: a plain allow reaches the dialog again.
+	if err := r.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionAllow}); err != nil {
+		t.Fatalf("Answer after the failed deny: %v", err)
+	}
+	if keys, _ := state.Keys(s.Label); !slices.Equal(keys, []string{"esc", "enter"}) {
+		t.Fatalf("keys = %v, want esc then enter", keys)
 	}
 }

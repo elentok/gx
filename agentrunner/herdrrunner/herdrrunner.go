@@ -44,6 +44,9 @@ type Runner struct {
 	mu sync.Mutex
 	// started remembers what RateLimit needs from Start, keyed by label.
 	started map[string]agentrunner.StartOptions
+	// held marks the sessions (by pane id) in the middle of a deny with a
+	// reason: Status reports them blocked and the other verbs refuse.
+	held map[string]bool
 }
 
 var _ agentrunner.Runner = (*Runner)(nil)
@@ -116,6 +119,15 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 }
 
 func (r *Runner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
+	return r.promptNudged(s, text, onNudge, false)
+}
+
+// promptNudged is PromptNudged; ownHold lets the deny's own reason prompt
+// through the hold that refuses everyone else.
+func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(string), ownHold bool) error {
+	if !ownHold && r.isHeld(s) {
+		return fmt.Errorf("%w: blocked on a deny with a reason", agentrunner.ErrNotReady)
+	}
 	turn, err := r.awaitNotBusy(s)
 	if err != nil {
 		return err
@@ -321,6 +333,9 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 // input line, and it would prefix the next prompt. Codex's Ctrl+U clears one
 // line only.
 func (r *Runner) Interrupt(s agentrunner.Session) error {
+	if r.isHeld(s) {
+		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
+	}
 	agent, err := herdr.AgentGet(s.ID)
 	if err != nil {
 		return mapNotFound(err)
@@ -460,21 +475,87 @@ func (r *Runner) codexRateLimit(s agentrunner.Session, cwd string, now time.Time
 func (r *Runner) Name() string { return string(agentrunner.ChoiceHerdr) }
 
 func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
-	st, err := r.status(s)
+	if a.Decision == agentrunner.DecisionDeny && a.Text != "" {
+		return r.denyWithReason(s, a.Text)
+	}
+	if r.isHeld(s) {
+		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
+	}
+	if err := r.requireBlocked(s); err != nil {
+		return err
+	}
+	key := "enter"
+	if a.Decision == agentrunner.DecisionDeny {
+		key = "esc"
+	}
+	return mapNotFound(herdr.AgentSendKeys(s.ID, key))
+}
+
+func (r *Runner) requireBlocked(s agentrunner.Session) error {
+	st, err := r.herdrStatus(s)
 	if err != nil {
 		return err
 	}
 	if st.State != agentrunner.StateBlocked {
 		return agentrunner.ErrNotReady
 	}
-	keys := []string{"enter"}
-	switch {
-	case a.Text != "":
-		keys = []string{a.Text, "enter"}
-	case a.Decision == agentrunner.DecisionDeny:
-		keys = []string{"escape"}
+	return nil
+}
+
+// denyWithReason presses Esc (the reason is never typed as dialog keys), waits
+// up to N for idle or done, then sends the reason as a prompt. The hold keeps
+// every caller seeing blocked from before the Esc until Answer returns, so no
+// waiter takes the gap for the turn's end and no other verb lands in it. Once
+// Esc is sent, any failure is ErrNotDelivered: the dialog is closed, the
+// session alive, the reason not typed.
+func (r *Runner) denyWithReason(s agentrunner.Session, reason string) error {
+	if !r.hold(s) {
+		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
 	}
-	return herdr.AgentSendKeys(s.ID, keys...)
+	defer r.release(s)
+	if err := r.requireBlocked(s); err != nil {
+		return err
+	}
+	if err := herdr.AgentSendKeys(s.ID, "esc"); err != nil {
+		return mapNotFound(err)
+	}
+	err := r.awaitIdle(s)
+	if err == nil {
+		err = r.promptNudged(s, reason, nil, true)
+	}
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, agentrunner.ErrNotFound):
+		return err
+	}
+	return fmt.Errorf("%w: denied, but the reason was not delivered: %w", agentrunner.ErrNotDelivered, err)
+}
+
+// hold starts s's deny hold, reporting false when one is already running.
+func (r *Runner) hold(s agentrunner.Session) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.held[s.ID] {
+		return false
+	}
+	if r.held == nil {
+		r.held = map[string]bool{}
+	}
+	r.held[s.ID] = true
+	return true
+}
+
+func (r *Runner) release(s agentrunner.Session) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.held, s.ID)
+}
+
+func (r *Runner) isHeld(s agentrunner.Session) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.held[s.ID]
 }
 
 // status reports herdr's StateChangeSeq as Turn: herdr keeps it, so it holds
@@ -483,6 +564,10 @@ func (r *Runner) status(s agentrunner.Session) (agentrunner.Status, error) {
 	st, err := r.herdrStatus(s)
 	if err != nil {
 		return st, err
+	}
+	if r.isHeld(s) {
+		st.State = agentrunner.StateBlocked
+		return st, nil
 	}
 	if st.State == agentrunner.StateIdle || st.State == agentrunner.StateDone {
 		// s may predate herdr learning the agent's session id.

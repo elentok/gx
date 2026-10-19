@@ -263,3 +263,19 @@ func TestHolderSocket_DenyReasonLocksKeysAndHoldsAttachInput(t *testing.T) {
 		t.Fatalf("keys after the step = %v; want accepted", err)
 	}
 }
+
+func TestHolderSocket_SecondDenyReasonDuringStepIsBusy(t *testing.T) {
+	c := startDenyHolder(t, denySlowIdle)
+	denied := make(chan error, 1)
+	go func() { denied <- c.DenyWithReason("use rg") }()
+	waitFor(t, "keys refused during the step", func() bool {
+		return errors.Is(c.SendKeys(""), nativerunner.ErrHolderDenyBusy)
+	})
+	if err := c.DenyWithReason("other"); !errors.Is(err, nativerunner.ErrHolderDenyBusy) {
+		t.Fatalf("second deny-reason = %v; want ErrHolderDenyBusy", err)
+	}
+	if err := <-denied; err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "got:use rg")
+}

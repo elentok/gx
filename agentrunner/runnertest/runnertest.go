@@ -81,6 +81,7 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"PermissionAllow", permissionAllow},
 		{"PermissionDeny", permissionDeny},
 		{"DenyWithReason", denyWithReason},
+		{"VerbsDuringDenyReason", verbsDuringDenyReason},
 		{"OtherDialogDeny", otherDialogDeny},
 		{"OtherDialogAllowRefused", otherDialogAllowRefused},
 		{"RateLimit", rateLimit},
@@ -458,6 +459,49 @@ func otherDialogDeny(t *testing.T, h Harness) {
 	if _, err := h.Runner.Wait(s, idleOrDone, waitTimeout); err != nil {
 		t.Fatalf("Wait idle after deny: %v", err)
 	}
+}
+
+// verbsDuringDenyReason: while a deny with a reason is open (a stalled agent
+// keeps its dialog through the Esc), Prompt, Interrupt and a second Answer are
+// refused and send nothing.
+func verbsDuringDenyReason(t *testing.T, h Harness) {
+	if h.BlockOnDialog == nil || h.Stall == nil || h.Received == nil {
+		t.Skip("runner has no BlockOnDialog, Stall or Received hook")
+	}
+	s := start(t, h.Runner, "e-01", "e")
+	prompt(t, h.Runner, s, "do it")
+	h.Stall(t, s)
+	h.BlockOnDialog(t, s, true)
+	if _, err := h.Runner.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, waitTimeout); err != nil {
+		t.Fatalf("Wait blocked: %v", err)
+	}
+	denied := make(chan error, 1)
+	go func() {
+		denied <- h.Runner.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"})
+	}()
+	deadline := time.Now().Add(waitTimeout)
+	for !strings.Contains(h.Received(t, s), "\x1b") {
+		if time.Now().After(deadline) {
+			t.Fatal("deny never pressed Esc")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	before := h.Received(t, s)
+	verbs := map[string]error{
+		"Prompt":      h.Runner.Prompt(s, "more"),
+		"Interrupt":   h.Runner.Interrupt(s),
+		"Answer":      h.Runner.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionAllow}),
+		"deny reason": h.Runner.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "other"}),
+	}
+	for verb, err := range verbs {
+		if !errors.Is(err, agentrunner.ErrNotReady) {
+			t.Errorf("%s during a deny with a reason err = %v, want ErrNotReady", verb, err)
+		}
+	}
+	if after := h.Received(t, s); after != before {
+		t.Errorf("received %q during the deny, want nothing beyond %q", after, before)
+	}
+	<-denied
 }
 
 func otherDialogAllowRefused(t *testing.T, h Harness) {
