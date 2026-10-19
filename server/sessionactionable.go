@@ -61,10 +61,6 @@ const grillingReason = "Grilling: waiting for your answers"
 // phase.
 var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next: (\w+) —.*$`)
 
-// SessionActionableQueue is the Kind of an Actionable whose Action is a queue
-// action on Target, not prompts.
-const SessionActionableQueue = "queue"
-
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
 func designActionable(text, ticket string) (SessionActionable, bool) {

@@ -70,7 +70,7 @@ func (m Model) resumeSelected() (tea.Model, tea.Cmd) {
 // actionSteps is what running a's Action does, one line per step: its prompts
 // in order, or the queue it runs. Empty means there is no Action.
 func actionSteps(a server.SessionActionable) []string {
-	if a.Kind == server.SessionActionableQueue && a.Target != "" {
+	if a.IsQueue() {
 		return []string{"Queue `" + a.Target + "`"}
 	}
 	return a.Action
@@ -87,9 +87,11 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 	if len(steps) == 0 {
 		return m, notify.Info("no action")
 	}
-	accept := sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
-	if isQueueAction(s.Actionable) {
+	var accept tea.Cmd
+	if s.Actionable.IsQueue() {
 		accept = queueActionCmd(m.client, s.Actionable.Target)
+	} else {
+		accept = sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:     "Run action on " + displayName(s) + "?",
@@ -98,10 +100,6 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 		DefaultYes: true,
 	})
 	return m, nil
-}
-
-func isQueueAction(a server.SessionActionable) bool {
-	return a.Kind == server.SessionActionableQueue && a.Target != ""
 }
 
 // queueActionMsg is the outcome of a queue action: how many tickets of epic

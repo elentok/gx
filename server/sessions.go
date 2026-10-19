@@ -120,6 +120,16 @@ type SessionActionable struct {
 	GxRaised bool     `json:"gx_raised,omitempty"`
 }
 
+// SessionActionableQueue is the Kind of an Actionable whose Action is a queue
+// action on Target, not prompts.
+const SessionActionableQueue = "queue"
+
+// IsQueue reports whether the Action queues Target's epic instead of sending
+// prompts.
+func (a SessionActionable) IsQueue() bool {
+	return a.Kind == SessionActionableQueue && a.Target != ""
+}
+
 // MarkActionableRequest is the body of `gx agent actionable`: the caller's
 // session, why it needs the person and its optional Action.
 type MarkActionableRequest struct {
