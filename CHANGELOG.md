@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.34.6 - 2026-10-19
+
+- Changed the Agents tab key for removing a session from `X` to `d`. This matches the delete key in the Worktrees and Stash tabs. `X` was next to `x` (stop), which made mistakes easy. `X` no longer does anything.
+- Changed the suggested-action icon to a light bulb.
+
 ## v0.34.5 - 2026-10-19
 
 - Added Ghostty support on macOS (1.3.0+) for `gx term` and the worktree terminal menu. Ghostty is detected from `TERM_PROGRAM=ghostty`, and splits and tabs are opened through AppleScript.
