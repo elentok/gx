@@ -109,11 +109,13 @@ type SessionUnread struct {
 
 // SessionActionable is set while Reason is; Action is its ordered prompts.
 // Kind is the block's kind on one derived from Blocked, which wins over an
-// agent-raised one while the block lasts.
+// agent-raised one while the block lasts. GxRaised marks one gx raised itself:
+// the person's input does not clear it.
 type SessionActionable struct {
-	Kind   string   `json:"kind,omitempty"`
-	Reason string   `json:"reason,omitempty"`
-	Action []string `json:"action,omitempty"`
+	Kind     string   `json:"kind,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+	Action   []string `json:"action,omitempty"`
+	GxRaised bool     `json:"gx_raised,omitempty"`
 }
 
 // MarkActionableRequest is the body of `gx agent actionable`: the caller's
@@ -203,7 +205,8 @@ type sessionMeta struct {
 	Exit            string        `json:"exit,omitempty"`
 	Stopped         bool          `json:"stopped,omitempty"`
 	Unread          SessionUnread `json:"unread,omitzero"`
-	// Actionable is the agent-raised one; the person's next input clears it.
+	// Actionable is the agent-raised one, which the person's next input clears,
+	// or a gx-raised one, which it spares. Exit clears either.
 	Actionable SessionActionable `json:"actionable,omitzero"`
 }
 
@@ -692,6 +695,9 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		case nativerunner.StreamInput:
 			first.personInput()
 			update(func(m *sessionMeta) bool {
+				if m.Actionable.GxRaised {
+					return false
+				}
 				changed := m.Actionable.Reason != ""
 				m.Actionable = SessionActionable{}
 				return changed
@@ -793,6 +799,7 @@ func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
 	}
 	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
 	m.FirstPrompt = ""
+	m.Actionable = SessionActionable{}
 	return true
 }
 

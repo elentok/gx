@@ -34,8 +34,8 @@ func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 	if got.ID != id || got.Name != "proj-1" || got.Status.State != server.SessionStarting || got.Stopped || got.Exit != "" {
 		t.Errorf("resumed session = %+v, want %s proj-1 starting, not stopped", got, id)
 	}
-	if got.Actionable.Reason != "ready" {
-		t.Errorf("actionable = %+v, want it kept", got.Actionable)
+	if got.Actionable.Reason != "" {
+		t.Errorf("actionable = %+v, want the exit to have cleared it", got.Actionable)
 	}
 
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))

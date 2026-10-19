@@ -1,6 +1,9 @@
 package server
 
 import (
+	"errors"
+	"path/filepath"
+
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 )
@@ -13,6 +16,27 @@ var sessionTyping = func() harness.Typing {
 	}
 	return t
 }()
+
+// draftReason is the reason of the Actionable gx raises instead of typing
+// into a draft.
+const draftReason = "input holds a draft"
+
+// errDraft stops a prompt gx would have typed over a person's draft.
+var errDraft = errors.New(draftReason)
+
+// inputHoldsDraft runs the harness empty check before gx types. Only a
+// definite "not empty" refuses; a check that can't decide types as before.
+func (s *Server) inputHoldsDraft(dir string, c *nativerunner.HolderClient) bool {
+	state := harness.InputUndecided
+	if c.Supports(nativerunner.OpScreenStyled) {
+		if rows, err := c.StyledScreen(); err == nil {
+			state = sessionTyping.InputIsEmpty(rows)
+		}
+	}
+	holds := state == harness.InputNotEmpty
+	s.log.Debug("draft check", "session", filepath.Base(dir), "holds_draft", holds)
+	return holds
+}
 
 // pressEnterIfStillTyped is the rule for a slash prompt that ended without
 // the session reacting: when the harness empty check says the prompt is still

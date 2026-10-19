@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/elentok/gx/sound"
 )
@@ -45,4 +46,22 @@ func (s *Server) markSessionActionable(req MarkActionableRequest) (SessionResult
 	}
 	s.triggerBanner(req.ID, sound.Attention, req.Reason)
 	return SessionResult{Session: &info}, nil
+}
+
+// raiseGxActionable saves an Actionable gx raises itself, replacing any
+// earlier one. The person's input does not clear it.
+func (s *Server) raiseGxActionable(dir, reason string, action []string) {
+	id := filepath.Base(dir)
+	raised := false
+	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
+		if m.Status.State == SessionExited {
+			return false
+		}
+		m.Actionable = SessionActionable{Reason: reason, Action: action, GxRaised: true}
+		raised = true
+		return true
+	})
+	if raised {
+		s.triggerBanner(id, sound.Attention, reason)
+	}
 }

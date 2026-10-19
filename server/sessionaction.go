@@ -90,10 +90,20 @@ func (s *Server) sendAction(dir string, action []string) error {
 			return fmt.Errorf("step %d: session is %s", i, run.state)
 		}
 		if err := run.step(i, prompt); err != nil {
+			if errors.Is(err, errDraft) {
+				s.refuseForDraft(dir, action[i:])
+				return nil
+			}
 			return err
 		}
 	}
 	return nil
+}
+
+// refuseForDraft raises the Actionable that keeps the prompts gx did not type.
+func (s *Server) refuseForDraft(dir string, unsent []string) {
+	s.log.Info("refused to type over a draft", "session", filepath.Base(dir), "unsent", len(unsent))
+	s.raiseGxActionable(dir, draftReason, unsent)
 }
 
 // openActionRun dials the session's holder and starts following its watch;
@@ -138,6 +148,9 @@ func (s *Server) openActionRun(dir string) (*actionRun, func(), error) {
 func (r *actionRun) step(i int, prompt string) error {
 	if !sessionTyping.ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
 		return fmt.Errorf("step %d: not ready to type", i)
+	}
+	if r.s.inputHoldsDraft(r.dir, r.holder) {
+		return errDraft
 	}
 	r.convChanged, r.sawStatus = false, false
 	begin := time.Now()

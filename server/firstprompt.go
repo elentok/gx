@@ -101,6 +101,8 @@ func (f *firstPrompt) start(signal, prompt string) {
 		switch {
 		case errors.Is(err, errNudgeCancelled):
 			f.log.Debug(errNudgeCancelled.Error())
+		case errors.Is(err, errDraft):
+			f.s.refuseForDraft(f.dir, []string{prompt})
 		case err != nil:
 			f.log.Warn("type first prompt", "err", err)
 		}
@@ -118,6 +120,9 @@ func (f *firstPrompt) deliver(prompt string) error {
 	_, turn, err := c.Status()
 	if err != nil {
 		return err
+	}
+	if f.s.inputHoldsDraft(f.dir, c) {
+		return errDraft
 	}
 	caps := claudeui.DefaultNudgeCaps
 	if g := f.s.cfg.FirstPromptGrace; g > 0 {
