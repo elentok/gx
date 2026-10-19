@@ -21,6 +21,12 @@ func aboutLines(conn *atomic.Pointer[ServerConn], terminal ui.Terminal) func() [
 		if c.PID > 0 {
 			lines = append(lines, ui.AboutLine{Label: "pid", Value: strconv.Itoa(c.PID)})
 		}
+		switch {
+		case c.WebError != "":
+			lines = append(lines, ui.AboutLine{Label: "Web UI", Value: "error: " + c.WebError})
+		case c.WebURL != "":
+			lines = append(lines, ui.AboutLine{Label: "Web UI", Value: c.WebURL})
+		}
 		split := terminal.String()
 		if split == "" {
 			split = "none"

@@ -46,6 +46,18 @@ func TestHelpAbout_ShowsCurrentServerAndSplitApp(t *testing.T) {
 		}
 	}
 
+	view = helpAbout(ServerConn{State: ServerUp, WebURL: "http://127.0.0.1:7777"})
+	if !strings.Contains(view, "Web UI   http://127.0.0.1:7777") {
+		t.Errorf("help view missing web url:\n%s", view)
+	}
+	view = helpAbout(ServerConn{State: ServerUp, WebError: "address in use"})
+	if !strings.Contains(view, "Web UI   error: address in use") {
+		t.Errorf("help view missing web error:\n%s", view)
+	}
+	if view = helpAbout(ServerConn{State: ServerUp}); strings.Contains(view, "Web UI") {
+		t.Errorf("help view shows Web UI while it is off:\n%s", view)
+	}
+
 	view = helpAbout(ServerConn{State: ServerDown})
 	if !strings.Contains(view, "server   server down") {
 		t.Errorf("help view missing down state:\n%s", view)

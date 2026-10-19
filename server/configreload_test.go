@@ -147,6 +147,23 @@ func TestConfigReload_StartupOnlyKeyWarnsUntilRestart(t *testing.T) {
 	}
 }
 
+// Seam A: a server.web change warns and leaves the running listener alone.
+func TestConfigReload_WebChangeWarnsAndKeepsListener(t *testing.T) {
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+	servertest.WriteConfig(t, path, store, map[string]any{
+		"server": map[string]any{"web": map[string]any{"listen": "127.0.0.1:0"}},
+	})
+	res := reload(t, h)
+	if want := []string{"restart needed for server.web.listen"}; res.Refused || !slices.Equal(res.Warnings, want) {
+		t.Fatalf("reload = %+v, want warnings %v", res, want)
+	}
+	if h.Server.WebURL() != "" {
+		t.Errorf("web listener = %q after reload, want unchanged (off)", h.Server.WebURL())
+	}
+}
+
 // Seam A: every outcome is one banner and one config-reloaded event, and
 // never a chat message.
 func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {

@@ -73,12 +73,15 @@ func handshake(d *ServerDeps) serverConnMsg {
 		return serverConnMsg{slow: true}
 	case err != nil:
 		return serverConnMsg{conn: ServerConn{State: ServerDown}}
-	case n.ReadOnly:
-		return serverConnMsg{conn: ServerConn{State: ServerReadOnly, PID: n.Pid}}
-	case n.HerdrUnavailable:
-		return serverConnMsg{conn: ServerConn{State: ServerHerdrUnavailable, PID: n.Pid}}
 	}
-	return serverConnMsg{conn: ServerConn{State: ServerUp, PID: n.Pid}}
+	conn := ServerConn{State: ServerUp, PID: n.Pid, WebURL: n.WebURL, WebError: n.WebError}
+	switch {
+	case n.ReadOnly:
+		conn.State = ServerReadOnly
+	case n.HerdrUnavailable:
+		conn.State = ServerHerdrUnavailable
+	}
+	return serverConnMsg{conn: conn}
 }
 
 func (m Model) cmdServerProbeLater() tea.Cmd {

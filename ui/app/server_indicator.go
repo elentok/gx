@@ -20,10 +20,13 @@ const (
 	ServerHerdrUnavailable
 )
 
-// ServerConn is the connection state plus the server pid, when known.
+// ServerConn is the connection state plus the server pid and web listener
+// status, when known.
 type ServerConn struct {
-	State ServerState
-	PID   int
+	State    ServerState
+	PID      int
+	WebURL   string
+	WebError string
 }
 
 // serverBadge is how the title row draws one connection state: a colored icon
