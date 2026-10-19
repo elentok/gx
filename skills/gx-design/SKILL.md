@@ -39,7 +39,7 @@ normally.
 ## Waiting for answers
 
 Whenever you grill the person (wayfinder's Destination and frontier grilling, a HITL ticket, the
-provisional Destination, the review), run this right after printing each round of questions:
+provisional Destination, the review), run this **before** printing each round of questions:
 
 ```
 gx agent actionable "Grilling: waiting for your answers"
@@ -47,6 +47,10 @@ gx agent actionable "Grilling: waiting for your answers"
 
 The Agents tab then shows the session as Actionable until the person's next input clears it. Outside
 a gx session it prints a note and does nothing, so always call it.
+
+The questions must be the last thing in the turn: no tool call, and no text, after them. The UI can
+hide earlier text of a turn once later tool calls or text follow it, so questions printed before a
+trailing call go unseen. Never pad the end with a tool call or a closing line.
 
 ## Detecting the next step
 
@@ -140,7 +144,8 @@ Examples:
 ✅ Review: findings resolved, spec amended, epic <epic>-impl created. Next: implement — launch it from the TUI Queue tab
 ```
 
-Right after printing that line, raise the session as Actionable with the same "Next:" text. When
+Raise the session as Actionable with the same "Next:" text **before** printing that line, so the
+line stays the last output of the turn. When
 the next step is a prompt, add it as the Action, after the fresh-session command
 (`/clear` in Claude, `/new` in Codex):
 
