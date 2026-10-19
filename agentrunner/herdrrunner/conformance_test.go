@@ -66,6 +66,12 @@ func TestConformance(t *testing.T) {
 				tasks[s.Label] = running
 			},
 			Restart: func(t *testing.T) agentrunner.Runner { return newRunner() },
+			Skip: map[string]string{
+				"BusyPromptWaitsThenSends": "herdr busy guard: ticket 08",
+				"BusyPastNNotReady":        "herdr busy guard: ticket 08",
+				"BackgroundTaskNotBusy":    "herdr busy guard: ticket 08",
+				"FastTurnDeliveredOnce":    "herdr busy guard: ticket 08",
+			},
 		}
 	})
 }

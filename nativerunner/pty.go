@@ -581,14 +581,9 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 	if err != nil {
 		return err
 	}
-	claude, turn, err := ss.holder.Status()
+	turn, err := p.awaitNotBusy(ss)
 	if err != nil {
-		return p.died(ss, err)
-	}
-	// Enter on a dialog would pick its first option, allowing a permission
-	// prompt nobody answered.
-	if claude != nil && claude.Status == ClaudeWaiting {
-		return fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, claude.WaitingFor)
+		return err
 	}
 	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
 	// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
@@ -599,6 +594,37 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
 	return err
+}
+
+// awaitNotBusy waits up to N for claude to stop being busy and returns the
+// Turn to send against. A prompt typed into a busy claude is only queued, so
+// its next idle edge would pass for delivery. A background task alone is not
+// busy.
+func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
+	deadline := time.Now().Add(p.WaitN())
+	for {
+		claude, turn, program, err := ss.holder.statusWithProgram()
+		if err != nil {
+			return 0, p.died(ss, err)
+		}
+		// Enter on a dialog would pick its first option, allowing a permission
+		// prompt nobody answered.
+		if claude != nil && claude.Status == ClaudeWaiting {
+			return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, claude.WaitingFor)
+		}
+		// The OSC report leads the pid file by up to a poll.
+		if program != "working" && (claude == nil || claude.Status != ClaudeBusy) {
+			return turn, nil
+		}
+		if time.Now().After(deadline) {
+			return 0, fmt.Errorf("%w: busy for %s", agentrunner.ErrNotReady, p.WaitN())
+		}
+		select {
+		case <-ss.exited:
+			return 0, p.died(ss, errors.New("holder exited"))
+		case <-time.After(p.pollInterval()):
+		}
+	}
 }
 
 // ptyPrompter is claudeui.Prompter over holder.sock. A turn has started once

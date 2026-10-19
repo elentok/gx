@@ -29,6 +29,9 @@ const (
 	ActionStall = "stall"
 	// ActionBackground starts (Running) or ends a background task.
 	ActionBackground = "background"
+	// ActionFast makes the TUI fake's next turn start and end at once, so a
+	// poll of its pid file sees no busy edge; only the OSC reports show it.
+	ActionFast = "fast"
 )
 
 // Control stands in for what real claude does on its own. It travels on the

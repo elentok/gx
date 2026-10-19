@@ -71,6 +71,12 @@ func TestHeadless_Conformance(t *testing.T) {
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
 				control(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
 			},
+			Skip: map[string]string{
+				"BusyPromptWaitsThenSends": "headless busy guard: ticket 07",
+				"BusyPastNNotReady":        "headless busy guard: ticket 07",
+				"BackgroundTaskNotBusy":    "headless busy guard: ticket 07",
+				"FastTurnDeliveredOnce":    "headless busy guard: ticket 07",
+			},
 			Restart: func(t *testing.T) agentrunner.Runner {
 				r := newRunner()
 				entries, err := os.ReadDir(root)

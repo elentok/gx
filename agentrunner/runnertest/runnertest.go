@@ -6,6 +6,7 @@ package runnertest
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,12 @@ type Harness struct {
 	// LastPrompt returns the prompt the agent behind s last started a turn
 	// on. Leave it nil to skip DenyWithReason.
 	LastPrompt func(t *testing.T, s agentrunner.Session) string
+	// Received returns the text and keys the agent behind s has received so
+	// far, in order. Leave it nil to skip the busy-guard scenarios.
+	Received func(t *testing.T, s agentrunner.Session) string
+	// FastTurn makes the next turn of the agent behind s start and end with no
+	// status edge a poll could see. Leave it nil to skip FastTurnDeliveredOnce.
+	FastTurn func(t *testing.T, s agentrunner.Session)
 	// Skip maps a scenario this runner can't pass yet to the reason why.
 	Skip map[string]string
 }
@@ -75,6 +82,10 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"RateLimit", rateLimit},
 		{"RestartThenFind", restartThenFind},
 		{"TurnSurvivesRestart", turnSurvivesRestart},
+		{"BusyPromptWaitsThenSends", busyPromptWaitsThenSends},
+		{"BusyPastNNotReady", busyPastNNotReady},
+		{"BackgroundTaskNotBusy", backgroundTaskNotBusy},
+		{"FastTurnDeliveredOnce", fastTurnDeliveredOnce},
 	}
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
@@ -466,6 +477,75 @@ func rateLimit(t *testing.T, h Harness) {
 	// Scraped reset times are only minute-precise.
 	if d := got.Sub(resetAt).Abs(); d > time.Minute {
 		t.Fatalf("RateLimit resetAt = %v, want ~%v", got, resetAt)
+	}
+}
+
+// received returns what the agent behind s has received, skipping when the
+// runner has no Received hook.
+func received(t *testing.T, h Harness, s agentrunner.Session) string {
+	t.Helper()
+	if h.Received == nil {
+		t.Skip("runner has no Received hook")
+	}
+	return h.Received(t, s)
+}
+
+// busyPromptWaitsThenSends: a prompt to a busy agent waits for idle, then
+// sends once.
+func busyPromptWaitsThenSends(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	prompt(t, h.Runner, s, "first")
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		h.FinishTurn(t, s)
+	}()
+	prompt(t, h.Runner, s, "second")
+	if n := strings.Count(received(t, h, s), "second"); n != 1 {
+		t.Fatalf("agent received %q %d times, want once", "second", n)
+	}
+}
+
+// busyPastNNotReady: an agent still busy after N refuses the prompt and
+// receives nothing.
+func busyPastNNotReady(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	prompt(t, h.Runner, s, "first")
+	if err := h.Runner.Prompt(s, "second"); !errors.Is(err, agentrunner.ErrNotReady) {
+		t.Fatalf("Prompt to a busy agent err = %v, want ErrNotReady", err)
+	}
+	if got := received(t, h, s); strings.Contains(got, "second") {
+		t.Fatalf("agent received %q after a refused prompt, want nothing of it", got)
+	}
+}
+
+// backgroundTaskNotBusy: an idle agent with a background task takes a prompt
+// at once, though Status still says working.
+func backgroundTaskNotBusy(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	prompt(t, h.Runner, s, "first")
+	h.BackgroundTask(t, s, true)
+	h.FinishTurn(t, s)
+	promptAdvancesTurn(t, h.Runner, s, "second")
+	if n := strings.Count(received(t, h, s), "second"); n != 1 {
+		t.Fatalf("agent received %q %d times, want once", "second", n)
+	}
+}
+
+// fastTurnDeliveredOnce: a turn that ends before any poll sees it still counts
+// as delivered, so the text is never retyped.
+func fastTurnDeliveredOnce(t *testing.T, h Harness) {
+	if h.FastTurn == nil {
+		t.Skip("runner has no FastTurn hook")
+	}
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	h.FastTurn(t, s)
+	promptAdvancesTurn(t, h.Runner, s, "quick")
+	if n := strings.Count(received(t, h, s), "quick"); n != 1 {
+		t.Fatalf("agent received %q %d times, want once", "quick", n)
 	}
 }
 

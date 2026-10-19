@@ -386,11 +386,18 @@ func (c *HolderClient) Supports(op string) bool { return slices.Contains(c.ops, 
 // Status returns claude's last pid file status, nil before the file first
 // appears, and the number of status changes the holder has seen.
 func (c *HolderClient) Status() (*PidStatus, int, error) {
+	claude, turn, _, err := c.statusWithProgram()
+	return claude, turn, err
+}
+
+// statusWithProgram is Status plus the OSC state from the same reply, so the
+// two never come from different moments.
+func (c *HolderClient) statusWithProgram() (*PidStatus, int, string, error) {
 	resp, err := c.call(holderRequest{Op: opStatus})
 	if resp.Exited != nil {
-		return nil, 0, &ClaudeExitedError{Code: *resp.Exited}
+		return nil, 0, "", &ClaudeExitedError{Code: *resp.Exited}
 	}
-	return resp.Claude, resp.Turn, err
+	return resp.Claude, resp.Turn, resp.Program, err
 }
 
 // ProgramState returns the last session-wide OSC 7501 state the holder

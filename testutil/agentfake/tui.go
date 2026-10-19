@@ -214,6 +214,8 @@ type tui struct {
 	transcript string
 	pid        PidFile
 	stalled    bool
+	// fast makes the next turn end as it starts.
+	fast bool
 	// trustYes is whether the trust dialog's cursor is on "Yes"; arrow
 	// collects an arrow key's escape sequence.
 	trustYes bool
@@ -388,6 +390,12 @@ func (t *tui) submit() error {
 	switch t.pid.Status {
 	case StatusIdle:
 		t.prompt = text
+		if t.fast {
+			t.fast = false
+			writeReport(t.out, "working", "", "")
+			writeReport(t.out, "done", "", "")
+			return nil
+		}
 		return t.setStatus(StatusBusy, "")
 	case StatusWaiting:
 		// Enter picks the dialog's first option, "Yes".
@@ -423,6 +431,9 @@ func (t *tui) handleControl(c Control) error {
 		return nil
 	case ActionBackground:
 		return t.writeBackgroundMarker(c.Running)
+	case ActionFast:
+		t.fast = true
+		return nil
 	case ActionReport:
 		writeReport(t.out, c.State, c.Kind, c.Message)
 		return nil

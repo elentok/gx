@@ -45,6 +45,7 @@ func ptyOn(root, exe string) *nativerunner.Pty {
 		PollInterval: 10 * time.Millisecond,
 		StartTimeout: 10 * time.Second,
 		PromptGrace:  500 * time.Millisecond,
+		N:            300 * time.Millisecond,
 	}
 }
 
@@ -70,6 +71,16 @@ func TestPty_Conformance(t *testing.T) {
 			},
 			LastPrompt: func(t *testing.T, s agentrunner.Session) string {
 				return ptyLastPrompt(t, p, s)
+			},
+			Received: func(t *testing.T, s agentrunner.Session) string {
+				data, err := os.ReadFile(agentfake.TUIInputPath(os.Getenv("HOME"), s.SessionID))
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(data)
+			},
+			FastTurn: func(t *testing.T, s agentrunner.Session) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFast})
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
