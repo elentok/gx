@@ -49,33 +49,61 @@ func LookupTyping(kind agentrunner.Kind) (Typing, error) {
 	case Claude:
 		return claudeHarness{}, nil
 	case Codex:
-		return codexTyping{}, nil
+		return codexTyping{codexInput}, nil
 	}
 	return nil, fmt.Errorf("no typing rules for %q", kind)
 }
 
 const ctrlU = "\x15"
 
+// ClaudeTyping is the typing rules of the claude harness, the only one the
+// server and the PTY runner type into.
+func ClaudeTyping() Typing { return claudeHarness{} }
+
+// markerTyping is the typing part shared by harnesses whose input row starts
+// with a marker rune.
+type markerTyping struct {
+	marker string
+	bold   bool
+}
+
+var (
+	claudeInput = markerTyping{marker: "❯"}
+	codexInput  = markerTyping{marker: "›", bold: true}
+)
+
+func (m markerTyping) InputIsEmpty(styledRows []string) InputState {
+	return inputState(styledRows, m)
+}
+
+func (markerTyping) ClearKey() string { return ctrlU }
+
 func (claudeHarness) InputIsEmpty(styledRows []string) InputState {
-	return inputState(styledRows, "❯", false)
+	return claudeInput.InputIsEmpty(styledRows)
 }
 
-func (claudeHarness) ClearKey() string { return ctrlU }
+func (claudeHarness) ClearKey() string { return claudeInput.ClearKey() }
 
-type codexTyping struct{}
-
-func (codexTyping) InputIsEmpty(styledRows []string) InputState {
-	return inputState(styledRows, "›", true)
-}
-
-func (codexTyping) ClearKey() string { return ctrlU }
+type codexTyping struct{ markerTyping }
 
 func (codexTyping) ReadyToType(TypingIO) bool { return true }
 
-// inputState finds the last row that starts with marker (bold when
-// boldMarker) and decides from the styling of the text after it and of the
-// draft rows that continue it.
-func inputState(rows []string, marker string, boldMarker bool) InputState {
+// lastInputRow is the index of the last row that starts with the marker (bold
+// when m.bold), or -1.
+func lastInputRow(rows []string, m markerTyping) int {
+	start := -1
+	for i, row := range rows {
+		cells := parseCells(row)
+		if len(cells) > 0 && string(cells[0].r) == m.marker && (!m.bold || cells[0].style.bold) {
+			start = i
+		}
+	}
+	return start
+}
+
+// inputState decides from the styling of the text after the last input row's
+// marker and of the draft rows that continue it.
+func inputState(rows []string, m markerTyping) InputState {
 	styled := false
 	for _, row := range rows {
 		if strings.Contains(row, "\x1b[") {
@@ -86,13 +114,7 @@ func inputState(rows []string, marker string, boldMarker bool) InputState {
 	if !styled {
 		return InputUndecided
 	}
-	start := -1
-	for i, row := range rows {
-		cells := parseCells(row)
-		if len(cells) > 0 && string(cells[0].r) == marker && (!boldMarker || cells[0].style.bold) {
-			start = i
-		}
-	}
+	start := lastInputRow(rows, m)
 	if start < 0 {
 		return InputUndecided
 	}

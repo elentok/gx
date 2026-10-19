@@ -9,13 +9,7 @@ import (
 )
 
 // sessionTyping is the only harness the server types into.
-var sessionTyping = func() harness.Typing {
-	t, err := harness.LookupTyping(harness.Claude)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}()
+var sessionTyping = harness.ClaudeTyping()
 
 // draftReason is the reason of the Actionable gx raises instead of typing
 // into a draft.

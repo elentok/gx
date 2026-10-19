@@ -74,13 +74,7 @@ func (Harness) ClearKey() string { return claudeTyping().ClearKey() }
 
 func (Harness) ReadyToType() bool { return true }
 
-func claudeTyping() harness.Typing {
-	t, err := harness.LookupTyping(harness.Claude)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}
+func claudeTyping() harness.Typing { return harness.ClaudeTyping() }
 
 func (Harness) DisplayName(raw []byte) (string, bool) {
 	return screen.Title(raw)

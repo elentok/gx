@@ -48,12 +48,7 @@ func insertMarkerShown(io TypingIO) bool {
 	if err != nil {
 		return false
 	}
-	input := -1
-	for i, row := range rows {
-		if cells := parseCells(row); len(cells) > 0 && string(cells[0].r) == "❯" {
-			input = i
-		}
-	}
+	input := lastInputRow(rows, claudeInput)
 	if input < 0 {
 		return false
 	}

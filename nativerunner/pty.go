@@ -750,13 +750,7 @@ func HolderTypingIO(h *HolderClient) harness.TypingIO {
 }
 
 // claudeTyping is the only harness the PTY runner drives.
-var claudeTyping = func() harness.Typing {
-	t, err := harness.LookupTyping(harness.Claude)
-	if err != nil {
-		panic(err)
-	}
-	return t
-}()
+var claudeTyping = harness.ClaudeTyping()
 
 func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
 
