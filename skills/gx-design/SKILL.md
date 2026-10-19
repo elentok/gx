@@ -36,17 +36,12 @@ Skill tool for them. Tell wayfinder to use the tracker's **Map epics** section f
 operation (chart, claim, close, frontier). `gx-to-tickets` is model-invocable and can be called
 normally.
 
-## Waiting for answers
+## Asking questions
 
 Whenever you grill the person (wayfinder's Destination and frontier grilling, a HITL ticket, the
-provisional Destination, the review), run this **before** printing each round of questions:
-
-```
-gx agent actionable "Grilling: waiting for your answers"
-```
-
-The Agents tab then shows the session as Actionable until the person's next input clears it. Outside
-a gx session it prints a note and does nothing, so always call it.
+provisional Destination, the review), call the Skill tool for `grilling`, `domain-modeling` and
+`unslop` first, and print each round in the format `grilling` defines. gx marks the session
+Actionable itself when it sees a round, so call nothing to raise it.
 
 The questions must be the last thing in the turn: no tool call, and no text, after them. The UI can
 hide earlier text of a turn once later tool calls or text follow it, so questions printed before a
@@ -67,7 +62,8 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    change. Then rework them and stop.
 3. **Open tickets, or a non-empty `## Not yet specified`** → follow wayfinder's "Work through the
    map", resolving exactly **one** ticket. Never more per run: HITL tickets must stay interactive.
-   Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
+   For a `grilling` ticket, load the skills named under "Asking questions" before the first
+   question. Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
    open, or its `blocked_by` are not all closed, say so and stop. A ticket address only ever runs
    this step: when step 1 or 2 matches first, run that step instead and name the ticket in the
    "Next:" line.
@@ -144,14 +140,5 @@ Examples:
 ✅ Review: findings resolved, spec amended, epic <epic>-impl created. Next: implement — launch it from the TUI Queue tab
 ```
 
-Raise the session as Actionable with the same "Next:" text **before** printing that line, so the
-line stays the last output of the turn. When
-the next step is a prompt, add it as the Action, after the fresh-session command
-(`/clear` in Claude, `/new` in Codex):
-
-```
-gx agent actionable "<phase>: <what happened>. Next: <phase>" --send "/clear" --send "/gx-design <epic>"
-gx agent actionable "Review: <epic>-impl created. Next: implement — launch it from the TUI Queue tab"
-```
-
-Outside a gx session it prints a note and does nothing, so always call it.
+This line must be the last output of the turn. gx reads it and raises the session as Actionable
+itself, so call nothing to raise it.
