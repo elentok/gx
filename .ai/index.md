@@ -26,6 +26,10 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   hangs.
 - `server/` is the slowest package by far (minutes, close to the default `go test` timeout under
   load). Run it only when you touched `server/` or `server/servertest/`, and scope it with `-run`.
+- Tests must never read the developer's real Claude config (their `editorMode: vim` changes
+  outcomes). Call `claudeenv.Isolate()` (`testutil/claudeenv`) from every package's `TestMain`. It
+  points `HOME` and a clean `CLAUDE_CONFIG_DIR` at a temp dir, unsets `XDG_*`, and leaves a vim-mode
+  `~/.claude.json` as a canary: code that reads `HOME` instead of `CLAUDE_CONFIG_DIR` fails loudly.
 - If a test run moves to the background, wait for its completion notice. Don't poll its output
   file, and don't write `sleep` or `until ...; do sleep` loops.
 
@@ -45,7 +49,7 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 - `ui/...` — TUI (`ui/app` is the root model; one package per tab or component)
 - `e2e/` — end-to-end tests (slow, CI only)
 - `testutil/` — fakes and helpers: `testutil/agentfake`, `testutil/herdrfake`,
-  `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`
+  `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`, `testutil/claudeenv`
 
 Run `rtk go list ./...` for the full list.
 

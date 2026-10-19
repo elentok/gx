@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -25,15 +26,9 @@ const testFlushInterval = 100 * time.Millisecond
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	// The ready-to-type step reads claude's config; a developer's own vim mode
-	// must not reach the tests.
-	dir, err := os.MkdirTemp("", "claude-config")
-	if err != nil {
-		panic(err)
-	}
-	os.Setenv("CLAUDE_CONFIG_DIR", dir)
+	cleanup := claudeenv.Isolate()
 	code := m.Run()
-	os.RemoveAll(dir)
+	cleanup()
 	os.Exit(code)
 }
 

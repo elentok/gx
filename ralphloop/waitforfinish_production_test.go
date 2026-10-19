@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/transcript"
 	"go.uber.org/goleak"
@@ -33,7 +34,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	landLockStateDir = func() (string, error) { return state, nil }
+	cleanup := claudeenv.Isolate()
 	code := m.Run()
+	cleanup()
 	os.RemoveAll(state)
 	if code == 0 {
 		if err := goleak.Find(); err != nil {

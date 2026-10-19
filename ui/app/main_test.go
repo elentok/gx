@@ -3,6 +3,8 @@ package app
 import (
 	"os"
 	"testing"
+
+	"github.com/elentok/gx/testutil/claudeenv"
 )
 
 // TestMain points HOME at a scratch directory for the whole package's test
@@ -14,11 +16,8 @@ import (
 // is what keeps every one of those real writes off the developer machine's
 // actual ~/.config/gx and ~/.local/state/gx.
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "gx-ui-app-home")
-	if err != nil {
-		panic(err)
-	}
-	defer os.RemoveAll(dir)
-	os.Setenv("HOME", dir)
-	os.Exit(m.Run())
+	cleanup := claudeenv.Isolate()
+	code := m.Run()
+	cleanup()
+	os.Exit(code)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/claudedoctor"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/claudeenv"
 )
 
 // The test binary doubles as the PTY holder and, under it, as the TUI fake.
@@ -27,7 +28,10 @@ func TestMain(m *testing.M) {
 	if os.Getenv(agentfake.TUIEnv) == "1" {
 		agentfake.TUIClaude()
 	}
-	os.Exit(m.Run())
+	cleanup := claudeenv.Isolate()
+	code := m.Run()
+	cleanup()
+	os.Exit(code)
 }
 
 func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -13,12 +14,8 @@ import (
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	state, err := os.MkdirTemp("", "gx-cmd-state")
-	if err != nil {
-		panic(err)
-	}
-	os.Setenv("XDG_STATE_HOME", state)
+	cleanup := claudeenv.Isolate()
 	code := m.Run()
-	os.RemoveAll(state)
+	cleanup()
 	os.Exit(code)
 }

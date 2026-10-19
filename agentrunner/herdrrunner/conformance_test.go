@@ -14,20 +14,15 @@ import (
 	"github.com/elentok/gx/agentrunner/runnertest"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	// The ready-to-type step reads claude's config; a developer's own vim mode
-	// must not reach the tests.
-	dir, err := os.MkdirTemp("", "claude-config")
-	if err != nil {
-		panic(err)
-	}
-	os.Setenv("CLAUDE_CONFIG_DIR", dir)
+	cleanup := claudeenv.Isolate()
 	code := m.Run()
-	os.RemoveAll(dir)
+	cleanup()
 	os.Exit(code)
 }
 
