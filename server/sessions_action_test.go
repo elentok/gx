@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -85,6 +86,94 @@ func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	waitForScreen(t, c, "/clear")
 	waitForScreen(t, c, "/gx-design X")
+}
+
+// startInputSession is startFakeSessionWith on a fake program with an input
+// box, so a slash step has a real input to check.
+func startInputSession(t *testing.T, settle time.Duration) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+	t.Helper()
+	t.Setenv(agentfake.ProgramInputEnv, "1")
+	return startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) {
+		c.ActionStepStartTimeout = time.Minute
+		c.ActionSlashSettle = settle
+	})
+}
+
+func submitted(t *testing.T, conv string) string {
+	t.Helper()
+	data, _ := os.ReadFile(agentfake.ProgramSubmittedPath(conv))
+	return string(data)
+}
+
+func waitForSubmitted(t *testing.T, conv, want string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for submitted(t, conv) != want {
+		if time.Now().After(deadline) {
+			t.Fatalf("submitted = %q, want %q", submitted(t, conv), want)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestRunAction_SlashStepEndsOnNewConversationWithoutWaiting(t *testing.T) {
+	// A settle window far past the test's own deadline: only the new
+	// conversation id can end the first step in time.
+	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
+	idleWithAction(ctx, t, h, evs, id, conv, agentfake.ProgramClearCommand, "next-step")
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	waitForSubmitted(t, conv, "\"/clear\"\n\"next-step\"\n")
+}
+
+func TestRunAction_LocalSlashStepEndsOnSettleWithoutAnotherEnter(t *testing.T) {
+	const settle = 200 * time.Millisecond
+	h, ctx, evs, id, conv := startInputSession(t, settle)
+	idleWithAction(ctx, t, h, evs, id, conv, "/local", "next-step")
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	waitForSubmitted(t, conv, "\"/local\"\n\"next-step\"\n")
+}
+
+func TestRunAction_SwallowedEnterOnSlashStepGetsOneEnter(t *testing.T) {
+	const settle = 200 * time.Millisecond
+	h, ctx, evs, id, conv := startInputSession(t, settle)
+	idleWithAction(ctx, t, h, evs, id, conv, "/local")
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
+		t.Fatal(err)
+	}
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	waitForSubmitted(t, conv, "\"/local\"\n")
+	time.Sleep(3 * settle)
+	if got := submitted(t, conv); got != "\"/local\"\n" {
+		t.Errorf("submitted = %q, want exactly one submission", got)
+	}
+}
+
+func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
+	const settle = 100 * time.Millisecond
+	h, ctx, evs, id, conv := startInputSession(t, settle)
+	idleWithAction(ctx, t, h, evs, id, conv, "real-prompt", "next-step")
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	waitForSubmitted(t, conv, "\"real-prompt\"\n")
+	time.Sleep(5 * settle)
+	if got := submitted(t, conv); got != "\"real-prompt\"\n" {
+		t.Errorf("submitted = %q, want the next step held until a turn", got)
+	}
+	report(t, conv, agentfake.Control{State: "working"})
+	time.Sleep(actionWatchSettle)
+	report(t, conv, agentfake.Control{State: "done"})
+	waitForSubmitted(t, conv, "\"real-prompt\"\n\"next-step\"\n")
 }
 
 func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {

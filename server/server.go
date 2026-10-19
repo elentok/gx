@@ -206,6 +206,9 @@ type Config struct {
 	// ActionStepStartTimeout bounds how long an Action step waits for its
 	// prompt to go Working; zero means DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration
+	// ActionSlashSettle is how long a slash step must stay Idle after typing
+	// to count as done; zero means DefaultActionSlashSettle.
+	ActionSlashSettle time.Duration
 
 	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
 	// DefaultCompactRewaitTimeout.
