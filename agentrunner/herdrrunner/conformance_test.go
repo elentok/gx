@@ -73,6 +73,12 @@ func TestConformance(t *testing.T) {
 				}
 				return strings.Join(got, "\n")
 			},
+			Skip: map[string]string{
+				"InterruptBusyCtrlC":        "herdr Interrupt key rule: ticket 10",
+				"InterruptBlockedEsc":       "herdr Interrupt key rule: ticket 10",
+				"InterruptIdleSendsNothing": "herdr Interrupt key rule: ticket 10",
+				"InterruptNotIdleNotReady":  "herdr Interrupt key rule: ticket 10",
+			},
 			FastTurn: func(t *testing.T, s agentrunner.Session) {
 				if err := state.FastTurn(s.Label); err != nil {
 					t.Fatal(err)

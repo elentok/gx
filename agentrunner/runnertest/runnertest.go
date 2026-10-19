@@ -93,6 +93,10 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"SlashIdleDeliveredOnce", slashIdleDeliveredOnce},
 		{"SlashClearReturnsAtOnce", slashClearReturnsAtOnce},
 		{"SlashDialogDelivered", slashDialogDelivered},
+		{"InterruptBusyCtrlC", interruptBusyCtrlC},
+		{"InterruptBlockedEsc", interruptBlockedEsc},
+		{"InterruptIdleSendsNothing", interruptIdleSendsNothing},
+		{"InterruptNotIdleNotReady", interruptNotIdleNotReady},
 	}
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
@@ -600,4 +604,68 @@ func restartThenFind(t *testing.T, h Harness) {
 		t.Fatalf("Find after restart = %+v, %v, %v; want %+v", got, ok, err, s)
 	}
 	status(t, r, got)
+}
+
+// interruptBusyCtrlC: a busy agent gets Ctrl+C, never Esc, and the prompt it
+// restores is cleared so the next prompt arrives unprefixed.
+func interruptBusyCtrlC(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	before := received(t, h, s)
+	prompt(t, h.Runner, s, "do it")
+	if err := h.Runner.Interrupt(s); err != nil {
+		t.Fatalf("Interrupt: %v", err)
+	}
+	keys := strings.TrimPrefix(received(t, h, s), before)
+	if !strings.Contains(keys, "\x03") || strings.Contains(keys, "\x1b") {
+		t.Fatalf("agent received %q on Interrupt, want Ctrl+C and no Esc", keys)
+	}
+	promptAdvancesTurn(t, h.Runner, s, "next")
+	if h.LastPrompt != nil {
+		if got := h.LastPrompt(t, s); got != "next" {
+			t.Fatalf("prompt after Interrupt = %q, want %q", got, "next")
+		}
+	}
+}
+
+// interruptBlockedEsc: a blocked agent gets a lone Esc.
+func interruptBlockedEsc(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	prompt(t, h.Runner, s, "do it")
+	h.Block(t, s, "permission prompt")
+	if _, err := h.Runner.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, waitTimeout); err != nil {
+		t.Fatalf("Wait blocked: %v", err)
+	}
+	before := received(t, h, s)
+	if err := h.Runner.Interrupt(s); err != nil {
+		t.Fatalf("Interrupt: %v", err)
+	}
+	keys := strings.TrimPrefix(received(t, h, s), before)
+	if !strings.Contains(keys, "\x1b") || strings.Contains(keys, "\x03") {
+		t.Fatalf("agent received %q on Interrupt, want Esc and no Ctrl+C", keys)
+	}
+}
+
+// interruptIdleSendsNothing: an idle agent gets no key.
+func interruptIdleSendsNothing(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	before := received(t, h, s)
+	if err := h.Runner.Interrupt(s); err != nil {
+		t.Fatalf("Interrupt on an idle agent: %v", err)
+	}
+	if got := received(t, h, s); got != before {
+		t.Fatalf("idle agent received %q on Interrupt, want nothing", strings.TrimPrefix(got, before))
+	}
+}
+
+// interruptNotIdleNotReady: a stalled agent ignores the key, stays busy past
+// N, and is not ready.
+func interruptNotIdleNotReady(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	prompt(t, h.Runner, s, "do it")
+	h.Stall(t, s)
+	if err := h.Runner.Interrupt(s); !errors.Is(err, agentrunner.ErrNotReady) {
+		t.Fatalf("Interrupt of an agent that stays busy err = %v, want ErrNotReady", err)
+	}
 }

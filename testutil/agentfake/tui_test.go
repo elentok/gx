@@ -221,15 +221,27 @@ func TestTUIClaude_StallLeavesPromptsUnstarted(t *testing.T) {
 	}
 }
 
-func TestTUIClaude_EscEndsTheTurn(t *testing.T) {
+func TestTUIClaude_CtrlCEndsTheTurnAndRestoresThePrompt(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")
 	f.typeLine("hello")
 	f.waitStatus(StatusBusy, "")
+	// A lone Esc leaves a running turn alone.
 	if _, err := io.WriteString(f.stdin, "\x1b"); err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(200 * time.Millisecond)
+	if m := f.pidFile(); m["status"] != StatusBusy {
+		t.Fatalf("status after Esc = %v, want busy", m["status"])
+	}
+	if _, err := io.WriteString(f.stdin, "\x03"); err != nil {
+		t.Fatal(err)
+	}
 	f.waitStatus(StatusIdle, "")
+	f.waitScreen("> hello")
+	if _, err := io.WriteString(f.stdin, "\x15"); err != nil {
+		t.Fatal(err)
+	}
 	f.typeLine("again")
 	f.waitScreen("> again")
 }

@@ -278,6 +278,13 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := t.interrupt(); err != nil {
 				return 0, err
 			}
+		case ev.key == ctrlC:
+			if err := t.cancel(); err != nil {
+				return 0, err
+			}
+		case ev.key == ctrlU:
+			t.typed.Reset()
+			t.draw()
 		default:
 			t.typed.WriteByte(ev.key)
 			// Echoed as claude does, the terminal's cursor after it.
@@ -425,14 +432,35 @@ func (t *tui) slashCommand(text string) error {
 
 const escKey = 0x1b
 
-// interrupt is Esc: it ends a running turn, or denies a dialog, and keeps
-// the session. A stalled fake leaves a dialog open.
+const (
+	ctrlC = 0x03
+	ctrlU = 0x15
+)
+
+// interrupt is Esc: it denies a dialog and keeps the session. On a running
+// turn it does nothing: only Ctrl+C cancels that. A stalled fake leaves a
+// dialog open.
 func (t *tui) interrupt() error {
 	t.typed.Reset()
-	if t.pid.Status != StatusBusy && (t.pid.Status != StatusWaiting || t.stalled) {
+	if t.pid.Status != StatusWaiting || t.stalled {
 		return nil
 	}
 	return t.setStatus(StatusIdle, "")
+}
+
+// cancel is Ctrl+C: it ends a running turn and restores the cancelled prompt
+// into the input line, which Ctrl+U clears. A stalled fake ignores it.
+func (t *tui) cancel() error {
+	if t.pid.Status != StatusBusy || t.stalled {
+		return nil
+	}
+	t.typed.Reset()
+	t.typed.WriteString(t.prompt)
+	if err := t.setStatus(StatusIdle, ""); err != nil {
+		return err
+	}
+	t.draw()
+	return nil
 }
 
 func (t *tui) handleControl(c Control) error {

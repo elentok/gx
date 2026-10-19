@@ -91,6 +91,12 @@ func TestHeadless_Conformance(t *testing.T) {
 			OpenDialogOnNextPrompt: func(t *testing.T, s agentrunner.Session) {
 				control(t, s, agentfake.Control{Action: agentfake.ActionDialog})
 			},
+			Skip: map[string]string{
+				"InterruptBusyCtrlC":        "headless Interrupt key rule: ticket 07",
+				"InterruptBlockedEsc":       "headless Interrupt key rule: ticket 07",
+				"InterruptIdleSendsNothing": "headless Interrupt key rule: ticket 07",
+				"InterruptNotIdleNotReady":  "headless Interrupt key rule: ticket 07",
+			},
 			Restart: func(t *testing.T) agentrunner.Runner {
 				r := newRunner()
 				entries, err := os.ReadDir(root)

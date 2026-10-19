@@ -705,14 +705,60 @@ func (pr *ptyPrompter) Screen() (string, error) {
 	return strings.Join(rows, "\n"), pr.p.died(pr.ss, err)
 }
 
-// Interrupt presses Esc, which ends claude's turn and keeps the session, so
-// smart-zone can send /compact next.
+// Interrupt picks its key by state: Ctrl+C when busy, a lone Esc when blocked
+// (it denies the dialog), nothing otherwise. After a key it waits up to N for
+// idle, then presses Ctrl+U: claude restores the cancelled prompt into the
+// input line, and it would prefix the next prompt. The session is kept, so
+// smart-zone can send /compact next with no further wait.
 func (p *Pty) Interrupt(s agentrunner.Session) error {
 	ss, err := p.live(s)
 	if err != nil {
 		return err
 	}
-	return p.died(ss, ss.holder.SendKeys("\x1b"))
+	claude, _, program, err := ss.holder.statusWithProgram()
+	if err != nil {
+		return p.died(ss, err)
+	}
+	var key string
+	switch {
+	case program == "blocked" || (program == "" && claude != nil && claude.Status == ClaudeWaiting):
+		key = "\x1b"
+	case program == "working" || (program == "" && claude != nil && claude.Status == ClaudeBusy):
+		key = "\x03"
+	default:
+		return nil
+	}
+	if err := ss.holder.SendKeys(key); err != nil {
+		return p.died(ss, err)
+	}
+	if err := p.awaitIdle(ss); err != nil {
+		return err
+	}
+	return p.died(ss, ss.holder.SendKeys("\x15"))
+}
+
+// awaitIdle waits up to N for claude to be neither busy nor blocked.
+func (p *Pty) awaitIdle(ss *ptySession) error {
+	deadline := time.Now().Add(p.WaitN())
+	for {
+		claude, _, program, err := ss.holder.statusWithProgram()
+		if err != nil {
+			return p.died(ss, err)
+		}
+		busy := program == "working" || program == "blocked" ||
+			(program == "" && claude != nil && (claude.Status == ClaudeBusy || claude.Status == ClaudeWaiting))
+		if !busy {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%w: not idle after %s", agentrunner.ErrNotReady, p.WaitN())
+		}
+		select {
+		case <-ss.exited:
+			return p.died(ss, errors.New("holder exited"))
+		case <-time.After(p.pollInterval()):
+		}
+	}
 }
 
 // RateLimit never reports a limit: phase 2 has no pty rate-limit rule.
