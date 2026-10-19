@@ -171,30 +171,77 @@ func withUnread(m Model, id string) Model {
 	return withSession(m, id, func(s *server.SessionInfo) { s.Unread.Unread = true })
 }
 
-func TestActions_RunActionSendsWithNoConfirm(t *testing.T) {
+func TestActions_RunActionAsksFirstListingEveryStep(t *testing.T) {
 	for name, press := range map[string]func(*testing.T, Model) Model{
 		"sidebar": func(t *testing.T, m Model) Model { m, _ = act(t, m, letter("a")); return m },
 		"leader": func(t *testing.T, m Model) Model {
 			m, cmd := leaderThen(t, m, letter("a"))
-			return update1(t, m, cmd())
+			if cmd != nil {
+				m = update1(t, m, cmd())
+			}
+			return m
+		},
+		"menu": func(t *testing.T, m Model) Model {
+			m, _ = act(t, m, letter("m"))
+			m, _ = pick(t, m, "run")
+			return m
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := &fakeSessionClient{}
-			m := press(t, withAction(actionModel(t, f, "live"), "live", "go on"))
-			if m.confirm.IsOpen {
-				t.Fatal("run action asked")
+			m := press(t, withAction(actionModel(t, f, "live"), "live", "/clear", "go on"))
+			if !m.confirm.IsOpen {
+				t.Fatal("run action did not ask")
 			}
-			if got := calls(f); !slices.Equal(got, []string{"action live"}) {
-				t.Fatalf("calls = %v", got)
+			view := m.confirm.View(80)
+			for _, step := range []string{"/clear", "go on"} {
+				if !strings.Contains(view, step) {
+					t.Fatalf("confirm lacks %q:\n%s", step, view)
+				}
+			}
+			if got := calls(f); len(got) != 0 {
+				t.Fatalf("sent before confirming: %v", got)
 			}
 		})
 	}
 }
 
+func TestActions_RunActionEnterRunsOnce(t *testing.T) {
+	f := &fakeSessionClient{}
+	m, _ := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
+	act(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if got := calls(f); !slices.Equal(got, []string{"action live"}) {
+		t.Fatalf("calls = %v", got)
+	}
+}
+
+func TestActions_RunActionEscSendsNothing(t *testing.T) {
+	f := &fakeSessionClient{}
+	m, _ := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
+	m, _ = act(t, m, tea.KeyPressMsg{Code: tea.KeyEscape})
+	if m.confirm.IsOpen {
+		t.Fatal("esc left the confirm open")
+	}
+	if got := calls(f); len(got) != 0 {
+		t.Fatalf("calls = %v, want none", got)
+	}
+}
+
+func TestActions_QueueActionListsTheQueue(t *testing.T) {
+	f := &fakeSessionClient{}
+	m := withSession(actionModel(t, f, "live"), "live", func(s *server.SessionInfo) {
+		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "epic-impl"}
+	})
+	m, _ = act(t, m, letter("a"))
+	if view := m.confirm.View(80); !strings.Contains(view, "Queue `epic-impl`") {
+		t.Fatalf("confirm lacks the queue:\n%s", view)
+	}
+}
+
 func TestActions_RunActionRefusalShowsItsMessage(t *testing.T) {
 	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Reason: server.ReasonSessionNotIdle, Message: "session live is working, not idle"}}
-	_, note := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
+	m, _ := act(t, withAction(actionModel(t, f, "live"), "live", "go on"), letter("a"))
+	_, note := act(t, m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if note != "session live is working, not idle" {
 		t.Fatalf("footer = %q, want the refusal", note)
 	}
@@ -283,7 +330,7 @@ func TestActions_MenuItemsMakeTheirSessionCalls(t *testing.T) {
 		want       string
 	}{
 		{"resume", "done", func(m Model) Model { return m }, "resume done"},
-		{"run", "live", func(m Model) Model { return withAction(m, "live", "go on") }, "action live"},
+		{"run", "live", func(m Model) Model { return withAction(m, "live", "go on") }, ""},
 		{"remove", "live", func(m Model) Model {
 			return withSession(m, "live", func(s *server.SessionInfo) { s.Status.State = server.SessionExited })
 		}, ""},

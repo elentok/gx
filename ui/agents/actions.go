@@ -65,17 +65,33 @@ func (m Model) resumeSelected() (tea.Model, tea.Cmd) {
 	return m, sessionActionCmd("resume", m.client.ResumeSession, s.ID)
 }
 
-// runActionSelected runs the Action at once: it only sends prompts the
-// session's own agent wrote, and the server refuses unless it is Idle.
+// actionSteps is what running a's Action does, one line per step: its prompts
+// in order, or the queue it runs. Empty means there is no Action.
+func actionSteps(a server.SessionActionable) []string {
+	if a.Kind == server.SessionActionableQueue && a.Target != "" {
+		return []string{"Queue `" + a.Target + "`"}
+	}
+	return a.Action
+}
+
+// runActionSelected asks before running the Action, listing every step;
+// Enter confirms and the server refuses unless the session is Idle.
 func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 	s, ok := m.selected()
 	if !ok {
 		return m, nil
 	}
-	if len(s.Actionable.Action) == 0 {
+	steps := actionSteps(s.Actionable)
+	if len(steps) == 0 {
 		return m, notify.Info("no action")
 	}
-	return m, sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt:     "Run action on " + displayName(s) + "?",
+		Items:      steps,
+		AcceptCmd:  sessionActionCmd("run action", m.client.RunSessionAction, s.ID),
+		DefaultYes: true,
+	})
+	return m, nil
 }
 
 func (m Model) markReadSelected() (tea.Model, tea.Cmd) {
@@ -116,7 +132,7 @@ func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInf
 		item("Resume", "r", "r", reason(!live, "running")),
 		item("Remove", "d", "d", reason(!live, "running")),
 		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
-		item("Run Action", "a", "a", reason(len(s.Actionable.Action) > 0, "no action")),
+		item("Run Action", "a", "a", reason(len(actionSteps(s.Actionable)) > 0, "no action")),
 	}
 }
 
