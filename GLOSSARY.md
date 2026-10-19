@@ -160,7 +160,7 @@ siblings tie-breaking on display number so an original sorts before its replacem
 **not** group or reorder them: a ticket never jumps out of its place once it finishes, so the list
 reads as the epic's intended order of execution.
 
-**Parked** — a ticket's state (`needs-answer`, `needs-repair`, or `draft`; `isParked`) and, derived
+**Parked** — a ticket's state (`needs-answer`, `needs-repair`, `error`, or `draft`; `isParked`) and, derived
 from it, an **epic state**: an epic with no runnable work left but at least one parked ticket keeps
 scheduling everything else, then parks indefinitely and notifies, releasing its slot in the
 epic-level concurrency cap, rather than exiting. Per ADR 0020, **stall** names the opposite thing —
@@ -189,6 +189,10 @@ verb).
 
 **Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either — a
 genuine dependency error, reported as a failure rather than parked on.
+
+**Recently finished** — the last few completed loop epics (by `completed_at`), listed apart from and
+dimmer than the live epics so a finished epic does not just vanish from the Queue. Map epics never
+appear.
 
 **Background task** — a shell command, Monitor or async subagent a Claude agent moved off its own
 foreground turn (recorded as a `backgroundTaskId`, Monitor `taskId` or async `agentId` in the session
