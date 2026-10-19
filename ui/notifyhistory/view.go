@@ -53,7 +53,7 @@ func (m Model) renderFrame(screenW, screenH int) string {
 		Title:         "Notifications",
 		RightTitle:    rightTitle,
 		Body:          strings.Join(rows, "\n"),
-		Hint:          "esc close · / search · ww export",
+		Hint:          "esc close · / search · y copy · ww export",
 		Width:         innerW,
 		BorderColor:   ui.ColorBorder,
 		TitleColor:    ui.ColorBlue,

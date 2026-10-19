@@ -84,6 +84,8 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "w":
 		m.pendingW = true
 		return m, nil
+	case "y":
+		return m.yank()
 	case "j", "down":
 		// Upper-bounded against the visible body height at render time
 		// (renderFrame), since screen size isn't known here.

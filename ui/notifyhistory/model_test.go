@@ -156,6 +156,52 @@ func TestUpdateKey_PendingWResetsOnUnrelatedKey(t *testing.T) {
 	}
 }
 
+func stubClipboard(t *testing.T) *[]string {
+	t.Helper()
+	var got []string
+	prev := clipboardWrite
+	clipboardWrite = func(s string) error {
+		got = append(got, s)
+		return nil
+	}
+	t.Cleanup(func() { clipboardWrite = prev })
+	return &got
+}
+
+func TestUpdateKey_YCopiesPlainTextLines(t *testing.T) {
+	got := stubClipboard(t)
+	entries := sampleEntries()
+	m := New().Open(entries, "repo", "wt")
+
+	_, cmd := m.Update(keyMsg('y'))
+
+	want := entryText(entries[0]) + "\n" + entryText(entries[1]) + "\n" + entryText(entries[2])
+	if len(*got) != 1 || (*got)[0] != want {
+		t.Fatalf("clipboard = %q, want [%q]", *got, want)
+	}
+	if cmd == nil {
+		t.Fatal("expected a notify cmd confirming the copy")
+	}
+}
+
+func TestUpdateKey_YCopiesOnlySearchMatches(t *testing.T) {
+	got := stubClipboard(t)
+	entries := sampleEntries()
+	m := New().Open(entries, "repo", "wt")
+	m, _ = m.Update(keyMsg('/'))
+	for _, r := range "third" {
+		m, _ = m.Update(keyMsg(r))
+	}
+	m, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	m.Update(keyMsg('y'))
+
+	want := entryText(entries[2])
+	if len(*got) != 1 || (*got)[0] != want {
+		t.Fatalf("clipboard = %q, want [%q]", *got, want)
+	}
+}
+
 func TestClampScroll(t *testing.T) {
 	tests := []struct {
 		name    string

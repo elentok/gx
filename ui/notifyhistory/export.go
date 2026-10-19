@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/ui/clip"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/notifylog"
 )
@@ -22,6 +23,21 @@ func (m Model) export() (Model, tea.Cmd) {
 		return m, notify.Error("export notifications: " + err.Error())
 	}
 	return m, notify.Success("exported to " + path)
+}
+
+var clipboardWrite = clip.Write
+
+// yank copies the visible entries as plain text, one per line.
+func (m Model) yank() (Model, tea.Cmd) {
+	visible := m.visibleEntries()
+	lines := make([]string, len(visible))
+	for i, e := range visible {
+		lines[i] = entryText(e)
+	}
+	if err := clipboardWrite(strings.Join(lines, "\n")); err != nil {
+		return m, notify.Error("copy notifications: " + err.Error())
+	}
+	return m, notify.Success("copied notifications")
 }
 
 func writeExport(entries []notifylog.Entry, repoName, worktreeName string) (string, error) {
