@@ -559,6 +559,29 @@ func TestRenderLines_VisibleRangeOffset(t *testing.T) {
 	}
 }
 
+func TestLabelWidth_IsTheLongestLabelRenderedWithoutTruncation(t *testing.T) {
+	const width = 20
+	labelW := LabelWidth(width)
+	render := func(labelLen int) string {
+		m := NewModel[int]()
+		m.SetEntries([]Entry[int]{{ID: "a"}})
+		m.SetVisibleHeight(1)
+		lines := m.RenderLines(3, RenderOpts[int]{
+			AccentColor: color.White,
+			Width:       width,
+			Label:       func(Entry[int]) string { return strings.Repeat("x", labelLen) },
+		})
+		return strings.TrimRight(ansi.Strip(lines[0]), " ")
+	}
+
+	if got := strings.Count(render(labelW), "x"); got != labelW {
+		t.Fatalf("label of LabelWidth(%d)=%d cells rendered %d cells, want no truncation", width, labelW, got)
+	}
+	if got := strings.Count(render(labelW+1), "x"); got != labelW {
+		t.Fatalf("label one past LabelWidth rendered %d cells, want truncated to %d", got, labelW)
+	}
+}
+
 func TestRenderLines_EmptyUsesEmptyLine(t *testing.T) {
 	m := NewModel[int]()
 	lines := m.RenderLines(4, RenderOpts[int]{EmptyLine: "(empty)", AccentColor: color.White})

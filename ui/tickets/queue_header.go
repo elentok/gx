@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
+	"github.com/elentok/gx/ui/tree"
 )
 
 // queueHeaderReservedLines is the constant height reserved for the Queue
@@ -228,15 +229,20 @@ const (
 
 const epicBarCells = 12
 
-// queueLabelWidth is the width a Queue row's label can use: the body width,
-// less the tree's selection mark and its two-column right margin. Zero or
-// negative widths (before the first resize) mean "unconstrained".
-func (m QueueModel) queueLabelWidth() int {
+// queueBodyWidth is the width of the Queue panel's body: the sidebar less its
+// two border columns.
+func (m QueueModel) queueBodyWidth() int {
 	sidebarW, _ := m.panelWidths(m.width)
+	return sidebarW - 2
+}
+
+// queueLabelWidth is the width a Queue row's label can use inside the body.
+// Zero or negative widths (before the first resize) mean "unconstrained".
+func (m QueueModel) queueLabelWidth() int {
 	if m.width <= 0 {
 		return 0
 	}
-	return sidebarW - 2 - 3
+	return tree.LabelWidth(m.queueBodyWidth())
 }
 
 func epicCounter(epic tickets.Epic) string {

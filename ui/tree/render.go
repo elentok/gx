@@ -25,6 +25,20 @@ type RenderOpts[T any] struct {
 	Faint    func(entry Entry[T]) bool
 }
 
+const (
+	// gutterW is the right-aligned scrollbar gutter (" " + glyph).
+	gutterW = 2
+	// markW is the selection mark column at the start of every row.
+	markW = 1
+)
+
+// LabelWidth is the width a row's label can use (at depth 0, with no icon or
+// meta text) when the tree renders with RenderOpts.Width == width: what is
+// left after the selection mark and the scrollbar gutter.
+func LabelWidth(width int) int {
+	return width - markW - gutterW
+}
+
 func (m Model[T]) RenderLines(height int, opts RenderOpts[T]) []string {
 	innerH := maxInt(1, height-2)
 	var searchLines []string
@@ -64,7 +78,7 @@ func (m Model[T]) appendScrollbar(lines []string, height int, opts RenderOpts[T]
 	if bar != "" {
 		barLines = strings.Split(bar, "\n")
 	}
-	padW := opts.Width - 2
+	padW := opts.Width - gutterW
 	if padW <= 0 {
 		padW = 0
 		for _, line := range lines {
@@ -187,7 +201,7 @@ func (m Model[T]) styleEntryLine(line string, selected, hovered, faint bool, opt
 		line = ui.RenderRowHover(line)
 	}
 	if opts.Width > 0 {
-		line = ansi.Truncate(line, opts.Width-2, "")
+		line = ansi.Truncate(line, opts.Width-gutterW, "")
 	}
 	return line
 }

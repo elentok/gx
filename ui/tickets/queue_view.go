@@ -29,7 +29,7 @@ func (m QueueModel) View() tea.View {
 	sidebarH, previewH := m.panelHeights(m.width, m.contentHeight())
 
 	queueView := ui.RenderPanel(ui.PanelOptionsFor(
-		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(sidebarW-2), m.focus == focusSidebar, ui.ColorBlue, nil, true,
+		sidebarW, sidebarH, m.queueHeaderTitle(), "", m.queueBody(m.queueBodyWidth()), m.focus == focusSidebar, ui.ColorBlue, nil, true,
 	))
 	previewView := ui.RenderPanel(ui.PanelOptionsFor(
 		previewW, previewH, "Preview", m.previewMatchStatus(), m.previewLines(), m.focus == focusPreview, ui.ColorBlue, nil, false,
