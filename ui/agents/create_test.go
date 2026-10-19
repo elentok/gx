@@ -197,11 +197,28 @@ func TestCreate_PrefilledFormIsEditable(t *testing.T) {
 			t.Fatalf("pre-filled form lacks %q:\n%s", want, view)
 		}
 	}
-	m = typeKeys(t, m, keyUpMsg, tab, keyBackspaceMsg, letter("x"))
+	m = typeKeys(t, m, keyBackspaceMsg, letter("x"))
 	m = step(t, m, keyEnterMsg)
 	got := lastCreate(t, f)
-	if got.Project != "gx" || got.Dir != "/r/gx/wt1" || got.Name != "plax" || got.Prompt != "read it" || got.Ticket != "gx:e/7" {
+	if got.Project != "gx" || got.Dir != "/r/gx/wt2" || got.Name != "plax" || got.Prompt != "read it" || got.Ticket != "gx:e/7" {
 		t.Fatalf("create = %+v", got)
+	}
+}
+
+func TestCreate_PrefillWithDirStartsOnName(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		prefill   CreatePrefill
+		wantField createField
+	}{
+		{"with dir", CreatePrefill{Project: "gx", Dir: "/r/gx/wt2", Name: "plan"}, fieldName},
+		{"without dir", CreatePrefill{Project: "gx", Name: "plan"}, fieldWhere},
+	} {
+		m := createModel(t, &fakeSessionClient{})
+		next, _ := m.OpenCreateForm(tc.prefill)
+		if next.create.field != tc.wantField {
+			t.Errorf("%s: focus = %v, want %v", tc.name, next.create.field, tc.wantField)
+		}
 	}
 }
 

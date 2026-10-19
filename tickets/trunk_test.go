@@ -218,3 +218,53 @@ func TestOpenRepo_NotARepo(t *testing.T) {
 		t.Errorf("OpenRepo() = %+v, %v; want nil repo and an error", r, err)
 	}
 }
+
+func TestTrunkCheckout(t *testing.T) {
+	t.Run("normal repo is its root", func(t *testing.T) {
+		repo, projectDir := trunkFixture(t, "")
+		testutil.WriteFile(t, projectDir, "project.json", registered(repo, ""))
+		if got := TrunkCheckout(filepath.Dir(projectDir), "p"); got != repo {
+			t.Errorf("TrunkCheckout() = %q, want %q", got, repo)
+		}
+	})
+
+	bare := func(t *testing.T) (bareDir, projectDir string) {
+		repo, projectDir := trunkFixture(t, "")
+		bareDir = filepath.Join(t.TempDir(), "r.git")
+		testutil.MustGitExported(t, repo, "clone", "--bare", repo, bareDir)
+		testutil.WriteFile(t, projectDir, "project.json", registered(bareDir, `,"trunk":"main"`))
+		return bareDir, projectDir
+	}
+
+	t.Run("bare repo is the worktree on trunk", func(t *testing.T) {
+		bareDir, projectDir := bare(t)
+		wt := filepath.Join(t.TempDir(), "main-wt")
+		testutil.MustGitExported(t, bareDir, "worktree", "add", wt, "main")
+		got := TrunkCheckout(filepath.Dir(projectDir), "p")
+		if canonicalPath(got) != canonicalPath(wt) {
+			t.Errorf("TrunkCheckout() = %q, want %q", got, wt)
+		}
+	})
+
+	t.Run("bare repo without a trunk worktree is empty", func(t *testing.T) {
+		_, projectDir := bare(t)
+		if got := TrunkCheckout(filepath.Dir(projectDir), "p"); got != "" {
+			t.Errorf("TrunkCheckout() = %q, want empty", got)
+		}
+	})
+
+	t.Run("missing trunk is empty", func(t *testing.T) {
+		_, projectDir := bare(t)
+		testutil.WriteFile(t, projectDir, "project.json", registered(filepath.Join(filepath.Dir(projectDir), "x"), `,"trunk":"nope"`))
+		if got := TrunkCheckout(filepath.Dir(projectDir), "p"); got != "" {
+			t.Errorf("TrunkCheckout() = %q, want empty", got)
+		}
+	})
+
+	t.Run("unknown project is empty", func(t *testing.T) {
+		_, projectDir := trunkFixture(t, "")
+		if got := TrunkCheckout(filepath.Dir(projectDir), "nope"); got != "" {
+			t.Errorf("TrunkCheckout() = %q, want empty", got)
+		}
+	})
+}

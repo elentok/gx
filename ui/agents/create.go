@@ -161,7 +161,11 @@ func (m Model) OpenCreateForm(p CreatePrefill) (Model, tea.Cmd) {
 	if m.client == nil {
 		return m, nil
 	}
-	m.create = &createForm{prefill: p, name: p.Name, prompt: p.Prompt, field: fieldWhere}
+	field := fieldWhere
+	if p.Dir != "" {
+		field = fieldName
+	}
+	m.create = &createForm{prefill: p, name: p.Name, prompt: p.Prompt, field: field}
 	list := m.listProjects
 	return m, func() tea.Msg {
 		projects, err := list()

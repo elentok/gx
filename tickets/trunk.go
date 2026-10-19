@@ -108,3 +108,39 @@ func checkTrunk(candidate *ErrTrunkMissing) (string, error) {
 	candidate.RemoteOnly = refExists(candidate.Repo, "refs/remotes/origin/"+trunk)
 	return "", candidate
 }
+
+// TrunkCheckout is the directory a design session runs in: the repo root of a
+// normal repo, or the worktree with trunk checked out in a bare one. It is empty
+// when the project, its repo, its trunk or the trunk's worktree is missing, so
+// callers fall back to asking.
+func TrunkCheckout(storePath, project string) string {
+	projectDir, err := ProjectDirByName(storePath, project)
+	if err != nil {
+		return ""
+	}
+	pf, err := config.ReadProjectFile(projectDir)
+	if err != nil || pf.Repo == nil {
+		return ""
+	}
+	repo, err := git.FindRepo(*pf.Repo)
+	if err != nil {
+		return ""
+	}
+	if !repo.IsBare {
+		return repo.Root
+	}
+	trunk, err := Trunk(projectDir, repo.Root)
+	if err != nil {
+		return ""
+	}
+	wts, err := git.ListWorktrees(*repo)
+	if err != nil {
+		return ""
+	}
+	for _, wt := range wts {
+		if !wt.IsBare && wt.Branch == trunk {
+			return wt.Path
+		}
+	}
+	return ""
+}

@@ -32,7 +32,7 @@ func dispatchMenuAction(api ServerAPI, link ServerLink, worktreeRoot string, set
 		file, _ := resolveTicketPath(settings.TicketStore, result.Path)
 		return cmdAnswerThen(worktreeRoot, settings, file, answerResume(api, link, result.Path))
 	case actionStartSession:
-		return startSessionCmd(result.Path)
+		return startSessionCmd(settings.TicketStore, result.Path)
 	case actionInvestigate:
 		return cmdLaunchInvestigate(worktreeRoot, result.EpicName, result.TicketID)
 	case actionTranscript:

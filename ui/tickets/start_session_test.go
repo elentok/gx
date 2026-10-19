@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/contextmenu"
 )
 
@@ -121,6 +123,40 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 		}
 		if len(calls) != 0 {
 			t.Errorf("%s: server calls = %v, want none (no ticket status written)", tc.address, calls)
+		}
+	}
+}
+
+func TestStartSession_CarriesTheTrunkCheckout(t *testing.T) {
+	repo := testutil.TempRepo(t)
+	bare := filepath.Join(t.TempDir(), "r.git")
+	testutil.MustGitExported(t, repo, "clone", "--bare", repo, bare)
+	trunkWt := filepath.Join(t.TempDir(), "main-wt")
+	testutil.MustGitExported(t, bare, "worktree", "add", trunkWt, "main")
+
+	for _, tc := range []struct {
+		name, repo, want string
+	}{
+		{"normal repo", repo, repo},
+		{"bare repo with a trunk worktree", bare, trunkWt},
+		{"bare repo without one", bare, ""},
+	} {
+		store := t.TempDir()
+		testutil.Mkdir(t, filepath.Join(store, "gx"))
+		testutil.WriteFile(t, filepath.Join(store, "gx"), "project.json", `{"name":"gx","repo":"`+tc.repo+`","trunk":"main"}`)
+		if tc.name == "bare repo without one" {
+			testutil.MustGitExported(t, bare, "worktree", "remove", "--force", trunkWt)
+		}
+		msg, ok := startSessionCmd(store, "gx:map")().(StartSessionMsg)
+		if !ok {
+			t.Fatalf("%s: not a StartSessionMsg", tc.name)
+		}
+		want := tc.want
+		if resolved, err := filepath.EvalSymlinks(want); err == nil && want != "" {
+			want = resolved
+		}
+		if msg.Dir != want {
+			t.Errorf("%s: Dir = %q, want %q", tc.name, msg.Dir, want)
 		}
 	}
 }
