@@ -27,29 +27,34 @@ var errDraft = errors.New(draftReason)
 // inputHoldsDraft runs the harness empty check before gx types. Only a
 // definite "not empty" refuses; a check that can't decide types as before.
 func (s *Server) inputHoldsDraft(dir string, c *nativerunner.HolderClient) bool {
-	state := harness.InputUndecided
-	if c.Supports(nativerunner.OpScreenStyled) {
-		if rows, err := c.StyledScreen(); err == nil {
-			state = sessionTyping.InputIsEmpty(rows)
-		}
-	}
+	state, _ := inputState(c)
 	holds := state == harness.InputNotEmpty
 	s.log.Debug("draft check", "session", filepath.Base(dir), "holds_draft", holds)
 	return holds
+}
+
+// inputState runs the harness empty check when the holder serves styled rows.
+// A holder that doesn't, or a read that fails, is InputUndecided; the error is
+// for callers that report it.
+func inputState(c *nativerunner.HolderClient) (harness.InputState, error) {
+	if !c.Supports(nativerunner.OpScreenStyled) {
+		return harness.InputUndecided, nil
+	}
+	rows, err := c.StyledScreen()
+	if err != nil {
+		return harness.InputUndecided, err
+	}
+	return sessionTyping.InputIsEmpty(rows), nil
 }
 
 // pressEnterIfStillTyped is the rule for a slash prompt that ended without
 // the session reacting: when the harness empty check says the prompt is still
 // in the input, press Enter once. An empty input, or a check that can't
 // decide, presses nothing.
-func pressEnterIfStillTyped(dir string) (pressed bool, err error) {
-	c, err := nativerunner.DialHolder(dir)
-	if err != nil || !c.Supports(nativerunner.OpScreenStyled) {
+func (r *actionRun) pressEnterIfStillTyped() (pressed bool, err error) {
+	state, err := inputState(r.holder)
+	if err != nil || state != harness.InputNotEmpty {
 		return false, err
 	}
-	rows, err := c.StyledScreen()
-	if err != nil || sessionTyping.InputIsEmpty(rows) != harness.InputNotEmpty {
-		return false, err
-	}
-	return true, c.SendKeys("\r")
+	return true, r.holder.SendKeys("\r")
 }

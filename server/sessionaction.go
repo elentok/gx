@@ -228,7 +228,7 @@ func (r *actionRun) waitForStep(slash bool) (string, error) {
 			if r.state != SessionIdle {
 				continue
 			}
-			pressed, err := pressEnterIfStillTyped(r.dir)
+			pressed, err := r.pressEnterIfStillTyped()
 			if pressed {
 				r.s.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
 			}

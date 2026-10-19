@@ -382,14 +382,11 @@ func (p *holderPrompter) ReadyToType() bool {
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
 func (p *holderPrompter) InputEmpty() (bool, bool, error) {
-	if !p.c.Supports(nativerunner.OpScreenStyled) {
-		return false, false, nil
-	}
-	rows, err := p.c.StyledScreen()
+	state, err := inputState(p.c)
 	if err != nil {
 		return false, false, err
 	}
-	switch sessionTyping.InputIsEmpty(rows) {
+	switch state {
 	case harness.InputEmpty:
 		return true, true, nil
 	case harness.InputNotEmpty:
