@@ -731,12 +731,12 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 
 // ReadyToType runs claude's ready-to-type step over the holder.
 func (pr *ptyPrompter) ReadyToType() bool {
-	return claudeTyping.ReadyToType(holderTypingIO(pr.ss.holder))
+	return claudeTyping.ReadyToType(HolderTypingIO(pr.ss.holder))
 }
 
-// holderTypingIO reads styled rows when the holder serves them, plain rows
+// HolderTypingIO reads styled rows when the holder serves them, plain rows
 // otherwise; the ready-to-type step needs only the text.
-func holderTypingIO(h *HolderClient) harness.TypingIO {
+func HolderTypingIO(h *HolderClient) harness.TypingIO {
 	return harness.TypingIO{
 		Rows: func() ([]string, error) {
 			if h.Supports(OpScreenStyled) {

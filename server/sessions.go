@@ -182,8 +182,8 @@ type sessionMeta struct {
 	AutoName bool   `json:"auto_name,omitempty"`
 	Ticket   string `json:"ticket,omitempty"`
 	Design   bool   `json:"design,omitempty"`
-	// FirstPrompt waits for the first Idle; it is cleared once typed or on
-	// exit.
+	// FirstPrompt waits for the ready report or the first Idle; it is cleared
+	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`
 	// ConversationID is the newest one the harness reported; a resume
 	// continues it.
@@ -641,6 +641,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		}
 		_ = stream.Close()
 	}()
+	first := s.newFirstPrompt(dir, id)
 	for {
 		msg, err := stream.Next()
 		if err != nil {
@@ -652,7 +653,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		switch msg.Type {
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
-			var prompt string
+			var prompt, signal string
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
@@ -676,16 +677,20 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					m.Name = msg.DisplayName
 					changed = true
 				}
-				if st.State == SessionIdle && m.FirstPrompt != "" {
-					prompt, m.FirstPrompt = m.FirstPrompt, ""
-					changed = true
+				if m.FirstPrompt != "" {
+					if sig := first.observe(st.State, msg.Ready); sig != "" {
+						prompt, signal, m.FirstPrompt = m.FirstPrompt, sig, ""
+						changed = true
+					}
 				}
 				return changed
 			})
+			first.noteState(st.State)
 			if prompt != "" {
-				s.typeFirstPrompt(dir, id, prompt)
+				first.start(signal, prompt)
 			}
 		case nativerunner.StreamInput:
+			first.personInput()
 			update(func(m *sessionMeta) bool {
 				changed := m.Actionable.Reason != ""
 				m.Actionable = SessionActionable{}
@@ -695,12 +700,6 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 			recordExit(sessionExitOf(msg.ExitCode))
 			return
 		}
-	}
-}
-
-func (s *Server) typeFirstPrompt(dir, id, prompt string) {
-	if err := typeSessionPrompt(dir, prompt); err != nil {
-		s.log.Warn("type first prompt", "session", id, "err", err)
 	}
 }
 

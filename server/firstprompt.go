@@ -1,0 +1,253 @@
+package server
+
+import (
+	"errors"
+	"log/slog"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner"
+)
+
+// signalFirstIdle names the fallback in the debug line when no ready report
+// came before the first Idle.
+const signalFirstIdle = "first Idle"
+
+// holderPollInterval is how often a holder-backed prompt waits between turn
+// checks.
+const holderPollInterval = 50 * time.Millisecond
+
+var errNudgeCancelled = errors.New("nudge cancelled: person input")
+
+// firstPrompt follows one session's first prompt from the watch stream: it
+// decides when to type, types in the background, and cancels the remaining
+// nudges when a person types too.
+type firstPrompt struct {
+	s   *Server
+	dir string
+	log *slog.Logger
+	// started, sawStatus and sawIdle only trace the watch for the debug lines;
+	// the watch loop is their one reader and writer.
+	started, sawStatus, sawIdle bool
+	typed                       atomic.Bool
+	cancel                      chan struct{}
+	cancelOnce                  sync.Once
+	turnStarted                 chan struct{}
+	turnOnce                    sync.Once
+}
+
+func (s *Server) newFirstPrompt(dir, id string) *firstPrompt {
+	return &firstPrompt{s: s, dir: dir, log: s.log.With("session", id), cancel: make(chan struct{}), turnStarted: make(chan struct{})}
+}
+
+// observe takes each status while the prompt is pending and returns the signal
+// that lets it type: the ready report, else the first Idle. It never fires
+// while Blocked.
+func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
+	if !f.started {
+		f.started = true
+		f.log.Debug("first prompt start")
+	}
+	if !f.sawStatus {
+		f.sawStatus = true
+		f.log.Debug("first prompt first status", "state", state)
+	}
+	if state == SessionIdle && !f.sawIdle {
+		f.sawIdle = true
+		f.log.Debug("first prompt first Idle")
+	}
+	switch {
+	case state == SessionBlocked:
+		return ""
+	case ready != "":
+		return string(ready)
+	case state == SessionIdle:
+		return signalFirstIdle
+	}
+	return ""
+}
+
+// noteState closes turnStarted on the first Working after gx typed: the watch
+// sees a turn start even where the holder's Turn counter does not move.
+func (f *firstPrompt) noteState(state string) {
+	if state == SessionWorking && f.typed.Load() {
+		f.turnOnce.Do(func() { close(f.turnStarted) })
+	}
+}
+
+// personInput stops the remaining nudges once gx has typed the prompt.
+func (f *firstPrompt) personInput() {
+	if f.typed.Load() {
+		f.cancelOnce.Do(func() { close(f.cancel) })
+	}
+}
+
+func (f *firstPrompt) markTyped() {
+	if f.typed.CompareAndSwap(false, true) {
+		f.log.Debug("first prompt typed")
+	}
+}
+
+// start types the prompt in the background, so the watch keeps reading the
+// person's input.
+func (f *firstPrompt) start(signal, prompt string) {
+	f.log.Debug("first prompt ready", "signal", signal)
+	f.s.sessionWatches.start(func() {
+		err := f.deliver(prompt)
+		switch {
+		case errors.Is(err, errNudgeCancelled):
+			f.log.Debug(errNudgeCancelled.Error())
+		case err != nil:
+			f.log.Warn("type first prompt", "err", err)
+		}
+	})
+}
+
+func (f *firstPrompt) deliver(prompt string) error {
+	if strings.HasPrefix(prompt, "/") {
+		return f.deliverSlash(prompt)
+	}
+	c, err := nativerunner.DialHolder(f.dir)
+	if err != nil {
+		return err
+	}
+	_, turn, err := c.Status()
+	if err != nil {
+		return err
+	}
+	caps := claudeui.DefaultNudgeCaps
+	if g := f.s.cfg.FirstPromptGrace; g > 0 {
+		caps.Grace = g
+	}
+	p := &holderPrompter{c: c, f: f, turn: turn}
+	report := func(d claudeui.NudgeDecision) {
+		f.log.Debug("first prompt nudge", "decision", string(d))
+	}
+	err = claudeui.PromptWithNudge(p, prompt, caps, time.Time{}, time.Now, report)
+	if f.s.sessionWatches.isStopped() && err != nil {
+		return nil
+	}
+	return err
+}
+
+// deliverSlash types the prompt once and ends like an Action slash step.
+func (f *firstPrompt) deliverSlash(prompt string) error {
+	run, closeRun, err := f.s.openActionRun(f.dir)
+	if err != nil {
+		return err
+	}
+	defer closeRun()
+	if err := run.catchUp(); err != nil {
+		return err
+	}
+	if run.state == SessionBlocked {
+		return errors.New("session is blocked")
+	}
+	run.onTyped, run.cancel = f.markTyped, f.cancel
+	if err := run.step(0, prompt); err != nil {
+		return err
+	}
+	select {
+	case <-f.cancel:
+		return errNudgeCancelled
+	default:
+		return nil
+	}
+}
+
+// holderPrompter is claudeui.Prompter over a session's holder. A turn has
+// started once the holder's Turn passes the one seen before typing.
+type holderPrompter struct {
+	c    *nativerunner.HolderClient
+	f    *firstPrompt
+	turn int
+}
+
+func (p *holderPrompter) cancelled() error {
+	select {
+	case <-p.f.cancel:
+		return errNudgeCancelled
+	default:
+		return nil
+	}
+}
+
+func (p *holderPrompter) Submit(text string) error {
+	if err := p.cancelled(); err != nil {
+		return err
+	}
+	if err := p.c.SendKeys(text); err != nil {
+		return err
+	}
+	p.f.markTyped()
+	return p.c.SendKeys("\r")
+}
+
+func (p *holderPrompter) Clear() error {
+	if err := p.cancelled(); err != nil {
+		return err
+	}
+	return p.c.SendKeys(sessionTyping.ClearKey())
+}
+
+func (p *holderPrompter) SendEnter() error {
+	if err := p.cancelled(); err != nil {
+		return err
+	}
+	return p.c.SendKeys("\r")
+}
+
+func (p *holderPrompter) WaitStart(timeout time.Duration) (bool, error) {
+	deadline := time.After(timeout)
+	for {
+		_, turn, err := p.c.Status()
+		if err != nil {
+			return false, err
+		}
+		if turn > p.turn {
+			return true, nil
+		}
+		select {
+		case <-p.f.turnStarted:
+			return true, nil
+		case <-p.f.cancel:
+			return false, errNudgeCancelled
+		case <-p.f.s.sessionWatches.stop:
+			return false, errors.New("server stopping")
+		case <-deadline:
+			return false, nil
+		case <-time.After(holderPollInterval):
+		}
+	}
+}
+
+func (p *holderPrompter) Screen() (string, error) {
+	rows, _, err := p.c.Screen(0)
+	return strings.Join(rows, "\n"), err
+}
+
+func (p *holderPrompter) ReadyToType() bool {
+	return sessionTyping.ReadyToType(nativerunner.HolderTypingIO(p.c))
+}
+
+// InputEmpty runs the harness empty check when the holder serves styled rows.
+func (p *holderPrompter) InputEmpty() (bool, bool, error) {
+	if !p.c.Supports(nativerunner.OpScreenStyled) {
+		return false, false, nil
+	}
+	rows, err := p.c.StyledScreen()
+	if err != nil {
+		return false, false, err
+	}
+	switch sessionTyping.InputIsEmpty(rows) {
+	case harness.InputEmpty:
+		return true, true, nil
+	case harness.InputNotEmpty:
+		return false, true, nil
+	}
+	return false, false, nil
+}

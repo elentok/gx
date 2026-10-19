@@ -55,6 +55,7 @@ func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
 type actionRun struct {
 	s       *Server
 	dir     string
+	holder  *nativerunner.HolderClient
 	msgs    <-chan nativerunner.WatchMessage
 	state   string
 	started time.Duration
@@ -65,23 +66,48 @@ type actionRun struct {
 	convChanged bool
 	// sawStatus is set by the first status of a step, for the debug line.
 	sawStatus bool
+	// onTyped runs once a step's prompt is typed. cancel, when closed, ends a
+	// step's wait without another Enter: the first prompt sets both so a
+	// person's own input stops it.
+	onTyped func()
+	cancel  <-chan struct{}
 }
 
 // sendAction sends each prompt once the one before it has finished its turn;
 // a step that finds the session not Idle, or whose prompt never starts,
 // drops the rest.
 func (s *Server) sendAction(dir string, action []string) error {
-	c, err := nativerunner.DialHolder(dir)
+	run, closeRun, err := s.openActionRun(dir)
 	if err != nil {
 		return err
+	}
+	defer closeRun()
+	for i, prompt := range action {
+		if err := run.catchUp(); err != nil {
+			return err
+		}
+		if run.state != SessionIdle {
+			return fmt.Errorf("step %d: session is %s", i, run.state)
+		}
+		if err := run.step(i, prompt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// openActionRun dials the session's holder and starts following its watch;
+// the returned func ends the watch.
+func (s *Server) openActionRun(dir string) (*actionRun, func(), error) {
+	c, err := nativerunner.DialHolder(dir)
+	if err != nil {
+		return nil, nil, err
 	}
 	w, err := c.Watch()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	done := make(chan struct{})
-	defer w.Close()
-	defer close(done)
 	msgs := make(chan nativerunner.WatchMessage)
 	go func() {
 		defer close(msgs)
@@ -98,31 +124,34 @@ func (s *Server) sendAction(dir string, action []string) error {
 		}
 	}()
 	run := &actionRun{
-		s: s, dir: dir, msgs: msgs, state: SessionIdle,
+		s: s, dir: dir, holder: c, msgs: msgs, state: SessionIdle,
 		started: cmp.Or(s.cfg.ActionStepStartTimeout, DefaultActionStepStartTimeout),
 		settle:  cmp.Or(s.cfg.ActionSlashSettle, DefaultActionSlashSettle),
 	}
-	for i, prompt := range action {
-		if err := run.catchUp(); err != nil {
-			return err
-		}
-		if run.state != SessionIdle {
-			return fmt.Errorf("step %d: session is %s", i, run.state)
-		}
-		if !sessionTyping.ReadyToType() {
-			return fmt.Errorf("step %d: not ready to type", i)
-		}
-		run.convChanged, run.sawStatus = false, false
-		begin := time.Now()
-		if err := typeSessionPrompt(dir, prompt); err != nil {
-			return err
-		}
-		s.log.Debug("action step typed", "session", filepath.Base(dir), "step", i)
-		signal, err := run.waitForStep(strings.HasPrefix(prompt, "/"))
-		s.log.Debug("action step done", "session", filepath.Base(dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
-		if err != nil {
-			return fmt.Errorf("step %d: %w", i, err)
-		}
+	return run, func() {
+		close(done)
+		_ = w.Close()
+	}, nil
+}
+
+// step types one prompt and waits for it to end.
+func (r *actionRun) step(i int, prompt string) error {
+	if !sessionTyping.ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
+		return fmt.Errorf("step %d: not ready to type", i)
+	}
+	r.convChanged, r.sawStatus = false, false
+	begin := time.Now()
+	if err := typeSessionPrompt(r.dir, prompt); err != nil {
+		return err
+	}
+	if r.onTyped != nil {
+		r.onTyped()
+	}
+	r.s.log.Debug("action step typed", "session", filepath.Base(r.dir), "step", i)
+	signal, err := r.waitForStep(strings.HasPrefix(prompt, "/"))
+	r.s.log.Debug("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
+	if err != nil {
+		return fmt.Errorf("step %d: %w", i, err)
 	}
 	return nil
 }
@@ -147,6 +176,7 @@ const (
 	signalNewConv      = "new-conversation"
 	signalSettle       = "settle"
 	signalStartTimeout = "start-timeout"
+	signalPersonInput  = "person-input"
 )
 
 // waitForStep waits for a step to end and returns the signal it ended on. A
@@ -167,6 +197,8 @@ func (r *actionRun) waitForStep(slash bool) (string, error) {
 		select {
 		case <-r.s.sessionWatches.stop:
 			return "", errors.New("server stopping")
+		case <-r.cancel:
+			return signalPersonInput, nil
 		case <-expired:
 			if working {
 				continue

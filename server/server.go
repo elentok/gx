@@ -209,6 +209,9 @@ type Config struct {
 	// ActionSlashSettle is how long a slash step must stay Idle after typing
 	// to count as done; zero means DefaultActionSlashSettle.
 	ActionSlashSettle time.Duration
+	// FirstPromptGrace bounds each wait for a first prompt's turn to start
+	// before it is nudged; zero means claudeui.DefaultNudgeCaps.
+	FirstPromptGrace time.Duration
 
 	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
 	// DefaultCompactRewaitTimeout.
