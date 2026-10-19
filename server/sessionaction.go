@@ -198,55 +198,85 @@ const (
 	signalPersonInput  = "person-input"
 )
 
-// waitForStep waits for a step to end and returns the signal it ended on. A
-// real prompt ends on Working then Idle, and stops the rest if it never goes
-// Working. A slash command may run locally in claude and never show Working,
-// so it also ends on a new conversation id while Idle (`/clear`), or on the
-// settle window with the session still Idle, where a swallowed Enter gets
-// one more. Blocked stops the rest rather than wait on a person who may never
-// come.
+// waitForStep waits for a step to end and returns the signal it ended on.
 func (r *actionRun) waitForStep(slash bool) (string, error) {
-	timer := r.started
 	if slash {
-		timer = r.settle
+		return r.waitForSlash()
 	}
-	expired := time.After(timer)
+	return r.waitForTurn()
+}
+
+// nextStatus blocks for the next event of a step. It reports expired when the
+// timer fires. Otherwise a non-empty signal or an error means the step is over,
+// and neither means a status was applied to r.state. Blocked stops the rest
+// rather than wait on a person who may never come.
+func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal string, err error) {
+	select {
+	case <-r.s.sessionWatches.stop:
+		return false, "", errors.New("server stopping")
+	case <-r.cancel:
+		return false, signalPersonInput, nil
+	case <-timer:
+		return true, "", nil
+	case msg, ok := <-r.msgs:
+		if err := r.apply(msg, ok); err != nil {
+			return false, "", err
+		}
+		if r.state == SessionBlocked {
+			return false, "", errors.New("session went blocked")
+		}
+		return false, "", nil
+	}
+}
+
+// waitForTurn waits for a real prompt to go Working then Idle. It stops the
+// rest if the session never goes Working within the start timeout.
+func (r *actionRun) waitForTurn() (string, error) {
+	timer := time.After(r.started)
 	working := false
 	for {
-		select {
-		case <-r.s.sessionWatches.stop:
-			return "", errors.New("server stopping")
-		case <-r.cancel:
-			return signalPersonInput, nil
-		case <-expired:
-			if working {
-				continue
-			}
-			if !slash {
-				return signalStartTimeout, errors.New("prompt never went working")
-			}
-			if r.state != SessionIdle {
-				continue
-			}
+		expired, signal, err := r.nextStatus(timer)
+		if signal != "" || err != nil {
+			return signal, err
+		}
+		switch {
+		case expired && !working:
+			return signalStartTimeout, errors.New("prompt never went working")
+		case expired:
+		case r.state == SessionWorking:
+			working = true
+		case r.state == SessionIdle && working:
+			return signalTurn, nil
+		}
+	}
+}
+
+// waitForSlash waits for a slash command to end. It may run locally in claude
+// and never show Working, so it ends on Working then Idle, on a new
+// conversation id while Idle (`/clear`), or on the settle window with the
+// session still Idle, where a swallowed Enter gets one more.
+func (r *actionRun) waitForSlash() (string, error) {
+	timer := time.After(r.settle)
+	working := false
+	for {
+		expired, signal, err := r.nextStatus(timer)
+		if signal != "" || err != nil {
+			return signal, err
+		}
+		switch {
+		case expired && (working || r.state != SessionIdle):
+		case expired:
 			pressed, err := r.pressEnterIfStillTyped()
 			if pressed {
 				r.s.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
 			}
 			return signalSettle, err
-		case msg, ok := <-r.msgs:
-			if err := r.apply(msg, ok); err != nil {
-				return "", err
-			}
-			switch {
-			case r.state == SessionBlocked:
-				return "", errors.New("session went blocked")
-			case r.state == SessionWorking:
-				working = true
-			case r.state == SessionIdle && working:
-				return signalTurn, nil
-			case r.state == SessionIdle && slash && r.convChanged:
-				return signalNewConv, nil
-			}
+		case r.state == SessionWorking:
+			working = true
+		case r.state == SessionIdle && working:
+			return signalTurn, nil
+		case r.state == SessionIdle && r.convChanged:
+			return signalNewConv, nil
 		}
 	}
 }
