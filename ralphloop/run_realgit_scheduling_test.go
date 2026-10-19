@@ -266,7 +266,6 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 
 		case "agent send-keys":
 			pane, key := argv[2], argv[3]
-			// Interrupt follows its Ctrl+C with Ctrl+U to clear the input line.
 			if pane == "pane-"+iterLabel(epicName, "03") && key == "ctrl+c" {
 				mu.Lock()
 				ctrlCCalls++
@@ -516,8 +515,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	if len(closedTabs) != 7 {
 		t.Errorf("closedTabs = %v, want exactly 7 (one per ticket plus D's conflict-resolution tab)", closedTabs)
 	}
-	if ctrlCCalls != 1 || compactCalls != 1 || finishUpCalls != 1 {
-		t.Errorf("C recovery calls = (ctrl-c:%d compact:%d finish-up:%d), want exactly one each", ctrlCCalls, compactCalls, finishUpCalls)
+	if ctrlCCalls != 2 || compactCalls != 1 || finishUpCalls != 1 {
+		t.Errorf("C recovery calls = (ctrl-c:%d compact:%d finish-up:%d), want ctrl-c twice (interrupt, clear) and one of the others", ctrlCCalls, compactCalls, finishUpCalls)
 	}
 	if !bLandedDuringCCompact {
 		t.Error("B did not land while C was compacting")

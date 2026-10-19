@@ -87,6 +87,9 @@ func TestPty_Conformance(t *testing.T) {
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+				// The control FIFO and the pty's keys reach the fake on
+				// separate paths, so a key sent right away can beat the stall.
+				time.Sleep(100 * time.Millisecond)
 			},
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})

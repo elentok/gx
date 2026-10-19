@@ -223,8 +223,8 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	if compactCalls != 1 {
 		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
 	}
-	if ctrlCCalls != 1 {
-		t.Errorf("ctrl+c sends = %d, want exactly 1", ctrlCCalls)
+	if ctrlCCalls != 2 {
+		t.Errorf("ctrl+c sends = %d, want exactly 2 (interrupt, then clear the restored prompt)", ctrlCCalls)
 	}
 	if enterCalls != 0 {
 		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
@@ -466,8 +466,8 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	if finishUpCalls != 1 {
 		t.Errorf("finish-up prompts = %d, want exactly 1 (the run must reach a normal finish, not merely withhold the prompt)", finishUpCalls)
 	}
-	if ctrlCCalls != 1 {
-		t.Errorf("ctrl+c sends = %d, want exactly 1", ctrlCCalls)
+	if ctrlCCalls != 2 {
+		t.Errorf("ctrl+c sends = %d, want exactly 2 (interrupt, then clear the restored prompt)", ctrlCCalls)
 	}
 	if enterCalls != 0 {
 		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
@@ -664,8 +664,8 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	if finishUpCalls != 0 {
 		t.Errorf("finish-up prompts = %d, want 0 (it would land as input to a still-running compaction)", finishUpCalls)
 	}
-	if ctrlCCalls != 1 {
-		t.Errorf("ctrl+c sends = %d, want exactly 1", ctrlCCalls)
+	if ctrlCCalls != 2 {
+		t.Errorf("ctrl+c sends = %d, want exactly 2 (interrupt, then clear the restored prompt)", ctrlCCalls)
 	}
 	if enterCalls != 0 {
 		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
@@ -972,8 +972,8 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	if compactCalls != 1 {
 		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
 	}
-	if ctrlCCalls != 1 {
-		t.Errorf("ctrl+c sends = %d, want exactly 1", ctrlCCalls)
+	if ctrlCCalls != 2 {
+		t.Errorf("ctrl+c sends = %d, want exactly 2 (interrupt, then clear the restored prompt)", ctrlCCalls)
 	}
 	if enterCalls != 0 {
 		t.Errorf("enter nudges = %d, want 0 (a stray Enter cancels an in-progress compaction)", enterCalls)
