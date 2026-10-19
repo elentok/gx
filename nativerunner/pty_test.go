@@ -615,3 +615,23 @@ func serveOldHolder(t *testing.T, dir string, resps map[string]any) {
 		}
 	}()
 }
+
+// While a deny-reason step runs, the holder refuses keys, and the runner
+// reports that as ErrNotReady rather than a dead session.
+func TestPty_KeysDuringDenyReasonAreNotReady(t *testing.T) {
+	p := newPty(t)
+	t.Setenv(holderDenyTimeoutEnv, "1500ms")
+	s := blockedPty(t, p, true)
+
+	denied := make(chan error, 1)
+	go func() {
+		denied <- p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"})
+	}()
+	waitFor(t, "Interrupt refused as not ready", func() bool {
+		return errors.Is(p.Interrupt(s), agentrunner.ErrNotReady)
+	})
+	if err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionAllow}); !errors.Is(err, agentrunner.ErrNotReady) {
+		t.Fatalf("Answer during the step = %v; want ErrNotReady", err)
+	}
+	<-denied
+}

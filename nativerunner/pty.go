@@ -427,12 +427,16 @@ func (p *Pty) markDied(ss *ptySession, err error) {
 	ss.died = err
 }
 
-// died maps a failed holder call to ErrSessionDied: claude's exit code when
+// died maps a failed holder call to ErrNotReady when the holder refused keys
+// during a deny-reason, else to ErrSessionDied: claude's exit code when
 // the holder reported or saved one, so claude exited, else the holder failure
 // itself.
 func (p *Pty) died(ss *ptySession, err error) error {
 	if err == nil {
 		return nil
+	}
+	if errors.Is(err, ErrHolderDenyBusy) {
+		return fmt.Errorf("%w: %v", agentrunner.ErrNotReady, err)
 	}
 	var exited *ClaudeExitedError
 	if errors.As(err, &exited) {

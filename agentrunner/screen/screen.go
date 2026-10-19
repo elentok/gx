@@ -78,6 +78,9 @@ type Screen struct {
 	mouse map[ansi.Mode]bool
 	st    stFilter
 	buf   []byte
+	// holding queues SendKey and Paste into held, as closures run under mu.
+	holding bool
+	held    []func()
 }
 
 // NewScreen returns a cols×rows screen whose replies to terminal queries are
@@ -335,6 +338,34 @@ func (s *Screen) StyledScrollback(i int) string {
 func (s *Screen) SendKey(k Key) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.holding {
+		s.held = append(s.held, func() { s.sendKeyLocked(k) })
+		return
+	}
+	s.sendKeyLocked(k)
+}
+
+// HoldInput queues SendKey and Paste calls until ReleaseInput. Replies to
+// terminal queries still go out.
+func (s *Screen) HoldInput() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.holding = true
+}
+
+// ReleaseInput writes the queued input in arrival order, then resumes direct
+// writes.
+func (s *Screen) ReleaseInput() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.holding = false
+	for _, f := range s.held {
+		f()
+	}
+	s.held = nil
+}
+
+func (s *Screen) sendKeyLocked(k Key) {
 	k.Mod &^= uv.ModCapsLock | uv.ModNumLock | uv.ModScrollLock
 	// The emulator drops a key with any modifier but Alt, so text typed with
 	// Shift (h with Shift is "H") goes as its runes.
@@ -460,6 +491,10 @@ func (s *Screen) SendMouse(x, y int, kind MouseKind, button int) {
 func (s *Screen) Paste(text string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.holding {
+		s.held = append(s.held, func() { s.emu.Paste(text) })
+		return
+	}
 	s.emu.Paste(text)
 }
 

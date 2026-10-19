@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -88,6 +89,14 @@ type holderResponse struct {
 	Exited *int `json:"exited,omitempty"`
 }
 
+// denyBusyMessage is the keys error while a deny-reason step runs. The
+// response shape is frozen, so the client tells the refusal apart by this text.
+const denyBusyMessage = "deny-reason in progress"
+
+// ErrHolderDenyBusy is the client's error for a keys op the holder refused
+// because a deny-reason step is running. Nothing was written.
+var ErrHolderDenyBusy = errors.New(denyBusyMessage)
+
 // ClaudeExitedError is status's error once claude has exited. The holder
 // writes exit-code only after its drain, so this is how a caller tells a
 // normal exit from a holder failure until then.
@@ -111,6 +120,8 @@ type holderServer struct {
 	// on the watcher's own changes and on output, which drives the rest.
 	changes signalHub
 	ops     []string
+	// denying is set while a deny-reason step runs; keys is refused meanwhile.
+	denying atomic.Bool
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
 	exitCode int
@@ -186,6 +197,9 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	case opScreen:
 		return holderResponse{Screen: h.scr.Rows(), Scrollback: h.scr.ScrollbackTail(req.Scrollback)}, nil
 	case opKeys:
+		if h.denying.Load() {
+			return holderResponse{Error: denyBusyMessage}, nil
+		}
 		if _, err := h.ptmx.Write([]byte(req.Keys)); err != nil {
 			return holderResponse{Error: err.Error()}, nil
 		}
@@ -211,6 +225,13 @@ func (h *holderServer) denyReason(reason string) error {
 	}
 	h.pid.Hold()
 	defer h.pid.Release()
+	// Attach input waits for the step's bytes; terminal replies do not.
+	h.denying.Store(true)
+	h.scr.HoldInput()
+	defer func() {
+		h.denying.Store(false)
+		h.scr.ReleaseInput()
+	}()
 	if _, err := h.ptmx.Write([]byte("\x1b")); err != nil {
 		return err
 	}
@@ -519,6 +540,9 @@ func (c *HolderClient) callWithin(req holderRequest, timeout time.Duration) (hol
 	}
 	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
 		return resp, fmt.Errorf("holder %s: %w", req.Op, err)
+	}
+	if resp.Error == denyBusyMessage {
+		return resp, fmt.Errorf("holder %s: %w", req.Op, ErrHolderDenyBusy)
 	}
 	if resp.Error != "" {
 		return resp, errors.New("holder " + req.Op + ": " + resp.Error)

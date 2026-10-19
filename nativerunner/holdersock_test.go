@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -222,4 +223,43 @@ func shortTempDir(t *testing.T) string {
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
+}
+
+// denySlowIdle goes idle only after a pause, so the deny-reason step lasts
+// long enough to act in the middle of it. The second line is what the held
+// attach input reads as.
+const denySlowIdle = `sleep 0.3; st idle; read -r l; st busy; printf 'got:%s\n' "$l"; read -r m; printf 'then:%s\n' "$m"; cat >/dev/null`
+
+func TestHolderSocket_DenyReasonLocksKeysAndHoldsAttachInput(t *testing.T) {
+	c := startDenyHolder(t, denySlowIdle)
+	a, err := c.Attach()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = a.Close() })
+
+	denied := make(chan error, 1)
+	go func() { denied <- c.DenyWithReason("use rg") }()
+	// An empty keys op writes nothing, so it probes the lock without typing.
+	waitFor(t, "keys refused during the step", func() bool {
+		return errors.Is(c.SendKeys(""), nativerunner.ErrHolderDenyBusy)
+	})
+	if err := a.Paste("held"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.SendKey(screen.Key{Code: '\r'}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SendKeys("q"); !errors.Is(err, nativerunner.ErrHolderDenyBusy) {
+		t.Fatalf("keys during the step = %v; want ErrHolderDenyBusy", err)
+	}
+	if err := <-denied; err != nil {
+		t.Fatal(err)
+	}
+	// The reason reaches the child first, then the held input in order.
+	waitForScreen(t, c, "got:use rg")
+	waitForScreen(t, c, "then:held")
+	if err := c.SendKeys(""); err != nil {
+		t.Fatalf("keys after the step = %v; want accepted", err)
+	}
 }

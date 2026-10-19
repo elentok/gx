@@ -513,3 +513,18 @@ func TestScreen_SendMouseFollowsMouseModes(t *testing.T) {
 		})
 	}
 }
+
+func TestScreen_HeldInputWaitsForReleaseButRepliesDoNot(t *testing.T) {
+	var out syncBuffer
+	s := screen.NewScreenWithReplies(10, 2, &out)
+	s.HoldInput()
+	s.SendKey(screen.Key{Code: 'a', Text: "a"})
+	s.Paste("p")
+	_, _ = s.Write([]byte("\x1b[c"))
+	s.SendKey(screen.Key{Code: 'b', Text: "b"})
+	s.ReleaseInput()
+	got := written(t, s, &out)
+	if !strings.HasPrefix(got, "\x1b[?") || !strings.HasSuffix(got, "apb") {
+		t.Errorf("written = %q; want the DA1 reply first, then the held input in order", got)
+	}
+}
