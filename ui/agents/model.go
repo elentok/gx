@@ -222,6 +222,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSessionCreated(msg)
 	case sessionActionMsg:
 		return m.updateSessionAction(msg)
+	case queueActionMsg:
+		return m.updateQueueAction(msg)
 	case sessionMenuPickMsg:
 		return m.updateMenuPick(msg)
 	case pageActivatedMsg:

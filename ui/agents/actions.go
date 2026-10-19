@@ -3,13 +3,17 @@ package agents
 import (
 	"context"
 	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
 type sessionActionMsg struct {
@@ -85,13 +89,66 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 	if len(steps) == 0 {
 		return m, notify.Info("no action")
 	}
+	accept := sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
+	if isQueueAction(s.Actionable) {
+		accept = queueActionCmd(m.client, s.Project, s.Actionable.Target)
+	}
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:     "Run action on " + displayName(s) + "?",
 		Items:      steps,
-		AcceptCmd:  sessionActionCmd("run action", m.client.RunSessionAction, s.ID),
+		AcceptCmd:  accept,
 		DefaultYes: true,
 	})
 	return m, nil
+}
+
+func isQueueAction(a server.SessionActionable) bool {
+	return a.Kind == server.SessionActionableQueue && a.Target != ""
+}
+
+// queueActionMsg is the outcome of a queue action: how many tickets of epic
+// the server took and the refusals as "address: reason".
+type queueActionMsg struct {
+	epic     string
+	queued   int
+	refusals []string
+	err      error
+}
+
+// queueActionCmd queues the open tickets of project's epic. The queue action
+// never goes to the session as a prompt.
+func queueActionCmd(c SessionClient, project, epic string) tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		snap, err := c.Snapshot(ctx)
+		if err != nil {
+			return queueActionMsg{err: err}
+		}
+		prefix := project + ":" + epic + "/"
+		var addrs []string
+		for _, t := range snap.Tickets {
+			if strings.HasPrefix(t.Address, prefix) && t.Status == string(schema.StatusOpen) {
+				addrs = append(addrs, t.Address)
+			}
+		}
+		slices.Sort(addrs)
+		queued, refusals := ticketsui.QueueAddresses(ctx, c.QueueAdd, addrs)
+		return queueActionMsg{epic: project + ":" + epic, queued: queued, refusals: refusals}
+	}
+}
+
+// updateQueueAction opens the Queue tab on the epic once the server took
+// every ticket; a refusal, or nothing to queue, stays here as a warning.
+func (m Model) updateQueueAction(msg queueActionMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case msg.err != nil:
+		return m, notify.Error("queue failed: " + msg.err.Error())
+	case msg.queued == 0 && len(msg.refusals) == 0:
+		return m, notify.Warning("nothing to queue in " + msg.epic)
+	case len(msg.refusals) > 0:
+		return m, ticketsui.QueuedToast(msg.queued, msg.refusals)
+	}
+	return m, tea.Batch(ticketsui.QueuedToast(msg.queued, nil), nav.Switch(nav.ViewState{Tab: nav.TabQueue, InitialPath: msg.epic}))
 }
 
 func (m Model) markReadSelected() (tea.Model, tea.Cmd) {

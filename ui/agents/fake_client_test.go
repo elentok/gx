@@ -20,6 +20,9 @@ type fakeSessionClient struct {
 
 	creates []server.CreateSessionRequest
 
+	snapshot      server.Snapshot
+	queueRefusals map[string]string
+
 	reports     []server.FocusReport
 	focusResult server.SessionResult
 }
@@ -58,6 +61,19 @@ func (f *fakeSessionClient) MarkSessionRead(_ context.Context, id string) (serve
 
 func (f *fakeSessionClient) RunSessionAction(_ context.Context, id string) (server.SessionResult, error) {
 	return f.record("action " + id)
+}
+
+func (f *fakeSessionClient) Snapshot(context.Context) (server.Snapshot, error) {
+	return f.snapshot, nil
+}
+
+// QueueAdd refuses the addresses in queueRefusals with the reason they map to.
+func (f *fakeSessionClient) QueueAdd(_ context.Context, address, _ string) (server.QueueResult, error) {
+	f.record("queue " + address)
+	if reason, ok := f.queueRefusals[address]; ok {
+		return server.QueueResult{Refused: true, Message: reason}, nil
+	}
+	return server.QueueResult{}, nil
 }
 
 func (f *fakeSessionClient) SetAFK(_ context.Context, on *bool) (server.AFKResult, error) {

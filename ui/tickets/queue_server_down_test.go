@@ -155,3 +155,25 @@ func TestQueueServerMode_ProjectInEpicHeaderAndFiltersByProject(t *testing.T) {
 		t.Errorf("after the last project the filter should return to all, got %q", got)
 	}
 }
+
+func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
+	m := newServerQueueModel(t, func(context.Context) error { return nil }).WithFocusEpic("gx:beta")
+	if m.FocusEpic() != "gx:beta" {
+		t.Fatal("the request must wait while the epic has no rows")
+	}
+
+	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:beta/01", Title: "Second", Status: "open"},
+	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:beta/01"}})
+	next, _ := m.WithServerState(&st, ServerLinkUp)
+	m = next.(QueueModel)
+
+	entry := m.queueTree.Entries()[m.queueTree.SelectedIndex()].Value
+	if entry.kind != nodeEpicName || entry.epic.Name != "gx:beta" {
+		t.Fatalf("selected = %+v, want the gx:beta header", entry)
+	}
+	if m.FocusEpic() != "" {
+		t.Fatal("the request must clear once met")
+	}
+}

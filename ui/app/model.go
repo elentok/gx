@@ -126,8 +126,8 @@ func cwdProjectName(root string) string {
 	return gxtickets.ProjectName(dir)
 }
 
-func (m Model) newQueueModel(root string, s ui.Settings) ticketsui.QueueModel {
-	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings()))
+func (m Model) newQueueModel(root string, s ui.Settings, focusEpic string) ticketsui.QueueModel {
+	qm := ticketsui.NewQueueModel(root, s, keys.New(Bindings())).WithFocusEpic(focusEpic)
 	if m.settings.Server != nil {
 		qm = qm.WithServerLink(m.settings.Server.Client, m.settings.Server.Start)
 	}
@@ -300,7 +300,7 @@ func (m Model) buildHistoryEntry(viewState nav.ViewState) historyEntry {
 	case nav.TabQueue:
 		return historyEntry{
 			viewState: viewState,
-			model:     m.newQueueModel(viewState.WorktreeRoot, s),
+			model:     m.newQueueModel(viewState.WorktreeRoot, s, viewState.InitialPath),
 		}
 	case nav.TabAgents:
 		return historyEntry{

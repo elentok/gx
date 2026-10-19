@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -185,30 +186,45 @@ type epicQueuedMsg struct {
 }
 
 func (msg epicQueuedMsg) toast() tea.Cmd {
-	text := fmt.Sprintf("queued %d, refused %d", msg.queued, len(msg.refusals))
-	if len(msg.refusals) == 0 {
-		return notify.Success(text)
-	}
-	return notify.Warning(text + " (" + strings.Join(msg.refusals, "; ") + ")")
+	return QueuedToast(msg.queued, msg.refusals)
 }
 
-// cmdQueueEpic sends one queue-add per address, carrying on past refusals so
-// one blocked ticket doesn't keep the rest out.
+// QueuedToast is the toast for a finished queue run: a warning listing the
+// refusals, else a success.
+func QueuedToast(queued int, refusals []string) tea.Cmd {
+	text := fmt.Sprintf("queued %d, refused %d", queued, len(refusals))
+	if len(refusals) == 0 {
+		return notify.Success(text)
+	}
+	return notify.Warning(text + " (" + strings.Join(refusals, "; ") + ")")
+}
+
+// QueueAddFunc is the queue-add call of the server client.
+type QueueAddFunc func(ctx context.Context, address, agent string) (server.QueueResult, error)
+
+// QueueAddresses sends one queue-add per address, carrying on past refusals so
+// one blocked ticket doesn't keep the rest out. It returns how many the server
+// took and the refusals as "address: reason".
+func QueueAddresses(ctx context.Context, add QueueAddFunc, addrs []string) (queued int, refusals []string) {
+	for _, addr := range addrs {
+		res, err := add(ctx, addr, string(serverEnqueueDefaultAgent))
+		switch {
+		case err != nil:
+			refusals = append(refusals, addr+": "+err.Error())
+		case res.Refused:
+			refusals = append(refusals, addr+": "+res.Message)
+		default:
+			queued++
+		}
+	}
+	return queued, refusals
+}
+
+// cmdQueueEpic queues addrs and reports the outcome as an epicQueuedMsg.
 func cmdQueueEpic(api ServerAPI, addrs []string) tea.Cmd {
 	return func() tea.Msg {
-		var out epicQueuedMsg
-		for _, addr := range addrs {
-			res, err := api.QueueAdd(context.Background(), addr, string(serverEnqueueDefaultAgent))
-			switch {
-			case err != nil:
-				out.refusals = append(out.refusals, addr+": "+err.Error())
-			case res.Refused:
-				out.refusals = append(out.refusals, addr+": "+res.Message)
-			default:
-				out.queued++
-			}
-		}
-		return out
+		queued, refusals := QueueAddresses(context.Background(), api.QueueAdd, addrs)
+		return epicQueuedMsg{queued: queued, refusals: refusals}
 	}
 }
 

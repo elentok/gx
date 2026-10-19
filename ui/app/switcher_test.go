@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
+	ticketsui "github.com/elentok/gx/ui/tickets"
 )
 
 var ctrlO = tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
@@ -348,5 +349,19 @@ func TestSwitcher_Golden(t *testing.T) {
 		m, _ = step(m, ctrlO)
 		m = typeText(m, tc.query)
 		assertGolden(t, tc.name, m.renderSwitcher()+"\n")
+	}
+}
+
+func TestSwitch_ToQueueWithAnEpicAddressFocusesThatEpic(t *testing.T) {
+	t.Parallel()
+	m, _ := switcherApp(t)
+
+	m, _ = step(m, nav.Switch(nav.ViewState{Tab: nav.TabQueue, InitialPath: "gx:epic-impl"})())
+	if got := m.navState.ActiveTab(); got != nav.TabQueue {
+		t.Fatalf("active tab = %q, want queue", got)
+	}
+	queue, ok := m.activePage().model.(ticketsui.QueueModel)
+	if !ok || queue.FocusEpic() != "gx:epic-impl" {
+		t.Fatalf("queue page = %#v, want it to wait on gx:epic-impl", m.activePage().model)
 	}
 }

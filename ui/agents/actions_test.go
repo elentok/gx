@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
 )
 
@@ -235,6 +236,65 @@ func TestActions_QueueActionListsTheQueue(t *testing.T) {
 	m, _ = act(t, m, letter("a"))
 	if view := m.confirm.View(80); !strings.Contains(view, "Queue `epic-impl`") {
 		t.Fatalf("confirm lacks the queue:\n%s", view)
+	}
+}
+
+// confirmQueueAction presses a then Enter on a "live" session with a queue
+// action and returns the model and the commands the confirmed action left.
+func confirmQueueAction(t *testing.T, f *fakeSessionClient) (Model, []tea.Msg) {
+	t.Helper()
+	f.snapshot = server.Snapshot{Tickets: []server.TicketInfo{
+		{Address: "gx:epic-impl/02", Status: "open"},
+		{Address: "gx:epic-impl/01", Status: "open"},
+		{Address: "gx:epic-impl/00", Status: "done"},
+		{Address: "gx:other/01", Status: "open"},
+	}}
+	m := withSession(actionModel(t, f, "live"), "live", func(s *server.SessionInfo) {
+		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "epic-impl"}
+	})
+	m, _ = act(t, m, letter("a"))
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	next, cmd = next.(Model).Update(cmd())
+	var msgs []tea.Msg
+	if batch, ok := cmd().(tea.BatchMsg); ok {
+		for _, c := range batch {
+			msgs = append(msgs, c())
+		}
+	} else {
+		msgs = append(msgs, cmd())
+	}
+	return next.(Model), msgs
+}
+
+func TestActions_QueueActionQueuesTheEpicAndSwitchesToTheQueueTab(t *testing.T) {
+	f := &fakeSessionClient{}
+	_, msgs := confirmQueueAction(t, f)
+	if got, want := calls(f), []string{"queue gx:epic-impl/01", "queue gx:epic-impl/02"}; !slices.Equal(got, want) {
+		t.Fatalf("calls = %v, want %v (never a run-action)", got, want)
+	}
+	var switched *nav.ViewState
+	for _, msg := range msgs {
+		if vs, ok := nav.IsSwitch(msg); ok {
+			switched = &vs
+		}
+	}
+	if switched == nil || switched.Tab != nav.TabQueue || switched.InitialPath != "gx:epic-impl" {
+		t.Fatalf("switch = %+v, want the queue tab on gx:epic-impl", switched)
+	}
+}
+
+func TestActions_QueueActionRefusalWarnsAndStays(t *testing.T) {
+	f := &fakeSessionClient{queueRefusals: map[string]string{"gx:epic-impl/02": "blocked by 01"}}
+	_, msgs := confirmQueueAction(t, f)
+	if len(msgs) != 1 {
+		t.Fatalf("msgs = %#v, want one warning", msgs)
+	}
+	n, ok := msgs[0].(notify.NotifyMsg)
+	if !ok || !strings.Contains(n.Message, "gx:epic-impl/02: blocked by 01") {
+		t.Fatalf("msg = %#v, want the refusal reason", msgs[0])
+	}
+	if _, switched := nav.IsSwitch(msgs[0]); switched {
+		t.Fatal("a refusal must not switch tabs")
 	}
 }
 
