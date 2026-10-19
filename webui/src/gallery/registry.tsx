@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
 import { Badge } from "../ui/badge/Badge";
 import { Card } from "../ui/card/Card";
+import { Chip } from "../ui/chip/Chip";
+import { EmptyState } from "../ui/empty-state/EmptyState";
+import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
+import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TONES, type Tone } from "../ui/tone";
 
@@ -50,6 +54,16 @@ export const galleryEntries: GalleryEntry[] = [
         </Card>
       )),
       { label: "no title", node: <Card>{ticket.title}</Card> },
+    ],
+  },
+  { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
+  { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },
+  { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
+  {
+    name: "EmptyState",
+    cases: [
+      ...perTone((tone) => <EmptyState tone={tone} title="All quiet" />),
+      { label: "with body", node: <EmptyState title="All quiet">Nothing is running.</EmptyState> },
     ],
   },
 ];
