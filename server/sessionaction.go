@@ -65,8 +65,6 @@ type actionRun struct {
 	// status carried a different one, and cleared at each step.
 	convID      string
 	convChanged bool
-	// sawStatus is set by the first status of a step, for the debug line.
-	sawStatus bool
 	actionRunOpts
 }
 
@@ -158,7 +156,7 @@ func (r *actionRun) step(i int, prompt string) error {
 	if r.s.inputHoldsDraft(r.dir, r.holder) {
 		return errDraft
 	}
-	r.convChanged, r.sawStatus = false, false
+	r.convChanged = false
 	begin := time.Now()
 	if err := typeSessionPrompt(r.dir, prompt); err != nil {
 		return err
@@ -288,10 +286,6 @@ func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
 	if msg.Type == nativerunner.StreamStatus {
 		r.state = sessionStatusOf(msg.Status).State
 		log := r.s.log.With("session", filepath.Base(r.dir))
-		if !r.sawStatus {
-			r.sawStatus = true
-			log.Debug("action step first status", "state", r.state)
-		}
 		if id := msg.ConversationID; id != "" && id != r.convID {
 			// The first id seen is the baseline, not a change.
 			if r.convID != "" {

@@ -36,57 +36,68 @@ const clearInputHint = " Clear the input first."
 // decides when to type, types in the background, and cancels the remaining
 // nudges when a person types too.
 type firstPrompt struct {
-	s   *Server
-	dir string
-	log *slog.Logger
-	// started, sawStatus and sawIdle only trace the watch for the debug lines;
-	// the watch loop is their one reader and writer.
-	started, sawStatus, sawIdle bool
-	typed                       atomic.Bool
-	cancel                      chan struct{}
-	cancelOnce                  sync.Once
-	turnStarted                 chan struct{}
-	turnOnce                    sync.Once
+	s           *Server
+	dir         string
+	log         *slog.Logger
+	typed       atomic.Bool
+	cancel      chan struct{}
+	cancelOnce  sync.Once
+	turnStarted chan struct{}
+	turnOnce    sync.Once
+	id          string
+	run         int
+	timeout     time.Duration
+	clock       *startClock
+}
 
-	// The Starting clock counts only time spent Starting, so a dialog a person
-	// answers (Blocked) does not use it up. Only the watch loop touches since
-	// and spent; the timer callback reads the session's state from its meta.
-	id      string
-	run     int
+// startClock counts only time spent Starting, so a dialog a person answers
+// (Blocked) does not use it up. Only the watch loop touches it; the timer
+// callback reads the session's state from its meta.
+type startClock struct {
 	timeout time.Duration
 	timer   *time.Timer
 	since   time.Time
 	spent   time.Duration
 }
 
+// startStartClock starts the clock at launch; onTimeout fires when the
+// session has spent timeout Starting.
+func startStartClock(timeout time.Duration, onTimeout func()) *startClock {
+	return &startClock{
+		timeout: timeout,
+		timer:   time.AfterFunc(timeout, onTimeout),
+		since:   time.Now(),
+	}
+}
+
+// track pauses the clock outside Starting and resumes it with what is left.
+func (c *startClock) track(state string) {
+	starting := state == SessionStarting || state == ""
+	switch {
+	case starting && c.since.IsZero():
+		c.since = time.Now()
+		c.timer.Reset(c.timeout - c.spent)
+	case !starting && !c.since.IsZero():
+		c.spent += time.Since(c.since)
+		c.since = time.Time{}
+		c.timer.Stop()
+	}
+}
+
+func (c *startClock) stop() { c.timer.Stop() }
+
 func (s *Server) newFirstPrompt(dir, id string, run int) *firstPrompt {
 	f := &firstPrompt{
 		s: s, dir: dir, id: id, run: run, log: s.log.With("session", id),
 		cancel: make(chan struct{}), turnStarted: make(chan struct{}),
 		timeout: cmp.Or(s.cfg.FirstPromptStartTimeout, DefaultFirstPromptStartTimeout),
-		since:   time.Now(),
 	}
-	f.timer = time.AfterFunc(f.timeout, f.startTimedOut)
+	f.clock = startStartClock(f.timeout, f.startTimedOut)
 	return f
 }
 
 // stop ends the Starting clock when the watch ends.
-func (f *firstPrompt) stop() { f.timer.Stop() }
-
-// trackStarting pauses the Starting clock outside Starting and resumes it with
-// what is left.
-func (f *firstPrompt) trackStarting(state string) {
-	starting := state == SessionStarting || state == ""
-	switch {
-	case starting && f.since.IsZero():
-		f.since = time.Now()
-		f.timer.Reset(f.timeout - f.spent)
-	case !starting && !f.since.IsZero():
-		f.spent += time.Since(f.since)
-		f.since = time.Time{}
-		f.timer.Stop()
-	}
-}
+func (f *firstPrompt) stop() { f.clock.stop() }
 
 // startTimedOut hands a still-pending prompt to a person when the session is
 // Starting at the deadline.
@@ -174,18 +185,6 @@ func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
 // that lets it type: the ready report, else the first Idle. It never fires
 // while Blocked.
 func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
-	if !f.started {
-		f.started = true
-		f.log.Debug("first prompt start")
-	}
-	if !f.sawStatus {
-		f.sawStatus = true
-		f.log.Debug("first prompt first status", "state", state)
-	}
-	if state == SessionIdle && !f.sawIdle {
-		f.sawIdle = true
-		f.log.Debug("first prompt first Idle")
-	}
 	switch {
 	case state == SessionBlocked:
 		return ""
@@ -200,7 +199,7 @@ func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
 // noteState closes turnStarted on the first Working after gx typed: the watch
 // sees a turn start even where the holder's Turn counter does not move.
 func (f *firstPrompt) noteState(state string) {
-	f.trackStarting(state)
+	f.clock.track(state)
 	if state == SessionWorking && f.typed.Load() {
 		f.turnOnce.Do(func() { close(f.turnStarted) })
 	}
