@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -33,6 +34,22 @@ func TestFirstPrompt_TypedOnReadyReportAndSubmittedOnce(t *testing.T) {
 	if got := submitted(t, conv); got != "\"fix the bug\"\n" {
 		t.Errorf("submitted = %q, want exactly one submission", got)
 	}
+}
+
+// The draft check must read the screen after ready-to-type switched vim to
+// INSERT, not while the box still sits in NORMAL.
+func TestFirstPrompt_RealPromptInVimNormalIsDeliveredAfterTheInsertSwitch(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_CONFIG_DIR", dir)
+	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug")
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionVimNormal}); err != nil {
+		t.Fatal(err)
+	}
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSubmitted(t, conv, "\"fix the bug\"\n")
 }
 
 func TestFirstPrompt_RealPromptWithSwallowedEnterIsNudged(t *testing.T) {
