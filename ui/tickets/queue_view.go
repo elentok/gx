@@ -120,9 +120,11 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicSeparator:
 				return ""
 			case nodeEpicName:
-				return epicNameLine(entry.Value.epic, entry.Value.layout, m.queueLabelWidth())
+				_, _, fill := m.epicStatus(entry.Value.epic)
+				return epicNameLine(entry.Value.epic, fill, entry.Value.layout, m.queueLabelWidth())
 			case nodeEpicBar:
-				return epicBarLine(entry.Value.epic, entry.Value.layout)
+				_, _, fill := m.epicStatus(entry.Value.epic)
+				return epicBarLine(entry.Value.epic, fill, entry.Value.layout)
 			case nodeEpicSpacer:
 				return ""
 			case nodeEpicStatusLine:
@@ -143,7 +145,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 				if cost > 0 {
 					extra = tickets.FormatCost(cost)
 				}
-				return epicStatusRow(m.icons(), entry.Value.epic, extra, m.queueLabelWidth())
+				return m.epicStatusRow(entry.Value.epic, extra, m.queueLabelWidth())
 			case nodeEpicError:
 				if stuck, ok := entry.Value.err.(*ralphloop.StuckPlanError); ok {
 					return "    " + metricsLineStyle.Render(

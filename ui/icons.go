@@ -33,6 +33,7 @@ type IconSet struct {
 	Warning       string
 	Info          string
 	Dot           string
+	EpicQueued    string
 	Ellipsis      string
 	CIRunning     string
 	Commented     string
@@ -121,6 +122,7 @@ func Icons(useNerdFont bool) IconSet {
 			Warning:           "⚠",
 			Info:              "i",
 			Dot:               "·",
+			EpicQueued:        "○",
 			Ellipsis:          "...",
 			CIRunning:         "⟳",
 			Commented:         "o",
@@ -186,6 +188,7 @@ func Icons(useNerdFont bool) IconSet {
 		Warning:           "",
 		Info:              "",
 		Dot:               "·",
+		EpicQueued:        "○",
 		Ellipsis:          "…",
 		CIRunning:         "⟳",
 		Commented:         "◐",

@@ -115,7 +115,7 @@ type QueueModel struct {
 
 func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager) QueueModel {
 	sp := spinner.New()
-	sp.Spinner = ui.ProgressSpinner
+	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
 	km := newQueueKeysManager()
 	queueTree := tree.NewModel[queueNode]()
 	queueTree.SetIsSelectable(func(n queueNode) bool {
