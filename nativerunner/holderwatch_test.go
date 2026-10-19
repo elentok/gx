@@ -253,6 +253,56 @@ func (w *settableWatcher) setReady(s agentharness.ReadySignal) {
 	}
 }
 
+// screenReadyHarness's watcher is ready only once the screen shows "READY",
+// and never calls OnChange: the screen is its sole evidence.
+type screenReadyHarness struct {
+	agentharness.Harness
+}
+
+func (screenReadyHarness) Watch(_ int, _ time.Time, scr agentharness.Screen, _ <-chan struct{}) (agentharness.Watcher, error) {
+	return &screenReadyWatcher{settableWatcher: &settableWatcher{}, scr: scr}, nil
+}
+
+func (screenReadyHarness) DisplayName([]byte) (string, bool) { return "", false }
+
+type screenReadyWatcher struct {
+	*settableWatcher
+	scr agentharness.Screen
+}
+
+func (w *screenReadyWatcher) Ready() agentharness.ReadySignal {
+	if strings.Contains(strings.Join(w.scr.Rows(), "\n"), "READY") {
+		return agentharness.ReadyScreen
+	}
+	return ""
+}
+
+func TestHolderWatch_ScreenOnlyReadyNeedsNoOtherStatusEvent(t *testing.T) {
+	dir := shortTempDir(t)
+	show := filepath.Join(dir, "show")
+	child := `while [ ! -e "$1" ]; do sleep 0.05; done; echo READY; sleep 30`
+	c, finished := startTestHolder(t, dir, screenReadyHarness{}, []string{"sh", "-c", child, "sh", show})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+	watch, err := c.Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = watch.Close() })
+
+	if m, err := watch.Next(); err != nil || m.Ready != "" {
+		t.Fatalf("first message = %+v, %v; want a status that is not ready", m, err)
+	}
+	if err := os.WriteFile(show, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus || m.Ready != agentharness.ReadyScreen {
+		t.Errorf("after the screen shows ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
+	}
+}
+
 func TestHolderWatch_ReportsReadySignal(t *testing.T) {
 	dir := shortTempDir(t)
 	w := &settableWatcher{}
