@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-const toolResultLineLimit = 50
+const (
+	toolResultLineLimit  = 50
+	errorResultLineLimit = 100
+)
 
 // ExportMarkdown reads the transcript at path and renders it as readable Markdown.
 // Noise records (system, isMeta, command wrappers) are stripped.
@@ -191,19 +194,28 @@ func renderToolResult(b exportBlock) string {
 		prefix = "**Result (error):**"
 	}
 
+	limit := toolResultLineLimit
+	if b.IsError {
+		limit = errorResultLineLimit
+	}
+
+	return fmt.Sprintf("%s\n```\n%s\n```", prefix, headAndTail(text, limit))
+}
+
+// headAndTail keeps the first and last limit/2 lines of text and replaces the
+// middle with an omitted-lines marker. The end of a result (an error, a test
+// summary) is usually what matters, so a head-only cut is not enough.
+func headAndTail(text string, limit int) string {
 	lines := strings.Split(text, "\n")
-	truncated := false
-	if len(lines) > toolResultLineLimit {
-		lines = lines[:toolResultLineLimit]
-		truncated = true
+	if len(lines) <= limit {
+		return text
 	}
-
-	body := strings.Join(lines, "\n")
-	if truncated {
-		body += "\n... (exporter truncated)"
-	}
-
-	return fmt.Sprintf("%s\n```\n%s\n```", prefix, body)
+	keep := limit / 2
+	omitted := len(lines) - 2*keep
+	out := append([]string{}, lines[:keep]...)
+	out = append(out, fmt.Sprintf("... (%d lines omitted)", omitted))
+	out = append(out, lines[len(lines)-keep:]...)
+	return strings.Join(out, "\n")
 }
 
 func extractToolResultText(raw json.RawMessage) string {

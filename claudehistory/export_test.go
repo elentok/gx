@@ -1,6 +1,7 @@
 package claudehistory
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -103,23 +104,58 @@ func TestExportMarkdownToolResult(t *testing.T) {
 	}
 }
 
-func TestExportMarkdownToolResultTruncated(t *testing.T) {
-	// Build a tool_result with more than 50 lines
+// exportNumberedResult exports a tool_result of n lines ("line 1" .. "line n").
+func exportNumberedResult(t *testing.T, n int, isError bool) string {
+	t.Helper()
 	var lines []string
-	for range 80 {
-		lines = append(lines, "line")
+	for i := 1; i <= n; i++ {
+		lines = append(lines, fmt.Sprintf("line %d", i))
 	}
 	bigResult := strings.Join(lines, `\n`) // JSON-escaped newline
 	fixture := `{"type":"user","isMeta":false,"isSidechain":false,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"` +
-		bigResult + `","is_error":false}]},"timestamp":"2026-01-01T10:00:00Z"}` + "\n"
+		bigResult + fmt.Sprintf(`","is_error":%t}]},"timestamp":"2026-01-01T10:00:00Z"}`, isError) + "\n"
 
-	path := writeFixture(t, fixture)
-	out, err := ExportMarkdown(path)
+	out, err := ExportMarkdown(writeFixture(t, fixture))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "... (exporter truncated)") {
-		t.Errorf("expected truncation marker\ngot:\n%s", out)
+	return out
+}
+
+func TestExportMarkdownToolResultKeepsHeadAndTail(t *testing.T) {
+	out := exportNumberedResult(t, 80, false)
+	for _, want := range []string{"line 1\n", "line 25\n", "line 56\n", "line 80\n", "... (30 lines omitted)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\ngot:\n%s", want, out)
+		}
+	}
+	for _, drop := range []string{"line 26\n", "line 55\n"} {
+		if strings.Contains(out, drop) {
+			t.Errorf("middle line %q should be omitted\ngot:\n%s", drop, out)
+		}
+	}
+}
+
+func TestExportMarkdownToolResultAtLimitNotCut(t *testing.T) {
+	out := exportNumberedResult(t, 50, false)
+	if strings.Contains(out, "omitted") {
+		t.Errorf("50 lines should not be cut\ngot:\n%s", out)
+	}
+}
+
+func TestExportMarkdownErrorResultHasLargerCap(t *testing.T) {
+	out := exportNumberedResult(t, 100, true)
+	if strings.Contains(out, "omitted") {
+		t.Errorf("100-line error should not be cut\ngot:\n%s", out)
+	}
+	out = exportNumberedResult(t, 150, true)
+	for _, want := range []string{"line 50\n", "line 101\n", "line 150\n", "... (50 lines omitted)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\ngot:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "line 51\n") {
+		t.Errorf("middle line should be omitted\ngot:\n%s", out)
 	}
 }
 
