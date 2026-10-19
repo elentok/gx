@@ -32,6 +32,15 @@ func deliverQueue(t *testing.T, snap server.Snapshot, queue []server.QueueItem) 
 }
 
 func deliverQueueTo(m QueueModel, snap server.Snapshot, queue []server.QueueItem) (QueueModel, tea.Cmd) {
+	if snap.Epics == nil {
+		claimedAt := map[string]time.Time{}
+		for _, t := range snap.Tickets {
+			if !t.ClaimedAt.IsZero() {
+				claimedAt[t.Address] = t.ClaimedAt
+			}
+		}
+		snap.Epics = fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: snap.Tickets}, viewmodel.Scope{}), claimedAt)
+	}
 	st := viewmodel.State{}.ApplySnapshot(snap)
 	st = st.SetQueue(queue)
 	next, cmd := m.WithServerState(&st, ServerLinkUp)

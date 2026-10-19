@@ -13,6 +13,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
@@ -540,6 +541,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("running", func(t *testing.T) {
 		m := base
 		m.runningEpics = map[string]bool{"alpha": true}
+		m.summaries = map[string]server.EpicSummary{"alpha": {State: server.StateRunning, Total: 1}}
 		got := m.queueHeaderTitle()
 		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · today $0.00") {
 			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · today $0.00\"", got)
@@ -757,6 +759,10 @@ func seedFromDisk(t *testing.T, m QueueModel) QueueModel {
 		t.Fatal(err)
 	}
 	m.applyEpics(epics, false)
+	m.summaries = map[string]server.EpicSummary{}
+	for _, sum := range fixtureSummaries(epics, nil) {
+		m.summaries[sum.Address] = sum
+	}
 	return m
 }
 

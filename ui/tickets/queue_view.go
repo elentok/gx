@@ -1,12 +1,14 @@
 package tickets
 
 import (
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
@@ -119,9 +121,11 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicSeparator:
 				return ""
 			case nodeEpicName:
-				return epicNameLine(entry.Value.epic, m.epicFill(entry.Value.epic), entry.Value.layout, m.queueLabelWidth())
+				_, _, fill := m.epicStatus(entry.Value.epic)
+				return epicNameLine(entry.Value.epic.Name, m.summaries[entry.Value.epic.Name], fill, entry.Value.layout, m.queueLabelWidth())
 			case nodeEpicBar:
-				return epicBarLine(entry.Value.epic, m.epicFill(entry.Value.epic), entry.Value.layout)
+				_, _, fill := m.epicStatus(entry.Value.epic)
+				return epicBarLine(m.summaries[entry.Value.epic.Name], fill, entry.Value.layout)
 			case nodeEpicSpacer:
 				return ""
 			case nodeEpicStatusLine:
@@ -256,14 +260,15 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 // title the same way the pre-tree.Model buildQueueLines' two-physical-line
 // row used to (triangle + icon + badge width, mirroring renderQueueTicketRow's
 // own column layout). ok reports false (empty line) when r's ticket isn't
-// currently parked.
+// listed in the server's Parked tickets for its epic.
 func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
 	status := epic.RenderedStatus(t)
-	reason := parkReason(epic, t, m.icons().Ellipsis)
-	if reason == "" {
+	i := slices.IndexFunc(m.summaries[epic.Name].Parked, func(p server.SummaryTicket) bool { return p.Address == t.Path })
+	if i < 0 || m.summaries[epic.Name].Parked[i].Reason == "" {
 		return "", false
 	}
+	reason := ellipsize(m.summaries[epic.Name].Parked[i].Reason, parkReasonMaxRunes, m.icons().Ellipsis)
 
 	triangleWidth := triangleColumnWidth(m.icons()) + 1
 	icon, _ := statusIconAndStyle(m.icons(), status)

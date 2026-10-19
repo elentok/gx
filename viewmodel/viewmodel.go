@@ -45,6 +45,9 @@ type State struct {
 	ExtraUsage bool
 	// Tickets is in snapshot order (by address, forks under their parent).
 	Tickets []server.TicketInfo
+	// Epics is the server's summary of each epic holding a queue item, in queue
+	// order, as the last snapshot delivered it.
+	Epics []server.EpicSummary
 	// Queue is the queued ticket addresses in launch order.
 	Queue []string
 	// Iterations holds live state by ticket address; absent means no live
@@ -149,6 +152,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Budget:           snap.Budget,
 		ExtraUsage:       snap.ExtraUsage,
 		Tickets:          slices.Clone(snap.Tickets),
+		Epics:            slices.Clone(snap.Epics),
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		Mode:             snap.Mode,

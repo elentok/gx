@@ -26,6 +26,7 @@ type streamFake struct {
 	mu        sync.Mutex
 	seq       uint64
 	tickets   []server.TicketInfo
+	epics     []server.EpicSummary
 	snapErr   error
 	snapshots int
 	streams   []*fakeStream
@@ -49,7 +50,7 @@ func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
 	if f.snapErr != nil {
 		return server.Snapshot{}, f.snapErr
 	}
-	return server.Snapshot{Seq: f.seq, Tickets: f.tickets, Mode: f.mode, Sessions: f.sessions}, nil
+	return server.Snapshot{Seq: f.seq, Tickets: f.tickets, Epics: f.epics, Mode: f.mode, Sessions: f.sessions}, nil
 }
 
 func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {

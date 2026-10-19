@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -16,88 +15,14 @@ import (
 	"github.com/elentok/gx/ui/keys"
 )
 
-func TestEpicStatusLineColorsByEpicState(t *testing.T) {
-	t.Parallel()
-	icons := ui.Icons(false)
-
-	done := tickets.Epic{Tickets: []tickets.Ticket{
-		{Identifier: "01", Status: "done", ElapsedTime: 754},
-	}}
-	icon, text, style := epicStatusLine(icons, done, false, "")
-	if text != "done" {
-		t.Fatalf("done epic: got text=%q, want %q", text, "done")
-	}
-	if style.Render(icon) != epicStatusDoneStyle.Render(icon) {
-		t.Fatalf("done epic: status line not rendered in epicStatusDoneStyle (green)")
-	}
-
-	problem := tickets.Epic{Tickets: []tickets.Ticket{
-		{Identifier: "01", Status: "done"},
-		{Identifier: "02", Status: "needs-answer"},
-		{Identifier: "03", Status: "open"},
-	}}
-	icon, text, style = epicStatusLine(icons, problem, false, "")
-	if text != "needs attention" {
-		t.Fatalf("problem epic: got text=%q, want %q", text, "needs attention")
-	}
-	if style.Render(icon) != epicStatusProblemStyle.Render(icon) {
-		t.Fatalf("problem epic: status line not rendered in epicStatusProblemStyle (yellow)")
-	}
-
-	clean := tickets.Epic{Tickets: []tickets.Ticket{
-		{Identifier: "01", Status: "done"},
-		{Identifier: "02", Status: "open"},
-	}}
-	icon, _, style = epicStatusLine(icons, clean, false, "")
-	if style.Render(icon) != icon {
-		t.Fatalf("in-progress-clean epic: expected the default/no-color treatment, got styled output %q", style.Render(icon))
-	}
-}
-
-func TestEpicStatusLineImplementingAndQueuedStates(t *testing.T) {
-	t.Parallel()
-	for _, nerd := range []bool{false, true} {
-		icons := ui.Icons(nerd)
-		epic := tickets.Epic{Tickets: []tickets.Ticket{
-			{Identifier: "01", Status: "done"},
-			{Identifier: "02", Status: "open"},
-		}}
-
-		icon, text, style := epicStatusLine(icons, epic, true, "S")
-		if icon != "S" || text != "implementing" || style.Render(text) != text {
-			t.Fatalf("nerd=%v running: got icon=%q text=%q styled=%q", nerd, icon, text, style.Render(text))
-		}
-
-		icon, text, style = epicStatusLine(icons, epic, false, "S")
-		if icon != "○" || text != "queued" || style.Render(text) != text {
-			t.Fatalf("nerd=%v queued: got icon=%q text=%q styled=%q", nerd, icon, text, style.Render(text))
-		}
-
-		problem := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "needs-repair"}, {Identifier: "02", Status: "open"}}}
-		icon, _, style = epicStatusLine(icons, problem, true, "S")
-		if icon != icons.Warning || style.Render(icon) != epicStatusProblemStyle.Render(icon) {
-			t.Fatalf("nerd=%v running+problem: needs attention must outrank implementing, got icon=%q", nerd, icon)
-		}
-
-		allDone := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "done"}}}
-		icon, _, _ = epicStatusLine(icons, allDone, true, "S")
-		if icon != icons.TicketDone {
-			t.Fatalf("nerd=%v running+done: done must outrank implementing, got icon=%q", nerd, icon)
-		}
-	}
-}
-
 func TestEpicBarFillFollowsStateColour(t *testing.T) {
 	t.Parallel()
-	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Identifier: "01", Status: "done"},
-		{Identifier: "02", Status: "open"},
-	}}
-	if got, want := epicBar(epic, epicStatusProblemStyle), epicBar(epic, lipgloss.NewStyle()); got == want {
+	sum := server.EpicSummary{Done: 1, Total: 2}
+	if got, want := epicBar(sum, epicStatusProblemStyle), epicBar(sum, lipgloss.NewStyle()); got == want {
 		t.Fatalf("bar fill ignored the state colour: %q", got)
 	}
-	if !strings.Contains(epicBar(epic, epicStatusProblemStyle), epicStatusProblemStyle.Render(strings.Repeat("▰", epicBarCells/2))) {
-		t.Fatalf("bar fill not rendered in the state colour: %q", epicBar(epic, epicStatusProblemStyle))
+	if !strings.Contains(epicBar(sum, epicStatusProblemStyle), epicStatusProblemStyle.Render(strings.Repeat("▰", epicBarCells/2))) {
+		t.Fatalf("bar fill not rendered in the state colour: %q", epicBar(sum, epicStatusProblemStyle))
 	}
 }
 
@@ -110,81 +35,6 @@ func TestQueueSpinnerFollowsNerdFontSetting(t *testing.T) {
 	}
 	if nerd.implementSpinner.Spinner.Frames[0] != ui.ProgressSpinner.Frames[0] {
 		t.Fatalf("nerd spinner frame = %q, want Nerd frames", nerd.implementSpinner.Spinner.Frames[0])
-	}
-}
-
-func parkedEpic(statuses ...string) tickets.Epic {
-	var ts []tickets.Ticket
-	for i, st := range statuses {
-		ts = append(ts, tickets.Ticket{Identifier: fmt.Sprintf("%02d", i+1), Status: st})
-	}
-	return tickets.Epic{Tickets: ts}
-}
-
-// Parked is derived from the epic's own tickets (mirroring server/deadlock.go):
-// nothing open/claimed and something needs a person.
-func TestEpicStatusLineParkedDerivedFromTickets(t *testing.T) {
-	t.Parallel()
-	icons := ui.Icons(false)
-
-	icon, text, style := epicStatusLine(icons, parkedEpic("done", "needs-answer", "draft"), false, "")
-	if icon != icons.Warning {
-		t.Fatalf("icon = %q, want icons.Warning", icon)
-	}
-	if text != "parked — waiting on 02" {
-		t.Fatalf("text = %q, drafts must not be listed", text)
-	}
-	if style.Render(icon) != epicStatusParkedAnswerStyle.Render(icon) {
-		t.Fatalf("needs-answer park: want orange")
-	}
-
-	if _, text, _ = epicStatusLine(icons, parkedEpic("needs-answer", "open"), false, ""); strings.Contains(text, "parked") {
-		t.Fatalf("an open ticket means not parked: text = %q", text)
-	}
-	if _, text, _ = epicStatusLine(icons, parkedEpic("needs-answer", "claimed"), false, ""); strings.Contains(text, "parked") {
-		t.Fatalf("a claimed ticket means not parked: text = %q", text)
-	}
-	if _, text, _ = epicStatusLine(icons, parkedEpic("done", "cancelled"), false, ""); strings.Contains(text, "parked") {
-		t.Fatalf("done/cancelled alone is not parked: text = %q", text)
-	}
-}
-
-func TestEpicStatusLineParkedColorByKind(t *testing.T) {
-	t.Parallel()
-	icons := ui.Icons(false)
-	for _, st := range []string{"needs-repair", "error"} {
-		icon, text, style := epicStatusLine(icons, parkedEpic("needs-answer", st), false, "")
-		if style.Render(icon) != epicStatusParkedRepairStyle.Render(icon) {
-			t.Fatalf("%s park: want red", st)
-		}
-		if text != "parked — waiting on 01, 02" {
-			t.Fatalf("%s park: text = %q", st, text)
-		}
-	}
-}
-
-func TestEpicStatusLineParkedOnlyDrafts(t *testing.T) {
-	t.Parallel()
-	icons := ui.Icons(false)
-	icon, text, style := epicStatusLine(icons, parkedEpic("done", "draft"), false, "")
-	if text != "parked — only drafts left" {
-		t.Fatalf("text = %q", text)
-	}
-	if style.Render(icon) != epicStatusParkedAnswerStyle.Render(icon) {
-		t.Fatalf("only-drafts park: want orange")
-	}
-}
-
-func TestEpicStatusLineParkedCapsWaitingList(t *testing.T) {
-	t.Parallel()
-	_, text, _ := epicStatusLine(ui.Icons(false), parkedEpic(
-		"needs-answer", "needs-answer", "needs-answer", "needs-answer", "needs-answer",
-	), false, "")
-	if text != "parked — waiting on 01, 02, 03 +2 more" {
-		t.Fatalf("text = %q", text)
-	}
-	if strings.Contains(text, "reattachable") {
-		t.Fatalf("no reattachable suffix expected: %q", text)
 	}
 }
 
@@ -263,8 +113,8 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := ansi.Strip(m.View().Content)
 
-	if strings.Count(content, "done") < 1 || strings.Contains(content, "took") {
-		t.Fatalf("expected the epic status line to say done without a took duration:\n%s", content)
+	if !strings.Contains(content, "awaiting-merge") || strings.Contains(content, "took") {
+		t.Fatalf("expected the epic status line to say awaiting-merge without a took duration:\n%s", content)
 	}
 	if !strings.Contains(content, "Status: ") || !strings.Contains(content, " · 3 compacts") {
 		t.Fatalf("expected the epic Status line with its compacts:\n%s", content)
@@ -518,10 +368,10 @@ func TestEpicStatusRowElapsedAndAgentParts(t *testing.T) {
 	}{
 		{"never started shows only the state", time.Hour,
 			tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
-			[]string{"queued"}, []string{"elapsed", "agent", "·"}},
+			[]string{"waiting"}, []string{"elapsed", "agent", "·"}},
 		{"started but idle uses the model clock, under a minute", 30 * time.Second,
 			tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
-			[]string{"queued · <1m elapsed"}, []string{"agent"}},
+			[]string{"waiting · <1m elapsed"}, []string{"agent"}},
 		{"minute resolution", 134 * time.Minute,
 			tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
 			[]string{"2h 14m elapsed"}, nil},

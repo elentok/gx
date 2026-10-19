@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/tree"
@@ -33,11 +34,8 @@ var (
 	// every ticket is done.
 	epicStatusDoneStyle = lipgloss.NewStyle().Foreground(ui.ColorGreen)
 
-	// epicStatusProblemStyle colors an epic header's status line yellow when
-	// any of its tickets is needs-answer/needs-repair/error-classed.
-	// "In progress, clean" deliberately falls through to the default/no-color
-	// treatment instead (ticket 02's same open=no-color choice), so it
-	// doesn't read as an alarm state.
+	// epicStatusProblemStyle is the warning yellow, used for the herdr banner
+	// and the budget total nearing its soft limit.
 	epicStatusProblemStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
 
 	// epicStatusParkedAnswerStyle colors a parked epic's header status line
@@ -55,126 +53,34 @@ var (
 	epicStatusParkedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
-// parkedWaitingMax caps how many waiting ids the parked status text names
-// before collapsing the rest into "+N more".
-const parkedWaitingMax = 3
-
-// epicState is an epic header's status, from which its icon, text and style
-// are all derived.
-type epicState int
-
-const (
-	epicStateQueued epicState = iota
-	epicStateImplementing
-	epicStateProblem
-	epicStateParkedAnswer
-	epicStateParkedRepair
-	epicStateDone
-)
-
-// style is the colour the state renders in (also the progress bar's fill).
-func (s epicState) style() lipgloss.Style {
-	switch s {
-	case epicStateDone:
-		return epicStatusDoneStyle
-	case epicStateProblem:
-		return epicStatusProblemStyle
-	case epicStateParkedAnswer:
-		return epicStatusParkedAnswerStyle
-	case epicStateParkedRepair:
-		return epicStatusParkedRepairStyle
-	default:
-		return lipgloss.NewStyle()
-	}
-}
-
-// epicStateOf classifies an epic. Precedence: done > parked > needs attention
-// > implementing > queued. running is whether the server reports the epic
-// running. parkedText is only set for the parked states.
-func epicStateOf(epic tickets.Epic, running bool) (state epicState, parkedText string) {
-	if epic.AllDone() {
-		return epicStateDone, ""
-	}
-	if text, parkedState, ok := parkedStatus(epic); ok {
-		return parkedState, text
-	}
-	switch {
-	case epicHasProblem(epic):
-		return epicStateProblem, ""
-	case running:
-		return epicStateImplementing, ""
-	default:
-		return epicStateQueued, ""
-	}
-}
-
 // epicStatusLine picks an epic header's status-line icon, text, and color from
-// its state. spinnerGlyph is the icon of the implementing state.
-func epicStatusLine(icons ui.IconSet, epic tickets.Epic, running bool, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
-	state, parkedText := epicStateOf(epic, running)
-	style = state.style()
-	switch state {
-	case epicStateDone:
-		return icons.TicketDone, "done", style
-	case epicStateParkedAnswer, epicStateParkedRepair:
-		return icons.Warning, parkedText, style
-	case epicStateProblem:
-		return icons.Warning, "needs attention", style
-	case epicStateImplementing:
-		return spinnerGlyph, "implementing", style
+// the server's summary. The text is the server's state word.
+func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
+	switch sum.State {
+	case server.StateAwaitingMerge:
+		return icons.TicketDone, sum.State, epicStatusDoneStyle
+	case server.StateRunning:
+		return spinnerGlyph, sum.State, lipgloss.NewStyle()
+	case server.StateParked:
+		// Red once a parked ticket is broken, since a fault outranks a question.
+		for _, t := range sum.Parked {
+			if t.Status == tickets.StatusNeedsRepair.Word() || t.Status == tickets.StatusError.Word() {
+				return icons.Warning, sum.State, epicStatusParkedRepairStyle
+			}
+		}
+		return icons.Warning, sum.State, epicStatusParkedAnswerStyle
+	case server.StateDeadlocked:
+		return icons.Warning, sum.State, epicStatusParkedRepairStyle
 	default:
-		return icons.EpicQueued, "queued", style
+		return icons.EpicQueued, server.StateWaiting, lipgloss.NewStyle()
 	}
 }
 
-// epicFill is the state colour of an epic on the Queue tab, for its bar fill.
-func (m QueueModel) epicFill(epic tickets.Epic) lipgloss.Style {
-	state, _ := epicStateOf(epic, m.runningEpics[epic.Name])
-	return state.style()
-}
-
-// epicStatus is epicStatusLine for an epic on the Queue tab, with the model's
-// running state and current spinner frame filled in.
+// epicStatus is epicStatusLine for an epic on the Queue tab, with the current
+// spinner frame filled in.
 func (m QueueModel) epicStatus(epic tickets.Epic) (icon, text string, style lipgloss.Style) {
 	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-	return epicStatusLine(m.icons(), epic, m.runningEpics[epic.Name], glyph)
-}
-
-// parkedStatus derives the parked state client-side from the same rule as the
-// server's all-parked deadlock check (tickets.Epic.IsParked): nothing renders
-// open or claimed, and some ticket is parked. Drafts keep the epic parked but
-// are never listed as waiting; repair (red) when any listed ticket is
-// needs-repair or error, answer (orange) otherwise.
-func parkedStatus(epic tickets.Epic) (text string, state epicState, ok bool) {
-	var waiting []string
-	anyFault, anyDraft := false, false
-	for _, t := range epic.Tickets {
-		status := epic.RenderedStatus(t)
-		switch {
-		case status == tickets.StatusOpen || status == tickets.StatusClaimed:
-			return "", 0, false
-		case !epic.IsParked(t):
-		case status == tickets.StatusDraft:
-			anyDraft = true
-		default:
-			waiting = append(waiting, t.Identifier)
-			anyFault = anyFault || status == tickets.StatusNeedsRepair || status == tickets.StatusError
-		}
-	}
-	switch {
-	case len(waiting) == 0 && !anyDraft:
-		return "", 0, false
-	case len(waiting) == 0:
-		return "parked — only drafts left", epicStateParkedAnswer, true
-	}
-	text = "parked — waiting on " + strings.Join(waiting[:min(len(waiting), parkedWaitingMax)], ", ")
-	if extra := len(waiting) - parkedWaitingMax; extra > 0 {
-		text += fmt.Sprintf(" +%d more", extra)
-	}
-	if anyFault {
-		return text, epicStateParkedRepair, true
-	}
-	return text, epicStateParkedAnswer, true
+	return epicStatusLine(m.icons(), m.summaries[epic.Name], glyph)
 }
 
 // epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the
@@ -195,18 +101,6 @@ func epicCost(epic tickets.Epic) float64 {
 		total += t.ActualCost
 	}
 	return total
-}
-
-// epicHasProblem reports whether any of the epic's tickets renders as
-// needs-answer/needs-repair/error — the header status line's yellow trigger.
-func epicHasProblem(epic tickets.Epic) bool {
-	for _, t := range epic.Tickets {
-		switch epic.RenderedStatus(t) {
-		case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusError:
-			return true
-		}
-	}
-	return false
 }
 
 // epicContextMetrics computes the epic's total compaction count.
@@ -245,23 +139,24 @@ func (m QueueModel) queueLabelWidth() int {
 	return tree.LabelWidth(m.queueBodyWidth())
 }
 
-func epicCounter(epic tickets.Epic) string {
-	return fmt.Sprintf("(%d/%d)", epic.DoneCount(), epic.TotalCount())
+func epicCounter(sum server.EpicSummary) string {
+	return fmt.Sprintf("(%d/%d)", sum.Done, sum.Total)
 }
 
 // epicHeaderLayoutFor picks the layout for all of epics: wide only if every
 // non-empty epic's name line fits, else narrow with the bar if its own line
 // fits, else narrow with only the counter.
-func epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHeaderLayout {
+func (m QueueModel) epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHeaderLayout {
 	if labelW <= 0 {
 		return epicLayoutWide
 	}
 	layout := epicLayoutWide
 	for _, epic := range epics {
-		if epic.TotalCount() == 0 {
+		sum := m.summaries[epic.Name]
+		if sum.Total == 0 {
 			continue
 		}
-		counterW := lipgloss.Width(epicCounter(epic))
+		counterW := lipgloss.Width(epicCounter(sum))
 		if 1+lipgloss.Width(epic.Name)+1+counterW+1+epicBarCells > labelW {
 			layout = epicLayoutNarrowBar
 		}
@@ -274,10 +169,10 @@ func epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHeaderLayout {
 
 // epicBar renders the epic's fixed-width progress bar, filled in the epic's
 // state colour (fill).
-func epicBar(epic tickets.Epic, fill lipgloss.Style) string {
+func epicBar(sum server.EpicSummary, fill lipgloss.Style) string {
 	fraction := 0.0
-	if total := epic.TotalCount(); total > 0 {
-		fraction = float64(epic.DoneCount()) / float64(total)
+	if sum.Total > 0 {
+		fraction = float64(sum.Done) / float64(sum.Total)
 	}
 	return ui.ProgressBar(fraction, epicBarCells, fill, lipgloss.NewStyle().Foreground(ui.ColorSurface1))
 }
@@ -285,26 +180,25 @@ func epicBar(epic tickets.Epic, fill lipgloss.Style) string {
 // epicNameLine renders the selectable name row. In the wide layout the
 // counter and bar are right-aligned to labelW; otherwise the name is alone,
 // cut with an ellipsis if it overflows.
-func epicNameLine(epic tickets.Epic, fill lipgloss.Style, layout epicHeaderLayout, labelW int) string {
-	name := epic.Name
+func epicNameLine(name string, sum server.EpicSummary, fill lipgloss.Style, layout epicHeaderLayout, labelW int) string {
 	if labelW > 0 && layout != epicLayoutWide {
 		name = ansi.Truncate(name, labelW-1, "…")
 	}
 	line := " " + epicHeaderStyle.Render(name)
-	if layout != epicLayoutWide || epic.TotalCount() == 0 {
+	if layout != epicLayoutWide || sum.Total == 0 {
 		return line
 	}
-	tail := epicCounter(epic) + " " + epicBar(epic, fill)
+	tail := epicCounter(sum) + " " + epicBar(sum, fill)
 	pad := max(labelW-lipgloss.Width(line)-lipgloss.Width(tail), 1)
 	return line + strings.Repeat(" ", pad) + tail
 }
 
 // epicBarLine renders the narrow layouts' second line.
-func epicBarLine(epic tickets.Epic, fill lipgloss.Style, layout epicHeaderLayout) string {
+func epicBarLine(sum server.EpicSummary, fill lipgloss.Style, layout epicHeaderLayout) string {
 	if layout == epicLayoutNarrowCount {
-		return " " + epicCounter(epic)
+		return " " + epicCounter(sum)
 	}
-	return " " + epicBar(epic, fill) + " " + epicCounter(epic)
+	return " " + epicBar(sum, fill) + " " + epicCounter(sum)
 }
 
 // formatSpan renders an elapsed span at minute resolution, "<1m" under a minute.
@@ -441,10 +335,10 @@ func (m QueueModel) queueRunStateTitle() string {
 // runningProgress sums the done/total ticket counts of the epics the server
 // reports running.
 func (m QueueModel) runningProgress() (done, total int) {
-	for _, epic := range m.epics {
-		if m.runningEpics[epic.Name] {
-			done += epic.DoneCount()
-			total += epic.TotalCount()
+	for _, sum := range m.summaries {
+		if sum.State == server.StateRunning {
+			done += sum.Done
+			total += sum.Total
 		}
 	}
 	return done, total

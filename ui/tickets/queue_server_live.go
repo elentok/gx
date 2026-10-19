@@ -19,7 +19,7 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.M
 	m.link = link
 	if m.serverDown() {
 		// Whatever the queue showed is stale; it refills on reconnect.
-		m.epics = nil
+		m.epics, m.summaries = nil, nil
 		m.clampSelected()
 		return m, nil
 	}
@@ -32,11 +32,9 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.M
 // applyServerState rebuilds rows, queue order, claim times, budget, herdr state
 // and queue mode from st.
 func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) {
-	m.serverClaimedAt = map[string]time.Time{}
-	for _, t := range st.Tickets {
-		if !t.ClaimedAt.IsZero() {
-			m.serverClaimedAt[t.Address] = t.ClaimedAt
-		}
+	m.summaries = make(map[string]server.EpicSummary, len(st.Epics))
+	for _, sum := range st.Epics {
+		m.summaries[sum.Address] = sum
 	}
 	m.herdrDown, m.serverBudget = st.HerdrUnavailable, st.Budget
 	m.paused = st.Mode == server.ModePaused
@@ -81,12 +79,11 @@ func (m QueueModel) OnPageActivated() tea.Cmd {
 }
 
 // syncServerRunState derives the Queue tab's running state from the server's
-// ticket snapshot: no run happens in-process, so a claimed ticket is the
-// only sign that an epic runs.
+// epic summaries: an epic runs when the server says so, and its active tickets
+// are the ones with a run.
 // It fills runningEpics and live for the header, row spinners and timers, and
 // returns the spinner tick when the tab goes from idle to running. A ticket's
-// timer counts from the server's claim time; a claimed ticket the server has no
-// run for is not counted as running.
+// timer counts from the server's claim time.
 func (m *QueueModel) syncServerRunState() tea.Cmd {
 	wasRunning := len(m.runningEpics) > 0
 	if m.runningEpics == nil {
@@ -95,11 +92,19 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	live := map[string]map[string]liveTicketState{}
 	running := map[string]bool{}
 	for _, epic := range m.epics {
+		sum := m.summaries[epic.Name]
+		if sum.State != server.StateRunning {
+			continue
+		}
+		active := make(map[string]time.Time, len(sum.Active))
+		for _, a := range sum.Active {
+			active[a.Address] = a.ClaimedAt
+		}
 		for _, t := range epic.Tickets {
-			if !serverRunning(epic, t, m.serverClaimedAt) {
+			seen, ok := active[t.Path]
+			if !ok {
 				continue
 			}
-			seen := m.serverClaimedAt[t.Path]
 			if live[epic.Name] == nil {
 				live[epic.Name] = map[string]liveTicketState{}
 			}

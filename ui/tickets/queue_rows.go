@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/tree"
 )
@@ -71,6 +72,7 @@ type queueNode struct {
 // cache.
 type queueEntriesCache struct {
 	epics        []tickets.Epic
+	summaries    map[string]server.EpicSummary
 	checked      map[string]bool
 	hideComplete bool
 	project      string
@@ -96,12 +98,14 @@ func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 		c.project == m.projectFilter &&
 		c.labelWidth == m.queueLabelWidth() &&
 		reflect.DeepEqual(c.epics, m.epics) &&
+		reflect.DeepEqual(c.summaries, m.summaries) &&
 		reflect.DeepEqual(c.checked, m.checked) &&
 		reflect.DeepEqual(c.collapsed, collapsed) {
 		return c.entries
 	}
 	entries := m.buildQueueEntries()
 	c.epics = m.epics
+	c.summaries = m.summaries
 	c.checked = m.checked
 	c.hideComplete = m.hideComplete
 	c.project = m.projectFilter
@@ -157,14 +161,14 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 	}
 	// Decided here, not at draw time, because the bar line is a real entry
 	// whose presence changes the tree's height; the cache keys on the width.
-	layout := epicHeaderLayoutFor(shownEpics, m.queueLabelWidth())
+	layout := m.epicHeaderLayoutFor(shownEpics, m.queueLabelWidth())
 
 	for _, s := range shown {
 		epic, ordered, planErr := s.epic, s.ordered, s.planErr
 
 		roots = append(roots, queueNode{kind: nodeEpicSeparator, epic: epic})
 		roots = append(roots, queueNode{kind: nodeEpicName, epic: epic, layout: layout})
-		if layout != epicLayoutWide && epic.TotalCount() > 0 {
+		if layout != epicLayoutWide && m.summaries[epic.Name].Total > 0 {
 			roots = append(roots, queueNode{kind: nodeEpicBar, epic: epic, layout: layout})
 		}
 		roots = append(roots, queueNode{kind: nodeEpicStatusLine, epic: epic})

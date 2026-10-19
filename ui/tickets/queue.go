@@ -34,10 +34,11 @@ type QueueModel struct {
 	// delivered state (syncServerRunState), so the Queue tab's rows render the
 	// running spinner+phase presentation (renderLiveTicketRow).
 	live map[string]map[string]liveTicketState
-	// serverClaimedAt and herdrDown come from the delivered state: the claim
-	// time of each running ticket, and whether the server can launch agents.
-	serverClaimedAt map[string]time.Time
-	herdrDown       bool
+	// summaries and herdrDown come from the delivered state: the server's
+	// summary of each queued epic by epic name, and whether the server can
+	// launch agents.
+	summaries map[string]server.EpicSummary
+	herdrDown bool
 	// serverBudget is the last snapshot's budget: the header's spend and the
 	// root rows' cost in server mode.
 	serverBudget     server.BudgetStatus

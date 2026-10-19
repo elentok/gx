@@ -26,6 +26,14 @@ func queuedTicket(status string, claimedAt time.Time) []server.TicketInfo {
 	return []server.TicketInfo{{Address: "gx:alpha/01", Title: "Zeta ticket", Status: status, ClaimedAt: claimedAt}}
 }
 
+// runningEpic is the server's summary of gx:alpha once 01 is claimed.
+func runningEpic() []server.EpicSummary {
+	return []server.EpicSummary{{
+		Address: "gx:alpha", Name: "alpha", State: server.StateRunning, Total: 1,
+		Active: []server.SummaryTicket{{Address: "gx:alpha/01", Title: "Zeta ticket", ClaimedAt: time.Now()}},
+	}}
+}
+
 func openQueueTab(h *harness) {
 	h.t.Helper()
 	h.send(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -39,17 +47,18 @@ func TestQueueStream_UpdatesOnEventWhileOpen(t *testing.T) {
 	f.tickets = queuedTicket("open", time.Time{})
 	f.queue = []server.QueueItem{{Address: "gx:alpha/01"}}
 	openQueueTab(h)
-	if view := queueView(h); !strings.Contains(view, "Zeta ticket") || strings.Contains(view, "implementing") {
+	if view := queueView(h); !strings.Contains(view, "Zeta ticket") || strings.Contains(view, "running") {
 		t.Fatalf("idle queue:\n%s", view)
 	}
 
 	f.mu.Lock()
 	f.tickets = queuedTicket("claimed", time.Now())
+	f.epics = runningEpic()
 	f.mu.Unlock()
 	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:alpha/01"}
 	h.pump()
 
-	if view := queueView(h); !strings.Contains(view, "implementing") {
+	if view := queueView(h); !strings.Contains(view, "running") {
 		t.Errorf("claim did not show without R:\n%s", view)
 	}
 }
@@ -63,13 +72,14 @@ func TestQueueStream_ClaimWhileHiddenShowsRunningOnOpen(t *testing.T) {
 
 	f.mu.Lock()
 	f.tickets = queuedTicket("claimed", time.Now())
+	f.epics = runningEpic()
 	f.mu.Unlock()
 	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:alpha/01"}
 	h.pump()
 	h.switchTo(nav.TabQueue)
 	h.pump()
 
-	if view := queueView(h); !strings.Contains(view, "implementing") {
+	if view := queueView(h); !strings.Contains(view, "running") {
 		t.Errorf("claim made while hidden is not running on open:\n%s", view)
 	}
 }

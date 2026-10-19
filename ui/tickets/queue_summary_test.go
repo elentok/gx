@@ -1,0 +1,150 @@
+package tickets
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/elentok/gx/server"
+	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui"
+)
+
+func TestEpicStatusLine_UsesServerStateWords(t *testing.T) {
+	t.Parallel()
+	icons := ui.Icons(false)
+	tests := []struct {
+		state    string
+		wantIcon string
+		wantText string
+	}{
+		{server.StateAwaitingMerge, icons.TicketDone, "awaiting-merge"},
+		{server.StateRunning, "S", "running"},
+		{server.StateWaiting, icons.EpicQueued, "waiting"},
+		{server.StateParked, icons.Warning, "parked"},
+		{server.StateDeadlocked, icons.Warning, "deadlocked"},
+	}
+	for _, tt := range tests {
+		icon, text, _ := epicStatusLine(icons, server.EpicSummary{State: tt.state}, "S")
+		if icon != tt.wantIcon || text != tt.wantText {
+			t.Errorf("state %q: got icon=%q text=%q, want icon=%q text=%q", tt.state, icon, text, tt.wantIcon, tt.wantText)
+		}
+	}
+}
+
+func TestEpicStatusLine_Colors(t *testing.T) {
+	t.Parallel()
+	icons := ui.Icons(false)
+	repair := server.EpicSummary{State: server.StateParked, Parked: []server.SummaryTicket{
+		{Status: "needs-answer"}, {Status: "needs-repair"},
+	}}
+	answer := server.EpicSummary{State: server.StateParked, Parked: []server.SummaryTicket{{Status: "needs-answer"}}}
+	for _, tt := range []struct {
+		name string
+		sum  server.EpicSummary
+		want string
+	}{
+		{"awaiting-merge", server.EpicSummary{State: server.StateAwaitingMerge}, epicStatusDoneStyle.Render(icons.TicketDone)},
+		{"parked needs-repair", repair, epicStatusParkedRepairStyle.Render(icons.Warning)},
+		{"parked needs-answer", answer, epicStatusParkedAnswerStyle.Render(icons.Warning)},
+		{"deadlocked", server.EpicSummary{State: server.StateDeadlocked}, epicStatusParkedRepairStyle.Render(icons.Warning)},
+	} {
+		icon, _, style := epicStatusLine(icons, tt.sum, "")
+		if got := style.Render(icon); got != tt.want {
+			t.Errorf("%s: icon rendered %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+// fixtureSummaries stands in for the server's epic summaries in fixtures that
+// only build tickets: it counts done tickets, lists the claimed ones that have
+// a claim time as active, and the needs-answer/needs-repair ones as parked.
+func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []server.EpicSummary {
+	var out []server.EpicSummary
+	for _, epic := range epics {
+		sum := server.EpicSummary{
+			Address: epic.Name, Name: epic.Name, State: server.StateWaiting, Total: len(epic.Tickets),
+			Active: []server.SummaryTicket{}, Parked: []server.SummaryTicket{},
+		}
+		for _, t := range epic.Tickets {
+			info := server.SummaryTicket{Address: t.Path, Title: t.Title}
+			switch status := epic.RenderedStatus(t); status {
+			case gxtickets.StatusDone:
+				sum.Done++
+			case gxtickets.StatusClaimed:
+				if at, ok := claimedAt[t.Path]; ok {
+					info.ClaimedAt = at
+					sum.Active = append(sum.Active, info)
+					sum.State = server.StateRunning
+				}
+			case gxtickets.StatusNeedsAnswer, gxtickets.StatusNeedsRepair:
+				info.Status, info.Reason = status.Word(), gxtickets.ParkReason(epic, t)
+				sum.Parked = append(sum.Parked, info)
+			}
+		}
+		if sum.Total > 0 && sum.Done == sum.Total {
+			sum.State = server.StateAwaitingMerge
+		}
+		out = append(out, sum)
+	}
+	return out
+}
+
+// summaryQueue delivers one epic with the given ticket rows and server summary.
+func summaryQueue(t *testing.T, sum server.EpicSummary, infos ...server.TicketInfo) QueueModel {
+	t.Helper()
+	items := make([]server.QueueItem, len(infos))
+	for i, info := range infos {
+		items[i] = server.QueueItem{Address: info.Address}
+	}
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: infos, Epics: []server.EpicSummary{sum}}, items)
+	return m
+}
+
+func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
+	m := summaryQueue(t,
+		server.EpicSummary{Address: "gx:alpha", Name: "alpha", State: server.StateWaiting, Done: 3, Total: 7},
+		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	)
+
+	body := ansi.Strip(m.View().Content)
+	if !strings.Contains(body, "(3/7)") {
+		t.Errorf("view lacks the summary counter (3/7):\n%s", body)
+	}
+	if !strings.Contains(body, "waiting") {
+		t.Errorf("view lacks the summary state word:\n%s", body)
+	}
+}
+
+func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
+	m := summaryQueue(t,
+		server.EpicSummary{
+			Address: "gx:alpha", Name: "alpha", State: server.StateParked, Done: 0, Total: 1,
+			Parked: []server.SummaryTicket{{
+				Address: "gx:alpha/01", Title: "First", Status: "needs-answer", Reason: "Which approach, A or B?",
+			}},
+		},
+		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
+	)
+
+	body := ansi.Strip(m.View().Content)
+	if !strings.Contains(body, "Which approach, A or B?") {
+		t.Errorf("view lacks the Park reason line:\n%s", body)
+	}
+	if !strings.Contains(body, "parked") {
+		t.Errorf("view lacks the parked state word:\n%s", body)
+	}
+}
+
+func TestQueueServerMode_DeadlockedWord(t *testing.T) {
+	m := summaryQueue(t,
+		server.EpicSummary{Address: "gx:alpha", Name: "alpha", State: server.StateDeadlocked, Total: 1, Reason: "01 waits on itself"},
+		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
+	)
+
+	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "deadlocked") {
+		t.Errorf("view lacks the deadlocked state word:\n%s", body)
+	}
+}
