@@ -489,3 +489,27 @@ func TestScreen_SendWheelFollowsMouseModes(t *testing.T) {
 		})
 	}
 }
+
+func TestScreen_SendMouseFollowsMouseModes(t *testing.T) {
+	cases := []struct {
+		name, modes string
+		kind        screen.MouseKind
+		want        string
+	}{
+		{"off", "", screen.MousePress, ""},
+		{"sgr press", "\x1b[?1000h\x1b[?1006h", screen.MousePress, "\x1b[<0;3;2M"},
+		{"sgr release", "\x1b[?1000h\x1b[?1006h", screen.MouseRelease, "\x1b[<0;3;2m"},
+		{"sgr drag", "\x1b[?1002h\x1b[?1006h", screen.MouseDrag, "\x1b[<32;3;2M"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var out syncBuffer
+			s := screen.NewScreenWithReplies(10, 3, &out)
+			_, _ = s.Write([]byte(c.modes))
+			s.SendMouse(2, 1, c.kind, 0)
+			if got := written(t, s, &out); got != c.want {
+				t.Errorf("SendMouse wrote %q, want %q", got, c.want)
+			}
+		})
+	}
+}

@@ -85,6 +85,11 @@ func (f *fakeAttach) Wheel(x, y int, down bool) error {
 	return nil
 }
 
+func (f *fakeAttach) Mouse(x, y int, kind screen.MouseKind, button int) error {
+	f.log = append(f.log, fmt.Sprintf("mouse:%d,%d,%d,%d", x, y, kind, button))
+	return nil
+}
+
 func (f *fakeAttach) Copy(start, end nativerunner.LinePos) error {
 	f.log = append(f.log, fmt.Sprintf("copy:%d.%d-%d.%d", start.Line, start.Col, end.Line, end.Col))
 	return nil

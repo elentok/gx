@@ -143,7 +143,9 @@ A new **Agents tab** in the gx TUI. `gx agents` opens the TUI on it.
     session or tab, so that hidden sessions cost nothing. [T01]
 40. As a user of a session hosted by an older holder (no `attach` op), I want a snapshot instead of
     an error. [T01]
-41. As a user, I want no mouse input sent to the session in v1. [T01]
+41. As a user, I want clicks, drags and releases over the session's screen sent to an agent that
+    reports the mouse (such as claude's diff sidebar "x"), and nothing else, so that gx's sidebar,
+    border and info rows keep their own clicks. [T01]
 
 ### Scrollback and copy mode
 
@@ -431,7 +433,8 @@ matters. Avoid "agent kind", "needs attention" as a status name, "restart".
   means no frames and no timers. [T01]
 - Input: key events, encoded by the holder with x/vt for the modes claude turned on. The vt's output
   now goes to the PTY (today it is discarded), so claude gets real answers to terminal queries. The
-  leader key is caught in the TUI and never sent. No mouse in v1. [T01]
+  leader key is caught in the TUI and never sent. Mouse: the wheel, and button press, drag and release over the screen, only to a child
+  that reports the mouse; a left click there also focuses the panel. [T01]
 - Paste: Bubble Tea paste → `paste` input → x/vt paste (bracketed only if claude enabled it).
   `ctrl+v` passes through so claude reads the clipboard image. Acceptance check: copy an image,
   press `ctrl+v` in the tab, claude shows `[Image #1]`. No temp-file fallback in v1: if the setsid
@@ -702,7 +705,6 @@ matters. Avoid "agent kind", "needs attention" as a status name, "restart".
 - Banner click opening a new terminal, automatic AFK mode, answering sessions from chat
   (gx:future-enhancements). [T07]
 - Copy-mode search and mouse drag selection (gx:future-enhancements). [T09]
-- Mouse input forwarded to the session. [T01]
 - OSC 52 clipboard writes. [T09]
 - Starting a session from a loop-epic ticket. [T10]
 - An app-wide `m` context menu on every focusable thing (gx:future-enhancements). [T10]

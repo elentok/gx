@@ -25,6 +25,7 @@ type AttachStream interface {
 	Resize(cols, rows int) error
 	Scroll(offset int) error
 	Wheel(x, y int, down bool) error
+	Mouse(x, y int, kind screen.MouseKind, button int) error
 	Copy(start, end nativerunner.LinePos) error
 	Close() error
 }
@@ -80,6 +81,9 @@ type attachment struct {
 	offset, scrollMax, scrollBase, newLines int
 	// mouse: the latest frame says the child reports the mouse.
 	mouse bool
+	// held is the button a forwarded press is waiting to be released from,
+	// plus one; zero when none is held.
+	held int
 }
 
 func (a *attachment) close() {
@@ -317,6 +321,55 @@ func (m Model) updateWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cmd) {
 		a.scroll(offset)
 	}
 	return m, nil
+}
+
+// mouseButton maps a bubbletea button to the AttachMouse button, false for
+// one the child is not sent.
+func mouseButton(b tea.MouseButton) (int, bool) {
+	switch b {
+	case tea.MouseLeft:
+		return 0, true
+	case tea.MouseMiddle:
+		return 1, true
+	case tea.MouseRight:
+		return 2, true
+	}
+	return 0, false
+}
+
+// forwardPress sends a click over the child's screen to a child that reports
+// the mouse, as the wheel is (see updateWheel). It reports whether the child
+// took it; a click on the border or the info rows stays with gx.
+func (m Model) forwardPress(mouse tea.Mouse) bool {
+	a := m.attach
+	button, ok := mouseButton(mouse.Button)
+	if !ok || !a.live() || !a.mouse || a.offset != 0 {
+		return false
+	}
+	x, y, ok := m.screenCell(mouse)
+	if !ok {
+		return false
+	}
+	a.held = button + 1
+	a.write(func(s AttachStream) error { return s.Mouse(x, y, screen.MousePress, button) })
+	return true
+}
+
+// forwardMove follows a held press with the pointer, clamped to the screen so
+// the child sees the drag end where it left the panel.
+func (m Model) forwardMove(mouse tea.Mouse, kind screen.MouseKind) {
+	a := m.attach
+	if !a.live() || a.held == 0 {
+		return
+	}
+	button := a.held - 1
+	ox, oy := m.screenOrigin()
+	cols, rows := m.screenSize()
+	x, y := max(0, min(mouse.X-ox, cols-1)), max(0, min(mouse.Y-oy, rows-1))
+	if kind == screen.MouseRelease {
+		a.held = 0
+	}
+	a.write(func(s AttachStream) error { return s.Mouse(x, y, kind, button) })
 }
 
 func (m Model) overPanel(mouse tea.Mouse) bool {

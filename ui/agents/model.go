@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
@@ -251,8 +252,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateWheel(msg)
 	case tea.MouseClickMsg:
 		return m.updateClick(msg)
+	case tea.MouseReleaseMsg:
+		m.forwardMove(msg.Mouse(), screen.MouseRelease)
+		return m, nil
 	case tea.MouseMotionMsg:
 		m.hoverAt = msg.Mouse()
+		m.forwardMove(msg.Mouse(), screen.MouseDrag)
 		return m, nil
 	}
 	return m, nil
@@ -379,7 +384,8 @@ func (m Model) View() tea.View {
 	// The mouse mode also keeps the wheel from reaching the agent as arrow
 	// keys, as a terminal sends it to a program in the alternate screen.
 	// All-motion is safe with an agent that reports the mouse: gx forwards it
-	// only the wheel (see updateWheel), which every mode reports.
+	// only the wheel and the buttons it holds (see updateWheel, forwardPress),
+	// and the mode drops the motion it did not ask for.
 	v := ui.NewMainView(m.render())
 	v.MouseMode = tea.MouseModeAllMotion
 	v.Cursor = m.terminalCursor()

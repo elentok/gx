@@ -471,6 +471,11 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 					if err = json.Unmarshal(payload, &w); err == nil {
 						h.scr.SendWheel(w.X, w.Y, w.Down)
 					}
+				case StreamMouse:
+					var m AttachMouse
+					if err = json.Unmarshal(payload, &m); err == nil {
+						h.scr.SendMouse(m.X, m.Y, m.Kind, m.Button)
+					}
 				case StreamCopy:
 					var c AttachCopy
 					if err = json.Unmarshal(payload, &c); err == nil {
@@ -635,6 +640,12 @@ func (a *HolderAttach) Scroll(offset int) error {
 // child whose frames say it reports the mouse.
 func (a *HolderAttach) Wheel(x, y int, down bool) error {
 	return a.Send(StreamWheel, AttachWheel{X: x, Y: y, Down: down})
+}
+
+// Mouse sends a press, release or drag of a button over the child's cell
+// (x, y), for a child whose frames say it reports the mouse.
+func (a *HolderAttach) Mouse(x, y int, kind screen.MouseKind, button int) error {
+	return a.Send(StreamMouse, AttachMouse{X: x, Y: y, Kind: kind, Button: button})
 }
 
 // Copy asks for the plain text from start up to end; Next returns it as a

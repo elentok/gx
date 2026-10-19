@@ -423,6 +423,38 @@ func (s *Screen) SendWheel(x, y int, down bool) {
 	s.emu.SendMouse(vt.MouseWheel{X: x, Y: y, Button: button})
 }
 
+// MouseKind is the phase of a button event SendMouse encodes.
+type MouseKind int
+
+const (
+	MousePress MouseKind = iota
+	MouseRelease
+	MouseDrag
+)
+
+// SendMouse encodes a left, middle or right button event over cell (x, y) for
+// the child's mouse modes and writes it to the replies writer. Without mouse
+// reporting it writes nothing.
+func (s *Screen) SendMouse(x, y int, kind MouseKind, button int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b := vt.MouseLeft
+	switch button {
+	case 1:
+		b = vt.MouseMiddle
+	case 2:
+		b = vt.MouseRight
+	}
+	switch kind {
+	case MouseRelease:
+		s.emu.SendMouse(vt.MouseRelease{X: x, Y: y, Button: b})
+	case MouseDrag:
+		s.emu.SendMouse(vt.MouseMotion{X: x, Y: y, Button: b})
+	default:
+		s.emu.SendMouse(vt.MouseClick{X: x, Y: y, Button: b})
+	}
+}
+
 // Paste writes text to the replies writer, bracketed when the child turned on
 // bracketed paste.
 func (s *Screen) Paste(text string) {

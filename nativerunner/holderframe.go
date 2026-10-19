@@ -41,6 +41,9 @@ const (
 	// StreamWheel is a wheel turn a client sends on an attach, as an
 	// AttachWheel, for a child that reports the mouse.
 	StreamWheel
+	// StreamMouse is a button press, release or drag a client sends on an
+	// attach, as an AttachMouse, for a child that reports the mouse.
+	StreamMouse
 )
 
 // maxStreamPayload bounds one stream message; a bigger one ends the stream
@@ -180,6 +183,15 @@ type AttachWheel struct {
 	X    int  `json:"x"`
 	Y    int  `json:"y"`
 	Down bool `json:"down,omitempty"`
+}
+
+// AttachMouse is StreamMouse's payload: a press, release or drag of a button
+// (0 left, 1 middle, 2 right) over the child's cell (X, Y).
+type AttachMouse struct {
+	X      int              `json:"x"`
+	Y      int              `json:"y"`
+	Kind   screen.MouseKind `json:"kind,omitempty"`
+	Button int              `json:"button,omitempty"`
 }
 
 // AttachCopy is a StreamCopy request: the plain text from Start up to, not

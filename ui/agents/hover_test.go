@@ -3,6 +3,7 @@ package agents
 import (
 	"fmt"
 	"image/color"
+	"slices"
 	"strings"
 	"testing"
 
@@ -132,5 +133,49 @@ func TestHover_AttachedMouseChildStillGetsOnlyTheWheel(t *testing.T) {
 	m = update1(t, m, tea.MouseWheelMsg{X: 40, Y: 4, Button: tea.MouseWheelDown})
 	if len(fa.log) != 1 || !strings.HasPrefix(fa.log[0], "wheel:") {
 		t.Fatalf("agent got %v, want only the wheel", fa.log)
+	}
+}
+
+// A click over the screen of an agent that reports the mouse reaches it, with
+// its release, and focuses the panel.
+func TestClick_ReachesAnAgentThatReportsTheMouse(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	fa := h.attaches["a"]
+	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{Mouse: true}}
+	m, _ = read(t, m, next)
+	fa.log = nil
+
+	ox, oy := m.screenOrigin()
+	m = update1(t, m, tea.MouseClickMsg{X: ox + 3, Y: oy + 2, Button: tea.MouseLeft})
+	m = update1(t, m, tea.MouseMotionMsg{X: ox + 4, Y: oy + 2, Button: tea.MouseLeft})
+	m = update1(t, m, tea.MouseReleaseMsg{X: ox + 5, Y: oy + 2, Button: tea.MouseLeft})
+	m = update1(t, m, tea.MouseMotionMsg{X: ox + 6, Y: oy + 2})
+	want := []string{"mouse:3,2,0,0", "mouse:4,2,2,0", "mouse:5,2,1,0"}
+	got := slices.DeleteFunc(slices.Clone(fa.log), func(s string) bool { return !strings.HasPrefix(s, "mouse:") })
+	if !slices.Equal(got, want) {
+		t.Fatalf("agent got %v, want %v", got, want)
+	}
+	if !m.terminalFocused {
+		t.Error("click on the screen did not focus the terminal")
+	}
+}
+
+// A click on the sidebar stays with gx even for an agent that reports the mouse.
+func TestClick_SidebarStaysWithGxForAMouseAgent(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m, cmd := attachModel(t, h)
+	m, next := dialed(t, m, cmd)
+	fa := h.attaches["a"]
+	fa.msgs <- nativerunner.AttachMessage{Type: nativerunner.StreamFrame, Frame: nativerunner.Frame{Mouse: true}}
+	m, _ = read(t, m, next)
+	fa.log = nil
+
+	m = update1(t, m, tea.MouseClickMsg{X: 2, Y: 1, Button: tea.MouseLeft})
+	for _, l := range fa.log {
+		if strings.HasPrefix(l, "mouse:") {
+			t.Fatalf("sidebar click reached the agent: %v", fa.log)
+		}
 	}
 }
