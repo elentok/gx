@@ -163,8 +163,8 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 	}
 
 	tickets := []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-		{Address: "gx:beta/01", Title: "Second", Status: "open"},
+		{Address: "gx:alpha/01", Title: "First", Status: "open", RenderedStatus: "open"},
+		{Address: "gx:beta/01", Title: "Second", Status: "open", RenderedStatus: "open"},
 	}
 	st := applySnapshot(viewmodel.State{}, server.Snapshot{
 		Seq:     1,
