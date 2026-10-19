@@ -3,12 +3,10 @@ package agents
 import (
 	"context"
 	"slices"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/confirm"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/nav"
@@ -91,7 +89,7 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 	}
 	accept := sessionActionCmd("run action", m.client.RunSessionAction, s.ID)
 	if isQueueAction(s.Actionable) {
-		accept = queueActionCmd(m.client, s.Project, s.Actionable.Target)
+		accept = queueActionCmd(m.client, s.Actionable.Target)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:     "Run action on " + displayName(s) + "?",
@@ -115,25 +113,17 @@ type queueActionMsg struct {
 	err      error
 }
 
-// queueActionCmd queues the open tickets of project's epic. The queue action
-// never goes to the session as a prompt.
-func queueActionCmd(c SessionClient, project, epic string) tea.Cmd {
+// queueActionCmd queues the open tickets of epic ("project:epic"). The queue
+// action never goes to the session as a prompt.
+func queueActionCmd(c SessionClient, epic string) tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
 		snap, err := c.Snapshot(ctx)
 		if err != nil {
 			return queueActionMsg{err: err}
 		}
-		prefix := project + ":" + epic + "/"
-		var addrs []string
-		for _, t := range snap.Tickets {
-			if strings.HasPrefix(t.Address, prefix) && t.Status == string(schema.StatusOpen) {
-				addrs = append(addrs, t.Address)
-			}
-		}
-		slices.Sort(addrs)
-		queued, refusals := ticketsui.QueueAddresses(ctx, c.QueueAdd, addrs)
-		return queueActionMsg{epic: project + ":" + epic, queued: queued, refusals: refusals}
+		queued, refusals := ticketsui.QueueEpic(ctx, snap, c.QueueAdd, epic)
+		return queueActionMsg{epic: epic, queued: queued, refusals: refusals}
 	}
 }
 

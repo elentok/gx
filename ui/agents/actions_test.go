@@ -231,10 +231,10 @@ func TestActions_RunActionEscSendsNothing(t *testing.T) {
 func TestActions_QueueActionListsTheQueue(t *testing.T) {
 	f := &fakeSessionClient{}
 	m := withSession(actionModel(t, f, "live"), "live", func(s *server.SessionInfo) {
-		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "epic-impl"}
+		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "gx:epic-impl"}
 	})
 	m, _ = act(t, m, letter("a"))
-	if view := m.confirm.View(80); !strings.Contains(view, "Queue `epic-impl`") {
+	if view := m.confirm.View(80); !strings.Contains(view, "Queue `gx:epic-impl`") {
 		t.Fatalf("confirm lacks the queue:\n%s", view)
 	}
 }
@@ -250,7 +250,8 @@ func confirmQueueAction(t *testing.T, f *fakeSessionClient) (Model, []tea.Msg) {
 		{Address: "gx:other/01", Status: "open"},
 	}}
 	m := withSession(actionModel(t, f, "live"), "live", func(s *server.SessionInfo) {
-		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "epic-impl"}
+		s.Project = "elsewhere" // the ticket lives in another project
+		s.Actionable = server.SessionActionable{Reason: "done", Kind: server.SessionActionableQueue, Target: "gx:epic-impl"}
 	})
 	m, _ = act(t, m, letter("a"))
 	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})

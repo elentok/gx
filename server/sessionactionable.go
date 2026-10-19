@@ -81,7 +81,7 @@ func designActionable(text, ticket string) (SessionActionable, bool) {
 	case "map", "review":
 		return SessionActionable{Reason: reason, Action: []string{"/clear", "/gx-design " + epic}}, true
 	case "implement":
-		return SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epic + "-impl"}, true
+		return SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epicAddress(ticket) + "-impl"}, true
 	}
 	return SessionActionable{}, false
 }
@@ -92,6 +92,13 @@ func ticketEpic(addr string) string {
 	_, rest, _ := strings.Cut(addr, ":")
 	epic, _, _ := strings.Cut(rest, "/")
 	return epic
+}
+
+// epicAddress is the "project:epic" part of a ticket address, whatever project
+// the session itself runs in.
+func epicAddress(addr string) string {
+	epicPart, _, _ := strings.Cut(addr, "/")
+	return epicPart
 }
 
 // detectDesignActionable raises the grilling or run-end Actionable when a

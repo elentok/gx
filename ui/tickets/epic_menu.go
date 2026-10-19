@@ -9,7 +9,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -197,27 +196,6 @@ func QueuedToast(queued int, refusals []string) tea.Cmd {
 		return notify.Success(text)
 	}
 	return notify.Warning(text + " (" + strings.Join(refusals, "; ") + ")")
-}
-
-// QueueAddFunc is the queue-add call of the server client.
-type QueueAddFunc func(ctx context.Context, address, agent string) (server.QueueResult, error)
-
-// QueueAddresses sends one queue-add per address, carrying on past refusals so
-// one blocked ticket doesn't keep the rest out. It returns how many the server
-// took and the refusals as "address: reason".
-func QueueAddresses(ctx context.Context, add QueueAddFunc, addrs []string) (queued int, refusals []string) {
-	for _, addr := range addrs {
-		res, err := add(ctx, addr, string(serverEnqueueDefaultAgent))
-		switch {
-		case err != nil:
-			refusals = append(refusals, addr+": "+err.Error())
-		case res.Refused:
-			refusals = append(refusals, addr+": "+res.Message)
-		default:
-			queued++
-		}
-	}
-	return queued, refusals
 }
 
 // cmdQueueEpic queues addrs and reports the outcome as an epicQueuedMsg.

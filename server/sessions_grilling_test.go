@@ -109,7 +109,7 @@ func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
 	}{
 		"next map":       {text: "Done.\n✅ Map: drafted. Next: map — more to split", reason: "✅ Map: drafted. Next: map — more to split", action: []string{"/clear", "/gx-design map"}, wantAction: true},
 		"next review":    {text: "✅ Map: drafted. Next: review — check it", reason: "✅ Map: drafted. Next: review — check it", action: []string{"/clear", "/gx-design map"}, wantAction: true},
-		"next implement": {text: "✅ Map: drafted. Next: implement — build it", reason: "✅ Map: drafted. Next: implement — build it", kind: "queue", target: "map-impl", wantAction: true},
+		"next implement": {text: "✅ Map: drafted. Next: implement — build it", reason: "✅ Map: drafted. Next: implement — build it", kind: "queue", target: "proj:map-impl", wantAction: true},
 		"grilling wins":  {text: grill + "✅ Map: drafted. Next: map — more", reason: "Grilling: waiting for your answers", wantAction: true},
 		"neither":        {text: "All done, nothing to ask."},
 	} {
