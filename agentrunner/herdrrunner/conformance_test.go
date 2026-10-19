@@ -471,6 +471,9 @@ func TestAnswer_DenyWithReasonFailureAfterEscIsNotDelivered(t *testing.T) {
 	if !errors.Is(err, agentrunner.ErrNotDelivered) || !strings.Contains(err.Error(), "denied, but the reason was not delivered") {
 		t.Fatalf("Answer err = %v, want ErrNotDelivered saying the reason was not delivered", err)
 	}
+	if errors.Is(err, agentrunner.ErrNotReady) {
+		t.Fatalf("Answer err = %v, must not also match ErrNotReady", err)
+	}
 	if got, _ := state.Received(s.Label); len(got) != 0 {
 		t.Fatalf("prompts = %v, want none", got)
 	}

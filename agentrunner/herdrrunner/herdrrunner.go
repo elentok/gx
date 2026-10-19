@@ -529,7 +529,7 @@ func (r *Runner) denyWithReason(s agentrunner.Session, reason string) error {
 	case errors.Is(err, agentrunner.ErrNotFound):
 		return err
 	}
-	return fmt.Errorf("%w: denied, but the reason was not delivered: %w", agentrunner.ErrNotDelivered, err)
+	return fmt.Errorf("%w: denied, but the reason was not delivered: %v", agentrunner.ErrNotDelivered, err)
 }
 
 // hold starts s's deny hold, reporting false when one is already running.

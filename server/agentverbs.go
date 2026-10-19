@@ -12,6 +12,8 @@ const (
 	ReasonAgentNotReady = "agent-not-ready"
 	ReasonNotBlocked    = "not-blocked"
 	ReasonBadDecision   = "invalid-decision"
+	// ReasonNotDelivered: a deny closed the dialog but its reason never reached the agent.
+	ReasonNotDelivered = "reason-not-delivered"
 )
 
 // agentVerb resolves a ticket to the runner session of its live iteration, so
@@ -61,6 +63,8 @@ func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (QueueResult, error) {
 		err := r.Answer(sess, agentrunner.Answer{Decision: decision, Text: req.Text})
 		switch {
+		case errors.Is(err, agentrunner.ErrNotDelivered):
+			return refusal(ReasonNotDelivered, err.Error()), nil
 		case errors.Is(err, agentrunner.ErrNotReady):
 			return refusal(ReasonNotBlocked, "the agent is not waiting on a request"), nil
 		case errors.Is(err, agentrunner.ErrInvalidDecision):
