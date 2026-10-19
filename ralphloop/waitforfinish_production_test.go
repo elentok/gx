@@ -175,6 +175,8 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 			switch k {
 			case "ctrl+c":
 				ctrlCCalls++
+				// An interrupt leaves the pane idle and promptable.
+				status = "idle"
 			case "enter":
 				enterCalls++
 			}
@@ -396,7 +398,12 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 				return nil, herdrfake.Identities{}, err
 			}
 		}
-		return agentResult(target, "working")
+		// The pane's own status after the keys: an interrupt leaves it idle.
+		status, err := compact.Status()
+		if err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		return agentResult(target, status)
 	})
 
 	s.Register("agent", "read", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -568,7 +575,12 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 				return nil, herdrfake.Identities{}, err
 			}
 		}
-		return agentResult(target, "working")
+		// The pane's own status after the keys: an interrupt leaves it idle.
+		status, err := compact.Status()
+		if err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		return agentResult(target, status)
 	})
 
 	s.Register("agent", "read", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -807,6 +819,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 			// confirms the compact finishing, so only the transcript can.
 			compacting = true
 			respond = "working"
+			status = "working"
 		case strings.Contains(text, "please finish up quickly"):
 			promptOrder = append(promptOrder, "finish-up")
 			respond = "working"
@@ -816,6 +829,14 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 			status = "working"
 		}
 		return agentResult(target, respond)
+	})
+
+	// The busy guard reads the pane's real status, which the wait below hides
+	// while the compaction never confirms.
+	s.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return agentResult(argv[2], status)
 	})
 
 	s.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -837,6 +858,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 			if compactWaitTicks >= compactBoundaryConfirmTick && !boundaryWritten {
 				boundaryWritten = true
 				compacting = false
+				status = "idle" // the pane settles once the compaction is over
 				mu.Unlock()
 				appendCompactBoundaryLine(t, cwd, sessionID)
 				mu.Lock()
@@ -857,6 +879,8 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 			switch k {
 			case "ctrl+c":
 				ctrlCCalls++
+				// An interrupt leaves the pane idle and promptable.
+				status = "idle"
 			case "enter":
 				enterCalls++
 			}

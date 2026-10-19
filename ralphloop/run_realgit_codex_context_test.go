@@ -403,7 +403,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 				ctrlCCalls++
 			}
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "working", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
+		// ctrl+c leaves a Codex pane idle and promptable.
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 	})
 	s.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		if phase == "implementing" && evidenceReads == 0 {
@@ -570,7 +571,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 				ctrlCCalls++
 			}
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "working", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
+		// ctrl+c leaves a Codex pane idle and promptable.
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 	})
 	s.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		if phase == "implementing" && evidenceReads == 0 {

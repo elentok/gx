@@ -35,6 +35,7 @@ func TestConformance(t *testing.T) {
 		tasks := map[string]bool{}
 		newRunner := func() agentrunner.Runner {
 			r := herdrrunner.New()
+			r.N = 200 * time.Millisecond
 			r.BackgroundTasks = func(s agentrunner.Session) bool {
 				tasksMu.Lock()
 				defer tasksMu.Unlock()
@@ -65,16 +66,24 @@ func TestConformance(t *testing.T) {
 				defer tasksMu.Unlock()
 				tasks[s.Label] = running
 			},
-			Restart: func(t *testing.T) agentrunner.Runner { return newRunner() },
-			Skip: map[string]string{
-				"BusyPromptWaitsThenSends": "herdr busy guard: ticket 08",
-				"BusyPastNNotReady":        "herdr busy guard: ticket 08",
-				"BackgroundTaskNotBusy":    "herdr busy guard: ticket 08",
-				"FastTurnDeliveredOnce":    "herdr busy guard: ticket 08",
-				"SlashIdleDeliveredOnce":   "herdr slash rule: ticket 08",
-				"SlashClearReturnsAtOnce":  "herdr slash rule: ticket 08",
-				"SlashDialogDelivered":     "herdr slash rule: ticket 08",
+			Received: func(t *testing.T, s agentrunner.Session) string {
+				got, err := state.Received(s.Label)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return strings.Join(got, "\n")
 			},
+			FastTurn: func(t *testing.T, s agentrunner.Session) {
+				if err := state.FastTurn(s.Label); err != nil {
+					t.Fatal(err)
+				}
+			},
+			OpenDialogOnNextPrompt: func(t *testing.T, s agentrunner.Session) {
+				if err := state.OpenDialogOnNextSlash(s.Label); err != nil {
+					t.Fatal(err)
+				}
+			},
+			Restart: func(t *testing.T) agentrunner.Runner { return newRunner() },
 		}
 	})
 }
@@ -189,6 +198,34 @@ func promptDispatched(state *herdrfake.State, text string) bool {
 	return slices.ContainsFunc(state.Trace(), func(e herdrfake.TraceEntry) bool {
 		return len(e.Argv) > 3 && e.Argv[0] == "agent" && e.Argv[1] == "prompt" && e.Argv[3] == text
 	})
+}
+
+// Codex's /status starts no turn and moves no seq: it is delivered once the
+// agent is still idle after N, and never retyped. /new moves the seq, so it
+// returns without waiting out N.
+func TestPrompt_CodexSlashCommands(t *testing.T) {
+	r, state, s := startCodex(t, nil)
+	r.N = 300 * time.Millisecond
+
+	start := time.Now()
+	if err := r.Prompt(s, "/new"); err != nil {
+		t.Fatalf("Prompt(/new) = %v, want nil", err)
+	}
+	if elapsed := time.Since(start); elapsed >= r.N {
+		t.Fatalf("Prompt(/new) took %v, want it to return on the seq move before N=%v", elapsed, r.N)
+	}
+
+	start = time.Now()
+	if err := r.Prompt(s, "/status"); err != nil {
+		t.Fatalf("Prompt(/status) = %v, want nil", err)
+	}
+	if elapsed := time.Since(start); elapsed < r.N {
+		t.Fatalf("Prompt(/status) took %v, want it to wait out N=%v", elapsed, r.N)
+	}
+	got, err := state.Received(s.Label)
+	if err != nil || !slices.Equal(got, []string{"/new", "/status"}) {
+		t.Fatalf("received = %q, %v; want each command once", got, err)
+	}
 }
 
 func TestPrompt_CompactConfirmationNeverAnsweredIsNotDelivered(t *testing.T) {

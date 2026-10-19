@@ -160,8 +160,16 @@ func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, 
 		c.Recovery = recovery.Default()
 	})
 	var mu sync.Mutex
+	// A "/" launch prompt is delivered once the seq moves, so get follows the
+	// prompt the way the pane would.
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
+		mu.Lock()
+		defer mu.Unlock()
+		status, seq := "idle", 1
+		if len(typed) > 0 {
+			status, seq = "working", 2
+		}
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": status, "state_change_seq": seq}}, herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		mu.Lock()

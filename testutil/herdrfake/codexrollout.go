@@ -193,7 +193,9 @@ func (c *CodexRollout) sendKeys(state *State, argv []string) (any, Identities, e
 			// agent_blocked bypass to accept the next prompt.
 			c.phase = codexPhaseIdle
 			c.setStatus(state, "idle")
-			break
+			// The agent answers too, so trackAgents' view of the pane (and a
+			// busy guard reading it) sees the interrupt land.
+			return c.agentResult("idle"), c.identities(), nil
 		}
 	}
 	return nil, c.identities(), nil

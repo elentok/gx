@@ -60,6 +60,11 @@ type Agent struct {
 	// ConfirmsCompact agents block on "/compact" like Codex (see
 	// ConfirmCompact).
 	ConfirmsCompact bool
+	// Received is every prompt the agent was sent (see Received). FastNext
+	// and DialogNext arm the next prompt (see FastTurn, OpenDialogOnNextSlash).
+	Received   []string
+	FastNext   bool
+	DialogNext bool
 	// PaneText is what "agent read" returns (see SetPaneText).
 	PaneText string
 }

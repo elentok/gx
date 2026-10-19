@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -124,9 +125,19 @@ func RegisterAgentHost(s *State) {
 		if a.Stalled {
 			return nil, Identities{AgentID: a.ID}, errorEnvelope("agent_prompt_stalled", "no observed state change after prompt")
 		}
-		if a.ConfirmsCompact && argv[3] == "/compact" {
+		a.Received = append(a.Received, argv[3])
+		switch text := argv[3]; {
+		case a.FastNext:
+			// The turn starts and ends between two polls: the seq moves but no
+			// status edge is ever visible, so herdr's wait stalls.
+			a.FastNext = false
+			a.Seq += 2
+			return nil, Identities{AgentID: a.ID}, errorEnvelope("agent_prompt_stalled", "no observed state change after prompt")
+		case a.ConfirmsCompact && text == "/compact":
 			a.setStatus("blocked", "compact_confirm")
-		} else {
+		case strings.HasPrefix(text, "/") && text != "/compact":
+			a.slashCommand(text)
+		default:
 			a.setStatus("working", "")
 		}
 		return s.agentJSON(a), Identities{AgentID: a.ID}, nil
@@ -240,6 +251,53 @@ func (s *State) SetPaneText(name, text string) error {
 	}
 	a.PaneText = text
 	return nil
+}
+
+// Received returns the prompts the agent named name has received, in order.
+func (s *State) Received(name string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.findAgent(name)
+	if a == nil {
+		return nil, fmt.Errorf("agent not found: %s", name)
+	}
+	return slices.Clone(a.Received), nil
+}
+
+// FastTurn makes the next prompt to the agent named name start and end a turn
+// with no status edge a poll could see.
+func (s *State) FastTurn(name string) error {
+	return s.withAgent(name, func(a *Agent) { a.FastNext = true })
+}
+
+// OpenDialogOnNextSlash makes the agent named name open a dialog on the next
+// "/" command it receives, as /help does.
+func (s *State) OpenDialogOnNextSlash(name string) error {
+	return s.withAgent(name, func(a *Agent) { a.DialogNext = true })
+}
+
+func (s *State) withAgent(name string, f func(*Agent)) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.findAgent(name)
+	if a == nil {
+		return fmt.Errorf("agent not found: %s", name)
+	}
+	f(a)
+	return nil
+}
+
+// slashCommand handles a "/" command as the agents do: it starts no turn.
+// /clear and /new start a new conversation, which moves the seq; a dialog
+// command leaves the agent blocked.
+func (a *Agent) slashCommand(text string) {
+	switch {
+	case a.DialogNext:
+		a.DialogNext = false
+		a.setStatus("blocked", "input_needed")
+	case text == "/clear" || text == "/new":
+		a.Seq++
+	}
 }
 
 func (a *Agent) setStatus(status, rule string) {

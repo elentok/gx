@@ -71,15 +71,29 @@ func TestBudget_NudgedParkedPaneIsMeteredAndKilled(t *testing.T) {
 		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
 		"agent_session": map[string]any{"value": "sess"},
 	}}
+	idle := map[string]any{"agent": map[string]any{
+		"pane_id": "p1", "tab_id": "t1", "agent_status": "idle",
+		"agent_session": map[string]any{"value": "sess"},
+	}}
+	var nudged atomic.Bool
 	live := func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		if gone.Load() {
 			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
 		}
 		return working, herdrfake.Identities{}, nil
 	}
-	h.Herdr.Register("agent", "get", live)
+	// The pane idles until nudged: a prompt to a working pane is refused.
+	h.Herdr.Register("agent", "get", func(s *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		if !nudged.Load() && !gone.Load() {
+			return idle, herdrfake.Identities{}, nil
+		}
+		return live(s, argv)
+	})
 	h.Herdr.Register("agent", "wait", live)
-	h.Herdr.Register("agent", "prompt", live)
+	h.Herdr.Register("agent", "prompt", func(s *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		nudged.Store(true)
+		return live(s, argv)
+	})
 	h.Herdr.Register("agent", "send-keys", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})

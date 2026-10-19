@@ -273,6 +273,10 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				if err := cCompact.SendKey(key); err != nil {
 					return herdrfake.CommandError(err.Error())
 				}
+				// An interrupt leaves the pane idle and promptable.
+				mu.Lock()
+				status[pane] = "idle"
+				mu.Unlock()
 			}
 			mu.Lock()
 			cur, sess := status[pane], session[pane]
@@ -688,7 +692,8 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 				ctrlCCalls++
 			}
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "working", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
+		// ctrl+c leaves a Codex pane idle and promptable.
+		return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 	})
 	s.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return "", herdrfake.Identities{}, nil

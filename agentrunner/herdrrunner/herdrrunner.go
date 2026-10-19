@@ -116,12 +116,12 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 }
 
 func (r *Runner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
-	st, err := r.status(s)
+	turn, err := r.awaitNotBusy(s)
 	if err != nil {
 		return err
 	}
-	if st.State == agentrunner.StateBlocked {
-		return agentrunner.ErrNotReady
+	if isSlashCommand(text) {
+		return r.promptSlash(s, text, turn)
 	}
 	compact := text == "/compact"
 	until := []string{"working"}
@@ -133,10 +133,24 @@ func (r *Runner) PromptNudged(s agentrunner.Session, text string, onNudge func(s
 		// decide when compaction has really finished.
 		until = append(until, "blocked", "idle", "done")
 	}
-	prompt := promptWithNudge(herdr.AgentPrompt, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
+	// A turn can start and end between herdr's polls, so its wait reports a
+	// stall though the seq moved: that turn was delivered, and a nudge or
+	// retype would send the text twice.
+	submit := func(o herdr.AgentPromptOptions) (herdr.Agent, error) {
+		agent, err := herdr.AgentPrompt(o)
+		if IsPollTimeout(err) {
+			if cur, getErr := herdr.AgentGet(s.ID); getErr == nil && cur.StateChangeSeq > turn {
+				return cur, errTurnPassedUnseen
+			}
+		}
+		return agent, err
+	}
+	prompt := promptWithNudge(submit, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {
+	case errors.Is(err, errTurnPassedUnseen):
+		return nil
 	case errors.As(err, &blocked):
 		return fmt.Errorf("%w: %s", agentrunner.ErrNotReady, blocked.Message)
 	case errors.Is(err, claudeui.ErrStuckSubmission):
@@ -144,13 +158,87 @@ func (r *Runner) PromptNudged(s agentrunner.Session, text string, onNudge func(s
 	case err != nil:
 		return err
 	}
-	if agent.StateChangeSeq <= st.Turn {
+	if agent.StateChangeSeq <= turn {
 		return agentrunner.ErrNotDelivered
 	}
 	if compact {
 		return r.confirmCompact(s, agent.AgentStatus)
 	}
 	return nil
+}
+
+var errTurnPassedUnseen = errors.New("turn started and ended between polls")
+
+// isSlashCommand reports whether text is a "/" command that takes the
+// single-send rule. /compact keeps the normal path: it starts a turn.
+func isSlashCommand(text string) bool {
+	return strings.HasPrefix(text, "/") && text != "/compact"
+}
+
+// awaitNotBusy waits up to N for herdr to stop showing the agent working and
+// returns the Turn to send against. A prompt typed into a working agent is
+// only queued, so its next idle edge would pass for delivery. herdr's state is
+// read before the background-task probe: a background task alone is not busy.
+func (r *Runner) awaitNotBusy(s agentrunner.Session) (int, error) {
+	now, sleep := r.clock()
+	deadline := now().Add(r.WaitN())
+	for {
+		st, err := r.herdrStatus(s)
+		if err != nil {
+			return 0, err
+		}
+		switch st.State {
+		case agentrunner.StateBlocked:
+			return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, st.BlockedReason)
+		case agentrunner.StateWorking:
+			if !now().Before(deadline) {
+				return 0, fmt.Errorf("%w: busy for %s", agentrunner.ErrNotReady, r.WaitN())
+			}
+			sleep(min(pollInterval, deadline.Sub(now())))
+		default:
+			return st.Turn, nil
+		}
+	}
+}
+
+// promptSlash sends a "/" command once, never nudging or retyping: most
+// commands start no turn, so a retype would run them twice. Delivered means
+// the seq moved (a turn, a new conversation, a dialog) or herdr still shows
+// the agent idle after N.
+func (r *Runner) promptSlash(s agentrunner.Session, text string, turn int) error {
+	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: s.ID, Text: text}); err != nil {
+		return mapNotFound(err)
+	}
+	now, sleep := r.clock()
+	deadline := now().Add(r.WaitN())
+	for {
+		st, err := r.herdrStatus(s)
+		if err != nil {
+			return err
+		}
+		if st.Turn > turn {
+			return nil
+		}
+		if !now().Before(deadline) {
+			if st.State == agentrunner.StateWorking {
+				return fmt.Errorf("%w: %q started no turn and the agent is not idle", agentrunner.ErrNotDelivered, text)
+			}
+			return nil
+		}
+		sleep(min(pollInterval, deadline.Sub(now())))
+	}
+}
+
+// clock is Now and Sleep, defaulting to the wall clock.
+func (r *Runner) clock() (func() time.Time, func(time.Duration)) {
+	now, sleep := time.Now, time.Sleep
+	if r.Now != nil {
+		now = r.Now
+	}
+	if r.Sleep != nil {
+		sleep = r.Sleep
+	}
+	return now, sleep
 }
 
 // Compact timings are vars so tests can shorten them.
@@ -198,13 +286,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	for i, st := range states {
 		until[i] = string(st)
 	}
-	now, sleep := time.Now, time.Sleep
-	if r.Now != nil {
-		now = r.Now
-	}
-	if r.Sleep != nil {
-		sleep = r.Sleep
-	}
+	now, sleep := r.clock()
 	deadline := now().Add(timeout)
 	for {
 		remaining := deadline.Sub(now())
@@ -353,22 +435,33 @@ func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 // status reports herdr's StateChangeSeq as Turn: herdr keeps it, so it holds
 // across a gx restart, and it advances on every turn start (and end).
 func (r *Runner) status(s agentrunner.Session) (agentrunner.Status, error) {
+	st, err := r.herdrStatus(s)
+	if err != nil {
+		return st, err
+	}
+	if st.State == agentrunner.StateIdle || st.State == agentrunner.StateDone {
+		// s may predate herdr learning the agent's session id.
+		probed := s
+		if st.SessionID != "" {
+			probed.SessionID = st.SessionID
+		}
+		if r.BackgroundTasks != nil && r.BackgroundTasks(probed) {
+			st.State = agentrunner.StateWorking
+		}
+	}
+	return st, nil
+}
+
+// herdrStatus is herdr's own view of the agent, before any background-task
+// override. A state herdr reports that gx doesn't know counts as working.
+func (r *Runner) herdrStatus(s agentrunner.Session) (agentrunner.Status, error) {
 	agent, err := herdr.AgentGet(s.ID)
 	if err != nil {
 		return agentrunner.Status{}, mapNotFound(err)
 	}
 	st := agentrunner.Status{State: agentrunner.State(agent.AgentStatus), Turn: agent.StateChangeSeq, SessionID: agent.AgentSession}
 	switch st.State {
-	case agentrunner.StateWorking, agentrunner.StateBlocked:
-	case agentrunner.StateIdle, agentrunner.StateDone:
-		// s may predate herdr learning the agent's session id.
-		probed := s
-		if agent.AgentSession != "" {
-			probed.SessionID = agent.AgentSession
-		}
-		if r.BackgroundTasks != nil && r.BackgroundTasks(probed) {
-			st.State = agentrunner.StateWorking
-		}
+	case agentrunner.StateWorking, agentrunner.StateBlocked, agentrunner.StateIdle, agentrunner.StateDone:
 	default:
 		st.State = agentrunner.StateWorking
 	}
