@@ -18,8 +18,7 @@ func (s *Server) bindWeb() {
 	if s.cfg.WebAddr == "" {
 		return
 	}
-	token, err := loadOrCreateWebToken(s.cfg.StateDir)
-	if err != nil {
+	if _, err := loadOrCreateWebToken(s.cfg.StateDir); err != nil {
 		s.webErr = "web token: " + err.Error()
 		s.log.Error("web token unavailable", "err", err)
 		return
@@ -34,7 +33,7 @@ func (s *Server) bindWeb() {
 		s.log.Warn("web listener is bound to all interfaces and serves its token over plain HTTP", "addr", ln.Addr().String())
 	}
 	s.web = ln
-	s.webHTTP = &http.Server{Handler: requireToken(token, s.webHandler())}
+	s.webHTTP = &http.Server{Handler: requireToken(s.cfg.StateDir, s.webHandler())}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.

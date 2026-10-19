@@ -58,6 +58,25 @@ func loadOrCreateWebToken(stateDir string) (string, error) {
 	return token, errors.Join(err, f.Close())
 }
 
+// RotateWebToken replaces the token file. The web listener reads the file on
+// every request, so the running server drops all old cookies at once.
+func RotateWebToken(stateDir string) (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	token := hex.EncodeToString(raw)
+	// Rename keeps a concurrent request from reading a half-written file.
+	tmp := WebTokenPath(stateDir) + ".tmp"
+	if err := os.WriteFile(tmp, []byte(token+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	if err := os.Rename(tmp, WebTokenPath(stateDir)); err != nil {
+		return "", errors.Join(err, os.Remove(tmp))
+	}
+	return token, nil
+}
+
 // webCookieValue derives the cookie from the token, so a new token makes every
 // old cookie invalid and the cookie never carries the token itself.
 func webCookieValue(token string) string {
@@ -72,9 +91,14 @@ func sameSecret(a, b string) bool {
 
 // requireToken lets a request through when it carries the session cookie. A
 // valid ?t= starts a session and redirects to the app root; anything else is a 401.
-func requireToken(token string, next http.Handler) http.Handler {
-	want := webCookieValue(token)
+func requireToken(stateDir string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := ReadWebToken(stateDir)
+		if err != nil {
+			unauthorized(w)
+			return
+		}
+		want := webCookieValue(token)
 		if t := r.URL.Query().Get("t"); t != "" {
 			if !sameSecret(t, token) {
 				unauthorized(w)

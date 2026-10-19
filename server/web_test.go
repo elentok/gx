@@ -194,6 +194,32 @@ func TestWeb_TokenChangeInvalidatesOldCookies(t *testing.T) {
 	}
 }
 
+func TestWeb_RotateInvalidatesCookiesOfRunningServer(t *testing.T) {
+	h, base := startWeb(t)
+	old := login(t, h.StateDir, base)
+	before, _ := server.ReadWebToken(h.StateDir)
+	token, err := server.RotateWebToken(h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token == before || len(token) != 64 {
+		t.Errorf("rotated token %q, was %q: want a new 32-byte hex token", token, before)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/", old); code != http.StatusUnauthorized {
+		t.Errorf("old cookie after rotate = %d, want 401", code)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/?t="+before, nil); code != http.StatusUnauthorized {
+		t.Errorf("old token after rotate = %d, want 401", code)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/", login(t, h.StateDir, base)); code != http.StatusOK {
+		t.Errorf("new cookie = %d, want 200", code)
+	}
+	info, err := os.Stat(server.WebTokenPath(h.StateDir))
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("token file after rotate: %v, %v, want mode 0600", info, err)
+	}
+}
+
 func TestWeb_TokenFileIs0600AndSurvivesRestart(t *testing.T) {
 	h, _ := startWeb(t)
 	info, err := os.Stat(server.WebTokenPath(h.StateDir))

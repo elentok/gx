@@ -126,7 +126,7 @@ func newServerCmd(_ deps) *cobra.Command {
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerEpicsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd(), newServerReloadConfigCmd(), newServerConfigStatusCmd(), newServerCPUSpikeCmd())
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerEpicsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd(), newServerReloadConfigCmd(), newServerConfigStatusCmd(), newServerCPUSpikeCmd(), newServerWebTokenCmd(), newServerWebURLCmd())
 	return cmd
 }
 
