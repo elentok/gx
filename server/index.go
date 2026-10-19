@@ -17,11 +17,14 @@ import (
 // TicketInfo is one ticket in the snapshot. Markdown stays the truth: this is
 // a read-only projection rebuilt from the store scan.
 type TicketInfo struct {
-	Address   string   `json:"address"`
-	Title     string   `json:"title"`
-	Status    string   `json:"status"`
-	Type      string   `json:"type"`
-	BlockedBy []string `json:"blocked_by,omitempty"`
+	Address string `json:"address"`
+	Title   string `json:"title"`
+	Status  string `json:"status"`
+	// RenderedStatus is tickets.Epic.RenderedStatus's word (blocked,
+	// waiting-for-children, ...): the one status every client shows.
+	RenderedStatus string   `json:"rendered_status"`
+	Type           string   `json:"type"`
+	BlockedBy      []string `json:"blocked_by,omitempty"`
 	// ExternalBlockers and WidenedBlockers carry the cross-epic resolution
 	// (see tickets.Ticket), which a client can't redo from one scope's tickets.
 	ExternalBlockers []string          `json:"external_blockers,omitempty"`
@@ -128,6 +131,7 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 		for _, e := range epics {
 			for _, t := range e.Tickets {
 				info := ticketInfo(project, filepath.Base(e.Path), t)
+				info.RenderedStatus = e.RenderedStatus(t).Word()
 				info.EpicMergedAt = e.MergedAt
 				info.EpicIsMap = e.IsMap
 				info.EpicStatus = e.Status
