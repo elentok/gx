@@ -127,6 +127,12 @@ name the same fix) as the input spec instead of a plan/spec document. Follow gx-
 process, skipping its step 5 (quiz the user) since this runs unattended — publish the drafted
 breakdown directly, same as any other unattended `gx-to-tickets` run.
 
+Pass `--parent <this-ticket-id>` on every `gx tickets add` call. `--parent` makes the new ticket a
+scheduling and UI child of this one: the scheduler's scope resolution and the Queue tab's tree
+nesting both walk the child's own `parent:` field, the only edge there is, and nothing is recorded
+on this ticket. Never set it in a later `gx tickets set`. A running epic's scheduler can claim the
+ticket between the two calls, so the parent edge would arrive after pickup.
+
 `gx-to-tickets` already skips appending a trailing `type: code-review` ticket when the target epic
 has one — this epic does, namely the ticket this skill is running as — so no
 extra guard is needed here to avoid a duplicate.
@@ -144,11 +150,6 @@ If the consultant deferred zero findings, skip this step.
 
 ## 7. Close out
 
-- For every ticket `gx-to-tickets` created in step 5, `gx tickets set <new-ticket-addr> --parent
-  <this-ticket-id>` — this is what makes the new ticket a scheduling/UI child of this one (the
-  scheduler's scope resolution and the Queue tab's tree nesting both walk the child's own `parent:`
-  field, the only edge there is; nothing is recorded on this ticket). Do this before the next step,
-  since a running epic's scheduler may pick up the new tickets as soon as they're published.
 - Write the ticket body (append under the existing sections, don't replace them) with three parts:
   - **Raw findings**, per axis and reviewer skill, verbatim from step 3.
   - **Consultant triage**, verbatim from step 4.

@@ -280,7 +280,8 @@ empty ticket is schedulable. Without `--body`, the stub lands
 `draft`; fill in the body first, then `gx tickets set <addr> --status open` to publish it.
 
 `parent` is only for descendants — a mid-flight fork or a code-review fix ticket — and is written on
-the descendant alone; a ticket published from a plan or spec has no `parent` and records nothing
+the descendant alone, with `--parent <id>` on `gx tickets add`, never a later `gx tickets set`
+(the scheduler can claim the ticket in between); a ticket published from a plan or spec has no `parent` and records nothing
 about the tickets that follow it.
 
 Avoid specific file paths or code snippets in the body — they go stale fast. Exceptions: the
