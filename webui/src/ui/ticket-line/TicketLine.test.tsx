@@ -16,6 +16,14 @@ describe("TicketLine", () => {
     expect(container.querySelector("[data-reason]")).toBeNull();
   });
 
+  it("renders a parked reason in the red parked token and others muted", () => {
+    const parked = renderThemed(<TicketLine id="parked-id" title="b" reason="needs a person" tone="parked" />);
+    const muted = renderThemed(<TicketLine id="muted-id" title="b" reason="other reason" tone="muted" />);
+    const parkedColor = getComputedStyle(parked.getByText("needs a person")).color;
+    expect(parkedColor).toBe(getComputedStyle(parked.getByText("parked-id")).color);
+    expect(getComputedStyle(muted.getByText("other reason")).color).not.toBe(parkedColor);
+  });
+
   it("clamps the reason to two lines with an ellipsis", () => {
     const { getByText } = renderThemed(<TicketLine id="a" title="b" reason={"long reason ".repeat(50)} />);
     const style = getComputedStyle(getByText(/long reason/));

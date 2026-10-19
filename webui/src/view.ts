@@ -75,7 +75,7 @@ function ticketLines(epic: EpicSummary): TicketLineView[] {
     detail,
   });
   return [
-    ...epic.active.map((t) => line(t, "running")),
+    ...epic.active.map((t) => line(t, "muted")),
     ...epic.parked.map((t) => line(t, "parked", t.reason)),
   ];
 }

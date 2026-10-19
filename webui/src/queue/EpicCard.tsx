@@ -36,7 +36,7 @@ export function EpicCard({ epic }: { epic: EpicView }) {
           id={shortId(t.address)}
           title={t.title}
           reason={t.detail}
-          tone={t.tone === "parked" ? "parked" : "muted"}
+          tone={t.tone}
         />
       ))}
       {epic.reason && (

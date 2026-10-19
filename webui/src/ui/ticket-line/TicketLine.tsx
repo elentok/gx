@@ -13,7 +13,7 @@ export function TicketLine({ id, title, reason, tone = "muted" }: { id: string; 
         </Text>
       </Box>
       {reason && (
-        <Text data-reason fontSize="sm" color="text.muted" lineClamp="2">
+        <Text data-reason fontSize="sm" color={tone === "parked" ? "tone.parked.fg" : "text.muted"} lineClamp="2">
           {reason}
         </Text>
       )}

@@ -30,7 +30,7 @@ describe("snapshotView", () => {
 
   it("lists active tickets before parked ones, and only Parked for Waiting", () => {
     expect(byName("run").tickets.map((t) => [t.address, t.tone])).toEqual([
-      ["gx:demo/run/03", "running"],
+      ["gx:demo/run/03", "muted"],
       ["gx:demo/run/04", "parked"],
     ]);
     expect(byName("wait").tickets.map((t) => [t.address, t.tone, t.detail])).toEqual([
