@@ -208,7 +208,7 @@ func Icons(useNerdFont bool) IconSet {
 		TicketError:              "",
 		TicketPaused:             "",
 
-		SuggestedAction: "\uf0e7",
+		SuggestedAction: "\uf0eb",
 
 		AgentStarting: "",
 		AgentExited:   "",

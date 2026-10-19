@@ -17,7 +17,7 @@ func TestIcons_TicketNerdFontCodepoints(t *testing.T) {
 		{"TicketDone", icons.TicketDone, '\uf00c'},
 		{"TicketError", icons.TicketError, '\uf057'},
 		{"TicketPaused", icons.TicketPaused, '\uf28c'},
-		{"SuggestedAction", icons.SuggestedAction, '\uf0e7'},
+		{"SuggestedAction", icons.SuggestedAction, '\uf0eb'},
 		{"SessionLive", icons.SessionLive, '\uf120'},
 		{"DesignSession", icons.DesignSession, '\U000f0349'},
 	}
