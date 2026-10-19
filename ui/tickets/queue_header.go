@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -181,6 +182,115 @@ func epicContextMetrics(epic tickets.Epic) (avg, maximum, compacts int) {
 		avg = total / count
 	}
 	return avg, maximum, compacts
+}
+
+// epicHeaderLayout is how every Queue epic header lays out its progress
+// counter and bar. It is one value for all shown epics so the bars line up.
+type epicHeaderLayout int
+
+const (
+	epicLayoutWide        epicHeaderLayout = iota // name … (n/m) bar on one line
+	epicLayoutNarrowBar                           // name, then " bar (n/m)"
+	epicLayoutNarrowCount                         // name, then " (n/m)"
+)
+
+const epicBarCells = 12
+
+// queueLabelWidth is the width a Queue row's label can use: the body width,
+// less the tree's selection mark and its two-column right margin. Zero or
+// negative widths (before the first resize) mean "unconstrained".
+func (m QueueModel) queueLabelWidth() int {
+	sidebarW, _ := m.panelWidths(m.width)
+	if m.width <= 0 {
+		return 0
+	}
+	return sidebarW - 2 - 3
+}
+
+func epicCounter(epic tickets.Epic) string {
+	return fmt.Sprintf("(%d/%d)", epic.DoneCount(), epic.TotalCount())
+}
+
+// epicHeaderLayoutFor picks the layout for all of epics: wide only if every
+// non-empty epic's name line fits, else narrow with the bar if its own line
+// fits, else narrow with only the counter.
+func epicHeaderLayoutFor(epics []tickets.Epic, labelW int) epicHeaderLayout {
+	if labelW <= 0 {
+		return epicLayoutWide
+	}
+	layout := epicLayoutWide
+	for _, epic := range epics {
+		if epic.TotalCount() == 0 {
+			continue
+		}
+		counterW := lipgloss.Width(epicCounter(epic))
+		if 1+lipgloss.Width(epic.Name)+1+counterW+1+epicBarCells > labelW {
+			layout = epicLayoutNarrowBar
+		}
+		if 1+epicBarCells+1+counterW > labelW {
+			return epicLayoutNarrowCount
+		}
+	}
+	return layout
+}
+
+// epicBar renders the epic's fixed-width progress bar.
+func epicBar(epic tickets.Epic) string {
+	fraction := 0.0
+	if total := epic.TotalCount(); total > 0 {
+		fraction = float64(epic.DoneCount()) / float64(total)
+	}
+	return ui.ProgressBar(fraction, epicBarCells, lipgloss.NewStyle(), lipgloss.NewStyle().Foreground(ui.ColorSurface1))
+}
+
+// epicNameLine renders the selectable name row. In the wide layout the
+// counter and bar are right-aligned to labelW; otherwise the name is alone,
+// cut with an ellipsis if it overflows.
+func epicNameLine(epic tickets.Epic, layout epicHeaderLayout, labelW int) string {
+	name := epic.Name
+	if labelW > 0 && layout != epicLayoutWide {
+		name = ansi.Truncate(name, labelW-1, "…")
+	}
+	line := " " + epicHeaderStyle.Render(name)
+	if layout != epicLayoutWide || epic.TotalCount() == 0 {
+		return line
+	}
+	tail := epicCounter(epic) + " " + epicBar(epic)
+	pad := max(labelW-lipgloss.Width(line)-lipgloss.Width(tail), 1)
+	return line + strings.Repeat(" ", pad) + tail
+}
+
+// epicBarLine renders the narrow layouts' second line.
+func epicBarLine(epic tickets.Epic, layout epicHeaderLayout) string {
+	if layout == epicLayoutNarrowCount {
+		return " " + epicCounter(epic)
+	}
+	return " " + epicBar(epic) + " " + epicCounter(epic)
+}
+
+// epicStatusRow renders "Status: <icon> <state> · n compact(s)", all dim
+// except the state, cut at labelW. extra is appended as another dim part.
+func epicStatusRow(icons ui.IconSet, epic tickets.Epic, extra string, labelW int) string {
+	icon, text, style := epicStatusLine(icons, epic, nil)
+	line := " " + metricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
+	parts := []string{}
+	if _, _, compacts := epicContextMetrics(epic); compacts > 0 {
+		noun := "compacts"
+		if compacts == 1 {
+			noun = "compact"
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", compacts, noun))
+	}
+	if extra != "" {
+		parts = append(parts, extra)
+	}
+	for _, p := range parts {
+		line += metricsLineStyle.Render(" · " + p)
+	}
+	if labelW > 0 {
+		line = ansi.Truncate(line, labelW, "…")
+	}
+	return line
 }
 
 // queueRunStateKind classifies the queue's run state for header rendering.

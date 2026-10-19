@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/ralphloop"
@@ -198,8 +200,11 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 	if !strings.Contains(content, "took 14m14s") {
 		t.Fatalf("expected the epic status line to report total elapsed time:\n%s", content)
 	}
-	if !strings.Contains(content, "Context window: avg 10.0k tok, max 12.0k tok (3 compacts)") {
-		t.Fatalf("expected the epic context-window line:\n%s", content)
+	if !strings.Contains(content, "Status: ") || !strings.Contains(content, " · 3 compacts") {
+		t.Fatalf("expected the epic Status line with its compacts:\n%s", content)
+	}
+	if strings.Contains(content, "Context window") {
+		t.Fatalf("expected the context-window row to be gone:\n%s", content)
 	}
 }
 
@@ -289,14 +294,26 @@ func TestQueueEpicHeaderAppendsSummedCostForCompletedEpic(t *testing.T) {
 	}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
-	headerLine := epicHeaderLine(t, m, "alpha")
-	if !strings.Contains(headerLine, "$43.00") {
-		t.Fatalf("epic header line missing summed cost \"$43.00\" for a completed epic: %q", headerLine)
+	statusLine := epicStatusLineText(t, m)
+	if !strings.Contains(statusLine, "$43.00") {
+		t.Fatalf("epic Status line missing summed cost \"$43.00\" for a completed epic: %q", statusLine)
 	}
 }
 
+// epicStatusLineText returns m.queueBody's plain-text "Status:" line.
+func epicStatusLineText(t *testing.T, m QueueModel) string {
+	t.Helper()
+	for _, line := range m.queueBody(80) {
+		if plain := ansi.Strip(line); strings.Contains(plain, "Status:") {
+			return plain
+		}
+	}
+	t.Fatalf("no epic Status line found")
+	return ""
+}
+
 // epicHeaderLine returns m.queueBody's plain-text epic header line naming
-// epicName (the line rendered by queue_view.go's nodeEpicStatus case), for
+// epicName (the line rendered by queue_view.go's nodeEpicName case), for
 // tests that need to inspect just that line rather than the whole panel
 // (which also carries queueHeaderTitle's own live-total suffix).
 func epicHeaderLine(t *testing.T, m QueueModel, epicName string) string {
@@ -309,4 +326,109 @@ func epicHeaderLine(t *testing.T, m QueueModel, epicName string) string {
 	}
 	t.Fatalf("no epic header line found naming %q", epicName)
 	return ""
+}
+
+// layoutBody loads one done and one open ticket per epic name at the given
+// window width and returns the plain Queue body lines.
+func layoutBody(t *testing.T, width int, epicNames ...string) (QueueModel, []string) {
+	t.Helper()
+	root := t.TempDir()
+	checked := map[string]bool{}
+	for _, name := range epicNames {
+		writeTicket(t, root, name, "01-first.md", "Status: open\n\nBody.\n")
+		writeTicket(t, root, name, "02-second.md", "Status: open\n\nBody.\n")
+		writeRawQueueTicket(t, root, name, "01-first.md", "---\nid: \"01\"\nstatus: done\ntype: implement\ncompactions: 1\n---\n\nBody.\n")
+		checked[ticketPath(root, name, "01-first.md")] = true
+		checked[ticketPath(root, name, "02-second.md")] = true
+	}
+	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+	m = updated.(QueueModel)
+	sidebarW, _ := m.panelWidths(m.width)
+	var lines []string
+	for _, line := range m.queueBody(sidebarW - 2) {
+		lines = append(lines, strings.TrimRight(ansi.Strip(line), " "))
+	}
+	return m, lines
+}
+
+func TestQueueEpicHeaderWideLayoutEndsWithCounterAndBar(t *testing.T) {
+	t.Parallel()
+	m, lines := layoutBody(t, 140, "alpha")
+	sidebarW, _ := m.panelWidths(m.width)
+	var name, status string
+	for i, l := range lines {
+		if strings.Contains(l, "alpha") && name == "" {
+			name = l
+			status, _ = lines[i+1], 0
+		}
+	}
+	if !strings.HasSuffix(name, "(1/2) ▰▰▰▰▰▰▱▱▱▱▱▱") {
+		t.Fatalf("wide name line should end with counter and half-full bar: %q", name)
+	}
+	if got, want := lipgloss.Width(name), sidebarW-2-3+1; got != want {
+		t.Fatalf("name line width (with selection mark) = %d, want %d", got, want)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(status), "Status: ") || !strings.Contains(status, "1 compact") || strings.Contains(status, "1 compacts") {
+		t.Fatalf("expected Status line with singular compact: %q", status)
+	}
+}
+
+func TestQueueEpicHeaderNarrowSwitchesEveryEpic(t *testing.T) {
+	t.Parallel()
+	_, lines := layoutBody(t, 60, "alpha", "a-very-long-epic-name-that-cannot-fit")
+	var bars []string
+	for _, l := range lines {
+		if strings.Contains(l, "▰") || strings.Contains(l, "▱") {
+			bars = append(bars, l)
+		}
+	}
+	if len(bars) != 2 {
+		t.Fatalf("expected a bar line per epic, got %q", bars)
+	}
+	for _, b := range bars {
+		if !strings.HasPrefix(strings.TrimLeft(b, "▌ "), "▰▰▰▰▰▰▱▱▱▱▱▱ (1/2)") || strings.Index(b, "▰") != strings.Index(bars[0], "▰") {
+			t.Fatalf("bar lines should share one column: %q", bars)
+		}
+	}
+}
+
+func TestQueueEpicHeaderVeryNarrowKeepsOnlyCounter(t *testing.T) {
+	t.Parallel()
+	_, lines := layoutBody(t, 20, "alpha")
+	joined := strings.Join(lines, "\n")
+	if strings.Contains(joined, "▰") || strings.Contains(joined, "▱") {
+		t.Fatalf("very narrow layout should drop the bar:\n%s", joined)
+	}
+	if !strings.Contains(joined, " (1/2)") {
+		t.Fatalf("very narrow layout should keep the counter:\n%s", joined)
+	}
+}
+
+func TestQueueEpicHeaderNarrowCutsLongNameWithEllipsis(t *testing.T) {
+	t.Parallel()
+	_, lines := layoutBody(t, 40, "an-extremely-long-epic-name-that-overflows-the-pane")
+	found := false
+	for _, l := range lines {
+		if strings.Contains(l, "an-extremely") && strings.HasSuffix(l, "…") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected the long name cut with an ellipsis:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+func TestQueueEpicHeaderHasSpacerAfterStatusLine(t *testing.T) {
+	t.Parallel()
+	_, lines := layoutBody(t, 140, "alpha")
+	for i, l := range lines {
+		if strings.Contains(l, "Status:") {
+			if strings.TrimSpace(lines[i+1]) != "" || !strings.Contains(lines[i+2], "First") {
+				t.Fatalf("expected a blank spacer then the first ticket after the Status line: %q", lines[i:i+3])
+			}
+			return
+		}
+	}
+	t.Fatalf("no Status line found")
 }

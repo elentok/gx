@@ -40,7 +40,7 @@ func (m *QueueModel) recomputeQueueSearchMatches() {
 		switch e.Value.kind {
 		case nodeQueueTicket:
 			matched = ticketMatchesQuery(e.Value.ticket.epic, e.Value.ticket.ticket, q)
-		case nodeEpicStatus:
+		case nodeEpicName:
 			matched = epicMatchesQuery(e.Value.epic, q)
 		}
 		if matched {

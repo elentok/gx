@@ -790,7 +790,7 @@ func firstSelectableQueueIndex(t *testing.T, m QueueModel) int {
 
 // isSelectableQueueKind is a ticket row or an epic header.
 func isSelectableQueueKind(kind queueNodeKind) bool {
-	return kind == nodeQueueTicket || kind == nodeEpicStatus
+	return kind == nodeQueueTicket || kind == nodeEpicName
 }
 
 func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
@@ -1296,7 +1296,7 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 
 	for name, click := range map[string]tea.MouseClickMsg{
 		"preview": {Button: tea.MouseRight, X: px, Y: py},
-		"context": {Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicContext])},
+		"context": {Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicStatusLine])},
 	} {
 		updated, cmd := m.Update(click)
 		got := updated.(QueueModel)
@@ -1315,9 +1315,9 @@ func TestQueueModelRightClickOpensContextMenu(t *testing.T) {
 		t.Fatalf("expected the ticket menu resolving for %q, got pending=%q cmd=%v", want, m.ticketMenuPending, cmd != nil)
 	}
 
-	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicStatus])})
+	updated, _ = m.Update(tea.MouseClickMsg{Button: tea.MouseRight, Y: rowY(rowOf[nodeEpicName])})
 	m = updated.(QueueModel)
-	if m.queueTree.SelectedIndex() != rowOf[nodeEpicStatus] || !m.ticketMenu.IsOpen || !strings.Contains(m.ticketMenu.View(), "Add epic to queue") {
+	if m.queueTree.SelectedIndex() != rowOf[nodeEpicName] || !m.ticketMenu.IsOpen || !strings.Contains(m.ticketMenu.View(), "Add epic to queue") {
 		t.Fatalf("expected the epic menu open on the epic header, got selection=%d view:\n%s", m.queueTree.SelectedIndex(), m.ticketMenu.View())
 	}
 }
@@ -1472,7 +1472,7 @@ func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
 		switch {
 		case e.Value.kind == nodeQueueTicket && e.Value.epic.Name == "alpha":
 			alphaTicket = i
-		case e.Value.kind == nodeEpicStatus && e.Value.epic.Name == "beta":
+		case e.Value.kind == nodeEpicName && e.Value.epic.Name == "beta":
 			betaHeader = i
 		}
 	}
@@ -1496,12 +1496,12 @@ func TestQueueModelCursorSkipsFillerRowsBetweenEpics(t *testing.T) {
 func TestQueueModelPageDownLandsOnSelectableRow(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= 4; i++ {
 		writeTicket(t, root, "alpha", fmt.Sprintf("%02d-ticket.md", i), "Status: open\n\nBody.\n")
 	}
 	writeTicket(t, root, "beta", "01-ticket.md", "Status: open\n\nBody.\n")
 	checked := map[string]bool{}
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= 4; i++ {
 		checked[ticketPath(root, "alpha", fmt.Sprintf("%02d-ticket.md", i))] = true
 	}
 	checked[ticketPath(root, "beta", "01-ticket.md")] = true
@@ -1684,7 +1684,7 @@ func TestQueueSearch_MatchesEpicHeaderRows(t *testing.T) {
 	entries := m.queueTree.Entries()
 	first, _ := m.search.Match(0)
 	second, _ := m.search.Match(1)
-	if e := entries[first.DataIndex].Value; e.kind != nodeEpicStatus || e.epic.Name != "alpha" {
+	if e := entries[first.DataIndex].Value; e.kind != nodeEpicName || e.epic.Name != "alpha" {
 		t.Fatalf("expected first match to be the alpha epic header, got %+v", e)
 	}
 	if e := entries[second.DataIndex].Value; e.kind != nodeQueueTicket || e.ticket.ticket.Title != "Alpha tweak" {

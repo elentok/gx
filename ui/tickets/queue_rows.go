@@ -42,20 +42,24 @@ type queueRow struct {
 type queueNodeKind int
 
 const (
-	nodeEpicSeparator queueNodeKind = iota // blank line before every epic
-	nodeEpicStatus                         // epic name + status icon/text (epicStatusLine)
-	nodeEpicContext                        // context-window metrics line
-	nodeEpicError                          // present only when planErrs[epic.Name] != nil
-	nodeQueueTicket                        // wraps a queueRow
+	nodeEpicSeparator  queueNodeKind = iota // blank line before every epic
+	nodeEpicName                            // selectable epic row: name, plus "(n/m)" and bar in the wide layout
+	nodeEpicBar                             // narrow layouts only: bar (and/or "(n/m)") line under the name
+	nodeEpicStatusLine                      // "Status: <icon> <state> · n compacts"
+	nodeEpicSpacer                          // blank line between the header and the tickets
+	nodeEpicError                           // present only when planErrs[epic.Name] != nil
+	nodeQueueTicket                         // wraps a queueRow
 )
 
 // queueNode is ui/tree.Model[queueNode]'s value type. err is set only for
-// nodeEpicError, ticket only for nodeQueueTicket.
+// nodeEpicError, ticket only for nodeQueueTicket, layout for the epic's
+// header rows.
 type queueNode struct {
 	kind   queueNodeKind
 	epic   tickets.Epic
 	err    error
 	ticket queueRow
+	layout epicHeaderLayout
 }
 
 // queueEntriesCache memoizes buildQueueEntries' output (see QueueModel.
@@ -71,6 +75,7 @@ type queueEntriesCache struct {
 	hideComplete bool
 	project      string
 	collapsed    map[string]bool
+	labelWidth   int
 	entries      []tree.Entry[queueNode]
 }
 
@@ -89,6 +94,7 @@ func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 	if c.entries != nil &&
 		c.hideComplete == m.hideComplete &&
 		c.project == m.projectFilter &&
+		c.labelWidth == m.queueLabelWidth() &&
 		reflect.DeepEqual(c.epics, m.epics) &&
 		reflect.DeepEqual(c.checked, m.checked) &&
 		reflect.DeepEqual(c.collapsed, collapsed) {
@@ -99,6 +105,7 @@ func (m QueueModel) buildQueueEntriesCached() []tree.Entry[queueNode] {
 	c.checked = m.checked
 	c.hideComplete = m.hideComplete
 	c.project = m.projectFilter
+	c.labelWidth = m.queueLabelWidth()
 	c.collapsed = collapsed
 	c.entries = entries
 	return entries
@@ -126,6 +133,13 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 	var roots []queueNode
 	childrenOf := map[string][]queueNode{}
 
+	type shownEpic struct {
+		epic    tickets.Epic
+		ordered []tickets.Ticket
+		planErr error
+	}
+	var shown []shownEpic
+	var shownEpics []tickets.Epic
 	for _, epic := range m.epics {
 		if m.projectFilter != "" && projectOf(epic.Name) != m.projectFilter {
 			continue
@@ -138,10 +152,23 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		if len(ordered) == 0 {
 			continue
 		}
+		shown = append(shown, shownEpic{epic, ordered, planErr})
+		shownEpics = append(shownEpics, epic)
+	}
+	// Decided here, not at draw time, because the bar line is a real entry
+	// whose presence changes the tree's height; the cache keys on the width.
+	layout := epicHeaderLayoutFor(shownEpics, m.queueLabelWidth())
+
+	for _, s := range shown {
+		epic, ordered, planErr := s.epic, s.ordered, s.planErr
 
 		roots = append(roots, queueNode{kind: nodeEpicSeparator, epic: epic})
-		roots = append(roots, queueNode{kind: nodeEpicStatus, epic: epic})
-		roots = append(roots, queueNode{kind: nodeEpicContext, epic: epic})
+		roots = append(roots, queueNode{kind: nodeEpicName, epic: epic, layout: layout})
+		if layout != epicLayoutWide && epic.TotalCount() > 0 {
+			roots = append(roots, queueNode{kind: nodeEpicBar, epic: epic, layout: layout})
+		}
+		roots = append(roots, queueNode{kind: nodeEpicStatusLine, epic: epic})
+		roots = append(roots, queueNode{kind: nodeEpicSpacer, epic: epic})
 		if planErr != nil {
 			roots = append(roots, queueNode{kind: nodeEpicError, epic: epic, err: planErr})
 		}
@@ -196,10 +223,14 @@ func (m QueueModel) buildQueueEntries() []tree.Entry[queueNode] {
 		switch n.kind {
 		case nodeEpicSeparator:
 			return "epic:" + n.epic.Name + ":sep"
-		case nodeEpicStatus:
+		case nodeEpicName:
 			return "epic:" + n.epic.Name + ":status"
-		case nodeEpicContext:
-			return "epic:" + n.epic.Name + ":context"
+		case nodeEpicBar:
+			return "epic:" + n.epic.Name + ":bar"
+		case nodeEpicStatusLine:
+			return "epic:" + n.epic.Name + ":statusline"
+		case nodeEpicSpacer:
+			return "epic:" + n.epic.Name + ":spacer"
 		case nodeEpicError:
 			return "epic:" + n.epic.Name + ":err"
 		default:

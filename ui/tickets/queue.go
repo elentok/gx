@@ -120,7 +120,7 @@ func NewQueueModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Man
 	queueTree := tree.NewModel[queueNode]()
 	queueTree.SetIsSelectable(func(n queueNode) bool {
 		switch n.kind {
-		case nodeEpicSeparator, nodeEpicContext, nodeEpicError:
+		case nodeEpicSeparator, nodeEpicBar, nodeEpicStatusLine, nodeEpicSpacer, nodeEpicError:
 			return false
 		default:
 			return true
@@ -190,6 +190,10 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.ready = true
 		m.help, _ = m.help.Update(msg)
+		if m.loaded {
+			// The epic header layout depends on the width (see buildQueueEntries).
+			m.queueTree.SetEntries(m.buildQueueEntriesCached())
+		}
 		m.queueTree.SetVisibleHeight(m.queueViewportHeight() - queueHeaderReservedLines)
 		return m, nil
 	case queueSpinnerRestartMsg:
@@ -363,7 +367,7 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		if !ok {
 			return m, nil
 		}
-		if kind := m.queueTree.Entries()[idx].Value.kind; kind != nodeQueueTicket && kind != nodeEpicStatus {
+		if kind := m.queueTree.Entries()[idx].Value.kind; kind != nodeQueueTicket && kind != nodeEpicName {
 			return m, nil
 		}
 		m.queueTree.SetSelectedIndex(idx)

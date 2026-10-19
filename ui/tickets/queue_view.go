@@ -1,7 +1,6 @@
 package tickets
 
 import (
-	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -120,33 +119,31 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			switch entry.Value.kind {
 			case nodeEpicSeparator:
 				return ""
-			case nodeEpicStatus:
-				icon, text, style := epicStatusLine(m.icons(), entry.Value.epic, nil)
-				line := " " + epicHeaderStyle.Render(entry.Value.epic.Name) + " " + style.Render(icon+" "+text)
-				// Ticket 10: the epic's own running total, appended dim italic
-				// (metricsLineStyle) regardless of the status line's color — the
-				// configured limits are session-wide, so coloring one epic's
-				// slice against them would misleadingly suggest that epic alone
-				// is over budget. In server mode it is the ledger's cost for
-				// today, per root; otherwise a completed epic gets its final
-				// summed cost (epicCost) appended alongside "took Xm", and an
-				// idle epic gets nothing.
+			case nodeEpicName:
+				return epicNameLine(entry.Value.epic, entry.Value.layout, m.queueLabelWidth())
+			case nodeEpicBar:
+				return epicBarLine(entry.Value.epic, entry.Value.layout)
+			case nodeEpicSpacer:
+				return ""
+			case nodeEpicStatusLine:
+				// Ticket 10: the epic's own running total, dim like the rest of
+				// the metrics regardless of the state's color — the configured
+				// limits are session-wide, so coloring one epic's slice against
+				// them would misleadingly suggest that epic alone is over
+				// budget. In server mode it is the ledger's cost for today, per
+				// root; otherwise a completed epic gets its final summed cost
+				// (epicCost), and an idle epic gets nothing.
+				cost := 0.0
 				if m.serverAPI != nil {
-					if cost := m.serverBudget.Roots[entry.Value.epic.Name]; cost > 0 {
-						line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
-					}
+					cost = m.serverBudget.Roots[entry.Value.epic.Name]
 				} else if entry.Value.epic.AllDone() {
-					if cost := epicCost(entry.Value.epic); cost > 0 {
-						line = appendRowMetrics(line, tickets.FormatCost(cost), metricsLineStyle)
-					}
+					cost = epicCost(entry.Value.epic)
 				}
-				return line
-			case nodeEpicContext:
-				avg, maximum, compacts := epicContextMetrics(entry.Value.epic)
-				return " " + metricsLineStyle.Render(fmt.Sprintf(
-					"Context window: avg %s, max %s (%d compacts)",
-					formatTokenCount(avg), formatTokenCount(maximum), compacts,
-				))
+				extra := ""
+				if cost > 0 {
+					extra = tickets.FormatCost(cost)
+				}
+				return epicStatusRow(m.icons(), entry.Value.epic, extra, m.queueLabelWidth())
 			case nodeEpicError:
 				if stuck, ok := entry.Value.err.(*ralphloop.StuckPlanError); ok {
 					return "    " + metricsLineStyle.Render(

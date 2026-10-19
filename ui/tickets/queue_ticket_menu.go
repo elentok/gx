@@ -70,7 +70,7 @@ func (m QueueModel) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.
 func (m QueueModel) selectedQueueEpic() (tickets.Epic, bool) {
 	entries := m.queueTree.Entries()
 	idx := m.queueTree.SelectedIndex()
-	if idx < 0 || idx >= len(entries) || entries[idx].Value.kind != nodeEpicStatus {
+	if idx < 0 || idx >= len(entries) || entries[idx].Value.kind != nodeEpicName {
 		return tickets.Epic{}, false
 	}
 	return entries[idx].Value.epic, true
