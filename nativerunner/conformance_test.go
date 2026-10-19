@@ -1,9 +1,11 @@
 package nativerunner_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -33,6 +35,7 @@ func TestHeadless_Conformance(t *testing.T) {
 				StopGrace:      2 * time.Second,
 				InterruptGrace: 2 * time.Second,
 				PromptTimeout:  500 * time.Millisecond,
+				N:              300 * time.Millisecond,
 			}
 		}
 		control := func(t *testing.T, s agentrunner.Session, c agentfake.Control) {
@@ -71,14 +74,22 @@ func TestHeadless_Conformance(t *testing.T) {
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
 				control(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
 			},
-			Skip: map[string]string{
-				"BusyPromptWaitsThenSends": "headless busy guard: ticket 07",
-				"BusyPastNNotReady":        "headless busy guard: ticket 07",
-				"BackgroundTaskNotBusy":    "headless busy guard: ticket 07",
-				"FastTurnDeliveredOnce":    "headless busy guard: ticket 07",
-				"SlashIdleDeliveredOnce":   "headless slash rule: ticket 07",
-				"SlashClearReturnsAtOnce":  "headless slash rule: ticket 07",
-				"SlashDialogDelivered":     "headless slash rule: ticket 07",
+			Received: func(t *testing.T, s agentrunner.Session) string {
+				data, err := os.ReadFile(filepath.Join(root, s.Label, nativerunner.OutFile))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got strings.Builder
+				for _, line := range bytes.Split(data, []byte("\n")) {
+					var e struct{ Type, Text string }
+					if json.Unmarshal(line, &e) == nil && e.Type == "agentfake_received" {
+						got.WriteString(e.Text + "\n")
+					}
+				}
+				return got.String()
+			},
+			OpenDialogOnNextPrompt: func(t *testing.T, s agentrunner.Session) {
+				control(t, s, agentfake.Control{Action: agentfake.ActionDialog})
 			},
 			Restart: func(t *testing.T) agentrunner.Runner {
 				r := newRunner()

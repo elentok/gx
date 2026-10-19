@@ -93,12 +93,24 @@ func (t *tracker) status() agentrunner.Status {
 	case t.blocked:
 		st.State = agentrunner.StateBlocked
 		st.BlockedReason = t.permission.reason()
-	case t.working || t.bgTasks > 0 || t.queued():
+	case t.busy() || t.bgTasks > 0:
 		st.State = agentrunner.StateWorking
 	default:
 		st.State = agentrunner.StateIdle
 	}
 	return st
+}
+
+// busy is a running turn or a queued gx command: what a new prompt would wait
+// behind. Unlike Status it ignores background tasks, which don't hold claude.
+func (t *tracker) busy() bool {
+	return t.working || t.queued()
+}
+
+// hasLifecycle reports whether claude sent any lifecycle event for uuid.
+func (t *tracker) hasLifecycle(uuid string) bool {
+	_, ok := t.commands[uuid]
+	return ok
 }
 
 // permission is a tool-use request waiting for an allow or deny.

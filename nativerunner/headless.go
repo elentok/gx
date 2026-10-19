@@ -370,20 +370,13 @@ func (h *Headless) live(s agentrunner.Session) (*headlessSession, error) {
 func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 	h.mu.Lock()
 	ss, err := h.live(s)
+	h.mu.Unlock()
 	if err != nil {
-		h.mu.Unlock()
 		return err
 	}
-	before, capErr := ss.track.status(), ss.track.capabilityErr()
-	h.mu.Unlock()
-	if capErr != nil {
-		return capErr
-	}
-	switch before.State {
-	case agentrunner.StateBlocked:
-		return agentrunner.ErrNotReady
-	case agentrunner.StateDone:
-		return agentrunner.ErrNotDelivered
+	before, err := h.awaitNotBusy(ss)
+	if err != nil {
+		return err
 	}
 	uuid, err := NewUUID()
 	if err != nil {
@@ -398,7 +391,72 @@ func (h *Headless) Prompt(s agentrunner.Session, text string) error {
 	if err != nil {
 		return fmt.Errorf("%w: %v", agentrunner.ErrNotDelivered, err)
 	}
+	if isSlashCommand(text) {
+		return h.awaitSlash(ss, uuid, before.Turn)
+	}
 	return h.awaitTurn(ss, uuid, before.Turn)
+}
+
+// awaitNotBusy waits up to N for a running turn or a queued gx command to
+// end, and returns the status to send against. A prompt sent into a busy
+// claude is only queued, and would run after Prompt reported it undelivered.
+// A background task alone is not busy, though Status reports it working.
+func (h *Headless) awaitNotBusy(ss *headlessSession) (agentrunner.Status, error) {
+	deadline := time.NewTimer(h.WaitN())
+	defer deadline.Stop()
+	for {
+		h.mu.Lock()
+		st, capErr := ss.track.status(), ss.track.capabilityErr()
+		busy, changed := ss.track.busy(), ss.changed
+		h.mu.Unlock()
+		switch {
+		case capErr != nil:
+			return st, capErr
+		case st.State == agentrunner.StateBlocked:
+			return st, agentrunner.ErrNotReady
+		case st.State == agentrunner.StateDone:
+			return st, agentrunner.ErrNotDelivered
+		case !busy:
+			return st, nil
+		}
+		select {
+		case <-changed:
+		case <-deadline.C:
+			return st, fmt.Errorf("%w: busy for %v", agentrunner.ErrNotReady, h.WaitN())
+		}
+	}
+}
+
+// awaitSlash waits for a "/" command sent once; it is never resent, since most
+// commands start no turn and a resend would run them twice. Delivered means
+// a lifecycle event for uuid, a turn that began, a dialog that blocked claude,
+// or claude still idle after N.
+func (h *Headless) awaitSlash(ss *headlessSession, uuid string, turn int) error {
+	deadline := time.NewTimer(h.WaitN())
+	defer deadline.Stop()
+	for {
+		h.mu.Lock()
+		capErr := ss.track.capabilityErr()
+		moved := ss.track.hasLifecycle(uuid) || ss.track.turn > turn || ss.track.blocked
+		exited, busy, changed := ss.track.exited, ss.track.busy(), ss.changed
+		h.mu.Unlock()
+		switch {
+		case capErr != nil:
+			return capErr
+		case moved:
+			return nil
+		case exited:
+			return fmt.Errorf("%w: claude exited", agentrunner.ErrNotDelivered)
+		}
+		select {
+		case <-changed:
+		case <-deadline.C:
+			if busy {
+				return fmt.Errorf("%w: slash command started no turn and claude is not idle", agentrunner.ErrNotDelivered)
+			}
+			return nil
+		}
+	}
 }
 
 // awaitTurn waits for claude to start command uuid. A turn that began since

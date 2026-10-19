@@ -150,12 +150,33 @@ func runClaude(in io.Reader, out io.Writer, init string) error {
 		initSent, stalled, compacting bool
 		// cmd is the gx command whose turn is running.
 		cmd string
+		// queue holds the gx commands claude accepted behind the running turn.
+		queue []string
+		// dialog makes the next "/" command open a dialog, as /help does.
+		dialog bool
 	)
+	sendInit := func() {
+		if !initSent {
+			emit(init)
+			initSent = true
+		}
+	}
+	startCmd := func(uuid string) {
+		cmd = uuid
+		emit(lifecycle(cmd, "started"))
+		sendInit()
+		emit(`{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`)
+	}
 	endTurn := func(subtype string) {
 		emit(fmt.Sprintf(`{"type":"result","subtype":%q}`, subtype))
 		if cmd != "" {
 			emit(lifecycle(cmd, "completed"))
 			cmd = ""
+		}
+		if len(queue) > 0 {
+			next := queue[0]
+			queue = queue[1:]
+			startCmd(next)
 		}
 	}
 
@@ -168,22 +189,36 @@ func runClaude(in io.Reader, out io.Writer, init string) error {
 		}
 		switch msg.Type {
 		case "user":
+			// The agent's own record of what it received, for tests to read back.
+			text, _ := json.Marshal(msg.Message.Content)
+			emit(fmt.Sprintf(`{"type":"agentfake_received","text":%s}`, text))
 			if stalled {
 				continue
 			}
-			if msg.Message.Content == "/compact" {
+			switch content := msg.Message.Content; {
+			case content == "/compact":
 				// Claude runs /compact without a command lifecycle.
 				emit(`{"type":"system","subtype":"status","status":"compacting"}`)
 				compacting = true
-				continue
+			case strings.HasPrefix(content, "/"):
+				// Most "/" commands run with no turn and no lifecycle event.
+				sendInit()
+				switch {
+				case dialog:
+					dialog = false
+					emit(`{"type":"system","subtype":"session_state_changed","state":"requires_action"}`)
+				case content == "/clear":
+					emit(lifecycle(msg.UUID, "queued"), lifecycle(msg.UUID, "started"))
+					cmd = msg.UUID
+					endTurn("success")
+				}
+			case cmd != "":
+				emit(lifecycle(msg.UUID, "queued"))
+				queue = append(queue, msg.UUID)
+			default:
+				emit(lifecycle(msg.UUID, "queued"))
+				startCmd(msg.UUID)
 			}
-			cmd = msg.UUID
-			emit(lifecycle(cmd, "queued"), lifecycle(cmd, "started"))
-			if !initSent {
-				emit(init)
-				initSent = true
-			}
-			emit(`{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`)
 		case "control_request":
 			emit(fmt.Sprintf(`{"type":"control_response","response":{"subtype":"success","request_id":%q}}`, msg.RequestID))
 			endTurn("error_during_execution")
@@ -212,6 +247,8 @@ func runClaude(in io.Reader, out io.Writer, init string) error {
 				emit(fmt.Sprintf(`{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":%d}}`, msg.ResetsAt))
 			case ActionStall:
 				stalled = true
+			case ActionDialog:
+				dialog = true
 			case ActionBackground:
 				tasks := `[]`
 				if msg.Running {
