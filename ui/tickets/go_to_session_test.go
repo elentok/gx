@@ -85,6 +85,19 @@ func TestGoToSession_TicketMenuMatching(t *testing.T) {
 	}
 }
 
+func TestGoToSession_NotOfferedOnNonMapTicket(t *testing.T) {
+	m := newServerModel(t).WithServer(fakeServerAPI{})
+	m = withState(m, server.Snapshot{
+		Tickets:  []server.TicketInfo{{Address: "gx:plain/01", Title: "One", Status: "claimed"}},
+		Sessions: []server.SessionInfo{{ID: "s1", Ticket: "gx:plain/01"}},
+	})
+	setCollapsedSection(&m, sectionOpenMaps, false)
+	labels := ticketMenuLabels(t, m, "gx:plain/01")
+	if slices.Contains(labels, goToSessionLabel) {
+		t.Errorf("labels = %v, want no %q on a non-map ticket", labels, goToSessionLabel)
+	}
+}
+
 func TestGoToSession_ListedAboveStartSession(t *testing.T) {
 	labels := ticketMenuLabels(t, goToSessionModel(t, "open", server.SessionInfo{ID: "s1", Ticket: "gx:map/01"}), "gx:map/01")
 	goTo, start := slices.Index(labels, goToSessionLabel), slices.Index(labels, startSessionLabel)

@@ -94,7 +94,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	answer := answerSuggested(in.rendered)
 
 	var items []contextmenu.Item[ticketTarget]
-	if in.session != "" {
+	if in.isMap && in.session != "" {
 		items = append(items, goToSessionItem(in.session))
 	}
 	if in.isMap && in.rendered == tickets.StatusOpen {
