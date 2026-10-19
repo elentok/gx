@@ -189,11 +189,10 @@ func queueSegments(q ticketsui.QueueStatus, icons ui.IconSet, bar bool) []titleS
 	sp := titleSegment{" ", titleBgStyle}
 	segs := []titleSegment{{icon, titleBgStyle.Foreground(color)}, sp}
 	if bar {
-		filled := q.Done * queueBarCells / max(q.Total, 1)
-		segs = append(segs,
-			titleSegment{strings.Repeat("▰", filled), titleBgStyle.Foreground(color)},
-			titleSegment{strings.Repeat("▱", queueBarCells-filled), titleQueueBarRest},
-			sp)
+		barText := ui.ProgressBar(float64(q.Done)/float64(max(q.Total, 1)), queueBarCells,
+			titleBgStyle.Foreground(color), titleQueueBarRest)
+		// Already styled, so the segment itself adds none.
+		segs = append(segs, titleSegment{barText, lipgloss.NewStyle()}, sp)
 	}
 	count := strconv.Itoa(q.Done) + "/" + strconv.Itoa(q.Total)
 	return append(segs, titleSegment{count, titleQueueCount}, sp)
