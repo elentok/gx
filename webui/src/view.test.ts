@@ -40,7 +40,7 @@ describe("snapshotView", () => {
 
   it("formats recently finished rows", () => {
     expect(view().recentlyFinished).toEqual([
-      { address: "gx:demo/old", name: "old", done: 4, total: 4, finished: "finished 2h ago" },
+      { address: "gx:demo/old", name: "old", project: "gx", done: 4, total: 4, finished: "finished 2h ago" },
     ]);
   });
 });

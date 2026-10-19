@@ -18,6 +18,13 @@ export default defineConfig({
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify(cannedSnapshot));
         });
+        // An idle stream with heartbeats keeps the page from showing Offline.
+        server.middlewares.use("/v1/events", (req, res) => {
+          res.setHeader("Content-Type", "text/event-stream");
+          res.write(": hello\n\n");
+          const beat = setInterval(() => res.write(": hb\n\n"), 15000);
+          req.on("close", () => clearInterval(beat));
+        });
       },
     },
   ],

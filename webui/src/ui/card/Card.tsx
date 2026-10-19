@@ -9,8 +9,6 @@ export function Card({ title, tone = "muted", children }: { title?: string; tone
       bg="surface.raised"
       borderWidth="1px"
       borderColor="border"
-      borderLeftWidth="3px"
-      borderLeftColor={`tone.${tone}.fg`}
       borderRadius="md"
       p="3"
     >

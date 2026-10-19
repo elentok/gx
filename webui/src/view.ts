@@ -23,6 +23,7 @@ export interface EpicView {
 export interface FinishedView {
   address: string;
   name: string;
+  project: string;
   done: number;
   total: number;
   finished: string;
@@ -116,6 +117,7 @@ export function finishedView(f: FinishedEpic, now: Date): FinishedView {
   return {
     address: f.address,
     name: f.name,
+    project: f.project,
     done: f.done,
     total: f.total,
     finished: when === "just now" ? "finished just now" : `finished ${when}`,
