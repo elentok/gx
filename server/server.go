@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -199,6 +200,8 @@ type Config struct {
 	HardLimitGrace time.Duration
 
 	SubscriberBuffer int // events a stream may lag behind before it is dropped; zero means the default
+
+	SSEHeartbeat time.Duration // idle gap before /v1/events writes a comment line; zero means DefaultSSEHeartbeat
 
 	// LandStopTimeout bounds how long a stop waits for a land in flight; zero
 	// means DefaultLandStopTimeout.
@@ -597,9 +600,14 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(snap)
 }
 
+// DefaultSSEHeartbeat is how long /v1/events may sit idle before it writes a
+// comment line, so proxies and browsers do not drop a quiet stream.
+const DefaultSSEHeartbeat = 15 * time.Second
+
 // streamEvents is SSE: every event with seq > ?since, then live events until
 // the client leaves or is dropped for lagging. 410 means re-snapshot. A
 // ?client= id keeps that client's focus reports alive while the stream is.
+// An idle stream gets a ":" comment line every SSEHeartbeat.
 func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	var since uint64
 	if v := r.URL.Query().Get("since"); v != "" {
@@ -627,10 +635,23 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	if flusher != nil {
 		flusher.Flush()
 	}
+	interval := s.cfg.SSEHeartbeat
+	if interval <= 0 {
+		interval = DefaultSSEHeartbeat
+	}
+	beat := time.NewTicker(interval)
+	defer beat.Stop()
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-beat.C:
+			if _, err := io.WriteString(w, ": heartbeat\n\n"); err != nil {
+				return
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
 		case ev, ok := <-ch:
 			if !ok {
 				return
