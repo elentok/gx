@@ -1,8 +1,10 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider } from "@chakra-ui/react";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { fetchSnapshot, type Snapshot } from "./snapshot";
+import "./ui/fonts.css";
+import { system } from "./ui/theme";
 
 function Root() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -17,7 +19,7 @@ function Root() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ChakraProvider value={defaultSystem}>
+    <ChakraProvider value={system}>
       <Root />
     </ChakraProvider>
   </StrictMode>,

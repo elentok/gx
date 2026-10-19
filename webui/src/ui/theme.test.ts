@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import { system, themeConfig } from "./theme";
+import { TONES } from "./tone";
+
+const tokens = themeConfig.theme!.tokens!;
+
+describe("theme", () => {
+  it.each(TONES)("has fg and bg tokens for tone %s", (tone) => {
+    const entry = (tokens.colors as Record<string, any>).tone[tone];
+    expect(entry.fg.value).toBeTruthy();
+    expect(entry.bg.value).toBeTruthy();
+    expect(system.token(`colors.tone.${tone}.fg`)).toBeTruthy();
+    expect(system.token(`colors.tone.${tone}.bg`)).toBeTruthy();
+  });
+
+  it("defines every token group", () => {
+    for (const group of ["colors", "fonts", "fontSizes", "spacing", "radii", "sizes"] as const) {
+      expect(Object.keys(tokens[group] ?? {}), group).not.toHaveLength(0);
+    }
+    const colors = tokens.colors as Record<string, any>;
+    for (const name of ["surface", "border", "text"]) expect(colors[name], name).toBeDefined();
+    expect(colors.text.muted).toBeDefined();
+    expect(colors.text.dim).toBeDefined();
+  });
+
+  it("uses the condensed and text font families with a 6px bar", () => {
+    expect(system.token("fonts.condensed")).toContain("Saira Condensed");
+    expect(system.token("fonts.text")).toContain("Saira");
+    expect(system.token("sizes.bar")).toBe("6px");
+  });
+});
