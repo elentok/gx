@@ -38,11 +38,47 @@ func TestObserve_ShortBurstDoesNotFire(t *testing.T) {
 	}
 }
 
-func TestObserve_FiresAgainAfterDrop(t *testing.T) {
+func TestObserve_FiresAgainAfterSustainedDrop(t *testing.T) {
 	w := &Watcher{Config: Config{Threshold: 15, Sustain: 20 * time.Second}}
-	got := feed(w, 20, 20, 20, 20, 5, 20, 20, 20)
-	if len(got) != 2 || got[0] != 2 || got[1] != 7 {
-		t.Fatalf("fired at %v, want at 2 and 7", got)
+	got := feed(w, 20, 20, 20, 20, 5, 5, 5, 20, 20, 20)
+	if len(got) != 2 || got[0] != 2 || got[1] != 9 {
+		t.Fatalf("fired at %v, want at 2 and 9", got)
+	}
+}
+
+func TestObserve_ShortDipDoesNotRearm(t *testing.T) {
+	w := &Watcher{Config: Config{Threshold: 15, Sustain: 20 * time.Second}}
+	got := feed(w, 20, 20, 20, 5, 20, 20, 20, 5, 20, 20, 20)
+	if len(got) != 1 || got[0] != 2 {
+		t.Fatalf("fired at %v, want once at 2: a one-sample dip is the same spike", got)
+	}
+}
+
+func TestObserve_CooldownHoldsTheNextSpike(t *testing.T) {
+	w := &Watcher{Config: Config{Threshold: 15, Sustain: 20 * time.Second, Cooldown: 2 * time.Minute}}
+	// Fires at 2 (20s), re-arms at 5, then stays high: the cooldown ends at
+	// 140s (sample 14), and the held spike reports only its last 20s.
+	totals := []float64{20, 20, 20, 5, 5, 5}
+	for range 12 {
+		totals = append(totals, 20)
+	}
+	got := feed(w, totals...)
+	if len(got) != 2 || got[0] != 2 || got[1] != 14 {
+		t.Fatalf("fired at %v, want at 2 and 14", got)
+	}
+}
+
+func TestObserve_HeldSpikeKeepsOnlyRecentSamples(t *testing.T) {
+	// The last spike fired at t0, so the cooldown holds this one until 60s.
+	w := &Watcher{Config: Config{Threshold: 15, Sustain: 20 * time.Second, Cooldown: time.Minute}, lastFired: t0}
+	var samples []Sample
+	for i := range 7 {
+		if got, ok := w.observe(Sample{At: t0.Add(time.Duration(i) * 10 * time.Second), Self: 20}); ok {
+			samples = got
+		}
+	}
+	if len(samples) != 3 || !samples[0].At.Equal(t0.Add(40*time.Second)) {
+		t.Fatalf("samples = %+v, want the 3 from 40s to 60s", samples)
 	}
 }
 

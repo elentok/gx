@@ -310,12 +310,12 @@
         "sustain": {
           "type": "string",
           "default": "1m",
-          "description": "Go duration string for how long the use must stay high before a spike fires. Default: \"1m\"."
+          "description": "Go duration string for how long the use must stay high before a spike fires, and low before it can fire again. Default: \"1m\"."
         },
         "cooldown": {
           "type": "string",
           "default": "6h",
-          "description": "Go duration string for the least time between two filed tickets. Default: \"6h\"."
+          "description": "Go duration string for the least time between two spikes: evidence captures per process, and filed tickets. Default: \"6h\"."
         }
       }
     },

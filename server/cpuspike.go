@@ -24,7 +24,7 @@ func CPUWatchConfig(c config.CPUWatchdogConfig) cpuwatch.Config {
 	if !c.Enabled {
 		return cpuwatch.Config{}
 	}
-	return cpuwatch.Config{Threshold: c.ThresholdPercent, Sustain: c.Sustain}
+	return cpuwatch.Config{Threshold: c.ThresholdPercent, Sustain: c.Sustain, Cooldown: c.Cooldown}
 }
 
 // CPUSpikeResult is what became of a reported spike.

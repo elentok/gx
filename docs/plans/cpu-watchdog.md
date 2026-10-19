@@ -10,7 +10,8 @@ the server files a ticket for an agent to find the cause.
   subprocesses. `RUSAGE_CHILDREN` only counts children that exited, which fits short `herdr`/`git`
   calls.
 - **Trigger:** self + children above `threshold-percent` (15) for `sustain` (1m). One long spike
-  fires once; the watch re-arms when use drops below the threshold.
+  fires once; the watch re-arms only after use stays below the threshold for `sustain`, so
+  a process hovering around the threshold is one spike.
 - **Evidence:** `<state dir>/cpu-spikes/<time>-<source>-<pid>/`:
   - `cpu.pprof`: a 20s `runtime/pprof` CPU profile (keeps Go stacks, unlike macOS `sample`)
   - `goroutines.txt`: every goroutine's stack
@@ -20,7 +21,8 @@ the server files a ticket for an agent to find the cause.
 - **Ticket:** only in evolve maintainer mode with a registered `gx` project. A front-queued,
   commitless one-off in `gx` (`cpu-spike-<source>-<time>`), deduped per source, with chat notify.
   Otherwise the spike is only logged.
-- **Limits:** `cooldown` (6h) between filed tickets, kept in memory (a server restart resets it).
+- **Limits:** `cooldown` (6h) between evidence captures in each process and between filed tickets,
+  kept in memory (a restart resets it).
 - **Config:** `cpu-watchdog.{enabled,threshold-percent,sustain,cooldown}`, reloadable for the
   server; a TUI reads it at start.
 
@@ -31,5 +33,6 @@ the server files a ticket for an agent to find the cause.
 - [x] Server: watcher goroutine, `cpuSpike` filing with cooldown, `/v1/cpu-spike`, tests
 - [x] API client `CPUSpike` and `gx server cpu-spike` verb
 - [x] TUI: every `app.New` entry point runs through `runApp`, which starts a watcher
-- [ ] Manual check: rebuild, restart, add a temporary busy loop, see the ticket and a usable
-      profile
+- [x] Manual check: a real server spike filed a ticket with a usable profile
+- [x] Fix: a server hovering around 15% captured evidence every ~2 min (64 dirs overnight);
+      re-arm needs a sustained drop, and the cooldown also holds captures

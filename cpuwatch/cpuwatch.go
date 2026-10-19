@@ -24,8 +24,12 @@ const (
 type Config struct {
 	// Threshold is the CPU use, in percent of one core, that counts as high.
 	Threshold float64
-	// Sustain is how long the use must stay high before a spike fires.
+	// Sustain is how long the use must stay high before a spike fires, and
+	// low before a fired spike re-arms.
 	Sustain time.Duration
+	// Cooldown is the least time between two spikes, so a process that hovers
+	// around the threshold does not capture evidence over and over.
+	Cooldown time.Duration
 }
 
 // Sample is one interval's CPU use, in percent of one core. Children is the
@@ -70,9 +74,11 @@ type Watcher struct {
 	Settings func() Config
 
 	streak []Sample
-	// fired holds a spike back until the use drops below the threshold, so
-	// one long spike reports once.
-	fired bool
+	// fired holds a spike back until the use stays below the threshold for
+	// Sustain, from calmSince, so one long spike reports once.
+	fired     bool
+	calmSince time.Time
+	lastFired time.Time
 }
 
 // Run samples until ctx ends.
@@ -111,15 +117,36 @@ func (w *Watcher) observe(s Sample) ([]Sample, bool) {
 	if w.Settings != nil {
 		cfg = w.Settings()
 	}
-	if cfg.Threshold <= 0 || s.Total() < cfg.Threshold {
-		w.streak, w.fired = nil, false
+	if cfg.Threshold <= 0 {
+		w.streak, w.fired, w.calmSince = nil, false, time.Time{}
 		return nil, false
 	}
+	if s.Total() < cfg.Threshold {
+		w.streak = nil
+		if w.fired {
+			if w.calmSince.IsZero() {
+				w.calmSince = s.At
+			}
+			if s.At.Sub(w.calmSince) >= cfg.Sustain {
+				w.fired, w.calmSince = false, time.Time{}
+			}
+		}
+		return nil, false
+	}
+	w.calmSince = time.Time{}
 	w.streak = append(w.streak, s)
+	// Keep only the last Sustain of samples: a spike held back by the
+	// cooldown reports its recent use, and a long one does not grow forever.
+	for len(w.streak) > 1 && s.At.Sub(w.streak[1].At) >= cfg.Sustain {
+		w.streak = w.streak[1:]
+	}
 	if w.fired || s.At.Sub(w.streak[0].At) < cfg.Sustain {
 		return nil, false
 	}
-	w.fired = true
+	if !w.lastFired.IsZero() && s.At.Sub(w.lastFired) < cfg.Cooldown {
+		return nil, false
+	}
+	w.fired, w.lastFired = true, s.At
 	samples := w.streak
 	w.streak = nil
 	return samples, true
