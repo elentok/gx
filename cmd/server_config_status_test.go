@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -88,5 +89,38 @@ func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
 	}
 	if !strings.HasPrefix(out.String(), "config error: config ") || !strings.Contains(out.String(), "\nrunning\n") {
 		t.Errorf("status = %q, want the config error on top", out.String())
+	}
+}
+
+func TestServerStatus_PrintsWebURLWithToken(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	token, err := server.ReadWebToken(h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Status reads the token from the user's state dir, which the harness does not use.
+	stateDir, err := config.StateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(server.WebTokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hs, err := h.Client.Handshake(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runServerStatusWith(context.Background(), h.Client, false, &out); err != nil {
+		t.Fatal(err)
+	}
+	if want := "web: " + hs.WebURL + "/?t=" + token + "\n"; !strings.Contains(out.String(), want) {
+		t.Errorf("status = %q, want line %q", out.String(), want)
 	}
 }

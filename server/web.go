@@ -18,6 +18,12 @@ func (s *Server) bindWeb() {
 	if s.cfg.WebAddr == "" {
 		return
 	}
+	token, err := loadOrCreateWebToken(s.cfg.StateDir)
+	if err != nil {
+		s.webErr = "web token: " + err.Error()
+		s.log.Error("web token unavailable", "err", err)
+		return
+	}
 	ln, err := net.Listen("tcp", s.cfg.WebAddr)
 	if err != nil {
 		s.webErr = err.Error()
@@ -25,10 +31,10 @@ func (s *Server) bindWeb() {
 		return
 	}
 	if host, _, _ := net.SplitHostPort(s.cfg.WebAddr); net.ParseIP(host).IsUnspecified() {
-		s.log.Warn("web listener is bound to all interfaces and has no auth", "addr", ln.Addr().String())
+		s.log.Warn("web listener is bound to all interfaces and serves its token over plain HTTP", "addr", ln.Addr().String())
 	}
 	s.web = ln
-	s.webHTTP = &http.Server{Handler: s.webHandler()}
+	s.webHTTP = &http.Server{Handler: requireToken(token, s.webHandler())}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.

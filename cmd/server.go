@@ -186,6 +186,8 @@ type StatusInfo struct {
 	Pid     int    `json:"pid,omitempty"`
 	Build   string `json:"build,omitempty"`
 	Paused  bool   `json:"paused,omitempty"`
+	// WebURL is the web UI link with its token; empty when the web listener is off.
+	WebURL string `json:"web_url,omitempty"`
 	// Starting: a server holds the lock but does not answer yet. It builds the
 	// ticket index before it opens its socket.
 	Starting bool     `json:"starting,omitempty"`
@@ -226,6 +228,13 @@ func runServerStatusWith(ctx context.Context, c *apiclient.Client, jsonOut bool,
 			return perr
 		}
 		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
+		if n.WebURL != "" {
+			token, terr := server.ReadWebToken(stateDir)
+			if terr != nil {
+				return terr
+			}
+			info.WebURL = n.WebURL + "/?t=" + token
+		}
 		if b, berr := c.Budget(ctx); berr == nil {
 			info.Budget = &b
 		}
@@ -266,6 +275,11 @@ func runServerStatusWith(ctx context.Context, c *apiclient.Client, jsonOut bool,
 	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", info.Pid, info.Build); err != nil {
 		return err
 	}
+	if info.WebURL != "" {
+		if _, err = fmt.Fprintln(w, "web: "+info.WebURL); err != nil {
+			return err
+		}
+	}
 	if info.Paused {
 		if _, err = fmt.Fprintln(w, "queue: paused (gx server queue resume)"); err != nil {
 			return err
@@ -295,9 +309,6 @@ func statusWarnings(n apiclient.Negotiation, storePath string) []string {
 	var out []string
 	if n.TCPAddr != "" {
 		out = append(out, fmt.Sprintf("TCP listener is on (%s): any local process can use the API, no auth", n.TCPAddr))
-	}
-	if n.WebURL != "" {
-		out = append(out, fmt.Sprintf("web UI is on (%s): no auth", n.WebURL))
 	}
 	if n.WebError != "" {
 		out = append(out, "web UI listener failed to bind: "+n.WebError)
