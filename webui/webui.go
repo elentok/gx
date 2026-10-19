@@ -9,12 +9,28 @@ import (
 //go:embed placeholder
 var placeholder embed.FS
 
-// Assets is the embedded web UI. It is the placeholder page until a build
-// embeds a real dist.
+// dist is the Vite build output (make web-build). Only dist/.gitkeep is
+// committed, so the embed pattern always matches; "all:" includes dotfiles.
+//
+//go:embed all:dist
+var dist embed.FS
+
+// Assets is the built web UI when dist/index.html exists, else the placeholder page.
 func Assets() fs.FS {
-	sub, err := fs.Sub(placeholder, "placeholder")
-	if err != nil {
-		panic(err) // the embedded directory is fixed at compile time
+	return pick(dist, placeholder)
+}
+
+func pick(distFS, placeholderFS fs.FS) fs.FS {
+	if _, err := fs.Stat(distFS, "dist/index.html"); err == nil {
+		return sub(distFS, "dist")
 	}
-	return sub
+	return sub(placeholderFS, "placeholder")
+}
+
+func sub(fsys fs.FS, dir string) fs.FS {
+	s, err := fs.Sub(fsys, dir)
+	if err != nil {
+		panic(err) // the directory name is fixed at compile time
+	}
+	return s
 }

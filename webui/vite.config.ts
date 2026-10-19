@@ -1,0 +1,44 @@
+/// <reference types="vitest/config" />
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+import cannedSnapshot from "./src/canned-snapshot.json";
+
+// Serves the canned snapshot at /v1/snapshot so `make web-dev` needs no gx
+// server. Set GX_WEBUI_PROXY=1 to proxy /v1 to a real one instead.
+const useRealServer = process.env.GX_WEBUI_PROXY === "1";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    {
+      name: "canned-snapshot",
+      configureServer(server) {
+        if (useRealServer) return;
+        server.middlewares.use("/v1/snapshot", (_req, res) => {
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(cannedSnapshot));
+        });
+      },
+    },
+  ],
+  server: {
+    proxy: useRealServer ? { "/v1": "http://127.0.0.1:7421" } : undefined,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (/node_modules\/(react|react-dom|scheduler|@chakra-ui|@ark-ui|@zag-js|@emotion)\//.test(id)) {
+            return "vendor";
+          }
+        },
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+      },
+    },
+  },
+  test: {
+    environment: "jsdom",
+  },
+});

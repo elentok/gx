@@ -80,11 +80,13 @@ func TestWeb_OffByDefault(t *testing.T) {
 	}
 }
 
-func TestWeb_ServesPlaceholderAtRootAndFallback(t *testing.T) {
+// The embed is the placeholder or a built dist, depending on whether make
+// web-build ran, so the test only checks that an HTML page is served.
+func TestWeb_ServesIndexAtRootAndFallback(t *testing.T) {
 	h, base := startWeb(t)
 	for _, path := range []string{"/", "/index.html", "/some/client/route"} {
 		code, body := webDo(t, h, http.MethodGet, base+path)
-		if code != http.StatusOK || !strings.Contains(body, "This build has no web UI") {
+		if code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
 			t.Errorf("GET %s = %d %q", path, code, body)
 		}
 	}

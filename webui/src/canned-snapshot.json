@@ -1,0 +1,33 @@
+{
+  "seq": 42,
+  "budget": {
+    "day": "2026-10-19",
+    "total": 12.5,
+    "soft_limit": 50,
+    "hard_limit": 100,
+    "budget_paused": false,
+    "hard_latched": false
+  },
+  "mode": "running",
+  "tickets": [
+    {
+      "address": "gx:demo/01",
+      "title": "First demo ticket",
+      "status": "done",
+      "rendered_status": "done",
+      "type": "implement"
+    },
+    {
+      "address": "gx:demo/02",
+      "title": "Second demo ticket",
+      "status": "open",
+      "rendered_status": "blocked",
+      "type": "implement",
+      "blocked_by": ["01"]
+    }
+  ],
+  "pending": [],
+  "sessions": [],
+  "epics": [],
+  "recently_finished": []
+}

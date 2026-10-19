@@ -1,4 +1,4 @@
-.PHONY: build install test test-race e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-test install test test-race e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -6,8 +6,20 @@ DEMO_DIR   := web/demo
 DEMO_WORK  := $(DEMO_DIR)/.work
 DEMO_TAPES := $(DEMO_DIR)/tapes
 
-build:
+build: web-build
 	go build -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" -o gx .
+
+# webui/dist is not committed; the Go embed falls back to a placeholder without it.
+web-build:
+	cd webui && pnpm install --frozen-lockfile && pnpm build
+	touch webui/dist/.gitkeep # vite empties dist; the Go embed needs this file to compile
+
+# Serves the canned snapshot; GX_WEBUI_PROXY=1 proxies /v1 to 127.0.0.1:7421 instead.
+web-dev:
+	cd webui && pnpm install --frozen-lockfile && pnpm dev
+
+web-test:
+	cd webui && pnpm install --frozen-lockfile && pnpm test
 
 install:
 	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
