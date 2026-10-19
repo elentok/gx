@@ -116,6 +116,11 @@ func (p *herdrPrompter) Screen() (string, error) {
 	return p.read(p.opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped"})
 }
 
+// StyledScreen reads the same pane as Screen, with styling as SGR codes.
+func (p *herdrPrompter) StyledScreen() (string, error) {
+	return p.read(p.opts.Target, herdr.AgentReadOptions{Source: "recent-unwrapped", Format: "ansi"})
+}
+
 // wrapErr keeps herdr's own poll-timeout text on a give-up, so callers still
 // see why the last wait failed.
 func (p *herdrPrompter) wrapErr(err error) error {

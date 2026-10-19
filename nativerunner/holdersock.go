@@ -49,8 +49,12 @@ const OpWatch = "watch"
 // working and sessionId bumps, and status carries the OSC state.
 const OpTurnOSC = "turn-osc"
 
+// OpScreenStyled returns the visible rows with their styling as SGR codes.
+// The core screen op stays plain.
+const OpScreenStyled = "screen-styled"
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled}
 
 const (
 	holderIOTimeout = 5 * time.Second
@@ -206,6 +210,9 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		return holderResponse{}, nil
 	case opStop:
 		return holderResponse{}, h.stop
+	}
+	if req.Op == OpScreenStyled && slices.Contains(h.ops, OpScreenStyled) {
+		return holderResponse{Screen: h.scr.StyledRows()}, nil
 	}
 	if req.Op == OpDenyReason && slices.Contains(h.ops, OpDenyReason) {
 		if err := h.denyReason(req.Reason); err != nil {
@@ -436,6 +443,13 @@ func (c *HolderClient) ProgramState() (string, error) {
 func (c *HolderClient) Screen(scrollback int) (rows, scrolled []string, err error) {
 	resp, err := c.call(holderRequest{Op: opScreen, Scrollback: scrollback})
 	return resp.Screen, resp.Scrollback, err
+}
+
+// StyledScreen runs the optional screen-styled op; check Supports first. Rows
+// carry their styling as SGR codes.
+func (c *HolderClient) StyledScreen() ([]string, error) {
+	resp, err := c.call(holderRequest{Op: OpScreenStyled})
+	return resp.Screen, err
 }
 
 // SendKeys writes keys to the child's terminal as typed input.

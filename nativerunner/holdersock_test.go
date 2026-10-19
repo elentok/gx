@@ -205,6 +205,33 @@ func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
 	}
 }
 
+// dimChild prints "dimmed" with the SGR dim attribute on, then idles.
+const dimChild = `printf '\033[2mdimmed\033[0m\n'; cat >/dev/null`
+
+func TestHolderSocket_StyledScreen(t *testing.T) {
+	_, c, _ := startHolder(t, dimChild)
+	if !c.Supports(nativerunner.OpScreenStyled) {
+		t.Fatal("ping does not list screen-styled")
+	}
+	waitForScreen(t, c, "dimmed")
+
+	rows, err := c.StyledScreen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	styled := strings.Join(rows, "\n")
+	if !strings.Contains(styled, "\x1b[") || !strings.Contains(styled, "2") || !strings.Contains(styled, "dimmed") {
+		t.Errorf("styled screen has no SGR dim span: %q", styled)
+	}
+	plain, _, err := c.Screen(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(plain, "\n"), "\x1b") {
+		t.Errorf("plain screen carries escape codes: %q", plain)
+	}
+}
+
 func waitForScreen(t *testing.T, c *nativerunner.HolderClient, want string) {
 	t.Helper()
 	waitFor(t, "the screen shows "+want, func() bool {

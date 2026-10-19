@@ -54,6 +54,30 @@ func changingRead() func(target string, opts herdr.AgentReadOptions) (string, er
 	}
 }
 
+func TestHerdrPrompter_StyledScreenAsksForAnsi(t *testing.T) {
+	t.Parallel()
+	var got []herdr.AgentReadOptions
+	read := func(target string, opts herdr.AgentReadOptions) (string, error) {
+		got = append(got, opts)
+		return "\x1b[2mdim\x1b[0m", nil
+	}
+	p := &herdrPrompter{opts: herdr.AgentPromptOptions{Target: "pane-1"}, read: read}
+
+	text, err := p.StyledScreen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text != "\x1b[2mdim\x1b[0m" {
+		t.Errorf("StyledScreen() = %q", text)
+	}
+	if _, err := p.Screen(); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Format != "ansi" || got[1].Format != "" {
+		t.Errorf("read formats = %+v; want ansi for the styled read, default for the plain one", got)
+	}
+}
+
 func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 	t.Parallel()
 	var promptCalls, sendKeysCalls, waitCalls int
