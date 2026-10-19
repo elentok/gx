@@ -572,6 +572,7 @@ One table of the keys this spec adds or renames. Keys a ticket did not name are 
 | `ticket-store.push-remote` | `config.json` only | unset | S3 |
 | `server.tcp-listen` | `config.json` only | off | S2 |
 | `server.auto-merge-epic` | `config.json` only | off | S4 |
+| `GX_SERVER_LOG_LEVEL` (env var: `debug`, `info`, `warn`, `error`) | server environment | `info` | S0 |
 | `execution-queue.retry-storm-launches` (N) | `config.json` only | 3 | S0 |
 | `execution-queue.spin-cycles` (M) | `config.json` only | 3 | S0 |
 | `execution-queue.spin-window` | `config.json` only | 5 min | S0 |

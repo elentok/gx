@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,46 @@ func TestRotatingFile_KeepsAtMostMaxFiles(t *testing.T) {
 		if info.Size() > 100 {
 			t.Errorf("%s is %d bytes, over the cap", f, info.Size())
 		}
+	}
+}
+
+// Seam: Config.LogLevel decides whether s.log.Debug lines reach the server log.
+func TestServer_LogLevelGatesDebugLines(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		level slog.Level
+		want  bool
+	}{
+		{"default is info", slog.LevelInfo, false},
+		{"debug", slog.LevelDebug, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base, err := os.MkdirTemp("", "gxs")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.RemoveAll(base) })
+			stateDir := filepath.Join(base, "s")
+			srv, err := New(Config{StateDir: stateDir, Build: "b", LogLevel: tc.level})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan error, 1)
+			go func() { done <- srv.Serve(ctx) }()
+			srv.log.Debug("debug-probe")
+			cancel()
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(LogPath(stateDir))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Contains(string(data), "debug-probe"); got != tc.want {
+				t.Errorf("debug line present = %v, want %v\n%s", got, tc.want, data)
+			}
+		})
 	}
 }
 

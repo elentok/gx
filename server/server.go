@@ -199,6 +199,10 @@ type Config struct {
 	// means DefaultLandStopTimeout.
 	LandStopTimeout time.Duration
 
+	// LogLevel is the minimum level written to the server log; the zero value
+	// is slog.LevelInfo.
+	LogLevel slog.Level
+
 	// ActionStepStartTimeout bounds how long an Action step waits for its
 	// prompt to go Working; zero means DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration
@@ -389,7 +393,7 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, err
 	}
-	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	log := slog.New(slog.NewJSONHandler(logf, &slog.HandlerOptions{Level: cfg.LogLevel}))
 	registry, savedRuns, err := openRuns(cfg.StateDir, log)
 	if err != nil {
 		ln.Close()

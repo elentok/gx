@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -152,8 +153,14 @@ func runServer(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	var logLevel slog.Level
+	if v := os.Getenv("GX_SERVER_LOG_LEVEL"); v != "" {
+		if err := logLevel.UnmarshalText([]byte(v)); err != nil {
+			return fmt.Errorf("GX_SERVER_LOG_LEVEL: %w", err)
+		}
+	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
-		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr})
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, LogLevel: logLevel})
 	if err != nil {
 		return err
 	}
