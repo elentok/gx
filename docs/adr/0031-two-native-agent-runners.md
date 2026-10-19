@@ -24,3 +24,8 @@ where one runner cannot do it.
   assumptions about claude after every claude upgrade.
 - Agents launch with `DISABLE_AUTOUPDATER=1` and `--permission-mode auto`, and park `needs-repair`
   when a claude feature the runner depends on is missing.
+- Parity covers delivery too (`docs/specs/agent-runner-hardening.md`): the busy guard, the `/`
+  rule, the state-aware `Interrupt` (Ctrl+C when busy, Esc when blocked, then Ctrl+U) and deny
+  with a reason act the same on PTY and herdr. Headless keeps its control-protocol `Interrupt` and
+  needs no Esc step for a deny reason; that is the allowed gap. The herdr deny hold lives only in
+  the server process, so the TUI reading herdr directly can still see `idle` mid-deny.

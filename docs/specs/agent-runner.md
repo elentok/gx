@@ -87,7 +87,9 @@ Dependencies:
 19. As ralph-loop, I want `Wait(session, states, timeout)` with a distinct timeout error, so that
     `finishRun` no longer waits forever. [T05]
 20. As ralph-loop, I want `Interrupt(session)` to keep the session alive, so that smart-zone can
-    send `/compact` after it. [T05]
+    send `/compact` after it. On PTY and herdr it picks its key by state (busy → Ctrl+C, blocked →
+    Esc, otherwise no key), waits up to N for idle and presses Ctrl+U; not idle in time →
+    `ErrNotReady`. [T05, hardening]
 21. As ralph-loop, I want `Stop(session)` to be idempotent, so that cleanup can run twice safely.
     [T05]
 22. As ralph-loop, I want `Find(label)` and `List(epic)`, so that I can detect a duplicate agent
@@ -441,8 +443,14 @@ Dependencies:
 **Herdr adapter**
 
 - Wraps today's herdr behaviour: workspaces and tabs as a naming layer, nudges, dialog rules, pane
-  scraping for rate limits and Codex context exhaustion, `trust_directory`. No behaviour change.
-  [T05, T01]
+  scraping for rate limits and Codex context exhaustion, `trust_directory`. Phase 1 changed
+  nothing; the hardening spec (`agent-runner-hardening.md`) later added the busy guard, the
+  state-aware `Interrupt` and deny with a reason (below). [T05, T01, hardening]
+- `deny <reason>` on herdr: Esc, wait up to N for `idle`/`done`, then the reason through the
+  normal `Prompt` path. While it runs, the runner reports the session as `blocked` to every caller
+  in the server process and refuses Prompt, Interrupt and Answer with `ErrNotReady`. The hold ends
+  when `StateChangeSeq` moves past the value read after Esc, or on any error. A reason that did not
+  arrive returns `ErrNotDelivered` and the session stays alive. [hardening H-01, H-08]
 - `TabFocus`, `terminalrun` and the worktree terminal menu stay in the herdr package and are hidden
   on native runners. [T05, map]
 
@@ -482,6 +490,9 @@ Dependencies:
 - State comes from structured events: session state, command lifecycle, `rate_limit_event`,
   `compact_boundary`. `blocked` comes from a `stdio` permission request. [T02, T08]
 - Prompt = stdin write. `Interrupt` and `/compact` act in the same session. [T08]
+- Differences from the key-based runners: `Interrupt` keeps its control-protocol `interrupt`, with
+  no key rule and no Ctrl+U (the busy guard on the next `Prompt` covers the wait for idle). Deny
+  with a reason travels inside the `control_response`, so it needs no Esc step. [hardening H-12]
 - Known risks: claude version drift, `--bare` becoming the `-p` default, and the undocumented
   `--permission-prompt-tool stdio`. [T02, T04]
 
@@ -502,8 +513,15 @@ Dependencies:
   The file appears ~0.5 s after the trust dialog is accepted and is deleted on clean exit.
   [P2-T01]
 - `Turn`: the holder counts `status` changes in the pid file and serves the count over
-  `holder.sock`. `Prompt` = text + Enter, bounded wait for `Turn` to move, one nudge and retype,
-  then `ErrNotDelivered`. [P2-review]
+  `holder.sock`. It also counts claude's session-wide OSC 7501 `working` reports and a new
+  `sessionId` in the pid file, so a fast turn and `/clear` move it. The status reply carries the
+  last OSC state in a `program` field. Ping lists the `turn-osc` marker (not an op) when the holder
+  does this; an older holder lacks it. [P2-review, hardening H-05]
+- `Prompt` = text + Enter. If the agent is busy it first waits up to N (default 5 s) for idle,
+  then sends; still busy → `ErrNotReady` and nothing is sent. Then a bounded wait for `Turn` to
+  move, one nudge and retype, then `ErrNotDelivered`. A `/` command other than `/compact` is sent
+  once and never retyped: delivered when `Turn` moves or the agent is still idle after N. The same
+  busy guard and `/` rule apply on herdr and headless. [P2-review, hardening H-05, H-07]
 - Claude exit with the server up: the holder writes `screen.txt` and claude's exit code to the
   agent directory, then exits; the server parks `needs-repair` naming the code. [P2-review]
 - Rate limit: PTY `RateLimit` returns nil in phase 2 (banner never captured); its doctor row
@@ -521,8 +539,15 @@ Dependencies:
   or refuses only that action with a clear reason. A gx upgrade never parks a live PTY run; it
   finishes on the holder that started it. Handing the PTY to a new holder (fd passing) was
   rejected as too complex. [P2-review]
-- PTY `Interrupt` sends Esc. The runner, not the holder, answers the trust dialog during `Start`;
-  the holder knows only the pid file and the deny-with-reason step. [P2-review]
+- PTY `Interrupt` picks its key by state: busy → Ctrl+C, blocked → lone Esc, any other state →
+  nothing (a Ctrl+C on an idle agent quits Codex or exits claude). After a key it waits up to N for
+  idle and presses Ctrl+U to clear the restored prompt; not idle in time → `ErrNotReady`. The
+  runner, not the holder, answers the trust dialog during `Start`; the holder knows only the pid
+  file and the deny-with-reason step. [P2-review, hardening H-07, H-09]
+- While the deny-reason step runs, the holder refuses a `keys` op at once ("deny-reason in
+  progress", no write), which the PTY runner reports as `ErrNotReady`. Attach input is held and sent
+  in order after the step; terminal replies and the program-status probe stay outside the lock.
+  [hardening H-04]
 - The transcript background-task probe moves to the runner-neutral package with the rate-limit
   helpers (story 130). Prune handles every agent directory by its own `Meta.Runner`, whatever
   runner is configured. [P2-review]
@@ -648,6 +673,9 @@ is added beyond the PTY fake's side channel):
   headless misroute as a regression test. [P2-T04]
 - **Agent-dir dispatch:** watch, prune, log lookup, evolve digests and `lastTouched` tests on a
   mixed dir (headless + pty). [P2-T03, P2-review]
+- **Hardening conformance:** shared cases for the busy guard, the `/` rule, the Interrupt key rule
+  and deny with a reason, run on every runner that has them; plus holder tests for the deny-reason
+  lock and the `turn-osc` marker. [hardening]
 - **PTY turn and delivery:** contract cases for `Turn` moving on each status change, nudge and
   retype once, then `ErrNotDelivered`; `deny <reason>` never shows `idle` before the reason is
   typed, and its idle timeout parks `needs-repair`. [P2-review]
@@ -686,12 +714,27 @@ is added beyond the PTY fake's side channel):
 - The PTY rate-limit screen rule: a follow-up captures the banner first. [P2-review]
 - Free-text answers or menu-number answers to a dialog. [P2-T05]
 - A live tail in the TUI "Watch" item, and a screen toggle in "Transcript". [P2-T06]
-- The herdr bug where `answer deny "reason"` types the reason into the dialog instead of pressing
-  Esc: filed as a follow-up in `gx:follow-ups`. [P2-T05]
 - A sticky runner (keep the old runner until its runs drain): rejected for per-run routing.
   [P2-T04]
 
 ## Further Notes
+
+- **Documented gaps** (from `agent-runner-hardening.md`, stories 58a, 59-63):
+  - Herdr deny gap: the `blocked` hold lives only in the server process. Readers outside it (the TUI
+    reading herdr directly) and a gx restart in the middle of a deny can still see `idle` between
+    Esc and the reason.
+  - Codex: the context-exhaustion banner's herdr state is unmeasured (likely not `blocked`), and
+    the `/model` picker and the backtrack view read `idle`. gx never sends `/model` to Codex and
+    never sends Esc to an idle pane, so only a person can open them. Ctrl+U clears only the current
+    composer line on Codex.
+  - Headless: `Interrupt` has no key rule and no Ctrl+U; deny with a reason needs no Esc step.
+  - The nudge can no longer steer an agent in the middle of a turn (it gives `agent-not-ready`). A
+    person can still type in the Agents tab attach (PTY) or the pane (herdr); headless has no other
+    way.
+  - Herdr has no turn counter; a turn herdr does not see moves no `Turn`. The holder lock is
+    PTY-only.
+  - Residual race: a turn that ends between the state read and the key lets one Ctrl+C reach an
+    idle agent. On claude it only shows a hint.
 
 - Terms (in `CONTEXT.md`): agent runner, native agent runner, headless runner, PTY runner.
 - Findings behind the decisions are in map tickets 01 (herdr touchpoints: 13 commands, 11 MUST
