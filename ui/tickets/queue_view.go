@@ -119,11 +119,9 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicSeparator:
 				return ""
 			case nodeEpicName:
-				_, _, fill := m.epicStatus(entry.Value.epic)
-				return epicNameLine(entry.Value.epic, fill, entry.Value.layout, m.queueLabelWidth())
+				return epicNameLine(entry.Value.epic, m.epicFill(entry.Value.epic), entry.Value.layout, m.queueLabelWidth())
 			case nodeEpicBar:
-				_, _, fill := m.epicStatus(entry.Value.epic)
-				return epicBarLine(entry.Value.epic, fill, entry.Value.layout)
+				return epicBarLine(entry.Value.epic, m.epicFill(entry.Value.epic), entry.Value.layout)
 			case nodeEpicSpacer:
 				return ""
 			case nodeEpicStatusLine:

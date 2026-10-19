@@ -192,21 +192,46 @@ func TestEpicStatusLinePrefersCompletionTimestampsOverElapsedSum(t *testing.T) {
 	t.Parallel()
 	started := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	completed := started.Add(3*time.Hour + 30*time.Minute)
-	m := QueueModel{}
+	now := time.Now()
 
 	withTimestamps := tickets.Epic{
 		Tickets:     []tickets.Ticket{{Identifier: "01", Status: "done", ElapsedTime: 754}},
 		StartedAt:   started,
 		CompletedAt: completed,
 	}
-	if got := m.epicElapsedPart(withTimestamps); got != "3h 30m elapsed" {
+	if got := epicElapsedPart(withTimestamps, now); got != "3h 30m elapsed" {
 		t.Fatalf("epic with completion timestamps: got %q, want %q", got, "3h 30m elapsed")
 	}
 
 	withoutCompletion := withTimestamps
 	withoutCompletion.CompletedAt = time.Time{}
-	if got := m.epicElapsedPart(withoutCompletion); got != "13m elapsed" {
+	if got := epicElapsedPart(withoutCompletion, now); got != "13m elapsed" {
 		t.Fatalf("epic without completion timestamp: got %q, want %q", got, "13m elapsed")
+	}
+}
+
+func TestEpicStatusPartsArePureInNowAndLive(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	epic := tickets.Epic{
+		Name:      "e",
+		StartedAt: now.Add(-2 * time.Hour),
+		Tickets: []tickets.Ticket{
+			{Identifier: "01", Status: "done", ElapsedTime: 600, Compactions: 1},
+			{Identifier: "02", Status: "claimed"},
+		},
+	}
+	live := map[string]liveTicketState{"02": {running: true, startedAt: now.Add(-30 * time.Minute)}}
+
+	got := strings.Join(epicStatusParts(epic, now, live), " | ")
+	if want := "2h 0m elapsed | 40m agent | 1 compact"; got != want {
+		t.Fatalf("parts: got %q, want %q", got, want)
+	}
+	if got := epicAgentPart(epic, now, nil); got != "10m agent" {
+		t.Fatalf("agent part without live tickets: got %q", got)
+	}
+	if got := pluralize(2, "compact"); got != "2 compacts" {
+		t.Fatalf("pluralize: got %q", got)
 	}
 }
 

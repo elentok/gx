@@ -58,25 +58,78 @@ var (
 // before collapsing the rest into "+N more".
 const parkedWaitingMax = 3
 
-// epicStatusLine picks an epic header's status-line icon, text, and color.
-// Precedence: done (green) > parked > needs attention (yellow) > implementing
-// (spinnerGlyph, no color) > queued (no color). running is whether the server
-// reports the epic running.
-func epicStatusLine(icons ui.IconSet, epic tickets.Epic, running bool, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
-	if epic.AllDone() {
-		return icons.TicketDone, "done", epicStatusDoneStyle
+// epicState is an epic header's status, from which its icon, text and style
+// are all derived.
+type epicState int
+
+const (
+	epicStateQueued epicState = iota
+	epicStateImplementing
+	epicStateProblem
+	epicStateParkedAnswer
+	epicStateParkedRepair
+	epicStateDone
+)
+
+// style is the colour the state renders in (also the progress bar's fill).
+func (s epicState) style() lipgloss.Style {
+	switch s {
+	case epicStateDone:
+		return epicStatusDoneStyle
+	case epicStateProblem:
+		return epicStatusProblemStyle
+	case epicStateParkedAnswer:
+		return epicStatusParkedAnswerStyle
+	case epicStateParkedRepair:
+		return epicStatusParkedRepairStyle
+	default:
+		return lipgloss.NewStyle()
 	}
-	if text, parkedStyle, ok := parkedStatus(epic); ok {
-		return icons.Warning, text, parkedStyle
+}
+
+// epicStateOf classifies an epic. Precedence: done > parked > needs attention
+// > implementing > queued. running is whether the server reports the epic
+// running. parkedText is only set for the parked states.
+func epicStateOf(epic tickets.Epic, running bool) (state epicState, parkedText string) {
+	if epic.AllDone() {
+		return epicStateDone, ""
+	}
+	if text, parkedState, ok := parkedStatus(epic); ok {
+		return parkedState, text
 	}
 	switch {
 	case epicHasProblem(epic):
-		return icons.Warning, "needs attention", epicStatusProblemStyle
+		return epicStateProblem, ""
 	case running:
-		return spinnerGlyph, "implementing", lipgloss.NewStyle()
+		return epicStateImplementing, ""
 	default:
-		return icons.EpicQueued, "queued", lipgloss.NewStyle()
+		return epicStateQueued, ""
 	}
+}
+
+// epicStatusLine picks an epic header's status-line icon, text, and color from
+// its state. spinnerGlyph is the icon of the implementing state.
+func epicStatusLine(icons ui.IconSet, epic tickets.Epic, running bool, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
+	state, parkedText := epicStateOf(epic, running)
+	style = state.style()
+	switch state {
+	case epicStateDone:
+		return icons.TicketDone, "done", style
+	case epicStateParkedAnswer, epicStateParkedRepair:
+		return icons.Warning, parkedText, style
+	case epicStateProblem:
+		return icons.Warning, "needs attention", style
+	case epicStateImplementing:
+		return spinnerGlyph, "implementing", style
+	default:
+		return icons.EpicQueued, "queued", style
+	}
+}
+
+// epicFill is the state colour of an epic on the Queue tab, for its bar fill.
+func (m QueueModel) epicFill(epic tickets.Epic) lipgloss.Style {
+	state, _ := epicStateOf(epic, m.runningEpics[epic.Name])
+	return state.style()
 }
 
 // epicStatus is epicStatusLine for an epic on the Queue tab, with the model's
@@ -89,16 +142,16 @@ func (m QueueModel) epicStatus(epic tickets.Epic) (icon, text string, style lipg
 // parkedStatus derives the parked state client-side from the same rule as the
 // server's all-parked deadlock check (tickets.Epic.IsParked): nothing renders
 // open or claimed, and some ticket is parked. Drafts keep the epic parked but
-// are never listed as waiting; red when any listed ticket is needs-repair or
-// error, orange otherwise.
-func parkedStatus(epic tickets.Epic) (string, lipgloss.Style, bool) {
+// are never listed as waiting; repair (red) when any listed ticket is
+// needs-repair or error, answer (orange) otherwise.
+func parkedStatus(epic tickets.Epic) (text string, state epicState, ok bool) {
 	var waiting []string
 	anyFault, anyDraft := false, false
 	for _, t := range epic.Tickets {
 		status := epic.RenderedStatus(t)
 		switch {
 		case status == tickets.StatusOpen || status == tickets.StatusClaimed:
-			return "", lipgloss.Style{}, false
+			return "", 0, false
 		case !epic.IsParked(t):
 		case status == tickets.StatusDraft:
 			anyDraft = true
@@ -109,18 +162,18 @@ func parkedStatus(epic tickets.Epic) (string, lipgloss.Style, bool) {
 	}
 	switch {
 	case len(waiting) == 0 && !anyDraft:
-		return "", lipgloss.Style{}, false
+		return "", 0, false
 	case len(waiting) == 0:
-		return "parked — only drafts left", epicStatusParkedAnswerStyle, true
+		return "parked — only drafts left", epicStateParkedAnswer, true
 	}
-	text := "parked — waiting on " + strings.Join(waiting[:min(len(waiting), parkedWaitingMax)], ", ")
+	text = "parked — waiting on " + strings.Join(waiting[:min(len(waiting), parkedWaitingMax)], ", ")
 	if extra := len(waiting) - parkedWaitingMax; extra > 0 {
 		text += fmt.Sprintf(" +%d more", extra)
 	}
 	if anyFault {
-		return text, epicStatusParkedRepairStyle, true
+		return text, epicStateParkedRepair, true
 	}
-	return text, epicStatusParkedAnswerStyle, true
+	return text, epicStateParkedAnswer, true
 }
 
 // epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the
@@ -259,14 +312,14 @@ func formatSpan(d time.Duration) string {
 // epicElapsedPart is the Status line's "<elapsed> elapsed" part, or "" when
 // the epic has no started_at. Done epics show start-to-completion, falling
 // back to the tickets' summed elapsed time when completed_at is missing.
-func (m QueueModel) epicElapsedPart(epic tickets.Epic) string {
+func epicElapsedPart(epic tickets.Epic, now time.Time) string {
 	if epic.StartedAt.IsZero() {
 		return ""
 	}
 	var d time.Duration
 	switch dur, ok := epic.CompletionDuration(); {
 	case !epic.AllDone():
-		d = m.now().Sub(epic.StartedAt)
+		d = now.Sub(epic.StartedAt)
 	case ok:
 		d = dur
 	default:
@@ -276,14 +329,14 @@ func (m QueueModel) epicElapsedPart(epic tickets.Epic) string {
 }
 
 // epicAgentPart is the Status line's "<agent> agent" part: landed tickets'
-// elapsed time plus the live elapsed of running ones. "" when zero.
-func (m QueueModel) epicAgentPart(epic tickets.Epic) string {
+// elapsed time plus the live elapsed of running ones (live is the epic's
+// ticket identifier -> running state; nil when the epic isn't running). ""
+// when zero.
+func epicAgentPart(epic tickets.Epic, now time.Time, live map[string]liveTicketState) string {
 	d := time.Duration(epicElapsedSeconds(epic)) * time.Second
-	if m.runningEpics[epic.Name] {
-		for _, t := range epic.Tickets {
-			if live, ok := m.live[epic.Name][t.Identifier]; ok && live.running && !live.startedAt.IsZero() {
-				d += m.now().Sub(live.startedAt)
-			}
+	for _, t := range epic.Tickets {
+		if l, ok := live[t.Identifier]; ok && l.running && !l.startedAt.IsZero() {
+			d += now.Sub(l.startedAt)
 		}
 	}
 	if d <= 0 {
@@ -292,13 +345,19 @@ func (m QueueModel) epicAgentPart(epic tickets.Epic) string {
 	return formatSpan(d) + " agent"
 }
 
-// epicStatusRow renders "Status: <icon> <state> · elapsed · agent · cost ·
-// n compact(s)", all dim except the state, zero parts hidden, cut at labelW.
-func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
-	icon, text, style := m.epicStatus(epic)
-	line := " " + metricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
-	parts := []string{}
-	for _, p := range []string{m.epicElapsedPart(epic), m.epicAgentPart(epic)} {
+// pluralize is "<n> <noun>", with noun pluralised by an "s" unless n is 1.
+func pluralize(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// epicStatusParts are the Status line's dim metrics after the state, in order:
+// elapsed, agent, cost, compactions; zero parts are left out.
+func epicStatusParts(epic tickets.Epic, now time.Time, live map[string]liveTicketState) []string {
+	var parts []string
+	for _, p := range []string{epicElapsedPart(epic, now), epicAgentPart(epic, now, live)} {
 		if p != "" {
 			parts = append(parts, p)
 		}
@@ -307,14 +366,22 @@ func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
 		parts = append(parts, tickets.FormatCost(cost))
 	}
 	if compacts := epicContextMetrics(epic); compacts > 0 {
-		noun := "compacts"
-		if compacts == 1 {
-			noun = "compact"
-		}
-		parts = append(parts, fmt.Sprintf("%d %s", compacts, noun))
+		parts = append(parts, pluralize(compacts, "compact"))
 	}
-	for _, p := range parts {
-		line += metricsLineStyle.Render(" · " + p)
+	return parts
+}
+
+// epicStatusRow renders "Status: <icon> <state> · elapsed · agent · cost ·
+// n compact(s)", all dim except the state, zero parts hidden, cut at labelW.
+func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
+	icon, text, style := m.epicStatus(epic)
+	line := " " + metricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
+	var live map[string]liveTicketState
+	if m.runningEpics[epic.Name] {
+		live = m.live[epic.Name]
+	}
+	if parts := epicStatusParts(epic, m.now(), live); len(parts) > 0 {
+		line += metricsLineStyle.Render(" · " + strings.Join(parts, " · "))
 	}
 	if labelW > 0 {
 		line = ansi.Truncate(line, labelW, "…")
