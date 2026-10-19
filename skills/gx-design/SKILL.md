@@ -36,6 +36,18 @@ Skill tool for them. Tell wayfinder to use the tracker's **Map epics** section f
 operation (chart, claim, close, frontier). `gx-to-tickets` is model-invocable and can be called
 normally.
 
+## Waiting for answers
+
+Whenever you grill the person (wayfinder's Destination and frontier grilling, a HITL ticket, the
+provisional Destination, the review), run this right after printing each round of questions:
+
+```
+gx agent actionable "Grilling: waiting for your answers"
+```
+
+The Agents tab then shows the session as Actionable until the person's next input clears it. Outside
+a gx session it prints a note and does nothing, so always call it.
+
 ## Detecting the next step
 
 First run `gx agent link <project:epic>` (the ticket address, when given one). The Agents tab then
