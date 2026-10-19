@@ -105,6 +105,12 @@ func (c *Coordinator) elapseTimedOutWaits(h Handler) Handler {
 func Start(t *testing.T, handler Handler) *Coordinator {
 	t.Helper()
 
+	// The runners under test read claude's vim mode from its config; the host's
+	// own config must not decide whether a test types or presses `i`.
+	if os.Getenv("CLAUDE_CONFIG_DIR") == "" {
+		t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	}
+
 	sockDir, err := os.MkdirTemp("", "hf")
 	if err != nil {
 		t.Fatalf("herdrfake: create socket dir: %v", err)
