@@ -193,7 +193,7 @@ func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 	epic := m.epics[0]
 	for i, want := range []string{"(blocked by epic2 (via epic2/b))", "(blocked by epic3)"} {
 		tk := epic.Tickets[i]
-		if got := blockedBySuffix(epic, tk, epic.RenderedStatus(tk)); got != want {
+		if got := blockedBySuffix(epic, tk, ticketStatus(epic, tk)); got != want {
 			t.Errorf("blockedBySuffix(%s) = %q, want %q", tk.Identifier, got, want)
 		}
 	}
