@@ -657,7 +657,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		switch msg.Type {
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
-			var prompt, signal string
+			var prompt, signal, grillConv string
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
@@ -672,6 +672,9 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
+					if st.State == SessionIdle && prev.State != SessionIdle && m.Design {
+						grillConv = m.ConversationID
+					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
 					m.ConversationID = msg.ConversationID
@@ -690,6 +693,9 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				return changed
 			})
 			first.noteState(st.State)
+			if grillConv != "" {
+				s.detectGrilling(dir, id, grillConv)
+			}
 			if prompt != "" {
 				first.start(signal, prompt)
 			}

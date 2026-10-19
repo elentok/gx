@@ -32,6 +32,8 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 	}{
 		{"plain/01", "proj:plain/01", false},
 		{"proj:map/01", "proj:map/01", true},
+		{"proj:map", "proj:map", true},
+		{"proj:plain", "proj:plain", false},
 		{"proj:missing", "proj:missing", false},
 	} {
 		res, err := h.Client.LinkSession(ctx, server.LinkSessionRequest{ID: id, Ticket: tc.ticket})

@@ -56,6 +56,15 @@ func ClaudeSessionsDir() (string, error) {
 	return filepath.Join(dir, "sessions"), nil
 }
 
+// ClaudeProjectsDir is where claude writes its transcripts.
+func ClaudeProjectsDir() (string, error) {
+	dir, _, err := claudeConfigDirs()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "projects"), nil
+}
+
 // claudeConfigDirs returns claude's config dir and the dir that holds its
 // global .claude.json: the same dir under CLAUDE_CONFIG_DIR, else ~/.claude and
 // the home dir.
