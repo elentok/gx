@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -62,6 +63,62 @@ func TestDeadlock_AllParkedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 	got := runLogOf(t, h, events.Deadlocked)
 	if len(got) != 1 || got[0].Kind != string(events.AllParked) {
 		t.Errorf("deadlocked events = %+v, want one all-parked", got)
+	}
+}
+
+// An epic holding an error ticket is Parked: a person can fix it, so it is not
+// a dependency deadlock.
+func TestDeadlock_ErrorTicketParksTheEpic(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "bogus"})
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
+	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/02", ""); err != nil {
+		t.Fatal(err)
+	}
+	h.Server.ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
+	got := runLogOf(t, h, events.Deadlocked)
+	if len(got) != 1 || got[0].Kind != string(events.AllParked) {
+		t.Errorf("deadlocked events = %+v, want one all-parked", got)
+	}
+}
+
+// A map epic holds notes, not work, so it is never Deadlocked.
+func TestDeadlock_MapEpicIsNeverDeadlocked(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "bogus"})
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	if err := os.WriteFile(filepath.Join(store, "proj", "epic-a", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := servertest.StartWithStore(t, store)
+	_, _ = h.Client.QueueAdd(context.Background(), "proj:epic-a/02", "")
+	for range 3 {
+		h.Server.ClaimNext()
+	}
+	time.Sleep(200 * time.Millisecond)
+	if got := runLogOf(t, h, events.Deadlocked); len(got) != 0 {
+		t.Errorf("deadlocked events = %+v, want none for a map epic", got)
+	}
+}
+
+// A blocked deadlock's record names the tickets that wait and what they wait on.
+func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "cancelled"})
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", servertest.TicketOpts{Parent: "01"})
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
+	_, _ = h.Client.QueueAdd(context.Background(), "proj:epic-a/02", "")
+	h.Server.ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
+	got := runLogOf(t, h, events.Deadlocked)
+	want := "proj:epic-a/02 waits on proj:epic-a/01"
+	if got[0].Kind != string(events.BlockedCycle) || got[0].Reason != want {
+		t.Errorf("deadlocked = %+v, want blocked-cycle %q", got[0], want)
 	}
 }
 

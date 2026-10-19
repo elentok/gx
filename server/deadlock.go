@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/elentok/gx/events"
@@ -36,6 +37,19 @@ func (d *deadlocks) leave(root rootRef) {
 	delete(d.roots, root)
 }
 
+// isParked is the server's one rule for a Parked ticket: one a person, not the
+// run, has to clear. Map epics hold no work, so none of their tickets are.
+func isParked(e tickets.Epic, t tickets.Ticket) bool {
+	if e.IsMap {
+		return false
+	}
+	switch e.RenderedStatus(t) {
+	case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusDraft, tickets.StatusError:
+		return true
+	}
+	return false
+}
+
 // deadlockKind says how e is deadlocked: nothing schedulable and nothing
 // running while work remains. Parked tickets make it all-parked, since a person
 // can clear them; none makes it a blocked cycle.
@@ -45,6 +59,11 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 	}
 	remaining, parked := false, false
 	for _, t := range e.Tickets {
+		if isParked(e, t) {
+			parked = true
+			remaining = true
+			continue
+		}
 		switch e.RenderedStatus(t) {
 		case tickets.StatusOpen, tickets.StatusClaimed:
 			return "", false
@@ -63,6 +82,39 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 	return events.BlockedCycle, true
 }
 
+// deadlockReason names what holds e: the parked tickets for all-parked, and for
+// a blocked cycle each waiting ticket with what it waits on.
+func deadlockReason(root rootRef, e tickets.Epic, kind events.Kind) string {
+	addr := func(t tickets.Ticket) string { return root.String() + "/" + t.Identifier }
+	var parts []string
+	for _, t := range e.Tickets {
+		if kind == events.AllParked {
+			if isParked(e, t) {
+				parts = append(parts, addr(t))
+			}
+			continue
+		}
+		if e.RenderedStatus(t) == tickets.StatusBlocked {
+			waits := e.UnresolvedBlockers(t)
+			if !e.ParentDone(t) {
+				waits = append(waits, *t.Parent)
+			}
+			var on []string
+			for _, b := range waits {
+				if !strings.Contains(b, ":") {
+					b = root.String() + "/" + b
+				}
+				on = append(on, b)
+			}
+			parts = append(parts, addr(t)+" waits on "+strings.Join(on, ", "))
+		}
+	}
+	if kind == events.AllParked {
+		return "every remaining ticket is parked: " + strings.Join(parts, ", ")
+	}
+	return strings.Join(parts, "; ")
+}
+
 // checkDeadlock logs deadlocked when root's epic enters deadlock and starts its
 // recovery; it forgets the deadlock once the epic can move again.
 func (s *Server) checkDeadlock(root rootRef, projectDir string, e tickets.Epic) {
@@ -74,10 +126,7 @@ func (s *Server) checkDeadlock(root rootRef, projectDir string, e tickets.Epic) 
 	if !s.deadlocks.enter(root) {
 		return
 	}
-	reason := "nothing runnable and nothing a person could clear"
-	if kind == events.AllParked {
-		reason = "every remaining ticket is parked"
-	}
+	reason := deadlockReason(root, e, kind)
 	ev := ralphloop.Event{Type: string(events.Deadlocked), Kind: string(kind), Reason: reason}
 	if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
 		s.log.Warn("cannot record deadlock", "root", root, "err", err)

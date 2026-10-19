@@ -160,7 +160,7 @@ siblings tie-breaking on display number so an original sorts before its replacem
 **not** group or reorder them: a ticket never jumps out of its place once it finishes, so the list
 reads as the epic's intended order of execution.
 
-**Parked** — a ticket's state (`needs-answer`, `needs-repair`, `error`, or `draft`; `isParked`) and, derived
+**Parked** — a ticket's state (`needs-answer`, `needs-repair`, `error`, or `draft`; the server's `isParked`; tickets of a map epic are never parked) and, derived
 from it, an **epic state**: an epic with no runnable work left but at least one parked ticket keeps
 scheduling everything else, then parks indefinitely and notifies, releasing its slot in the
 epic-level concurrency cap, rather than exiting. Per ADR 0020, **stall** names the opposite thing —
@@ -187,8 +187,8 @@ liveness-only rule for it, ignoring the field. Cleared on claim; the event keeps
 (retired informal names — collided with the already-established `Gate` type and its `.gates()`
 verb).
 
-**Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either — a
-genuine dependency error, reported as a failure rather than parked on.
+**Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either (an `error` ticket counts as parked; map epics are never Deadlocked) — a
+genuine dependency error, reported as a failure rather than parked on. Its record names the blocked tickets and what they wait on.
 
 **Recently finished** — the last few completed loop epics (by `completed_at`), listed apart from and
 dimmer than the live epics so a finished epic does not just vanish from the Queue. Map epics never
