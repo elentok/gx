@@ -2,6 +2,8 @@ package server_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -311,4 +314,108 @@ func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64, ticket s
 	if live, _ := fake.List("epic-a"); len(live) != 0 {
 		t.Errorf("sessions still live after budget kill: %v", live)
 	}
+}
+
+// startBudgetRuns launches n runs of epic-a, one fake session each, with the
+// hard limit not yet reached. It returns the harness, the fake and the labels.
+func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harness, *runnerfake.Runner, *atomic.Bool, []string) {
+	t.Helper()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	var labels []string
+	for i := 1; i <= n; i++ {
+		id := fmt.Sprintf("%02d", i)
+		servertest.WriteTicket(t, store, "proj", "epic-a", id, "t"+id, "")
+		labels = append(labels, "epic-a-iter-"+id)
+	}
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.Runner = fake
+		c.BudgetHardLimit = 5
+		c.BudgetKillGrace = grace
+		c.BudgetPollInterval = time.Hour
+		c.MaxAgentsPerRoot = n
+		c.MaxAgents = n
+	})
+	var over atomic.Bool
+	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) {
+		if over.Load() {
+			return 6, true
+		}
+		return 0, true
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for i := 1; i <= n; i++ {
+		if _, err := h.Client.QueueAdd(ctx, fmt.Sprintf("proj:epic-a/%02d", i), "claude"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for ctx.Err() == nil {
+		if live, _ := fake.List("epic-a"); len(live) >= n {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if live, _ := fake.List("epic-a"); len(live) < n {
+		t.Fatalf("live sessions = %d, want %d", len(live), n)
+	}
+	return h, fake, &over, labels
+}
+
+// The grace counts from the stop decision and the Interrupts run side by side:
+// stopping N slow runs takes about the grace, not the sum of their Interrupts.
+func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
+	h, fake, over, labels := startBudgetRuns(t, 3, 400*time.Millisecond)
+	for _, l := range labels {
+		fake.SetInterruptDelay(l, 300*time.Millisecond)
+	}
+	over.Store(true)
+	start := time.Now()
+	h.Server.PollBudget()
+	elapsed := time.Since(start)
+	if elapsed < 400*time.Millisecond || elapsed >= 800*time.Millisecond {
+		t.Errorf("stop took %v, want about the 400ms grace (serial Interrupts would take 900ms)", elapsed)
+	}
+	assertNoLiveSessions(t, fake)
+}
+
+// A grace shorter than the Interrupts does not cut them off: Stop waits for
+// every Interrupt to return.
+func TestBudget_HardLimitStopWaitsForSlowInterrupts(t *testing.T) {
+	h, fake, over, labels := startBudgetRuns(t, 2, 20*time.Millisecond)
+	for _, l := range labels {
+		fake.SetInterruptDelay(l, 300*time.Millisecond)
+	}
+	over.Store(true)
+	start := time.Now()
+	h.Server.PollBudget()
+	if elapsed := time.Since(start); elapsed < 300*time.Millisecond {
+		t.Errorf("stop took %v, want it to wait for the 300ms Interrupts", elapsed)
+	}
+	assertNoLiveSessions(t, fake)
+}
+
+// An Interrupt that fails (here: the agent is not ready) is logged and the run
+// is stopped anyway.
+func TestBudget_HardLimitStopsDespiteInterruptError(t *testing.T) {
+	h, fake, over, labels := startBudgetRuns(t, 2, 50*time.Millisecond)
+	fake.SetInterruptErr(labels[0], agentrunner.ErrNotReady)
+	fake.SetInterruptErr(labels[1], errors.New("boom"))
+	over.Store(true)
+	h.Server.PollBudget()
+	assertNoLiveSessions(t, fake)
+}
+
+// A run that settles on its own during the stop closes its session a moment
+// after the stop returns, so the check waits for it.
+func assertNoLiveSessions(t *testing.T, fake *runnerfake.Runner) {
+	t.Helper()
+	var live []agentrunner.Session
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if live, _ = fake.List("epic-a"); len(live) == 0 {
+			return
+		}
+	}
+	t.Errorf("sessions still live: %v", live)
 }

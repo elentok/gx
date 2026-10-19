@@ -522,17 +522,24 @@ func (s *Server) killForBudget(now time.Time) int {
 			runs = append(runs, t)
 		}
 	}
+	deadline := now.Add(grace)
+	var wg sync.WaitGroup
 	for _, t := range runs {
 		s.registry.markBudgetStop(t.Address)
-		r, err := s.runnerOf(t.Run)
-		if err == nil {
-			err = r.Interrupt(t.Session)
-		}
-		if err != nil {
-			s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r, err := s.runnerOf(t.Run)
+			if err == nil {
+				err = r.Interrupt(t.Session)
+			}
+			if err != nil {
+				s.log.Warn("budget stop signal", "ticket", t.Address, "err", err)
+			}
+		}()
 	}
-	time.Sleep(grace)
+	wg.Wait()
+	time.Sleep(time.Until(deadline))
 	for _, t := range runs {
 		if _, first := s.registry.claimBudgetStop(t.Address); !first {
 			continue // its run already settled and parked it
