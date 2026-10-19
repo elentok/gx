@@ -114,7 +114,7 @@ func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInf
 	return []contextmenu.Item[server.SessionInfo]{
 		item("Stop", "x", "x", reason(live, "exited")),
 		item("Resume", "r", "r", reason(!live, "running")),
-		item("Remove", "X", "X", reason(!live, "running")),
+		item("Remove", "d", "d", reason(!live, "running")),
 		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
 		item("Run Action", "a", "a", reason(len(s.Actionable.Action) > 0, "no action")),
 	}
@@ -161,7 +161,7 @@ func (m Model) updateMenuPick(msg sessionMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m.stopSelected()
 	case "r":
 		return m.resumeSelected()
-	case "X":
+	case "d":
 		return m.removeSelected()
 	case "mark-read":
 		return m.markReadSelected()

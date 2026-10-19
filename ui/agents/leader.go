@@ -24,7 +24,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"j"}, Title: "jump to session"},
 	{Seq: []string{"c"}, Title: "new session"},
 	{Seq: []string{"x"}, Title: "stop session"},
-	{Seq: []string{"X"}, Title: "remove session"},
+	{Seq: []string{"d"}, Title: "remove session"},
 	{Seq: []string{"r"}, Title: "resume session"},
 	{Seq: []string{"a"}, Title: "run action"},
 	{Seq: []string{"["}, Title: "copy mode"},
@@ -49,7 +49,7 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"/"}, Title: "jump to session"},
 	{Seq: []string{"c"}, Title: "new session"},
 	{Seq: []string{"x"}, Title: "stop session"},
-	{Seq: []string{"X"}, Title: "remove session"},
+	{Seq: []string{"d"}, Title: "remove session"},
 	{Seq: []string{"r"}, Title: "resume session"},
 	{Seq: []string{"a"}, Title: "run action"},
 	{Seq: []string{"m"}, Title: "session menu"},
@@ -148,7 +148,7 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m.openCreate()
 	case "x":
 		return m.stopSelected()
-	case "X":
+	case "d":
 		return m.removeSelected()
 	case "r":
 		return m.resumeSelected()

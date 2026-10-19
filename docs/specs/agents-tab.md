@@ -184,7 +184,7 @@ A new **Agents tab** in the gx TUI. `gx agents` opens the TUI on it.
 60. As a user, I want these leader actions: `j` jump popup, `b` toggle sidebar, `tab` move focus
     between sidebar and terminal, `n`/`p` next/previous session in sidebar order, `u` next session
     needing attention (Actionable first, then Unread), `c` new session, `a` run the Action, `x` stop,
-    `X` remove, `r` resume, `[` copy mode, `z` toggle AFK mode, `1`-`8` switch gx tabs, `o` back to
+    `d` remove, `r` resume, `[` copy mode, `z` toggle AFK mode, `1`-`8` switch gx tabs, `o` back to
     the last active tab, `q` leave the tab like `q` elsewhere, `?` help. [T06, T07, T09]
 61. As a user, I want the leader to work in the sidebar too, so that one habit works everywhere.
     [T06]

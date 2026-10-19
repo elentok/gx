@@ -96,7 +96,7 @@ func TestActions_LeaderXStops(t *testing.T) {
 
 func TestActions_RemoveExitedAsksAndSends(t *testing.T) {
 	f := &fakeSessionClient{}
-	m, _ := act(t, actionModel(t, f, "done"), letter("X"))
+	m, _ := act(t, actionModel(t, f, "done"), letter("d"))
 	if !m.confirm.IsOpen || !strings.Contains(plainView(m), "Remove session done?") {
 		t.Fatalf("X did not ask:\n%s", plainView(m))
 	}
@@ -108,7 +108,7 @@ func TestActions_RemoveExitedAsksAndSends(t *testing.T) {
 
 func TestActions_RemoveLiveShowsTheRefusal(t *testing.T) {
 	f := &fakeSessionClient{result: server.SessionResult{Refused: true, Message: "session live is live"}}
-	m, note := act(t, actionModel(t, f, "live"), letter("X"))
+	m, note := act(t, actionModel(t, f, "live"), letter("d"))
 	if m.confirm.IsOpen {
 		t.Fatal("X on a live session asked")
 	}
@@ -237,7 +237,7 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 			return withUnread(withAction(m, "live", "go on"), "live")
 		}, map[string]string{"Stop": "x", "Run Action": "a"}},
 		{"exited", "done", func(m Model) Model { return m }, map[string]string{
-			"Stop": "exited", "Resume": "r", "Remove": "X",
+			"Stop": "exited", "Resume": "r", "Remove": "d",
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
