@@ -19,12 +19,15 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   full suite runs in CI (`.github/workflows/ci.yml`, on pushes and PRs to `main`): `go test ./...
   -timeout=10m`, `make test-race`, and `go test ./e2e/...`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
-- Always pass `-timeout` (e.g. `-timeout=120s`) when you pass `-count=N` or `-race`. Without it a
-  hung test blocks until the tool times out.
+- While iterating, always pass `-timeout 60s` and `-run <pattern>`. A hung fake otherwise waits for
+  the 10-minute default. Run the whole package once at the end. Also pass `-timeout` with `-count=N`
+  or `-race`. `server/` is exempt from the 60s limit.
+- Run packages one at a time. A multi-package run that moves to the background hides which package
+  hangs.
 - `server/` is the slowest package by far (minutes, close to the default `go test` timeout under
   load). Run it only when you touched `server/` or `server/servertest/`, and scope it with `-run`.
 - If a test run moves to the background, wait for its completion notice. Don't poll its output
-  file.
+  file, and don't write `sleep` or `until ...; do sleep` loops.
 
 ## Package map
 

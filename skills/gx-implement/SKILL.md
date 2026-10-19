@@ -160,9 +160,13 @@ real assertion; if one cannot be observed, park `needs-answer` naming the seam i
 Run typechecking regularly and single test files regularly. At the end, test only the packages you
 touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.
 
+While iterating, always pass `-timeout 60s` and `-run <pattern>` to `go test`, and run one package
+per call. Run the whole package once at the end. `server/` is exempt from the 60s limit.
+
 Tests in `server/` take over 120s, the Bash default timeout. Start them with `run_in_background`
-up front, then wait for the completion notice. Don't poll with Monitor or Workflow, and don't start
-a second run of the same suite while one is going.
+up front, then wait for the completion notice. Don't poll with Monitor or Workflow, don't write
+`sleep` or `until ...; do sleep` loops, and don't start a second run of the same suite while one is
+going.
 
 Before every commit, and before `--iteration-status finished`: run `gofmt -l` on the changed `.go`
 files only (e.g. `gofmt -l $(git diff --name-only HEAD -- '*.go')`; add `--cached`/new files as
