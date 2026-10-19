@@ -64,18 +64,14 @@ const parkedWaitingMax = 3
 // reports the epic running.
 func epicStatusLine(icons ui.IconSet, epic tickets.Epic, running bool, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
 	if epic.AllDone() {
-		text := "took " + formatElapsed(epicElapsedSeconds(epic))
-		if dur, ok := epic.CompletionDuration(); ok {
-			text = "took " + formatDuration(dur)
-		}
-		return icons.TicketDone, text, epicStatusDoneStyle
+		return icons.TicketDone, "done", epicStatusDoneStyle
 	}
 	if text, parkedStyle, ok := parkedStatus(epic); ok {
 		return icons.Warning, text, parkedStyle
 	}
 	switch {
 	case epicHasProblem(epic):
-		return icons.Warning, fmt.Sprintf("%d of %d done", epic.DoneCount(), epic.TotalCount()), epicStatusProblemStyle
+		return icons.Warning, "needs attention", epicStatusProblemStyle
 	case running:
 		return spinnerGlyph, "implementing", lipgloss.NewStyle()
 	default:
@@ -128,7 +124,7 @@ func parkedStatus(epic tickets.Epic) (text string, style lipgloss.Style, ok bool
 }
 
 // epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the
-// header status line's "took <elapsed>" once the epic is fully done.
+// header status line's elapsed part once the epic is fully done.
 func epicElapsedSeconds(epic tickets.Epic) int {
 	total := 0
 	for _, t := range epic.Tickets {
@@ -137,9 +133,8 @@ func epicElapsedSeconds(epic tickets.Epic) int {
 	return total
 }
 
-// epicCost sums the epic's tickets' landed ActualCost, for the "took Xm
-// $X.XX" cost summary appended alongside "took Xm" once the epic is fully
-// done.
+// epicCost sums the epic's tickets' landed ActualCost, for the Status line's
+// cost part.
 func epicCost(epic tickets.Epic) float64 {
 	total := 0.0
 	for _, t := range epic.Tickets {
@@ -160,25 +155,12 @@ func epicHasProblem(epic tickets.Epic) bool {
 	return false
 }
 
-// epicContextMetrics computes the header's context-window line figures:
-// avg/max landed context window across tickets that have landed one, plus
-// the epic's total compaction count.
-func epicContextMetrics(epic tickets.Epic) (avg, maximum, compacts int) {
-	total := 0
-	count := 0
+// epicContextMetrics computes the epic's total compaction count.
+func epicContextMetrics(epic tickets.Epic) (compacts int) {
 	for _, t := range epic.Tickets {
 		compacts += t.Compactions
-		if t.ActualContextWindow == 0 {
-			continue
-		}
-		total += t.ActualContextWindow
-		maximum = max(maximum, t.ActualContextWindow)
-		count++
 	}
-	if count > 0 {
-		avg = total / count
-	}
-	return avg, maximum, compacts
+	return compacts
 }
 
 // epicHeaderLayout is how every Queue epic header lays out its progress
@@ -324,7 +306,7 @@ func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
 	if cost := epicCost(epic); cost > 0 {
 		parts = append(parts, tickets.FormatCost(cost))
 	}
-	if _, _, compacts := epicContextMetrics(epic); compacts > 0 {
+	if compacts := epicContextMetrics(epic); compacts > 0 {
 		noun := "compacts"
 		if compacts == 1 {
 			noun = "compact"

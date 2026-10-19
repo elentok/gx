@@ -24,8 +24,8 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 		{Identifier: "01", Status: "done", ElapsedTime: 754},
 	}}
 	icon, text, style := epicStatusLine(icons, done, false, "")
-	if !strings.Contains(text, "took 12m34s") {
-		t.Fatalf("done epic: got text=%q, want it to contain %q", text, "took 12m34s")
+	if text != "done" {
+		t.Fatalf("done epic: got text=%q, want %q", text, "done")
 	}
 	if style.Render(icon) != epicStatusDoneStyle.Render(icon) {
 		t.Fatalf("done epic: status line not rendered in epicStatusDoneStyle (green)")
@@ -36,7 +36,10 @@ func TestEpicStatusLineColorsByEpicState(t *testing.T) {
 		{Identifier: "02", Status: "needs-answer"},
 		{Identifier: "03", Status: "open"},
 	}}
-	icon, _, style = epicStatusLine(icons, problem, false, "")
+	icon, text, style = epicStatusLine(icons, problem, false, "")
+	if text != "needs attention" {
+		t.Fatalf("problem epic: got text=%q, want %q", text, "needs attention")
+	}
 	if style.Render(icon) != epicStatusProblemStyle.Render(icon) {
 		t.Fatalf("problem epic: status line not rendered in epicStatusProblemStyle (yellow)")
 	}
@@ -187,38 +190,36 @@ func TestEpicStatusLineParkedCapsWaitingList(t *testing.T) {
 
 func TestEpicStatusLinePrefersCompletionTimestampsOverElapsedSum(t *testing.T) {
 	t.Parallel()
-	icons := ui.Icons(false)
 	started := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	completed := started.Add(3*time.Hour + 30*time.Minute)
+	m := QueueModel{}
 
 	withTimestamps := tickets.Epic{
 		Tickets:     []tickets.Ticket{{Identifier: "01", Status: "done", ElapsedTime: 754}},
 		StartedAt:   started,
 		CompletedAt: completed,
 	}
-	_, text, _ := epicStatusLine(icons, withTimestamps, false, "")
-	if !strings.Contains(text, "took 3h 30m") {
-		t.Fatalf("epic with completion timestamps: got text=%q, want it to contain %q", text, "took 3h 30m")
+	if got := m.epicElapsedPart(withTimestamps); got != "3h 30m elapsed" {
+		t.Fatalf("epic with completion timestamps: got %q, want %q", got, "3h 30m elapsed")
 	}
 
-	withoutTimestamps := tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "done", ElapsedTime: 754}}}
-	_, text, _ = epicStatusLine(icons, withoutTimestamps, false, "")
-	if !strings.Contains(text, "took 12m34s") {
-		t.Fatalf("epic without completion timestamps: got text=%q, want it to contain %q", text, "took 12m34s")
+	withoutCompletion := withTimestamps
+	withoutCompletion.CompletedAt = time.Time{}
+	if got := m.epicElapsedPart(withoutCompletion); got != "13m elapsed" {
+		t.Fatalf("epic without completion timestamp: got %q, want %q", got, "13m elapsed")
 	}
 }
 
-func TestEpicContextMetricsAveragesMaxAndSumsCompactions(t *testing.T) {
+func TestEpicContextMetricsSumsCompactions(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Identifier: "01", Status: "done", ActualContextWindow: 12000, Compactions: 2},
-		{Identifier: "02", Status: "done", ActualContextWindow: 8000, Compactions: 1},
-		{Identifier: "03", Status: "open"}, // never run: excluded from avg/max, contributes 0 compactions
+		{Identifier: "01", Status: "done", Compactions: 2},
+		{Identifier: "02", Status: "done", Compactions: 1},
+		{Identifier: "03", Status: "open"}, // never run: contributes 0 compactions
 	}}
 
-	avg, maximum, compacts := epicContextMetrics(epic)
-	if avg != 10000 || maximum != 12000 || compacts != 3 {
-		t.Fatalf("got avg=%d max=%d compacts=%d, want avg=10000 max=12000 compacts=3", avg, maximum, compacts)
+	if compacts := epicContextMetrics(epic); compacts != 3 {
+		t.Fatalf("got compacts=%d, want 3", compacts)
 	}
 }
 
@@ -237,8 +238,8 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := ansi.Strip(m.View().Content)
 
-	if !strings.Contains(content, "took 14m14s") {
-		t.Fatalf("expected the epic status line to report total elapsed time:\n%s", content)
+	if strings.Count(content, "done") < 1 || strings.Contains(content, "took") {
+		t.Fatalf("expected the epic status line to say done without a took duration:\n%s", content)
 	}
 	if !strings.Contains(content, "Status: ") || !strings.Contains(content, " · 3 compacts") {
 		t.Fatalf("expected the epic Status line with its compacts:\n%s", content)
