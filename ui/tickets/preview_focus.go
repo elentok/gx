@@ -27,6 +27,19 @@ type previewFocus struct {
 	previewSearch search.Model
 	// previewHidden backs the "tv" chord. Kept per tab, in memory only.
 	previewHidden bool
+
+	cache              previewCache
+	contentHighlighted bool // whether the viewport currently holds search-highlighted content
+}
+
+// previewCache is Sync's last contentFor result, with the inputs it was built from.
+type previewCache struct {
+	key       string
+	width     int
+	content   string
+	target    int
+	hasTarget bool
+	valid     bool
 }
 
 // togglePreview flips previewHidden. Hiding hands focus back to the list,
@@ -91,18 +104,35 @@ func newPreviewFocus() previewFocus {
 // parked ticket's park section — see renderTicketPreview): when the
 // selection just changed and a target is reported, the viewport centers on
 // it instead of the usual GotoTop.
-func (p *previewFocus) Sync(width, height int, selKey string, contentFor func(width int) (content string, scrollTarget int, hasScrollTarget bool)) {
+//
+// contentKey names everything contentFor's output depends on besides width
+// (a ticket's file mtime, body length, status...). While it and width are
+// unchanged, contentFor is skipped and the cached output reused — Sync runs on
+// every Update, and a render is far costlier than building the key. An empty
+// contentKey disables the cache.
+func (p *previewFocus) Sync(width, height int, selKey, contentKey string, contentFor func(width int) (content string, scrollTarget int, hasScrollTarget bool)) {
 	p.previewVP.SetWidth(width)
 	p.previewVP.SetHeight(height)
 
 	selectionChanged := selKey != p.previewSelKey
 	p.previewSelKey = selKey
 
-	content, target, hasTarget := contentFor(width)
-	if p.previewSearch.HasQuery() {
+	cacheHit := contentKey != "" && p.cache.valid && p.cache.key == contentKey && p.cache.width == width
+	if !cacheHit {
+		content, target, hasTarget := contentFor(width)
+		p.cache = previewCache{key: contentKey, width: width, content: content, target: target, hasTarget: hasTarget, valid: contentKey != ""}
+	}
+	content, target, hasTarget := p.cache.content, p.cache.target, p.cache.hasTarget
+
+	highlighted := p.previewSearch.HasQuery()
+	if highlighted {
 		content = highlightPreviewContent(content, p.previewSearch)
 	}
-	p.previewVP.SetContent(content)
+	// Re-setting identical plain content is the per-Update cost the cache exists to avoid.
+	if !cacheHit || highlighted || p.contentHighlighted {
+		p.previewVP.SetContent(content)
+	}
+	p.contentHighlighted = highlighted
 
 	if selectionChanged {
 		if hasTarget {

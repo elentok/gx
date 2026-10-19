@@ -40,7 +40,7 @@ func (m *Model) syncPreviewViewport() {
 	width, height := previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
 
-	m.previewFocus.Sync(contentW, height, m.previewSelectionKey(), m.previewContent)
+	m.previewFocus.Sync(contentW, height, m.previewSelectionKey(), "", m.previewContent)
 }
 
 // highlightPreviewLine wraps query's first match on an already

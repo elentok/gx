@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
+	"sync"
 
 	"charm.land/glamour/v2"
 	"charm.land/glamour/v2/ansi"
@@ -30,12 +31,12 @@ var ticketGlamourStyle = ansi.StyleConfig{
 	Heading: ansi.StyleBlock{
 		StylePrimitive: ansi.StylePrimitive{BlockSuffix: "\n", Color: colorPtr(ui.ColorBlue), Bold: boolPtr(true)},
 	},
-	H1: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "# "}},
-	H2: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "## "}},
-	H3: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "### "}},
-	H4: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "#### "}},
-	H5: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "##### "}},
-	H6: ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "###### "}},
+	H1:             ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "# "}},
+	H2:             ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "## "}},
+	H3:             ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "### "}},
+	H4:             ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "#### "}},
+	H5:             ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "##### "}},
+	H6:             ansi.StyleBlock{StylePrimitive: ansi.StylePrimitive{Prefix: "###### "}},
 	Strikethrough:  ansi.StylePrimitive{CrossedOut: boolPtr(true)},
 	Emph:           ansi.StylePrimitive{Color: colorPtr(ui.ColorYellow), Italic: boolPtr(true)},
 	Strong:         ansi.StylePrimitive{Color: colorPtr(ui.ColorText), Bold: boolPtr(true)},
@@ -68,6 +69,29 @@ func boolPtr(b bool) *bool { return &b }
 
 func uintPtr(u uint) *uint { return &u }
 
+// termRenderers holds one glamour renderer per wrap width: building one is
+// costly and the preview re-renders at the same few widths. A TermRenderer is
+// not safe for concurrent use, so termRenderersMu also serializes Render.
+var (
+	termRenderersMu sync.Mutex
+	termRenderers   = map[int]*glamour.TermRenderer{}
+)
+
+func renderWithCachedRenderer(body string, width int) (string, error) {
+	termRenderersMu.Lock()
+	defer termRenderersMu.Unlock()
+	r, ok := termRenderers[width]
+	if !ok {
+		var err error
+		r, err = glamour.NewTermRenderer(glamour.WithStyles(ticketGlamourStyle), glamour.WithWordWrap(width))
+		if err != nil {
+			return "", err
+		}
+		termRenderers[width] = r
+	}
+	return r.Render(body)
+}
+
 // renderTicketMarkdown renders a ticket/map body's raw markdown verbatim
 // through glamour, word-wrapped to width. Falls back to the raw body on a
 // renderer error (malformed style construction only - never a property of
@@ -76,11 +100,7 @@ func renderTicketMarkdown(body string, width int) string {
 	if width < 1 {
 		width = 1
 	}
-	r, err := glamour.NewTermRenderer(glamour.WithStyles(ticketGlamourStyle), glamour.WithWordWrap(width))
-	if err != nil {
-		return body
-	}
-	out, err := r.Render(body)
+	out, err := renderWithCachedRenderer(body, width)
 	if err != nil {
 		return body
 	}

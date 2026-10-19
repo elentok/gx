@@ -1,6 +1,9 @@
 package tickets
 
 import (
+	"fmt"
+	"os"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/ui"
@@ -64,7 +67,24 @@ func (m *QueueModel) syncQueuePreviewViewport() {
 	_, previewH := splitPanelHeight(m.width, m.contentHeight())
 	width, ht := previewInnerSize(previewW, previewH)
 	contentW := max(width-previewScrollbarGutter, 1)
-	m.previewFocus.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContent)
+	m.previewFocus.Sync(contentW, ht, m.queuePreviewSelectionKey(), m.queuePreviewContentKey(), m.queuePreviewContent)
+}
+
+// queuePreviewContentKey is everything queuePreviewContent's output depends
+// on besides width: the ticket's file mtime and body length (the file is the
+// source of truth for a server-mode ticket, whose snapshot carries no body)
+// and its rendered status. Empty (uncached) when nothing is selected.
+func (m QueueModel) queuePreviewContentKey() string {
+	row, ok := m.selectedQueueRow()
+	if !ok {
+		return ""
+	}
+	t := row.ticket
+	var mtime int64
+	if info, err := os.Stat(t.FilePath()); err == nil {
+		mtime = info.ModTime().UnixNano()
+	}
+	return fmt.Sprintf("%s|%d|%d|%d|%v", t.Path, mtime, len(t.Body), len(t.ReadErr), row.epic.RenderedStatus(t))
 }
 
 // handleQueuePreviewKey processes key input while the Queue tab's preview
