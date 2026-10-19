@@ -268,8 +268,28 @@ func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "do it\r" + "\r" + "\x15do it\r"; string(in) != want {
-		t.Errorf("keys typed = %q; want submit, one nudge, one cleared retype: %q", in, want)
+	if want := "do it\r" + "\r" + "\x15\x15\x15do it\r"; string(in) != want {
+		t.Errorf("keys typed = %q; want submit, one nudge, one whole-input-cleared retype: %q", in, want)
+	}
+}
+
+func TestPty_MultiLinePromptKeepsRawLF(t *testing.T) {
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+
+	if err := p.Prompt(s, "one\ntwo"); err != nil {
+		t.Fatalf("Prompt = %v", err)
+	}
+	in, err := os.ReadFile(agentfake.TUIInputPath(os.Getenv("HOME"), s.SessionID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "one\ntwo\r"; string(in) != want {
+		t.Errorf("keys typed = %q; want raw LF between lines and one Enter: %q", in, want)
 	}
 }
 

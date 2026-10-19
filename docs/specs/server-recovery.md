@@ -214,8 +214,8 @@ both herdr and headless runners.
 
 ### The launch prompt
 
-52. As a developer on herdr or the PTY runner, I want the input cleared before every full retype, so
-    that the slash command is never prefixed by a newline or doubled.
+52. As a developer on herdr or the PTY runner, I want the whole input cleared (repeated Ctrl+U) before
+    every full retype, so that the slash command is never prefixed by a newline or doubled.
 53. As a developer, I want every nudge decision (Enter sent, retype, stuck, timeout) in the run log,
     so that a bad launch is visible after the fact.
 
@@ -403,8 +403,7 @@ plumbing.
 
 ### Launch prompt
 
-- `claudeui.PromptWithNudge` clears the input before every full retype. The key sequence is the
-  implementer's choice. Applies to herdr and PTY; headless sends stream-json and is unaffected.
+- `claudeui.PromptWithNudge` clears the whole input (repeated Ctrl+U) before every full retype. Applies to herdr and PTY; headless sends stream-json and is unaffected.
 - Each nudge decision (Enter sent, retype, stuck, timeout) appends a run-log event.
 
 ### Recovery through the run's runner

@@ -678,8 +678,37 @@ func (pr *ptyPrompter) Submit(text string) error {
 	return pr.SendEnter()
 }
 
-// Clear presses Ctrl+U, as herdr's does.
-func (pr *ptyPrompter) Clear() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\x15")) }
+// Clear presses the harness clear key once.
+func (pr *ptyPrompter) Clear() error {
+	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(claudeTyping.ClearKey()))
+}
+
+// InputEmpty runs the harness empty check when the holder serves styled rows.
+func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
+	if !pr.ss.holder.Supports(OpScreenStyled) {
+		return false, false, nil
+	}
+	rows, err := pr.ss.holder.StyledScreen()
+	if err != nil {
+		return false, false, pr.p.died(pr.ss, err)
+	}
+	switch claudeTyping.InputIsEmpty(rows) {
+	case harness.InputEmpty:
+		return true, true, nil
+	case harness.InputNotEmpty:
+		return false, true, nil
+	}
+	return false, false, nil
+}
+
+// claudeTyping is the only harness the PTY runner drives.
+var claudeTyping = func() harness.Typing {
+	t, err := harness.LookupTyping(harness.Claude)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}()
 
 func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
 

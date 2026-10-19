@@ -3,6 +3,8 @@ package claudeui
 import (
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -51,7 +53,7 @@ func ReportDecisions(onNudge func(string)) func(NudgeDecision) {
 }
 
 // Prompter is what PromptWithNudge needs from a runner. Submit types text and
-// presses Enter. Clear empties the input box. WaitStart reports false, not an
+// presses Enter. Clear presses the harness clear key once. WaitStart reports false, not an
 // error, when timeout elapses with no turn started; an error aborts the prompt.
 type Prompter interface {
 	Submit(text string) error
@@ -59,6 +61,42 @@ type Prompter interface {
 	SendEnter() error
 	WaitStart(timeout time.Duration) (bool, error)
 	Screen() (string, error)
+}
+
+// InputChecker is the optional part of a Prompter that can tell whether the
+// input box is empty from a styled screen read. known is false when the read
+// carries no styling, so the clear count alone decides.
+type InputChecker interface {
+	InputEmpty() (empty, known bool, err error)
+}
+
+// clearPresses is how many clear-key presses empty an input holding text: one
+// per line to delete it and one per newline between lines (2N-1), plus two
+// spare for a stray trailing line.
+func clearPresses(text string) int {
+	n := strings.Count(text, "\n") + 1
+	return 2*n - 1 + 2
+}
+
+// clearWhole empties the whole input, not just its current line, then checks
+// it when the Prompter can.
+func clearWhole(p Prompter, text string) error {
+	for range clearPresses(text) {
+		if err := p.Clear(); err != nil {
+			return fmt.Errorf("clearing input before retype: %w", err)
+		}
+	}
+	c, ok := p.(InputChecker)
+	if !ok {
+		return nil
+	}
+	empty, known, err := c.InputEmpty()
+	if err != nil || !known || empty {
+		return nil
+	}
+	screen, _ := p.Screen()
+	slog.Debug("input not empty after full clear", "screen", screen)
+	return fmt.Errorf("%w: input not empty after clearing", ErrStuckSubmission)
 }
 
 // PromptWithNudge submits text and waits for the turn to start, working
@@ -112,8 +150,11 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 			report(NudgeRetype)
 			// Partial text the screen didn't show would otherwise prefix the
 			// retype.
-			if err = p.Clear(); err != nil {
-				return fmt.Errorf("clearing input before retype: %w", err)
+			if err = clearWhole(p, text); err != nil {
+				if errors.Is(err, ErrStuckSubmission) {
+					report(NudgeStuck)
+				}
+				return err
 			}
 			if err = p.Submit(text); err != nil {
 				return err

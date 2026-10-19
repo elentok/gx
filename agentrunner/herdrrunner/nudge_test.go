@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -19,6 +21,17 @@ import (
 var pollTimeoutErr = errors.New("timed out waiting for state")
 
 var graceMs = int(claudeui.DefaultNudgeCaps.Grace / time.Millisecond)
+
+// claudeTyping is the typing rules of a Claude session.
+func claudeTyping() harness.Typing { return kindTyping(harness.Claude) }
+
+func kindTyping(kind agentrunner.Kind) harness.Typing {
+	ty, err := harness.LookupTyping(kind)
+	if err != nil {
+		panic(err)
+	}
+	return ty
+}
 
 // fixedNow returns a clock that never advances, for tests where elapsed
 // time isn't under test.
@@ -97,7 +110,7 @@ func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -135,7 +148,7 @@ func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
 
 	// The pane's text changed since the initial submit (changingRead), so
 	// this reads as "typed but not submitted" and should nudge, not retype.
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -174,7 +187,7 @@ exit status 1
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -207,7 +220,7 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 		return herdr.Agent{}, pollTimeoutErr
 	}
 
-	_, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -256,7 +269,7 @@ func TestPromptWithNudge_UnchangedPane_ExhaustsRetypes_ReturnsStuckSubmission(t 
 
 	var decisions []claudeui.NudgeDecision
 	report := func(d claudeui.NudgeDecision) { decisions = append(decisions, d) }
-	_, err := promptWithNudge(prompt, sendKeys, wait, read, fixedNow(), report)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, read, fixedNow(), report)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -270,12 +283,76 @@ func TestPromptWithNudge_UnchangedPane_ExhaustsRetypes_ReturnsStuckSubmission(t 
 	if promptCalls != 1+claudeui.DefaultNudgeCaps.Retypes {
 		t.Errorf("promptCalls = %d, want %d (1 initial + claudeui.DefaultNudgeCaps.Retypes retypes)", promptCalls, 1+claudeui.DefaultNudgeCaps.Retypes)
 	}
-	if want := []string{"prompt", "ctrl+u", "prompt", "ctrl+u", "prompt"}; !slices.Equal(sent, want) {
+	if want := []string{"prompt", "ctrl+u", "ctrl+u", "ctrl+u", "prompt", "ctrl+u", "ctrl+u", "ctrl+u", "prompt"}; !slices.Equal(sent, want) {
 		t.Errorf("sent = %v, want %v (input cleared before every retype, no Enter nudges)", sent, want)
 	}
 	want := []claudeui.NudgeDecision{claudeui.NudgeRetype, claudeui.NudgeRetype, claudeui.NudgeStuck}
 	if !slices.Equal(decisions, want) {
 		t.Errorf("decisions = %v, want %v", decisions, want)
+	}
+}
+
+func TestPromptWithNudge_MultiLineRetype_ClearsWholeInputForEveryKind(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []agentrunner.Kind{harness.Claude, harness.Codex} {
+		t.Run(string(kind), func(t *testing.T) {
+			t.Parallel()
+			var texts []string
+			var keys []string
+			prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+				texts = append(texts, opts.Text)
+				return herdr.Agent{}, pollTimeoutErr
+			}
+			sendKeys := func(target string, k ...string) error {
+				keys = append(keys, k...)
+				return nil
+			}
+			wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) { return herdr.Agent{}, pollTimeoutErr }
+			read := func(target string, opts herdr.AgentReadOptions) (string, error) { return "empty pane", nil }
+
+			_, err := promptWithNudge(kindTyping(kind), prompt, sendKeys, wait, read, fixedNow(), nil)(herdr.AgentPromptOptions{
+				Target: "pane-1", Text: "a\nb", Wait: true, Until: []string{"working"},
+			})
+			if !errors.Is(err, claudeui.ErrStuckSubmission) {
+				t.Fatalf("error = %v, want ErrStuckSubmission", err)
+			}
+			// 2 lines: 2*2-1 presses plus two spare, before each of the 2 retypes.
+			if want := 2 * 5; len(keys) != want || slices.ContainsFunc(keys, func(k string) bool { return k != "ctrl+u" }) {
+				t.Errorf("keys = %v, want %d x ctrl+u and nothing else (never ctrl+c)", keys, want)
+			}
+			for _, text := range texts {
+				if text != "a\nb" {
+					t.Errorf("prompt text = %q, want newlines kept", text)
+				}
+			}
+		})
+	}
+}
+
+func TestPromptWithNudge_StyledNotEmptyAfterClear_IsStuckWithoutRetyping(t *testing.T) {
+	t.Parallel()
+	var prompts int
+	prompt := func(opts herdr.AgentPromptOptions) (herdr.Agent, error) {
+		prompts++
+		return herdr.Agent{}, pollTimeoutErr
+	}
+	sendKeys := func(target string, k ...string) error { return nil }
+	wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) { return herdr.Agent{}, pollTimeoutErr }
+	read := func(target string, opts herdr.AgentReadOptions) (string, error) {
+		if opts.Format == "ansi" {
+			return "\x1b[1m❯\x1b[0m draft left behind", nil
+		}
+		return "empty pane", nil
+	}
+
+	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, read, fixedNow(), nil)(herdr.AgentPromptOptions{
+		Target: "pane-1", Text: "hello", Wait: true, Until: []string{"working"},
+	})
+	if !errors.Is(err, claudeui.ErrStuckSubmission) {
+		t.Fatalf("error = %v, want ErrStuckSubmission", err)
+	}
+	if prompts != 1 {
+		t.Errorf("prompts = %d, want 1 (no retype into a dirty input)", prompts)
 	}
 }
 
@@ -298,7 +375,7 @@ func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "hello",
 		Wait:      true,
@@ -338,7 +415,7 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -390,7 +467,7 @@ func TestPromptWithNudge_SlowStart_CompletionGetsRemainingBudget(t *testing.T) {
 	// 3s elapses between the deadline being captured and the first
 	// start/nudge attempt (simulating a slow submit); the clock holds
 	// steady after that.
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), stepNow(3_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), stepNow(3_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -434,7 +511,7 @@ func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutW
 
 	// 1s elapses before the start attempt, then a further 5s before the
 	// completion-budget check, exhausting the caller's 5s deadline.
-	_, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), stepNow(1_000*time.Millisecond, 5_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), stepNow(1_000*time.Millisecond, 5_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -468,7 +545,7 @@ func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *test
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := promptWithNudge(prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,

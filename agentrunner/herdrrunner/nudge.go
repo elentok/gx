@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -20,6 +21,7 @@ import (
 // no deadline: start waits stay bounded, completion waits unbounded. report
 // may be nil.
 func promptWithNudge(
+	typing harness.Typing,
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
@@ -37,7 +39,11 @@ func promptWithNudge(
 			deadline = now().Add(time.Duration(opts.TimeoutMs) * time.Millisecond)
 		}
 
-		p := &herdrPrompter{opts: opts, prompt: prompt, sendKeys: sendKeys, wait: wait, read: read}
+		clearKey, ok := herdrKeyNames[typing.ClearKey()]
+		if !ok {
+			return herdr.Agent{}, fmt.Errorf("no herdr key name for clear key %q", typing.ClearKey())
+		}
+		p := &herdrPrompter{opts: opts, prompt: prompt, sendKeys: sendKeys, wait: wait, read: read, typing: typing, clearKey: clearKey}
 		p.startUntil = opts.Until
 		if !slices.Contains(p.startUntil, "working") {
 			p.startUntil = append([]string{"working"}, p.startUntil...)
@@ -73,6 +79,9 @@ type herdrPrompter struct {
 	wait       func(herdr.AgentWaitOptions) (herdr.Agent, error)
 	read       func(target string, opts herdr.AgentReadOptions) (string, error)
 
+	typing   harness.Typing
+	clearKey string
+
 	pending bool
 	agent   herdr.Agent
 	pollErr error
@@ -84,11 +93,30 @@ func (p *herdrPrompter) Submit(text string) error {
 	return nil
 }
 
-// Clear presses Ctrl+U: unlike Esc or Ctrl+C it can't interrupt a turn that
-// started unseen.
+// Clear presses the harness clear key once. It is never Esc or Ctrl+C: they
+// can interrupt a turn that started unseen, and Ctrl+C quits Codex on an empty
+// input.
 func (p *herdrPrompter) Clear() error {
-	return p.sendKeys(p.opts.Target, "ctrl+u")
+	return p.sendKeys(p.opts.Target, p.clearKey)
 }
+
+// InputEmpty runs the harness empty check on a styled read.
+func (p *herdrPrompter) InputEmpty() (bool, bool, error) {
+	styled, err := p.StyledScreen()
+	if err != nil {
+		return false, false, err
+	}
+	switch p.typing.InputIsEmpty(strings.Split(styled, "\n")) {
+	case harness.InputEmpty:
+		return true, true, nil
+	case harness.InputNotEmpty:
+		return false, true, nil
+	}
+	return false, false, nil
+}
+
+// herdrKeyNames maps the raw clear keys harness rules use to herdr's key names.
+var herdrKeyNames = map[string]string{"\x15": "ctrl+u"}
 
 func (p *herdrPrompter) SendEnter() error {
 	return p.sendKeys(p.opts.Target, "enter")

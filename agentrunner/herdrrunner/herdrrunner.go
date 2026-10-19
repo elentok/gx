@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
 )
 
@@ -145,6 +146,17 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 		// decide when compaction has really finished.
 		until = append(until, "blocked", "idle", "done")
 	}
+	// A session this runner did not start is read as Claude, as in RateLimit.
+	r.mu.Lock()
+	kind := r.started[s.Label].Kind
+	r.mu.Unlock()
+	if kind == "" {
+		kind = harness.Claude
+	}
+	typing, err := harness.LookupTyping(kind)
+	if err != nil {
+		return err
+	}
 	// A turn can start and end between herdr's polls, so its wait reports a
 	// stall though the seq moved: that turn was delivered, and a nudge or
 	// retype would send the text twice.
@@ -157,7 +169,7 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 		}
 		return agent, err
 	}
-	prompt := promptWithNudge(submit, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
+	prompt := promptWithNudge(typing, submit, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {
