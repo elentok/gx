@@ -3,6 +3,7 @@ package agents
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -123,14 +124,9 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 	if st != nil {
 		m.loaded = true
 		m.afk = st.AFK
-		selected := m.selectedID()
-		m.sessions = orderedSessions(st.Sessions)
-		m.cursor = 0
-		for i, s := range m.sessions {
-			if s.ID == selected {
-				m.cursor = i
-			}
-		}
+		sessions := orderedSessions(st.Sessions)
+		m.cursor = followSelection(m.sessions, m.cursor, sessions)
+		m.sessions = sessions
 		if !m.opened {
 			m.opened = true
 			m = m.open()
@@ -355,6 +351,21 @@ func (m Model) workingVisible() bool {
 
 func (m Model) sidebarShown() bool {
 	return !m.hideSidebar && m.loaded && m.client != nil && m.link != ticketsui.ServerLinkDown
+}
+
+// followSelection is the cursor into next that keeps the session selected in
+// prev. When that session is gone it moves to the nearest one above it that
+// remains, so removing a session selects the one above; else the first.
+func followSelection(prev []server.SessionInfo, cursor int, next []server.SessionInfo) int {
+	index := func(id string) int {
+		return slices.IndexFunc(next, func(s server.SessionInfo) bool { return s.ID == id })
+	}
+	for i := min(cursor, len(prev)-1); i >= 0; i-- {
+		if j := index(prev[i].ID); j >= 0 {
+			return j
+		}
+	}
+	return 0
 }
 
 func (m Model) selectedID() string {

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -230,6 +231,27 @@ func TestSidebar_SelectionFollowsTheSessionAcrossUpdates(t *testing.T) {
 	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
 	if got := m.selectedID(); got != "s3" {
 		t.Fatalf("selected %s after an update, want s3", got)
+	}
+}
+
+func TestSidebar_SelectionMovesUpWhenTheSelectedSessionGoes(t *testing.T) {
+	without := func(id string) []server.SessionInfo {
+		return slices.DeleteFunc(fixtureSessions(), func(s server.SessionInfo) bool { return s.ID == id })
+	}
+
+	m := press(t, press(t, sidebarModel(t, false, fixtureSessions(), 70, 14), "j"), "j")
+	above, gone := m.sessions[1].ID, m.sessions[2].ID
+	m = withState(t, m, &viewmodel.State{Sessions: without(gone)}, ticketsui.ServerLinkUp)
+	if got := m.selectedID(); got != above {
+		t.Fatalf("selected %s after %s went, want %s above it", got, gone, above)
+	}
+
+	// With nothing above, the selection goes to the first session.
+	top := sidebarModel(t, false, fixtureSessions(), 70, 14)
+	rest := without(top.sessions[0].ID)
+	top = withState(t, top, &viewmodel.State{Sessions: rest}, ticketsui.ServerLinkUp)
+	if got, want := top.selectedID(), orderedSessions(rest)[0].ID; got != want {
+		t.Fatalf("selected %s after the top session went, want the first, %s", got, want)
 	}
 }
 
