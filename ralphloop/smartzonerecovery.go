@@ -3,6 +3,8 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
+
+	"github.com/elentok/gx/agentrunner"
 )
 
 // smartZoneRecovery holds the smart-zone-breach sub-state that waitForFinish's
@@ -70,6 +72,22 @@ func (r *smartZoneRecovery) recordGatedGiveUp() (exceeded bool) {
 	return r.gatedGiveUps >= maxConsecutiveGatedGiveUps
 }
 
+// interruptOrRetry interrupts the pane ahead of a recovery. Interrupt refuses
+// with ErrNotReady when the pane is in a state it can't safely interrupt; that
+// is not a failure, so retry reports true and the caller skips this poll and
+// tries again on the next one. Any other error aborts waitForFinish.
+func interruptOrRetry(d Deps, p launchAndPromptParams, why string) (retry bool, err error) {
+	err = d.Runner.Interrupt(p.session())
+	switch {
+	case err == nil:
+		return false, nil
+	case errors.Is(err, agentrunner.ErrNotReady):
+		return true, nil
+	default:
+		return false, fmt.Errorf("interrupting %s after %s: %w", p.Label, why, err)
+	}
+}
+
 // checkAndRecover reads the session's current context occupancy and, on a
 // breach, interrupts the pane and runs recoverSmartZoneBreach, updating the
 // gated-give-up bookkeeping from its outcome. breached reports whether a
@@ -86,8 +104,8 @@ func (r *smartZoneRecovery) checkAndRecover(d Deps, p launchAndPromptParams, ses
 		return false, nil
 	}
 
-	if err := d.Runner.Interrupt(p.session()); err != nil {
-		return false, fmt.Errorf("interrupting %s after smart-zone breach: %w", p.Label, err)
+	if retry, err := interruptOrRetry(d, p, "smart-zone breach"); retry || err != nil {
+		return false, err
 	}
 	reason := fmt.Sprintf("context occupancy %d exceeds --smart-zone %d", occupancy, r.zone)
 	// Snapshotted here rather than read back out of recoverSmartZoneBreach:

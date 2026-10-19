@@ -87,8 +87,13 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					// Codex can sit blocked on its own context-exhaustion
 					// banner; that is recoverable, not a question for a human.
 					if evidence != "" {
-						if err := d.Runner.Interrupt(p.session()); err != nil {
-							return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
+						if retry, err := interruptOrRetry(d, p, "Codex context exhaustion"); err != nil {
+							return err
+						} else if retry {
+							// Wait returns at once on a blocked pane, so pace the retry.
+							d.Sleep(smartZonePollMs * time.Millisecond)
+							elapsedMs += smartZonePollMs
+							continue
 						}
 						if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
 							return err
@@ -120,8 +125,13 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			// deliberately not acted on here, only its context exhaustion.
 			resetAt, limited, evidence, _ := runnerRateLimit(d, p)
 			if p.Agent == AgentCodex && evidence != "" {
-				if err := d.Runner.Interrupt(p.session()); err != nil {
-					return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
+				if retry, err := interruptOrRetry(d, p, "Codex context exhaustion"); err != nil {
+					return err
+				} else if retry {
+					// Wait returns at once on an idle pane, so pace the retry.
+					d.Sleep(smartZonePollMs * time.Millisecond)
+					elapsedMs += smartZonePollMs
+					continue
 				}
 				if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
 					return err
@@ -211,8 +221,10 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				continue
 			}
 			if evidence != "" {
-				if err := d.Runner.Interrupt(p.session()); err != nil {
-					return fmt.Errorf("interrupting %s after Codex context exhaustion: %w", p.Label, err)
+				if retry, err := interruptOrRetry(d, p, "Codex context exhaustion"); err != nil {
+					return err
+				} else if retry {
+					continue // the Wait above already paced this poll
 				}
 				if err := recoverOrFailCodexContextExhaustion(d, p, sessionID, evidence, smartZone); err != nil {
 					return err

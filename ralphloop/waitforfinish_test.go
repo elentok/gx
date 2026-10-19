@@ -145,6 +145,92 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfParking
 	}
 }
 
+// refuseFirstInterrupt answers the first Interrupt with ErrNotReady. A real
+// pane shows its context-exhaustion banner on every poll, so the refusal
+// re-arms blipRunner's one-shot evidence for the retry.
+type refuseFirstInterrupt struct {
+	*blipRunner
+	evidence string
+	refused  bool
+}
+
+func (r *refuseFirstInterrupt) Interrupt(s agentrunner.Session) error {
+	if !r.refused {
+		r.refused = true
+		r.blipRunner.interrupts++
+		r.blipRunner.contextExhausted = r.evidence
+		return agentrunner.ErrNotReady
+	}
+	return r.blipRunner.Interrupt(s)
+}
+
+// TestWaitForFinish_InterruptNotReadyRetriesNextPoll covers every Interrupt
+// caller in recovery: ErrNotReady skips the poll, the next poll retries, and
+// recovery then completes.
+func TestWaitForFinish_InterruptNotReadyRetriesNextPoll(t *testing.T) {
+	t.Parallel()
+	const banner = "■ Codex ran out of room in the model's context window."
+	cases := []struct {
+		name  string
+		agent AgentKind
+		setup func(r *blipRunner)
+		zone  bool
+	}{
+		{name: "codex blocked", agent: AgentCodex, setup: func(r *blipRunner) {
+			r.contextExhausted = banner
+			r.SetState("iter-30", agentrunner.StateBlocked, "")
+		}},
+		{name: "codex idle", agent: AgentCodex, setup: func(r *blipRunner) { r.contextExhausted = banner }},
+		{name: "codex timeout while working", agent: AgentCodex, setup: func(r *blipRunner) {
+			r.contextExhausted = banner
+			r.timeoutIf = func(n int) bool { return n <= 2 }
+		}},
+		{name: "smart zone", agent: AgentCodex, zone: true, setup: func(r *blipRunner) { r.timeoutIf = func(n int) bool { return n <= 2 } }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ticketPath := writeFrontmatterTicket(t, "claimed")
+			r := &blipRunner{Runner: idlePromptRunner("iter-30", "codex-session-30")}
+			tc.setup(r)
+			d := Deps{Runner: &refuseFirstInterrupt{blipRunner: r, evidence: r.contextExhausted}, Sleep: func(time.Duration) {}}
+			if tc.zone {
+				d.ReadCodexContext = func(string, string) (int, bool, error) { return 150001, true, nil }
+			}
+
+			err := waitForFinish(d, launchAndPromptParams{
+				Label: "iter-30", Agent: tc.agent, Pane: "pane-1", Ticket: "30", TicketPath: ticketPath,
+				SmartZone: 150_000, Gate: NewGate(),
+			}, "codex-session-30")
+			if err != nil {
+				t.Fatalf("waitForFinish: %v", err)
+			}
+			if r.interrupts != 2 {
+				t.Errorf("interrupts = %d, want a refused one then a retry", r.interrupts)
+			}
+			if prompts := r.Prompts("iter-30"); len(prompts) == 0 || prompts[0] != "/compact" {
+				t.Errorf("prompts = %v, want /compact after the retry", prompts)
+			}
+		})
+	}
+}
+
+func TestWaitForFinish_InterruptOtherErrorStillFails(t *testing.T) {
+	t.Parallel()
+	r := &blipRunner{Runner: idlePromptRunner("iter-31", "codex-session-31"), timeoutOn: 1, interruptErr: errors.New("pane gone")}
+	d := Deps{
+		Runner:           r,
+		ReadCodexContext: func(string, string) (int, bool, error) { return 150001, true, nil },
+		Sleep:            func(time.Duration) {},
+	}
+	err := waitForFinish(d, launchAndPromptParams{
+		Label: "iter-31", Agent: AgentCodex, Pane: "pane-1", Ticket: "31", SmartZone: 150_000, Gate: NewGate(),
+	}, "codex-session-31")
+	if err == nil || !strings.Contains(err.Error(), "pane gone") {
+		t.Fatalf("waitForFinish() = %v, want the interrupt error", err)
+	}
+}
+
 func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
