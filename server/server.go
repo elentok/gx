@@ -209,6 +209,10 @@ type Config struct {
 	// ActionSlashSettle is how long a slash step must stay Idle after typing
 	// to count as done; zero means DefaultActionSlashSettle.
 	ActionSlashSettle time.Duration
+	// FirstPromptStartTimeout bounds the Starting time, counted from launch,
+	// before a pending first prompt is handed to a person; zero means
+	// DefaultFirstPromptStartTimeout.
+	FirstPromptStartTimeout time.Duration
 	// FirstPromptGrace bounds each wait for a first prompt's turn to start
 	// before it is nudged; zero means claudeui.DefaultNudgeCaps.
 	FirstPromptGrace time.Duration

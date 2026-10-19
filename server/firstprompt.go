@@ -1,7 +1,9 @@
 package server
 
 import (
+	"cmp"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -21,7 +23,14 @@ const signalFirstIdle = "first Idle"
 // checks.
 const holderPollInterval = 50 * time.Millisecond
 
+// DefaultFirstPromptStartTimeout is how long a session may stay Starting,
+// counted from launch, before its first prompt is handed to a person.
+const DefaultFirstPromptStartTimeout = 30 * time.Second
+
 var errNudgeCancelled = errors.New("nudge cancelled: person input")
+
+// clearInputHint ends a reason when the input may still hold gx's text.
+const clearInputHint = " Clear the input first."
 
 // firstPrompt follows one session's first prompt from the watch stream: it
 // decides when to type, types in the background, and cancels the remaining
@@ -38,10 +47,116 @@ type firstPrompt struct {
 	cancelOnce                  sync.Once
 	turnStarted                 chan struct{}
 	turnOnce                    sync.Once
+
+	// The Starting clock counts only time spent Starting, so a dialog a person
+	// answers (Blocked) does not use it up. Only the watch loop touches since
+	// and spent; the timer callback reads the session's state from its meta.
+	id      string
+	run     int
+	timeout time.Duration
+	timer   *time.Timer
+	since   time.Time
+	spent   time.Duration
 }
 
-func (s *Server) newFirstPrompt(dir, id string) *firstPrompt {
-	return &firstPrompt{s: s, dir: dir, log: s.log.With("session", id), cancel: make(chan struct{}), turnStarted: make(chan struct{})}
+func (s *Server) newFirstPrompt(dir, id string, run int) *firstPrompt {
+	f := &firstPrompt{
+		s: s, dir: dir, id: id, run: run, log: s.log.With("session", id),
+		cancel: make(chan struct{}), turnStarted: make(chan struct{}),
+		timeout: cmp.Or(s.cfg.FirstPromptStartTimeout, DefaultFirstPromptStartTimeout),
+		since:   time.Now(),
+	}
+	f.timer = time.AfterFunc(f.timeout, f.startTimedOut)
+	return f
+}
+
+// stop ends the Starting clock when the watch ends.
+func (f *firstPrompt) stop() { f.timer.Stop() }
+
+// trackStarting pauses the Starting clock outside Starting and resumes it with
+// what is left.
+func (f *firstPrompt) trackStarting(state string) {
+	starting := state == SessionStarting || state == ""
+	switch {
+	case starting && f.since.IsZero():
+		f.since = time.Now()
+		f.timer.Reset(f.timeout - f.spent)
+	case !starting && !f.since.IsZero():
+		f.spent += time.Since(f.since)
+		f.since = time.Time{}
+		f.timer.Stop()
+	}
+}
+
+// startTimedOut hands a still-pending prompt to a person when the session is
+// Starting at the deadline.
+func (f *firstPrompt) startTimedOut() {
+	var prompt string
+	f.s.updateSessionMetaOrWarn(f.dir, f.id, func(m *sessionMeta) bool {
+		starting := m.Status.State == "" || m.Status.State == SessionStarting
+		if m.Run != f.run || m.FirstPrompt == "" || !starting {
+			return false
+		}
+		prompt, m.FirstPrompt = m.FirstPrompt, ""
+		return true
+	})
+	if prompt != "" {
+		f.raise(prompt, fmt.Sprintf("agent still starting after %s", f.timeout))
+	}
+}
+
+// raise logs the failure, then hands the prompt to a person as a one-step
+// Action.
+func (f *firstPrompt) raise(prompt, reason string) {
+	f.log.Warn("first prompt failed", "reason", reason)
+	f.s.raiseGxActionable(f.dir, reason, []string{prompt})
+}
+
+// failed raises the Actionable for a nudge that gave up. Where the input is
+// not in vim NORMAL mode and was not just cleared, it first clears gx's own
+// text once; a clear that cannot be confirmed tells the person to do it.
+func (f *firstPrompt) failed(prompt string, err error) {
+	switch {
+	case errors.Is(err, claudeui.ErrNotReadyToType):
+		f.raise(prompt, "input is in vim NORMAL mode")
+		return
+	case errors.Is(err, claudeui.ErrInputNotEmpty):
+		f.raise(prompt, "input not empty."+clearInputHint)
+		return
+	}
+	reason := "prompt never reached the input"
+	if errors.Is(err, claudeui.ErrStartTimeout) {
+		reason = "agent never started"
+	}
+	cleared, cancelled := f.clearLeftover(prompt)
+	switch {
+	case cancelled:
+		f.log.Debug(errNudgeCancelled.Error())
+	case cleared:
+		f.raise(prompt, reason)
+	default:
+		f.raise(prompt, reason+"."+clearInputHint)
+	}
+}
+
+// clearLeftover clears the whole input once and reports whether the harness
+// check confirms it empty.
+func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
+	c, err := nativerunner.DialHolder(f.dir)
+	if err != nil {
+		f.log.Warn("clear leftover first prompt", "err", err)
+		return false, false
+	}
+	p := &holderPrompter{c: c, f: f}
+	if err := claudeui.ClearInput(p, prompt); err != nil {
+		if errors.Is(err, errNudgeCancelled) {
+			return false, true
+		}
+		f.log.Warn("clear leftover first prompt", "err", err)
+		return false, false
+	}
+	empty, known, err := p.InputEmpty()
+	return err == nil && known && empty, false
 }
 
 // observe takes each status while the prompt is pending and returns the signal
@@ -74,6 +189,7 @@ func (f *firstPrompt) observe(state string, ready harness.ReadySignal) string {
 // noteState closes turnStarted on the first Working after gx typed: the watch
 // sees a turn start even where the holder's Turn counter does not move.
 func (f *firstPrompt) noteState(state string) {
+	f.trackStarting(state)
 	if state == SessionWorking && f.typed.Load() {
 		f.turnOnce.Do(func() { close(f.turnStarted) })
 	}
@@ -103,6 +219,8 @@ func (f *firstPrompt) start(signal, prompt string) {
 			f.log.Debug(errNudgeCancelled.Error())
 		case errors.Is(err, errDraft):
 			f.s.refuseForDraft(f.dir, []string{prompt})
+		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout):
+			f.failed(prompt, err)
 		case err != nil:
 			f.log.Warn("type first prompt", "err", err)
 		}

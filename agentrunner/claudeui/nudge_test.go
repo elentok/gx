@@ -134,8 +134,8 @@ func TestPromptWithNudge_ReadyToTypeRunsBeforeTypingAndBeforeTheClear(t *testing
 func TestPromptWithNudge_ReadyGiveUpBeforeTyping_StopsAsStuck(t *testing.T) {
 	f := &readyPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, ready: []bool{false}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
-	if !errors.Is(err, ErrStuckSubmission) {
-		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	if !errors.Is(err, ErrStuckSubmission) || !errors.Is(err, ErrNotReadyToType) {
+		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission wrapping ErrNotReadyToType", err)
 	}
 	assertCalls(t, f.calls, "ready")
 	assertDecisions(t, f.decisions, NudgeStuck)

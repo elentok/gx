@@ -644,7 +644,8 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		}
 		_ = stream.Close()
 	}()
-	first := s.newFirstPrompt(dir, id)
+	first := s.newFirstPrompt(dir, id, run)
+	defer first.stop()
 	for {
 		msg, err := stream.Next()
 		if err != nil {

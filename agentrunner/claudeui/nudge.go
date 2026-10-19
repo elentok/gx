@@ -32,6 +32,14 @@ var ErrStuckSubmission = errors.New("submission never reached the pane")
 // caller's deadline.
 var ErrStartTimeout = errors.New("timed out waiting for agent to start")
 
+// ErrNotReadyToType and ErrInputNotEmpty name why a stuck submission gave up,
+// for callers that word the cause for a person. Each travels wrapped with
+// ErrStuckSubmission.
+var (
+	ErrNotReadyToType = errors.New("input not ready to type")
+	ErrInputNotEmpty  = errors.New("input not empty after clearing")
+)
+
 // NudgeDecision is what PromptWithNudge did about a submit the agent didn't
 // pick up. Its values are written to the run log as is.
 type NudgeDecision string
@@ -109,7 +117,12 @@ func clearWhole(p Prompter, text string) error {
 	}
 	screen, _ := p.Screen()
 	slog.Debug("input not empty after full clear", "screen", screen)
-	return fmt.Errorf("%w: input not empty after clearing", ErrStuckSubmission)
+	return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrInputNotEmpty)
+}
+
+// ClearInput empties the whole input once, as the retype does for text.
+func ClearInput(p Prompter, text string) error {
+	return clearWhole(p, text)
 }
 
 // PromptWithNudge submits text and waits for the turn to start, working
@@ -141,7 +154,7 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 	// a changed screen.
 	if !readyToType(p) {
 		report(NudgeStuck)
-		return fmt.Errorf("%w: input not ready to type", ErrStuckSubmission)
+		return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrNotReadyToType)
 	}
 
 	// A screen read error counts as "changed": with no evidence the text is
@@ -170,7 +183,7 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 			report(NudgeRetype)
 			if !readyToType(p) {
 				report(NudgeStuck)
-				return fmt.Errorf("%w: input not ready to type", ErrStuckSubmission)
+				return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrNotReadyToType)
 			}
 			// Partial text the screen didn't show would otherwise prefix the
 			// retype.
