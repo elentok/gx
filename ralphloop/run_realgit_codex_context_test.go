@@ -328,6 +328,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	s := herdrfake.NewState(t)
 	phase := "starting"
 	ctrlCCalls, compactCalls, evidenceReads := 0, 0, 0
+	interrupted := false
 	var recoveryPrompts []string
 
 	s.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -383,7 +384,11 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 			// The pane never settles into a finish state on its own here:
 			// the loop must classify the native-exhaustion banner off
 			// ReadPaneRecent during this very poll timeout, not wait for the
-			// pane to go idle first.
+			// pane to go idle first. The interrupt's own wait for idle is the
+			// exception (a finish poll also waits for blocked).
+			if interrupted && !slices.Contains(parseUntil(argv[3:]), "blocked") {
+				return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
+			}
 			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
 		case "compact-blocked":
 			phase = "compacting"
@@ -401,6 +406,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 		for _, key := range argv[3:] {
 			if key == "ctrl+c" {
 				ctrlCCalls++
+				interrupted = true
 			}
 		}
 		// ctrl+c leaves a Codex pane idle and promptable.
@@ -514,6 +520,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	s := herdrfake.NewState(t)
 	phase := "starting"
 	ctrlCCalls, compactCalls, evidenceReads := 0, 0, 0
+	interrupted := false
 	var recoveryPrompts []string
 
 	s.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -560,6 +567,11 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		case "starting":
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 		case "implementing":
+			// The interrupt's own wait for the pane to go idle (a finish
+			// poll also waits for blocked).
+			if interrupted && !slices.Contains(parseUntil(argv[3:]), "blocked") {
+				return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
+			}
 			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
 		default:
 			return nil, herdrfake.Identities{}, fmt.Errorf("unexpected wait in phase %q", phase)
@@ -569,6 +581,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		for _, key := range argv[3:] {
 			if key == "ctrl+c" {
 				ctrlCCalls++
+				interrupted = true
 			}
 		}
 		// ctrl+c leaves a Codex pane idle and promptable.

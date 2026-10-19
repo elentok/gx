@@ -373,6 +373,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		}
 		mu.Lock()
 		done := finishedUp
+		keyed := ctrlCCalls > 0
 		mu.Unlock()
 		// Before the finish-up prompt lands the agent is mid-turn, so every
 		// ordinary finish poll times out — that's the tick the smart-zone
@@ -380,7 +381,33 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		if done && (len(until) == 0 || slices.Contains(until, "done")) {
 			return agentResult(target, "done")
 		}
+		// The interrupt's own wait for the pane to go idle.
+		if keyed {
+			status, err := compact.Status()
+			if err != nil {
+				return nil, herdrfake.Identities{}, err
+			}
+			if slices.Contains(until, status) {
+				return agentResult(target, status)
+			}
+		}
 		return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
+	})
+
+	// Interrupt reads the state to pick its key: the pane is mid-turn until
+	// the interrupt lands.
+	s.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		keyed := ctrlCCalls > 0
+		mu.Unlock()
+		if !keyed {
+			return agentResult(argv[2], "working")
+		}
+		status, err := compact.Status()
+		if err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		return agentResult(argv[2], status)
 	})
 
 	s.Register("agent", "send-keys", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -543,11 +570,13 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 		until := parseUntil(argv[3:])
 		mu.Lock()
 		started := compactStarted
+		keyed := ctrlCCalls > 0
 		mu.Unlock()
 		// Before "/compact" the agent is mid-turn, so every poll times out —
-		// that's the tick the smart-zone breach is detected on. Afterwards both
+		// that's the tick the smart-zone breach is detected on (the interrupt's
+		// own wait for idle is the one that gets an answer). Afterwards both
 		// poll kinds get the same answer the real pane gave: idle.
-		if !started {
+		if !started && !keyed {
 			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
 		}
 		status, err := compact.Status()
@@ -581,6 +610,22 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 			return nil, herdrfake.Identities{}, err
 		}
 		return agentResult(target, status)
+	})
+
+	// Interrupt reads the state to pick its key: the pane is mid-turn until
+	// the interrupt lands.
+	s.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		mu.Lock()
+		keyed := ctrlCCalls > 0
+		mu.Unlock()
+		if !keyed {
+			return agentResult(argv[2], "working")
+		}
+		status, err := compact.Status()
+		if err != nil {
+			return nil, herdrfake.Identities{}, err
+		}
+		return agentResult(argv[2], status)
 	})
 
 	s.Register("agent", "read", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {

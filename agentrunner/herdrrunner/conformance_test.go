@@ -71,13 +71,17 @@ func TestConformance(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				return strings.Join(got, "\n")
-			},
-			Skip: map[string]string{
-				"InterruptBusyCtrlC":        "herdr Interrupt key rule: ticket 10",
-				"InterruptBlockedEsc":       "herdr Interrupt key rule: ticket 10",
-				"InterruptIdleSendsNothing": "herdr Interrupt key rule: ticket 10",
-				"InterruptNotIdleNotReady":  "herdr Interrupt key rule: ticket 10",
+				keys, err := state.Keys(s.Label)
+				if err != nil {
+					t.Fatal(err)
+				}
+				// Keys follow the prompts, as the pty harness reports raw input.
+				raw := map[string]string{"ctrl+c": "\x03", "esc": "\x1b", "ctrl+u": "\x15"}
+				out := strings.Join(got, "\n")
+				for _, k := range keys {
+					out += raw[k]
+				}
+				return out
 			},
 			FastTurn: func(t *testing.T, s agentrunner.Session) {
 				if err := state.FastTurn(s.Label); err != nil {

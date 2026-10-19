@@ -556,6 +556,10 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 
 		case "agent send-keys":
 			pane := argv[2]
+			if pane == pane01 && argv[3] == "ctrl+c" {
+				// The pane goes idle, which Interrupt waits for.
+				contextPhase = "idle"
+			}
 			mu.Lock()
 			cur, sess := status[pane], session[pane]
 			mu.Unlock()

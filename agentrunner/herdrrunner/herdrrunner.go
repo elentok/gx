@@ -314,8 +314,53 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	}
 }
 
+// Interrupt picks its key by herdr's state, read right before the key: Ctrl+C
+// when working, Esc when blocked (it denies the dialog), nothing otherwise
+// (including a state gx doesn't know). After a key it waits up to N for idle or
+// done, then presses Ctrl+U: claude restores the cancelled prompt into the
+// input line, and it would prefix the next prompt. Codex's Ctrl+U clears one
+// line only.
 func (r *Runner) Interrupt(s agentrunner.Session) error {
-	return mapNotFound(herdr.AgentSendKeys(s.ID, "ctrl+c"))
+	agent, err := herdr.AgentGet(s.ID)
+	if err != nil {
+		return mapNotFound(err)
+	}
+	var key string
+	switch agentrunner.State(agent.AgentStatus) {
+	case agentrunner.StateWorking:
+		key = "ctrl+c"
+	case agentrunner.StateBlocked:
+		key = "esc"
+	default:
+		return nil
+	}
+	if err := herdr.AgentSendKeys(s.ID, key); err != nil {
+		return mapNotFound(err)
+	}
+	if err := r.awaitIdle(s); err != nil {
+		return err
+	}
+	return mapNotFound(herdr.AgentSendKeys(s.ID, "ctrl+u"))
+}
+
+// awaitIdle waits up to N for herdr to show the agent idle or done.
+func (r *Runner) awaitIdle(s agentrunner.Session) error {
+	now, sleep := r.clock()
+	deadline := now().Add(r.WaitN())
+	for {
+		remaining := deadline.Sub(now())
+		_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: []string{"idle", "done"}, TimeoutMs: max(1, int(remaining.Milliseconds()))})
+		if err == nil {
+			return nil
+		}
+		if !IsPollTimeout(err) {
+			return mapNotFound(err)
+		}
+		if !now().Before(deadline) {
+			return fmt.Errorf("%w: not idle after %s", agentrunner.ErrNotReady, r.WaitN())
+		}
+		sleep(min(pollInterval, deadline.Sub(now())))
+	}
 }
 
 func (r *Runner) Stop(s agentrunner.Session) error {

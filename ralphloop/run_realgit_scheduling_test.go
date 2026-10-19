@@ -266,7 +266,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 
 		case "agent send-keys":
 			pane, key := argv[2], argv[3]
-			if pane == "pane-"+iterLabel(epicName, "03") {
+			// Interrupt follows its Ctrl+C with Ctrl+U to clear the input line.
+			if pane == "pane-"+iterLabel(epicName, "03") && key == "ctrl+c" {
 				mu.Lock()
 				ctrlCCalls++
 				mu.Unlock()
@@ -654,6 +655,11 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 		case "implementing":
 			assertClaimed("smart-zone breach")
+			// The interrupt's own wait for the pane to go idle (a finish poll
+			// also waits for blocked).
+			if ctrlCCalls > 0 && !slices.Contains(until, "blocked") {
+				return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
+			}
 			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
 		case "compact-blocked":
 			assertClaimed("compact start confirmation")
