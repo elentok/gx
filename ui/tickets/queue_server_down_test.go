@@ -162,10 +162,15 @@ func TestQueueFocusEpic_SelectsTheEpicHeaderOnceItsRowsArrive(t *testing.T) {
 		t.Fatal("the request must wait while the epic has no rows")
 	}
 
-	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	tickets := []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 		{Address: "gx:beta/01", Title: "Second", Status: "open"},
-	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:beta/01"}})
+	}
+	st := applySnapshot(viewmodel.State{}, server.Snapshot{
+		Seq:     1,
+		Tickets: tickets,
+		Epics:   fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: tickets}, viewmodel.Scope{}), nil),
+	}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:beta/01"}})
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 	m = next.(QueueModel)
 
