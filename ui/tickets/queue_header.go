@@ -7,7 +7,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -54,11 +53,15 @@ var (
 	epicStatusParkedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
+// parkedWaitingMax caps how many waiting ids the parked status text names
+// before collapsing the rest into "+N more".
+const parkedWaitingMax = 3
+
 // epicStatusLine picks an epic header's status-line icon, text, and color.
 // Precedence: done (green) > parked > needs attention (yellow) > implementing
 // (spinnerGlyph, no color) > queued (no color). running is whether the server
 // reports the epic running.
-func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.StalledTicket, running bool, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
+func epicStatusLine(icons ui.IconSet, epic tickets.Epic, running bool, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
 	if epic.AllDone() {
 		text := "took " + formatElapsed(epicElapsedSeconds(epic))
 		if dur, ok := epic.CompletionDuration(); ok {
@@ -66,8 +69,8 @@ func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.Stal
 		}
 		return icons.TicketDone, text, epicStatusDoneStyle
 	}
-	if waiting, parkedStyle := parkedWaitingAndStyle(epic, parked); len(waiting) > 0 {
-		return icons.Warning, fmt.Sprintf("%d parked — %s", len(waiting), parkedStallText(waiting)), parkedStyle
+	if text, parkedStyle, ok := parkedStatus(epic); ok {
+		return icons.Warning, text, parkedStyle
 	}
 	switch {
 	case epicHasProblem(epic):
@@ -83,61 +86,44 @@ func epicStatusLine(icons ui.IconSet, epic tickets.Epic, parked []ralphloop.Stal
 // running state and current spinner frame filled in.
 func (m QueueModel) epicStatus(epic tickets.Epic) (icon, text string, style lipgloss.Style) {
 	glyph := strings.TrimRight(m.implementSpinner.View(), " ")
-	return epicStatusLine(m.icons(), epic, nil, m.runningEpics[epic.Name], glyph)
+	return epicStatusLine(m.icons(), epic, m.runningEpics[epic.Name], glyph)
 }
 
-// parkedWaitingAndStyle filters parked down to the tickets a human still
-// needs to act on and picks the colour for them: draft tickets are excluded
-// (they're parked for scheduling — see StatusDraft — not waiting on a
-// person, which is what this count is for), and the style is red if any
-// remaining ticket is needs-repair, orange otherwise.
-func parkedWaitingAndStyle(epic tickets.Epic, parked []ralphloop.StalledTicket) (waiting []ralphloop.StalledTicket, style lipgloss.Style) {
-	anyRepair := false
-	for _, s := range parked {
-		status, ok := epicTicketStatus(epic, s.Identifier)
-		if ok && status == tickets.StatusDraft {
-			continue
-		}
-		waiting = append(waiting, s)
-		if status == tickets.StatusNeedsRepair {
-			anyRepair = true
-		}
-	}
-	if anyRepair {
-		return waiting, epicStatusParkedRepairStyle
-	}
-	return waiting, epicStatusParkedAnswerStyle
-}
-
-// epicTicketStatus looks up identifier's rendered status within epic. ok is
-// false when identifier isn't one of the epic's own tickets, in which case
-// the caller treats it as non-draft so it still counts.
-func epicTicketStatus(epic tickets.Epic, identifier string) (status tickets.RenderedStatus, ok bool) {
+// parkedStatus derives the parked state client-side, mirroring the server's
+// all-parked deadlock check (server/deadlock.go): nothing renders open or
+// claimed, and some ticket is needs-answer, needs-repair, error or draft.
+// Drafts keep the epic parked but are never listed as waiting; red when any
+// listed ticket is needs-repair or error, orange otherwise.
+func parkedStatus(epic tickets.Epic) (text string, style lipgloss.Style, ok bool) {
+	var waiting []string
+	anyFault, anyDraft := false, false
 	for _, t := range epic.Tickets {
-		if t.Identifier == identifier {
-			return epic.RenderedStatus(t), true
+		switch epic.RenderedStatus(t) {
+		case tickets.StatusOpen, tickets.StatusClaimed:
+			return "", style, false
+		case tickets.StatusNeedsAnswer:
+			waiting = append(waiting, t.Identifier)
+		case tickets.StatusNeedsRepair, tickets.StatusError:
+			waiting = append(waiting, t.Identifier)
+			anyFault = true
+		case tickets.StatusDraft:
+			anyDraft = true
 		}
 	}
-	return 0, false
-}
-
-// parkedStallText renders a parked epic's stall reason for the header status
-// line: "waiting on <id>[, <id>...]", with "(reattachable)" appended per
-// ticket for the ones whose prior iteration still owns a live herdr
-// tab/agent (StalledTicket.Reattachable — see resumeReattachable) — the "jump
-// to pane" acceptance criterion resolved as informational rendering, not a
-// new navigation action, since no jump-to-pane affordance exists anywhere in
-// this UI today (see ticket 11a4's "Open question").
-func parkedStallText(stalled []ralphloop.StalledTicket) string {
-	names := make([]string, len(stalled))
-	for i, s := range stalled {
-		name := s.Identifier
-		if s.Reattachable {
-			name += " (reattachable)"
-		}
-		names[i] = name
+	switch {
+	case len(waiting) == 0 && !anyDraft:
+		return "", style, false
+	case len(waiting) == 0:
+		return "parked — only drafts left", epicStatusParkedAnswerStyle, true
 	}
-	return "waiting on " + strings.Join(names, ", ")
+	text = "parked — waiting on " + strings.Join(waiting[:min(len(waiting), parkedWaitingMax)], ", ")
+	if extra := len(waiting) - parkedWaitingMax; extra > 0 {
+		text += fmt.Sprintf(" +%d more", extra)
+	}
+	if anyFault {
+		return text, epicStatusParkedRepairStyle, true
+	}
+	return text, epicStatusParkedAnswerStyle, true
 }
 
 // epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the
