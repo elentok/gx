@@ -39,7 +39,7 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
 			},
 			wantAgentArgs: func(string) []string {
-				return []string{"--permission-mode", "auto", "--model", "sonnet", "--effort", "medium"}
+				return []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet", "--effort", "medium"}
 			},
 		},
 		{

@@ -189,6 +189,11 @@ func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
 	return fmt.Sprintf("%s%s %s", prefix, skill, ticketAddr)
 }
 
+// claudeGuardSettings adds a PreToolUse hook that rejects shell file edits
+// (sed -i, heredoc writes), which agents keep using despite the gx-implement
+// skill forbidding them. See `gx agent guard-bash`.
+const claudeGuardSettings = `{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"gx agent guard-bash"}]}]}}`
+
 func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []string {
 	if agent == AgentCodex {
 		args := []string{
@@ -207,7 +212,7 @@ func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []st
 		}
 		return args
 	}
-	args := []string{"--permission-mode", "auto"}
+	args := []string{"--permission-mode", "auto", "--settings", claudeGuardSettings}
 	if model != "" {
 		args = append(args, "--model", model)
 	}

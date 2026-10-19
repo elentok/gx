@@ -372,7 +372,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 		{
 			name:       "claude default",
 			wantKind:   "claude",
-			wantArgs:   []string{"--permission-mode", "auto"},
+			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings},
 			wantPrefix: "/implement ",
 		},
 		{
@@ -389,7 +389,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
 			},
 			wantKind:   "claude",
-			wantArgs:   []string{"--permission-mode", "auto", "--model", "sonnet", "--effort", "medium"},
+			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet", "--effort", "medium"},
 			wantPrefix: "/implement ",
 		},
 		{
@@ -472,26 +472,26 @@ func TestAgentArgs_ModelAndEffort(t *testing.T) {
 		{
 			name:  "claude both empty unchanged",
 			agent: AgentClaude,
-			want:  []string{"--permission-mode", "auto"},
+			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings},
 		},
 		{
 			name:   "claude both set",
 			agent:  AgentClaude,
 			model:  "sonnet",
 			effort: "medium",
-			want:   []string{"--permission-mode", "auto", "--model", "sonnet", "--effort", "medium"},
+			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet", "--effort", "medium"},
 		},
 		{
 			name:  "claude model only",
 			agent: AgentClaude,
 			model: "sonnet",
-			want:  []string{"--permission-mode", "auto", "--model", "sonnet"},
+			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet"},
 		},
 		{
 			name:   "claude effort only",
 			agent:  AgentClaude,
 			effort: "medium",
-			want:   []string{"--permission-mode", "auto", "--effort", "medium"},
+			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--effort", "medium"},
 		},
 		{
 			name:  "codex both empty unchanged",

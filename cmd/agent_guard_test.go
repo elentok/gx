@@ -1,0 +1,74 @@
+package cmd
+
+import (
+	"bytes"
+	"errors"
+	"strings"
+	"testing"
+)
+
+func TestGuardBashCommand(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		command string
+		blocked bool
+	}{
+		{"sed -i", `sed -i 's/a/b/' queue.go`, true},
+		{"rtk sed -i", `rtk sed -i 's/a/b/' queue.go`, true},
+		{"sed -i -E", `sed -i -E 's/a/b/' x_test.go`, true},
+		{"sed -Ei", `sed -Ei 's/a/b/' x_test.go`, true},
+		{"sed --in-place", `sed --in-place 's/a/b/' x.go`, true},
+		{"cat append heredoc", "cat >> a_test.go <<'EOF'\nfunc T() {}\nEOF", true},
+		{"cat overwrite heredoc", "cat > a.go <<EOF\npackage a\nEOF", true},
+		{"python heredoc", "python3 - <<'PY'\nprint(1)\nPY", true},
+		{"sed print", `sed -n '1,5p' queue.go`, false},
+		{"sed pipe", `echo a | sed 's/a/b/'`, false},
+		{"plain redirect", `echo hi > out.txt`, false},
+		{"heredoc to stdin", "gx tickets section 1/2 Notes - <<'EOF'\nbody\nEOF", false},
+		{"heredoc with stderr merge", "rtk git commit -F - <<'EOF' 2>&1\nmsg\nEOF", false},
+		{"heredoc with dev null", "rtk git commit -F - <<'EOF' >/dev/null\nmsg\nEOF", false},
+		{"git status", `rtk git status`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := guardBashCommand(tc.command)
+			if (got != "") != tc.blocked {
+				t.Errorf("guardBashCommand(%q) = %q, blocked want %v", tc.command, got, tc.blocked)
+			}
+			if tc.blocked && !strings.Contains(got, "Edit or Write") {
+				t.Errorf("reason %q does not name Edit/Write", got)
+			}
+		})
+	}
+}
+
+func TestAgentGuardBash_ExitCodes(t *testing.T) {
+	t.Parallel()
+	run := func(stdin string) (string, error) {
+		c := newAgentGuardBashCmd()
+		var stderr bytes.Buffer
+		c.SetIn(strings.NewReader(stdin))
+		c.SetErr(&stderr)
+		err := c.Execute()
+		return stderr.String(), err
+	}
+
+	stderr, err := run(`{"tool_input":{"command":"sed -i s/a/b/ x.go"}}`)
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != guardBashExitCode {
+		t.Fatalf("err = %v, want ExitError{%d}", err, guardBashExitCode)
+	}
+	if !strings.Contains(stderr, "Edit or Write") {
+		t.Errorf("stderr = %q, want a reason naming Edit/Write", stderr)
+	}
+
+	for name, in := range map[string]string{
+		"allowed command": `{"tool_input":{"command":"rtk git status"}}`,
+		"unreadable json": `not json`,
+	} {
+		if _, err := run(in); err != nil {
+			t.Errorf("%s: err = %v, want nil", name, err)
+		}
+	}
+}
