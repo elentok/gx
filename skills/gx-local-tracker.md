@@ -149,7 +149,8 @@ conversation history.
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
   the stub straight to `<id>-<slug>.md`. The epic argument may be `project:epic`. Filing into a
   `follow-ups` epic with a plain `add` and no `category` refuses; use `follow-up add` instead.
-- **File a follow-up**: `gx tickets follow-up add <project:epic> --body -`. Skills never call it
+- **File a follow-up**: `gx tickets follow-up add <project:epic> --category bug|idea --body -`
+  (or `category:` in the body frontmatter, never both). Skills never call it
   directly: they file through the [gx-follow-up](gx-follow-up/SKILL.md) skill, which calls this
   verb. See "Follow-ups".
 - **Move a ticket**: `gx tickets move <addr> <epic> [--slug s] [--dry-run] [--json]` — moves one

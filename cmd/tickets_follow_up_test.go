@@ -52,6 +52,33 @@ func TestExecute_TicketsFollowUpAdd_FilesDraftResearch(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsFollowUpAdd_CategoryFlag(t *testing.T) {
+	repo, project := setupShowProject(t)
+
+	out, err := runIn(t, repo, "tickets", "follow-up", "add", "mine:follow-ups", "--category", "idea", "--body", followUpSections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk, err := schema.ParseTicket(addedPath(t, filepath.Join(project, "follow-ups"), out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Category != schema.CategoryIdea {
+		t.Errorf("category = %s, want idea", tk.Category)
+	}
+
+	both := "---\ncategory: idea\n---\n\n" + followUpSections
+	_, err = runIn(t, repo, "tickets", "follow-up", "add", "mine:follow-ups", "--category", "idea", "--body", both)
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeCategoryConflict {
+		t.Fatalf("err = %v, want code %s", err, tickets.CodeCategoryConflict)
+	}
+
+	if _, err = runIn(t, repo, "tickets", "follow-up", "add", "mine:follow-ups", "--category", "nope", "--body", followUpSections); err == nil {
+		t.Error("invalid --category was accepted")
+	}
+}
+
 func TestExecute_TicketsFollowUpAdd_Refusals(t *testing.T) {
 	repo, project := setupShowProject(t)
 	epic := filepath.Join(project, "follow-ups")

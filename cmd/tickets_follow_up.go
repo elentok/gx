@@ -17,7 +17,7 @@ import (
 // files one writes the same shape. The ticket is always draft + research; a
 // body asking for anything else is refused. Every check runs before anything
 // is written.
-func runTicketsFollowUpAdd(epicPath, body string, jsonOut bool, w io.Writer) error {
+func runTicketsFollowUpAdd(epicPath, body, category string, jsonOut bool, w io.Writer) error {
 	if filepath.Base(filepath.Clean(epicPath)) != followUpsEpic {
 		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + followUpsEpic + " epic, not " + filepath.Base(epicPath)}
 	}
@@ -42,6 +42,15 @@ func runTicketsFollowUpAdd(epicPath, body string, jsonOut bool, w io.Writer) err
 	fm, text, err := bodyFrontmatter(body)
 	if err != nil {
 		return err
+	}
+	if category != "" {
+		if fm.Category != "" {
+			return &tickets.AddressError{Code: tickets.CodeCategoryConflict, Msg: "category is set by both --category and the body frontmatter; use one"}
+		}
+		if !schema.Category(category).Valid() {
+			return fmt.Errorf("invalid category %q, want bug or idea", category)
+		}
+		fm.Category = category
 	}
 	if fm.Category == "" {
 		return &tickets.AddressError{Code: tickets.CodeCategoryRequired, Msg: "a follow-up needs a category (bug or idea)"}

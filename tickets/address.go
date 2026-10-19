@@ -16,6 +16,7 @@ const (
 	CodeUnknownEpic      = "unknown-epic"
 	CodeUnknownTicket    = "unknown-ticket"
 	CodeCategoryRequired = "category-required"
+	CodeCategoryConflict = "category-conflict"
 	CodeNotFollowUpsEpic = "not-follow-ups-epic"
 	CodeSectionRequired  = "section-required"
 	CodeStatusOverride   = "status-override"
