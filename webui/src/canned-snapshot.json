@@ -32,7 +32,7 @@
   "sessions": [],
   "epics": [
     {
-      "address": "gx:demo/await",
+      "address": "gx:await",
       "name": "await",
       "project": "gx",
       "state": "awaiting-merge",
@@ -42,7 +42,7 @@
       "parked": []
     },
     {
-      "address": "gx:demo/wait",
+      "address": "gx:wait",
       "name": "wait",
       "project": "gx",
       "state": "waiting",
@@ -51,16 +51,16 @@
       "active": [],
       "parked": [
         {
-          "address": "gx:demo/wait/03",
+          "address": "gx:wait/03",
           "title": "Stuck one",
-          "status": "open",
-          "recovery": "needs-answer",
+          "status": "needs-answer",
+          "recovery": "pending",
           "reason": "needs a person"
         }
       ]
     },
     {
-      "address": "gx:demo/run",
+      "address": "gx:run",
       "name": "run",
       "project": "gx",
       "state": "running",
@@ -68,7 +68,7 @@
       "total": 5,
       "active": [
         {
-          "address": "gx:demo/run/03",
+          "address": "gx:run/03",
           "title": "Active one",
           "status": "claimed",
           "claimed_at": "2026-10-19T08:00:00Z"
@@ -76,14 +76,14 @@
       ],
       "parked": [
         {
-          "address": "gx:demo/run/04",
+          "address": "gx:run/04",
           "title": "Parked one",
-          "status": "open"
+          "status": "needs-repair"
         }
       ]
     },
     {
-      "address": "gx:demo/dead",
+      "address": "gx:dead",
       "name": "dead",
       "project": "gx",
       "state": "deadlocked",
@@ -94,7 +94,7 @@
       "reason": "blocked cycle"
     },
     {
-      "address": "gx:demo/park",
+      "address": "gx:park",
       "name": "park",
       "project": "gx",
       "state": "parked",
@@ -103,14 +103,14 @@
       "active": [],
       "parked": [
         {
-          "address": "gx:demo/park/01",
+          "address": "gx:park/01",
           "title": "Parked only",
-          "status": "open"
+          "status": "needs-answer"
         }
       ]
     },
     {
-      "address": "gx:demo/run2",
+      "address": "gx:run2",
       "name": "run2",
       "project": "gx",
       "state": "running",
@@ -118,7 +118,7 @@
       "total": 1,
       "active": [
         {
-          "address": "gx:demo/run2/01",
+          "address": "gx:run2/01",
           "title": "Second active",
           "status": "claimed",
           "claimed_at": "2026-10-19T08:00:00Z"
@@ -129,7 +129,7 @@
   ],
   "recently_finished": [
     {
-      "address": "gx:demo/old",
+      "address": "gx:old",
       "name": "old",
       "project": "gx",
       "done": 4,

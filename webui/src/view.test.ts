@@ -30,17 +30,17 @@ describe("snapshotView", () => {
 
   it("lists active tickets before parked ones, and only Parked for Waiting", () => {
     expect(byName("run").tickets.map((t) => [t.address, t.tone])).toEqual([
-      ["gx:demo/run/03", "muted"],
-      ["gx:demo/run/04", "parked"],
+      ["gx:run/03", "muted"],
+      ["gx:run/04", "parked"],
     ]);
     expect(byName("wait").tickets.map((t) => [t.address, t.tone, t.detail])).toEqual([
-      ["gx:demo/wait/03", "parked", "needs a person"],
+      ["gx:wait/03", "parked", "needs a person"],
     ]);
   });
 
   it("formats recently finished rows", () => {
     expect(view().recentlyFinished).toEqual([
-      { address: "gx:demo/old", name: "old", project: "gx", done: 4, total: 4, finished: "finished 2h ago" },
+      { address: "gx:old", name: "old", project: "gx", done: 4, total: 4, finished: "finished 2h ago" },
     ]);
   });
 });
