@@ -20,6 +20,11 @@ const (
 // to headless.
 const HerdrPingTimeout = 2 * time.Second
 
+// DefaultN is the runner wait N when the config does not set one. It bounds
+// the busy guard's wait, the `/` rule's idle-after-N, Interrupt's wait for idle
+// and herdr's deny wait.
+const DefaultN = 5 * time.Second
+
 // Probe is what Select needs to know about the machine.
 type Probe struct {
 	LookPath func(file string) (string, error)

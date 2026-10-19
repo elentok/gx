@@ -927,6 +927,29 @@ func TestInitFailsIfConfigExists(t *testing.T) {
 	}
 }
 
+func TestParseRunnerWait(t *testing.T) {
+	for name, tc := range map[string]struct {
+		json string
+		want time.Duration
+	}{
+		"default":    {`{}`, 5 * time.Second},
+		"overridden": {`{"runner-wait":"12s"}`, 12 * time.Second},
+		"unparsable": {`{"runner-wait":"soon"}`, 5 * time.Second},
+		"zero":       {`{"runner-wait":"0s"}`, 5 * time.Second},
+		"negative":   {`{"runner-wait":"-3s"}`, 5 * time.Second},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := Parse([]byte(tc.json))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if cfg.RunnerWait != tc.want {
+				t.Fatalf("RunnerWait = %s, want %s", cfg.RunnerWait, tc.want)
+			}
+		})
+	}
+}
+
 func TestLoadExecutionQueueSpinKeys(t *testing.T) {
 	for name, tc := range map[string]struct {
 		json       string

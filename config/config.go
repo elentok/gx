@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/agentrunner"
 )
 
 // UserConfigDir hardcodes ~/.config as gx's config base directory on every
@@ -68,6 +70,9 @@ type Config struct {
 	// AgentRunner is auto, herdr, headless or pty. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
 	AgentRunner string `json:"agent-runner"`
+	// RunnerWait is N, the wait every runner bounds its guards by. Read from
+	// the "runner-wait" key as a Go duration string.
+	RunnerWait time.Duration `json:"-"`
 	// Evolve is off, maintainer or contributor. Unlike agent-runner it is
 	// validated in Load: a guessed mode would file findings to the wrong place.
 	Evolve string `json:"evolve"`
@@ -126,9 +131,20 @@ func Default() Config {
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		AgentRunner:           "auto",
+		RunnerWait:            agentrunner.DefaultN,
 		Evolve:                EvolveOff,
 		EvolveDeepReadCap:     DefaultEvolveDeepReadCap,
 	}
+}
+
+// LoadRunnerWait is N from the config file, or the default when the file is
+// missing or unreadable. For runners built where no loaded Config is at hand.
+func LoadRunnerWait() time.Duration {
+	cfg, _ := Load()
+	if cfg.RunnerWait <= 0 {
+		return agentrunner.DefaultN
+	}
+	return cfg.RunnerWait
 }
 
 // FilePath returns the config file path, typically ~/.config/gx/config.json.
@@ -234,6 +250,7 @@ func Parse(data []byte) (Config, error) {
 			WatchConfig  *bool    `json:"watch-config"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
+		RunnerWait        *string `json:"runner-wait"`
 		Evolve            *string `json:"evolve"`
 		EvolveDeepReadCap *int    `json:"evolve.deep-read-cap"`
 		Recovery          *struct {
@@ -392,6 +409,11 @@ func Parse(data []byte) (Config, error) {
 	}
 	if raw.AgentRunner != nil {
 		cfg.AgentRunner = *raw.AgentRunner
+	}
+	if raw.RunnerWait != nil {
+		if d, err := time.ParseDuration(*raw.RunnerWait); err == nil && d > 0 {
+			cfg.RunnerWait = d
+		}
 	}
 	if raw.Evolve != nil {
 		if !validEvolveMode(*raw.Evolve) {

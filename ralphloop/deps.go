@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/transcript"
 )
@@ -193,6 +194,7 @@ type DepsOverrides struct {
 // in-process env reads described on DepsOverrides.
 func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 	runner := herdrrunner.New()
+	runner.N = config.LoadRunnerWait()
 	runner.CodexQuota = codexHomeFn(overrides.CodexHome,
 		codexsession.LastRateLimit,
 		func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {

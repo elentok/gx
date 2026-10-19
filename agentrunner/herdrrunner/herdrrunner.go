@@ -38,6 +38,8 @@ type Runner struct {
 	// herdrfake swap in its virtual one (Coordinator.Clock).
 	Now   func() time.Time
 	Sleep func(time.Duration)
+	// N is the configured runner wait; zero means agentrunner.DefaultN.
+	N time.Duration
 
 	mu sync.Mutex
 	// started remembers what RateLimit needs from Start, keyed by label.
@@ -56,6 +58,14 @@ func New() *Runner {
 		r.BackgroundTasks = claudeui.BackgroundTasks(home, time.Now)
 	}
 	return r
+}
+
+// WaitN is N, the configured runner wait.
+func (r *Runner) WaitN() time.Duration {
+	if r.N <= 0 {
+		return agentrunner.DefaultN
+	}
+	return r.N
 }
 
 func (r *Runner) Healthy() error { return herdr.Ping() }

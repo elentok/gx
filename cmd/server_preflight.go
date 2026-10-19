@@ -60,7 +60,7 @@ const fallbackProject = "_default"
 // its agent dirs are per project; runnerFor is nil for a runner it cannot build.
 // The returned runner answers host health and projects runnerFor never sees, so
 // it is built for a fallback project.
-func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
+func serverRunner(c agentrunner.Choice, stateDir string, n time.Duration) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
 	type pair struct{ runner, project string }
 	var mu sync.Mutex
 	built := map[pair]agentrunner.Runner{}
@@ -74,11 +74,13 @@ func serverRunner(c agentrunner.Choice, stateDir string) (r agentrunner.Runner, 
 		var r agentrunner.Runner
 		switch agentrunner.Choice(runner) {
 		case agentrunner.ChoiceHerdr:
-			r = herdrrunner.New()
+			h := herdrrunner.New()
+			h.N = n
+			r = h
 		case agentrunner.ChoiceHeadless:
-			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project)}
+			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
 		case agentrunner.ChoicePTY:
-			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project)}
+			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
 		default:
 			return nil
 		}

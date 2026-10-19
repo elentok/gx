@@ -46,6 +46,8 @@ type Headless struct {
 	PromptTimeout time.Duration
 	// Procs checks agent liveness on reattach; defaults to ps.
 	Procs ProcessTable
+	// N is the configured runner wait; zero means agentrunner.DefaultN.
+	N time.Duration
 
 	mu       sync.Mutex
 	sessions map[string]*headlessSession
@@ -54,6 +56,14 @@ type Headless struct {
 }
 
 var _ agentrunner.Runner = (*Headless)(nil)
+
+// WaitN is N, the configured runner wait.
+func (h *Headless) WaitN() time.Duration {
+	if h.N <= 0 {
+		return agentrunner.DefaultN
+	}
+	return h.N
+}
 
 type headlessSession struct {
 	session agentrunner.Session

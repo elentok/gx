@@ -47,6 +47,8 @@ type Pty struct {
 	// BackgroundTasks reports whether the claude behind s still runs a
 	// background task; defaults to reading its transcript under $HOME.
 	BackgroundTasks func(s agentrunner.Session) bool
+	// N is the configured runner wait; zero means agentrunner.DefaultN.
+	N time.Duration
 
 	mu       sync.Mutex
 	sessions map[string]*ptySession
@@ -766,6 +768,14 @@ func (p *Pty) pollInterval() time.Duration {
 		return 100 * time.Millisecond
 	}
 	return p.PollInterval
+}
+
+// WaitN is N, the configured runner wait.
+func (p *Pty) WaitN() time.Duration {
+	if p.N <= 0 {
+		return agentrunner.DefaultN
+	}
+	return p.N
 }
 
 func (p *Pty) promptGrace() time.Duration {

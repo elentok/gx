@@ -294,7 +294,9 @@ type Server struct {
 // It does not serve until Serve is called.
 func New(cfg Config) (*Server, error) {
 	if cfg.Runner == nil {
-		cfg.Runner = herdrrunner.New()
+		h := herdrrunner.New()
+		h.N = config.LoadRunnerWait()
+		cfg.Runner = h
 	}
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()

@@ -252,6 +252,11 @@
       "default": "auto",
       "description": "How the server runs agents. auto uses herdr when it answers within 2s, else headless. herdr requires herdr to be up; headless requires claude on PATH. Checked when the server starts. Default: auto."
     },
+    "runner-wait": {
+      "type": "string",
+      "default": "5s",
+      "description": "Go duration string (e.g. \"10s\") for N, the wait every agent runner bounds its guards by. Unparsable or non-positive values keep the default. Read when the server starts. Default: \"5s\"."
+    },
     "evolve": {
       "type": "string",
       "enum": ["off", "maintainer", "contributor"],
