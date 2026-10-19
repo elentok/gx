@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -38,6 +39,7 @@ type sidebarSection int
 
 const (
 	sectionOpen sidebarSection = iota
+	sectionMapsInProgress
 	sectionOpenMaps
 	sectionComplete
 	sectionMerged
@@ -61,6 +63,8 @@ func epicSection(epic tickets.Epic) sidebarSection {
 	switch {
 	case epic.IsMap && epic.AllDone():
 		return sectionCompleteMaps
+	case epic.IsMap && hasDoneTicket(epic):
+		return sectionMapsInProgress
 	case epic.IsMap:
 		return sectionOpenMaps
 	case !epic.AllDone():
@@ -70,6 +74,14 @@ func epicSection(epic tickets.Epic) sidebarSection {
 	default:
 		return sectionComplete
 	}
+}
+
+// hasDoneTicket reports whether any ticket renders as done. Cancelled and
+// waiting-for-children tickets don't count.
+func hasDoneTicket(epic tickets.Epic) bool {
+	return slices.ContainsFunc(epic.Tickets, func(t tickets.Ticket) bool {
+		return epic.RenderedStatus(t) == tickets.StatusDone
+	})
 }
 
 // groupEpicIndexesBySection buckets m.epics' indexes by epicSection,
@@ -362,6 +374,8 @@ func sidebarSectionID(section sidebarSection) string {
 	switch section {
 	case sectionOpen:
 		return "section:open"
+	case sectionMapsInProgress:
+		return "section:maps-in-progress"
 	case sectionOpenMaps:
 		return "section:open-maps"
 	case sectionComplete:

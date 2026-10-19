@@ -118,6 +118,8 @@ func sectionLabel(section sidebarSection) string {
 	switch section {
 	case sectionOpen:
 		return "Open epics"
+	case sectionMapsInProgress:
+		return "Maps in progress"
 	case sectionOpenMaps:
 		return "Open maps"
 	case sectionComplete:
