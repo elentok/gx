@@ -423,6 +423,12 @@ func (t *tui) handleControl(c Control) error {
 		return nil
 	case ActionBackground:
 		return t.writeBackgroundMarker(c.Running)
+	case ActionReport:
+		writeReport(t.out, c.State, c.Kind, c.Message)
+		return nil
+	case ActionConversation:
+		t.pid.SessionID = c.ConversationID
+		return t.writePid()
 	default:
 		return fmt.Errorf("unknown control action %q", c.Action)
 	}

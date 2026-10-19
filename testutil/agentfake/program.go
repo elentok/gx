@@ -220,6 +220,10 @@ func (p *program) control(c Control) error {
 }
 
 func (p *program) report(state, kind, msg string) {
+	writeReport(p.out, state, kind, msg)
+}
+
+func writeReport(out io.Writer, state, kind, msg string) {
 	s := "\x1b]7501;state=" + state + ":app=agentfake"
 	if kind != "" {
 		s += ":kind=" + kind
@@ -227,5 +231,5 @@ func (p *program) report(state, kind, msg string) {
 	if msg != "" {
 		s += ":msg=" + base64.StdEncoding.EncodeToString([]byte(msg))
 	}
-	fmt.Fprint(p.out, s+"\a")
+	fmt.Fprint(out, s+"\a")
 }

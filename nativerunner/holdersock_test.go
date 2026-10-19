@@ -100,6 +100,36 @@ func startDenyHolder(t *testing.T, tail string) *nativerunner.HolderClient {
 	return c
 }
 
+func TestHolderSocket_StatusCarriesOSCState(t *testing.T) {
+	c := startDenyHolder(t, `printf '\033]7501;state=working:app=claude\a'; cat >/dev/null`)
+	if !c.Supports(nativerunner.OpTurnOSC) {
+		t.Fatal("ping does not list the turn-osc marker")
+	}
+	// denyChild runs the tail after one key.
+	if err := c.SendKeys("x"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "status carries the OSC state", func() bool {
+		got, err := c.ProgramState()
+		return err == nil && got == "working"
+	})
+	if _, turn, _ := c.Status(); turn < 2 {
+		t.Errorf("turn = %d; want the pid status change and the OSC working both counted", turn)
+	}
+}
+
+func TestHolderSocket_OlderHolderLacksTurnMarker(t *testing.T) {
+	nativerunner.SetHolderOptionalOps(t, nil)
+	_, c, _ := startHolder(t, echoChild)
+	if c.Supports(nativerunner.OpTurnOSC) {
+		t.Error("an older holder lists turn-osc")
+	}
+	waitForScreen(t, c, "ready")
+	if _, _, err := c.Status(); err != nil {
+		t.Errorf("status on an older holder: %v", err)
+	}
+}
+
 func TestHolderSocket_DenyReason(t *testing.T) {
 	c := startDenyHolder(t, denyGoesIdle)
 

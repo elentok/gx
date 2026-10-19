@@ -72,6 +72,9 @@ type PidStatusWatcher interface {
 	// PidState returns the last status read, nil before the file first
 	// appears, and the turn count.
 	PidState() (*PidStatus, int)
+	// ProgramState is the last session-wide OSC 7501 state, "" before one or
+	// after clear.
+	ProgramState() string
 	// Hold freezes what PidState and Status report until Release.
 	Hold()
 	Release()

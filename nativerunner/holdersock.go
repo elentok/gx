@@ -44,8 +44,12 @@ const OpDenyReason = "deny-reason"
 // holder died.
 const OpWatch = "watch"
 
+// OpTurnOSC is a marker, not an op: the holder's Turn includes the OSC
+// working and sessionId bumps, and status carries the OSC state.
+const OpTurnOSC = "turn-osc"
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC}
 
 const (
 	holderIOTimeout = 5 * time.Second
@@ -77,6 +81,9 @@ type holderResponse struct {
 	// Claude is nil until claude's pid status file first appears.
 	Claude *PidStatus `json:"claude,omitempty"`
 	Turn   int        `json:"turn,omitempty"`
+	// Program is claude's last session-wide OSC 7501 state, empty before one
+	// and after clear.
+	Program string `json:"program,omitempty"`
 	// Exited is claude's exit code, reported by status once claude exits.
 	Exited *int `json:"exited,omitempty"`
 }
@@ -175,7 +182,7 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 			return holderResponse{}, nil
 		}
 		claude, turn := h.pid.PidState()
-		return holderResponse{Claude: claude, Turn: turn}, nil
+		return holderResponse{Claude: claude, Turn: turn, Program: h.pid.ProgramState()}, nil
 	case opScreen:
 		return holderResponse{Screen: h.scr.Rows(), Scrollback: h.scr.ScrollbackTail(req.Scrollback)}, nil
 	case opKeys:
@@ -384,6 +391,13 @@ func (c *HolderClient) Status() (*PidStatus, int, error) {
 		return nil, 0, &ClaudeExitedError{Code: *resp.Exited}
 	}
 	return resp.Claude, resp.Turn, err
+}
+
+// ProgramState returns the last session-wide OSC 7501 state the holder
+// stored. It is empty from a holder without OpTurnOSC.
+func (c *HolderClient) ProgramState() (string, error) {
+	resp, err := c.call(holderRequest{Op: opStatus})
+	return resp.Program, err
 }
 
 // Screen returns the visible screen rows and up to the last scrollback rows

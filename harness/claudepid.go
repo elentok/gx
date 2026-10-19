@@ -155,7 +155,9 @@ func (w *PidWatcher) poll() {
 	changed := !w.live.seen || s != w.live.last || f.SessionID != w.live.conversationID
 	// last starts as ClaudeStarting, so a first read past starting still
 	// counts the change a poll missed.
-	if s.Status != w.live.last.Status {
+	// A new sessionId (/clear) is a turn a poll could not otherwise see.
+	newSession := w.live.conversationID != "" && f.SessionID != w.live.conversationID
+	if s.Status != w.live.last.Status || newSession {
 		w.live.turn++
 		if s.Status == ClaudeBusy || s.Status == ClaudeShell {
 			w.live.rateLimit = nil
@@ -306,8 +308,19 @@ func (w *PidWatcher) Program(r ProgramReport) {
 		return
 	case "working":
 		w.live.rateLimit = nil
+		w.live.turn++
 	}
 	w.live.program = &r
+}
+
+// ProgramState is the last session-wide OSC 7501 state, "" before one or
+// after clear.
+func (w *PidWatcher) ProgramState() string {
+	st := w.state()
+	if st.program == nil {
+		return ""
+	}
+	return st.program.State
 }
 
 func programStatus(r *ProgramReport) (Status, bool) {

@@ -196,6 +196,17 @@ func TestTUIClaude_PidFileFollowsControls(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_EmitsOSCAndChangesSessionID(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+
+	f.control(Control{Action: ActionReport, State: "working"})
+	f.waitFor("the OSC report", func() bool { return strings.Contains(f.screen.String(), "\x1b]7501;state=working") })
+
+	f.control(Control{Action: ActionConversation, ConversationID: "sess-2"})
+	f.waitFor("the new sessionId", func() bool { return f.pidFile()["sessionId"] == "sess-2" })
+}
+
 func TestTUIClaude_StallLeavesPromptsUnstarted(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")

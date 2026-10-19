@@ -160,6 +160,60 @@ func TestPidWatcher_ProgramStatusOverPidFile(t *testing.T) {
 	}
 }
 
+func TestPidWatcher_TurnBumps(t *testing.T) {
+	dir := t.TempDir()
+	spawned := time.Now()
+	w := newPidWatcher(dir, 4242, spawned)
+	turn := func() int { _, n := w.PidState(); return n }
+	want := func(step string, n int) {
+		t.Helper()
+		if got := turn(); got != n {
+			t.Fatalf("%s: turn = %d, want %d", step, got, n)
+		}
+	}
+
+	writePidFile(t, dir, spawned, `,"status":"busy"`)
+	w.poll()
+	want("first status", 1)
+	feedOSC7501(w, "\x1b]7501;state=working:app=claude\a")
+	want("session-wide working", 2)
+	feedOSC7501(w, "\x1b]7501;state=working:app=claude:id=t1\a")
+	want("per-task working", 2)
+	feedOSC7501(w, "\x1b]7501;state=done:app=claude\a")
+	want("done", 2)
+	writePidFile(t, dir, spawned, `,"status":"waiting","waitingFor":"input needed"`)
+	w.poll()
+	want("waiting", 3)
+	data := fmt.Sprintf(`{"pid":4242,"sessionId":"conv-2","startedAt":%d,"status":"waiting","waitingFor":"input needed"}`, spawned.UnixMilli())
+	if err := os.WriteFile(filepath.Join(dir, "4242.json"), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	w.poll()
+	want("new sessionId", 4)
+	w.poll()
+	want("same sessionId", 4)
+}
+
+func TestPidWatcher_ProgramState(t *testing.T) {
+	w := newPidWatcher(t.TempDir(), 4242, time.Now())
+	if got := w.ProgramState(); got != "" {
+		t.Fatalf("before a report: %q", got)
+	}
+	feedOSC7501(w, "\x1b]7501;state=working:app=claude\a")
+	if got := w.ProgramState(); got != "working" {
+		t.Fatalf("after working: %q", got)
+	}
+	feedOSC7501(w, "\x1b]7501;state=working:app=claude:id=t1\a")
+	feedOSC7501(w, "\x1b]7501;state=idle:app=claude:id=t1\a")
+	if got := w.ProgramState(); got != "working" {
+		t.Fatalf("after a task report: %q", got)
+	}
+	feedOSC7501(w, "\x1b]7501;state=clear:app=claude\a")
+	if got := w.ProgramState(); got != "" {
+		t.Fatalf("after clear: %q", got)
+	}
+}
+
 func TestPidWatcher_ConversationIDFollowsPidFile(t *testing.T) {
 	dir := t.TempDir()
 	spawned := time.Now()
