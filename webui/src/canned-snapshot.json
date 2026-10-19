@@ -23,11 +23,118 @@
       "status": "open",
       "rendered_status": "blocked",
       "type": "implement",
-      "blocked_by": ["01"]
+      "blocked_by": [
+        "01"
+      ]
     }
   ],
   "pending": [],
   "sessions": [],
-  "epics": [],
-  "recently_finished": []
+  "epics": [
+    {
+      "address": "gx:demo/await",
+      "name": "await",
+      "project": "gx",
+      "state": "awaiting-merge",
+      "done": 3,
+      "total": 3,
+      "active": [],
+      "parked": []
+    },
+    {
+      "address": "gx:demo/wait",
+      "name": "wait",
+      "project": "gx",
+      "state": "waiting",
+      "done": 1,
+      "total": 4,
+      "active": [],
+      "parked": [
+        {
+          "address": "gx:demo/wait/03",
+          "title": "Stuck one",
+          "status": "open",
+          "recovery": "needs-answer",
+          "reason": "needs a person"
+        }
+      ]
+    },
+    {
+      "address": "gx:demo/run",
+      "name": "run",
+      "project": "gx",
+      "state": "running",
+      "done": 2,
+      "total": 5,
+      "active": [
+        {
+          "address": "gx:demo/run/03",
+          "title": "Active one",
+          "status": "claimed",
+          "claimed_at": "2026-10-19T08:00:00Z"
+        }
+      ],
+      "parked": [
+        {
+          "address": "gx:demo/run/04",
+          "title": "Parked one",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "address": "gx:demo/dead",
+      "name": "dead",
+      "project": "gx",
+      "state": "deadlocked",
+      "done": 0,
+      "total": 2,
+      "active": [],
+      "parked": [],
+      "reason": "blocked cycle"
+    },
+    {
+      "address": "gx:demo/park",
+      "name": "park",
+      "project": "gx",
+      "state": "parked",
+      "done": 0,
+      "total": 2,
+      "active": [],
+      "parked": [
+        {
+          "address": "gx:demo/park/01",
+          "title": "Parked only",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "address": "gx:demo/run2",
+      "name": "run2",
+      "project": "gx",
+      "state": "running",
+      "done": 0,
+      "total": 1,
+      "active": [
+        {
+          "address": "gx:demo/run2/01",
+          "title": "Second active",
+          "status": "claimed",
+          "claimed_at": "2026-10-19T08:00:00Z"
+        }
+      ],
+      "parked": []
+    }
+  ],
+  "recently_finished": [
+    {
+      "address": "gx:demo/old",
+      "name": "old",
+      "project": "gx",
+      "done": 4,
+      "total": 4,
+      "completed_at": "2026-10-19T10:00:00Z"
+    }
+  ]
 }

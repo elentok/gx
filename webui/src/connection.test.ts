@@ -23,7 +23,7 @@ function setup(opts: { snapshotFails?: () => boolean } = {}) {
     fetchSnapshot: async () => {
       log.push("snapshot");
       if (opts.snapshotFails?.()) throw new Error("down");
-      return { seq: ++seq, tickets: [] } as Snapshot;
+      return { seq: ++seq, tickets: [], epics: [], recently_finished: [] } satisfies Snapshot;
     },
     openStream: async (url, signal) => {
       log.push(`events ${url}`);
