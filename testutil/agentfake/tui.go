@@ -449,9 +449,18 @@ func (t *tui) interrupt() error {
 }
 
 // cancel is Ctrl+C: it ends a running turn and restores the cancelled prompt
-// into the input line, which Ctrl+U clears. A stalled fake ignores it.
+// into the input line. On an idle prompt it clears the whole input, as real
+// claude does. A stalled fake ignores it.
 func (t *tui) cancel() error {
-	if t.pid.Status != StatusBusy || t.stalled {
+	if t.stalled {
+		return nil
+	}
+	if t.pid.Status == StatusIdle {
+		t.typed.Reset()
+		t.draw()
+		return nil
+	}
+	if t.pid.Status != StatusBusy {
 		return nil
 	}
 	t.typed.Reset()

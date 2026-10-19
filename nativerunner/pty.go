@@ -707,9 +707,12 @@ func (pr *ptyPrompter) Screen() (string, error) {
 
 // Interrupt picks its key by state: Ctrl+C when busy, a lone Esc when blocked
 // (it denies the dialog), nothing otherwise. After a key it waits up to N for
-// idle, then presses Ctrl+U: claude restores the cancelled prompt into the
-// input line, and it would prefix the next prompt. The session is kept, so
-// smart-zone can send /compact next with no further wait.
+// idle, then presses Ctrl+C once: claude restores the cancelled prompt into the
+// input line, and it would prefix the next prompt. Ctrl+U clears one line per
+// press, so it can't empty a multi-line prompt; Ctrl+C on an idle prompt clears
+// it all. It is sent once and only after idle, since a second quick Ctrl+C
+// quits claude. The session is kept, so smart-zone can send /compact next with
+// no further wait.
 func (p *Pty) Interrupt(s agentrunner.Session) error {
 	ss, err := p.live(s)
 	if err != nil {
@@ -734,7 +737,7 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	if err := p.awaitIdle(ss); err != nil {
 		return err
 	}
-	return p.died(ss, ss.holder.SendKeys("\x15"))
+	return p.died(ss, ss.holder.SendKeys("\x03"))
 }
 
 // awaitIdle waits up to N for claude to be neither busy nor blocked.
