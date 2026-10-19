@@ -329,9 +329,10 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 // Interrupt picks its key by herdr's state, read right before the key: Ctrl+C
 // when working, Esc when blocked (it denies the dialog), nothing otherwise
 // (including a state gx doesn't know). After a key it waits up to N for idle or
-// done, then presses Ctrl+U: claude restores the cancelled prompt into the
-// input line, and it would prefix the next prompt. Codex's Ctrl+U clears one
-// line only.
+// done, then clears the input line: claude restores the cancelled prompt into
+// it, and it would prefix the next prompt. Claude gets Ctrl+C like the PTY
+// runner, since Ctrl+U clears one line per press and leaves a multi-line prompt
+// behind. Codex keeps Ctrl+U: Ctrl+C on its empty composer quits the agent.
 func (r *Runner) Interrupt(s agentrunner.Session) error {
 	if r.isHeld(s) {
 		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
@@ -355,7 +356,14 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 	if err := r.awaitIdle(s); err != nil {
 		return err
 	}
-	return mapNotFound(herdr.AgentSendKeys(s.ID, "ctrl+u"))
+	r.mu.Lock()
+	kind := r.started[s.Label].Kind
+	r.mu.Unlock()
+	clear := "ctrl+c"
+	if kind == "codex" {
+		clear = "ctrl+u"
+	}
+	return mapNotFound(herdr.AgentSendKeys(s.ID, clear))
 }
 
 // awaitIdle waits up to N for herdr to show the agent idle or done.

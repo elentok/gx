@@ -650,8 +650,9 @@ func restartThenFind(t *testing.T, h Harness) {
 	status(t, r, got)
 }
 
-// interruptBusyCtrlC: a busy agent gets Ctrl+C, never Esc, and the prompt it
-// restores is cleared so the next prompt arrives unprefixed.
+// interruptBusyCtrlC: a busy agent gets Ctrl+C, never Esc, and then one more
+// Ctrl+C that clears the prompt it restores so the next prompt arrives
+// unprefixed.
 func interruptBusyCtrlC(t *testing.T, h Harness) {
 	s := start(t, h.Runner, "e-01", "e")
 	before := received(t, h, s)
@@ -660,8 +661,8 @@ func interruptBusyCtrlC(t *testing.T, h Harness) {
 		t.Fatalf("Interrupt: %v", err)
 	}
 	keys := strings.TrimPrefix(received(t, h, s), before)
-	if !strings.Contains(keys, "\x03") || strings.Contains(keys, "\x1b") {
-		t.Fatalf("agent received %q on Interrupt, want Ctrl+C and no Esc", keys)
+	if strings.Count(keys, "\x03") != 2 || strings.Contains(keys, "\x1b") {
+		t.Fatalf("agent received %q on Interrupt, want two Ctrl+C and no Esc", keys)
 	}
 	promptAdvancesTurn(t, h.Runner, s, "next")
 	if h.LastPrompt != nil {
@@ -671,7 +672,8 @@ func interruptBusyCtrlC(t *testing.T, h Harness) {
 	}
 }
 
-// interruptBlockedEsc: a blocked agent gets a lone Esc.
+// interruptBlockedEsc: a blocked agent gets a lone Esc, then the one Ctrl+C
+// that clears the input line. Never a Ctrl+C before the Esc.
 func interruptBlockedEsc(t *testing.T, h Harness) {
 	s := start(t, h.Runner, "e-01", "e")
 	received(t, h, s)
@@ -685,8 +687,8 @@ func interruptBlockedEsc(t *testing.T, h Harness) {
 		t.Fatalf("Interrupt: %v", err)
 	}
 	keys := strings.TrimPrefix(received(t, h, s), before)
-	if !strings.Contains(keys, "\x1b") || strings.Contains(keys, "\x03") {
-		t.Fatalf("agent received %q on Interrupt, want Esc and no Ctrl+C", keys)
+	if keys != "\x1b\x03" {
+		t.Fatalf("agent received %q on Interrupt, want Esc then one Ctrl+C", keys)
 	}
 }
 

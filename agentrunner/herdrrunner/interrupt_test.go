@@ -70,11 +70,15 @@ func TestInterrupt_ClaudeInputLineIsEmptyAfterwards(t *testing.T) {
 	if err := state.SetAgentStatus(s.Label, "working", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := state.SetInput(s.Label, "restored prompt"); err != nil {
+	if err := state.SetInput(s.Label, "restored\nmulti-line prompt"); err != nil {
 		t.Fatal(err)
 	}
+	before := keysOf(t, state)
 	if err := r.Interrupt(s); err != nil {
 		t.Fatalf("Interrupt: %v", err)
+	}
+	if got, want := keysOf(t, state)[len(before):], []string{"ctrl+c", "ctrl+c"}; !slices.Equal(got, want) {
+		t.Fatalf("keys = %q, want %q", got, want)
 	}
 	if got, err := state.Input(s.Label); err != nil || got != "" {
 		t.Fatalf("input line = %q, %v; want empty", got, err)

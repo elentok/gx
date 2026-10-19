@@ -283,7 +283,7 @@ func (s *State) Keys(name string) ([]string, error) {
 }
 
 // SetInput sets the text on the input line of the agent named name, as typing
-// would. Ctrl+U clears it.
+// would. Ctrl+C on an idle claude clears it; Ctrl+U clears its last line.
 func (s *State) SetInput(name, text string) error {
 	return s.withAgent(name, func(a *Agent) { a.Input = text })
 }
@@ -328,8 +328,11 @@ func (s *State) deliverKeys(a *Agent, keys []string) (quit bool) {
 		case key == "ctrl+c" && a.Status == "idle" && codex:
 			s.removeAgent(a)
 			return true
-		case key == "ctrl+u":
+		case key == "ctrl+c" && a.Status == "idle":
 			a.Input = ""
+		case key == "ctrl+u":
+			// One line per press, as claude and Codex do.
+			a.Input = a.Input[:max(strings.LastIndex(a.Input, "\n"), 0)]
 		}
 		if a.VanishOnKey == key {
 			s.removeAgent(a)
