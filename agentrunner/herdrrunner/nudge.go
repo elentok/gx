@@ -115,6 +115,23 @@ func (p *herdrPrompter) InputEmpty() (bool, bool, error) {
 	return false, false, nil
 }
 
+// ReadyToType runs the harness's ready-to-type step over herdr's text read and
+// key presses.
+func (p *herdrPrompter) ReadyToType() bool {
+	return p.typing.ReadyToType(harness.TypingIO{
+		Rows: func() ([]string, error) {
+			screen, err := p.Screen()
+			return strings.Split(screen, "\n"), err
+		},
+		SendKeys: func(keys string) error {
+			if name, ok := herdrKeyNames[keys]; ok {
+				keys = name
+			}
+			return p.sendKeys(p.opts.Target, keys)
+		},
+	})
+}
+
 // herdrKeyNames maps the raw clear keys harness rules use to herdr's key names.
 var herdrKeyNames = map[string]string{"\x15": "ctrl+u"}
 

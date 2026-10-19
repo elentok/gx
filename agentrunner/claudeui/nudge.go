@@ -70,6 +70,19 @@ type InputChecker interface {
 	InputEmpty() (empty, known bool, err error)
 }
 
+// ReadyChecker is the optional part of a Prompter that runs the harness's
+// ready-to-type step. PromptWithNudge calls it before typing and before the
+// retype's clear; false means give-up, which stops the nudge as stuck.
+type ReadyChecker interface {
+	ReadyToType() bool
+}
+
+// readyToType is true for a Prompter with no ready-to-type step.
+func readyToType(p Prompter) bool {
+	r, ok := p.(ReadyChecker)
+	return !ok || r.ReadyToType()
+}
+
 // clearPresses is how many clear-key presses empty an input holding text: one
 // per line to delete it and one per newline between lines (2N-1), plus two
 // spare for a stray trailing line.
@@ -124,6 +137,13 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 		return fmt.Errorf("%w: overall deadline exceeded", ErrStartTimeout)
 	}
 
+	// Before the snapshot: pressing `i` redraws the footer, which would read as
+	// a changed screen.
+	if !readyToType(p) {
+		report(NudgeStuck)
+		return fmt.Errorf("%w: input not ready to type", ErrStuckSubmission)
+	}
+
 	// A screen read error counts as "changed": with no evidence the text is
 	// missing, a bare Enter is safer than typing it twice.
 	snapshot, _ := p.Screen()
@@ -148,6 +168,10 @@ func PromptWithNudge(p Prompter, text string, caps NudgeCaps, deadline time.Time
 			}
 			retypes++
 			report(NudgeRetype)
+			if !readyToType(p) {
+				report(NudgeStuck)
+				return fmt.Errorf("%w: input not ready to type", ErrStuckSubmission)
+			}
 			// Partial text the screen didn't show would otherwise prefix the
 			// retype.
 			if err = clearWhole(p, text); err != nil {

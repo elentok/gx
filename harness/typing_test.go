@@ -1,7 +1,10 @@
 package harness_test
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -125,7 +128,7 @@ func TestTyping_InputIsEmpty(t *testing.T) {
 	}
 }
 
-func TestTyping_ClearKeyAndReady(t *testing.T) {
+func TestTyping_ClearKey(t *testing.T) {
 	for _, kind := range []string{"claude", "codex"} {
 		ty, err := harness.LookupTyping(agentKind(kind))
 		if err != nil {
@@ -134,9 +137,109 @@ func TestTyping_ClearKeyAndReady(t *testing.T) {
 		if got := ty.ClearKey(); got != "\x15" {
 			t.Errorf("%s ClearKey = %q, want Ctrl+U", kind, got)
 		}
-		if !ty.ReadyToType() {
-			t.Errorf("%s ReadyToType = false", kind)
-		}
+	}
+}
+
+// vimConfig points claude's config at a temp dir whose .claude.json has mode.
+func vimConfig(t *testing.T, mode string) {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", dir)
+	if mode == "" {
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"`+mode+`"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// screenIO serves rows[i] on the i-th read (the last one repeats) and records
+// the keys pressed. An `i` press advances to the next row set.
+type screenIO struct {
+	rows  [][]string
+	reads int
+	keys  []string
+}
+
+func (s *screenIO) io() harness.TypingIO {
+	return harness.TypingIO{
+		Rows: func() ([]string, error) {
+			s.reads++
+			return s.rows[min(len(s.keys), len(s.rows)-1)], nil
+		},
+		SendKeys: func(k string) error { s.keys = append(s.keys, k); return nil },
+	}
+}
+
+var (
+	normalRows = []string{rule, "❯ " + rev + " " + rst, rule, dim + "  ? for shortcuts" + rst}
+	insertRows = []string{rule, "❯ " + rev + " " + rst, rule, dim + "  -- INSERT --" + rst}
+)
+
+func TestClaudeReadyToType_Vim(t *testing.T) {
+	tests := []struct {
+		name     string
+		mode     string
+		rows     [][]string
+		want     bool
+		wantKeys []string
+	}{
+		{name: "vim in NORMAL presses i then sees INSERT", mode: "vim", rows: [][]string{normalRows, insertRows}, want: true, wantKeys: []string{"i"}},
+		{name: "vim already in INSERT presses nothing", mode: "vim", rows: [][]string{insertRows}, want: true},
+		{name: "vim never reaching INSERT gives up", mode: "vim", rows: [][]string{normalRows}, want: false, wantKeys: []string{"i"}},
+		{name: "marker above the input box is not the footer", mode: "vim", rows: [][]string{{"-- INSERT --", rule, "❯ ", rule}}, want: false, wantKeys: []string{"i"}},
+		{name: "normal mode presses nothing", mode: "normal", rows: [][]string{normalRows}, want: true},
+		{name: "no editorMode presses nothing", mode: "", rows: [][]string{normalRows}, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vimConfig(t, tt.mode)
+			ty, _ := harness.LookupTyping(harness.Claude)
+			s := &screenIO{rows: tt.rows}
+			if got := ty.ReadyToType(s.io()); got != tt.want {
+				t.Errorf("ReadyToType = %v, want %v", got, tt.want)
+			}
+			if !slices.Equal(s.keys, tt.wantKeys) {
+				t.Errorf("keys = %q, want %q", s.keys, tt.wantKeys)
+			}
+		})
+	}
+}
+
+func TestClaudeReadyToType_ReadsEditorModeEveryCall(t *testing.T) {
+	vimConfig(t, "normal")
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows}}
+	if !ty.ReadyToType(s.io()) || len(s.keys) != 0 {
+		t.Fatalf("normal mode: keys = %q", s.keys)
+	}
+	if err := os.WriteFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s = &screenIO{rows: [][]string{normalRows, insertRows}}
+	if !ty.ReadyToType(s.io()) || !slices.Equal(s.keys, []string{"i"}) {
+		t.Fatalf("after toggle to vim: keys = %q", s.keys)
+	}
+}
+
+func TestClaudeReadyToType_SettingsJSONAlsoCounts(t *testing.T) {
+	vimConfig(t, "")
+	if err := os.WriteFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows, insertRows}}
+	if !ty.ReadyToType(s.io()) || !slices.Equal(s.keys, []string{"i"}) {
+		t.Fatalf("keys = %q", s.keys)
+	}
+}
+
+func TestCodexReadyToType_IsANoOp(t *testing.T) {
+	vimConfig(t, "vim")
+	ty, _ := harness.LookupTyping(harness.Codex)
+	s := &screenIO{rows: [][]string{normalRows}}
+	if !ty.ReadyToType(s.io()) || len(s.keys) != 0 || s.reads != 0 {
+		t.Fatalf("codex touched the screen: keys = %q, reads = %d", s.keys, s.reads)
 	}
 }
 

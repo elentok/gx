@@ -107,6 +107,50 @@ func TestPromptWithNudge_RetypeCap_ReturnsStuckSubmission(t *testing.T) {
 	assertDecisions(t, f.decisions, NudgeRetype, NudgeRetype, NudgeStuck)
 }
 
+// readyPrompter adds a ready-to-type step to fakePrompter; the calls it
+// records are "ready".
+type readyPrompter struct {
+	*fakePrompter
+	ready []bool
+}
+
+func (r *readyPrompter) ReadyToType() bool {
+	r.calls = append(r.calls, "ready")
+	ok := r.ready[0]
+	if len(r.ready) > 1 {
+		r.ready = r.ready[1:]
+	}
+	return ok
+}
+
+func TestPromptWithNudge_ReadyToTypeRunsBeforeTypingAndBeforeTheClear(t *testing.T) {
+	f := &readyPrompter{fakePrompter: &fakePrompter{starts: []bool{false, true}, screens: []string{"empty"}}, ready: []bool{true}}
+	if err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report); err != nil {
+		t.Fatalf("PromptWithNudge() error = %v", err)
+	}
+	assertCalls(t, f.calls, "ready", "submit:hi", "wait", "ready", "clear", "clear", "clear", "submit:hi", "wait")
+}
+
+func TestPromptWithNudge_ReadyGiveUpBeforeTyping_StopsAsStuck(t *testing.T) {
+	f := &readyPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, ready: []bool{false}}
+	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
+	if !errors.Is(err, ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	}
+	assertCalls(t, f.calls, "ready")
+	assertDecisions(t, f.decisions, NudgeStuck)
+}
+
+func TestPromptWithNudge_ReadyGiveUpBeforeTheClear_StopsAsStuckWithoutClearing(t *testing.T) {
+	f := &readyPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, ready: []bool{true, false}}
+	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
+	if !errors.Is(err, ErrStuckSubmission) {
+		t.Fatalf("PromptWithNudge() error = %v, want ErrStuckSubmission", err)
+	}
+	assertCalls(t, f.calls, "ready", "submit:hi", "wait", "ready")
+	assertDecisions(t, f.decisions, NudgeRetype, NudgeStuck)
+}
+
 // checkingPrompter adds an input check to fakePrompter; calls it records are
 // "clear" and "check".
 type checkingPrompter struct {

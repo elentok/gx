@@ -49,14 +49,25 @@ func ParsePidStatus(data []byte) (PidStatus, error) {
 // ClaudeSessionsDir is where claude writes its pid status files: under
 // CLAUDE_CONFIG_DIR when set, as claude itself resolves it, else ~/.claude.
 func ClaudeSessionsDir() (string, error) {
-	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
-		return filepath.Join(dir, "sessions"), nil
-	}
-	home, err := os.UserHomeDir()
+	dir, _, err := claudeConfigDirs()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".claude", "sessions"), nil
+	return filepath.Join(dir, "sessions"), nil
+}
+
+// claudeConfigDirs returns claude's config dir and the dir that holds its
+// global .claude.json: the same dir under CLAUDE_CONFIG_DIR, else ~/.claude and
+// the home dir.
+func claudeConfigDirs() (configDir, globalDir string, err error) {
+	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+		return dir, dir, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", "", err
+	}
+	return filepath.Join(home, ".claude"), home, nil
 }
 
 // PidWatcher follows one claude's pid status file, counting its status

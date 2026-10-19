@@ -249,6 +249,14 @@ func (h *holderServer) denyReason(reason string) error {
 	if !ok {
 		return errors.New("claude did not go idle after Esc")
 	}
+	// Esc can leave vim mode in NORMAL, where the reason would run as commands.
+	ready := claudeTyping.ReadyToType(harness.TypingIO{
+		Rows:     func() ([]string, error) { return h.scr.StyledRows(), nil },
+		SendKeys: func(keys string) error { _, err := h.ptmx.Write([]byte(keys)); return err },
+	})
+	if !ready {
+		return errors.New("claude input not ready to type the reason")
+	}
 	if _, err := h.ptmx.Write([]byte(reason)); err != nil {
 		return err
 	}

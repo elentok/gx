@@ -32,8 +32,15 @@ type Typing interface {
 	// ClearKey is the key a full clear repeats.
 	ClearKey() string
 	// ReadyToType runs before any typed text and reports whether typing can
-	// start; false means give up.
-	ReadyToType() bool
+	// start; false means give up. It may press keys and re-read through io.
+	ReadyToType(io TypingIO) bool
+}
+
+// TypingIO is how a ready-to-type step reads the agent's screen and presses
+// keys, whichever runner owns the session. Rows may be styled or plain.
+type TypingIO struct {
+	Rows     func() ([]string, error)
+	SendKeys func(keys string) error
 }
 
 // LookupTyping returns the typing rules for kind.
@@ -55,8 +62,6 @@ func (claudeHarness) InputIsEmpty(styledRows []string) InputState {
 
 func (claudeHarness) ClearKey() string { return ctrlU }
 
-func (claudeHarness) ReadyToType() bool { return true }
-
 type codexTyping struct{}
 
 func (codexTyping) InputIsEmpty(styledRows []string) InputState {
@@ -65,7 +70,7 @@ func (codexTyping) InputIsEmpty(styledRows []string) InputState {
 
 func (codexTyping) ClearKey() string { return ctrlU }
 
-func (codexTyping) ReadyToType() bool { return true }
+func (codexTyping) ReadyToType(TypingIO) bool { return true }
 
 // inputState finds the last row that starts with marker (bold when
 // boldMarker) and decides from the styling of the text after it and of the

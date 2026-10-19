@@ -19,7 +19,16 @@ import (
 
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	os.Exit(m.Run())
+	// The ready-to-type step reads claude's config; a developer's own vim mode
+	// must not reach the tests.
+	dir, err := os.MkdirTemp("", "claude-config")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("CLAUDE_CONFIG_DIR", dir)
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
 }
 
 func TestConformance(t *testing.T) {

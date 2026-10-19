@@ -93,7 +93,13 @@ const denyStaysWaiting = `cat >/dev/null`
 
 func startDenyHolder(t *testing.T, tail string) *nativerunner.HolderClient {
 	t.Helper()
-	t.Setenv("HOME", shortTempDir(t))
+	return startDenyHolderWith(t, tail, func(t *testing.T) { t.Setenv("HOME", shortTempDir(t)) })
+}
+
+// startDenyHolderWith lets setup choose the HOME the holder runs with.
+func startDenyHolderWith(t *testing.T, tail string, setup func(*testing.T)) *nativerunner.HolderClient {
+	t.Helper()
+	setup(t)
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	_, c, _ := startHolder(t, denyChild+tail)
 	waitForScreen(t, c, "ready")
@@ -170,6 +176,39 @@ func TestHolderSocket_DenyReasonIdleTimeout(t *testing.T) {
 
 	if err := c.DenyWithReason("use rg"); err == nil {
 		t.Fatal("deny-reason succeeded with no idle")
+	}
+}
+
+// vimConfigHome turns vim mode on in the HOME startDenyHolder points at.
+func vimConfigHome(t *testing.T) {
+	t.Helper()
+	home := shortTempDir(t)
+	t.Setenv("HOME", home)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// denyVimNormal shows the input box with no INSERT marker once idle, and
+// shows the marker after a single `i`.
+const denyVimNormal = `stty -icanon -echo min 1; printf '\n❯ \n'; st idle; dd bs=1 count=1 2>/dev/null >/dev/null; printf -- '-- INSERT --\n'; stty icanon; read -r l; st busy; printf 'got:%s\n' "$l"; cat >/dev/null`
+
+func TestHolderSocket_DenyReason_VimNormalGetsIBeforeTheReason(t *testing.T) {
+	c := startDenyHolderWith(t, denyVimNormal, vimConfigHome)
+	if err := c.DenyWithReason("use rg"); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "got:use rg")
+}
+
+func TestHolderSocket_DenyReason_VimGiveUpFailsTheDenyWithoutTyping(t *testing.T) {
+	c := startDenyHolderWith(t, `printf '\n❯ \n'; st idle; read -r l; printf 'got:%s\n' "$l"; cat >/dev/null`, vimConfigHome)
+	if err := c.DenyWithReason("use rg"); err == nil {
+		t.Fatal("deny-reason succeeded with no INSERT marker")
+	}
+	screen, _, _ := c.Screen(0)
+	if strings.Contains(strings.Join(screen, "\n"), "got:use rg") {
+		t.Errorf("reason was typed into NORMAL mode: %q", screen)
 	}
 }
 
