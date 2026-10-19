@@ -65,6 +65,23 @@ func (Harness) StartupScreen(_, rows []string) harness.Startup {
 	return harness.Startup{}
 }
 
+// The input box renders like claude's, so the typing rules are claude's.
+func (Harness) InputIsEmpty(styledRows []string) harness.InputState {
+	return claudeTyping().InputIsEmpty(styledRows)
+}
+
+func (Harness) ClearKey() string { return claudeTyping().ClearKey() }
+
+func (Harness) ReadyToType() bool { return true }
+
+func claudeTyping() harness.Typing {
+	t, err := harness.LookupTyping(harness.Claude)
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
 func (Harness) DisplayName(raw []byte) (string, bool) {
 	return screen.Title(raw)
 }

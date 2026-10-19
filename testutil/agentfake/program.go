@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/harness"
@@ -105,6 +106,7 @@ func runProgram() (int, error) {
 		return 0, err
 	}
 	defer os.Remove(convPath)
+	_ = os.Remove(ProgramSubmittedPath(id))
 	ctlPath := ProgramControlPath(id)
 	// A crashed run with the same id leaves its FIFO behind.
 	_ = os.Remove(ctlPath)
@@ -118,7 +120,15 @@ func runProgram() (int, error) {
 		return 0, err
 	}
 	defer ctl.Close()
-	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath}
+	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath, convID: id}
+	if os.Getenv(ProgramInputEnv) == "1" {
+		p.box = newInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))
+		if s := os.Getenv(ProgramReadyDelayEnv); s != "" {
+			if p.readyDelay, err = time.ParseDuration(s); err != nil {
+				return 0, err
+			}
+		}
+	}
 	return p.run(os.Stdin, ctl)
 }
 
@@ -126,9 +136,16 @@ type program struct {
 	out      io.Writer
 	trust    bool
 	convPath string
+	// convID is the id the program launched with, which names its side channels.
+	convID string
 	// esc and osc track an escape sequence on input, so the terminal's
 	// reply to the probe is not echoed as typed text.
 	esc, osc bool
+	// box is nil unless ProgramInputEnv is set. It takes keys once ready.
+	box        *inputBox
+	ready      bool
+	readyDelay time.Duration
+	readyC     <-chan time.Time
 }
 
 func (p *program) run(in, ctl io.Reader) (int, error) {
@@ -138,61 +155,118 @@ func (p *program) run(in, ctl io.Reader) (int, error) {
 	} else {
 		p.start()
 	}
-	for ev := range events {
-		switch {
-		case ev.err != nil:
-			if ptyClosed(ev.err) {
+	for {
+		select {
+		case <-p.readyC:
+			p.readyC = nil
+			p.becomeReady()
+		case ev, ok := <-events:
+			if !ok {
 				return 0, nil
 			}
-			return 0, ev.err
-		case ev.control != nil:
-			if ev.control.Action == ActionExit {
-				p.report("clear", "", "")
-				return ev.control.Code, nil
+			if code, done, err := p.event(ev); done || err != nil {
+				return code, err
 			}
-			if err := p.control(*ev.control); err != nil {
-				return 0, err
-			}
-		case p.trust:
-			if ev.key == '\r' || ev.key == '\n' {
-				p.trust = false
-				p.start()
-			}
-		default:
-			p.key(ev.key)
 		}
 	}
-	return 0, nil
+}
+
+// event handles one event; done means the program exits with code.
+func (p *program) event(ev tuiEvent) (code int, done bool, err error) {
+	switch {
+	case ev.err != nil:
+		if ptyClosed(ev.err) {
+			return 0, true, nil
+		}
+		return 0, false, ev.err
+	case ev.control != nil:
+		if ev.control.Action == ActionExit {
+			p.report("clear", "", "")
+			return ev.control.Code, true, nil
+		}
+		return 0, false, p.control(*ev.control)
+	case p.trust:
+		if ev.key == '\r' || ev.key == '\n' {
+			p.trust = false
+			p.start()
+		}
+	default:
+		return 0, false, p.key(ev.key)
+	}
+	return 0, false, nil
 }
 
 func (p *program) start() {
 	fmt.Fprint(p.out, "\x1b[2J\x1b[H"+harness.ProgramStatusProbe)
+	switch {
+	case p.box == nil:
+	case p.readyDelay > 0:
+		p.readyC = time.After(p.readyDelay)
+	default:
+		p.becomeReady()
+	}
 }
 
-// key echoes a typed key, skipping OSC sequences.
-func (p *program) key(b byte) {
+func (p *program) becomeReady() {
+	p.ready = true
+	p.box.draw()
+}
+
+// key takes a typed key, skipping OSC sequences: into the input box if there
+// is one, else echoed.
+func (p *program) key(b byte) error {
 	switch {
 	case p.osc:
 		p.osc = b != '\a'
-		return
+		return nil
 	case p.esc:
 		p.esc = false
 		if b == ']' {
 			p.osc = true
-			return
+			return nil
 		}
 	case b == escKey:
 		p.esc = true
-		return
+		return nil
+	}
+	if p.box != nil {
+		if !p.ready {
+			return nil
+		}
+		text, submitted := p.box.key(b)
+		if !submitted {
+			return nil
+		}
+		if err := logSubmitted(p.convID, text); err != nil {
+			return err
+		}
+		if text == ProgramClearCommand {
+			return p.setConversation(p.convID + ProgramClearedSuffix)
+		}
+		return nil
 	}
 	if b == '\r' || b == '\n' {
 		fmt.Fprint(p.out, "\r\n")
-		return
+		return nil
 	}
 	_, _ = p.out.Write([]byte{b})
+	return nil
+}
+
+func (p *program) setConversation(id string) error {
+	if err := os.WriteFile(p.convPath, []byte(id), 0o644); err != nil {
+		return err
+	}
+	// Claude redraws on /clear; the holder's watch wakes on that output.
+	// An SGR reset stands in for it without changing the screen.
+	fmt.Fprint(p.out, "\x1b[0m")
+	return nil
 }
 
 func (p *program) control(c Control) error {
+	if p.box != nil && p.box.control(c) {
+		return nil
+	}
 	switch c.Action {
 	case ActionReport:
 		p.report(c.State, c.Kind, c.Message)
@@ -201,12 +275,7 @@ func (p *program) control(c Control) error {
 	case ActionWrite:
 		fmt.Fprint(p.out, c.Output)
 	case ActionConversation:
-		if err := os.WriteFile(p.convPath, []byte(c.ConversationID), 0o644); err != nil {
-			return err
-		}
-		// Claude redraws on /clear; the holder's watch wakes on that output.
-		// An SGR reset stands in for it without changing the screen.
-		fmt.Fprint(p.out, "\x1b[0m")
+		return p.setConversation(c.ConversationID)
 	case ActionSize:
 		cols, rows, err := term.GetSize(os.Stdout.Fd())
 		if err != nil {
