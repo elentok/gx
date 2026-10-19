@@ -239,6 +239,23 @@ type Config struct {
 	SessionBannerDelay time.Duration
 }
 
+// Defaults for the session-prompting timings in Config. A zero Config field
+// means the default; FirstPromptGrace defaults to claudeui.DefaultNudgeCaps.
+const (
+	// DefaultActionStepStartTimeout is how long an Action step waits for its
+	// prompt to go Working before the rest of the Action is dropped.
+	DefaultActionStepStartTimeout = 10 * time.Second
+
+	// DefaultActionSlashSettle is how long a slash step stays Idle after
+	// typing before it counts as done: claude runs some commands locally and
+	// never goes Working.
+	DefaultActionSlashSettle = time.Second
+
+	// DefaultFirstPromptStartTimeout is how long a session may stay Starting,
+	// counted from launch, before its first prompt is handed to a person.
+	DefaultFirstPromptStartTimeout = 30 * time.Second
+)
+
 // DefaultTCPAddr is where the opt-in TCP listener binds.
 const DefaultTCPAddr = "127.0.0.1:7421"
 

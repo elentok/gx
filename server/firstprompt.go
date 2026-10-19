@@ -23,10 +23,6 @@ const signalFirstIdle = "first Idle"
 // checks.
 const holderPollInterval = 50 * time.Millisecond
 
-// DefaultFirstPromptStartTimeout is how long a session may stay Starting,
-// counted from launch, before its first prompt is handed to a person.
-const DefaultFirstPromptStartTimeout = 30 * time.Second
-
 var errNudgeCancelled = errors.New("nudge cancelled: person input")
 
 // clearInputHint ends a reason when the input may still hold gx's text.
@@ -259,9 +255,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 		return errDraft
 	}
 	caps := claudeui.DefaultNudgeCaps
-	if g := f.s.cfg.FirstPromptGrace; g > 0 {
-		caps.Grace = g
-	}
+	caps.Grace = cmp.Or(f.s.cfg.FirstPromptGrace, caps.Grace)
 	p := &holderPrompter{c: c, f: f, turn: turn}
 	report := func(d claudeui.NudgeDecision) {
 		f.log.Debug("first prompt nudge", "decision", string(d))

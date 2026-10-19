@@ -12,15 +12,6 @@ import (
 	"github.com/elentok/gx/nativerunner"
 )
 
-// DefaultActionStepStartTimeout is how long an Action step waits for its
-// prompt to go Working before the rest of the Action is dropped.
-const DefaultActionStepStartTimeout = 10 * time.Second
-
-// DefaultActionSlashSettle is how long a slash step stays Idle after typing
-// before it counts as done: claude runs some commands locally and never
-// goes Working.
-const DefaultActionSlashSettle = time.Second
-
 // runSessionAction clears an Idle session's Actionable and sends its Action
 // in the background, so the run outlives the client that asked for it.
 func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
