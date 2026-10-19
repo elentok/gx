@@ -84,7 +84,7 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			if err != nil {
 				return Log{}, err
 			}
-			return Log{Path: p, Ended: ended, PtyDir: ptyDir}, nil
+			return Log{Path: transcript.Resolve(p), Ended: ended, PtyDir: ptyDir}, nil
 		}
 		return Log{Path: d.Log(), Offset: d.Meta.Offset, Ended: ended}, nil
 	case !errors.Is(err, agentrunner.ErrNotFound):
@@ -108,7 +108,7 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 		return Log{}, fmt.Errorf("%w for %s: herdr agent has no claude session yet", ErrNoAgent, a)
 	}
 	return Log{
-		Path: it.Transcript,
+		Path: transcript.Resolve(it.Transcript),
 		Ended: func() bool {
 			_, ok, err := l.Herdr(ctx, a.String())
 			return err == nil && !ok

@@ -82,6 +82,29 @@ func FindByIDIn(projectsDir, sessionID string) ([]string, error) {
 	return matches, nil
 }
 
+// Resolve returns path when it exists. Otherwise it looks for the same
+// session id under the sibling project directories (the launcher may have
+// slugified a different cwd than the caller) and returns the newest match.
+// With no match it returns path unchanged, so the caller's open reports the
+// original missing file.
+func Resolve(path string) string {
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+	matches, err := FindByIDIn(filepath.Dir(filepath.Dir(path)), id)
+	if err != nil || len(matches) == 0 {
+		return path
+	}
+	newest, newestTime := path, time.Time{}
+	for _, m := range matches {
+		if fi, err := os.Stat(m); err == nil && fi.ModTime().After(newestTime) {
+			newest, newestTime = m, fi.ModTime()
+		}
+	}
+	return newest
+}
+
 // transcriptLine is the subset of a transcript JSONL line this package
 // reads: the assistant-turn usage fields, a system-line's compaction-boundary
 // marker, plus the line's own timestamp (used by ReadAll to compute a

@@ -136,6 +136,48 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 	}
 }
 
+func TestAgentLog_TranscriptUnderAnotherProjectDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stateDir := t.TempDir()
+	writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	// The launcher wrote the transcript under the epic's dir, not the worktree's.
+	want := transcript.PathIn(home, "/work", session)
+	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(want, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Path != want {
+		t.Errorf("got %s, want %s", l.Path, want)
+	}
+}
+
+func TestAgentLog_HerdrTranscriptUnderAnotherProjectDir(t *testing.T) {
+	home := t.TempDir()
+	want := transcript.PathIn(home, "/work", session)
+	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(want, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	derived := transcript.PathIn(home, "/work/tree", session)
+	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: "claude", Transcript: derived}, true)}
+	l, err := loc.AgentLog(context.Background(), addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Path != want {
+		t.Errorf("got %s, want %s", l.Path, want)
+	}
+}
+
 func TestAgentLog_PtyPruned(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
