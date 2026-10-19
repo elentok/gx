@@ -147,13 +147,7 @@ func RegisterAgentHost(s *State) {
 		if err != nil {
 			return nil, Identities{}, err
 		}
-		switch {
-		case a.Status == "blocked":
-			// Any answer dismisses the dialog and the turn carries on.
-			a.setStatus("working", "")
-		case a.Status == "working" && slices.Contains(argv[3:], "ctrl+c"):
-			a.setStatus("idle", "")
-		}
+		s.deliverKeys(a, argv[3:])
 		return map[string]any{}, Identities{AgentID: a.ID}, nil
 	})
 }
@@ -276,6 +270,75 @@ func (s *State) OpenDialogOnNextSlash(name string) error {
 	return s.withAgent(name, func(a *Agent) { a.DialogNext = true })
 }
 
+// Keys returns every key the agent named name has received, in order.
+func (s *State) Keys(name string) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	a := s.findAgent(name)
+	if a == nil {
+		return nil, fmt.Errorf("agent not found: %s", name)
+	}
+	return slices.Clone(a.Keys), nil
+}
+
+// SetInput sets the text on the input line of the agent named name, as typing
+// would. Ctrl+U clears it.
+func (s *State) SetInput(name, text string) error {
+	return s.withAgent(name, func(a *Agent) { a.Input = text })
+}
+
+// Input returns the text on the input line of the agent named name.
+func (s *State) Input(name string) (string, error) {
+	var text string
+	err := s.withAgent(name, func(a *Agent) { text = a.Input })
+	return text, err
+}
+
+// VanishAfterKey makes the agent named name disappear once it receives key, so
+// later commands against it fail with agent_not_found.
+func (s *State) VanishAfterKey(name, key string) error {
+	return s.withAgent(name, func(a *Agent) { a.VanishOnKey = key })
+}
+
+// deliverKeys records keys and applies them to a, as claude (and, for Kind
+// "codex", Codex) handles them. It reports whether the agent quit; a quit
+// agent is gone from State. Must be called with s.mu held.
+func (s *State) deliverKeys(a *Agent, keys []string) (quit bool) {
+	codex := a.Kind == "codex"
+	for _, key := range keys {
+		a.Keys = append(a.Keys, key)
+		switch {
+		case a.Status == "blocked" && key == "esc":
+			a.setStatus("idle", "")
+		case a.Status == "blocked" && key == "ctrl+c" && codex:
+			a.setStatus("idle", "")
+		case a.Status == "blocked" && !codex:
+			// Any other answer dismisses the dialog and the turn carries on.
+			a.setStatus("working", "")
+		case key == "ctrl+c" && a.Status == "working":
+			if codex {
+				a.setStatus("done", "")
+			} else {
+				a.setStatus("idle", "")
+			}
+		case key == "ctrl+c" && a.Status == "idle" && codex:
+			s.removeAgent(a)
+			return true
+		case key == "ctrl+u":
+			a.Input = ""
+		}
+		if a.VanishOnKey == key {
+			s.removeAgent(a)
+			return true
+		}
+	}
+	return false
+}
+
+func (s *State) removeAgent(a *Agent) {
+	delete(s.Agents, a.ID)
+}
+
 func (s *State) withAgent(name string, f func(*Agent)) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -323,7 +386,11 @@ func (s *State) targetAgent(argv []string) (*Agent, error) {
 	if a := s.findAgent(argv[2]); a != nil {
 		return a, nil
 	}
-	return nil, errorEnvelope("agent_not_found", fmt.Sprintf("agent target %s not found", argv[2]))
+	return nil, agentNotFound(argv[2])
+}
+
+func agentNotFound(target string) error {
+	return errorEnvelope("agent_not_found", fmt.Sprintf("agent target %s not found", target))
 }
 
 func (s *State) agentJSON(a *Agent) map[string]any {

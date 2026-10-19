@@ -67,6 +67,11 @@ type Agent struct {
 	DialogNext bool
 	// PaneText is what "agent read" returns (see SetPaneText).
 	PaneText string
+	// Keys is every key the agent was sent, in order. Input is its input line
+	// (see SetInput). VanishOnKey removes the agent once it receives that key.
+	Keys        []string
+	Input       string
+	VanishOnKey string
 }
 
 type Session struct {

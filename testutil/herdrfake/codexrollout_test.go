@@ -120,8 +120,8 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	if err := herdr.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
 		t.Fatalf("AgentSendKeys: %v", err)
 	}
-	if agent, err := wait("idle", 0); err != nil || agent.AgentStatus != "idle" {
-		t.Fatalf("post-interrupt wait = %+v, %v; want idle, not blocked", agent, err)
+	if agent, err := wait("idle", 0); err != nil || agent.AgentStatus != "done" {
+		t.Fatalf("post-interrupt wait = %+v, %v; want done, not blocked", agent, err)
 	}
 	if agent := prompt("/compact"); agent.AgentStatus != "blocked" {
 		t.Fatalf("compact confirmation status = %q, want blocked", agent.AgentStatus)
@@ -173,7 +173,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 			t.Fatalf("trace entry %d identities = %+v, want Codex agent and session", i, entry.Identities)
 		}
 	}
-	if !strings.Contains(trace[3].After, "Status:idle") || !strings.Contains(trace[6].After, "Status:working") || !strings.Contains(trace[10].After, "Status:idle") {
+	if !strings.Contains(trace[3].After, "Status:done") || !strings.Contains(trace[6].After, "Status:working") || !strings.Contains(trace[10].After, "Status:idle") {
 		t.Fatalf("trace snapshots do not expose post-interrupt idle, continuation, and final states: %+v", trace)
 	}
 	stats, ok, err := codexsession.ReadStats(cwd, rollout.SessionID())
@@ -183,8 +183,8 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 }
 
 // TestCodexRolloutCtrlCInterruptLeavesPaneIdleNotBlocked locks the real
-// contract from ticket 03: a single ctrl+c on a working Codex pane lands in
-// idle, not blocked, and a following "/compact" is accepted even with the
+// contract from ticket 03: a single ctrl+c on a working Codex pane lands in done,
+// not blocked, and a following "/compact" is accepted even with the
 // agent_blocked guard switched on. Before this ticket the fake modeled ctrl+c
 // as landing in a blocked phase no real Codex pane produces, which made this
 // path look like it needed a blocked-pane bypass it never actually needed.
@@ -208,8 +208,8 @@ func TestCodexRolloutCtrlCInterruptLeavesPaneIdleNotBlocked(t *testing.T) {
 	if err := herdr.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
 		t.Fatalf("AgentSendKeys: %v", err)
 	}
-	if agent, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{"idle"}}); err != nil || agent.AgentStatus != "idle" {
-		t.Fatalf("post-interrupt wait = %+v, %v; want idle", agent, err)
+	if agent, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{"idle"}}); err != nil || agent.AgentStatus != "done" {
+		t.Fatalf("post-interrupt wait = %+v, %v; want done", agent, err)
 	}
 
 	agent, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "/compact"})

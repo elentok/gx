@@ -127,6 +127,9 @@ func (c *CodexRollout) prompt(state *State, argv []string) (any, Identities, err
 	if len(argv) < 4 || argv[2] != c.opts.PaneID {
 		return nil, Identities{}, fmt.Errorf("unexpected Codex prompt: %v", argv)
 	}
+	if c.gone(state) {
+		return nil, c.identities(), agentNotFound(c.opts.PaneID)
+	}
 	if c.opts.RejectPromptWhenBlocked {
 		if agent := state.Agents[c.opts.AgentID]; agent != nil && agent.Status == "blocked" {
 			return nil, c.identities(), AgentBlockedError(c.opts.AgentName)
@@ -149,6 +152,9 @@ func (c *CodexRollout) prompt(state *State, argv []string) (any, Identities, err
 func (c *CodexRollout) wait(state *State, argv []string) (any, Identities, error) {
 	if len(argv) < 3 || argv[2] != c.opts.PaneID {
 		return nil, Identities{}, fmt.Errorf("unexpected Codex wait: %v", argv)
+	}
+	if c.gone(state) {
+		return nil, c.identities(), agentNotFound(c.opts.PaneID)
 	}
 	switch c.phase {
 	case codexPhaseRunning:
@@ -175,7 +181,12 @@ func (c *CodexRollout) wait(state *State, argv []string) (any, Identities, error
 		c.setStatus(state, "idle")
 		return c.agentResult("idle"), c.identities(), nil
 	case codexPhaseIdle, codexPhaseFinal:
-		return c.agentResult("idle"), c.identities(), nil
+		// An interrupted turn rests in done until the next prompt.
+		status := "idle"
+		if agent := state.Agents[c.opts.AgentID]; agent != nil {
+			status = agent.Status
+		}
+		return c.agentResult(status), c.identities(), nil
 	default:
 		return nil, c.identities(), fmt.Errorf("unexpected Codex phase %q", c.phase)
 	}
@@ -185,20 +196,32 @@ func (c *CodexRollout) sendKeys(state *State, argv []string) (any, Identities, e
 	if len(argv) < 4 || argv[2] != c.opts.PaneID {
 		return nil, Identities{}, fmt.Errorf("unexpected Codex send-keys: %v", argv)
 	}
-	for _, key := range argv[3:] {
-		if key == "ctrl+c" {
-			// A single ctrl+c on a working Codex pane leaves it idle with
-			// "Conversation interrupted" on screen, not blocked (verified
-			// against a live pane; see ticket 03). It never needs the
-			// agent_blocked bypass to accept the next prompt.
-			c.phase = codexPhaseIdle
-			c.setStatus(state, "idle")
-			// The agent answers too, so trackAgents' view of the pane (and a
-			// busy guard reading it) sees the interrupt land.
-			return c.agentResult("idle"), c.identities(), nil
-		}
+	if c.gone(state) {
+		return nil, c.identities(), agentNotFound(c.opts.PaneID)
 	}
-	return nil, c.identities(), nil
+	agent := state.Agents[c.opts.AgentID]
+	if agent == nil {
+		return nil, c.identities(), nil
+	}
+	before := agent.Status
+	// A single ctrl+c on a working Codex pane ends the turn as done, not
+	// blocked (verified against a live pane; see ticket 03), so the next
+	// prompt never needs the agent_blocked bypass. On an idle pane it quits
+	// Codex.
+	if state.deliverKeys(agent, argv[3:]) {
+		return nil, c.identities(), nil
+	}
+	if agent.Status != before && agent.Status != "blocked" {
+		c.phase = codexPhaseIdle
+	}
+	// The agent answers too, so trackAgents' view of the pane (and a busy
+	// guard reading it) sees the interrupt land.
+	return c.agentResult(agent.Status), c.identities(), nil
+}
+
+// gone reports whether the agent was started and has since quit or vanished.
+func (c *CodexRollout) gone(state *State) bool {
+	return c.started && state.Agents[c.opts.AgentID] == nil
 }
 
 func (c *CodexRollout) setStatus(state *State, status string) {
