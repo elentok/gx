@@ -89,6 +89,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
+	if req, ok := msg.(ticketsui.GoToSessionMsg); ok {
+		next, cmd := m.focusSession(req.ID)
+		return next, tea.Batch(notifyCmd, cmd)
+	}
+
 	if req, ok := msg.(ticketsui.CheckPathsMsg); ok {
 		next, cmd := m.checkOnTicketsTab(req)
 		return next, tea.Batch(notifyCmd, cmd)

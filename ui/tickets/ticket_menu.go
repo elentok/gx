@@ -40,6 +40,8 @@ type ticketMenuInput struct {
 	serverReason string
 	// onQueue adds the Queue group, which only the Queue tab offers.
 	onQueue, hasProposal bool
+	// session is the design session Go to design session… opens; "" offers none.
+	session string
 }
 
 const (
@@ -92,6 +94,9 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	answer := answerSuggested(in.rendered)
 
 	var items []contextmenu.Item[ticketTarget]
+	if in.session != "" {
+		items = append(items, goToSessionItem(in.session))
+	}
 	if in.isMap && in.rendered == tickets.StatusOpen {
 		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
 	}
@@ -280,6 +285,7 @@ func (m QueueModel) rowHasSuggestedActions(epic tickets.Epic, ticket tickets.Tic
 func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived bool) (tea.Model, tea.Cmd) {
 	in := newTicketMenuInput(epic, ticket, m.settings.HerdrUnavailable, serverReason(m.serverAPI, m.link))
 	in.archived = archived
+	in.session = ticketSession(m.vm.Sessions, epic.Path, ticket)
 	m.ticketMenuPending = ticket.Path
 	return m, cmdTicketMenu(m.serverAPI, in)
 }

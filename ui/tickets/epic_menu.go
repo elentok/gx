@@ -45,6 +45,8 @@ type epicMenuInput struct {
 	queueable    []string
 	serverReason string
 	archived     bool
+	// session is the design session Go to design session… opens; "" offers none.
+	session string
 }
 
 // epicMenuItems lists every action for an epic, in the shape of
@@ -68,6 +70,9 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 
 	var items []contextmenu.Item[ticketTarget]
 	if epic.IsMap {
+		if in.session != "" {
+			items = append(items, goToSessionItem(in.session))
+		}
 		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
 	}
 	mergeWhy := firstReason(reasonIf(!epic.AllDone(), ticketsNotDone), reasonIf(!epic.MergedAt.IsZero(), alreadyMerged))
@@ -113,6 +118,7 @@ func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
 		queueable:    queueableAddresses(epic, m.vm.Queue),
 		serverReason: serverReason(m.serverAPI, m.link),
 		archived:     archived,
+		session:      epicSession(m.vm.Sessions, epic.Path),
 	})
 	return m
 }

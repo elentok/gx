@@ -5,7 +5,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/ui/contextmenu"
 )
 
 // actionStartSession hands a map epic or one of its open tickets to the
@@ -20,6 +22,51 @@ const startSessionLabel = "Start session…"
 // which this package can't import.
 type StartSessionMsg struct {
 	Project, Dir, Name, Prompt, Ticket string
+}
+
+const goToSessionLabel = "Go to design session…"
+
+// GoToSessionMsg asks the app shell to switch to the Agents tab with session ID
+// selected.
+type GoToSessionMsg struct{ ID string }
+
+// latestSession is the ID of the most recently changed session whose Session
+// ticket matches; "" when none does. Exited and Stopped sessions count.
+func latestSession(sessions []server.SessionInfo, matches func(ticket string) bool) string {
+	var best *server.SessionInfo
+	for i := range sessions {
+		s := &sessions[i]
+		if s.Ticket != "" && matches(s.Ticket) && (best == nil || s.StatusChangedAt.After(best.StatusChangedAt)) {
+			best = s
+		}
+	}
+	if best == nil {
+		return ""
+	}
+	return best.ID
+}
+
+// epicSession is the session linked to the epic or any of its tickets.
+func epicSession(sessions []server.SessionInfo, epicAddress string) string {
+	return latestSession(sessions, func(ticket string) bool {
+		return ticket == epicAddress || strings.HasPrefix(ticket, epicAddress+"/")
+	})
+}
+
+// ticketSession is the session linked to the ticket, or to its epic while the
+// ticket is claimed.
+func ticketSession(sessions []server.SessionInfo, epicAddress string, ticket tickets.Ticket) string {
+	claimed := strings.EqualFold(strings.TrimSpace(ticket.Status), "claimed")
+	return latestSession(sessions, func(t string) bool {
+		return t == ticket.Path || (claimed && t == epicAddress)
+	})
+}
+
+func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
+	return contextmenu.Item[ticketTarget]{
+		Label: goToSessionLabel, Group: contextmenu.Suggested,
+		Run: func(ticketTarget) tea.Cmd { return func() tea.Msg { return GoToSessionMsg{ID: id} } },
+	}
 }
 
 // startSessionCmd builds the request for address ("project:epic" or
