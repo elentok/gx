@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -66,9 +67,13 @@ type actionRun struct {
 	convChanged bool
 	// sawStatus is set by the first status of a step, for the debug line.
 	sawStatus bool
-	// onTyped runs once a step's prompt is typed. cancel, when closed, ends a
-	// step's wait without another Enter: the first prompt sets both so a
-	// person's own input stops it.
+	actionRunOpts
+}
+
+// actionRunOpts hooks a run into a person's own input. onTyped runs once a
+// step's prompt is typed. cancel, when closed, ends a step's wait without
+// another Enter: the first prompt sets both so a person's own input stops it.
+type actionRunOpts struct {
 	onTyped func()
 	cancel  <-chan struct{}
 }
@@ -77,7 +82,7 @@ type actionRun struct {
 // a step that finds the session not Idle, or whose prompt never starts,
 // drops the rest.
 func (s *Server) sendAction(dir string, action []string) error {
-	run, closeRun, err := s.openActionRun(dir)
+	run, closeRun, err := s.openActionRun(dir, actionRunOpts{})
 	if err != nil {
 		return err
 	}
@@ -108,7 +113,7 @@ func (s *Server) refuseForDraft(dir string, unsent []string) {
 
 // openActionRun dials the session's holder and starts following its watch;
 // the returned func ends the watch.
-func (s *Server) openActionRun(dir string) (*actionRun, func(), error) {
+func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func(), error) {
 	c, err := nativerunner.DialHolder(dir)
 	if err != nil {
 		return nil, nil, err
@@ -134,7 +139,8 @@ func (s *Server) openActionRun(dir string) (*actionRun, func(), error) {
 		}
 	}()
 	run := &actionRun{
-		s: s, dir: dir, holder: c, msgs: msgs, state: SessionIdle,
+		actionRunOpts: opts,
+		s:             s, dir: dir, holder: c, msgs: msgs, state: SessionIdle,
 		started: cmp.Or(s.cfg.ActionStepStartTimeout, DefaultActionStepStartTimeout),
 		settle:  cmp.Or(s.cfg.ActionSlashSettle, DefaultActionSlashSettle),
 	}
@@ -147,7 +153,7 @@ func (s *Server) openActionRun(dir string) (*actionRun, func(), error) {
 // step types one prompt and waits for it to end.
 func (r *actionRun) step(i int, prompt string) error {
 	if !sessionTyping.ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
-		return fmt.Errorf("step %d: not ready to type", i)
+		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
 	if r.s.inputHoldsDraft(r.dir, r.holder) {
 		return errDraft

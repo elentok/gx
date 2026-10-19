@@ -116,27 +116,38 @@ func (f *firstPrompt) raise(prompt, reason string) {
 // not in vim NORMAL mode and was not just cleared, it first clears gx's own
 // text once; a clear that cannot be confirmed tells the person to do it.
 func (f *firstPrompt) failed(prompt string, err error) {
+	reason, clearNeeded := failureReason(err)
+	if clearNeeded {
+		cleared, cancelled := f.clearLeftover(prompt)
+		if cancelled {
+			f.log.Debug(errNudgeCancelled.Error())
+			return
+		}
+		if !cleared {
+			reason = withClearHint(reason)
+		}
+	}
+	f.raise(prompt, reason)
+}
+
+// failureReason words a first-prompt failure and says whether gx's own text
+// may still be in the input and so needs the clear.
+func failureReason(err error) (reason string, clearNeeded bool) {
 	switch {
+	case errors.Is(err, errSessionBlocked):
+		return "session is blocked", false
 	case errors.Is(err, claudeui.ErrNotReadyToType):
-		f.raise(prompt, "input is in vim NORMAL mode")
-		return
+		return "input is in vim NORMAL mode", false
 	case errors.Is(err, claudeui.ErrInputNotEmpty):
-		f.raise(prompt, "input not empty."+clearInputHint)
-		return
+		return withClearHint("input not empty"), false
+	case errors.Is(err, claudeui.ErrStartTimeout):
+		return "agent never started", true
 	}
-	reason := "prompt never reached the input"
-	if errors.Is(err, claudeui.ErrStartTimeout) {
-		reason = "agent never started"
-	}
-	cleared, cancelled := f.clearLeftover(prompt)
-	switch {
-	case cancelled:
-		f.log.Debug(errNudgeCancelled.Error())
-	case cleared:
-		f.raise(prompt, reason)
-	default:
-		f.raise(prompt, reason+"."+clearInputHint)
-	}
+	return "prompt never reached the input", true
+}
+
+func withClearHint(reason string) string {
+	return reason + "." + clearInputHint
 }
 
 // clearLeftover clears the whole input once and reports whether the harness
@@ -219,7 +230,8 @@ func (f *firstPrompt) start(signal, prompt string) {
 			f.log.Debug(errNudgeCancelled.Error())
 		case errors.Is(err, errDraft):
 			f.s.refuseForDraft(f.dir, []string{prompt})
-		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout):
+		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
+			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked):
 			f.failed(prompt, err)
 		case err != nil:
 			f.log.Warn("type first prompt", "err", err)
@@ -257,9 +269,16 @@ func (f *firstPrompt) deliver(prompt string) error {
 	return err
 }
 
-// deliverSlash types the prompt once and ends like an Action slash step.
+// errSessionBlocked means the first prompt was never typed because the session
+// waits on a person.
+var errSessionBlocked = errors.New("session is blocked")
+
+// deliverSlash types the prompt once and ends like an Action slash step. It
+// skips the Idle check on purpose: the ready report can arrive while the
+// session is still Starting, so only Blocked refuses. A step that fails after
+// typing (blocked, ended) is only logged: the prompt was delivered.
 func (f *firstPrompt) deliverSlash(prompt string) error {
-	run, closeRun, err := f.s.openActionRun(f.dir)
+	run, closeRun, err := f.s.openActionRun(f.dir, actionRunOpts{onTyped: f.markTyped, cancel: f.cancel})
 	if err != nil {
 		return err
 	}
@@ -268,9 +287,8 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 		return err
 	}
 	if run.state == SessionBlocked {
-		return errors.New("session is blocked")
+		return errSessionBlocked
 	}
-	run.onTyped, run.cancel = f.markTyped, f.cancel
 	if err := run.step(0, prompt); err != nil {
 		return err
 	}

@@ -120,8 +120,13 @@ func clearWhole(p Prompter, text string) error {
 	return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrInputNotEmpty)
 }
 
-// ClearInput empties the whole input once, as the retype does for text.
+// ClearInput gets the input ready to type, then empties the whole input once,
+// as the retype does for text. In vim NORMAL mode the clear keys would run as
+// vim commands, so a give-up there is ErrNotReadyToType.
 func ClearInput(p Prompter, text string) error {
+	if !readyToType(p) {
+		return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrNotReadyToType)
+	}
 	return clearWhole(p, text)
 }
 

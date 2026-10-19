@@ -131,6 +131,23 @@ func TestPromptWithNudge_ReadyToTypeRunsBeforeTypingAndBeforeTheClear(t *testing
 	assertCalls(t, f.calls, "ready", "submit:hi", "wait", "ready", "clear", "clear", "clear", "submit:hi", "wait")
 }
 
+func TestClearInput_RunsReadyToTypeBeforeTheClearKeys(t *testing.T) {
+	f := &readyPrompter{fakePrompter: &fakePrompter{}, ready: []bool{true}}
+	if err := ClearInput(f, "hi"); err != nil {
+		t.Fatalf("ClearInput() error = %v", err)
+	}
+	assertCalls(t, f.calls, "ready", "clear", "clear", "clear")
+}
+
+func TestClearInput_ReadyGiveUp_DoesNotClear(t *testing.T) {
+	f := &readyPrompter{fakePrompter: &fakePrompter{}, ready: []bool{false}}
+	err := ClearInput(f, "hi")
+	if !errors.Is(err, ErrStuckSubmission) || !errors.Is(err, ErrNotReadyToType) {
+		t.Fatalf("ClearInput() error = %v, want ErrStuckSubmission wrapping ErrNotReadyToType", err)
+	}
+	assertCalls(t, f.calls, "ready")
+}
+
 func TestPromptWithNudge_ReadyGiveUpBeforeTyping_StopsAsStuck(t *testing.T) {
 	f := &readyPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, ready: []bool{false}}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
