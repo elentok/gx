@@ -206,6 +206,21 @@ func (m Model[T]) EntryAtBodyLine(bodyLine int) (int, bool) {
 	return idx, true
 }
 
+// ToggleEntry selects entry idx and flips its collapse state, as the toggle
+// key does for the selected row. It reports false, changing nothing but the
+// selection, when the entry has no children. A true result means the caller
+// owes the same rebuild it does for Result.RebuildRequested.
+func (m *Model[T]) ToggleEntry(idx int) bool {
+	m.SetSelectedIndex(idx)
+	return toggleOnEnter(m.entries, m.collapsed, idx)
+}
+
+// LabelColumn is the 0-based column, inside the panel's content area, where
+// the entry's label starts: the selection mark, then two cells per depth.
+func LabelColumn[T any](entry Entry[T]) int {
+	return 1 + 2*entry.Depth
+}
+
 // SelectedBodyLine is EntryAtBodyLine's inverse for the selection: the body
 // line the selected entry starts on and how many lines it spans. ok is false
 // when the selection is scrolled above the viewport.

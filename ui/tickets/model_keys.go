@@ -199,25 +199,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	m.sidebarTree = next
 	if result.RebuildRequested {
-		// Record only selectedID's own resulting value into the durable
-		// explicit map — never the whole CollapsedIDs() map, which would
-		// reintroduce the read-back-and-write-back loop (ticket 02) that
-		// made every declared default/search override permanent.
-		if selectedID != "" {
-			if m.explicitCollapsed == nil {
-				m.explicitCollapsed = map[string]bool{}
-			}
-			m.explicitCollapsed[selectedID] = m.sidebarTree.CollapsedIDs()[selectedID]
-		}
-		if selectedID == sidebarSectionID(sectionArchived) && !m.sidebarTree.CollapsedIDs()[selectedID] && m.archivedEpicCount > 0 {
-			if expandCmd := m.archivedLazy.Expand(); expandCmd != nil {
-				cmd = tea.Batch(cmd, expandCmd)
-			}
-		}
-		m.clampSelected()
-		if m.search.HasQuery() {
-			m.recomputeSearchMatches()
-		}
+		cmd = m.afterSidebarToggle(selectedID, cmd)
 	}
 	if result.OpenSelected {
 		m.focusPreviewPane()
@@ -226,6 +208,33 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// inside tree.Model.Update (see SetIsSelectable/SkipUnselectable) — no
 	// extra nudge needed here for j/k/up/down.
 	return m, cmd
+}
+
+// afterSidebarToggle is the bookkeeping owed after the sidebar tree flipped
+// the collapse state of entry toggledID, whether by key or by a click on its
+// icon. It returns cmd, plus the Archived section's load when that section
+// was just expanded.
+func (m *Model) afterSidebarToggle(toggledID string, cmd tea.Cmd) tea.Cmd {
+	// Record only toggledID's own resulting value into the durable
+	// explicit map — never the whole CollapsedIDs() map, which would
+	// reintroduce the read-back-and-write-back loop (ticket 02) that
+	// made every declared default/search override permanent.
+	if toggledID != "" {
+		if m.explicitCollapsed == nil {
+			m.explicitCollapsed = map[string]bool{}
+		}
+		m.explicitCollapsed[toggledID] = m.sidebarTree.CollapsedIDs()[toggledID]
+	}
+	if toggledID == sidebarSectionID(sectionArchived) && !m.sidebarTree.CollapsedIDs()[toggledID] && m.archivedEpicCount > 0 {
+		if expandCmd := m.archivedLazy.Expand(); expandCmd != nil {
+			cmd = tea.Batch(cmd, expandCmd)
+		}
+	}
+	m.clampSelected()
+	if m.search.HasQuery() {
+		m.recomputeSearchMatches()
+	}
+	return cmd
 }
 
 // archivedReadOnlyGuard is the mutating keybindings' shared no-op check:

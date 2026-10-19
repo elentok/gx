@@ -445,7 +445,13 @@ func (m Model) handleSidebarMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cm
 		return m.handleSuggestedActionsKey()
 	}
 	m.focus = focusSidebar
-	m.sidebarTree.SelectAtBodyLine(bodyLine)
+	if idx, ok := m.sidebarTree.EntryAtBodyLine(bodyLine); ok {
+		entry := m.sidebarTree.Entries()[idx]
+		if onTreeIcon(mouse.X, entry, 0, m.icons()) && m.sidebarTree.ToggleEntry(idx) {
+			return m, m.afterSidebarToggle(entry.ID, nil)
+		}
+		m.sidebarTree.SetSelectedIndex(idx)
+	}
 	return m, nil
 }
 

@@ -375,7 +375,19 @@ func (m QueueModel) handleQueueMouseClick(msg tea.MouseClickMsg) (tea.Model, tea
 		m.queueTree.SetSelectedIndex(idx)
 		return m.handleQueueTicketMenuKey()
 	}
-	m.queueTree.SelectAtBodyLine(bodyLine)
+	if idx, ok := m.queueTree.EntryAtBodyLine(bodyLine); ok {
+		entry := m.queueTree.Entries()[idx]
+		// Only ticket rows draw a triangle; the label's leading cell is the
+		// indent renderQueueTicketRow puts before it.
+		if entry.Value.kind == nodeQueueTicket && onTreeIcon(mouse.X, entry, 1, m.icons()) && m.queueTree.ToggleEntry(idx) {
+			m.clampSelected()
+			if m.search.HasQuery() {
+				m.recomputeQueueSearchMatches()
+			}
+			return m, nil
+		}
+		m.queueTree.SetSelectedIndex(idx)
+	}
 	return m, nil
 }
 
