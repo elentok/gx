@@ -120,15 +120,15 @@ func (r *Runner) Prompt(s agentrunner.Session, text string) error {
 }
 
 func (r *Runner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
-	return r.promptNudged(s, text, onNudge, false)
+	if err := r.guard(s); err != nil {
+		return err
+	}
+	return r.promptNudged(s, text, onNudge)
 }
 
-// promptNudged is PromptNudged; ownHold lets the deny's own reason prompt
-// through the hold that refuses everyone else.
-func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(string), ownHold bool) error {
-	if !ownHold && r.isHeld(s) {
-		return fmt.Errorf("%w: blocked on a deny with a reason", agentrunner.ErrNotReady)
-	}
+// promptNudged is PromptNudged without the hold check, so the deny's own
+// reason prompt gets through the hold that refuses everyone else.
+func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
 	turn, err := r.awaitNotBusy(s)
 	if err != nil {
 		return err
@@ -157,19 +157,7 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 	if err != nil {
 		return err
 	}
-	// A turn can start and end between herdr's polls, so its wait reports a
-	// stall though the seq moved: that turn was delivered, and a nudge or
-	// retype would send the text twice.
-	submit := func(o herdr.AgentPromptOptions) (herdr.Agent, error) {
-		agent, err := herdr.AgentPrompt(o)
-		if IsPollTimeout(err) {
-			if cur, getErr := herdr.AgentGet(s.ID); getErr == nil && cur.StateChangeSeq > turn {
-				return cur, errTurnPassedUnseen
-			}
-		}
-		return agent, err
-	}
-	prompt := promptWithNudge(typing, submit, herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
+	prompt := promptWithNudge(typing, submitSince(s, turn), herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {
@@ -192,6 +180,21 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 }
 
 var errTurnPassedUnseen = errors.New("turn started and ended between polls")
+
+// submitSince sends a prompt against turn. A turn can start and end between
+// herdr's polls, so its wait reports a stall though the seq moved: that turn
+// was delivered, and a nudge or retype would send the text twice.
+func submitSince(s agentrunner.Session, turn int) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+	return func(o herdr.AgentPromptOptions) (herdr.Agent, error) {
+		agent, err := herdr.AgentPrompt(o)
+		if IsPollTimeout(err) {
+			if cur, getErr := herdr.AgentGet(s.ID); getErr == nil && cur.StateChangeSeq > turn {
+				return cur, errTurnPassedUnseen
+			}
+		}
+		return agent, err
+	}
+}
 
 // isSlashCommand reports whether text is a "/" command that takes the
 // single-send rule. /compact keeps the normal path: it starts a turn.
@@ -346,8 +349,8 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 // runner, since Ctrl+U clears one line per press and leaves a multi-line prompt
 // behind. Codex keeps Ctrl+U: Ctrl+C on its empty composer quits the agent.
 func (r *Runner) Interrupt(s agentrunner.Session) error {
-	if r.isHeld(s) {
-		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
+	if err := r.guard(s); err != nil {
+		return err
 	}
 	agent, err := herdr.AgentGet(s.ID)
 	if err != nil {
@@ -498,8 +501,8 @@ func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	if a.Decision == agentrunner.DecisionDeny && a.Text != "" {
 		return r.denyWithReason(s, a.Text)
 	}
-	if r.isHeld(s) {
-		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
+	if err := r.guard(s); err != nil {
+		return err
 	}
 	if err := r.requireBlocked(s); err != nil {
 		return err
@@ -530,7 +533,7 @@ func (r *Runner) requireBlocked(s agentrunner.Session) error {
 // session alive, the reason not typed.
 func (r *Runner) denyWithReason(s agentrunner.Session, reason string) error {
 	if !r.hold(s) {
-		return fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
+		return errDenyInProgress
 	}
 	defer r.release(s)
 	if err := r.requireBlocked(s); err != nil {
@@ -541,7 +544,7 @@ func (r *Runner) denyWithReason(s agentrunner.Session, reason string) error {
 	}
 	err := r.awaitIdle(s)
 	if err == nil {
-		err = r.promptNudged(s, reason, nil, true)
+		err = r.promptNudged(s, reason, nil)
 	}
 	switch {
 	case err == nil:
@@ -570,6 +573,16 @@ func (r *Runner) release(s agentrunner.Session) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.held, s.ID)
+}
+
+var errDenyInProgress = fmt.Errorf("%w: a deny with a reason is in progress", agentrunner.ErrNotReady)
+
+// guard refuses a verb on a session held by a deny with a reason.
+func (r *Runner) guard(s agentrunner.Session) error {
+	if r.isHeld(s) {
+		return errDenyInProgress
+	}
+	return nil
 }
 
 func (r *Runner) isHeld(s agentrunner.Session) bool {
