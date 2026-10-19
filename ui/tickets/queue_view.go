@@ -91,9 +91,10 @@ func (m QueueModel) queueBody(width int) []string {
 		lines = append(lines, "  "+ui.StyleHint.Render(line))
 	}
 
-	treeH := m.queueViewportHeight() - len(lines)
+	finished := m.finishedLines()
+	treeH := m.queueViewportHeight() - len(lines) - len(finished)
 	lines = append(lines, m.queueTree.RenderLines(treeH+2, m.queueRenderOpts(width))...)
-	return lines
+	return append(lines, finished...)
 }
 
 // queueRenderOpts builds the tree.RenderOpts m.queueTree.RenderLines renders

@@ -39,6 +39,11 @@ type QueueModel struct {
 	// launch agents.
 	summaries map[string]server.EpicSummary
 	herdrDown bool
+	// finished is the snapshot's Recently finished list. finishedGen numbers the
+	// refresh tick chain: each page activation starts a new chain and the older
+	// chain's pending tick is ignored.
+	finished    []server.FinishedEpic
+	finishedGen int
 	// serverBudget is the last snapshot's budget: the header's spend and the
 	// root rows' cost in server mode.
 	serverBudget     server.BudgetStatus
@@ -152,6 +157,26 @@ func (m QueueModel) Init() tea.Cmd {
 	return nil // the app shell delivers the state (WithServerState)
 }
 
+// finishedRefreshInterval is how often the Recently finished times re-render.
+const finishedRefreshInterval = time.Minute
+
+// finishedTickMsg re-renders the relative times of the Recently finished list.
+type finishedTickMsg struct{ gen int }
+
+func finishedTick(gen int) tea.Cmd {
+	return tea.Tick(finishedRefreshInterval, func(time.Time) tea.Msg { return finishedTickMsg{gen: gen} })
+}
+
+// restartFinishedTick starts a new refresh chain, orphaning the old one, or
+// returns nil when there is no finished entry to refresh.
+func (m *QueueModel) restartFinishedTick() tea.Cmd {
+	m.finishedGen++
+	if len(m.finished) == 0 {
+		return nil
+	}
+	return finishedTick(m.finishedGen)
+}
+
 // queueSpinnerRestartMsg restarts the running spinner on page activation.
 type queueSpinnerRestartMsg struct{}
 
@@ -202,12 +227,20 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case queueSpinnerRestartMsg:
 		// The tick chain dies while the tab is hidden, so a claim that arrived
 		// meanwhile would otherwise show no spinner.
+		// The finished-time refresh chain dies the same way, so activation
+		// starts a new one and orphans any tick still pending from the old one.
+		tick := m.restartFinishedTick()
 		if len(m.runningEpics) == 0 {
-			return m, nil
+			return m, tick
 		}
-		return m, m.implementSpinner.Tick
+		return m, tea.Batch(m.implementSpinner.Tick, tick)
 	case spinner.TickMsg:
 		return m.handleQueueSpinnerTick(msg)
+	case finishedTickMsg:
+		if msg.gen != m.finishedGen {
+			return m, nil
+		}
+		return m, finishedTick(m.finishedGen)
 	case tea.MouseWheelMsg:
 		if next, cmd, handled := m.help.Forward(msg); handled {
 			m.help = next

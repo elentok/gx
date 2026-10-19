@@ -48,6 +48,8 @@ type State struct {
 	// Epics is the server's summary of each epic holding a queue item, in queue
 	// order, as the last snapshot delivered it.
 	Epics []server.EpicSummary
+	// RecentlyFinished is the last snapshot's completed epics, newest first.
+	RecentlyFinished []server.FinishedEpic
 	// Queue is the queued ticket addresses in launch order.
 	Queue []string
 	// Iterations holds live state by ticket address; absent means no live
@@ -153,6 +155,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		ExtraUsage:       snap.ExtraUsage,
 		Tickets:          slices.Clone(snap.Tickets),
 		Epics:            slices.Clone(snap.Epics),
+		RecentlyFinished: slices.Clone(snap.RecentlyFinished),
 		Queue:            s.Queue,
 		Pending:          slices.Clone(snap.Pending),
 		Mode:             snap.Mode,

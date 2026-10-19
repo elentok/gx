@@ -19,7 +19,7 @@ func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.M
 	m.link = link
 	if m.serverDown() {
 		// Whatever the queue showed is stale; it refills on reconnect.
-		m.epics, m.summaries = nil, nil
+		m.epics, m.summaries, m.finished = nil, nil, nil
 		m.clampSelected()
 		return m, nil
 	}
@@ -36,6 +36,8 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 	for _, sum := range st.Epics {
 		m.summaries[sum.Address] = sum
 	}
+	hadFinished := len(m.finished) > 0
+	m.finished = st.RecentlyFinished
 	m.herdrDown, m.serverBudget = st.HerdrUnavailable, st.Budget
 	m.paused = st.Mode == server.ModePaused
 	m.checked = make(map[string]bool, len(st.Queue))
@@ -45,7 +47,13 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 		m.checkOrder[addr] = uint64(i + 1)
 	}
 	m.applyEpics(epicsFromViewModel(*st, viewmodel.Scope{}), true)
-	return m, m.syncServerRunState()
+	cmd := m.syncServerRunState()
+	if !hadFinished && len(m.finished) > 0 {
+		// The first finished entry has no chain yet; a delivery only reaches the
+		// tab that is on screen.
+		cmd = tea.Batch(cmd, m.restartFinishedTick())
+	}
+	return m, cmd
 }
 
 // applyEpics swaps the rows in and re-derives what hangs off them. With
