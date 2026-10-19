@@ -69,6 +69,13 @@ Then, while working:
   then stop it (TaskStop) before reporting finished. `TaskStop` is a deferred tool: if it isn't
   callable, load it first with `ToolSearch` query `select:TaskStop`. ralph-loop will not land a
   ticket while one is open.
+- **One check per Bash call.** A chained call (`rg ...; go test; gofmt -l`) can return the output
+  of one segment only. Run each check in its own call.
+- **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
+  Do not claim "no remaining imports" or "gofmt is clean" from silence.
+- **On a test failure, re-run it with `rtk proxy go test ...`.** `rtk` truncates multi-line
+  assertion text and server logs. If a shell read of a file ends in "(exporter truncated)"
+  or has lost its indentation, use the `Read` tool instead.
 
 ## Forking when the ticket outgrows budget
 
