@@ -52,12 +52,16 @@ func TestQueueServerMode_HeaderColourBands(t *testing.T) {
 	}
 }
 
-func TestQueueServerMode_RootRowShowsItsCostToday(t *testing.T) {
-	m := loadedServerQueueWithBudget(t, server.BudgetStatus{
-		Total: 5, SoftLimit: 50, Roots: map[string]float64{"gx:alpha": 3.25},
-	})
+func TestQueueServerMode_EpicStatusLineShowsTicketCostSum(t *testing.T) {
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1,
+		Budget: server.BudgetStatus{Total: 5, SoftLimit: 50, Roots: map[string]float64{"gx:alpha": 99}},
+		Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: "done", ActualCost: 1.5},
+			{Address: "gx:alpha/02", Title: "Second", Status: "open", ActualCost: 1.75},
+		}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
-	if view := m.View().Content; !strings.Contains(view, "$3.25") {
-		t.Errorf("queue view does not show the root's $3.25:\n%s", view)
+	line := epicStatusLineText(t, m)
+	if !strings.Contains(line, "$3.25") || strings.Contains(line, "$99") {
+		t.Errorf("Status line should show the ticket sum $3.25, not the ledger root: %q", line)
 	}
 }

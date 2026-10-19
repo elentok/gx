@@ -7,7 +7,6 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/search"
 	"github.com/elentok/gx/ui/tree"
@@ -128,24 +127,11 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 			case nodeEpicSpacer:
 				return ""
 			case nodeEpicStatusLine:
-				// Ticket 10: the epic's own running total, dim like the rest of
-				// the metrics regardless of the state's color — the configured
-				// limits are session-wide, so coloring one epic's slice against
-				// them would misleadingly suggest that epic alone is over
-				// budget. In server mode it is the ledger's cost for today, per
-				// root; otherwise a completed epic gets its final summed cost
-				// (epicCost), and an idle epic gets nothing.
-				cost := 0.0
-				if m.serverAPI != nil {
-					cost = m.serverBudget.Roots[entry.Value.epic.Name]
-				} else if entry.Value.epic.AllDone() {
-					cost = epicCost(entry.Value.epic)
-				}
-				extra := ""
-				if cost > 0 {
-					extra = tickets.FormatCost(cost)
-				}
-				return m.epicStatusRow(entry.Value.epic, extra, m.queueLabelWidth())
+				// The cost is dim like the rest of the metrics regardless of the
+				// state's color — the configured limits are session-wide, so
+				// coloring one epic's slice against them would misleadingly
+				// suggest that epic alone is over budget.
+				return m.epicStatusRow(entry.Value.epic, m.queueLabelWidth())
 			case nodeEpicError:
 				if stuck, ok := entry.Value.err.(*ralphloop.StuckPlanError); ok {
 					return "    " + metricsLineStyle.Render(

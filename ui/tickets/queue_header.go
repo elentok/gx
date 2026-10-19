@@ -3,6 +3,7 @@ package tickets
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -265,21 +266,70 @@ func epicBarLine(epic tickets.Epic, fill lipgloss.Style, layout epicHeaderLayout
 	return " " + epicBar(epic, fill) + " " + epicCounter(epic)
 }
 
-// epicStatusRow renders "Status: <icon> <state> · n compact(s)", all dim
-// except the state, cut at labelW. extra is appended as another dim part.
-func (m QueueModel) epicStatusRow(epic tickets.Epic, extra string, labelW int) string {
+// formatSpan renders an elapsed span at minute resolution, "<1m" under a minute.
+func formatSpan(d time.Duration) string {
+	if d < time.Minute {
+		return "<1m"
+	}
+	return formatDuration(d)
+}
+
+// epicElapsedPart is the Status line's "<elapsed> elapsed" part, or "" when
+// the epic has no started_at. Done epics show start-to-completion, falling
+// back to the tickets' summed elapsed time when completed_at is missing.
+func (m QueueModel) epicElapsedPart(epic tickets.Epic) string {
+	if epic.StartedAt.IsZero() {
+		return ""
+	}
+	var d time.Duration
+	switch dur, ok := epic.CompletionDuration(); {
+	case !epic.AllDone():
+		d = m.now().Sub(epic.StartedAt)
+	case ok:
+		d = dur
+	default:
+		d = time.Duration(epicElapsedSeconds(epic)) * time.Second
+	}
+	return formatSpan(d) + " elapsed"
+}
+
+// epicAgentPart is the Status line's "<agent> agent" part: landed tickets'
+// elapsed time plus the live elapsed of running ones. "" when zero.
+func (m QueueModel) epicAgentPart(epic tickets.Epic) string {
+	d := time.Duration(epicElapsedSeconds(epic)) * time.Second
+	if m.runningEpics[epic.Name] {
+		for _, t := range epic.Tickets {
+			if live, ok := m.live[epic.Name][t.Identifier]; ok && live.running && !live.startedAt.IsZero() {
+				d += m.now().Sub(live.startedAt)
+			}
+		}
+	}
+	if d <= 0 {
+		return ""
+	}
+	return formatSpan(d) + " agent"
+}
+
+// epicStatusRow renders "Status: <icon> <state> · elapsed · agent · cost ·
+// n compact(s)", all dim except the state, zero parts hidden, cut at labelW.
+func (m QueueModel) epicStatusRow(epic tickets.Epic, labelW int) string {
 	icon, text, style := m.epicStatus(epic)
 	line := " " + metricsLineStyle.Render("Status:") + " " + style.Render(icon+" "+text)
 	parts := []string{}
+	for _, p := range []string{m.epicElapsedPart(epic), m.epicAgentPart(epic)} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	if cost := epicCost(epic); cost > 0 {
+		parts = append(parts, tickets.FormatCost(cost))
+	}
 	if _, _, compacts := epicContextMetrics(epic); compacts > 0 {
 		noun := "compacts"
 		if compacts == 1 {
 			noun = "compact"
 		}
 		parts = append(parts, fmt.Sprintf("%d %s", compacts, noun))
-	}
-	if extra != "" {
-		parts = append(parts, extra)
 	}
 	for _, p := range parts {
 		line += metricsLineStyle.Render(" · " + p)
