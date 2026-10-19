@@ -109,12 +109,14 @@ type SessionUnread struct {
 
 // SessionActionable is set while Reason is; Action is its ordered prompts.
 // Kind is the block's kind on one derived from Blocked, which wins over an
-// agent-raised one while the block lasts. GxRaised marks one gx raised itself:
-// the person's input does not clear it.
+// agent-raised one while the block lasts. A "queue" Kind has no prompts: its
+// Target is the epic whose queue the Action runs. GxRaised marks one gx raised
+// itself: the person's input does not clear it.
 type SessionActionable struct {
 	Kind     string   `json:"kind,omitempty"`
 	Reason   string   `json:"reason,omitempty"`
 	Action   []string `json:"action,omitempty"`
+	Target   string   `json:"target,omitempty"`
 	GxRaised bool     `json:"gx_raised,omitempty"`
 }
 
@@ -657,7 +659,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		switch msg.Type {
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
-			var prompt, signal, grillConv string
+			var prompt, signal, designConv, designTicket string
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
@@ -673,7 +675,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
 					if st.State == SessionIdle && prev.State != SessionIdle && m.Design {
-						grillConv = m.ConversationID
+						designConv, designTicket = m.ConversationID, m.Ticket
 					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
@@ -693,8 +695,8 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				return changed
 			})
 			first.noteState(st.State)
-			if grillConv != "" {
-				s.detectGrilling(dir, id, grillConv)
+			if designConv != "" {
+				s.detectDesignActionable(dir, id, designConv, designTicket)
 			}
 			if prompt != "" {
 				first.start(signal, prompt)

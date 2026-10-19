@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -91,6 +92,45 @@ func TestGrilling_DetectedOnIdleForDesignSessions(t *testing.T) {
 			got = waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
 			if got.Actionable.Reason != "" {
 				t.Errorf("actionable = %+v, want none", got.Actionable)
+			}
+		})
+	}
+}
+
+func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
+	const grill = "❓ **Q1** Which store?\n"
+	for name, tc := range map[string]struct {
+		text       string
+		reason     string
+		kind       string
+		target     string
+		action     []string
+		wantAction bool
+	}{
+		"next map":       {text: "Done.\n✅ Map: drafted. Next: map — more to split", reason: "✅ Map: drafted. Next: map — more to split", action: []string{"/clear", "/gx-design map"}, wantAction: true},
+		"next review":    {text: "✅ Map: drafted. Next: review — check it", reason: "✅ Map: drafted. Next: review — check it", action: []string{"/clear", "/gx-design map"}, wantAction: true},
+		"next implement": {text: "✅ Map: drafted. Next: implement — build it", reason: "✅ Map: drafted. Next: implement — build it", kind: "queue", target: "map-impl", wantAction: true},
+		"grilling wins":  {text: grill + "✅ Map: drafted. Next: map — more", reason: "Grilling: waiting for your answers", wantAction: true},
+		"neither":        {text: "All done, nothing to ask."},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h, ctx, evs, id, conv, path := startGrillingSession(t, "proj:map")
+			writeAssistantMessage(t, path, tc.text)
+			report(t, conv, agentfake.Control{State: "working"})
+			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+			report(t, conv, agentfake.Control{State: "idle"})
+			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+			if !tc.wantAction {
+				report(t, conv, agentfake.Control{State: "working"})
+				got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+				if got.Actionable.Reason != "" {
+					t.Errorf("actionable = %+v, want none", got.Actionable)
+				}
+				return
+			}
+			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
+			if got.Reason != tc.reason || got.Kind != tc.kind || got.Target != tc.target || !slices.Equal(got.Action, tc.action) {
+				t.Errorf("actionable = %+v, want reason %q kind %q target %q action %v", got, tc.reason, tc.kind, tc.target, tc.action)
 			}
 		})
 	}

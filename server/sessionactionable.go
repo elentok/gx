@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/elentok/gx/harness"
@@ -56,11 +57,48 @@ const grillingMarker = "❓ **Q"
 
 const grillingReason = "Grilling: waiting for your answers"
 
-// detectGrilling raises the grilling Actionable when a Design session's last
-// assistant message holds a question marker. Like an agent-raised one, the
-// person's next input clears it. A harness without a claude transcript
-// (codex) never matches.
-func (s *Server) detectGrilling(dir, id, conversationID string) {
+// runEndLine matches the closing line of a gx-design run, capturing the next
+// phase.
+var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next: (\w+) —.*$`)
+
+// SessionActionableQueue is the Kind of an Actionable whose Action is a queue
+// action on Target, not prompts.
+const SessionActionableQueue = "queue"
+
+// designActionable is what a Design session's last assistant message asks of
+// the person: the grilling question wins over the run-end line.
+func designActionable(text, ticket string) (SessionActionable, bool) {
+	if strings.Contains(text, grillingMarker) {
+		return SessionActionable{Reason: grillingReason}, true
+	}
+	m := runEndLine.FindStringSubmatch(text)
+	if m == nil {
+		return SessionActionable{}, false
+	}
+	reason := strings.TrimSpace(m[0])
+	epic := ticketEpic(ticket)
+	switch m[1] {
+	case "map", "review":
+		return SessionActionable{Reason: reason, Action: []string{"/clear", "/gx-design " + epic}}, true
+	case "implement":
+		return SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epic + "-impl"}, true
+	}
+	return SessionActionable{}, false
+}
+
+// ticketEpic is the epic of a ticket address like "project:epic" or
+// "project:epic/03".
+func ticketEpic(addr string) string {
+	_, rest, _ := strings.Cut(addr, ":")
+	epic, _, _ := strings.Cut(rest, "/")
+	return epic
+}
+
+// detectDesignActionable raises the grilling or run-end Actionable when a
+// Design session's last assistant message holds its marker. Like an
+// agent-raised one, the person's next input clears it. A harness without a
+// claude transcript (codex) never matches.
+func (s *Server) detectDesignActionable(dir, id, conversationID, ticket string) {
 	projects, err := harness.ClaudeProjectsDir()
 	if err != nil || conversationID == "" {
 		return
@@ -70,7 +108,11 @@ func (s *Server) detectGrilling(dir, id, conversationID string) {
 		return
 	}
 	text, ok, err := transcript.LastAssistantText(paths[0])
-	if err != nil || !ok || !strings.Contains(text, grillingMarker) {
+	if err != nil || !ok {
+		return
+	}
+	a, ok := designActionable(text, ticket)
+	if !ok {
 		return
 	}
 	raised := false
@@ -78,12 +120,12 @@ func (s *Server) detectGrilling(dir, id, conversationID string) {
 		if m.Status.State != SessionIdle || m.Actionable.Reason != "" {
 			return false
 		}
-		m.Actionable = SessionActionable{Reason: grillingReason}
+		m.Actionable = a
 		raised = true
 		return true
 	})
 	if raised {
-		s.triggerBanner(id, sound.Attention, grillingReason)
+		s.triggerBanner(id, sound.Attention, a.Reason)
 	}
 }
 
