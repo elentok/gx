@@ -76,6 +76,9 @@ func TestHeadless_Conformance(t *testing.T) {
 				"BusyPastNNotReady":        "headless busy guard: ticket 07",
 				"BackgroundTaskNotBusy":    "headless busy guard: ticket 07",
 				"FastTurnDeliveredOnce":    "headless busy guard: ticket 07",
+				"SlashIdleDeliveredOnce":   "headless slash rule: ticket 07",
+				"SlashClearReturnsAtOnce":  "headless slash rule: ticket 07",
+				"SlashDialogDelivered":     "headless slash rule: ticket 07",
 			},
 			Restart: func(t *testing.T) agentrunner.Runner {
 				r := newRunner()

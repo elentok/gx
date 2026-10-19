@@ -586,6 +586,9 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 		return err
 	}
 	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
+	if isSlashCommand(text) {
+		return p.promptSlash(pr, text)
+	}
 	// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
 	// would hold a stuck prompt for minutes before the loop hears of it.
 	caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
@@ -594,6 +597,35 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
 	return err
+}
+
+// isSlashCommand reports whether text is a "/" command that takes the
+// single-send rule. /compact keeps the normal path: it starts a turn.
+func isSlashCommand(text string) bool {
+	return strings.HasPrefix(text, "/") && text != "/compact"
+}
+
+// promptSlash sends a "/" command once, never nudging or retyping: most
+// commands start no turn, so a retype would run them twice. Delivered means
+// Turn moved (a working report, a new sessionId, a dialog) or claude is still
+// idle after N. A dialog command leaves the session blocked; gx never closes
+// it.
+func (p *Pty) promptSlash(pr *ptyPrompter, text string) error {
+	if err := pr.Submit(text); err != nil {
+		return err
+	}
+	started, err := pr.WaitStart(p.WaitN())
+	if err != nil || started {
+		return err
+	}
+	claude, _, program, err := pr.ss.holder.statusWithProgram()
+	if err != nil {
+		return p.died(pr.ss, err)
+	}
+	if program == "working" || (claude != nil && claude.Status == ClaudeBusy) {
+		return fmt.Errorf("%w: %q started no turn and claude is not idle", agentrunner.ErrNotDelivered, text)
+	}
+	return nil
 }
 
 // awaitNotBusy waits up to N for claude to stop being busy and returns the

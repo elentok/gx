@@ -32,6 +32,9 @@ const (
 	// ActionFast makes the TUI fake's next turn start and end at once, so a
 	// poll of its pid file sees no busy edge; only the OSC reports show it.
 	ActionFast = "fast"
+	// ActionDialog makes the TUI fake open a dialog on the next "/" command,
+	// as /help does.
+	ActionDialog = "dialog"
 )
 
 // Control stands in for what real claude does on its own. It travels on the

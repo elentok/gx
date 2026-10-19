@@ -79,6 +79,9 @@ func TestPty_Conformance(t *testing.T) {
 				}
 				return string(data)
 			},
+			OpenDialogOnNextPrompt: func(t *testing.T, s agentrunner.Session) {
+				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionDialog})
+			},
 			FastTurn: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFast})
 			},

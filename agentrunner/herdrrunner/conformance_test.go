@@ -71,6 +71,9 @@ func TestConformance(t *testing.T) {
 				"BusyPastNNotReady":        "herdr busy guard: ticket 08",
 				"BackgroundTaskNotBusy":    "herdr busy guard: ticket 08",
 				"FastTurnDeliveredOnce":    "herdr busy guard: ticket 08",
+				"SlashIdleDeliveredOnce":   "herdr slash rule: ticket 08",
+				"SlashClearReturnsAtOnce":  "herdr slash rule: ticket 08",
+				"SlashDialogDelivered":     "herdr slash rule: ticket 08",
 			},
 		}
 	})

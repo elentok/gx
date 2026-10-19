@@ -216,6 +216,8 @@ type tui struct {
 	stalled    bool
 	// fast makes the next turn end as it starts.
 	fast bool
+	// dialogNext makes the next "/" command open a dialog.
+	dialogNext bool
 	// trustYes is whether the trust dialog's cursor is on "Yes"; arrow
 	// collects an arrow key's escape sequence.
 	trustYes bool
@@ -389,6 +391,9 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
+		if strings.HasPrefix(text, "/") && text != "/compact" {
+			return t.slashCommand(text)
+		}
 		t.prompt = text
 		if t.fast {
 			t.fast = false
@@ -400,6 +405,20 @@ func (t *tui) submit() error {
 	case StatusWaiting:
 		// Enter picks the dialog's first option, "Yes".
 		return t.setStatus(StatusBusy, "")
+	}
+	return nil
+}
+
+// slashCommand handles a "/" command at idle as claude does: it starts no
+// turn. /clear starts a new conversation; a dialog command waits on a dialog.
+func (t *tui) slashCommand(text string) error {
+	switch {
+	case t.dialogNext:
+		t.dialogNext = false
+		return t.setStatus(StatusWaiting, "input needed")
+	case text == "/clear":
+		t.pid.SessionID += "-cleared"
+		return t.writePid()
 	}
 	return nil
 }
@@ -433,6 +452,9 @@ func (t *tui) handleControl(c Control) error {
 		return t.writeBackgroundMarker(c.Running)
 	case ActionFast:
 		t.fast = true
+		return nil
+	case ActionDialog:
+		t.dialogNext = true
 		return nil
 	case ActionReport:
 		writeReport(t.out, c.State, c.Kind, c.Message)

@@ -45,6 +45,10 @@ type Harness struct {
 	// FastTurn makes the next turn of the agent behind s start and end with no
 	// status edge a poll could see. Leave it nil to skip FastTurnDeliveredOnce.
 	FastTurn func(t *testing.T, s agentrunner.Session)
+	// OpenDialogOnNextPrompt makes the agent behind s open a dialog on the next
+	// "/" command it receives, as /help does. Leave it nil to skip
+	// SlashDialogDelivered.
+	OpenDialogOnNextPrompt func(t *testing.T, s agentrunner.Session)
 	// Skip maps a scenario this runner can't pass yet to the reason why.
 	Skip map[string]string
 }
@@ -86,6 +90,9 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 		{"BusyPastNNotReady", busyPastNNotReady},
 		{"BackgroundTaskNotBusy", backgroundTaskNotBusy},
 		{"FastTurnDeliveredOnce", fastTurnDeliveredOnce},
+		{"SlashIdleDeliveredOnce", slashIdleDeliveredOnce},
+		{"SlashClearReturnsAtOnce", slashClearReturnsAtOnce},
+		{"SlashDialogDelivered", slashDialogDelivered},
 	}
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
@@ -546,6 +553,42 @@ func fastTurnDeliveredOnce(t *testing.T, h Harness) {
 	promptAdvancesTurn(t, h.Runner, s, "quick")
 	if n := strings.Count(received(t, h, s), "quick"); n != 1 {
 		t.Fatalf("agent received %q %d times, want once", "quick", n)
+	}
+}
+
+// slashIdleDeliveredOnce: a "/" command that starts no turn counts as
+// delivered once the agent is still idle after N, and is never retyped.
+func slashIdleDeliveredOnce(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	prompt(t, h.Runner, s, "/cost")
+	if n := strings.Count(received(t, h, s), "/cost"); n != 1 {
+		t.Fatalf("agent received %q %d times, want once", "/cost", n)
+	}
+}
+
+// slashClearReturnsAtOnce: /clear starts a new conversation, which moves Turn
+// without waiting out N.
+func slashClearReturnsAtOnce(t *testing.T, h Harness) {
+	s := start(t, h.Runner, "e-01", "e")
+	received(t, h, s)
+	promptAdvancesTurn(t, h.Runner, s, "/clear")
+	if n := strings.Count(received(t, h, s), "/clear"); n != 1 {
+		t.Fatalf("agent received %q %d times, want once", "/clear", n)
+	}
+}
+
+// slashDialogDelivered: a dialog command counts as delivered and leaves the
+// session blocked.
+func slashDialogDelivered(t *testing.T, h Harness) {
+	if h.OpenDialogOnNextPrompt == nil {
+		t.Skip("runner has no OpenDialogOnNextPrompt hook")
+	}
+	s := start(t, h.Runner, "e-01", "e")
+	h.OpenDialogOnNextPrompt(t, s)
+	prompt(t, h.Runner, s, "/help")
+	if st := status(t, h.Runner, s); st.State != agentrunner.StateBlocked {
+		t.Fatalf("status after a dialog command = %+v, want blocked", st)
 	}
 }
 
