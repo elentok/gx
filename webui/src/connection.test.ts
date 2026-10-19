@@ -173,18 +173,97 @@ test("a quick reconnect never flips connected", async () => {
   conn.stop();
 });
 
-test("becoming visible or online refreshes immediately", async () => {
+test("becoming visible leaves a live stream alone, online reconnects", async () => {
   const { conn, log } = setup();
   conn.start();
   await vi.advanceTimersByTimeAsync(0);
   setVisibility("hidden");
   setVisibility("visible");
   await vi.advanceTimersByTimeAsync(0);
-  expect(log.filter((l) => l === "snapshot").length).toBe(2);
+  expect(log.filter((l) => l === "snapshot").length).toBe(1);
   window.dispatchEvent(new Event("online"));
   await vi.advanceTimersByTimeAsync(0);
-  expect(log.filter((l) => l === "snapshot").length).toBe(3);
-  expect(log[log.length - 1]).toBe("events /v1/events?since=3");
+  expect(log.filter((l) => l === "snapshot").length).toBe(2);
+  expect(log[log.length - 1]).toBe("events /v1/events?since=2");
+  conn.stop();
+});
+
+test("becoming visible with a dead stream reconnects immediately", async () => {
+  const { conn, log, streams } = setup();
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  setVisibility("hidden");
+  streams[0].end();
+  await vi.advanceTimersByTimeAsync(0);
+  setVisibility("visible");
+  await vi.advanceTimersByTimeAsync(0);
+  expect(streams.length).toBe(2);
+  expect(log.filter((l) => l === "snapshot").length).toBe(2);
+  conn.stop();
+});
+
+test("a burst of events runs one refresh in flight plus one trailing, never out of order", async () => {
+  const pending: { seq: number; resolve: () => void }[] = [];
+  let calls = 0;
+  const streams: { push(c: string): void }[] = [];
+  const conn = createConnection({
+    fetchSnapshot: async () => {
+      const seq = ++calls;
+      if (seq > 1) await new Promise<void>((resolve) => pending.push({ seq, resolve }));
+      return { seq, tickets: [], epics: [], recently_finished: [] } satisfies Snapshot;
+    },
+    openStream: async () => {
+      const queue: string[] = [];
+      let wake: (() => void) | undefined;
+      streams.push({
+        push(c) {
+          queue.push(c);
+          wake?.();
+        },
+      });
+      return (async function* () {
+        for (;;) {
+          while (queue.length === 0) await new Promise<void>((r) => (wake = r));
+          yield queue.shift()!;
+        }
+      })();
+    },
+  });
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  for (let i = 0; i < 5; i++) {
+    streams[0].push(`id: ${i}\nevent: ticket\ndata: {}\n\n`);
+    await vi.advanceTimersByTimeAsync(0);
+  }
+  expect(pending.map((p) => p.seq)).toEqual([2]);
+  pending[0].resolve();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(conn.getState().snapshot?.seq).toBe(2);
+  expect(pending.map((p) => p.seq)).toEqual([2, 3]);
+  pending[1].resolve();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(conn.getState().snapshot?.seq).toBe(3);
+  expect(pending.length).toBe(2);
+  conn.stop();
+});
+
+test("a connect that never resolves trips the watchdog after 45s", async () => {
+  const signals: AbortSignal[] = [];
+  const conn = createConnection({
+    fetchSnapshot: async () => ({ seq: 1, tickets: [], epics: [], recently_finished: [] }),
+    openStream: (_url, signal) => {
+      signals.push(signal);
+      return new Promise<AsyncIterable<string>>(() => {});
+    },
+  });
+  conn.start();
+  await vi.advanceTimersByTimeAsync(WATCHDOG_MS - 1);
+  expect(signals[0].aborted).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(signals[0].aborted).toBe(true);
+  expect(conn.getState().connected).toBe(false);
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(signals.length).toBe(2);
   conn.stop();
 });
 

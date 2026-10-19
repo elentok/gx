@@ -50,6 +50,9 @@ export function createConnection(deps: ConnectionDeps = {}) {
   let gen = 0;
   let abort: AbortController | null = null;
   let backoff = BACKOFF_MIN_MS;
+  let live = false;
+  let refreshing = false;
+  let refreshQueued = false;
   let watchdog: ReturnType<typeof setTimeout> | undefined;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let offline: ReturnType<typeof setTimeout> | undefined;
@@ -64,6 +67,9 @@ export function createConnection(deps: ConnectionDeps = {}) {
     gen++;
     abort?.abort();
     abort = null;
+    live = false;
+    refreshing = false;
+    refreshQueued = false;
     clearTimeout(watchdog);
     clearTimeout(retry);
   }
@@ -96,21 +102,37 @@ export function createConnection(deps: ConnectionDeps = {}) {
     }, WATCHDOG_MS);
   }
 
+  // One fetch in flight, at most one queued behind it. Fetches run one after another, so an
+  // older snapshot can never land after a newer one.
   async function refresh(g: number) {
+    if (refreshing) {
+      refreshQueued = true;
+      return;
+    }
+    refreshing = true;
     try {
-      const snap = await getSnapshot();
-      if (g === gen) set({ snapshot: snap });
+      do {
+        refreshQueued = false;
+        const snap = await getSnapshot();
+        if (g !== gen) return;
+        set({ snapshot: snap });
+      } while (refreshQueued);
     } catch {
       if (g === gen) fail();
+    } finally {
+      if (g === gen) refreshing = false;
     }
   }
 
   async function consume(g: number, since: number) {
     const ctl = new AbortController();
     abort = ctl;
+    // Armed before the connect so a hung connect trips the watchdog too.
+    arm(g);
     try {
       const stream = await openStream(`/v1/events?since=${since}`, ctl.signal);
       if (g !== gen) return;
+      live = true;
       markUp();
       arm(g);
       let buf = "";
@@ -156,7 +178,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   function onVisibility() {
     if (document.visibilityState === "visible") {
       startTick();
-      void connect();
+      if (!live) void connect();
     } else {
       stopTick();
     }
