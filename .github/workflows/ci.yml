@@ -21,6 +21,20 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: webui/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Web tests
+        run: make web-test
+
+      - name: Build web UI
+        run: make web-build
+
       - name: Install delta (Ubuntu)
         if: runner.os == 'Linux'
         run: |

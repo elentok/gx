@@ -5,6 +5,8 @@ version: 2
 before:
   hooks:
     - go mod tidy
+    - make web-build
+    - test -f webui/dist/index.html
 
 builds:
   - binary: gx

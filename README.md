@@ -70,6 +70,9 @@ Using `go install`:
 go install github.com/elentok/gx@latest
 ```
 
+A `go install` build has no web UI, because `webui/dist` is built by `make web-build` and is not
+committed. Use homebrew, a release binary, or `make build` for the web UI.
+
 ```sh
 make install
 ```
