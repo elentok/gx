@@ -91,9 +91,12 @@ type streamStatus struct {
 	Message        string              `json:"message,omitempty"`
 	ConversationID string              `json:"conversation_id,omitempty"`
 	DisplayName    string              `json:"display_name,omitempty"`
+	// Ready names the signal that showed the input ready, "" until one has.
+	// It is a report of its own: Status and its precedence don't change.
+	Ready harness.ReadySignal `json:"ready,omitempty"`
 }
 
-func newStreamStatus(s harness.Status, conversationID, displayName string) streamStatus {
+func newStreamStatus(s harness.Status, conversationID, displayName string, ready harness.ReadySignal) streamStatus {
 	return streamStatus{
 		State:          s.State,
 		Background:     s.Background,
@@ -102,6 +105,7 @@ func newStreamStatus(s harness.Status, conversationID, displayName string) strea
 		Message:        s.Message,
 		ConversationID: conversationID,
 		DisplayName:    displayName,
+		Ready:          ready,
 	}
 }
 

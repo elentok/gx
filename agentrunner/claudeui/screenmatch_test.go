@@ -38,6 +38,34 @@ func replayFixture(t *testing.T, name string, cols, rows int) string {
 	return ScreenText(s.ScrollbackTail(100), s.Rows())
 }
 
+func fixtureRows(t *testing.T, name string) []string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name+".screen.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Split(string(b), "\n")
+}
+
+func TestInputBox(t *testing.T) {
+	cases := []struct {
+		name string
+		rows []string
+		want bool
+	}{
+		{"startup screen with its input box", fixtureRows(t, "startup-w250"), true},
+		{"trust dialog", fixtureRows(t, "trust-w160"), false},
+		{"permission prompt", fixtureRows(t, "permission-w160"), false},
+		{"plan approval", fixtureRows(t, "plan-approval"), false},
+		{"blank screen", []string{"", ""}, false},
+	}
+	for _, c := range cases {
+		if got := InputBox(c.rows); got != c.want {
+			t.Errorf("%s: InputBox = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestClassifyStartup(t *testing.T) {
 	cases := []struct {
 		name string

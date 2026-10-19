@@ -69,8 +69,10 @@ type PidWatcher struct {
 	notBefore int64
 	// startup reports a pre-session dialog on screen; nil sees none.
 	startup func() bool
-	now     func() time.Time
-	find    func(projectsDir, conversationID string) ([]string, error)
+	// inputBox reports claude's prompt input on screen; nil sees none.
+	inputBox func() bool
+	now      func() time.Time
+	find     func(projectsDir, conversationID string) ([]string, error)
 
 	// transcript is read only when its size changes; poll alone touches it.
 	transcript struct {
@@ -91,6 +93,10 @@ type PidWatcher struct {
 	// one, still the transcript's last word early in a turn, isn't news.
 	lastLimit time.Time
 	onChange  func()
+	// readyPidAt and readyOSCAt are when those signals first showed the input
+	// ready; ready latches the signal Ready reported first.
+	readyPidAt, readyOSCAt time.Time
+	ready                  ReadySignal
 }
 
 type pidState struct {
@@ -164,6 +170,9 @@ func (w *PidWatcher) poll() {
 		}
 	}
 	w.live.seen, w.live.last, w.live.conversationID = true, s, f.SessionID
+	if s.Status == ClaudeIdle && w.readyPidAt.IsZero() {
+		w.readyPidAt = w.now()
+	}
 	w.mu.Unlock()
 	if changed {
 		w.changed()
@@ -311,6 +320,32 @@ func (w *PidWatcher) Program(r ProgramReport) {
 		w.live.turn++
 	}
 	w.live.program = &r
+	if s, ok := programStatus(&r); ok && s.State == Idle && w.readyOSCAt.IsZero() {
+		w.readyOSCAt = w.now()
+	}
+}
+
+// Ready is the earliest of the pid file's idle, an OSC 7501 idle or done
+// report, and the input box on screen. The first two are stamped when seen;
+// the screen is read here, so it counts only when neither of them has fired.
+func (w *PidWatcher) Ready() ReadySignal {
+	if w.Status().State == Blocked {
+		return ""
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.ready != "" {
+		return w.ready
+	}
+	switch {
+	case !w.readyPidAt.IsZero() && (w.readyOSCAt.IsZero() || !w.readyOSCAt.Before(w.readyPidAt)):
+		w.ready = ReadyPidFile
+	case !w.readyOSCAt.IsZero():
+		w.ready = ReadyOSC7501
+	case w.inputBox != nil && w.inputBox():
+		w.ready = ReadyScreen
+	}
+	return w.ready
 }
 
 // ProgramState is the last session-wide OSC 7501 state, "" before one or

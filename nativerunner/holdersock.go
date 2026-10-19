@@ -287,7 +287,7 @@ func (h *holderServer) watch(conn net.Conn) {
 	defer h.changes.unsubscribe(changes)
 	var last *streamStatus
 	for {
-		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get())
+		cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.watcher.Ready())
 		if last == nil || cur != *last {
 			if send(StreamStatus, cur) != nil {
 				return
@@ -508,7 +508,9 @@ type WatchMessage struct {
 	ConversationID string
 	// DisplayName is "" until the child sets one.
 	DisplayName string
-	ExitCode    int
+	// Ready is "" until the harness reports its input ready.
+	Ready    harness.ReadySignal
+	ExitCode int
 }
 
 // Next blocks for the next message, skipping types it does not know. An
@@ -525,7 +527,7 @@ func (w *HolderWatch) Next() (WatchMessage, error) {
 			if err := json.Unmarshal(payload, &s); err != nil {
 				return WatchMessage{}, err
 			}
-			return WatchMessage{Type: typ, Status: s.status(), ConversationID: s.ConversationID, DisplayName: s.DisplayName}, nil
+			return WatchMessage{Type: typ, Status: s.status(), ConversationID: s.ConversationID, DisplayName: s.DisplayName, Ready: s.Ready}, nil
 		case StreamExit:
 			var e streamExit
 			if err := json.Unmarshal(payload, &e); err != nil {

@@ -62,7 +62,20 @@ type Watcher interface {
 	// the Watcher sees apart from the child's output, such as a file it
 	// follows. A change the output drives may skip it.
 	OnChange(f func())
+	// Ready names the signal that first showed the input ready for a prompt
+	// after launch, "" until one has. It is separate from Status and "" while
+	// Status is Blocked.
+	Ready() ReadySignal
 }
+
+// ReadySignal is what showed a session's input ready for a prompt.
+type ReadySignal string
+
+const (
+	ReadyPidFile ReadySignal = "pid"
+	ReadyOSC7501 ReadySignal = "osc7501"
+	ReadyScreen  ReadySignal = "screen"
+)
 
 // PidStatusWatcher is a Watcher that follows a claude-style pid status file
 // and can freeze it. A host checks Watch's result for it: only such a watcher

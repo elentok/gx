@@ -26,6 +26,24 @@ func Matches(text, anchor string) bool {
 	return strings.Contains(text, Normalize(anchor))
 }
 
+// InputBox reports whether rows show claude's prompt input: a row starting
+// with ❯ between two border rules. Dialog options also start with ❯ but sit
+// under one rule at most, and an echoed prompt has no rule under it.
+func InputBox(rows []string) bool {
+	for i := 1; i+1 < len(rows); i++ {
+		if strings.HasPrefix(strings.TrimSpace(rows[i]), "❯") && isRule(rows[i-1]) && isRule(rows[i+1]) {
+			return true
+		}
+	}
+	return false
+}
+
+// isRule reports whether row is a horizontal border: only ─ and spaces.
+func isRule(row string) bool {
+	row = strings.TrimSpace(row)
+	return strings.Contains(row, "───") && strings.Trim(row, "─") == ""
+}
+
 // trustAnchors both show on claude's "trust this folder?" dialog; requiring
 // both keeps a prompt that merely quotes one from passing for the dialog.
 var trustAnchors = []string{

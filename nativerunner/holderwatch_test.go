@@ -195,6 +195,7 @@ type settableWatcher struct {
 	status         agentharness.Status
 	conversationID string
 	onChange       func()
+	ready          agentharness.ReadySignal
 	// reads counts Status calls.
 	reads int
 }
@@ -235,3 +236,42 @@ func (w *settableWatcher) ConversationID() string {
 }
 
 func (w *settableWatcher) Program(agentharness.ProgramReport) {}
+
+func (w *settableWatcher) Ready() agentharness.ReadySignal {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.ready
+}
+
+func (w *settableWatcher) setReady(s agentharness.ReadySignal) {
+	w.mu.Lock()
+	w.ready = s
+	onChange := w.onChange
+	w.mu.Unlock()
+	if onChange != nil {
+		onChange()
+	}
+}
+
+func TestHolderWatch_ReportsReadySignal(t *testing.T) {
+	dir := shortTempDir(t)
+	w := &settableWatcher{}
+	c, finished := startTestHolder(t, dir, settableHarness{w: w}, []string{"sh", "-c", "sleep 30"})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+	watch, err := c.Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = watch.Close() })
+
+	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus || m.Ready != "" {
+		t.Fatalf("first message = %+v, %v; want a status that is not ready", m, err)
+	}
+	w.setReady(agentharness.ReadyScreen)
+	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus || m.Ready != agentharness.ReadyScreen {
+		t.Errorf("after ready = %+v, %v; want ready by %q", m, err, agentharness.ReadyScreen)
+	}
+}

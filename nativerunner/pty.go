@@ -163,14 +163,42 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 		return err
 	}
 	ss.holderStart, ss.claudeStart = meta.HolderPIDStart, meta.PIDStart
+	// A holder without the watch op can't report ready; it falls back to the
+	// pid file's idle.
+	watchReady := ss.holder.Supports(OpWatch)
+	ready := make(chan struct{})
+	if watchReady {
+		watch, err := ss.holder.Watch()
+		if err != nil {
+			return err
+		}
+		defer watch.Close()
+		go func() {
+			for {
+				m, err := watch.Next()
+				if err != nil {
+					return
+				}
+				if m.Type == StreamStatus && m.Ready != "" {
+					close(ready)
+					return
+				}
+			}
+		}()
+	}
 	var nextTrustKey time.Time
 	for {
 		claude, _, err := ss.holder.Status()
 		if err != nil {
 			return err
 		}
-		if claude != nil && claude.Status == ClaudeIdle {
+		if !watchReady && claude != nil && claude.Status == ClaudeIdle {
 			return nil
+		}
+		select {
+		case <-ready:
+			return nil
+		default:
 		}
 		if claude == nil && !time.Now().Before(nextTrustKey) {
 			// The trust dialog shows before claude writes its pid file, so

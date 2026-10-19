@@ -39,6 +39,82 @@ func TestPidWatcher_IgnoresFileFromBeforeSpawn(t *testing.T) {
 	}
 }
 
+func TestPidWatcher_Ready(t *testing.T) {
+	spawned := time.Now()
+	newWatcher := func(t *testing.T) (*PidWatcher, string, *time.Time) {
+		dir := t.TempDir()
+		w := newPidWatcher(dir, 4242, spawned)
+		clock := spawned
+		w.now = func() time.Time { return clock }
+		return w, dir, &clock
+	}
+	pidIdle := func(t *testing.T, w *PidWatcher, dir string) {
+		writePidFile(t, dir, spawned, `,"status":"idle"`)
+		w.poll()
+	}
+
+	t.Run("not ready before any signal", func(t *testing.T) {
+		w, dir, _ := newWatcher(t)
+		writePidFile(t, dir, spawned, `,"status":"busy"`)
+		w.poll()
+		w.inputBox = func() bool { return false }
+		if got := w.Ready(); got != "" {
+			t.Fatalf("Ready = %q, want none", got)
+		}
+	})
+	t.Run("pid file idle alone", func(t *testing.T) {
+		w, dir, _ := newWatcher(t)
+		pidIdle(t, w, dir)
+		if got := w.Ready(); got != ReadyPidFile {
+			t.Fatalf("Ready = %q, want %q", got, ReadyPidFile)
+		}
+	})
+	t.Run("OSC 7501 alone", func(t *testing.T) {
+		w, _, _ := newWatcher(t)
+		w.Program(ProgramReport{State: "done", Progress: -1})
+		if got := w.Ready(); got != ReadyOSC7501 {
+			t.Fatalf("Ready = %q, want %q", got, ReadyOSC7501)
+		}
+	})
+	t.Run("input box alone", func(t *testing.T) {
+		w, _, _ := newWatcher(t)
+		w.inputBox = func() bool { return true }
+		if got := w.Ready(); got != ReadyScreen {
+			t.Fatalf("Ready = %q, want %q", got, ReadyScreen)
+		}
+	})
+	t.Run("earliest signal wins and stays", func(t *testing.T) {
+		w, dir, clock := newWatcher(t)
+		w.Program(ProgramReport{State: "done", Progress: -1})
+		*clock = clock.Add(time.Second)
+		pidIdle(t, w, dir)
+		w.inputBox = func() bool { return true }
+		if got := w.Ready(); got != ReadyOSC7501 {
+			t.Fatalf("OSC first: Ready = %q, want %q", got, ReadyOSC7501)
+		}
+
+		w, dir, clock = newWatcher(t)
+		pidIdle(t, w, dir)
+		*clock = clock.Add(time.Second)
+		w.Program(ProgramReport{State: "done", Progress: -1})
+		if got := w.Ready(); got != ReadyPidFile {
+			t.Fatalf("pid file first: Ready = %q, want %q", got, ReadyPidFile)
+		}
+	})
+	t.Run("ignored while blocked", func(t *testing.T) {
+		w, _, _ := newWatcher(t)
+		w.inputBox = func() bool { return true }
+		w.Program(ProgramReport{State: "blocked", Kind: "permission", Progress: -1})
+		if got := w.Ready(); got != "" {
+			t.Fatalf("Blocked: Ready = %q, want none", got)
+		}
+		w.Program(ProgramReport{State: "done", Progress: -1})
+		if got := w.Ready(); got == "" {
+			t.Fatal("after Blocked ended: Ready = none, want a signal")
+		}
+	})
+}
+
 func TestPidWatcher_IgnoresFileWithoutStartedAt(t *testing.T) {
 	dir := t.TempDir()
 	w := newPidWatcher(dir, 4242, time.Now())

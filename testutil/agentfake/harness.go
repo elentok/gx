@@ -75,6 +75,21 @@ type programWatcher struct {
 	startup func() bool
 	mu      sync.Mutex
 	status  harness.Status
+	// idleSeen is set by the first idle report, the fake's ready rule.
+	idleSeen bool
+}
+
+// Ready is the OSC idle report: the fake has no pid file or input box.
+func (w *programWatcher) Ready() harness.ReadySignal {
+	if w.Status().State == harness.Blocked {
+		return ""
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.idleSeen {
+		return harness.ReadyOSC7501
+	}
+	return ""
 }
 
 func (w *programWatcher) Status() harness.Status {
@@ -111,7 +126,9 @@ func (w *programWatcher) Program(r harness.ProgramReport) {
 		w.status = harness.Status{State: harness.Working}
 	case "done":
 		w.status = harness.Status{State: harness.Idle}
+		w.idleSeen = true
 	case "idle":
+		w.idleSeen = true
 		// idle without done is an Esc-cancel, but only of a turn or a dialog.
 		cancelled := w.status.State == harness.Working || w.status.State == harness.Blocked
 		w.status = harness.Status{State: harness.Idle, Cancelled: cancelled}

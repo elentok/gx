@@ -34,6 +34,7 @@ func (h claudeHarness) Watch(pid int, spawned time.Time, scr Screen, stop <-chan
 	w.startup = func() bool {
 		return h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()).Dialog != NoDialog
 	}
+	w.inputBox = func() bool { return claudeui.InputBox(scr.Rows()) }
 	go w.watch(stop)
 	return w, nil
 }

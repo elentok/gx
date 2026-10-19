@@ -219,3 +219,20 @@ func TestHarness_StartupScreenAnswersTrustDialog(t *testing.T) {
 		return Harness{}.StartupScreen(nil, p.rows()).Dialog == harness.NoDialog
 	})
 }
+
+func TestProgramWatcher_ReadyOnFirstIdleReport(t *testing.T) {
+	w := &programWatcher{startup: func() bool { return false }}
+	if got := w.Ready(); got != "" {
+		t.Fatalf("before any report: Ready = %q, want none", got)
+	}
+	w.Program(harness.ProgramReport{State: "blocked", Kind: "question", Progress: -1})
+	w.Program(harness.ProgramReport{State: "done", Progress: -1})
+	w.Program(harness.ProgramReport{State: "working", Progress: -1})
+	if got := w.Ready(); got != harness.ReadyOSC7501 {
+		t.Fatalf("after idle: Ready = %q, want %q", got, harness.ReadyOSC7501)
+	}
+	w.Program(harness.ProgramReport{State: "blocked", Kind: "question", Progress: -1})
+	if got := w.Ready(); got != "" {
+		t.Fatalf("while Blocked: Ready = %q, want none", got)
+	}
+}
