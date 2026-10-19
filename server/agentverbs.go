@@ -45,7 +45,11 @@ func (s *Server) agentPrompt(req QueueRequest) (QueueResult, error) {
 
 func (s *Server) agentInterrupt(req QueueRequest) (QueueResult, error) {
 	return s.agentVerb(req, func(r agentrunner.Runner, sess agentrunner.Session) (QueueResult, error) {
-		return QueueResult{}, r.Interrupt(sess)
+		err := r.Interrupt(sess)
+		if errors.Is(err, agentrunner.ErrNotReady) {
+			return refusal(ReasonAgentNotReady, err.Error()), nil
+		}
+		return QueueResult{}, err
 	})
 }
 

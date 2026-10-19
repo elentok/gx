@@ -14,20 +14,22 @@ import (
 
 type session struct {
 	agentrunner.Session
-	epic      string
-	cwd       string
-	args      []string
-	status    agentrunner.Status
-	promptErr error
-	answerErr error
-	stopErr   error
-	limited   bool
-	resetAt   time.Time
-	limitErr  error
-	diedErr   error
-	bgTask    bool
-	prompts   []string
-	answers   []agentrunner.Answer
+	epic           string
+	cwd            string
+	args           []string
+	status         agentrunner.Status
+	promptErr      error
+	answerErr      error
+	interruptErr   error
+	interruptDelay time.Duration
+	stopErr        error
+	limited        bool
+	resetAt        time.Time
+	limitErr       error
+	diedErr        error
+	bgTask         bool
+	prompts        []string
+	answers        []agentrunner.Answer
 }
 
 // view is the status callers see: a running background task keeps an idle
@@ -205,11 +207,20 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 
 func (r *Runner) Interrupt(s agentrunner.Session) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	ss, err := r.live(s)
 	if err != nil {
+		r.mu.Unlock()
 		return err
 	}
+	delay, failure := ss.interruptDelay, ss.interruptErr
+	r.mu.Unlock()
+	// The delay runs unlocked so other calls on the runner proceed meanwhile.
+	time.Sleep(delay)
+	if failure != nil {
+		return failure
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	ss.status.State = agentrunner.StateIdle
 	ss.status.BlockedReason = ""
 	r.notify()
@@ -319,6 +330,22 @@ func (r *Runner) SetPromptErr(label string, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.byLabel(label).promptErr = err
+}
+
+// SetInterruptErr makes every Interrupt of label fail with err until cleared
+// with nil.
+func (r *Runner) SetInterruptErr(label string, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).interruptErr = err
+}
+
+// SetInterruptDelay makes every Interrupt of label take d before it acts (or
+// fails), until cleared with 0.
+func (r *Runner) SetInterruptDelay(label string, d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.byLabel(label).interruptDelay = d
 }
 
 // FailNextPrompts makes the next n Prompts to label fail with err, across

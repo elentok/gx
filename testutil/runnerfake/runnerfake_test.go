@@ -145,6 +145,27 @@ func TestWait_ReturnsOnStateChangeOrTimesOut(t *testing.T) {
 	}
 }
 
+func TestInterruptErrAndDelayHooks(t *testing.T) {
+	r := NewRunner()
+	s, err := r.Start(agentrunner.StartOptions{Label: "a", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.SetInterruptErr("a", agentrunner.ErrNotReady)
+	if err := r.Interrupt(s); !errors.Is(err, agentrunner.ErrNotReady) {
+		t.Errorf("Interrupt = %v, want ErrNotReady", err)
+	}
+	r.SetInterruptErr("a", nil)
+	r.SetInterruptDelay("a", 50*time.Millisecond)
+	start := time.Now()
+	if err := r.Interrupt(s); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(start) < 50*time.Millisecond {
+		t.Error("Interrupt returned before its delay")
+	}
+}
+
 func TestInterruptKeepsSessionAndStopIsIdempotent(t *testing.T) {
 	r := NewRunner()
 	s := start(t, r, "a")

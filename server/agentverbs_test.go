@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -72,6 +73,26 @@ func TestAgentVerbs_AnswerInvalidDecisionRefuses(t *testing.T) {
 	}
 	if want := "not a permission prompt; deny cancels it"; res.Message != want {
 		t.Errorf("message = %q, want %q", res.Message, want)
+	}
+}
+
+func TestAgentVerbs_InterruptNotReadyRefuses(t *testing.T) {
+	h, fake := startAgentVerbs(t)
+	const label = "epic-a-iter-01"
+	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	fake.SetInterruptErr(label, agentrunner.ErrNotReady)
+	res, err := h.Client.AgentInterrupt(ctx, "proj:epic-a/01")
+	if err != nil || !res.Refused || res.Reason != server.ReasonAgentNotReady {
+		t.Errorf("interrupt = %+v, %v; want refusal %s", res, err, server.ReasonAgentNotReady)
+	}
+
+	fake.SetInterruptErr(label, errors.New("boom"))
+	if res, err := h.Client.AgentInterrupt(ctx, "proj:epic-a/01"); err == nil || res.Refused {
+		t.Errorf("other interrupt error = %+v, %v; want an error", res, err)
 	}
 }
 

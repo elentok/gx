@@ -80,6 +80,9 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonRateLimited, fmt.Sprintf("more than %d nudges to %s within %s", nudgeLimit, address, nudgeWindow)), nil
 		}
 		if err := it.runner.Prompt(it.session, text); err != nil {
+			if errors.Is(err, agentrunner.ErrNotReady) {
+				return refusal(ReasonAgentNotReady, err.Error()), nil
+			}
 			return QueueResult{}, fmt.Errorf("nudge %s: %w", address, err)
 		}
 		err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{

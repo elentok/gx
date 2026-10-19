@@ -9,10 +9,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func claimTicket(t *testing.T, store, epic, id, file string) {
@@ -81,6 +83,32 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 		t.Errorf("a refused nudge must not reach the pane, typed = %v", typed)
 	}
 	mu.Unlock()
+}
+
+func TestNudge_NotReadyRefuses(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	claimTicket(t, store, "epic-a", "01", "01-first.md")
+	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Runner = fake })
+	const label = "epic-a-iter-01"
+	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	fake.SetState(label, agentrunner.StateBlocked, "permission to use Bash")
+	res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "hi")
+	if err != nil || !res.Refused || res.Reason != server.ReasonAgentNotReady {
+		t.Errorf("nudge while blocked = %+v, %v; want refusal %s", res, err, server.ReasonAgentNotReady)
+	}
+
+	fake.SetState(label, agentrunner.StateIdle, "")
+	fake.SetPromptErr(label, errors.New("boom"))
+	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "hi"); err == nil || res.Refused {
+		t.Errorf("other prompt error = %+v, %v; want an error", res, err)
+	}
 }
 
 func TestNudge_Refusals(t *testing.T) {
