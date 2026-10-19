@@ -29,7 +29,8 @@ func (s *Server) bindWeb() {
 		s.log.Error("web listener failed to bind", "addr", s.cfg.WebAddr, "err", err)
 		return
 	}
-	if host, _, _ := net.SplitHostPort(s.cfg.WebAddr); net.ParseIP(host).IsUnspecified() {
+	// An empty host (":8080") binds every interface but parses to a nil IP.
+	if host, _, _ := net.SplitHostPort(s.cfg.WebAddr); host == "" || net.ParseIP(host).IsUnspecified() {
 		s.log.Warn("web listener is bound to all interfaces and serves its token over plain HTTP", "addr", ln.Addr().String())
 	}
 	s.web = ln
