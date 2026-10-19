@@ -26,6 +26,8 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      // gallery.html is served by the dev server only; keep it out of the production input.
+      input: "index.html",
       output: {
         manualChunks(id) {
           if (/node_modules\/(react|react-dom|scheduler|@chakra-ui|@ark-ui|@zag-js|@emotion)\//.test(id)) {
@@ -40,5 +42,7 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Testing Library registers its between-test cleanup only when globals exist.
+    globals: true,
   },
 });
