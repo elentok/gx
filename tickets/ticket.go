@@ -40,7 +40,11 @@ type Ticket struct {
 	// pointing back at it (Epic.forkChildren).
 	Parent *string
 	Status string // raw Status: value; "" only for a ticket that failed to load (see ReadErr)
-	Body   string // raw markdown after the leading metadata lines, unmodified
+	// Rendered is the status a server computed for this ticket (the TUI's
+	// server mode). Nil means none was given, and clients compute it with
+	// Epic.RenderedStatus.
+	Rendered *RenderedStatus
+	Body     string // raw markdown after the leading metadata lines, unmodified
 
 	// ActualContextWindow and ElapsedTime are the landing-time metrics
 	// ralphloop/report_metrics.go's writeLandedMetrics stamps into a done

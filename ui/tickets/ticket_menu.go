@@ -230,7 +230,7 @@ type ticketMenuReadyMsg struct {
 // pressed; liveness is left to cmdTicketMenu.
 func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool, serverReason string) ticketMenuInput {
 	return ticketMenuInput{
-		rendered:     epic.RenderedStatus(ticket),
+		rendered:     ticketStatus(epic, ticket),
 		ticket:       ticket,
 		isMap:        epic.IsMap,
 		herdrDown:    herdrDown,

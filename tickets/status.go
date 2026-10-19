@@ -412,3 +412,14 @@ func (s RenderedStatus) Word() string {
 		return "error"
 	}
 }
+
+// ParseRenderedStatus is Word's inverse; ok is false for a word Word never
+// returns.
+func ParseRenderedStatus(word string) (RenderedStatus, bool) {
+	for s := StatusOpen; s <= StatusCancelled; s++ {
+		if s.Word() == word {
+			return s, true
+		}
+	}
+	return StatusError, false
+}

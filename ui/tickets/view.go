@@ -170,7 +170,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 // signature change at every call site.
 func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	t := epic.Tickets[r.ticketIdx]
-	status := epic.RenderedStatus(t)
+	status := ticketStatus(epic, t)
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
 	if r.hasChildren {

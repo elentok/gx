@@ -32,7 +32,7 @@ func (m QueueModel) doneCheckedPaths() []string {
 	var paths []string
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
-			if m.checked[t.Path] && epic.RenderedStatus(t).Terminal() {
+			if m.checked[t.Path] && ticketStatus(epic, t).Terminal() {
 				paths = append(paths, t.Path)
 			}
 		}

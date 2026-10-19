@@ -58,7 +58,7 @@ func epicRunning(epic gxtickets.Epic, claimedAt map[string]time.Time) bool {
 // server holds no run for it: a person claimed it (a grilling session, say),
 // so nothing is implementing.
 func serverRunning(epic gxtickets.Epic, t gxtickets.Ticket, claimedAt map[string]time.Time) bool {
-	if epic.RenderedStatus(t) != gxtickets.StatusClaimed {
+	if ticketStatus(epic, t) != gxtickets.StatusClaimed {
 		return false
 	}
 	seen, ok := claimedAt[t.Path]

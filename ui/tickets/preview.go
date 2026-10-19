@@ -99,7 +99,7 @@ func (m Model) previewContent(width int) (string, int, bool) {
 // section's line index within the returned content and whether one was
 // found, for the caller to auto-scroll to.
 func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string, int, bool) {
-	status := epic.RenderedStatus(t)
+	status := ticketStatus(epic, t)
 
 	var b strings.Builder
 	b.WriteString(renderFrontmatterBlock(t, status, width))

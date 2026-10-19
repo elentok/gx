@@ -130,7 +130,7 @@ func (m Model) buildEpicTicketTree(epic tickets.Epic) epicTicketTree {
 
 	visible := make(map[int]bool, len(sorted))
 	for _, idx := range sorted {
-		if m.hideDone && epic.RenderedStatus(epic.Tickets[idx]).Terminal() {
+		if m.hideDone && ticketStatus(epic, epic.Tickets[idx]).Terminal() {
 			continue
 		}
 		visible[idx] = true
@@ -414,7 +414,7 @@ func epicCollapseDefaults(epics []tickets.Epic, archivedEpics []tickets.Epic) ma
 // lands on the epic row rather than on every ticket inside it. q must already
 // be lowercased and trimmed.
 func ticketMatchesQuery(epic tickets.Epic, t tickets.Ticket, q string) bool {
-	haystack := t.DisplayNumber() + " " + t.Title + " " + epic.RenderedStatus(t).Word()
+	haystack := t.DisplayNumber() + " " + t.Title + " " + ticketStatus(epic, t).Word()
 	return strings.Contains(strings.ToLower(haystack), q)
 }
 

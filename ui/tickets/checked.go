@@ -64,7 +64,7 @@ func (m Model) handleToggleCheck() (tea.Model, tea.Cmd) {
 func eligibleEpicTickets(epic tickets.Epic) []tickets.Ticket {
 	var out []tickets.Ticket
 	for _, t := range epic.Tickets {
-		if !epic.RenderedStatus(t).Terminal() {
+		if !ticketStatus(epic, t).Terminal() {
 			out = append(out, t)
 		}
 	}
@@ -127,7 +127,7 @@ func (m Model) toggleTicketChecked(r row) (tea.Model, tea.Cmd) {
 		m.setPathsChecked([]string{t.Path}, false)
 		return m, nil
 	}
-	if epic.RenderedStatus(t).Terminal() {
+	if ticketStatus(epic, t).Terminal() {
 		return m, nil
 	}
 

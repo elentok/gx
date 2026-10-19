@@ -75,7 +75,7 @@ func (m Model) checkedPendingAddresses() []string {
 	var addrs []string
 	for _, epic := range m.epics {
 		for _, t := range epic.Tickets {
-			if m.checked[t.Path] && !epic.RenderedStatus(t).Terminal() {
+			if m.checked[t.Path] && !ticketStatus(epic, t).Terminal() {
 				addrs = append(addrs, t.Path)
 			}
 		}
@@ -290,7 +290,7 @@ func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
 		text += ": " + p.Reason
 	}
 	icons := m.icons()
-	icon, _ := statusIconAndStyle(icons, m.epicAt(r).RenderedStatus(t))
+	icon, _ := statusIconAndStyle(icons, ticketStatus(m.epicAt(r), t))
 	width := triangleColumnWidth(icons) + 1 + lipgloss.Width(icons.CheckboxUnchecked) + 1 + lipgloss.Width(icon) + 1
 	return strings.Repeat(" ", width) + blockedBySuffixStyle.Render(ellipsize(text, parkReasonMaxRunes, icons.Ellipsis)), true
 }
@@ -359,6 +359,9 @@ func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
 		Category:   info.Category,
 		ExportedAt: info.ExportedAt,
 		Mutes:      info.Mutes,
+	}
+	if rendered, ok := gxtickets.ParseRenderedStatus(info.RenderedStatus); ok {
+		t.Rendered = &rendered
 	}
 	if info.Parent != "" {
 		_, parent, _ := gxtickets.SplitTrailerValue(info.Parent)

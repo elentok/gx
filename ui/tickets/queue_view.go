@@ -170,7 +170,7 @@ func (m QueueModel) queueRenderOpts(width int) tree.RenderOpts[queueNode] {
 // Entry.Body in buildQueueEntries) rather than rendered here.
 func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 	epic, t := r.epic, r.ticket
-	status := epic.RenderedStatus(t)
+	status := ticketStatus(epic, t)
 	indent := " "
 
 	triangle := strings.Repeat(" ", triangleColumnWidth(m.icons())) + " "
@@ -264,7 +264,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 // listed in the server's Parked tickets for its epic.
 func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
-	status := epic.RenderedStatus(t)
+	status := ticketStatus(epic, t)
 	i := slices.IndexFunc(m.summaries[epic.Name].Parked, func(p server.SummaryTicket) bool { return p.Address == t.Path })
 	if i < 0 || m.summaries[epic.Name].Parked[i].Reason == "" {
 		return "", false

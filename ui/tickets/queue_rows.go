@@ -294,7 +294,7 @@ func nextProject(epics []tickets.Epic, current string) string {
 func filterDoneTickets(epic tickets.Epic, ordered []tickets.Ticket) []tickets.Ticket {
 	filtered := make([]tickets.Ticket, 0, len(ordered))
 	for _, t := range ordered {
-		if epic.RenderedStatus(t).Terminal() {
+		if ticketStatus(epic, t).Terminal() {
 			continue
 		}
 		filtered = append(filtered, t)
