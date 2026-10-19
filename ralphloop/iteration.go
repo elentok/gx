@@ -498,11 +498,15 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 		return false, 0, "", nil
 	}
 
-	if err := d.Runner.Prompt(s, unexecutedToolCallCorrection); err != nil {
-		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
-	}
 	retrySessionID := cmp.Or(status.SessionID, sessionID)
 	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
+	launchParams.Session = s
+	if err := promptIdle(d, launchParams, retrySessionID, unexecutedToolCallCorrection); err != nil {
+		if errors.Is(err, errBlockedPaneParked) {
+			return false, 0, "", err
+		}
+		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
+	}
 
 	if err := waitForFinish(d, launchParams, retrySessionID); err != nil {
 		if errors.Is(err, errBlockedPaneParked) {

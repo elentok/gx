@@ -426,7 +426,10 @@ func adoptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
 			p.logLifecycleEvent(p.FinishEvent, sessionID)
 			return sessionID, nil
 		}
-		if err := d.Runner.Prompt(p.Session, p.Prompt); err != nil {
+		if err := promptIdle(d, p, sessionID, p.Prompt); err != nil {
+			if errors.Is(err, errBlockedPaneParked) {
+				return sessionID, err
+			}
 			return "", fmt.Errorf("sending initial prompt to stalled adopted session: %w", err)
 		}
 	}

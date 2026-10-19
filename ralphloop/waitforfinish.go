@@ -733,10 +733,44 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID string, r
 	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	p.Gate.ForceResume(p.Label)
 
-	if err := d.Runner.Prompt(p.session(), "continue"); err != nil {
+	if err := promptIdle(d, p, sessionID, "continue"); err != nil {
+		if errors.Is(err, errBlockedPaneParked) {
+			return err
+		}
 		return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
 	}
 	return nil
+}
+
+// promptIdle sends text to a session its caller expects to be idle. A
+// refusal with ErrNotReady means that expectation was stale, so Status is
+// re-read: busy (the agent is already working) skips the prompt, since the
+// caller goes on to wait for the iteration to finish anyway; blocked goes
+// through parkOnBlockedPane and returns errBlockedPaneParked when it parks.
+// Any other state, or a block that cleared before the re-check, returns the
+// original error.
+func promptIdle(d Deps, p launchAndPromptParams, sessionID, text string) error {
+	err := d.Runner.Prompt(p.session(), text)
+	if !errors.Is(err, agentrunner.ErrNotReady) {
+		return err
+	}
+	st, statusErr := d.Runner.Status(p.session())
+	if statusErr != nil {
+		return fmt.Errorf("re-reading %s after refused prompt: %w", p.Label, statusErr)
+	}
+	switch st.State {
+	case agentrunner.StateWorking:
+		return nil
+	case agentrunner.StateBlocked:
+		parked, parkErr := parkOnBlockedPane(d, p, sessionID)
+		if parkErr != nil {
+			return parkErr
+		}
+		if parked {
+			return errBlockedPaneParked
+		}
+	}
+	return err
 }
 
 func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, resetAt time.Time) error {

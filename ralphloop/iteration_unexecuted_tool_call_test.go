@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 )
@@ -161,6 +162,83 @@ func TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *test
 	if len(*prompts) != wantPrompts {
 		t.Fatalf("prompts = %v, want %d (initial launch only, blocked pane gets no corrective prompt)", *prompts, wantPrompts)
 	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: needs-answer") {
+		t.Errorf("ticket not marked needs-answer:\n%s", raw)
+	}
+}
+
+// TestRun_UnexecutedToolCallRetry_PromptRefusedWhileBusy_KeepsWaiting pins
+// the race where the agent resumed between the finish check and the
+// corrective prompt: the refused prompt is skipped and the iteration waits
+// for the turn that is already running, with no park.
+func TestRun_UnexecutedToolCallRetry_PromptRefusedWhileBusy_KeepsWaiting(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+	})
+	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	d, _, _ := fakeDeps()
+
+	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) { return true, nil }
+	fakeRunner(d).PromptState = agentrunner.StateIdle
+	var calls int32
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
+		if atomic.AddInt32(&calls, 1) <= 2 {
+			return 0, nil
+		}
+		return 1, nil
+	}
+	onRunnerPrompt(d, func(s agentrunner.Session, text string) error {
+		if text != unexecutedToolCallCorrection {
+			return nil
+		}
+		r := fakeRunner(d)
+		r.SetState(s.Label, agentrunner.StateWorking, "")
+		time.AfterFunc(200*time.Millisecond, func() { r.SetState(s.Label, agentrunner.StateDone, "") })
+		return agentrunner.ErrNotReady
+	})
+
+	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, newRecordingEventSink()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !strings.Contains(string(raw), "status: done") {
+		t.Errorf("ticket not done after waiting out the busy agent:\n%s", raw)
+	}
+}
+
+// TestRun_UnexecutedToolCallRetry_PromptRefusedWhileBlocked_Parks is the
+// blocked counterpart: the agent blocked on a dialog between the check and
+// the prompt, so the iteration parks blocked-pane.
+func TestRun_UnexecutedToolCallRetry_PromptRefusedWhileBlocked_Parks(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
+	})
+	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
+	d, _, _ := fakeDeps()
+
+	d.ReadUnexecutedToolCall = func(cwd, sessionID string) (bool, error) { return true, nil }
+	fakeRunner(d).PromptState = agentrunner.StateIdle
+	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
+	onRunnerPrompt(d, func(s agentrunner.Session, text string) error {
+		if text != unexecutedToolCallCorrection {
+			return nil
+		}
+		fakeRunner(d).SetState(s.Label, agentrunner.StateBlocked, "approval")
+		return agentrunner.ErrNotReady
+	})
+
+	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
