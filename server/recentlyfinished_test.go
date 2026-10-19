@@ -65,6 +65,15 @@ func TestSnapshot_RecentlyFinishedIsCappedOrderedAndSkipsMaps(t *testing.T) {
 	}
 }
 
+func TestSnapshot_RecentlyFinishedZeroListsNone(t *testing.T) {
+	store := t.TempDir()
+	writeFinishedEpic(t, store, "e1", time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.RecentlyFinished = 0 })
+	if got := finishedNames(t, h); len(got) != 0 {
+		t.Fatalf("len = %d, want 0", len(got))
+	}
+}
+
 func TestSnapshot_RecentlyFinishedDefaultsToFive(t *testing.T) {
 	store := t.TempDir()
 	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
