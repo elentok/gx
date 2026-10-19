@@ -162,6 +162,21 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 	}
 }
 
+func TestDeadlockReason_ParkedAndCycle(t *testing.T) {
+	root := rootRef{Project: "proj", Epic: "epic"}
+	parked := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{summaryTicket("01", "needs-answer"), summaryTicket("02", "draft")}}
+	if got, want := deadlockReason(root, parked, events.AllParked), "every remaining ticket is parked: proj:epic/01, proj:epic/02"; got != want {
+		t.Errorf("parked reason = %q, want %q", got, want)
+	}
+	first := summaryTicket("01", "open", "02")
+	first.ExternalBlockers = []string{"other:epic2/07"}
+	cycle := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{first, summaryTicket("02", "open", "01")}}
+	want := "proj:epic/01 waits on other:epic2/07, proj:epic/02; proj:epic/02 waits on proj:epic/01"
+	if got := deadlockReason(root, cycle, events.BlockedCycle); got != want {
+		t.Errorf("cycle reason = %q, want %q", got, want)
+	}
+}
+
 func summaryAddresses(list []SummaryTicket) []string {
 	var out []string
 	for _, x := range list {

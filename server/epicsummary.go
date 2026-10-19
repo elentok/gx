@@ -4,8 +4,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -80,9 +78,7 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		Address: root.String(), Name: e.Name, Project: root.Project, Total: len(e.Tickets),
 		Active: []SummaryTicket{}, Parked: []SummaryTicket{},
 	}
-	runnable := false
-	for i, d := range ralphloop.EpicQueue(e) {
-		t := e.Tickets[i]
+	for _, t := range e.Tickets {
 		status := e.RenderedStatus(t)
 		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
 		info := SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
@@ -92,26 +88,26 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		case isParked(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.ParkReason(e, t)
 			sum.Parked = append(sum.Parked, info)
-		case d.Decision == "claimed" || d.Decision == "frontier":
-			runnable = true
-			if at, ok := claimedAt(addr); ok && status == tickets.StatusClaimed {
+		case status == tickets.StatusClaimed:
+			if at, ok := claimedAt(addr); ok {
 				info.ClaimedAt = at
 				sum.Active = append(sum.Active, info)
 			}
 		}
 	}
-	switch {
-	case e.AllDone() && e.MergedAt.IsZero():
+	switch epicStateOf(e) {
+	case epicDone:
 		sum.State = StateAwaitingMerge
-	case len(sum.Active) > 0:
-		sum.State = StateRunning
-	case runnable:
+	case epicRunnable:
 		sum.State = StateWaiting
-	case len(sum.Parked) > 0:
+		if len(sum.Active) > 0 {
+			sum.State = StateRunning
+		}
+	case epicParked:
 		sum.State = StateParked
-	default:
+	case epicCycle:
 		sum.State = StateDeadlocked
-		sum.Reason = deadlockReason(root, e, events.BlockedCycle)
+		sum.Reason = cycleReason(root, e)
 	}
 	if sum.State != StateRunning {
 		sum.Active = []SummaryTicket{}

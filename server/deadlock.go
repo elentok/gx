@@ -1,6 +1,7 @@
 package server
 
 import (
+	"slices"
 	"strings"
 	"sync"
 
@@ -37,80 +38,108 @@ func (d *deadlocks) leave(root rootRef) {
 	delete(d.roots, root)
 }
 
-// isParked is the server's one rule for a Parked ticket: one a person, not the
-// run, has to clear. Map epics hold no work, so none of their tickets are.
+// isParked is tickets.Epic.IsParked, the rule shared with ralph-loop and the
+// Queue tab, except that map epics hold no work, so none of their tickets are.
 func isParked(e tickets.Epic, t tickets.Ticket) bool {
+	return !e.IsMap && e.IsParked(t)
+}
+
+// epicState is how far e can move.
+type epicState int
+
+const (
+	// epicDone: no work remains (also every map epic, which holds none).
+	epicDone epicState = iota
+	// epicRunnable: a ticket is open or claimed, so the run can proceed.
+	epicRunnable
+	// epicParked: nothing runnable, and a person can clear what remains.
+	epicParked
+	// epicCycle: nothing runnable and nothing a person can clear, only blocked
+	// tickets.
+	epicCycle
+)
+
+// epicStateOf is the server's one rule for an epic's state; the deadlock check and
+// the epic summary both derive from it. A status it does not recognize counts as
+// parked, never as a cycle: a person has to look at it.
+func epicStateOf(e tickets.Epic) epicState {
 	if e.IsMap {
-		return false
+		return epicDone
 	}
-	switch e.RenderedStatus(t) {
-	case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusDraft, tickets.StatusError:
-		return true
+	state := epicDone
+	for _, t := range e.Tickets {
+		if isParked(e, t) {
+			state = max(state, epicParked)
+			continue
+		}
+		switch e.RenderedStatus(t) {
+		case tickets.StatusOpen, tickets.StatusClaimed:
+			return epicRunnable
+		case tickets.StatusDone, tickets.StatusCancelled:
+		case tickets.StatusBlocked, tickets.StatusWaitingForChildren:
+			if state == epicDone {
+				state = epicCycle
+			}
+		default:
+			state = epicParked
+		}
 	}
-	return false
+	return state
 }
 
 // deadlockKind says how e is deadlocked: nothing schedulable and nothing
 // running while work remains. Parked tickets make it all-parked, since a person
 // can clear them; none makes it a blocked cycle.
 func deadlockKind(e tickets.Epic) (events.Kind, bool) {
-	if e.IsMap {
-		return "", false
-	}
-	remaining, parked := false, false
-	for _, t := range e.Tickets {
-		if isParked(e, t) {
-			parked = true
-			remaining = true
-			continue
-		}
-		switch e.RenderedStatus(t) {
-		case tickets.StatusOpen, tickets.StatusClaimed:
-			return "", false
-		case tickets.StatusDone, tickets.StatusCancelled:
-			continue
-		}
-		parked = parked || e.IsParked(t)
-		remaining = true
-	}
-	switch {
-	case !remaining:
-		return "", false
-	case parked:
+	switch epicStateOf(e) {
+	case epicParked:
 		return events.AllParked, true
+	case epicCycle:
+		return events.BlockedCycle, true
 	}
-	return events.BlockedCycle, true
+	return "", false
 }
 
 // deadlockReason names what holds e: the parked tickets for all-parked, and for
 // a blocked cycle each waiting ticket with what it waits on.
 func deadlockReason(root rootRef, e tickets.Epic, kind events.Kind) string {
-	addr := func(t tickets.Ticket) string { return root.String() + "/" + t.Identifier }
+	if kind == events.AllParked {
+		return parkedReason(root, e)
+	}
+	return cycleReason(root, e)
+}
+
+func ticketAddr(root rootRef, t tickets.Ticket) string { return root.String() + "/" + t.Identifier }
+
+func parkedReason(root rootRef, e tickets.Epic) string {
 	var parts []string
 	for _, t := range e.Tickets {
-		if kind == events.AllParked {
-			if isParked(e, t) {
-				parts = append(parts, addr(t))
-			}
-			continue
-		}
-		if e.RenderedStatus(t) == tickets.StatusBlocked {
-			waits := e.UnresolvedBlockers(t)
-			if !e.ParentDone(t) {
-				waits = append(waits, *t.Parent)
-			}
-			var on []string
-			for _, b := range waits {
-				if !strings.Contains(b, ":") {
-					b = root.String() + "/" + b
-				}
-				on = append(on, b)
-			}
-			parts = append(parts, addr(t)+" waits on "+strings.Join(on, ", "))
+		if isParked(e, t) {
+			parts = append(parts, ticketAddr(root, t))
 		}
 	}
-	if kind == events.AllParked {
-		return "every remaining ticket is parked: " + strings.Join(parts, ", ")
+	return "every remaining ticket is parked: " + strings.Join(parts, ", ")
+}
+
+func cycleReason(root rootRef, e tickets.Epic) string {
+	ctx := tickets.AddressContext{Project: root.Project, Epic: root.Epic}
+	var parts []string
+	for _, t := range e.Tickets {
+		if e.RenderedStatus(t) != tickets.StatusBlocked {
+			continue
+		}
+		waits := slices.Clone(e.UnresolvedBlockers(t))
+		if !e.ParentDone(t) {
+			waits = append(waits, *t.Parent)
+		}
+		var on []string
+		for _, b := range waits {
+			if a, err := tickets.ParseAddress(b, ctx); err == nil {
+				b = a.String()
+			}
+			on = append(on, b)
+		}
+		parts = append(parts, ticketAddr(root, t)+" waits on "+strings.Join(on, ", "))
 	}
 	return strings.Join(parts, "; ")
 }
