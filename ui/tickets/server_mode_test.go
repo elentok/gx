@@ -135,6 +135,23 @@ func (f fakeServerAPI) Snapshot(context.Context) (server.Snapshot, error) {
 func (fakeServerAPI) Events(context.Context, uint64) (<-chan server.Event, error) { return nil, nil }
 func (f fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)    { return f.queue, nil }
 
+// withRenderedStatus makes snap look like one from a current server, which
+// always sends rendered_status: a ticket without one gets its raw status word.
+// A snapshot with none at all reads as an older server's.
+func withRenderedStatus(snap server.Snapshot) server.Snapshot {
+	snap.Tickets = slices.Clone(snap.Tickets)
+	for i := range snap.Tickets {
+		if snap.Tickets[i].RenderedStatus == "" {
+			snap.Tickets[i].RenderedStatus = snap.Tickets[i].Status
+		}
+	}
+	return snap
+}
+
+func applySnapshot(st viewmodel.State, snap server.Snapshot) viewmodel.State {
+	return st.ApplySnapshot(withRenderedStatus(snap))
+}
+
 func newServerModel(t *testing.T) Model {
 	t.Helper()
 	return NewModel(t.TempDir(), ui.Settings{}, keys.New(nil)).WithServer(fakeServerAPI{})
@@ -143,7 +160,7 @@ func newServerModel(t *testing.T) Model {
 // withState hands the tab the state the app shell would deliver for snap,
 // then expands its open epics.
 func withState(m Model, snap server.Snapshot) Model {
-	st := viewmodel.State{}.ApplySnapshot(snap)
+	st := applySnapshot(viewmodel.State{}, snap)
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 	m = next.(Model)
 	expandOpenEpics(&m)
@@ -220,7 +237,7 @@ func TestServerMode_OutsideProjectShowsAllWithoutToasting(t *testing.T) {
 
 func TestServerMode_StaleStateIsIgnoredWhileOnFallback(t *testing.T) {
 	m := newServerModel(t)
-	st := viewmodel.State{}.ApplySnapshot(scopeSnap)
+	st := applySnapshot(viewmodel.State{}, scopeSnap)
 	next, _ := m.WithServerState(&st, ServerLinkDown)
 	m = next.(Model)
 	if m.loaded || len(m.epics) != 0 {
@@ -517,7 +534,7 @@ func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
 }
 
 func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
-	vm := viewmodel.State{}.ApplySnapshot(server.Snapshot{Tickets: []server.TicketInfo{
+	vm := applySnapshot(viewmodel.State{}, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
 	}})
 	epics := epicsFromViewModel(vm, viewmodel.Scope{})
@@ -531,7 +548,7 @@ func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
 }
 
 func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
-	vm := viewmodel.State{}.ApplySnapshot(server.Snapshot{Tickets: []server.TicketInfo{
+	vm := applySnapshot(viewmodel.State{}, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "proj:epic-a/27", Status: "done"},
 		{Address: "proj:epic-a/27a", Status: "done", Parent: "proj:epic-a/27"},
 		{Address: "proj:epic-a/27a1", Status: "done", Parent: "proj:epic-a/27a"},

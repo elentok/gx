@@ -17,9 +17,11 @@ import (
 // starts the running spinner when the tab goes from idle to running.
 func (m QueueModel) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model, tea.Cmd) {
 	m.link = link
-	if m.serverDown() {
+	m.olderServer = st != nil && !m.serverDown() && st.OlderServer()
+	if m.serverDown() || m.olderServer {
 		// Whatever the queue showed is stale; it refills on reconnect.
 		m.epics, m.summaries, m.finished = nil, nil, nil
+		m.loaded = m.loaded || m.olderServer
 		m.clampSelected()
 		return m, nil
 	}

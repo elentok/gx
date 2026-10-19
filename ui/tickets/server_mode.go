@@ -204,6 +204,7 @@ func (m Model) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model,
 	wasDown := m.link == ServerLinkDown
 	m.link = link
 	if m.readsDisk() {
+		m.olderServer = false
 		if link == ServerLinkDown && !wasDown {
 			return m, m.cmdLoadDisk()
 		}
@@ -215,6 +216,10 @@ func (m Model) WithServerState(st *viewmodel.State, link ServerLink) (tea.Model,
 	m.vm = *st
 	firstLoad := !m.loaded
 	m.loaded = true
+	m.olderServer = st.OlderServer()
+	if m.olderServer {
+		m.vm = viewmodel.State{}
+	}
 	m = m.applyServerRows()
 	if firstLoad {
 		m.selectFirstEpic()

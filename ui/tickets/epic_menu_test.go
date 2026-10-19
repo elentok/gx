@@ -109,7 +109,7 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 // status Add epic to queue tells apart; gx:alpha/06 is already queued.
 func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
-	st := viewmodel.State{}.SetQueue([]server.QueueItem{{Address: "gx:alpha/06"}}).ApplySnapshot(server.Snapshot{Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}.SetQueue([]server.QueueItem{{Address: "gx:alpha/06"}}), server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "Done", Status: "done"},
 		{Address: "gx:alpha/02", Title: "Draft", Status: "draft"},
 		{Address: "gx:alpha/03", Title: "Open", Status: "open"},

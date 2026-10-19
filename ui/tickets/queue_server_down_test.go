@@ -40,12 +40,12 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 		t.Fatalf("rows not cleared: %+v", m.epics)
 	}
 	view := ansi.Strip(m.View().Content)
-	if !strings.Contains(view, "server down — s to start") || strings.Contains(view, "First") {
+	if !strings.Contains(view, "server not running — s to start") || strings.Contains(view, "First") {
 		t.Fatalf("view = %s", view)
 	}
 
 	// Coming back clears the banner and brings the rows, in one delivery.
-	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}})
 	next, _ = m.WithServerState(&st, ServerLinkUp)
@@ -62,7 +62,7 @@ func TestQueueServerDown_ClearsRowsAndShowsBanner(t *testing.T) {
 func TestQueueServerDown_StateDeliveredDownShowsOnceUp(t *testing.T) {
 	m := newServerQueueModel(t, func(context.Context) error { return nil })
 
-	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 2, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/09", Title: "Ninth", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/09"}})
 	next, _ := m.WithServerState(&st, ServerLinkDown)

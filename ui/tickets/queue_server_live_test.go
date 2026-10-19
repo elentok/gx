@@ -41,7 +41,7 @@ func deliverQueueTo(m QueueModel, snap server.Snapshot, queue []server.QueueItem
 		}
 		snap.Epics = fixtureSummaries(epicsFromViewModel(viewmodel.State{Tickets: snap.Tickets}, viewmodel.Scope{}), claimedAt)
 	}
-	st := viewmodel.State{}.ApplySnapshot(snap)
+	st := applySnapshot(viewmodel.State{}, snap)
 	st = st.SetQueue(queue)
 	next, cmd := m.WithServerState(&st, ServerLinkUp)
 	return next.(QueueModel), cmd
@@ -184,9 +184,9 @@ func TestQueueServerMode_ClaimedMergeTicketShowsMergingAndCounts(t *testing.T) {
 
 func TestQueueServerMode_CrossEpicBlockersShowTheirEpic(t *testing.T) {
 	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "Widened", Status: "open", BlockedBy: []string{"epic2/b"},
+		{Address: "gx:alpha/01", Title: "Widened", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic2/b"},
 			ExternalBlockers: []string{"epic2/b"}, WidenedBlockers: map[string]string{"epic2/b": "epic2"}},
-		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", BlockedBy: []string{"epic3"},
+		{Address: "gx:alpha/02", Title: "Whole epic", Status: "open", RenderedStatus: "blocked", BlockedBy: []string{"epic3"},
 			ExternalBlockers: []string{"epic3"}},
 	}}, []server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})
 
@@ -281,7 +281,7 @@ func TestQueueServerMode_InitDoesNotFetch(t *testing.T) {
 // turns done after a ticket-done event keeps its row without a queue refetch.
 func TestQueueServerMode_DoneTicketKeepsRowAfterDoneEventWithoutRefetch(t *testing.T) {
 	m, _ := loadedServerQueue(t, "claimed")
-	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+	st := applySnapshot(viewmodel.State{}, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
 		{Address: "gx:alpha/01", Title: "First", Status: "claimed", ClaimedAt: time.Now()},
 		{Address: "gx:alpha/02", Title: "Second", Status: "open"},
 	}}).SetQueue([]server.QueueItem{{Address: "gx:alpha/01"}, {Address: "gx:alpha/02"}})

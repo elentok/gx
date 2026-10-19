@@ -19,6 +19,11 @@ const (
 	ServerLinkReadOnly
 )
 
+// olderServerNotice replaces every tab's ticket data when the server predates
+// rendered status and epic summaries. There is no client-side fallback: the TUI
+// and the server ship in one binary.
+const olderServerNotice = "older server — update the server"
+
 // disabledReason is why server keys are off; empty when they are usable.
 func (l ServerLink) disabledReason() string {
 	switch l {

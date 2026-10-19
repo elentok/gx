@@ -76,38 +76,6 @@ func TestModel_PreviewFrontmatterUsesPrettifiedFieldLabels(t *testing.T) {
 	}
 }
 
-func TestModel_PreviewBlockedBySuffixOmittedOnceResolved(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-blocked-ticket.md", "Status: open\nBlocked by: 01\n\nBody.\n")
-
-	m := NewModel(root, ui.Settings{}, keys.New(nil))
-	m = deliverLoad(t, m)
-	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	m = updated.(Model)
-
-	// rows: [section header, epic (selected), blocker-ticket,
-	// blocked-ticket] - move down twice to select the blocked ticket.
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-	updated, _ = m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	m = updated.(Model)
-
-	content := ansi.Strip(m.View().Content)
-	if !strings.Contains(content, "(blocked by 01)") {
-		t.Fatalf("expected blocked-by suffix in preview, got:\n%s", content)
-	}
-
-	// Resolve the blocker and reload: the suffix should disappear.
-	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: done\n\nBody.\n")
-	m = deliverLoad(t, m)
-	content = ansi.Strip(m.View().Content)
-	if strings.Contains(content, "blocked by") {
-		t.Fatalf("expected no blocked-by suffix in preview once blocker resolves, got:\n%s", content)
-	}
-}
-
 func TestModel_PreviewPlainEpicShowsHeaderOnly(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

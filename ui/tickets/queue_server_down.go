@@ -18,7 +18,7 @@ type (
 	queueServerStartConfirm struct{}
 )
 
-const queueServerDownBanner = "server down — s to start"
+const queueServerDownBanner = "server not running — s to start"
 
 // WithServerLink puts the Queue tab in server mode: rows come from the state
 // the app shell delivers, and start launches the server on "s".

@@ -84,7 +84,7 @@ func TestDownMode_NoClientQueueTabShowsDownBanner(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	view := ansi.Strip(next.(Model).View().Content)
-	if !strings.Contains(view, "server down — s to start") {
+	if !strings.Contains(view, "server not running — s to start") {
 		t.Fatalf("no-client Queue tab:\n%s", view)
 	}
 }

@@ -109,6 +109,10 @@ func (t Ticket) ShowsCommitlessSuffix() bool {
 	return t.Commitless && !commitlessByDesignTypes[t.Type]
 }
 
+// RawStatus is t's status as its file says it, with no Blocked by: or
+// waiting-for-children overlay.
+func (t Ticket) RawStatus() RenderedStatus { return t.baseStatus() }
+
 // baseStatus classifies t's raw Status: value alone, before the Blocked by:
 // overlay (see Epic.RenderedStatus) is applied.
 func (t Ticket) baseStatus() RenderedStatus {

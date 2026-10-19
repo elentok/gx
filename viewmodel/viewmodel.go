@@ -68,6 +68,14 @@ type State struct {
 	Sessions []server.SessionInfo
 }
 
+// OlderServer reports a snapshot from a server that predates rendered status
+// and epic summaries: it has tickets, none carrying a rendered status.
+func (s State) OlderServer() bool {
+	return len(s.Tickets) > 0 && !slices.ContainsFunc(s.Tickets, func(t server.TicketInfo) bool {
+		return t.RenderedStatus != ""
+	})
+}
+
 // ActionableCount is how many sessions are Actionable.
 func (s State) ActionableCount() int {
 	n := 0

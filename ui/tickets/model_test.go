@@ -211,7 +211,9 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	}
 }
 
-func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+// Reading the store itself (no server), the blocked overlay is not computed:
+// the row shows the file's own status.
+func TestNewModel_BlockedTicketShowsRawStatusWithoutServer(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
@@ -223,8 +225,8 @@ func TestNewModel_BlockedTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	if !strings.Contains(content, "(blocked by 01)") {
-		t.Fatalf("expected blocked-by suffix in view, got:\n%s", content)
+	if strings.Contains(content, "(blocked by 01)") {
+		t.Fatalf("expected no blocked-by suffix without a server, got:\n%s", content)
 	}
 }
 

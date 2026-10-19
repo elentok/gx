@@ -106,7 +106,7 @@ func TestServerMode_ConnectionDropAndReconnect(t *testing.T) {
 	if got := titleText(m); !strings.Contains(got, "○ server down") {
 		t.Fatalf("down: title = %q", got)
 	}
-	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "server down — s to start") {
+	if got := ansi.Strip(m.View().Content); !strings.Contains(got, "server not running — s to start") {
 		t.Fatalf("down: Queue tab has no banner:\n%s", got)
 	}
 

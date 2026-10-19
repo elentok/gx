@@ -75,6 +75,9 @@ func (m QueueModel) View() tea.View {
 func (m QueueModel) queueBody(width int) []string {
 	// A server down before the first load never loads, so its banner must
 	// not wait behind "loading…".
+	if m.olderServer {
+		return []string{ui.StyleWarning.Render("  " + olderServerNotice)}
+	}
 	if !m.loaded && !m.serverDown() {
 		return []string{ui.StyleDim.Render("  loading…")}
 	}

@@ -116,7 +116,10 @@ type Model struct {
 	// link is the link half of the last WithServerState delivery; nothing else
 	// writes it (server_link.go).
 	link ServerLink
-	vm   viewmodel.State
+	// olderServer: the last snapshot came from a server without rendered
+	// status; the tab shows olderServerNotice and no tickets.
+	olderServer bool
+	vm          viewmodel.State
 	// scope is which projects the tab shows; owned by the tab, so no snapshot
 	// or event can reset it.
 	scope viewmodel.Scope
@@ -391,6 +394,9 @@ func (m Model) sidebarViewportHeight() int {
 // means the Archived section (ticket 04) still has something to render, so
 // an empty active `.scratch/` alone must not suppress the whole tree.
 func (m Model) sidebarBody(sidebarViewportH, width int) []string {
+	if m.olderServer {
+		return []string{ui.StyleWarning.Render("  " + olderServerNotice)}
+	}
 	if m.loaded && len(m.epics) == 0 && m.archivedEpicCount == 0 {
 		return []string{ui.StyleMuted.Render("  no .scratch/ directory found")}
 	}

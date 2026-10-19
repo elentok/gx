@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -50,7 +51,19 @@ func (f *streamFake) Snapshot(context.Context) (server.Snapshot, error) {
 	if f.snapErr != nil {
 		return server.Snapshot{}, f.snapErr
 	}
-	return server.Snapshot{Seq: f.seq, Tickets: f.tickets, Epics: f.epics, Mode: f.mode, Sessions: f.sessions}, nil
+	return server.Snapshot{Seq: f.seq, Tickets: withRenderedStatus(f.tickets), Epics: f.epics, Mode: f.mode, Sessions: f.sessions}, nil
+}
+
+// withRenderedStatus makes tickets look like a current server's, which always
+// sends rendered_status; a snapshot with none reads as an older server's.
+func withRenderedStatus(tickets []server.TicketInfo) []server.TicketInfo {
+	out := slices.Clone(tickets)
+	for i := range out {
+		if out[i].RenderedStatus == "" {
+			out[i].RenderedStatus = out[i].Status
+		}
+	}
+	return out
 }
 
 func (f *streamFake) Events(ctx context.Context, since uint64) (<-chan server.Event, error) {
@@ -532,7 +545,7 @@ func TestServerStream_ParkToastsOnLiveEventsOnly(t *testing.T) {
 func TestServerStream_SnapshotNeverToastsButFailureDoes(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
-	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3, Tickets: f.tickets}})
+	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3, Tickets: withRenderedStatus(f.tickets)}})
 	h.m = next.(Model)
 	for _, got := range toastTexts(cmd) {
 		if got.Kind == notify.KindWarning { // the unregistered-project hint is Info

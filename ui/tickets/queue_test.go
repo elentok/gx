@@ -835,8 +835,8 @@ func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := m.View().Content
 
-	if !strings.Contains(content, "(blocked by 01)") {
-		t.Fatalf("expected blocked-by suffix for the dependent ticket:\n%s", content)
+	if strings.Contains(content, "(blocked by 01)") {
+		t.Fatalf("expected no blocked-by suffix without a server:\n%s", content)
 	}
 	if !strings.Contains(content, "12.0k tok") || !strings.Contains(content, "12m34s") {
 		t.Fatalf("expected the done ticket's elapsed/tokens metrics line:\n%s", content)

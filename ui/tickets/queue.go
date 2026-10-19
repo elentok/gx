@@ -115,6 +115,8 @@ type QueueModel struct {
 	serverAPI   ServerAPI
 	serverStart func(context.Context) error
 	link        ServerLink
+	// olderServer: see Model.olderServer.
+	olderServer bool
 	// projectFilter narrows the server-mode rows to one project; "" shows all.
 	projectFilter string
 	// focusEpic is the address of an epic to select when its rows arrive.
