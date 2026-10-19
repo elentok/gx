@@ -1006,6 +1006,15 @@ func TestParseServerWatchConfig(t *testing.T) {
 	}
 }
 
+func TestParseServerRecentlyFinished(t *testing.T) {
+	for body, want := range map[string]int{`{}`: 5, `{"server":{"recently-finished":8}}`: 8, `{"server":{"recently-finished":-1}}`: 5} {
+		cfg, err := Parse([]byte(body))
+		if err != nil || cfg.Server.RecentlyFinished != want {
+			t.Errorf("%s: RecentlyFinished = %d (err %v), want %d", body, cfg.Server.RecentlyFinished, err, want)
+		}
+	}
+}
+
 func TestLoadCPUWatchdog(t *testing.T) {
 	def := DefaultCPUWatchdogConfig()
 	for _, tc := range []struct {

@@ -110,7 +110,12 @@ type ServerConfig struct {
 	LogRetention time.Duration `json:"-"`
 	// WatchConfig reloads the config file whenever it is saved.
 	WatchConfig bool `json:"watch-config"`
+	// RecentlyFinished is how many completed epics the snapshot's history lists.
+	RecentlyFinished int `json:"recently-finished"`
 }
+
+// DefaultRecentlyFinished is the RecentlyFinished when none is configured.
+const DefaultRecentlyFinished = 5
 
 // Default returns the default configuration.
 func Default() Config {
@@ -127,7 +132,7 @@ func Default() Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
-		Server:                ServerConfig{WatchConfig: true},
+		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		AgentRunner:           "auto",
@@ -248,6 +253,8 @@ func Parse(data []byte) (Config, error) {
 			TabEnv       []string `json:"tab-env"`
 			LogRetention *string  `json:"log-retention"`
 			WatchConfig  *bool    `json:"watch-config"`
+
+			RecentlyFinished *int `json:"recently-finished"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
 		RunnerWait        *string `json:"runner-wait"`
@@ -403,6 +410,9 @@ func Parse(data []byte) (Config, error) {
 		if d, err := time.ParseDuration(*raw.Server.LogRetention); err == nil && d > 0 {
 			cfg.Server.LogRetention = d
 		}
+	}
+	if raw.Server != nil && raw.Server.RecentlyFinished != nil && *raw.Server.RecentlyFinished >= 0 {
+		cfg.Server.RecentlyFinished = *raw.Server.RecentlyFinished
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

@@ -108,6 +108,10 @@ type Settings struct {
 	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
 	CPUWatchdog config.CPUWatchdogConfig
 
+	// RecentlyFinished is config server.recently-finished: how many completed
+	// epics the snapshot lists. Zero means config.DefaultRecentlyFinished.
+	RecentlyFinished int
+
 	// AgentsClaude and AgentsCodex are the global model and effort of config
 	// agents.*, before a project's overrides.
 	AgentsClaude config.AgentConfig
@@ -141,6 +145,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		AgentsSounds:              cfg.Agents.Sounds,
 		AgentsClaudeArgs:          cfg.Agents.ClaudeArgs,
 		CPUWatchdog:               cfg.CPUWatchdog,
+		RecentlyFinished:          cfg.Server.RecentlyFinished,
 		AgentsClaude:              cfg.Agents.Claude,
 		AgentsCodex:               cfg.Agents.Codex,
 	}
@@ -581,6 +586,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
+	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().recentlyFinishedLimit())
 	snap.Mode = s.pause.currentMode()
 	snap.AFK = s.afk.isOn()
 	sessions, err := s.listSessions()
@@ -738,6 +744,13 @@ func (s *Server) Serve(ctx context.Context) error {
 		return fmt.Errorf("serve: %w", err)
 	}
 	return nil
+}
+
+func (s Settings) recentlyFinishedLimit() int {
+	if s.RecentlyFinished == 0 {
+		return config.DefaultRecentlyFinished
+	}
+	return s.RecentlyFinished
 }
 
 func (s Settings) storeCommitDebounce() time.Duration {

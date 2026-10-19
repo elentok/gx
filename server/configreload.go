@@ -160,6 +160,7 @@ func changedKeys(old, next Settings) []string {
 		{"server.tab-env", old.TabEnv, next.TabEnv},
 		{"server.log-retention", old.LogRetention, next.LogRetention},
 		{"server.watch-config", old.WatchConfig, next.WatchConfig},
+		{"server.recently-finished", old.RecentlyFinished, next.RecentlyFinished},
 		{"evolve", old.Evolve, next.Evolve},
 		{"recovery.enabled", old.RecoverySettings.Enabled, next.RecoverySettings.Enabled},
 		{"recovery.disabled", old.RecoverySettings.Disabled, next.RecoverySettings.Disabled},

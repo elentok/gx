@@ -99,6 +99,9 @@ type Snapshot struct {
 	Sessions []SessionInfo `json:"sessions"`
 	// Epics summarizes every epic holding a queue item; filled in by the handler.
 	Epics []EpicSummary `json:"epics"`
+	// RecentlyFinished is the last completed loop epics, newest first; filled in
+	// by the handler.
+	RecentlyFinished []FinishedEpic `json:"recently_finished"`
 }
 
 // index is the server's in-memory view of the ticket store.
