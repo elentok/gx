@@ -1,9 +1,6 @@
 package tickets
 
 import (
-	"regexp"
-	"strings"
-
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
@@ -19,14 +16,12 @@ const parkReasonMaxRunes = 60
 // markNeedsAnswerWithReasonAndStub/markNeedsRepairWithReason
 // (ralphloop/claim.go) append to a parked ticket's body.
 const (
-	needsAnswerHeading = "## Needs Answer"
-	needsRepairHeading = "## Needs Repair"
+	needsAnswerHeading = tickets.NeedsAnswerHeading
+	needsRepairHeading = tickets.NeedsRepairHeading
 )
 
 // needsAnswerHint is rendered under the preview's "## Needs Answer" heading.
 const needsAnswerHint = "Press m to answer."
-
-var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 
 // parkReason returns t's park-reason subtext, ellipsized with ellipsisIcon,
 // or "" if t isn't currently parked (gated on epic.RenderedStatus(t), not on
@@ -35,47 +30,11 @@ var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 // section presence to decide the row's status) or the section/its first
 // content line is missing.
 func parkReason(epic tickets.Epic, t tickets.Ticket, ellipsisIcon string) string {
-	status := epic.RenderedStatus(t)
-	var heading string
-	switch status {
-	case tickets.StatusNeedsAnswer:
-		heading = needsAnswerHeading
-	case tickets.StatusNeedsRepair:
-		heading = needsRepairHeading
-	default:
-		return ""
-	}
-
-	line := firstContentLineAfterHeading(t.Body, heading)
-	if line == "" {
-		return ""
-	}
-	return ellipsize(stripMarkdownMarkers(line), parkReasonMaxRunes, ellipsisIcon)
-}
-
-// firstContentLineAfterHeading finds heading as an exact line in body and
-// returns the first non-empty line after it, or "" if either isn't found.
-func firstContentLineAfterHeading(body, heading string) string {
-	lines := strings.Split(body, "\n")
-	for i, line := range lines {
-		if line != heading {
-			continue
-		}
-		for _, next := range lines[i+1:] {
-			trimmed := strings.TrimSpace(next)
-			if trimmed != "" {
-				return trimmed
-			}
-		}
-		return ""
+	switch epic.RenderedStatus(t) {
+	case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair:
+		return ellipsize(tickets.ParkReason(epic, t), parkReasonMaxRunes, ellipsisIcon)
 	}
 	return ""
-}
-
-// stripMarkdownMarkers removes simple emphasis/code markers (*, _, `) — not
-// a full markdown parser, matches the modest "markers stripped" ask.
-func stripMarkdownMarkers(line string) string {
-	return strings.TrimSpace(markdownMarkerPattern.ReplaceAllString(line, ""))
 }
 
 // rowTitle is a list row's "<num> <title>". The title is a ticket's whole `#`

@@ -97,6 +97,8 @@ type Snapshot struct {
 	// Sessions are the interactive sessions, oldest first; filled in by the
 	// handler.
 	Sessions []SessionInfo `json:"sessions"`
+	// Epics summarizes every epic holding a queue item; filled in by the handler.
+	Epics []EpicSummary `json:"epics"`
 }
 
 // index is the server's in-memory view of the ticket store.
