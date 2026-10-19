@@ -265,6 +265,10 @@ resume, which belongs to the pause **Gate**. _Avoid_: restart (sounds like a fre
 when the session is created, and shown with the session. It never changes the ticket's status: the
 person in the session works the ticket. _Avoid_: assignee, claim (a claim is a ticket status).
 
+**Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
+map. It runs in the project's trunk checkout. A map epic or map ticket can have more than one at a
+time. _Avoid_: planning session.
+
 **Session status** — what an interactive session is doing now: Starting, Working, Idle, Blocked,
 Rate-limited or Exited. Finer than an agent runner's working/idle/blocked, which the loop keeps
 using. _Avoid_: "state" for this (state is the runner's coarse view).
@@ -275,8 +279,10 @@ Says nothing about whether the person must act. _Avoid_: needs attention (retire
 0018), unseen.
 
 **Actionable** — the agent needs something specific from the person: an answer to a permission
-prompt, question or dialog (while Blocked), or a next step the agent itself raised. Viewing does not
-clear it; resolving the block or typing into the session does. Always carries a reason.
+prompt, question or dialog (while Blocked), a next step the agent itself raised, or prompts gx could
+not send (the input held a draft, or the first prompt failed). Viewing does not clear it; resolving
+the block or typing into the session does, except for one gx raised itself, which only running it or
+a newer Actionable or session exit replaces. Always carries a reason.
 _Avoid_: unread (a read session can still be actionable).
 
 **Action** — the prompts an agent attaches to an Actionable it raised, which gx can send into the
