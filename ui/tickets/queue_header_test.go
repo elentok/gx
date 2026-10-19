@@ -113,8 +113,8 @@ func TestQueueModelEpicHeaderRendersStatusAndContextLines(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 	content := ansi.Strip(m.View().Content)
 
-	if !strings.Contains(content, "awaiting-merge") || strings.Contains(content, "took") {
-		t.Fatalf("expected the epic status line to say awaiting-merge without a took duration:\n%s", content)
+	if !strings.Contains(content, "Awaiting merge") || strings.Contains(content, "took") {
+		t.Fatalf("expected the epic status line to say Awaiting merge without a took duration:\n%s", content)
 	}
 	if !strings.Contains(content, "Status: ") || !strings.Contains(content, " · 3 compacts") {
 		t.Fatalf("expected the epic Status line with its compacts:\n%s", content)
@@ -368,10 +368,10 @@ func TestEpicStatusRowElapsedAndAgentParts(t *testing.T) {
 	}{
 		{"never started shows only the state", time.Hour,
 			tickets.Epic{Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
-			[]string{"waiting"}, []string{"elapsed", "agent", "·"}},
+			[]string{"Waiting for a slot"}, []string{"elapsed", "agent", "·"}},
 		{"started but idle uses the model clock, under a minute", 30 * time.Second,
 			tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
-			[]string{"waiting · <1m elapsed"}, []string{"agent"}},
+			[]string{"Waiting for a slot · <1m elapsed"}, []string{"agent"}},
 		{"minute resolution", 134 * time.Minute,
 			tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
 			[]string{"2h 14m elapsed"}, nil},

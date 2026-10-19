@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
-func TestEpicStatusLine_UsesServerStateWords(t *testing.T) {
+func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
 	tests := []struct {
@@ -20,17 +20,25 @@ func TestEpicStatusLine_UsesServerStateWords(t *testing.T) {
 		wantIcon string
 		wantText string
 	}{
-		{server.StateAwaitingMerge, icons.TicketDone, "awaiting-merge"},
-		{server.StateRunning, "S", "running"},
-		{server.StateWaiting, icons.EpicQueued, "waiting"},
-		{server.StateParked, icons.Warning, "parked"},
-		{server.StateDeadlocked, icons.Warning, "deadlocked"},
+		{server.StateAwaitingMerge, icons.TicketDone, "Awaiting merge"},
+		{server.StateRunning, "S", "Running"},
+		{server.StateWaiting, icons.EpicQueued, "Waiting for a slot"},
+		{server.StateParked, icons.Warning, "Parked"},
+		{server.StateDeadlocked, icons.Warning, "Deadlocked"},
 	}
 	for _, tt := range tests {
 		icon, text, _ := epicStatusLine(icons, server.EpicSummary{State: tt.state}, "S")
 		if icon != tt.wantIcon || text != tt.wantText {
 			t.Errorf("state %q: got icon=%q text=%q, want icon=%q text=%q", tt.state, icon, text, tt.wantIcon, tt.wantText)
 		}
+	}
+}
+
+func TestEpicStatusLine_DeadlockedShowsReason(t *testing.T) {
+	t.Parallel()
+	_, text, _ := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.StateDeadlocked, Reason: "01 waits on itself"}, "")
+	if text != "Deadlocked: 01 waits on itself" {
+		t.Errorf("text = %q, want the label followed by the reason", text)
 	}
 }
 
@@ -113,8 +121,8 @@ func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 	if !strings.Contains(body, "(3/7)") {
 		t.Errorf("view lacks the summary counter (3/7):\n%s", body)
 	}
-	if !strings.Contains(body, "waiting") {
-		t.Errorf("view lacks the summary state word:\n%s", body)
+	if !strings.Contains(body, "Waiting for a slot") {
+		t.Errorf("view lacks the summary state label:\n%s", body)
 	}
 }
 
@@ -133,8 +141,8 @@ func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
 	if !strings.Contains(body, "Which approach, A or B?") {
 		t.Errorf("view lacks the Park reason line:\n%s", body)
 	}
-	if !strings.Contains(body, "parked") {
-		t.Errorf("view lacks the parked state word:\n%s", body)
+	if !strings.Contains(body, "Parked") {
+		t.Errorf("view lacks the parked state label:\n%s", body)
 	}
 }
 
@@ -144,7 +152,7 @@ func TestQueueServerMode_DeadlockedWord(t *testing.T) {
 		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	)
 
-	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "deadlocked") {
-		t.Errorf("view lacks the deadlocked state word:\n%s", body)
+	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "Deadlocked: 01 waits on itself") {
+		t.Errorf("view lacks the deadlocked label and reason:\n%s", body)
 	}
 }

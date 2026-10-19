@@ -47,7 +47,7 @@ func TestQueueStream_UpdatesOnEventWhileOpen(t *testing.T) {
 	f.tickets = queuedTicket("open", time.Time{})
 	f.queue = []server.QueueItem{{Address: "gx:alpha/01"}}
 	openQueueTab(h)
-	if view := queueView(h); !strings.Contains(view, "Zeta ticket") || strings.Contains(view, "running") {
+	if view := queueView(h); !strings.Contains(view, "Zeta ticket") || strings.Contains(view, "Running") {
 		t.Fatalf("idle queue:\n%s", view)
 	}
 
@@ -58,7 +58,7 @@ func TestQueueStream_UpdatesOnEventWhileOpen(t *testing.T) {
 	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventTicketClaimed, Address: "gx:alpha/01"}
 	h.pump()
 
-	if view := queueView(h); !strings.Contains(view, "running") {
+	if view := queueView(h); !strings.Contains(view, "Running") {
 		t.Errorf("claim did not show without R:\n%s", view)
 	}
 }
@@ -79,7 +79,7 @@ func TestQueueStream_ClaimWhileHiddenShowsRunningOnOpen(t *testing.T) {
 	h.switchTo(nav.TabQueue)
 	h.pump()
 
-	if view := queueView(h); !strings.Contains(view, "running") {
+	if view := queueView(h); !strings.Contains(view, "Running") {
 		t.Errorf("claim made while hidden is not running on open:\n%s", view)
 	}
 }

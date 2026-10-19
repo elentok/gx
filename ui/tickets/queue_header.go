@@ -17,11 +17,7 @@ import (
 // queueHeaderReservedLines is the constant height reserved for the Queue
 // tab's run-state banner slot (queueHeaderBodyLines), whether or not a
 // banner is actually active — the maximum line count any queueRunStateKind
-// can emit. Keeping this a fixed constant, rather than deriving it from
-// len(queueHeaderBodyLines()), is the point of ticket 21: m.queueTree's
-// SetVisibleHeight only runs from the window-resize handler, so a banner
-// that changed the body's line count mid-session (no resize in between)
-// used to desync the tree's scroll/paging math.
+// can emit.
 const queueHeaderReservedLines = 1
 
 var (
@@ -40,10 +36,7 @@ var (
 
 	// epicStatusParkedAnswerStyle colors a parked epic's header status line
 	// orange when every ticket a human still needs to act on is waiting on a
-	// question (needs-answer) rather than a fault. This recolours the single
-	// existing parked style into two variants instead of adding a third
-	// visual style alongside it (see ticket 21's "recolour, not a third
-	// style").
+	// question (needs-answer) rather than a fault.
 	epicStatusParkedAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 
 	// epicStatusParkedRepairStyle colors a parked epic's header status line
@@ -53,26 +46,40 @@ var (
 	epicStatusParkedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
+// epicStateLabels must match LABELS in webui/src/view.ts.
+var epicStateLabels = map[string]string{
+	server.StateParked:        "Parked",
+	server.StateDeadlocked:    "Deadlocked",
+	server.StateRunning:       "Running",
+	server.StateWaiting:       "Waiting for a slot",
+	server.StateAwaitingMerge: "Awaiting merge",
+}
+
 // epicStatusLine picks an epic header's status-line icon, text, and color from
-// the server's summary. The text is the server's state word.
+// the server's summary. The text is the state's label, plus the reason for a
+// deadlocked epic.
 func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
 	switch sum.State {
 	case server.StateAwaitingMerge:
-		return icons.TicketDone, sum.State, epicStatusDoneStyle
+		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
 	case server.StateRunning:
-		return spinnerGlyph, sum.State, lipgloss.NewStyle()
+		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
 	case server.StateParked:
 		// Red once a parked ticket is broken, since a fault outranks a question.
 		for _, t := range sum.Parked {
 			if t.Status == tickets.StatusNeedsRepair.Word() || t.Status == tickets.StatusError.Word() {
-				return icons.Warning, sum.State, epicStatusParkedRepairStyle
+				return icons.Warning, epicStateLabels[sum.State], epicStatusParkedRepairStyle
 			}
 		}
-		return icons.Warning, sum.State, epicStatusParkedAnswerStyle
+		return icons.Warning, epicStateLabels[sum.State], epicStatusParkedAnswerStyle
 	case server.StateDeadlocked:
-		return icons.Warning, sum.State, epicStatusParkedRepairStyle
+		text = epicStateLabels[sum.State]
+		if sum.Reason != "" {
+			text += ": " + sum.Reason
+		}
+		return icons.Warning, text, epicStatusParkedRepairStyle
 	default:
-		return icons.EpicQueued, server.StateWaiting, lipgloss.NewStyle()
+		return icons.EpicQueued, epicStateLabels[server.StateWaiting], lipgloss.NewStyle()
 	}
 }
 
