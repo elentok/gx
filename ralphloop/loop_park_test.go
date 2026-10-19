@@ -95,7 +95,7 @@ func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
 }
 
 // TestRun_DraftOnlyEpic_Parks covers the other human-clearable status:
-// draft. Unlike needs-answer/needs-repair, isParked matches it off
+// draft. Unlike needs-answer/needs-repair, IsParked matches it off
 // the raw frontmatter Status: rather than RenderedStatus, so this proves a
 // draft ticket parks rather than deadlocking.
 func TestRun_DraftOnlyEpic_Parks(t *testing.T) {

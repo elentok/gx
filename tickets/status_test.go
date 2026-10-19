@@ -642,3 +642,21 @@ func TestEpic_CancelledBlockerResolvesAndEpicCompletes(t *testing.T) {
 		t.Error("AllDone = false, want true when remaining tickets are cancelled")
 	}
 }
+
+func TestEpic_IsParked(t *testing.T) {
+	cases := map[string]bool{
+		"needs-answer": true,
+		"needs-repair": true,
+		"draft":        true,
+		"bogus-value":  true, // renders as error
+		"open":         false,
+		"claimed":      false,
+		"done":         false,
+	}
+	for status, want := range cases {
+		epic := Epic{Tickets: []Ticket{{Number: 1, Status: status}}}
+		if got := epic.IsParked(epic.Tickets[0]); got != want {
+			t.Errorf("IsParked(%q) = %v, want %v", status, got, want)
+		}
+	}
+}

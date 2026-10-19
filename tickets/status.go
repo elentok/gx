@@ -156,6 +156,19 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	return base
 }
 
+// IsParked reports whether t is stalled on a person rather than on the run:
+// needs-answer, needs-repair, error, or draft (a stub nobody has filled in).
+// None of these is ever schedulable, but a person can clear any of them,
+// which is what separates parking from a deadlock. The one rule the server,
+// ralph-loop and the Queue tab share.
+func (e Epic) IsParked(t Ticket) bool {
+	switch e.RenderedStatus(t) {
+	case StatusNeedsAnswer, StatusNeedsRepair, StatusError, StatusDraft:
+		return true
+	}
+	return false
+}
+
 // parkedOnInvestigation reports whether t is parked while an investigate child
 // of it is still unfinished: it renders as waiting for that child. An
 // investigate ticket is the one fork child that works on a parked parent, so

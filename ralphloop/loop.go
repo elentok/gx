@@ -933,7 +933,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// claimed, not done, so this is not a completed land — no
 			// completed++/sink.IterationFinished. Drop it from launched so a
 			// later run's reconcile can pick the orphaned claim back up
-			// (see isParked's doc: "claimed" itself is never parked, so
+			// (see tickets.Epic.IsParked: "claimed" itself is never parked, so
 			// nothing else would remove it here).
 			delete(launched, r.ticket.Identifier)
 			continue
@@ -957,7 +957,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 					// commonly) is no longer launched, so a human clearing
 					// its status puts it back in the frontier for this run
 					// instead of only for the next one.
-					if isParked(*landedEpic, t) {
+					if landedEpic.IsParked(t) {
 						parked = true
 						delete(launched, t.Identifier)
 					}
@@ -1036,7 +1036,7 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 	case status == tickets.StatusError:
 		d.Decision = "error"
 		d.Reason = cmp.Or(t.ReadErr, t.GraphErr, t.BlockedByErr, "unrecognized status "+t.Status)
-	case isParked(epic, t):
+	case epic.IsParked(t):
 		d.Decision = "stalled"
 	case inFrontier:
 		d.Decision = "frontier"
@@ -1053,7 +1053,7 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 func AllDone(e tickets.Epic) bool { return allDone(e) }
 
 // allDone reports whether every ticket in e is done — the run's one exit
-// condition. A stalled ticket (see isParked) is deliberately not an
+// condition. A stalled ticket (see tickets.Epic.IsParked) is deliberately not an
 // exit condition: the run parks on it instead, so the agent's question is
 // still answerable in its own pane.
 func allDone(e tickets.Epic) bool {
@@ -1068,27 +1068,12 @@ func allDone(e tickets.Epic) bool {
 	return true
 }
 
-// isParked reports whether t is stalled on a person rather than on
-// the run: needs-answer (an iteration finished with no commits to land),
-// needs-repair (operator intervention, or a done ticket reconciliation
-// found unrecoverable — see markDoneTicketUnrecoverable), or draft (a stub
-// nobody has filled in yet). None of these ever appear in the frontier, so a
-// run with only these left has nothing to schedule — but a person can clear
-// any of them, which is what separates parking from a deadlock.
-func isParked(e tickets.Epic, t tickets.Ticket) bool {
-	switch e.RenderedStatus(t) {
-	case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusDraft:
-		return true
-	}
-	return false
-}
-
 // stalledTickets lists every in-scope, human-clearable ticket in e, in file
 // order — what a park notification names as the thing waiting on a person.
 func stalledTickets(e tickets.Epic, scope RunScope) []tickets.Ticket {
 	var stalled []tickets.Ticket
 	for _, t := range e.Tickets {
-		if scope.Contains(t, e) && isParked(e, t) {
+		if scope.Contains(t, e) && e.IsParked(t) {
 			stalled = append(stalled, t)
 		}
 	}

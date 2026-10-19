@@ -86,34 +86,34 @@ func (m QueueModel) epicStatus(epic tickets.Epic) (icon, text string, style lipg
 	return epicStatusLine(m.icons(), epic, m.runningEpics[epic.Name], glyph)
 }
 
-// parkedStatus derives the parked state client-side, mirroring the server's
-// all-parked deadlock check (server/deadlock.go): nothing renders open or
-// claimed, and some ticket is needs-answer, needs-repair, error or draft.
-// Drafts keep the epic parked but are never listed as waiting; red when any
-// listed ticket is needs-repair or error, orange otherwise.
-func parkedStatus(epic tickets.Epic) (text string, style lipgloss.Style, ok bool) {
+// parkedStatus derives the parked state client-side from the same rule as the
+// server's all-parked deadlock check (tickets.Epic.IsParked): nothing renders
+// open or claimed, and some ticket is parked. Drafts keep the epic parked but
+// are never listed as waiting; red when any listed ticket is needs-repair or
+// error, orange otherwise.
+func parkedStatus(epic tickets.Epic) (string, lipgloss.Style, bool) {
 	var waiting []string
 	anyFault, anyDraft := false, false
 	for _, t := range epic.Tickets {
-		switch epic.RenderedStatus(t) {
-		case tickets.StatusOpen, tickets.StatusClaimed:
-			return "", style, false
-		case tickets.StatusNeedsAnswer:
-			waiting = append(waiting, t.Identifier)
-		case tickets.StatusNeedsRepair, tickets.StatusError:
-			waiting = append(waiting, t.Identifier)
-			anyFault = true
-		case tickets.StatusDraft:
+		status := epic.RenderedStatus(t)
+		switch {
+		case status == tickets.StatusOpen || status == tickets.StatusClaimed:
+			return "", lipgloss.Style{}, false
+		case !epic.IsParked(t):
+		case status == tickets.StatusDraft:
 			anyDraft = true
+		default:
+			waiting = append(waiting, t.Identifier)
+			anyFault = anyFault || status == tickets.StatusNeedsRepair || status == tickets.StatusError
 		}
 	}
 	switch {
 	case len(waiting) == 0 && !anyDraft:
-		return "", style, false
+		return "", lipgloss.Style{}, false
 	case len(waiting) == 0:
 		return "parked — only drafts left", epicStatusParkedAnswerStyle, true
 	}
-	text = "parked — waiting on " + strings.Join(waiting[:min(len(waiting), parkedWaitingMax)], ", ")
+	text := "parked — waiting on " + strings.Join(waiting[:min(len(waiting), parkedWaitingMax)], ", ")
 	if extra := len(waiting) - parkedWaitingMax; extra > 0 {
 		text += fmt.Sprintf(" +%d more", extra)
 	}

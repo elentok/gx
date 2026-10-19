@@ -48,11 +48,10 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 		switch e.RenderedStatus(t) {
 		case tickets.StatusOpen, tickets.StatusClaimed:
 			return "", false
-		case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair, tickets.StatusDraft:
-			parked = true
 		case tickets.StatusDone, tickets.StatusCancelled:
 			continue
 		}
+		parked = parked || e.IsParked(t)
 		remaining = true
 	}
 	switch {
