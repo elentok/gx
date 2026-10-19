@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/progress"
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/git"
@@ -375,14 +374,10 @@ func numberFromValue(value float64, asPercent bool) string {
 func contextProgressValue(percent, tokens float64) string {
 	pct := math.Max(0, math.Min(100, percent))
 	barColor := tokenColor(tokens)
-	bar := progress.New(
-		progress.WithWidth(12),
-		progress.WithFillCharacters('■', '·'),
-		progress.WithColors(barColor),
-		progress.WithoutPercentage(),
-	)
-	percentText := lipgloss.NewStyle().Foreground(barColor).Render(numberFromValue(percent, true))
-	return fmt.Sprintf("%s%s%s %s", claudeLeftBracket, bar.ViewAs(pct/100), claudeRightBracket, percentText)
+	fill := lipgloss.NewStyle().Foreground(barColor)
+	bar := ui.ProgressBar(pct/100, 12, fill, lipgloss.NewStyle().Foreground(ui.ColorSurface1))
+	percentText := fill.Render(numberFromValue(percent, true))
+	return fmt.Sprintf("%s%s%s %s", claudeLeftBracket, bar, claudeRightBracket, percentText)
 }
 
 // tokenColor escalates through gx's palette as context usage grows, giving an

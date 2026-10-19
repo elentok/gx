@@ -318,11 +318,23 @@ func TestTokenColorThresholds(t *testing.T) {
 func TestContextProgressValue_RendersBar(t *testing.T) {
 	t.Parallel()
 	got := contextProgressValue(50, 1000)
-	if !strings.Contains(got, "■") && !strings.Contains(got, "·") {
+	if !strings.Contains(got, "▰") || !strings.Contains(got, "▱") {
 		t.Fatalf("expected a rendered progress bar, got %q", got)
 	}
 	if !strings.Contains(got, "50%") {
 		t.Fatalf("expected the percentage text, got %q", got)
+	}
+}
+
+func TestContextProgressValue_FullOnlyAtHundred(t *testing.T) {
+	t.Parallel()
+	full := contextProgressValue(100, 1000)
+	if strings.Contains(full, "▱") || strings.Count(full, "▰") != 12 {
+		t.Fatalf("expected a full bar at 100%%, got %q", full)
+	}
+	almost := contextProgressValue(99, 1000)
+	if !strings.Contains(almost, "▱") {
+		t.Fatalf("expected a non-full bar at 99%%, got %q", almost)
 	}
 }
 
