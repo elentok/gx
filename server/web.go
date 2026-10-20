@@ -69,11 +69,9 @@ func (s *Server) webHandler() http.Handler {
 				http.Error(w, reason, http.StatusForbidden)
 				return
 			}
-			for _, route := range routeTable {
-				if route.pattern == r.Method+" "+r.URL.Path && webPOSTAllowlist[route.pattern] {
-					route.handler(s, w, r)
-					return
-				}
+			if handler, ok := webWrites[r.Method+" "+r.URL.Path]; ok {
+				handler(s)(w, r)
+				return
 			}
 			http.NotFound(w, r)
 			return
@@ -81,6 +79,8 @@ func (s *Server) webHandler() http.Handler {
 		switch {
 		case r.URL.Path == "/v1/snapshot":
 			s.snapshot(w, r)
+		case r.URL.Path == "/v1/tickets/detail":
+			s.detail(w, r)
 		case r.URL.Path == "/v1/events":
 			s.streamEvents(w, r)
 		case strings.HasPrefix(r.URL.Path, "/v1/"):
@@ -93,9 +93,13 @@ func (s *Server) webHandler() http.Handler {
 	})
 }
 
-// webPOSTAllowlist names the "METHOD /path" routeTable entries the web mux
-// serves besides the read-only GETs. Later tickets add their routes here.
-var webPOSTAllowlist = map[string]bool{}
+// webWrites names the "METHOD /path" writes the web mux serves besides the
+// read-only GETs, each with the handler the web mux uses: the web variants
+// require a state token. There is deliberately no withdraw or undo route.
+var webWrites = map[string]func(*Server) http.HandlerFunc{
+	"POST /v1/tickets/answer": func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketAnswer) },
+	"POST /v1/tickets/unpark": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairUnpark) },
+}
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the
 // CSRF guard: a cross-site form post cannot set a JSON content type, and a

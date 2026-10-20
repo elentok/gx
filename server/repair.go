@@ -471,6 +471,10 @@ func repairWriteAs(web bool, do func(RepairRequest) (RepairResult, error)) http.
 			return
 		}
 		req.RequireState = web
+		if web && req.State == "" {
+			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current park"}))
+			return
+		}
 		res, err := do(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

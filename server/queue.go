@@ -442,10 +442,24 @@ func (s *Server) queueItems(w http.ResponseWriter, _ *http.Request) {
 // queueWrite adapts a queue write to a POST handler. Refusals are results, so
 // they answer 200; only a failure to persist is an HTTP error.
 func (s *Server) queueWrite(do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
+	return queueWriteAs(false, do)
+}
+
+// queueWriteWeb is queueWrite for the web mux: a request without a state token
+// is refused as stale before anything runs.
+func (s *Server) queueWriteWeb(do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
+	return queueWriteAs(true, do)
+}
+
+func queueWriteAs(web bool, do func(QueueRequest) (QueueResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req QueueRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if web && req.State == "" {
+			writeJSON(w, refusal(ReasonStale, "a state token is required; review the current question"))
 			return
 		}
 		res, err := do(req)
