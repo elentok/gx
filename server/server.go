@@ -97,6 +97,11 @@ type Settings struct {
 	// MaxOneOffAgents caps live agents across one project's one-offs (config
 	// execution-queue.max-one-off-agents).
 	MaxOneOffAgents int
+	// WaitingSlotGrace and MaxReleasedAgents are config
+	// execution-queue.waiting-slot-grace and .max-released-agents; zero grace
+	// means the config default.
+	WaitingSlotGrace  time.Duration
+	MaxReleasedAgents int
 
 	// Chat names the chat destinations the server notifies; empty means none.
 	Chat ralphloop.ServerChatConfig
@@ -147,6 +152,8 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		MaxAgents:           cfg.ExecutionQueue.MaxAgents,
 		MaxAgentsPerRoot:    cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
 		MaxOneOffAgents:     cfg.ExecutionQueue.MaxOneOffAgents,
+		WaitingSlotGrace:    cfg.ExecutionQueue.WaitingSlotGrace,
+		MaxReleasedAgents:   cfg.ExecutionQueue.MaxReleasedAgents,
 		Chat: ralphloop.ServerChatConfig{
 			TelegramBotToken: cfg.Notifications.Telegram.BotToken,
 			TelegramChatID:   cfg.Notifications.Telegram.ChatID,

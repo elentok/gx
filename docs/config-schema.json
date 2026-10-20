@@ -93,6 +93,17 @@
           "type": "string",
           "description": "Go duration string (e.g. \"5m\") bounding the spin-cycles count. Unparsable or non-positive values keep the default. Default: \"5m\".",
           "default": "5m"
+        },
+        "waiting-slot-grace": {
+          "type": "string",
+          "description": "Go duration string (e.g. \"10m\"). A waiting agent counts toward the slot caps this long, then releases its slot and stays alive. Unparsable or non-positive values keep the default. Default: \"10m\".",
+          "default": "10m"
+        },
+        "max-released-agents": {
+          "type": "integer",
+          "description": "Maximum waiting agents that may hold a released slot at once, across every project. The next waiting agent keeps its slot. 0 disables release. Default: 5.",
+          "minimum": 0,
+          "default": 5
         }
       },
       "default": {
@@ -101,7 +112,9 @@
         "max-one-off-agents": 3,
         "retry-storm-launches": 3,
         "spin-cycles": 3,
-        "spin-window": "5m"
+        "spin-window": "5m",
+        "waiting-slot-grace": "10m",
+        "max-released-agents": 5
       }
     },
     "budget": {

@@ -156,6 +156,8 @@ func changedKeys(old, next Settings) []string {
 		{"execution-queue.max-agents", old.MaxAgents, next.MaxAgents},
 		{"execution-queue.max-agents-per-epic", old.MaxAgentsPerRoot, next.MaxAgentsPerRoot},
 		{"execution-queue.max-one-off-agents", old.MaxOneOffAgents, next.MaxOneOffAgents},
+		{"execution-queue.waiting-slot-grace", old.WaitingSlotGrace, next.WaitingSlotGrace},
+		{"execution-queue.max-released-agents", old.MaxReleasedAgents, next.MaxReleasedAgents},
 		{"budget.soft-limit", old.BudgetSoftLimit, next.BudgetSoftLimit},
 		{"budget.hard-limit", old.BudgetHardLimit, next.BudgetHardLimit},
 		{"server.tab-env", old.TabEnv, next.TabEnv},

@@ -9,6 +9,8 @@ const (
 	defaultRetryStormLaunches        = 3
 	defaultSpinCycles                = 3
 	defaultSpinWindow                = 5 * time.Minute
+	defaultWaitingSlotGrace          = 10 * time.Minute
+	defaultMaxReleasedAgents         = 5
 )
 
 // ExecutionQueueConfig controls parallel execution from the Tickets and Queue tabs.
@@ -28,6 +30,13 @@ type ExecutionQueueConfig struct {
 	// (e.g. "5m"); an unparsable or non-positive value keeps the default.
 	SpinCycles int           `json:"spin-cycles"`
 	SpinWindow time.Duration `json:"-"`
+	// WaitingSlotGrace is how long a waiting agent counts toward the slot caps
+	// before it releases its slot. Read from the "waiting-slot-grace" key as a
+	// Go duration string; an unparsable or non-positive value keeps the default.
+	WaitingSlotGrace time.Duration `json:"-"`
+	// MaxReleasedAgents caps how many waiting agents may hold a released slot at
+	// once, across every project.
+	MaxReleasedAgents int `json:"max-released-agents"`
 }
 
 // DefaultExecutionQueueConfig returns the execution queue defaults.
@@ -40,6 +49,8 @@ func DefaultExecutionQueueConfig() ExecutionQueueConfig {
 		RetryStormLaunches:          defaultRetryStormLaunches,
 		SpinCycles:                  defaultSpinCycles,
 		SpinWindow:                  defaultSpinWindow,
+		WaitingSlotGrace:            defaultWaitingSlotGrace,
+		MaxReleasedAgents:           defaultMaxReleasedAgents,
 	}
 }
 

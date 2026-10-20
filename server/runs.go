@@ -84,6 +84,9 @@ type trackedRun struct {
 	// WaitingSince is when the agent asked a question and went idle, still
 	// alive for the answer. Zero while it works.
 	WaitingSince time.Time `json:"waiting_since,omitzero"`
+	// SlotReleased marks a waiting run that outlived the grace period: it stays
+	// alive but no longer counts toward the slot caps. Cleared by the answer.
+	SlotReleased bool `json:"slot_released,omitempty"`
 	// State is runLaunching from the claim until the agent has started and
 	// been prompted, so a crash in between leaves a handle reclaim can see.
 	State string `json:"state,omitempty"`
@@ -163,30 +166,27 @@ func (r *runRegistry) has(address string) bool {
 	return ok
 }
 
-// countRoot is how many iterations of root's tickets are running.
-func (r *runRegistry) countRoot(root string) int {
+// countWhere counts the runs that hold a slot and match keep.
+func (r *runRegistry) countWhere(keep func(trackedRun) bool) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	n := 0
 	for _, t := range r.runs {
-		if t.Root == root {
+		if !t.SlotReleased && keep(t) {
 			n++
 		}
 	}
 	return n
 }
 
-// countProject is how many iterations of the project's tickets are running.
+// countRoot is how many iterations of root's tickets hold a slot.
+func (r *runRegistry) countRoot(root string) int {
+	return r.countWhere(func(t trackedRun) bool { return t.Root == root })
+}
+
+// countProject is how many iterations of the project's tickets hold a slot.
 func (r *runRegistry) countProject(project string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	n := 0
-	for _, t := range r.runs {
-		if strings.HasPrefix(t.Root, project+":") {
-			n++
-		}
-	}
-	return n
+	return r.countWhere(func(t trackedRun) bool { return strings.HasPrefix(t.Root, project+":") })
 }
 
 // runOf returns the run whose iteration is of the ticket at address.
@@ -223,10 +223,41 @@ func (r *runRegistry) list() []trackedRun {
 	return out
 }
 
+// count is how many runs hold a slot toward the global cap.
 func (r *runRegistry) count() int {
+	return r.countWhere(func(trackedRun) bool { return true })
+}
+
+// releaseWaiting releases the slot of each run that has waited at least grace,
+// oldest wait first, while fewer than max runs are released. It reports how
+// many it released.
+func (r *runRegistry) releaseWaiting(now time.Time, grace time.Duration, max int) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return len(r.runs)
+	released := 0
+	var due []trackedRun
+	for _, t := range r.runs {
+		switch {
+		case t.SlotReleased:
+			released++
+		case !t.WaitingSince.IsZero() && now.Sub(t.WaitingSince) >= grace:
+			due = append(due, t)
+		}
+	}
+	slices.SortFunc(due, func(a, b trackedRun) int { return a.WaitingSince.Compare(b.WaitingSince) })
+	n := 0
+	for _, t := range due {
+		if released+n >= max {
+			break
+		}
+		t.SlotReleased = true
+		r.runs[t.Address] = t
+		n++
+	}
+	if n > 0 {
+		r.save()
+	}
+	return n
 }
 
 func (r *runRegistry) tracked(address string) (trackedRun, bool) {
@@ -330,12 +361,14 @@ func (r *runRegistry) markWaiting(address string, at time.Time) {
 	}
 }
 
-// clearWaiting ends the run's wait for an answer.
+// clearWaiting ends the run's wait for an answer. The run takes its slot back
+// at once, even over the limit.
 func (r *runRegistry) clearWaiting(address string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if t, ok := r.runs[address]; ok {
 		t.WaitingSince = time.Time{}
+		t.SlotReleased = false
 		r.runs[address] = t
 		r.save()
 	}

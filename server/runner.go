@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -201,6 +202,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 		s.checkProjects()
 		s.checkTrunks()
 		s.stampHandLanded()
+		s.releaseWaitingSlots(time.Now())
 		s.claimNext()
 		s.publishVerdictChanges()
 		select {
@@ -240,6 +242,16 @@ func (s *Server) claimNext() {
 			}
 			running++
 		}
+	}
+}
+
+// releaseWaitingSlots frees the slots of agents that waited past the grace
+// period, up to the release cap. The agents stay alive.
+func (s *Server) releaseWaitingSlots(now time.Time) {
+	st, def := s.settings.Load(), config.DefaultExecutionQueueConfig()
+	grace := cmp.Or(st.WaitingSlotGrace, def.WaitingSlotGrace)
+	if n := s.registry.releaseWaiting(now, grace, st.MaxReleasedAgents); n > 0 {
+		s.log.Info("released waiting slots", "count", n)
 	}
 }
 

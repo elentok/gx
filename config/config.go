@@ -227,6 +227,8 @@ func Parse(data []byte) (Config, error) {
 			RetryStormLaunches *int    `json:"retry-storm-launches"`
 			SpinCycles         *int    `json:"spin-cycles"`
 			SpinWindow         *string `json:"spin-window"`
+			WaitingSlotGrace   *string `json:"waiting-slot-grace"`
+			MaxReleasedAgents  *int    `json:"max-released-agents"`
 		} `json:"execution-queue"`
 		Budget *struct {
 			SoftLimit              *float64  `json:"soft-limit"`
@@ -357,6 +359,14 @@ func Parse(data []byte) (Config, error) {
 			if d, err := time.ParseDuration(*raw.ExecutionQueue.SpinWindow); err == nil && d > 0 {
 				cfg.ExecutionQueue.SpinWindow = d
 			}
+		}
+		if raw.ExecutionQueue.WaitingSlotGrace != nil {
+			if d, err := time.ParseDuration(*raw.ExecutionQueue.WaitingSlotGrace); err == nil && d > 0 {
+				cfg.ExecutionQueue.WaitingSlotGrace = d
+			}
+		}
+		if raw.ExecutionQueue.MaxReleasedAgents != nil {
+			cfg.ExecutionQueue.MaxReleasedAgents = max(*raw.ExecutionQueue.MaxReleasedAgents, 0)
 		}
 	}
 	if raw.Budget != nil {
