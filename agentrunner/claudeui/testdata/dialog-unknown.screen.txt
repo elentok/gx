@@ -1,0 +1,9 @@
+
+────────────────────────────────────────────────────────────────────────────────
+ Frobnicate widget
+ widget-7
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. No
+
+ Esc to cancel · Tab to amend

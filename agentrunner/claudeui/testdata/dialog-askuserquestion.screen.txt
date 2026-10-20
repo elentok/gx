@@ -1,0 +1,11 @@
+
+────────────────────────────────────────────────────────────────────────────────
+ ☐ Color
+
+Which color do you want?
+
+❯ 1. Red
+  2. Blue
+  3. Type something.
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
