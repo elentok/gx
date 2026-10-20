@@ -202,6 +202,13 @@ func (c *Client) Explain(ctx context.Context, address string) (server.Explanatio
 	return e, err
 }
 
+// Detail returns one ticket's park detail, by its full address.
+func (c *Client) Detail(ctx context.Context, address string) (server.TicketDetail, error) {
+	var d server.TicketDetail
+	err := c.get(ctx, "/v1/tickets/detail?address="+url.QueryEscape(address), &d)
+	return d, err
+}
+
 // Iterations returns the live iterations.
 func (c *Client) Iterations(ctx context.Context) ([]server.IterationInfo, error) {
 	var l []server.IterationInfo

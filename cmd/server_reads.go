@@ -584,6 +584,22 @@ func newServerTicketsCmd() *cobra.Command {
 	explain.Flags().BoolVar(&explainJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(explain)
 
+	var detailJSON bool
+	detail := &cobra.Command{
+		Use:   "detail <project:epic/NN>",
+		Short: "show a ticket's park rounds, state token and applicable actions",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverRead(c.Context(), detailJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (server.TicketDetail, error) {
+					return cl.Detail(ctx, args[0])
+				},
+				printDetail)
+		},
+	}
+	detail.Flags().BoolVar(&detailJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(detail)
+
 	var changedJSON bool
 	changed := &cobra.Command{
 		Use:   "changed <project:epic/NN>",
@@ -730,6 +746,24 @@ func printExplanation(w io.Writer, e server.Explanation) error {
 		line += ": " + e.Reason
 	}
 	_, err := fmt.Fprintln(w, line)
+	return err
+}
+
+func printDetail(w io.Writer, d server.TicketDetail) error {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", d.Address, d.Status, d.Title); err != nil {
+		return err
+	}
+	for _, r := range d.Rounds {
+		if _, err := fmt.Fprintf(w, "round %d (%s, %s): %s\n", r.Seq, r.By, r.Outcome, r.Summary); err != nil {
+			return err
+		}
+	}
+	if d.Latest != nil {
+		if _, err := fmt.Fprintf(w, "round %d (%s, %s): %s\n", d.Latest.Seq, d.Latest.By, d.Latest.Outcome, d.Latest.Summary); err != nil {
+			return err
+		}
+	}
+	_, err := fmt.Fprintf(w, "actions: %s\n", strings.Join(d.Actions, ", "))
 	return err
 }
 

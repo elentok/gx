@@ -534,6 +534,7 @@ var routeTable = []struct {
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
+	{"GET /v1/tickets/detail", (*Server).detail},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"POST /v1/tickets/changed", (*Server).ticketChanged},
 	{"GET /v1/queue", (*Server).queue},

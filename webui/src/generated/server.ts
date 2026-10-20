@@ -58,6 +58,112 @@ export interface BudgetIncreaseRequest {
 export const ReasonNotAnIncrease = "not-an-increase";
 
 //////////
+// source: detail.go
+
+export const ActionAnswer = "answer";
+export const ActionApprove = "approve";
+export const ActionUnpark = "unpark";
+/**
+ * Actions the detail route offers. The server decides them; the UI renders them.
+ */
+export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionUnpark;
+export const RoundOpen = "open";
+export const RoundAnswered = "answered";
+export const RoundClosed = "closed";
+/**
+ * Outcomes of a park round.
+ */
+export type Round = typeof RoundOpen | typeof RoundAnswered | typeof RoundClosed;
+/**
+ * DetailOption is one choice of an options question.
+ */
+export interface DetailOption {
+  id: string;
+  label: string;
+  consequence?: string;
+}
+/**
+ * DetailRound is one park round. The earlier rounds fill only Seq, By, Summary
+ * and Outcome; the latest fills the rest.
+ */
+export interface DetailRound {
+  seq: number /* int */;
+  by: string;
+  summary: string;
+  outcome: string;
+  kind?: string;
+  text?: string;
+  block?: string;
+  handoff?: string;
+  options?: DetailOption[];
+  recommended?: string;
+  yes?: string;
+  no?: string;
+  /**
+   * Answer is the park.answer that ended the round.
+   */
+  answer?: DetailAnswer;
+  /**
+   * ClosedReason is the park.closed reason of a round no answer ended.
+   */
+  closed_reason?: string;
+}
+/**
+ * DetailAnswer is a person's reply to a round.
+ */
+export interface DetailAnswer {
+  source?: string;
+  choice?: string;
+  text?: string;
+  note?: string;
+}
+/**
+ * PermissionCard is the pending permission prompt of a blocked agent.
+ */
+export interface PermissionCard {
+  request_id: string;
+  tool?: string;
+  input?: string;
+  description?: string;
+}
+/**
+ * ChatMessage is one message of the latest round's exchange.
+ */
+export interface ChatMessage {
+  from: string; // "agent", "gx", or the answer's source
+  text: string;
+}
+/**
+ * TicketDetail is the /v1/tickets/detail payload.
+ */
+export interface TicketDetail {
+  address: string;
+  title: string;
+  status: string;
+  park_kind?: string;
+  /**
+   * Answered is derived, never stored: the ticket is open again and its
+   * latest question has an answer.
+   */
+  answered: boolean;
+  /**
+   * Rounds holds every round before the latest, oldest first.
+   */
+  rounds: DetailRound[];
+  latest?: DetailRound;
+  /**
+   * Permission is empty until a headless or pty agent reports a pending prompt.
+   */
+  permission?: PermissionCard;
+  chat: ChatMessage[];
+  /**
+   * State is the token an answer or unpark sends back; empty without a round.
+   */
+  state?: string;
+  actions: string[];
+}
+
+//////////
 // source: epicsummary.go
 
 /**
