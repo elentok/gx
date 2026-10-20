@@ -60,9 +60,14 @@ type QueueResult struct {
 	MergeTicket string `json:"merge_ticket,omitempty"`
 	Parked      bool   `json:"parked,omitempty"`
 	ParkKind    string `json:"park_kind,omitempty"`
-	Refused     bool   `json:"refused,omitempty"`
-	Reason      string `json:"reason,omitempty"`
-	Message     string `json:"message,omitempty"`
+	// Outcome is an answer's result: delivered or adopted. A stale refusal
+	// carries the current Question and its State token.
+	Outcome  string            `json:"outcome,omitempty"`
+	Question *tickets.LogEvent `json:"question,omitempty"`
+	State    string            `json:"state,omitempty"`
+	Refused  bool              `json:"refused,omitempty"`
+	Reason   string            `json:"reason,omitempty"`
+	Message  string            `json:"message,omitempty"`
 }
 
 func refusal(reason, msg string) QueueResult {
@@ -88,6 +93,13 @@ type QueueRequest struct {
 	Text string `json:"text,omitempty"`
 	// Decision is allow or deny, for answering a blocked permission request.
 	Decision string `json:"decision,omitempty"`
+	// Choice, Note, State and Source are an answer's choice (an option id, yes or
+	// no), its note, the state token of the question it answers and where it
+	// came from (cli or web). A free-text answer uses Text.
+	Choice string `json:"choice,omitempty"`
+	Note   string `json:"note,omitempty"`
+	State  string `json:"state,omitempty"`
+	Source string `json:"source,omitempty"`
 
 	// actor is set only by the server's own recovery calls, never decoded from a
 	// client: a park made by recovery must not trigger recovery again.

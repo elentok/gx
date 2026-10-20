@@ -96,6 +96,19 @@ func ParseQuestionLenient(body string) Question {
 	return parsed
 }
 
+// QuestionOfEvent is the question a park.question line recorded, read leniently.
+func QuestionOfEvent(ev LogEvent) Question {
+	q := Question{Kind: QuestionText, Summary: ev.Summary, Detail: ev.Text, Handoff: ev.Handoff}
+	if ev.Block == "" {
+		return q
+	}
+	parsed := q
+	if err := applyBlock(&parsed, ev.Block); err != nil {
+		return q
+	}
+	return parsed
+}
+
 // QuestionBlock is the raw YAML of body's gx-question block, or "" without one.
 func QuestionBlock(body string) string {
 	_, block, _ := splitQuestion(body)

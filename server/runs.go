@@ -330,6 +330,17 @@ func (r *runRegistry) markWaiting(address string, at time.Time) {
 	}
 }
 
+// clearWaiting ends the run's wait for an answer.
+func (r *runRegistry) clearWaiting(address string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t, ok := r.runs[address]; ok {
+		t.WaitingSince = time.Time{}
+		r.runs[address] = t
+		r.save()
+	}
+}
+
 func (r *runRegistry) put(t trackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

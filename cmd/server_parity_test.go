@@ -70,7 +70,9 @@ var routeVerbs = map[string]string{
 
 // plannedRoutes are routes whose CLI verb a queued ticket builds: the server op
 // lands first. The verb's ticket moves its entry into routeVerbs.
-var plannedRoutes = map[string]bool{}
+var plannedRoutes = map[string]bool{
+	"POST /v1/tickets/answer": true,
+}
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {
 	t.Parallel()

@@ -302,6 +302,13 @@ func (c *Client) TicketNudge(ctx context.Context, address, text string) (server.
 	return c.queueWriteTo(ctx, "/v1/tickets/nudge", server.QueueRequest{Address: address, Text: text})
 }
 
+// TicketAnswer delivers a person's reply to the live agent that asked. The
+// request carries the address, the state token, the choice or free text, a note
+// and the source.
+func (c *Client) TicketAnswer(ctx context.Context, req server.QueueRequest) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/answer", req)
+}
+
 // AgentPrompt sends text to the live agent of a ticket's iteration.
 func (c *Client) AgentPrompt(ctx context.Context, address, text string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/agents/prompt", server.QueueRequest{Address: address, Text: text})

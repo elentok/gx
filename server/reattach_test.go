@@ -43,6 +43,9 @@ func (h *headlessFake) Stop(s agentrunner.Session) error {
 }
 
 func (h *headlessFake) Reattach(label string) (agentrunner.Session, nativerunner.Verdict, error) {
+	if s, ok, _ := h.Find(label); ok {
+		return s, h.verdict, nil
+	}
 	return agentrunner.Session{Label: label, ID: "p1"}, h.verdict, nil
 }
 

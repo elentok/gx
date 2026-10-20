@@ -91,6 +91,12 @@ func AppendLogIf(ticketPath string, ev LogEvent, guard func([]LogEvent) error) (
 	})
 }
 
+// AppendLogFrom appends the event mk builds from the existing events, all under
+// the ticket lock. An error from mk writes nothing and is returned as is.
+func AppendLogFrom(ticketPath string, mk func([]LogEvent) (LogEvent, error)) (LogEvent, error) {
+	return appendLogWith(ticketPath, mk)
+}
+
 // appendLogWith appends the event mk builds from the existing events, all under
 // the ticket lock.
 func appendLogWith(ticketPath string, mk func([]LogEvent) (LogEvent, error)) (LogEvent, error) {

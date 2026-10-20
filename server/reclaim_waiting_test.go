@@ -41,6 +41,14 @@ func markWaiting(t *testing.T, h *servertest.Harness, since time.Time) {
 
 func startWaitingRestart(t *testing.T, hardLimit float64) (*servertest.Harness, string) {
 	t.Helper()
+	h, ticketPath, _ := startWaitingRestartFake(t, hardLimit)
+	return h, ticketPath
+}
+
+// startWaitingRestartFake is startWaitingRestart that also returns the runner
+// hosting the waiting agent, for tests that read its prompts.
+func startWaitingRestartFake(t *testing.T, hardLimit float64) (*servertest.Harness, string, *headlessFake) {
+	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -59,7 +67,7 @@ func startWaitingRestart(t *testing.T, hardLimit float64) (*servertest.Harness, 
 	asHeadlessRun(t, h)
 	markWaiting(t, h, time.Now().Add(-time.Hour))
 	h.Restart(t)
-	return h, ticketPath
+	return h, ticketPath, fake
 }
 
 func TestReclaim_WaitingRunStaysWaitingAndUnsettled(t *testing.T) {
