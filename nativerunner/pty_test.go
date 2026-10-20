@@ -350,8 +350,11 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 		}
 	}
 	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
-	if !strings.Contains(claude.Cmdline, "--disallowedTools AskUserQuestion") {
-		t.Errorf("claude cmdline %q does not disallow AskUserQuestion", claude.Cmdline)
+	if got := strings.Count(claude.Cmdline, "--disallowedTools"); got != 1 {
+		t.Errorf("claude cmdline %q has --disallowedTools %d times, want 1", claude.Cmdline, got)
+	}
+	if want := "--disallowedTools " + agentrunner.LoopDisallowedTools; !strings.Contains(claude.Cmdline, want) {
+		t.Errorf("claude cmdline %q lacks %q", claude.Cmdline, want)
 	}
 }
 

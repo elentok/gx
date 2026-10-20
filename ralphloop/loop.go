@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/logger"
@@ -212,7 +213,10 @@ func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []st
 		}
 		return args
 	}
-	args := []string{"--permission-mode", "auto", "--settings", claudeGuardSettings}
+	args := []string{
+		"--permission-mode", "auto", "--settings", claudeGuardSettings,
+		"--disallowedTools", agentrunner.LoopDisallowedTools,
+	}
 	if model != "" {
 		args = append(args, "--model", model)
 	}

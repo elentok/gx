@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -86,6 +87,19 @@ type Pending struct {
 
 // NotApprovableTools are the tools a permission request cannot approve by name.
 var NotApprovableTools = []string{"ExitPlanMode", "AskUserQuestion"}
+
+// LoopDisallowedTools are the interactive tools no loop (ticket) agent may
+// use. Agents ask through the ticket's Needs Answer section instead.
+const LoopDisallowedTools = "AskUserQuestion,EnterPlanMode,ExitPlanMode"
+
+// WithLoopDisallowedTools appends the claude ban on LoopDisallowedTools to
+// args unless args already carry it (ralphloop.AgentArgs does).
+func WithLoopDisallowedTools(args []string) []string {
+	if slices.Contains(args, "--disallowedTools") {
+		return args
+	}
+	return append(args, "--disallowedTools", LoopDisallowedTools)
+}
 
 // Waiting is an agent that is not working: idle, or done.
 func (s Status) Waiting() bool {

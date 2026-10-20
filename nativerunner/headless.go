@@ -277,7 +277,7 @@ func lineBoundary(out *os.File) (int64, error) {
 }
 
 func launchArgs(sessionID string, extra []string) []string {
-	return append([]string{
+	return agentrunner.WithLoopDisallowedTools(append([]string{
 		"-p",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
@@ -285,7 +285,7 @@ func launchArgs(sessionID string, extra []string) []string {
 		"--session-id", sessionID,
 		"--permission-mode", "auto",
 		"--permission-prompt-tool", "stdio",
-	}, extra...)
+	}, extra...))
 }
 
 // tail follows out.jsonl from offset and folds each complete line into the

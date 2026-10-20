@@ -269,7 +269,7 @@ func TestHeadless_StartLaunchesDetachedClaude(t *testing.T) {
 	wantArgs := []string{
 		"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--session-id", s.SessionID, "--permission-mode", "auto", "--permission-prompt-tool", "stdio",
-		"--model", "opus",
+		"--model", "opus", "--disallowedTools", agentrunner.LoopDisallowedTools,
 	}
 	if !slices.Equal(rec.Args, wantArgs) {
 		t.Errorf("args = %q\nwant %q", rec.Args, wantArgs)

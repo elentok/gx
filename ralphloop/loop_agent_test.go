@@ -372,7 +372,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 		{
 			name:       "claude default",
 			wantKind:   "claude",
-			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings},
+			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools},
 			wantPrefix: "/implement ",
 		},
 		{
@@ -389,7 +389,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
 			},
 			wantKind:   "claude",
-			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet", "--effort", "medium"},
+			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet", "--effort", "medium"},
 			wantPrefix: "/implement ",
 		},
 		{
@@ -472,26 +472,26 @@ func TestAgentArgs_ModelAndEffort(t *testing.T) {
 		{
 			name:  "claude both empty unchanged",
 			agent: AgentClaude,
-			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings},
+			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools},
 		},
 		{
 			name:   "claude both set",
 			agent:  AgentClaude,
 			model:  "sonnet",
 			effort: "medium",
-			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet", "--effort", "medium"},
+			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet", "--effort", "medium"},
 		},
 		{
 			name:  "claude model only",
 			agent: AgentClaude,
 			model: "sonnet",
-			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet"},
+			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet"},
 		},
 		{
 			name:   "claude effort only",
 			agent:  AgentClaude,
 			effort: "medium",
-			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--effort", "medium"},
+			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--effort", "medium"},
 		},
 		{
 			name:  "codex both empty unchanged",

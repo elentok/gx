@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -39,7 +40,7 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
 			},
 			wantAgentArgs: func(string) []string {
-				return []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--model", "sonnet", "--effort", "medium"}
+				return []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet", "--effort", "medium"}
 			},
 		},
 		{

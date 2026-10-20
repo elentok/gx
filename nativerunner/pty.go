@@ -400,13 +400,11 @@ var ptyHarness = func() harness.Harness {
 }()
 
 func ptyLaunchArgs(extra []string) []string {
-	return append([]string{
+	return agentrunner.WithLoopDisallowedTools(append([]string{
 		"--permission-mode", "auto",
 		// The main screen keeps a scrollback to read back.
 		"--settings", `{"tui":"default"}`,
-		// Agents ask through the ticket's Needs Answer section instead.
-		"--disallowedTools", "AskUserQuestion",
-	}, extra...)
+	}, extra...))
 }
 
 // killLaunch SIGKILLs each nonzero pid's whole session unchecked. Only a
