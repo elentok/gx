@@ -227,10 +227,28 @@ still parked and either has commits (it lands), reported commitless (it closes `
 to land), or is a merge ticket whose merge checks pass (it closes `done`), the same as an on-time
 one.
 
-**Park reason** — the first non-empty line after a parked ticket's `## Needs Answer` or `## Needs
-Repair` heading, with markdown markers stripped and ellipsised for display. What the Queue row
+**Park reason** — for a `needs-answer` ticket, the summary line of its open question. For a
+`needs-repair` ticket, the first non-empty line after its `## Needs Repair` heading. Markdown markers
+are stripped and the line is ellipsised for display. What the Queue row
 shows as subtext for a parked ticket, read fresh from disk on every render rather than cached, so
 the row can't go stale between a park and a restart.
+
+**Question block** — the optional fenced `gx-question` YAML block in a question's text. It gives the
+question's type (`yes-no`, `options` or `text`), its options, and which option is recommended. A
+question without one is a free-text question. Not the `Park reason`, which is the question's summary
+line.
+
+**Answered** — a ticket that is `open` again after a person answered its `needs-answer` park and that
+gx has not yet claimed. It is derived, never written: the ticket's latest question has an answer. It
+ends when gx claims the ticket. Not a status value.
+
+**Ticket log** — a ticket's append-only conversation record, kept beside its markdown file. It holds
+the park rounds and the person's permission decisions. Not the run log, which records what happened
+to a ticket.
+
+**Park round** — one question a parked ticket asks and what ends it: a person's answer, or gx closing
+it because the ticket left `needs-answer` another way. The ticket's open question is the latest
+question with neither. Not an iteration, and not a `park` event in the run log.
 
 ## Agent Runners
 
@@ -297,6 +315,10 @@ structured-event mode. The default native choice.
 
 **PTY runner** — the native agent runner that drives interactive claude on a terminal gx owns. The
 backup for when the headless runner is unavailable; never picked automatically.
+
+**GX system prompt** — the fixed text gx appends to the system prompt of every Claude agent it
+launches or resumes. It tells the agent how to ask a person (`gx tickets ask`) instead of using an
+interactive tool. Not a skill, and not the agent's first prompt.
 
 ## Tickets, the Store, and Addresses
 
