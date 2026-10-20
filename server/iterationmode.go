@@ -34,19 +34,16 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 		return iterationMode{feature: true, target: func() (string, error) { return s.landTarget(addr) }}
 	}
 	m := iterationMode{commitless: addr.Project == ScratchProject || addr.Epic == OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
-	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {
+	if m.commitless && (addr.Project == ScratchProject || s.projectHasNoVCS(addr.Project)) {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}
 	return m
 }
 
-// investigatesWithoutVCS: an investigate ticket in a vcs: none project has no
-// repository to check out, so it runs in a scratch subdir.
-func (s *Server) investigatesWithoutVCS(addr tickets.Address, t tickets.Ticket) bool {
-	if t.Type != string(schema.TypeInvestigate) {
-		return false
-	}
-	dir, err := s.projectDir(addr.Project)
+// projectHasNoVCS: a commitless ticket in a vcs: none project has no repository
+// to check out, so it runs in a scratch subdir.
+func (s *Server) projectHasNoVCS(project string) bool {
+	dir, err := s.projectDir(project)
 	if err != nil {
 		return false
 	}

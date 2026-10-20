@@ -95,3 +95,38 @@ func TestInvestigateLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 		t.Errorf("investigate cwd = %s, want the scratch subdir %s", p.Cwd, want)
 	}
 }
+
+func TestOneOffLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
+	for _, typ := range []string{"prompt", "evolve", "diagnose"} {
+		t.Run(typ, func(t *testing.T) {
+			store := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(store, "proj"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(`{"name":"proj","repo":"`+dir+`","vcs":"none"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+			got := make(chan servertest.Prompt, 1)
+			h.RegisterLaunch(func(p servertest.Prompt) {
+				select {
+				case got <- p:
+				default:
+				}
+			})
+			res, err := h.Client.OneOff(context.Background(), server.OneOffRequest{Prompt: "look around", Project: "proj", Type: typ})
+			if err != nil || res.Refused {
+				t.Fatalf("one-off: %+v, %v", res, err)
+			}
+			select {
+			case p := <-got:
+				if want := filepath.Join(server.ScratchWorkspace(store), "one-offs"); p.Cwd != want {
+					t.Errorf("cwd = %s, want the scratch subdir %s", p.Cwd, want)
+				}
+			case <-time.After(20 * time.Second):
+				t.Fatal("one-off never launched")
+			}
+		})
+	}
+}
