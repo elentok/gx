@@ -1299,12 +1299,11 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			if ticket.ParkKind != schema.ParkKindBlockedPane {
 				t.Errorf("ParkKind = %q, want blocked-pane", ticket.ParkKind)
 			}
-			body := schema.ParseBody(string(raw))
-			if !strings.Contains(body, "## Needs Answer") {
-				t.Errorf("body missing ## Needs Answer stub:\n%s", body)
+			if body := schema.ParseBody(string(raw)); strings.Contains(body, "## Needs Answer") {
+				t.Errorf("body carries a Needs Answer section:\n%s", body)
 			}
-			if !strings.Contains(body, "iter-01") {
-				t.Errorf("body does not name the iteration label iter-01:\n%s", body)
+			if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "iter-01") {
+				t.Errorf("open question summary %q does not name the iteration label iter-01", got)
 			}
 
 			events, ok, err := ReadEvents(scratchDir, "epic")
@@ -1474,8 +1473,8 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 	if !strings.Contains(string(raw), "needs-answer") {
 		t.Errorf("ticket was not parked despite a blocked pane:\n%s", raw)
 	}
-	if !strings.Contains(string(raw), "iter-01") {
-		t.Errorf("park reason does not name the iteration label:\n%s", raw)
+	if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "iter-01") {
+		t.Errorf("open question summary %q does not name the iteration label", got)
 	}
 }
 
@@ -1538,8 +1537,8 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	if !strings.Contains(string(raw), "needs-answer") || strings.Contains(string(raw), "needs-repair") {
 		t.Errorf("ticket status = %s, want needs-answer without needs-repair", raw)
 	}
-	if !strings.Contains(string(raw), "approval_prompt") {
-		t.Errorf("ticket = %s, want the park reason to name the runner's blocked reason", raw)
+	if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "approval_prompt") {
+		t.Errorf("open question summary %q, want the park reason to name the runner's blocked reason", got)
 	}
 }
 

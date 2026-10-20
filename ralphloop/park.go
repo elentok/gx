@@ -49,18 +49,27 @@ var (
 )
 
 // logGxQuestion writes the by-gx park.question for kind before the status
-// flips. A ticket that already has an open question keeps it.
-func logGxQuestion(ticketPath string, kind events.Kind) error {
+// flips. A ticket that already has an open question keeps it. A blocked pane's
+// question lives only in the pane, so its summary is the park reason.
+func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 	summary, ok := gxQuestions[kind]
+	if kind == events.BlockedPane && reason != "" {
+		summary, ok = reason, true
+	}
 	if !ok {
 		return nil
+	}
+	text := summary
+	if reason != "" && reason != summary {
+		// The fixed wording carries no detail; the reason (e.g. the dirty file) does.
+		text += "\n\n" + reason
 	}
 	ev := tickets.LogEvent{
 		Type:     tickets.EventParkQuestion,
 		By:       "gx",
 		ParkKind: string(kind),
 		Summary:  summary,
-		Text:     summary,
+		Text:     text,
 	}
 	_, err := tickets.AppendLogIf(ticketPath, ev, func(evs []tickets.LogEvent) error {
 		if tickets.OpenQuestion(evs) != nil {
@@ -150,17 +159,11 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	case events.NeedsRepair:
 		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair, req.ReparkDone)
 	case events.NeedsAnswer:
-		if err := logGxQuestion(req.Path, req.Kind); err != nil {
+		if err := logGxQuestion(req.Path, req.Kind, reason); err != nil {
 			// A silent park is the bug this path exists to remove: park anyway.
 			reason = fmt.Sprintf("%s (also failed logging question: %v)", reason, err)
 		}
-		// A blocked pane's question lives only in the pane, so its ticket gets a
-		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
-		if req.Kind.NeedsReasonStub() {
-			writeErr = markNeedsAnswerWithReasonAndStub(req.Path, reason, schema.ParkKind(req.Kind))
-		} else {
-			writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
-		}
+		writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
 	case events.ManualLand:
 		if !req.AlreadyDone {
 			writeErr = MarkDone(req.Path)

@@ -1015,6 +1015,7 @@ type gateRaise struct {
 	escalated *ralphloop.Event
 	log       []ralphloop.Event
 	ticket    string
+	question  string // text of the ticket log's events
 	worktree  string
 }
 
@@ -1061,8 +1062,15 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 		}
 		return done
 	})
-	data, _ := os.ReadFile(filepath.Join(dir, "epic-a", "issues", "01-first.md"))
+	ticketPath := filepath.Join(dir, "epic-a", "issues", "01-first.md")
+	data, _ := os.ReadFile(ticketPath)
 	got.ticket, got.worktree = string(data), worktree
+	// The park reason lives in the log's question, not in the markdown.
+	if evs, err := tickets.ReadLog(ticketPath); err == nil {
+		for _, ev := range evs {
+			got.question += ev.Text + "\n"
+		}
+	}
 	return got
 }
 
@@ -1112,7 +1120,7 @@ func TestRecovery_R10ParksADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
 			if got.applied.Reason != "R10" || got.applied.Outcome != "ok" {
 				t.Errorf("applied = %+v, want R10 ok", got.applied)
 			}
-			if !strings.Contains(got.ticket, "status: needs-answer") || !strings.Contains(got.ticket, "park_kind: background-task-gate") || !strings.Contains(got.ticket, "stray.txt") {
+			if !strings.Contains(got.ticket, "status: needs-answer") || !strings.Contains(got.ticket, "park_kind: background-task-gate") || !strings.Contains(got.question, "stray.txt") {
 				t.Errorf("ticket not parked background-task-gate naming the dirty file:\n%s", got.ticket)
 			}
 			if _, err := os.Stat(filepath.Join(got.worktree, "stray.txt")); err != nil {

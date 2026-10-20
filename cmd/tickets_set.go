@@ -310,6 +310,9 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 			return err
 		}
 	}
+	if err := checkOpenQuestionGuard(c, path); err != nil {
+		return err
+	}
 
 	if c.Flags().Changed("parent") {
 		parent, _ := c.Flags().GetString("parent")
@@ -489,6 +492,38 @@ func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
 		return fmt.Errorf("%s: --iteration-status %s is invalid; want working, needs-answer, or finished", path, v)
 	}
 	return nil
+}
+
+// checkOpenQuestionGuard keeps `status: needs-answer` meaning "the latest
+// question is open": moving a parked ticket to open, or reporting
+// --iteration-status needs-answer, both need a question in the log, and
+// the refusal names the verb that writes one (ask) or ends one (answer).
+func checkOpenQuestionGuard(c *cobra.Command, path string) error {
+	var verb string
+	if v, _ := c.Flags().GetString("iteration-status"); c.Flags().Changed("iteration-status") &&
+		schema.IterationStatus(v) == schema.IterationStatusNeedsAnswer {
+		verb = "ask"
+	}
+	if v, _ := c.Flags().GetString("status"); c.Flags().Changed("status") && schema.Status(v) == schema.StatusOpen {
+		current, err := schema.ParseTicket(path)
+		if err != nil {
+			return err
+		}
+		if current.Status == schema.StatusNeedsAnswer {
+			verb = "answer"
+		}
+	}
+	if verb == "" {
+		return nil
+	}
+	evs, err := tickets.ReadLog(path)
+	if err != nil {
+		return err
+	}
+	if tickets.OpenQuestion(evs) != nil {
+		return nil
+	}
+	return fmt.Errorf("%s: the log has no open question; use `gx tickets %s` instead of `tickets set`", ticketLabel(path), verb)
 }
 
 // isRalphLoopBranch is the shared branch-detection logic behind

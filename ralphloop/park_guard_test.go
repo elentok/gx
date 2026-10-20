@@ -16,9 +16,8 @@ var parkStatuses = map[string]bool{"StatusNeedsAnswer": true, "StatusNeedsRepair
 // parkWriters are the claim.go helpers that write a park status; only park.go
 // may call them.
 var parkWriters = map[string]bool{
-	"markNeedsAnswer":                  true,
-	"markNeedsAnswerWithReasonAndStub": true,
-	"markNeedsRepairWithReason":        true,
+	"markNeedsAnswer":           true,
+	"markNeedsRepairWithReason": true,
 }
 
 // TestParkPath_NoStatusWriteBypasses is Seam F: it fails when non-test code

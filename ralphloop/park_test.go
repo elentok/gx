@@ -236,18 +236,36 @@ func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
 	}
 }
 
-// Seam: Park derives the event type from the kind, and writes the reason stub
-// only for kinds whose question lives nowhere else.
-func TestPark_DerivesTypeAndStubFromKind(t *testing.T) {
+// openQuestionSummary is the summary of the ticket's open log question, "" when none.
+func openQuestionSummary(t *testing.T, path string) string {
+	t.Helper()
+	evs, err := tickets.ReadLog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q := tickets.OpenQuestion(evs); q != nil {
+		return q.Summary
+	}
+	return ""
+}
+
+// Seam 1: Park derives the event type from the kind, and a needs-answer park
+// never writes a Needs Answer/Handoff section into the markdown: the question
+// lives in the log.
+func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		kind   events.Kind
-		status schema.Status
-		event  string
-		stub   bool
+		kind     events.Kind
+		status   schema.Status
+		event    string
+		question bool // the log carries an open question afterwards
 	}{
 		{events.ManualPark, schema.StatusNeedsRepair, "needs-repair", false},
 		{events.AmbiguousBase, schema.StatusNeedsAnswer, "needs-answer", true},
+		{events.BlockedPane, schema.StatusNeedsAnswer, "needs-answer", true},
+		{events.StrandedCommits, schema.StatusNeedsAnswer, "needs-answer", true},
+		{events.BackgroundTaskGate, schema.StatusNeedsAnswer, "needs-answer", true},
+		{events.ZeroCommit, schema.StatusNeedsAnswer, "needs-answer", true},
 		{events.BudgetKilled, schema.StatusNeedsRepair, "needs-repair", false},
 		{events.HandleMismatch, schema.StatusNeedsRepair, "needs-repair", false},
 		{events.AmbiguousLand, schema.StatusNeedsRepair, "needs-repair", false},
@@ -267,11 +285,15 @@ func TestPark_DerivesTypeAndStubFromKind(t *testing.T) {
 			if got.Status != c.status || got.ParkKind != schema.ParkKind(c.kind) {
 				t.Errorf("ticket = (%q, %q), want %s/%s", got.Status, got.ParkKind, c.status, c.kind)
 			}
-			if c.kind.NeedsReasonStub() != c.stub {
-				t.Errorf("NeedsReasonStub = %v, want %v", !c.stub, c.stub)
+			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Needs Answer") || strings.Contains(string(data), "## Handoff") {
+				t.Errorf("park wrote a conversation section into the .md:\n%s", data)
 			}
-			if data, _ := os.ReadFile(path); c.status == schema.StatusNeedsAnswer && !strings.Contains(string(data), "the-reason") {
-				t.Errorf("needs-answer stub lacks the reason:\n%s", data)
+			qevs, err := tickets.ReadLog(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if open := tickets.OpenQuestion(qevs); (open != nil) != c.question {
+				t.Errorf("open question = %+v, want present=%v", open, c.question)
 			}
 			evs, _, _ := ReadEvents(scratchDir, "my-epic")
 			if len(evs) != 1 || evs[0].Type != c.event || evs[0].Kind != string(c.kind) {

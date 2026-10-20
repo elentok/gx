@@ -182,11 +182,6 @@ var kindNeedsAnswer = map[Kind]bool{
 	BackgroundTaskGate: true,
 }
 
-// kindNeedsStub lists the kinds whose question lives nowhere in the ticket, so
-// the park writes a "## Needs Answer" stub carrying the reason. Ticket-answered
-// kinds (zero-commit, self-reported) stay bare.
-var kindNeedsStub = map[Kind]bool{BlockedPane: true, AmbiguousBase: true, StrandedCommits: true, BackgroundTaskGate: true}
-
 // ParkType is the event type a park of this kind writes.
 func (k Kind) ParkType() Type {
 	if kindNeedsAnswer[k] {
@@ -194,10 +189,6 @@ func (k Kind) ParkType() Type {
 	}
 	return NeedsRepair
 }
-
-// NeedsReasonStub reports whether a park of this kind writes its reason into a
-// stub section on the ticket.
-func (k Kind) NeedsReasonStub() bool { return kindNeedsStub[k] }
 
 // CauseHerdr reports whether a herdr outage can cause this kind.
 func (k Kind) CauseHerdr() bool { return kindCauseHerdr[k] }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -539,18 +540,47 @@ func TestExecute_TicketsSet_IterationStatusFinishedAlreadyCommitlessOnDiskAccept
 	}
 }
 
-func TestExecute_TicketsSet_IterationStatusNeedsAnswerBareAccepted(t *testing.T) {
+// Seam 1: the two `set` writes that need an open question refuse without one
+// and name the verb to use.
+func TestExecute_TicketsSet_RefusesWithoutOpenQuestionNamingVerb(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, frontmatter, flag, verb string
+	}{
+		{"iteration-status", "status: claimed", "--iteration-status=needs-answer", "ask"},
+		{"status-open", "status: needs-answer", "--status=open", "answer"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "04b-ticket.md")
+			writeTicketFile(t, path, "---\nid: \"04b\"\n"+c.frontmatter+"\ntype: implement\n---\nBody.\n")
+
+			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+			err := execute([]string{"tickets", "set", path, c.flag}, d)
+			if err == nil || !strings.Contains(err.Error(), "gx tickets "+c.verb) {
+				t.Fatalf("err = %v, want a refusal naming `gx tickets %s`", err, c.verb)
+			}
+		})
+	}
+}
+
+func TestExecute_TicketsSet_IterationStatusNeedsAnswerAcceptedWithOpenQuestion(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
+	q := tickets.LogEvent{Type: tickets.EventParkQuestion, By: "agent", Summary: "Which?", Text: "Which?", Handoff: "Resume after the answer."}
+	if _, err := tickets.AppendLog(path, q); err != nil {
+		t.Fatal(err)
+	}
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
 	err := execute([]string{"tickets", "set", path, "--iteration-status=needs-answer"}, d)
 	if err != nil {
-		t.Fatalf("execute tickets set: %v, want needs-answer to never trip the finished-only guard", err)
+		t.Fatalf("execute tickets set: %v, want needs-answer accepted with an open question", err)
 	}
 
 	raw, err := os.ReadFile(path)

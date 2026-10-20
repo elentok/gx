@@ -13,13 +13,21 @@ const (
 
 var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 
-// ParkReason is the Park reason of t as the epic renders it: the first
-// non-empty line after its Needs Answer or Needs Repair heading, markdown
-// markers stripped, unclipped. An error ticket's reason is what broke it. It is
-// "" for any other status, and for a parked ticket whose section already retired.
+// ParkReason is the Park reason of t as the epic renders it. A needs-answer
+// ticket's reason is its open question's summary from the log; an old ticket
+// that still carries a Needs Answer section falls back to that section. A
+// needs-repair ticket's reason is the first non-empty line after its Needs
+// Repair heading, markdown markers stripped, unclipped. An error ticket's
+// reason is what broke it. It is "" for any other status, and for a parked
+// ticket with neither an open question nor a section.
 func ParkReason(e Epic, t Ticket) string {
 	switch status := e.RenderedStatus(t); status {
 	case StatusNeedsAnswer:
+		if evs, err := ReadLog(t.Path); err == nil {
+			if q := OpenQuestion(evs); q != nil && q.Summary != "" {
+				return strings.TrimSpace(markdownMarkerPattern.ReplaceAllString(q.Summary, ""))
+			}
+		}
 		return parkSectionLine(t.Body, NeedsAnswerHeading)
 	case StatusNeedsRepair:
 		return parkSectionLine(t.Body, NeedsRepairHeading)
