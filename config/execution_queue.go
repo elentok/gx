@@ -11,6 +11,7 @@ const (
 	defaultSpinWindow                = 5 * time.Minute
 	defaultWaitingSlotGrace          = 10 * time.Minute
 	defaultMaxReleasedAgents         = 5
+	defaultStalledNudgeDelay         = 2 * time.Minute
 )
 
 // ExecutionQueueConfig controls parallel execution from the Tickets and Queue tabs.
@@ -37,6 +38,11 @@ type ExecutionQueueConfig struct {
 	// MaxReleasedAgents caps how many waiting agents may hold a released slot at
 	// once, across every project.
 	MaxReleasedAgents int `json:"max-released-agents"`
+	// StalledNudgeDelay is how long an idle agent with no question and no
+	// finished report waits before the server types its one stall nudge. Read
+	// from the "stalled-nudge-delay" key as a Go duration string; an unparsable
+	// or non-positive value keeps the default.
+	StalledNudgeDelay time.Duration `json:"-"`
 }
 
 // DefaultExecutionQueueConfig returns the execution queue defaults.
@@ -51,6 +57,7 @@ func DefaultExecutionQueueConfig() ExecutionQueueConfig {
 		SpinWindow:                  defaultSpinWindow,
 		WaitingSlotGrace:            defaultWaitingSlotGrace,
 		MaxReleasedAgents:           defaultMaxReleasedAgents,
+		StalledNudgeDelay:           defaultStalledNudgeDelay,
 	}
 }
 

@@ -255,6 +255,14 @@ func (s *Server) releaseWaitingSlots(now time.Time) {
 	}
 }
 
+// stalledNudgeDelay is how long an idle agent with no report waits for its
+// nudge. A negative setting, which no config file can produce, turns the nudge
+// off for tests whose fake agents never leave idle again.
+func (s *Server) stalledNudgeDelay() time.Duration {
+	d := cmp.Or(s.settings.Load().StalledNudgeDelay, config.DefaultExecutionQueueConfig().StalledNudgeDelay)
+	return max(d, 0)
+}
+
 // claimRootAfterAdoption is claimRoot once a late-finish adoption in flight is
 // done, so a root never launches an investigation the adoption is about to cancel.
 func (s *Server) claimRootAfterAdoption(item QueueItem) (bool, error) {
@@ -444,7 +452,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	model, effort := s.runAgentConfig(queued.Project, agent, Run{})
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
-		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path),
+		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
 	}
 	deps := s.depsFor(ticket.Project)
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)

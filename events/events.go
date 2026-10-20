@@ -45,6 +45,9 @@ const (
 	TicketReset                Type = "ticket-reset"
 	// Nudged is text typed into a live iteration pane through the server.
 	Nudged Type = "nudged"
+	// StallNudged is the fixed text the server typed into an agent that sat idle
+	// with no open question and no finished report.
+	StallNudged Type = "stall-nudged"
 	// PromptNudged is one step a runner took on a launch prompt the agent
 	// didn't pick up; its reason is a claudeui.NudgeDecision.
 	PromptNudged Type = "prompt-nudged"

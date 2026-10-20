@@ -229,6 +229,7 @@ func Parse(data []byte) (Config, error) {
 			SpinWindow         *string `json:"spin-window"`
 			WaitingSlotGrace   *string `json:"waiting-slot-grace"`
 			MaxReleasedAgents  *int    `json:"max-released-agents"`
+			StalledNudgeDelay  *string `json:"stalled-nudge-delay"`
 		} `json:"execution-queue"`
 		Budget *struct {
 			SoftLimit              *float64  `json:"soft-limit"`
@@ -367,6 +368,11 @@ func Parse(data []byte) (Config, error) {
 		}
 		if raw.ExecutionQueue.MaxReleasedAgents != nil {
 			cfg.ExecutionQueue.MaxReleasedAgents = max(*raw.ExecutionQueue.MaxReleasedAgents, 0)
+		}
+		if raw.ExecutionQueue.StalledNudgeDelay != nil {
+			if d, err := time.ParseDuration(*raw.ExecutionQueue.StalledNudgeDelay); err == nil && d > 0 {
+				cfg.ExecutionQueue.StalledNudgeDelay = d
+			}
 		}
 	}
 	if raw.Budget != nil {

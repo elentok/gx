@@ -52,7 +52,13 @@ type OneIteration struct {
 	KeepAskedAgent bool
 	// Sink hears the finish path's events; nil hears nothing.
 	Sink EventSink
+	// StallNudgeDelay is how long an idle agent with no question and no finished
+	// report waits before the one stall nudge; zero sends none.
+	StallNudgeDelay time.Duration
 }
+
+// StallNudgeText is the fixed text of the stall nudge.
+const StallNudgeText = "If you are waiting for a person's reply, run `gx tickets ask` now. Otherwise continue."
 
 func (o OneIteration) sink() EventSink {
 	if o.Sink == nil {
@@ -275,6 +281,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	until := runnerFinishStates
 	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink()}
 	elapsedMs := 0
+	nudged := false
 	for {
 		if _, err := d.Runner.Wait(s, until, smartZonePollMs*time.Millisecond); err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
@@ -294,10 +301,59 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 		if err != nil {
 			return err
 		}
-		if confirmed {
+		if !confirmed {
+			continue
+		}
+		if nudged || o.StallNudgeDelay <= 0 {
 			return nil
 		}
+		nudgedNow, again, err := nudgeIfStalled(d, o, w, s, until)
+		if err != nil {
+			return err
+		}
+		if !again {
+			return nil
+		}
+		nudged = nudged || nudgedNow
 	}
+}
+
+// nudgeIfStalled waits out the stall delay, then types the stall nudge into an
+// agent that is still idle with no open question and no finished report.
+// again tells the caller to wait for the agent to settle once more: after the
+// nudge, or because the agent went back to work during the delay.
+func nudgeIfStalled(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
+	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
+		return false, false, err
+	}
+	d.Sleep(o.StallNudgeDelay)
+	// The agent may have asked or finished during the delay.
+	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
+		return false, false, err
+	}
+	if _, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond); err != nil {
+		if errors.Is(err, agentrunner.ErrTimeout) {
+			return false, true, nil
+		}
+		return false, false, err
+	}
+	if err := d.Runner.Prompt(s, StallNudgeText); err != nil {
+		return false, false, fmt.Errorf("stall nudge for %s: %w", w.Label, err)
+	}
+	err = logEvent(o.ScratchDir, o.Epic, Event{
+		Type: string(events.StallNudged), Ticket: o.Ticket.Identifier, Label: w.Label, Text: StallNudgeText,
+	})
+	return true, true, err
+}
+
+// agentReported reports whether the ticket carries an agent report: a question
+// (needs-answer) or a finished report.
+func agentReported(ticketPath string) (bool, error) {
+	t, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		return false, fmt.Errorf("reading ticket for stall check: %w", err)
+	}
+	return t.IterationStatus == schema.IterationStatusFinished || t.IterationStatus == schema.IterationStatusNeedsAnswer, nil
 }
 
 // landBuilt lands a built iteration that was waiting on the land queue.

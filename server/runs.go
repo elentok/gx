@@ -711,6 +711,7 @@ func (s *Server) resolveRun(t trackedRun) (ralphloop.OneIteration, ralphloop.Ite
 	}
 	one := ralphloop.OneIteration{
 		RepoDir: t.Repo, WorkspaceID: t.Workspace, Epic: addr.Epic, ScratchDir: dir, Agent: ralphloop.AgentKind(t.Agent),
+		StallNudgeDelay: s.stalledNudgeDelay(),
 	}
 	for _, e := range epics {
 		for _, tk := range e.Tickets {

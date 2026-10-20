@@ -440,6 +440,9 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// Every land pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
+	// Fake agents idle without a report and never leave idle after a nudge, so
+	// the stall nudge is off unless a test sets its delay.
+	h.cfg.StalledNudgeDelay = -1
 	for _, o := range opts {
 		o(&h.cfg)
 	}

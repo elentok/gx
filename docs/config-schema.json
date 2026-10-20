@@ -104,6 +104,11 @@
           "description": "Maximum waiting agents that may hold a released slot at once, across every project. The next waiting agent keeps its slot. 0 disables release. Default: 5.",
           "minimum": 0,
           "default": 5
+        },
+        "stalled-nudge-delay": {
+          "type": "string",
+          "description": "Go duration string (e.g. \"2m\"). An idle agent with no open question and no finished report gets one nudge after this long, telling it to run `gx tickets ask` if it waits for a person. Unparsable or non-positive values keep the default. Default: \"2m\".",
+          "default": "2m"
         }
       },
       "default": {
@@ -114,7 +119,8 @@
         "spin-cycles": 3,
         "spin-window": "5m",
         "waiting-slot-grace": "10m",
-        "max-released-agents": 5
+        "max-released-agents": 5,
+        "stalled-nudge-delay": "2m"
       }
     },
     "budget": {

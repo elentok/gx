@@ -102,6 +102,9 @@ type Settings struct {
 	// means the config default.
 	WaitingSlotGrace  time.Duration
 	MaxReleasedAgents int
+	// StalledNudgeDelay is config execution-queue.stalled-nudge-delay; zero
+	// means the config default.
+	StalledNudgeDelay time.Duration
 
 	// Chat names the chat destinations the server notifies; empty means none.
 	Chat ralphloop.ServerChatConfig
@@ -154,6 +157,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		MaxOneOffAgents:     cfg.ExecutionQueue.MaxOneOffAgents,
 		WaitingSlotGrace:    cfg.ExecutionQueue.WaitingSlotGrace,
 		MaxReleasedAgents:   cfg.ExecutionQueue.MaxReleasedAgents,
+		StalledNudgeDelay:   cfg.ExecutionQueue.StalledNudgeDelay,
 		Chat: ralphloop.ServerChatConfig{
 			TelegramBotToken: cfg.Notifications.Telegram.BotToken,
 			TelegramChatID:   cfg.Notifications.Telegram.ChatID,

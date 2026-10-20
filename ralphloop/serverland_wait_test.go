@@ -2,12 +2,14 @@ package ralphloop
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -51,6 +53,94 @@ func TestWaitIterationFinished_TransientIdleKeepsWaiting(t *testing.T) {
 	}
 	if r.waits != 4 {
 		t.Errorf("Runner.Wait calls = %d, want 4 (idle, blip, idle, confirmed)", r.waits)
+	}
+}
+
+// stallNudgeFixture is an idle agent whose ticket carries iterationStatus (""
+// for none) and the OneIteration that waits on it.
+func stallNudgeFixture(t *testing.T, iterationStatus string, delay time.Duration) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+	t.Helper()
+	front := "---\nid: \"01\"\nstatus: claimed\ntype: implement\n"
+	if iterationStatus != "" {
+		front += "iteration_status: " + iterationStatus + "\n"
+	}
+	scratchDir := writeEpic(t, "epic", map[string]string{"01-a.md": front + "---\n# A\n"})
+	r := idleRunner("iter-01")
+	r.PromptState = agentrunner.StateIdle
+	var sleeps []time.Duration
+	d := Deps{Runner: r, Sleep: func(d time.Duration) { sleeps = append(sleeps, d) }}
+	one := OneIteration{
+		Agent: AgentClaude, Epic: "epic", ScratchDir: scratchDir, StallNudgeDelay: delay,
+		Ticket: tickets.Ticket{Identifier: "01", Path: filepath.Join(scratchDir, "epic", "issues", "01-a.md")},
+	}
+	return d, r, one, &sleeps
+}
+
+func waitStallFixture(t *testing.T, d Deps, one OneIteration) {
+	t.Helper()
+	if err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"}); err != nil {
+		t.Fatalf("WaitIterationFinished: %v", err)
+	}
+}
+
+func stallNudgeEvents(t *testing.T, one OneIteration) []Event {
+	t.Helper()
+	evs, _, err := ReadEvents(one.ScratchDir, one.Epic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []Event
+	for _, ev := range evs {
+		if ev.Type == string(events.StallNudged) {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
+// An idle agent with no question and no finished report gets one nudge after
+// the delay, then the wait ends and the existing finish path applies.
+func TestWaitIterationFinished_NudgesIdleAgentWithNoReportOnce(t *testing.T) {
+	t.Parallel()
+	d, r, one, sleeps := stallNudgeFixture(t, "", 2*time.Minute)
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+		t.Errorf("prompts = %q, want exactly the stall nudge", got)
+	}
+	if !slices.Contains(*sleeps, 2*time.Minute) {
+		t.Errorf("sleeps = %v, want the 2m delay", *sleeps)
+	}
+	if evs := stallNudgeEvents(t, one); len(evs) != 1 || evs[0].Text != StallNudgeText || evs[0].Ticket != "01" {
+		t.Errorf("run log stall-nudged events = %+v, want one with the nudge text", evs)
+	}
+}
+
+func TestWaitIterationFinished_NoNudgeWhileQuestionOpenOrFinished(t *testing.T) {
+	t.Parallel()
+	for _, status := range []string{"needs-answer", "finished"} {
+		t.Run(status, func(t *testing.T) {
+			t.Parallel()
+			d, r, one, sleeps := stallNudgeFixture(t, status, 2*time.Minute)
+			waitStallFixture(t, d, one)
+			if got := r.Prompts("iter-01"); len(got) != 0 {
+				t.Errorf("prompts = %q, want none", got)
+			}
+			if slices.Contains(*sleeps, 2*time.Minute) {
+				t.Errorf("sleeps = %v, want no stall delay", *sleeps)
+			}
+			if evs := stallNudgeEvents(t, one); len(evs) != 0 {
+				t.Errorf("stall-nudged events = %+v, want none", evs)
+			}
+		})
+	}
+}
+
+func TestWaitIterationFinished_ZeroDelayDisablesNudge(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 0)
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); len(got) != 0 {
+		t.Errorf("prompts = %q, want none", got)
 	}
 }
 
