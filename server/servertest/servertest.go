@@ -378,6 +378,10 @@ func StartWithTCP(t *testing.T) *Harness {
 	return startWith(t, t.TempDir(), "127.0.0.1:0", false)
 }
 
+// processHome is HOME as the test process started, to tell a test that set its
+// own from one that left the real one.
+var processHome = os.Getenv("HOME")
+
 func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
@@ -411,6 +415,21 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
 	herdrfake.StartState(t, h.Herdr)
+
+	// The herdr runner's wait N defaults to 5s, which every launch's slash
+	// command prompt would sit out: the fake agent starts no turn. Read from
+	// the config file, so give the server a home with a short one, unless the
+	// test already set up its own.
+	if os.Getenv("HOME") == processHome {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		if err := os.MkdirAll(filepath.Join(home, ".config", "gx"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(home, ".config", "gx", "config.json"), []byte(`{"runner-wait":"100ms"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
