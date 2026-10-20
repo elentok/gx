@@ -1,10 +1,13 @@
 package server
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -20,6 +23,10 @@ const (
 	VerdictWaitingInQueue = "waiting in queue"
 	VerdictConcurrencyCap = "concurrency cap"
 	VerdictNotQueued      = "not queued"
+
+	VerdictWaitingOnAnswer    = "waiting on answer"
+	VerdictWaitingReleased    = "waiting (slot released)"
+	VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)"
 )
 
 // PendingRow is one queue entry with its explain verdict.
@@ -41,6 +48,10 @@ type verdictLog struct {
 func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Address) Explanation {
 	// A launch is tracked before the index may have reread its claim.
 	claimed := t.Status == "claimed" || s.registry.has(addr.String())
+	// A live agent waiting for its answer outranks the stored status.
+	if v, ok := s.waitingVerdict(addr); ok {
+		return Explanation{Address: addr.String(), Verdict: v}
+	}
 	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
 	case ralphloop.DecisionStalled:
@@ -63,6 +74,22 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 		}
 	}
 	return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Reason}
+}
+
+// waitingVerdict is the verdict of a ticket whose live agent waits for an answer.
+func (s *Server) waitingVerdict(addr tickets.Address) (string, bool) {
+	st, def := s.settings.Load(), config.DefaultExecutionQueueConfig()
+	grace := cmp.Or(st.WaitingSlotGrace, def.WaitingSlotGrace)
+	w := s.registry.waitStateOf(addr.String(), time.Now(), grace, st.MaxReleasedAgents)
+	switch {
+	case !w.Waiting:
+		return "", false
+	case w.Released:
+		return VerdictWaitingReleased, true
+	case w.CapHeld:
+		return VerdictWaitingReleaseCapd, true
+	}
+	return VerdictWaitingOnAnswer, true
 }
 
 // scheduleVerdict explains an unclaimed ticket that nothing in the store blocks:

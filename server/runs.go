@@ -228,6 +228,38 @@ func (r *runRegistry) count() int {
 	return r.countWhere(func(trackedRun) bool { return true })
 }
 
+// waitState is where the run at address stands in its wait for an answer.
+type waitState struct {
+	Waiting  bool // the run is alive and waiting
+	Released bool // it gave its slot up
+	// CapHeld: the grace period is over but the release cap kept the slot.
+	CapHeld bool
+}
+
+// waitStateOf reports the wait of the run at address, judged at now against
+// grace and the release cap max.
+func (r *runRegistry) waitStateOf(address string, now time.Time, grace time.Duration, max int) waitState {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.runs[address]
+	if !ok || t.WaitingSince.IsZero() {
+		return waitState{}
+	}
+	if t.SlotReleased {
+		return waitState{Waiting: true, Released: true}
+	}
+	if now.Sub(t.WaitingSince) < grace {
+		return waitState{Waiting: true}
+	}
+	released := 0
+	for _, o := range r.runs {
+		if o.SlotReleased {
+			released++
+		}
+	}
+	return waitState{Waiting: true, CapHeld: released >= max}
+}
+
 // releaseWaiting releases the slot of each run that has waited at least grace,
 // oldest wait first, while fewer than max runs are released. It reports how
 // many it released.
