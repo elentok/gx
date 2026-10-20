@@ -329,6 +329,7 @@ type Server struct {
 	savedRuns      []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused        refusals
 	lands          landGuard
+	adoptMu        sync.Mutex // a late-finish adoption holds it from its finish to the cancel of unstarted investigations; the runner claims under it
 	trunkLocks     trunkLocks
 	mergeTargets   mergeTargetCache
 	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests

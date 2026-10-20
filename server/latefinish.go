@@ -200,6 +200,17 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		return false
 	}
 	defer s.lands.end()
+	// The finish makes the ticket's investigations claimable; the claim waits
+	// until the unstarted ones are cancelled.
+	s.adoptMu.Lock()
+	unlocked := false
+	unlock := func() {
+		if !unlocked {
+			unlocked = true
+			s.adoptMu.Unlock()
+		}
+	}
+	defer unlock()
 	one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
 	out, err := mode.finish(deps, one, wt, pane)
 	if err != nil {
@@ -229,6 +240,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	s.events.publish(EventTicketDone, addr.String())
 	s.stampRetro(addr, lf.path, false)
 	s.cancelUnstartedInvestigations(lf.dir, addr)
+	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
 	s.completeRootIfDone(rootOf(addr), one)
 	s.kickRunner()

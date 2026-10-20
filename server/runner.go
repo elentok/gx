@@ -230,7 +230,7 @@ func (s *Server) claimNext() {
 		seen[rootOf(addr).String()] = true
 		// One root fills its own slots before the next root in the queue gets a turn.
 		for running < limit {
-			launched, err := s.claimRoot(item)
+			launched, err := s.claimRootAfterAdoption(item)
 			if err != nil {
 				s.log.Warn("claim queued root", "root", item.Address, "err", err)
 				break
@@ -241,6 +241,14 @@ func (s *Server) claimNext() {
 			running++
 		}
 	}
+}
+
+// claimRootAfterAdoption is claimRoot once a late-finish adoption in flight is
+// done, so a root never launches an investigation the adoption is about to cancel.
+func (s *Server) claimRootAfterAdoption(item QueueItem) (bool, error) {
+	s.adoptMu.Lock()
+	defer s.adoptMu.Unlock()
+	return s.claimRoot(item)
 }
 
 // perRootLimit is how many agents one root may run at once.
