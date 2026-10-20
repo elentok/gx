@@ -301,11 +301,29 @@ func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	if ss.answerErr != nil {
 		return ss.answerErr
 	}
+	if p := ss.status.Pending; a.RequestID != "" && (p == nil || p.ID != a.RequestID) {
+		return fmt.Errorf("%w: %s", agentrunner.ErrRequestMismatch, a.RequestID)
+	}
 	ss.answers = append(ss.answers, a)
 	ss.status.State = agentrunner.StateWorking
 	ss.status.BlockedReason = ""
+	ss.status.Pending = nil
 	r.notify()
 	return nil
+}
+
+// SetPending blocks the live session label on the open request p, the way a
+// headless can_use_tool request does. A nil p clears it.
+func (r *Runner) SetPending(label string, p *agentrunner.Pending) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ss := r.byLabel(label)
+	ss.status.Pending = p
+	if p != nil {
+		ss.status.State = agentrunner.StateBlocked
+		ss.status.BlockedReason = "permission to use " + p.Tool
+	}
+	r.notify()
 }
 
 func (r *Runner) Healthy() error {
@@ -322,6 +340,7 @@ func (r *Runner) SetState(label string, state agentrunner.State, reason string) 
 	ss := r.byLabel(label)
 	ss.status.State = state
 	ss.status.BlockedReason = ""
+	ss.status.Pending = nil
 	if state == agentrunner.StateBlocked {
 		ss.status.BlockedReason = reason
 	}

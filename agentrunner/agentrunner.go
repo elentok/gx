@@ -5,6 +5,7 @@
 package agentrunner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -66,7 +67,25 @@ type Status struct {
 	Turn          int
 	SessionID     string
 	BlockedReason string
+	// Pending is the open tool-permission request, for runners that can name
+	// it (headless). Nil when none is open.
+	Pending *Pending
 }
+
+// Pending is a tool-permission request waiting for an allow or deny.
+type Pending struct {
+	// ID is the request id; Answer.RequestID must match it.
+	ID          string
+	Tool        string
+	Input       json.RawMessage
+	Description string
+	// NotApprovable marks a tool that must never be approved by tool name:
+	// plan approval and AskUserQuestion need a real answer, not an allow.
+	NotApprovable bool
+}
+
+// NotApprovableTools are the tools a permission request cannot approve by name.
+var NotApprovableTools = []string{"ExitPlanMode", "AskUserQuestion"}
 
 // Waiting is an agent that is not working: idle, or done.
 func (s Status) Waiting() bool {
@@ -97,6 +116,9 @@ const (
 type Answer struct {
 	Decision Decision
 	Text     string
+	// RequestID (wire request_id) names the request being answered. Headless
+	// refuses an id that is not the open one; empty answers whatever is open.
+	RequestID string `json:"request_id,omitempty"`
 }
 
 var (
@@ -127,6 +149,9 @@ var (
 	// ErrInvalidDecision: Answer got a decision the blocked prompt can't take,
 	// e.g. allow on a dialog that is not a permission prompt.
 	ErrInvalidDecision = errors.New("agentrunner: invalid decision")
+	// ErrRequestMismatch: Answer named a RequestID that is not the open
+	// permission request (already answered, cancelled or never opened).
+	ErrRequestMismatch = errors.New("agentrunner: request id is not the open request")
 )
 
 // SessionDied wraps ErrSessionDied with reason, e.g. "claude exited (code 1)".

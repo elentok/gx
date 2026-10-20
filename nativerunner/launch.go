@@ -33,6 +33,9 @@ type Meta struct {
 	// Offset is where this session's events begin in out.jsonl, always at a
 	// line boundary. Earlier lines belong to a previous run in the same dir.
 	Offset int64 `json:"offset"`
+	// Answered lists the permission request ids gx answered (headless), so a
+	// replay of out.jsonl after a restart skips them.
+	Answered []string `json:"answered,omitempty"`
 }
 
 // LaunchEnv is the claude harness's launch environment, which the headless

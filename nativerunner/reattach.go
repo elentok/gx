@@ -55,7 +55,10 @@ func (h *Headless) Reattach(label string) (agentrunner.Session, Verdict, error) 
 	}
 	// Replay before returning, so the caller sees the rebuilt state at once.
 	out := filepath.Join(dir, OutFile)
-	track := tracker{sessionID: meta.SessionID}
+	track := tracker{sessionID: meta.SessionID, answered: map[string]bool{}}
+	for _, id := range meta.Answered {
+		track.answered[id] = true
+	}
 	offset, err := replay(out, meta.Offset, &track)
 	if err != nil {
 		return agentrunner.Session{}, 0, err

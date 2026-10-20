@@ -35,9 +35,10 @@ type event struct {
 	// can_use_tool (a permission prompt) is read.
 	RequestID string `json:"request_id"`
 	Request   struct {
-		Subtype  string          `json:"subtype"`
-		ToolName string          `json:"tool_name"`
-		Input    json.RawMessage `json:"input"`
+		Subtype     string          `json:"subtype"`
+		ToolName    string          `json:"tool_name"`
+		Input       json.RawMessage `json:"input"`
+		Description string          `json:"description"`
 	} `json:"request"`
 	Capabilities  []string   `json:"capabilities"`
 	Tasks         []struct{} `json:"tasks"`
@@ -68,6 +69,10 @@ type tracker struct {
 	// out.jsonl and nothing records our answer there, so replaying the file
 	// after a restart rebuilds it until claude moves on.
 	permission *permission
+	// answered holds the request ids gx already answered. The replay rebuilds
+	// permission from out.jsonl, so without this a restart would reopen them.
+	// meta.json persists it.
+	answered map[string]bool
 	// turnCmd is set once a gx command has claimed the current turn, so a
 	// second queued command starting inside it counts as a new turn.
 	turnCmd bool
@@ -93,6 +98,7 @@ func (t *tracker) status() agentrunner.Status {
 	case t.blocked:
 		st.State = agentrunner.StateBlocked
 		st.BlockedReason = t.permission.reason()
+		st.Pending = t.permission.pending()
 	case t.busy() || t.bgTasks > 0:
 		st.State = agentrunner.StateWorking
 	default:
@@ -112,6 +118,18 @@ type permission struct {
 	requestID string
 	tool      string
 	input     json.RawMessage
+	desc      string
+}
+
+// pending is the Status view of p; nil for a block claude gave no detail on.
+func (p *permission) pending() *agentrunner.Pending {
+	if p == nil {
+		return nil
+	}
+	return &agentrunner.Pending{
+		ID: p.requestID, Tool: p.tool, Input: p.input, Description: p.desc,
+		NotApprovable: slices.Contains(agentrunner.NotApprovableTools, p.tool),
+	}
 }
 
 // reason names the tool and its input, so a person can judge the request
@@ -194,8 +212,8 @@ func (t *tracker) apply(e event) {
 			t.turnCmd = true
 		}
 	case "control_request":
-		if e.Request.Subtype == "can_use_tool" {
-			t.permission = &permission{requestID: e.RequestID, tool: e.Request.ToolName, input: e.Request.Input}
+		if e.Request.Subtype == "can_use_tool" && !t.answered[e.RequestID] {
+			t.permission = &permission{requestID: e.RequestID, tool: e.Request.ToolName, input: e.Request.Input, desc: e.Request.Description}
 			t.blocked = true
 		}
 	case "control_cancel_request":

@@ -671,6 +671,10 @@ func (h *Headless) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 		return err
 	}
 	p := ss.track.permission
+	if a.RequestID != "" && (p == nil || p.requestID != a.RequestID) {
+		h.mu.Unlock()
+		return fmt.Errorf("%w: %s", agentrunner.ErrRequestMismatch, a.RequestID)
+	}
 	if p == nil {
 		h.mu.Unlock()
 		return fmt.Errorf("%w: no permission request is open", agentrunner.ErrNotReady)
@@ -696,6 +700,27 @@ func (h *Headless) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 			return
 		}
 		t.blocked = false
+		if t.answered == nil {
+			t.answered = map[string]bool{}
+		}
+		t.answered[p.requestID] = true
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return h.recordAnswered(s.Label, p.requestID)
+}
+
+// recordAnswered saves id in the agent's meta.json, so a restart's replay of
+// out.jsonl doesn't reopen the request.
+func (h *Headless) recordAnswered(label, id string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	dir := filepath.Join(h.Root, label)
+	meta, err := readMeta(dir)
+	if err != nil {
+		return err
+	}
+	meta.Answered = append(meta.Answered, id)
+	return WriteMeta(dir, meta)
 }

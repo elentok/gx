@@ -104,6 +104,9 @@ func fakeClaude() {
 				`{"type":"result","subtype":"error_during_execution"}`)
 			continue
 		}
+		if msg.Type == "control_response" {
+			continue
+		}
 		content := msg.Message.Content
 		if content == "stall" {
 			continue
@@ -128,6 +131,12 @@ func fakeClaude() {
 		if !initSent {
 			emit(fmt.Sprintf(`{"type":"system","subtype":"init","session_id":%q,"capabilities":["msg_lifecycle_v1"]}`, sessionID))
 			initSent = true
+		}
+		if tool, ok := strings.CutPrefix(content, "permit:"); ok {
+			emit(`{"type":"system","subtype":"session_state_changed","state":"running"}`,
+				fmt.Sprintf(`{"type":"control_request","request_id":"req-%s","request":{"subtype":"can_use_tool","tool_name":%q,"input":{"x":1},"description":"run it"}}`, tool, tool),
+				`{"type":"system","subtype":"session_state_changed","state":"requires_action"}`)
+			continue
 		}
 		switch content {
 		case "block":
