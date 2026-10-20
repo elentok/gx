@@ -162,6 +162,7 @@ func changedKeys(old, next Settings) []string {
 		{"server.log-retention", old.LogRetention, next.LogRetention},
 		{"server.watch-config", old.WatchConfig, next.WatchConfig},
 		{"server.recently-finished", old.RecentlyFinished, next.RecentlyFinished},
+		{"server.web.allowed-hosts", old.WebAllowedHosts, next.WebAllowedHosts},
 		{"evolve", old.Evolve, next.Evolve},
 		{"recovery.enabled", old.RecoverySettings.Enabled, next.RecoverySettings.Enabled},
 		{"recovery.disabled", old.RecoverySettings.Disabled, next.RecoverySettings.Disabled},

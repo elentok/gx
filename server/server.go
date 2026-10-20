@@ -125,6 +125,10 @@ type Settings struct {
 	// agents.*, before a project's overrides.
 	AgentsClaude config.AgentConfig
 	AgentsCodex  config.AgentConfig
+
+	// WebAllowedHosts is config server.web.allowed-hosts: names, besides IP
+	// literals and localhost, that the web listener accepts in Host.
+	WebAllowedHosts []string
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -158,6 +162,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		RecentlyFinished:          cfg.Server.RecentlyFinished,
 		AgentsClaude:              cfg.Agents.Claude,
 		AgentsCodex:               cfg.Agents.Codex,
+		WebAllowedHosts:           cfg.Server.Web.AllowedHosts,
 	}
 }
 

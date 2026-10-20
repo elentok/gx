@@ -125,6 +125,9 @@ type WebConfig struct {
 	DevFrontend bool `json:"dev-frontend"`
 	// DevURL is the loopback http URL of the Vite dev server.
 	DevURL string `json:"dev-url"`
+	// AllowedHosts are host names, besides IP literals and localhost, the
+	// listener accepts in the Host header.
+	AllowedHosts []string `json:"allowed-hosts"`
 }
 
 // DevFrontendURL is the dev server URL to proxy to, or "" when dev-frontend is off.
@@ -284,6 +287,8 @@ func Parse(data []byte) (Config, error) {
 				Listen      *string `json:"listen"`
 				DevFrontend *bool   `json:"dev-frontend"`
 				DevURL      *string `json:"dev-url"`
+
+				AllowedHosts []string `json:"allowed-hosts"`
 			} `json:"web"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
@@ -455,6 +460,9 @@ func Parse(data []byte) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevURL != nil {
 		cfg.Server.Web.DevURL = *raw.Server.Web.DevURL
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.AllowedHosts != nil {
+		cfg.Server.Web.AllowedHosts = raw.Server.Web.AllowedHosts
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

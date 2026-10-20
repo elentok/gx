@@ -239,6 +239,12 @@
           "type": "object",
           "description": "Web UI listener settings.",
           "properties": {
+            "allowed-hosts": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": [],
+              "description": "Host names the web listener accepts in the Host header, besides IP literals and localhost (e.g. a MagicDNS name). Matched without the port, case-insensitively. Any other Host gets a 403. Reloads without a restart."
+            },
             "dev-frontend": {
               "type": "boolean",
               "default": false,
