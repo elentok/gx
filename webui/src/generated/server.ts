@@ -165,6 +165,11 @@ export interface TicketDetail {
    * State is the token an answer or unpark sends back; empty without a round.
    */
   state?: string;
+  /**
+   * Bases are the competing blockers an ambiguous-base park chooses between;
+   * the unpark sends the chosen one back as its base.
+   */
+  bases?: string[];
   actions: string[];
 }
 

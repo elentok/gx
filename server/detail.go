@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -95,7 +96,10 @@ type TicketDetail struct {
 	Permission *PermissionCard `json:"permission,omitempty"`
 	Chat       []ChatMessage   `json:"chat"`
 	// State is the token an answer or unpark sends back; empty without a round.
-	State   string   `json:"state,omitempty"`
+	State string `json:"state,omitempty"`
+	// Bases are the competing blockers an ambiguous-base park chooses between;
+	// the unpark sends the chosen one back as its base.
+	Bases   []string `json:"bases,omitempty"`
 	Actions []string `json:"actions"`
 }
 
@@ -156,6 +160,9 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		}
 	}
 	d.Actions = detailActions(t, &last, gone, d.Permission)
+	if t.Status == schema.StatusNeedsAnswer && string(t.ParkKind) == string(events.AmbiguousBase) {
+		d.Bases = s.ambiguousBlockers(ref.addr)
+	}
 	return d, nil
 }
 

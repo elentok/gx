@@ -1,4 +1,4 @@
-import { Box, Skeleton } from "@chakra-ui/react";
+import { Box, Skeleton, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -9,12 +9,14 @@ import { AnswerForm } from "./AnswerForm";
 import { AnswerResult } from "./AnswerResult";
 import { useTicketDetail, type FetchDetail } from "./detail";
 import { TicketReading } from "./TicketReading";
+import { UnparkForm } from "./UnparkForm";
 
 export function TicketPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
+  const [unparked, setUnparked] = useState("");
 
   return (
     <Box>
@@ -31,6 +33,19 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
               detail={detail}
               onSent={(s) => {
                 setSent(s);
+                refetch();
+              }}
+              onStale={refetch}
+            />
+            {unparked && (
+              <Text role="status" aria-label="Unpark result" mt="4">
+                Unparked · {unparked}
+              </Text>
+            )}
+            <UnparkForm
+              detail={detail}
+              onDone={(words) => {
+                setUnparked(words);
                 refetch();
               }}
               onStale={refetch}

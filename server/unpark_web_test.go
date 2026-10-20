@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/events"
@@ -189,6 +190,23 @@ func TestWebUnpark_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	}
 	if got := answerEvents(t, path); len(got) != 1 || got[0].Choice != "unpark" || got[0].Base != "02" {
 		t.Errorf("answers = %+v; want park.answer{choice: unpark, base: 02}", got)
+	}
+}
+
+func TestDetail_AmbiguousBaseListsTheCompetingBlockers(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+	registerLaunch(h)
+	if _, err := h.Server.ClaimTicket("proj:epic-a/03", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	d, err := h.Client.Detail(context.Background(), "proj:epic-a/03")
+	if err != nil || len(d.Bases) != 2 || !slices.Contains(d.Bases, "01") || !slices.Contains(d.Bases, "02") {
+		t.Errorf("bases = %v, %v; want 01 and 02", d.Bases, err)
 	}
 }
 
