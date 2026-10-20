@@ -67,6 +67,14 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 		t.Fatal(err)
 	}
 	waitRuns(ctx, t, h, 1)
+	// A launching run has no session yet, so the stop would skip it and report
+	// zero agents stopped.
+	for h.Server.LaunchingRuns() > 0 {
+		if ctx.Err() != nil {
+			t.Fatalf("runs = %+v, want none launching", h.Server.Runs())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)

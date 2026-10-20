@@ -19,6 +19,12 @@ var (
 	HardGraceTitle = hardGraceTitle
 )
 
+// LaunchingRuns counts runs whose agent has no session yet, which a budget
+// stop skips.
+func (s *Server) LaunchingRuns() int {
+	return len(s.registry.list()) - len(s.killableRuns())
+}
+
 // LockReload holds the reload lock until the returned func runs, so a test can
 // keep a reload in flight.
 func (s *Server) LockReload() (unlock func()) {
