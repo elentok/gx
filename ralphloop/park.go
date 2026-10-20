@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -31,6 +32,43 @@ type parkRequest struct {
 	// caller whose finding is that the done itself is false (its commits never
 	// landed). Every other park on a done ticket is refused.
 	ReparkDone bool
+}
+
+// gxQuestions is the fixed wording of the parks gx itself asks about. Other
+// kinds carry the agent's own question or are not questions.
+var gxQuestions = map[events.Kind]string{
+	events.ZeroCommit:         "The agent finished with no commits. Adopt it as done, or reopen the ticket?",
+	events.StrandedCommits:    "The agent stopped with commits that never landed. Reopen the ticket to retry?",
+	events.BackgroundTaskGate: "The agent ended its turn with a background task still running. Reopen the ticket?",
+	events.AmbiguousBase:      "Several blockers have different branches. Pick the base branch.",
+}
+
+var errQuestionOpen = errors.New("open question")
+
+// logGxQuestion writes the by-gx park.question for kind before the status
+// flips. A ticket that already has an open question keeps it.
+func logGxQuestion(ticketPath string, kind events.Kind) error {
+	summary, ok := gxQuestions[kind]
+	if !ok {
+		return nil
+	}
+	ev := tickets.LogEvent{
+		Type:     tickets.EventParkQuestion,
+		By:       "gx",
+		ParkKind: string(kind),
+		Summary:  summary,
+		Text:     summary,
+	}
+	_, err := tickets.AppendLogIf(ticketPath, ev, func(evs []tickets.LogEvent) error {
+		if tickets.OpenQuestion(evs) != nil {
+			return errQuestionOpen
+		}
+		return nil
+	})
+	if errors.Is(err, errQuestionOpen) {
+		return nil
+	}
+	return err
 }
 
 // isParkType reports whether t is an event type a park writes for a person to
@@ -75,6 +113,10 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	case events.NeedsRepair:
 		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair, req.ReparkDone)
 	case events.NeedsAnswer:
+		if err := logGxQuestion(req.Path, req.Kind); err != nil {
+			// A silent park is the bug this path exists to remove: park anyway.
+			reason = fmt.Sprintf("%s (also failed logging question: %v)", reason, err)
+		}
 		// A blocked pane's question lives only in the pane, so its ticket gets a
 		// stub; ticket-answered parks (zero-commit, self-reported) stay bare.
 		if req.Kind.NeedsReasonStub() {

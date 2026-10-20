@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -160,6 +161,49 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 				t.Errorf("sink calls = %v, want one TicketNeedsHuman", calls)
 			}
 		})
+	}
+}
+
+func TestPark_LogsGxQuestionPerKind(t *testing.T) {
+	t.Parallel()
+	for kind, summary := range gxQuestions {
+		t.Run(string(kind), func(t *testing.T) {
+			t.Parallel()
+			scratchDir := writeEpic(t, "my-epic", map[string]string{
+				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
+			})
+			path := ticketPath(scratchDir, "my-epic", "01-a.md")
+			if _, err := park(&recordingSink{}, parkRequest{
+				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
+				Type: events.NeedsAnswer, Kind: kind, Reason: "why",
+			}); err != nil {
+				t.Fatal(err)
+			}
+			evs, err := tickets.ReadLog(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(evs) != 1 || evs[0].By != "gx" || evs[0].ParkKind != string(kind) || evs[0].Summary != summary {
+				t.Errorf("log = %+v, want one by-gx %s question %q", evs, kind, summary)
+			}
+		})
+	}
+}
+
+func TestPark_SelfReportedLogsNoQuestion(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
+	})
+	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	if _, err := park(&recordingSink{}, parkRequest{
+		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
+		Type: events.NeedsAnswer, Kind: events.SelfReported, Reason: "why",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if evs, _ := tickets.ReadLog(path); len(evs) != 0 {
+		t.Errorf("log = %+v, want empty", evs)
 	}
 }
 
