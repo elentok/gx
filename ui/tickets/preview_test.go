@@ -351,3 +351,25 @@ func TestRenderTicketPreview_ReadsBodyFromFileWhenMissing(t *testing.T) {
 		t.Errorf("preview has no body:\n%s", ansi.Strip(content))
 	}
 }
+
+func TestRenderTicketPreview_NeedsAnswerAppendsParkRounds(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "20-a.md")
+	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: needs-answer\ntype: research\n---\n\n# 20 — A\n\nThe body text.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tickets.AppendLog(file, tickets.LogEvent{Type: tickets.EventParkQuestion, Summary: "Which store?", Text: "Details."}); err != nil {
+		t.Fatal(err)
+	}
+	rendered := tickets.StatusNeedsAnswer
+	ticket := tickets.Ticket{Identifier: "20", Title: "A", Path: "gx:alpha/20", File: file, Status: "needs-answer", Rendered: &rendered}
+
+	content, target, ok := renderTicketPreview(tickets.Epic{Tickets: []tickets.Ticket{ticket}}, ticket, 80)
+
+	lines := strings.Split(ansi.Strip(content), "\n")
+	if !ok || target >= len(lines) || lines[target] != "1. open: Which store?" {
+		t.Fatalf("ok=%v target=%d, want the latest round line in:\n%s", ok, target, strings.Join(lines, "\n"))
+	}
+	if !strings.Contains(strings.Join(lines, "\n"), needsAnswerHint) {
+		t.Errorf("preview lacks the answer hint:\n%s", strings.Join(lines, "\n"))
+	}
+}

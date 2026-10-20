@@ -114,16 +114,77 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 
 	prefixLines := strings.Count(b.String(), "\n")
 	body, target, ok := highlightParkSection(renderTicketMarkdown(text, width), status)
-	b.WriteString(body)
 	if ok {
 		target += prefixLines
+	}
+	b.WriteString(body)
+	if status == tickets.StatusNeedsAnswer {
+		if block, line, found := renderParkRoundsBlock(ticketLogEvents(t), width); found {
+			if !strings.HasSuffix(body, "\n") {
+				b.WriteString("\n")
+			}
+			b.WriteString("\n")
+			target, ok = strings.Count(b.String(), "\n")+line, true
+			b.WriteString(block)
+		}
 	}
 	return b.String(), target, ok
 }
 
-// highlightParkSection finds status's park heading ("## Needs Answer"/"##
-// Needs Repair", the literal text markNeedsAnswerWithReasonAndStub/
-// markNeedsRepairWithReason append — see ralphloop/claim.go) within rendered
+// ticketLogEvents is t's event log, nil when it can't be read: a preview
+// without the rounds block beats an error in place of the whole preview.
+func ticketLogEvents(t tickets.Ticket) []tickets.LogEvent {
+	// A server-mode ticket's Path is its address, not a file.
+	path := t.File
+	if path == "" {
+		path = t.Path
+	}
+	if path == "" {
+		return nil
+	}
+	events, err := tickets.ReadLog(path)
+	if err != nil {
+		return nil
+	}
+	return events
+}
+
+// renderParkRoundsBlock renders the shared "Park rounds" block (see
+// tickets.RenderRounds) under the answer hint, with the latest round in
+// orange and earlier rounds plain. line is the latest round's first line
+// within block, for the caller to scroll to; found is false when the log has
+// no park round.
+func renderParkRoundsBlock(events []tickets.LogEvent, width int) (block string, line int, found bool) {
+	rounds := tickets.RenderRounds(events)
+	if rounds == "" {
+		return "", 0, false
+	}
+	latest := fmt.Sprintf("%d. ", len(tickets.Rounds(events)))
+	orange := lipgloss.NewStyle().Foreground(ui.ColorOrange)
+
+	var out []string
+	inLatest := false
+	for i, l := range strings.Split(strings.TrimRight(rounds, "\n"), "\n") {
+		if i > 0 && strings.HasPrefix(l, latest) {
+			inLatest = true
+			line = len(out)
+		}
+		for _, wrapped := range strings.Split(ansi.Wrap(l, max(width, 1), ""), "\n") {
+			if inLatest {
+				wrapped = orange.Render(wrapped)
+			}
+			out = append(out, wrapped)
+			if i == 0 {
+				out = append(out, ui.StyleDim.Render(needsAnswerHint))
+			}
+		}
+	}
+	return strings.Join(out, "\n") + "\n", line, true
+}
+
+// highlightParkSection finds the needs-repair heading ("## Needs Repair", the
+// literal text markNeedsRepairWithReason appends — see ralphloop/claim.go)
+// within rendered
 // (glamour output, so headings survive verbatim as their own line — see
 // ticketGlamourStyle's H2 prefix in glamour.go) and re-styles that line
 // through the section's end (the next "## " heading, or content end) in the
@@ -135,18 +196,11 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 // Returns rendered unchanged with ok=false for any other status or when the
 // heading isn't found.
 func highlightParkSection(rendered string, status tickets.RenderedStatus) (out string, target int, ok bool) {
-	var heading string
-	var style lipgloss.Style
-	switch status {
-	case tickets.StatusNeedsAnswer:
-		heading = needsAnswerHeading
-		style = lipgloss.NewStyle().Foreground(ui.ColorOrange)
-	case tickets.StatusNeedsRepair:
-		heading = needsRepairHeading
-		style = lipgloss.NewStyle().Foreground(ui.ColorRed)
-	default:
+	if status != tickets.StatusNeedsRepair {
 		return rendered, 0, false
 	}
+	heading := needsRepairHeading
+	style := lipgloss.NewStyle().Foreground(ui.ColorRed)
 
 	lines := strings.Split(rendered, "\n")
 	start := -1
@@ -169,10 +223,6 @@ func highlightParkSection(rendered string, status tickets.RenderedStatus) (out s
 	}
 	for i := start; i < end; i++ {
 		lines[i] = style.Render(ansi.Strip(lines[i]))
-	}
-	if status == tickets.StatusNeedsAnswer {
-		hint := ui.StyleDim.Render("  " + needsAnswerHint)
-		lines = append(lines[:start+1], append([]string{hint}, lines[start+1:]...)...)
 	}
 	return strings.Join(lines, "\n"), start, true
 }

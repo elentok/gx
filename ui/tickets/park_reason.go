@@ -19,8 +19,8 @@ const (
 	needsRepairHeading = tickets.NeedsRepairHeading
 )
 
-// needsAnswerHint is rendered under the preview's "## Needs Answer" heading.
-const needsAnswerHint = "Press m to answer."
+// needsAnswerHint is rendered under the preview's "Park rounds" heading.
+const needsAnswerHint = "Answer in the web UI or run `gx tickets answer <addr>`."
 
 // rowTitle is a list row's "<num> <title>". The title is a ticket's whole `#`
 // heading, which can be long; capping it here (same reasoning as

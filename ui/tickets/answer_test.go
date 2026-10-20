@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/confirm"
 )
 
@@ -65,14 +64,5 @@ func TestHandleAnswerEditorFinished_Split_HintNoModal(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("cmd = nil, want a hint notification")
-	}
-}
-
-func TestHighlightParkSection_NeedsAnswer_RendersHintUnderHeading(t *testing.T) {
-	t.Parallel()
-	out, target, ok := highlightParkSection("## Needs Answer\nWhich?\n", tickets.StatusNeedsAnswer)
-	lines := strings.Split(out, "\n")
-	if !ok || target != 0 || !strings.Contains(lines[1], needsAnswerHint) {
-		t.Errorf("ok=%v target=%d lines=%q, want hint right under the heading", ok, target, lines)
 	}
 }

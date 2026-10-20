@@ -61,23 +61,12 @@ func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
 	}
 }
 
-// TestHighlightParkSection_NeedsAnswerAndNeedsRepairUseDistinctColors covers
-// the preview's severity coloring: needs-answer highlights orange,
-// needs-repair red - distinct from each other and from the row-icon colors.
-func TestHighlightParkSection_NeedsAnswerAndNeedsRepairUseDistinctColors(t *testing.T) {
+// TestHighlightParkSection_NeedsRepairRed covers the preview's needs-repair
+// coloring: the heading is red, and needs-answer is left to the rounds block.
+func TestHighlightParkSection_NeedsRepairRed(t *testing.T) {
 	t.Parallel()
-	rendered := "intro\n" + needsAnswerHeading + "\nsome reason\n"
-	out, target, ok := highlightParkSection(rendered, tickets.StatusNeedsAnswer)
-	if !ok || target != 1 {
-		t.Fatalf("highlightParkSection() ok=%v target=%d, want ok=true target=1", ok, target)
-	}
-	wantOrange := lipgloss.NewStyle().Foreground(ui.ColorOrange).Render(needsAnswerHeading)
-	if !strings.Contains(out, wantOrange) {
-		t.Fatalf("expected needs-answer heading styled orange in:\n%s", out)
-	}
-
-	rendered = "intro\n" + needsRepairHeading + "\nsome reason\n"
-	out, target, ok = highlightParkSection(rendered, tickets.StatusNeedsRepair)
+	rendered := "intro\n" + needsRepairHeading + "\nsome reason\n"
+	out, target, ok := highlightParkSection(rendered, tickets.StatusNeedsRepair)
 	if !ok || target != 1 {
 		t.Fatalf("highlightParkSection() ok=%v target=%d, want ok=true target=1", ok, target)
 	}
@@ -85,8 +74,43 @@ func TestHighlightParkSection_NeedsAnswerAndNeedsRepairUseDistinctColors(t *test
 	if !strings.Contains(out, wantRed) {
 		t.Fatalf("expected needs-repair heading styled red in:\n%s", out)
 	}
-	if wantOrange == wantRed {
-		t.Fatal("expected needs-answer and needs-repair to use distinct colors")
+	if _, _, ok := highlightParkSection(rendered, tickets.StatusNeedsAnswer); ok {
+		t.Fatal("needs-answer must not highlight a body section")
+	}
+}
+
+func TestRenderParkRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
+	t.Parallel()
+	events := []tickets.LogEvent{
+		{Seq: 1, Type: tickets.EventParkQuestion, Summary: "First?"},
+		{Seq: 2, Type: tickets.EventParkAnswer, Question: 1, Choice: "yes"},
+		{Seq: 3, Type: tickets.EventParkQuestion, Summary: "Second?", Text: "detail"},
+	}
+	block, line, ok := renderParkRoundsBlock(events, 80)
+	if !ok {
+		t.Fatal("found = false, want true")
+	}
+	lines := strings.Split(block, "\n")
+	if got := ansi.Strip(lines[line]); got != "2. open: Second?" {
+		t.Errorf("latest line = %q (index %d), want the second round", got, line)
+	}
+	orange := lipgloss.NewStyle().Foreground(ui.ColorOrange)
+	if !strings.Contains(lines[line], orange.Render("2. open: Second?")) ||
+		!strings.Contains(lines[line+1], orange.Render("   detail")) {
+		t.Errorf("latest round not orange:\n%q", lines[line:])
+	}
+	if strings.Contains(strings.Join(lines[:line], "\n"), orange.Render("1.")) {
+		t.Errorf("earlier rounds must stay plain:\n%q", lines[:line])
+	}
+	if !strings.Contains(lines[1], needsAnswerHint) {
+		t.Errorf("hint missing under the heading: %q", lines[1])
+	}
+}
+
+func TestRenderParkRoundsBlock_NoRoundsIsNotFound(t *testing.T) {
+	t.Parallel()
+	if _, _, ok := renderParkRoundsBlock(nil, 80); ok {
+		t.Error("found = true, want false")
 	}
 }
 
