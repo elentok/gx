@@ -24,6 +24,7 @@ var headlessChecks = []Check{
 	{Runner: "headless", Name: "rate-limit-event", Mode: Fixture, Session: "turn", DependsOn: []string{"init-capabilities"}, Run: checkRateLimitEvent},
 	{Runner: "headless", Name: "command-lifecycle", Mode: Fixture, Session: "turn", DependsOn: []string{"init-capabilities"}, Run: checkCommandLifecycle},
 	{Runner: "headless", Name: "permission-request-answer", Mode: Fixture, Session: "permission", DependsOn: []string{"init-capabilities"}, Run: checkPermission},
+	{Runner: "headless", Name: "permission-request-shape", Mode: Fixture, Session: "permission", DependsOn: []string{"init-capabilities"}, Run: checkPermissionRequestShape},
 	{Runner: "headless", Name: "interrupt", Mode: Fixture, Session: "interrupt", DependsOn: []string{"init-capabilities"}, Run: checkInterrupt},
 	{Runner: "headless", Name: "compact-same-session", Mode: Fixture, Session: "compact", DependsOn: []string{"init-capabilities"}, Run: checkCompact},
 	{Runner: "headless", Name: "survives-launcher-exit", Mode: Live, DependsOn: []string{"claude-version"}, Run: checkSurvivesLauncherExit},
@@ -40,6 +41,7 @@ type doctorEvent struct {
 	State        string   `json:"state"`
 	CommandUUID  string   `json:"command_uuid"`
 	Capabilities []string `json:"capabilities"`
+	RequestID    string   `json:"request_id"`
 	Request      struct {
 		Subtype  string `json:"subtype"`
 		ToolName string `json:"tool_name"`
@@ -182,6 +184,24 @@ func checkPermission(in Input) (string, bool) {
 		return "session did not resume after the answer", false
 	}
 	return fmt.Sprintf("%d requires_action event(s); resumed after answer", required), true
+}
+
+// checkPermissionRequestShape: the answer is routed by request_id and the web
+// UI shows tool_name, so a can_use_tool request lacking either is unanswerable.
+func checkPermissionRequestShape(in Input) (string, bool) {
+	e, ok := findEvent(parseEvents(in.Events), func(e doctorEvent) bool {
+		return e.Type == "control_request" && e.Request.Subtype == "can_use_tool"
+	})
+	if !ok {
+		return "no can_use_tool control_request", false
+	}
+	if e.RequestID == "" {
+		return "can_use_tool request has no request_id", false
+	}
+	if e.Request.ToolName == "" {
+		return "can_use_tool request has no tool_name", false
+	}
+	return fmt.Sprintf("request_id %s for %s", e.RequestID, e.Request.ToolName), true
 }
 
 func checkInterrupt(in Input) (string, bool) {

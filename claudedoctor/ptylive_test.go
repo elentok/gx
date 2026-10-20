@@ -71,7 +71,8 @@ func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
 	}
 	src := claudedoctor.Source{Session: func(string) (claudedoctor.Recording, error) { return rec, nil }}
 	for _, r := range claudedoctor.Run(claudedoctor.Table, "pty", src) {
-		if r.Status == claudedoctor.Fail {
+		// The recording ends at the trust dialog; no permission dialog is shown.
+		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" {
 			t.Errorf("%s failed on the live recording: %s", r.Name, r.Detail)
 		}
 	}

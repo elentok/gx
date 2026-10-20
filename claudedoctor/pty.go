@@ -13,6 +13,7 @@ import (
 var ptyChecks = []Check{
 	{Runner: "pty", Name: "pid-status", Mode: Fixture, Session: "pty-status", Run: checkPidStatus},
 	{Runner: "pty", Name: "trust-screen", Mode: Fixture, Session: "pty-trust", Run: checkTrustScreen},
+	{Runner: "pty", Name: "permission-dialog", Mode: Fixture, Session: "pty-dialog", Run: checkPermissionDialog},
 	// No recorded session has hit a rate limit, so there is no banner to
 	// write a screen rule against; PTY RateLimit reports nothing until then.
 	{Runner: "pty", Name: "rate-limit-screen", Mode: Fixture, SkipReason: "banner never captured"},
@@ -86,6 +87,19 @@ func checkPidStatus(in Input) (string, bool) {
 		return "no waiting snapshot", false
 	}
 	return "waitingFor: " + strings.Join(waitingFor, ", "), true
+}
+
+// checkPermissionDialog parses recorded frames with the parser the web UI
+// approves through: a release that moves the dialog markers leaves no
+// approvable dialog, and gx would silently stop offering approval.
+func checkPermissionDialog(in Input) (string, bool) {
+	for i, frame := range in.Frames {
+		d := claudeui.ParseDialog(strings.Split(frame, "\n"))
+		if d.Approvable && d.ID != "" {
+			return fmt.Sprintf("frame %d parses as %q dialog", i, d.Header), true
+		}
+	}
+	return fmt.Sprintf("no approvable permission dialog in %d frames", len(in.Frames)), false
 }
 
 // checkTrustScreen matches the trust dialog screen rule on recorded frames.

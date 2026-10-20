@@ -65,7 +65,7 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FixtureSource: %v", err)
 	}
-	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "rate-limit-screen": Skip, "holder-survives-kickstart": Skip}
+	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "permission-dialog": Pass, "rate-limit-screen": Skip, "holder-survives-kickstart": Skip}
 	got := map[string]Result{}
 	for _, r := range Run(Table, "pty", src) {
 		got[r.Name] = r
@@ -112,6 +112,56 @@ func TestCheckTrustScreen_FailsOnBrokenFrame(t *testing.T) {
 	}
 	if _, ok := checkTrustScreen(Input{}); ok {
 		t.Error("no frames must fail")
+	}
+}
+
+func TestCheckPermissionDialog_FailsOnMutatedFrame(t *testing.T) {
+	t.Parallel()
+	src, _ := FixtureSource()
+	rec, err := src.Session("pty-dialog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail, ok := checkPermissionDialog(Input{Recording: rec}); !ok {
+		t.Fatalf("golden frame failed: %s", detail)
+	}
+	for name, mutate := range map[string]func(string) string{
+		"question moved":   func(f string) string { return strings.Replace(f, "Do you want", "Shall we", 1) },
+		"footer moved":     func(f string) string { return strings.Replace(f, "Esc to cancel", "Escape", 1) },
+		"options unnumber": func(f string) string { return strings.Replace(f, "1. Yes", "Yes", 1) },
+	} {
+		frames := []string{mutate(rec.Frames[0])}
+		if detail, ok := checkPermissionDialog(Input{Recording: Recording{Frames: frames}}); ok {
+			t.Errorf("%s: passed (%s)", name, detail)
+		}
+	}
+	if _, ok := checkPermissionDialog(Input{}); ok {
+		t.Error("no frames must fail")
+	}
+}
+
+func TestCheckPermissionRequestShape_FailsOnMutatedRequest(t *testing.T) {
+	t.Parallel()
+	src, _ := FixtureSource()
+	rec, err := src.Session("permission")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail, ok := checkPermissionRequestShape(Input{Recording: rec}); !ok {
+		t.Fatalf("golden stream failed: %s", detail)
+	}
+	for name, from := range map[string]string{
+		"request_id renamed": `"request_id"`,
+		"tool_name renamed":  `"tool_name"`,
+		"subtype renamed":    `"can_use_tool"`,
+	} {
+		var events []json.RawMessage
+		for _, e := range rec.Events {
+			events = append(events, json.RawMessage(strings.Replace(string(e), from, `"renamed"`, 1)))
+		}
+		if detail, ok := checkPermissionRequestShape(Input{Recording: Recording{Events: events}}); ok {
+			t.Errorf("%s: passed (%s)", name, detail)
+		}
 	}
 }
 
