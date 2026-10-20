@@ -21,3 +21,25 @@ HTTP 403.
 ```
 
 IP addresses and `localhost` are unaffected.
+
+## Answering a parked ticket from a phone
+
+When an agent parks a ticket with a question, the question shows in the queue. Open the ticket page,
+read the question, and send your answer from the browser. The running agent picks it up.
+
+The same flow has command-line verbs:
+
+- `gx tickets ask <project:epic/NN>` records a question and flags the ticket `needs-answer`.
+- `gx tickets answer <project:epic/NN>` answers the question a parked ticket is waiting on.
+- `gx tickets log <addr>` prints the ticket's raw log events, one JSON object per line.
+
+## Upgrade note: run migrate
+
+The person who runs the gx server runs `gx tickets migrate <path>` once after you upgrade. Pass the
+tracker root as `<path>`. gx does not run it at server start.
+
+The step moves each live `## Needs Answer` and `## Handoff` section into the ticket log as a question
+(and an answer, if you answered by hand and the ticket is open again). A second run changes nothing.
+
+Until it runs, an old ticket without a log shows no open question on the web, and the web cannot answer it.
+Run migrate first.
