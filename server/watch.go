@@ -137,6 +137,7 @@ func (s *Server) rescanTree(walk bool) {
 	}
 	s.scanParentDefects()
 	s.scanLateFinishes()
+	s.sweepOneOffs()
 }
 
 // WatchTree adds every directory under root. fsnotify is not recursive, and

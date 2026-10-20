@@ -209,7 +209,9 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			addrs[i] = tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}
 		}
 		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
-		if res, refused, err := s.settleLive(addrs, req.Stop, anyLive); refused || err != nil {
+		// A one-off is archived on cancel, so its run can't be left alive behind it.
+		stop := req.Stop || ref.addr.Epic == OneOffsEpic
+		if res, refused, err := s.settleLive(addrs, stop, anyLive); refused || err != nil {
 			return res, err
 		}
 		for _, t := range targets {
@@ -218,6 +220,9 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			}
 			s.stampRetro(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
 			s.events.publish(EventTicketCancelled, ref.address(t))
+		}
+		if ref.addr.Epic == OneOffsEpic {
+			s.rescan()
 		}
 		return QueueResult{}, nil
 	})

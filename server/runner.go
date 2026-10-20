@@ -666,6 +666,10 @@ func (s *Server) settleRun(rc runContext, err error) {
 	defer func() {
 		if !keepRun {
 			s.registry.delete(ticketAddr)
+			// The sweep skips a tracked run, so this is the earliest it can archive it.
+			if a, err := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}); err == nil && a.Epic == OneOffsEpic {
+				s.rescan()
+			}
 		}
 	}()
 	// A run the budget hard limit is stopping never finishes, lands or parks

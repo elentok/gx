@@ -266,6 +266,9 @@ type Ticket struct {
 	// after a park from one already on file. gx's own finished write
 	// (MarkBuiltAwaitingLand) leaves it alone.
 	FinishedAt time.Time
+	// CompletedAt is when the server archived a one-off that ended done; the
+	// archive sweep stamps it, and a cancelled one gets none.
+	CompletedAt time.Time
 	// ParkKind records which needs-answer producer parked this ticket (see
 	// the ParkKind type doc). Never checked by Validate, same as
 	// IterationStatus.

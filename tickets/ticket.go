@@ -70,8 +70,9 @@ type Ticket struct {
 	Commitless bool
 
 	// Category and ExportedAt mirror schema.Ticket's fields of the same name.
-	Category   string
-	ExportedAt time.Time
+	Category    string
+	ExportedAt  time.Time
+	CompletedAt time.Time
 
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool

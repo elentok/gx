@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/elentok/gx/tickets/schema"
@@ -64,6 +65,12 @@ type MoveOpts struct {
 	// RecordOriginal adds a ## Resolution naming the old address when the
 	// ticket has none, leaving its status alone.
 	RecordOriginal bool
+	// AppendOriginal is RecordOriginal that also adds the old address to a
+	// ## Resolution the ticket already has.
+	AppendOriginal bool
+	// CompletedAt, when set, is stamped on a done ticket that has no
+	// completed_at yet. A cancelled ticket never gets one.
+	CompletedAt time.Time
 }
 
 // PlanMove runs the refusals and computes the moved ticket, writing nothing.
@@ -153,6 +160,9 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 	if opts.Resolution != "" {
 		p.ticket.Status = schema.StatusCancelled
 	}
+	if p.ticket.Status == schema.StatusDone && p.ticket.CompletedAt.IsZero() {
+		p.ticket.CompletedAt = opts.CompletedAt
+	}
 
 	if err := schema.Validate(p.ticket); err != nil {
 		return MovePlan{}, fmt.Errorf("moved ticket would be invalid: %w", err)
@@ -167,8 +177,13 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 		// After planInbound: the resolution names the old address on purpose,
 		// which is no stale prose mention.
 		p.body = schema.SetSection(p.body, "Resolution", opts.Resolution)
-	} else if opts.RecordOriginal && schema.Section(p.body, "Resolution") == "" {
-		p.body = schema.SetSection(p.body, "Resolution", fmt.Sprintf("- original: %s\n", a))
+	} else if opts.RecordOriginal || opts.AppendOriginal {
+		original := fmt.Sprintf("- original: %s\n", a)
+		if res := schema.Section(p.body, "Resolution"); res == "" {
+			p.body = schema.SetSection(p.body, "Resolution", original)
+		} else if opts.AppendOriginal && !strings.Contains(res, original) {
+			p.body = schema.SetSection(p.body, "Resolution", strings.TrimRight(res, "\n")+"\n"+original)
+		}
 	}
 	return p, nil
 }
@@ -270,7 +285,8 @@ func (p *MovePlan) planInbound(root string, epics []Epic) error {
 			}
 		}
 		for _, t := range e.Tickets {
-			if t.Path == p.OldPath {
+			// NewPath is already on disk when a crashed move resumes.
+			if t.Path == p.OldPath || t.Path == p.NewPath {
 				continue
 			}
 			changed, err := scan(t.Path, fn)
@@ -379,6 +395,40 @@ func ApplyMove(p MovePlan) error {
 	if err := os.WriteFile(p.NewPath, out, 0644); err != nil {
 		return fmt.Errorf("writing ticket %s: %w", p.NewPath, err)
 	}
+	return p.finish()
+}
+
+// ResumeMove finishes a move whose new file was written but whose old file is
+// still there (a crash between the two): it re-plans the inbound refs against
+// the existing new file, rewrites them and removes the old file.
+func ResumeMove(root string, from, to Address, oldPath, newPath string) error {
+	unlock, err := schema.LockTicket(oldPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	raw, err := os.ReadFile(newPath)
+	if err != nil {
+		return err
+	}
+	t, err := schema.ParseTicketFromRaw(string(raw), newPath)
+	if err != nil {
+		return err
+	}
+	p := MovePlan{From: from, To: to, OldPath: oldPath, NewPath: newPath, ticket: t, body: schema.ParseBody(string(raw))}
+	epics, err := Load(root)
+	if err != nil {
+		return err
+	}
+	if err := p.planInbound(root, epics); err != nil {
+		return err
+	}
+	return p.finish()
+}
+
+// finish rewrites the inbound refs, then deletes the old file.
+func (p MovePlan) finish() error {
 	for _, e := range p.inbound {
 		if _, err := RewriteRefsInFile(e.path, e.fn); err != nil {
 			return err

@@ -168,6 +168,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string) Tic
 	ticket.Commitless = parsed.IsCommitless()
 	ticket.Category = string(parsed.Category)
 	ticket.ExportedAt = parsed.ExportedAt
+	ticket.CompletedAt = parsed.CompletedAt
 	ticket.Notify = parsed.Notify
 	ticket.Manual = parsed.Manual
 	ticket.NoRecover = parsed.NoRecover

@@ -327,6 +327,7 @@ type Server struct {
 	deadlocks    deadlocks
 	gatesRaised  map[gateHold]bool      // touched only by the gate watchdog
 	rewatch      atomic.Pointer[func()] // set by keepFresh when the watch is active; read by every rescan caller
+	sweepMu      sync.Mutex             // one archive sweep at a time; the move's own writes wake the watcher
 
 	chat           *ralphloop.ServerChat // never nil; sends nothing when no destination is configured
 	registry       *runRegistry
