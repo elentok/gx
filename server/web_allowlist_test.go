@@ -81,7 +81,7 @@ func TestWeb_AnswerAndUnparkNeedAStateToken(t *testing.T) {
 func TestWeb_NoWithdrawRoute(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
-	for _, path := range []string{"/v1/tickets/withdraw", "/v1/tickets/undo", "/v1/agents/answer"} {
+	for _, path := range []string{"/v1/tickets/withdraw", "/v1/tickets/undo"} {
 		if code, _ := webPostJSON(t, base+path, `{"state":"1:needs-answer"}`, cookie, "", jsonPost(base)); code != http.StatusNotFound {
 			t.Errorf("POST %s = %d, want 404", path, code)
 		}

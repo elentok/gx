@@ -125,6 +125,11 @@ export interface PermissionCard {
   tool?: string;
   input?: string;
   description?: string;
+  /**
+   * Hint is set when the prompt cannot be approved from here; the card carries
+   * no approve action then.
+   */
+  hint?: string;
 }
 /**
  * ChatMessage is one message of the latest round's exchange.
@@ -198,6 +203,10 @@ export interface SummaryTicket {
    * Answered is set on an open ticket whose latest question has an answer.
    */
   answered: boolean;
+  /**
+   * NeedsApproval is set on an active ticket whose agent waits on a permission prompt.
+   */
+  needs_approval: boolean;
 }
 /**
  * EpicSummary is one epic holding a queue item, as the web page's cards show it.
@@ -574,11 +583,14 @@ export const VerdictEligible = "eligible";
 export const VerdictWaitingInQueue = "waiting in queue";
 export const VerdictConcurrencyCap = "concurrency cap";
 export const VerdictNotQueued = "not queued";
+export const VerdictWaitingOnAnswer = "waiting on answer";
+export const VerdictWaitingReleased = "waiting (slot released)";
+export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)";
 /**
  * Verdicts only the server's queue and slot state can give. The rest are the
  * scheduler's own decision words (blocked, stalled, done, error, claimed, ...).
  */
-export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued;
+export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
 /**
  * PendingRow is one queue entry with its explain verdict.
  */

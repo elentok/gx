@@ -59,7 +59,8 @@
           "reason": "needs a person",
           "summary": "Which option do you want?",
           "answerable": true,
-          "answered": false
+          "answered": false,
+          "needs_approval": false
         }
       ],
       "has_repair": false

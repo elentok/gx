@@ -17,7 +17,9 @@ const (
 	// With a request ID: the open request differs, needs a real answer, or the agent is gone.
 	ReasonRequestChanged = "request-changed"
 	ReasonNotApprovable  = "not-approvable"
-	ReasonAgentGone      = "agent-gone"
+	// ReasonRequestIDRequired is the web's refusal of an answer that names no request.
+	ReasonRequestIDRequired = "request-id-required"
+	ReasonAgentGone         = "agent-gone"
 	// ReasonAgentWaiting is the refusal of a plain unpark on a live waiting
 	// self-reported park. It is public (ADR 0028) and named in the tracker text.
 	ReasonAgentWaiting = "agent-waiting"
@@ -109,8 +111,19 @@ func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 		if _, err := tickets.AppendLog(ref.ticket.Path, ev); err != nil {
 			return QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.addr, err)
 		}
+		// The prompt is gone, so open pages re-read the detail and the snapshot.
+		s.events.publish(EventTicketChanged, ref.addr.String())
 		return QueueResult{}, nil
 	})
+}
+
+// agentAnswerWeb is agentAnswer for the web mux: the person answered a card, so
+// the request must name the prompt they saw.
+func (s *Server) agentAnswerWeb(req QueueRequest) (QueueResult, error) {
+	if req.RequestID == "" {
+		return refusal(ReasonRequestIDRequired, "a request ID is required; review the current prompt"), nil
+	}
+	return s.agentAnswer(req)
 }
 
 // checkOpenRequest refuses unless st holds an approvable open request named id.

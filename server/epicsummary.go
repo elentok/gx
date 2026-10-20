@@ -33,6 +33,8 @@ type SummaryTicket struct {
 	Answerable bool `json:"answerable"`
 	// Answered is set on an open ticket whose latest question has an answer.
 	Answered bool `json:"answered"`
+	// NeedsApproval is set on an active ticket whose agent waits on a permission prompt.
+	NeedsApproval bool `json:"needs_approval"`
 }
 
 // EpicSummary is one epic holding a queue item, as the web page's cards show it.
@@ -77,9 +79,25 @@ func (s *Server) epicSummaries(all []TicketInfo) []EpicSummary {
 		if i < 0 || epics[i].IsMap || !epics[i].MergedAt.IsZero() {
 			continue
 		}
-		out = append(out, summarizeEpic(root, epics[i], s.registry.startedAtOf, recoveryOf, readLogLenient))
+		sum := summarizeEpic(root, epics[i], s.registry.startedAtOf, recoveryOf, readLogLenient)
+		for j := range sum.Active {
+			sum.Active[j].NeedsApproval = s.needsApproval(sum.Active[j].Address)
+		}
+		out = append(out, sum)
 	}
 	return out
+}
+
+// needsApproval reports whether the live agent of address waits on a
+// permission prompt. It reads the runner's status, so it runs only when a
+// snapshot or a detail is built.
+func (s *Server) needsApproval(address string) bool {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return false
+	}
+	card, err := s.permissionCard(addr)
+	return err == nil && card != nil
 }
 
 // readLogLenient reads a ticket's log for the snapshot, where an unreadable log

@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -65,7 +66,12 @@ type PermissionCard struct {
 	Tool        string `json:"tool,omitempty"`
 	Input       string `json:"input,omitempty"`
 	Description string `json:"description,omitempty"`
+	// Hint is set when the prompt cannot be approved from here; the card carries
+	// no approve action then.
+	Hint string `json:"hint,omitempty"`
 }
+
+const permissionHint = "Approve it in the TUI"
 
 // ChatMessage is one message of the latest round's exchange.
 type ChatMessage struct {
@@ -124,9 +130,14 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(t.Status), ParkKind: string(t.ParkKind),
 		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
 	}
+	if t.Status == schema.StatusClaimed {
+		if d.Permission, err = s.permissionCard(ref.addr); err != nil {
+			return TicketDetail{}, err
+		}
+	}
 	rounds := tickets.Rounds(evs)
 	if len(rounds) == 0 {
-		d.Actions = detailActions(t, nil, false)
+		d.Actions = detailActions(t, nil, false, d.Permission)
 		return d, nil
 	}
 	last := rounds[len(rounds)-1]
@@ -144,14 +155,41 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 			return TicketDetail{}, err
 		}
 	}
-	d.Actions = detailActions(t, &last, gone)
+	d.Actions = detailActions(t, &last, gone, d.Permission)
 	return d, nil
 }
 
+// permissionCard is the pending prompt of addr's live agent, or nil. It reads
+// the runner's status, so it runs only when a detail or a snapshot is built.
+// A prompt the web cannot approve (a herdr-hosted agent, an unnamed dialog, a
+// tool that needs a real answer) gets a card with a hint and no request ID.
+func (s *Server) permissionCard(addr tickets.Address) (*PermissionCard, error) {
+	runner, sess, ok, err := s.liveSession(addr)
+	if err != nil || !ok {
+		return nil, err
+	}
+	st, err := runner.Status(sess)
+	if err != nil || st.State != agentrunner.StateBlocked {
+		return nil, nil
+	}
+	p := st.Pending
+	if p == nil {
+		return &PermissionCard{Description: st.BlockedReason, Hint: permissionHint}, nil
+	}
+	card := &PermissionCard{RequestID: p.ID, Tool: p.Tool, Input: string(p.Input), Description: p.Description}
+	if p.NotApprovable || runner.Name() == string(agentrunner.ChoiceHerdr) {
+		card.RequestID, card.Hint = "", permissionHint
+	}
+	return card, nil
+}
+
 // detailActions is what a person may do with the ticket right now. Approve
-// joins when a permission card exists.
-func detailActions(t schema.Ticket, latest *tickets.ParkRound, agentGone bool) []string {
+// joins when the permission card can be approved from here.
+func detailActions(t schema.Ticket, latest *tickets.ParkRound, agentGone bool, card *PermissionCard) []string {
 	actions := []string{}
+	if card != nil && card.RequestID != "" {
+		actions = append(actions, ActionApprove)
+	}
 	if t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusNeedsRepair {
 		return actions
 	}

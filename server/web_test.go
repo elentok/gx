@@ -176,7 +176,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 	for _, pattern := range server.RoutePatterns() {
 		method, path, _ := strings.Cut(pattern, " ")
 		if pattern == "GET /v1/snapshot" || pattern == "GET /v1/events" || pattern == "GET /v1/tickets/detail" ||
-			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" {
+			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" || pattern == "POST /v1/agents/answer" {
 			continue
 		}
 		if code := webSend(t, h, method, base+path, validWrite); code != http.StatusNotFound {
