@@ -99,6 +99,9 @@ func (s *Server) endHardGrace(gen int) {
 	g.mu.Unlock()
 
 	now := time.Now()
+	// While held nothing is latched, so no budget poll has killed a run yet. Once
+	// the hold lifts one may stop and settle a run before this stop looks.
+	runs := s.killableRuns()
 	// The banners below are this stop's report, so the hard notice is marked
 	// sent before the hold lifts: a budget poll in between must not send one.
 	s.budgetNotes.markHard()
@@ -117,6 +120,6 @@ func (s *Server) endHardGrace(gen int) {
 		s.kickRunner()
 		return
 	}
-	n := s.killForBudget(now)
+	n := s.killRuns(now, runs)
 	s.banner(EventLevelError, fmt.Sprintf("gx: %d agents stopped — hard budget limit reached.", n), "")
 }

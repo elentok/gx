@@ -511,16 +511,27 @@ func (s *Server) budgetHardReached(now time.Time) bool { return s.budgetLatches(
 // instead of finishing, landing or parking for another reason. It returns how
 // many runs it stopped.
 func (s *Server) killForBudget(now time.Time) int {
-	grace := s.cfg.BudgetKillGrace
-	if grace <= 0 {
-		grace = defaultBudgetKillGrace
-	}
+	return s.killRuns(now, s.killableRuns())
+}
+
+// killableRuns is the runs a budget kill stops: every run with a session.
+func (s *Server) killableRuns() []trackedRun {
 	var runs []trackedRun
 	for _, t := range s.registry.list() {
 		// A launch has no session to interrupt yet; a later check stops it once it runs.
 		if t.State != runLaunching {
 			runs = append(runs, t)
 		}
+	}
+	return runs
+}
+
+// killRuns is killForBudget for a run list taken earlier. The list is the
+// count the caller reports: a budget poll may stop and settle a run first.
+func (s *Server) killRuns(now time.Time, runs []trackedRun) int {
+	grace := s.cfg.BudgetKillGrace
+	if grace <= 0 {
+		grace = defaultBudgetKillGrace
 	}
 	deadline := now.Add(grace)
 	var wg sync.WaitGroup
