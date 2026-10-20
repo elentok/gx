@@ -4,7 +4,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/fsnotify/fsnotify"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
@@ -66,11 +65,10 @@ func ScratchDir(worktreeRoot string) string { return scratchDirFor(worktreeRoot)
 // WatchStore signals (debounced) on every change under dir. stop ends the
 // watch and closes the channel.
 func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
-	w, err := fsnotify.NewWatcher()
+	w, err := server.NewStoreWatch(dir)
 	if err != nil {
 		return nil, nil, err
 	}
-	server.WatchTree(w, dir)
 	out := make(chan struct{}, 1)
 	go func() {
 		defer close(out)
@@ -84,13 +82,9 @@ func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
 				if debounce == nil {
 					debounce = time.After(storeWatchDebounce)
 				}
-			case _, ok := <-w.Errors:
-				if !ok {
-					return
-				}
 			case <-debounce:
 				debounce = nil
-				server.WatchTree(w, dir) // pick up directories created since
+				w.Rewatch() // pick up directories created since
 				select {
 				case out <- struct{}{}:
 				default: // a signal is already pending
@@ -98,5 +92,5 @@ func WatchStore(dir string) (events <-chan struct{}, stop func(), err error) {
 			}
 		}
 	}()
-	return out, func() { _ = w.Close() }, nil
+	return out, w.Close, nil
 }

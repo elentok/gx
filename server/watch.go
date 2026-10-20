@@ -35,25 +35,13 @@ func (s *Server) keepFresh(ctx context.Context) {
 	pollUnset := s.cfg.PollInterval <= 0
 	var events <-chan fsnotify.Event
 	if !s.cfg.DisableWatch {
-		w, err := fsnotify.NewWatcher()
+		w, err := NewStoreWatch(s.cfg.TicketStore)
 		if err != nil {
 			s.log.Warn("store watch unavailable, polling only", "err", err)
 		} else {
-			// kqueue's Close leaves the per-file fds open; Remove closes them.
-			defer func() {
-				for _, p := range w.WatchList() {
-					_ = w.Remove(p)
-				}
-				w.Close()
-			}()
-			WatchTree(w, s.cfg.TicketStore)
+			defer w.Close()
 			events = w.Events
-			go func() {
-				// Drain errors so the watcher never blocks; the poll covers any loss.
-				for range w.Errors {
-				}
-			}()
-			rewatch := func() { WatchTree(w, s.cfg.TicketStore) }
+			rewatch := w.Rewatch
 			s.rewatch.Store(&rewatch)
 			// The watcher closes on return; a late rescan must not touch it.
 			defer s.rewatch.Store(nil)
@@ -152,12 +140,17 @@ func (s *Server) rescanTree(walk bool) {
 }
 
 // WatchTree adds every directory under root. fsnotify is not recursive, and
-// re-adding a watched directory is a no-op.
+// re-adding a watched directory is a no-op. It skips .git: the tickets repo's
+// object store holds thousands of directories and would exhaust the file limit.
 func WatchTree(w *fsnotify.Watcher, root string) {
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err == nil && d.IsDir() {
-			_ = w.Add(path)
+		if err != nil || !d.IsDir() {
+			return nil
 		}
+		if d.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		_ = w.Add(path)
 		return nil
 	})
 }
