@@ -263,6 +263,10 @@ export interface FinishedEpic {
   done: number /* int */;
   total: number /* int */;
   completed_at: string;
+  /**
+   * OneOff marks a ticket entry: Address is the ticket's, Done and Total are 0.
+   */
+  one_off: boolean;
 }
 
 //////////
