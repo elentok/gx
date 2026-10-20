@@ -54,6 +54,50 @@ func (s *Server) sweepOneOffs() {
 			s.log.Warn("refresh after one-off sweep", "err", err)
 		}
 	}
+	for _, dir := range dirs {
+		s.dequeueIdleOneOffs(dir)
+	}
+}
+
+// dequeueIdleOneOffs takes the project's one-offs root off the queue once no
+// live one-off is left; the next submit queues it again. A submit writes its
+// ticket before it looks at the queue, so the disk check under the queue lock
+// either sees that ticket (root stays) or the submit finds the root gone and
+// queues it afresh.
+func (s *Server) dequeueIdleOneOffs(dir string) {
+	root := rootRef{Project: tickets.ProjectName(dir), Epic: OneOffsEpic}
+	removed, err := s.queued.removeRootIf(root, func() bool {
+		return !s.oneOffsLive(dir, root)
+	})
+	if err != nil {
+		s.log.Warn("dequeue idle one-offs", "root", root, "err", err)
+	} else if removed {
+		s.events.publish(EventQueueChanged, root.String())
+	}
+}
+
+// oneOffsLive reports whether a one-off is still pending, or its run is tracked.
+// Failed, parked and needs-* tickets are not terminal, so they count.
+func (s *Server) oneOffsLive(dir string, root rootRef) bool {
+	epics, err := tickets.Load(dir)
+	if err != nil {
+		return true
+	}
+	for _, e := range epics {
+		if filepath.Base(e.Path) != OneOffsEpic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			addr := tickets.Address{Project: root.Project, Epic: OneOffsEpic, ID: t.Identifier}
+			if _, tracked := s.registry.tracked(addr.String()); tracked {
+				return true
+			}
+			if t.Status != string(schema.StatusDone) && t.Status != string(schema.StatusCancelled) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // archiveOneOff moves one terminal one-off into the archive epic, creating the

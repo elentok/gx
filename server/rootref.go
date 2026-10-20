@@ -28,6 +28,12 @@ func rootOf(addr tickets.Address) rootRef { return rootRef{Project: addr.Project
 
 // removeRoot drops every queued ticket of root and reports whether any went.
 func (q *queueStore) removeRoot(root rootRef) (bool, error) {
+	return q.removeRootIf(root, func() bool { return true })
+}
+
+// removeRootIf is removeRoot gated by drop, which runs under the queue lock so a
+// submit's enqueue cannot slip between the check and the removal.
+func (q *queueStore) removeRootIf(root rootRef, drop func() bool) (bool, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	kept := make([]QueueItem, 0, len(q.items))
@@ -37,7 +43,7 @@ func (q *queueStore) removeRoot(root rootRef) (bool, error) {
 		}
 		kept = append(kept, it)
 	}
-	if len(kept) == len(q.items) {
+	if len(kept) == len(q.items) || !drop() {
 		return false, nil
 	}
 	prev := q.items

@@ -5,12 +5,26 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui"
 )
+
+func TestEpicNameLine_NoTotalShowsNoCounterOrBar(t *testing.T) {
+	t.Parallel()
+	sum := server.EpicSummary{Name: "one-offs", State: server.EpicStateWaiting}
+	got := ansi.Strip(epicNameLine("one-offs", sum, lipgloss.NewStyle(), epicLayoutWide, 40))
+	if strings.TrimSpace(got) != "one-offs" {
+		t.Errorf("name line = %q, want the name alone", got)
+	}
+	_, text, _ := epicStatusLine(ui.Icons(false), sum, "")
+	if strings.Contains(text, "merge") {
+		t.Errorf("status = %q, must not read awaiting merge", text)
+	}
+}
 
 func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 	t.Parallel()

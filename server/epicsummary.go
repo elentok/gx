@@ -99,9 +99,17 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 			}
 		}
 	}
+	// The one-offs root has no end to merge and no total to count towards.
+	oneOffs := root.Epic == OneOffsEpic
+	if oneOffs {
+		sum.Done, sum.Total = 0, 0
+	}
 	switch epicStateOf(e) {
 	case epicDone:
 		sum.State = EpicStateAwaitingMerge
+		if oneOffs {
+			sum.State = EpicStateWaiting
+		}
 	case epicRunnable:
 		sum.State = EpicStateWaiting
 		if len(sum.Active) > 0 {

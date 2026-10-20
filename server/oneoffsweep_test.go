@@ -93,6 +93,117 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	}
 }
 
+func oneOffsQueued(t *testing.T, h *servertest.Harness) bool {
+	t.Helper()
+	q, err := h.Client.QueueItems(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range q {
+		if strings.HasPrefix(it.Address, "proj:"+server.OneOffsEpic+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func waitOneOffsQueued(t *testing.T, h *servertest.Harness, want bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if oneOffsQueued(t, h) == want {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("one-offs queued = %v never reached", want)
+}
+
+func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
+	h := startSweep(t, store)
+	ctx := context.Background()
+	if _, err := h.Client.QueuePause(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "first", Project: "proj"})
+	if err != nil || res.Refused {
+		t.Fatalf("submit: %+v, %v", res, err)
+	}
+	waitOneOffsQueued(t, h, true)
+	if cres, err := h.Client.TicketCancel(ctx, res.Address, false); err != nil || cres.Refused {
+		t.Fatalf("cancel: %+v, %v", cres, err)
+	}
+	waitOneOffsQueued(t, h, false)
+
+	res, err = h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "second", Project: "proj"})
+	if err != nil || res.Refused {
+		t.Fatalf("second submit: %+v, %v", res, err)
+	}
+	if !oneOffsQueued(t, h) {
+		t.Fatal("second submit did not restore the one-offs root")
+	}
+}
+
+func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
+	for _, status := range []string{"needs-repair", "needs-answer", "parked", "failed"} {
+		t.Run(status, func(t *testing.T) {
+			store := t.TempDir()
+			servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: status})
+			h := startSweep(t, store)
+			ctx := context.Background()
+			if _, err := h.Client.QueuePause(ctx); err != nil {
+				t.Fatal(err)
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				res, err := h.Client.QueueAdd(ctx, "proj:one-offs/01", "")
+				if err == nil && !res.Refused {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("queue add: %+v, %v", res, err)
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			// Several rescans pass; none may drop the root.
+			time.Sleep(400 * time.Millisecond)
+			if !oneOffsQueued(t, h) {
+				t.Fatalf("%s one-off lost the queue entry", status)
+			}
+		})
+	}
+}
+
+func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
+	h := startSweep(t, store)
+	ctx := context.Background()
+	if _, err := h.Client.QueuePause(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 10 {
+		res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "p" + string(rune('a'+i)), Project: "proj"})
+		if err != nil || res.Refused {
+			t.Fatalf("submit %d: %+v, %v", i, res, err)
+		}
+		if cres, err := h.Client.TicketCancel(ctx, res.Address, false); err != nil || cres.Refused {
+			t.Fatalf("cancel %d: %+v, %v", i, cres, err)
+		}
+	}
+	last, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "last", Project: "proj"})
+	if err != nil || last.Refused {
+		t.Fatalf("last submit: %+v, %v", last, err)
+	}
+	time.Sleep(400 * time.Millisecond)
+	if !oneOffsQueued(t, h) {
+		t.Fatal("the live one-off lost its queue entry")
+	}
+}
+
 func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")

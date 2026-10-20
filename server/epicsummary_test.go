@@ -141,6 +141,26 @@ func TestSummarizeEpic_ParkedDetails(t *testing.T) {
 	}
 }
 
+func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T) {
+	none := func(string) (time.Time, bool) { return time.Time{}, false }
+	noRecovery := func(string) string { return "" }
+	root := rootRef{Project: "proj", Epic: OneOffsEpic}
+
+	allDone := tickets.Epic{Name: OneOffsEpic, Tickets: []tickets.Ticket{summaryTicket("01", "done")}}
+	got := summarizeEpic(root, allDone, none, noRecovery)
+	if got.State == EpicStateAwaitingMerge || got.Done != 0 || got.Total != 0 {
+		t.Errorf("all-done one-offs = state %q done %d total %d", got.State, got.Done, got.Total)
+	}
+
+	broken := tickets.Epic{Name: OneOffsEpic, Tickets: []tickets.Ticket{
+		summaryTicket("01", "done"), summaryTicket("02", "needs-repair"), summaryTicket("03", "needs-answer"),
+	}}
+	got = summarizeEpic(root, broken, none, noRecovery)
+	if got.State != EpicStateParked || len(got.Parked) != 2 {
+		t.Errorf("one-offs with needs-* = state %q parked %+v", got.State, got.Parked)
+	}
+}
+
 // The Deadlocked state is deadlockKind's blocked cycle, nothing more.
 func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
