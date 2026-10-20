@@ -160,7 +160,7 @@ func runServer(ctx context.Context) error {
 		}
 	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
-		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, LogLevel: logLevel})
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel})
 	if err != nil {
 		return err
 	}

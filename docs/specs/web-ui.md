@@ -94,6 +94,7 @@ rule serves both. This also fixes the two TUI bugs above.
 
 - The web UI runs inside `gx server`, as a separate HTTP listener in the same process. It reads the snapshot and epic summaries in memory. There is no `gx web` command.
 - A new `server.web` config block turns it on. It is off by default. Its `listen` key is a `host:port` string. Any IP is allowed. `0.0.0.0` logs a warning.
+- `server.web.dev-frontend` (dev only, default off) serves the UI from the Vite dev server at `server.web.dev-url` (default `http://127.0.0.1:5173`). The web listener forwards every non-`/v1` GET to it, websockets included, and keeps `/v1` local. A non-loopback URL fails the bind with an error. Both keys are startup-only.
 - `server.web` is startup-only, like `tcp-listen`. A reload that changes it warns "restart needed for server.web" and does nothing else.
 - A bind failure does not stop the server. The server logs the error, reports it, and does not retry. Restarting the server is the fix. This differs from `tcp-listen`, where a bad bind aborts start.
 - The handshake gains a `web_url` field and a web bind error field. `gx server status` prints the URL with the token. The TUI help dialog About section shows `Web UI  http://<addr>:<port>` (no token) when on, `Web UI  error: <reason>` when the bind failed, and no line when off.

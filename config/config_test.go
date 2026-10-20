@@ -1049,3 +1049,22 @@ func TestLoadCPUWatchdog(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadServerWebDevFrontend(t *testing.T) {
+	for body, want := range map[string]string{
+		`{}`: "",
+		`{"server":{"web":{"dev-frontend":true}}}`:                                    DefaultWebDevURL,
+		`{"server":{"web":{"dev-frontend":true,"dev-url":"http://localhost:5174"}}}`:  "http://localhost:5174",
+		`{"server":{"web":{"dev-frontend":false,"dev-url":"http://localhost:5174"}}}`: "",
+	} {
+		tmp := t.TempDir()
+		prev := userConfigDirFn
+		userConfigDirFn = func() (string, error) { return tmp, nil }
+		t.Cleanup(func() { userConfigDirFn = prev })
+		writeBudgetConfig(t, tmp, body)
+		cfg, err := Load()
+		if err != nil || cfg.Server.Web.DevFrontendURL() != want {
+			t.Errorf("%s: DevFrontendURL = %q (err %v), want %q", body, cfg.Server.Web.DevFrontendURL(), err, want)
+		}
+	}
+}

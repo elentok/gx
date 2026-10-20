@@ -120,10 +120,26 @@ type ServerConfig struct {
 type WebConfig struct {
 	// Listen is the host:port to serve the web UI on; empty means off.
 	Listen string `json:"listen"`
+	// DevFrontend serves the UI from the Vite dev server at DevURL instead of
+	// the embedded build. Dev only.
+	DevFrontend bool `json:"dev-frontend"`
+	// DevURL is the loopback http URL of the Vite dev server.
+	DevURL string `json:"dev-url"`
+}
+
+// DevFrontendURL is the dev server URL to proxy to, or "" when dev-frontend is off.
+func (w WebConfig) DevFrontendURL() string {
+	if !w.DevFrontend {
+		return ""
+	}
+	return w.DevURL
 }
 
 // DefaultRecentlyFinished is the RecentlyFinished when none is configured.
 const DefaultRecentlyFinished = 5
+
+// DefaultWebDevURL is the Vite dev server that server.web.dev-frontend uses when dev-url is unset.
+const DefaultWebDevURL = "http://127.0.0.1:5173"
 
 // Default returns the default configuration.
 func Default() Config {
@@ -140,7 +156,7 @@ func Default() Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           DefaultTicketStoreConfig(),
-		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished},
+		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		AgentRunner:           "auto",
@@ -264,7 +280,9 @@ func Parse(data []byte) (Config, error) {
 
 			RecentlyFinished *int `json:"recently-finished"`
 			Web              *struct {
-				Listen *string `json:"listen"`
+				Listen      *string `json:"listen"`
+				DevFrontend *bool   `json:"dev-frontend"`
+				DevURL      *string `json:"dev-url"`
 			} `json:"web"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
@@ -427,6 +445,12 @@ func Parse(data []byte) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.Listen != nil {
 		cfg.Server.Web.Listen = *raw.Server.Web.Listen
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevFrontend != nil {
+		cfg.Server.Web.DevFrontend = *raw.Server.Web.DevFrontend
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.DevURL != nil {
+		cfg.Server.Web.DevURL = *raw.Server.Web.DevURL
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

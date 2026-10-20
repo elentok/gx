@@ -201,6 +201,9 @@ func (s *Server) startupOnlyChanges(cfg config.Config) []string {
 	if cfg.Server.Web.Listen != s.cfg.WebAddr {
 		keys = append(keys, "server.web.listen")
 	}
+	if cfg.Server.Web.DevFrontendURL() != s.cfg.WebDevURL {
+		keys = append(keys, "server.web.dev-frontend")
+	}
 	if runnerChoice(cfg.AgentRunner) != runnerChoice(s.cfg.AgentRunner) {
 		keys = append(keys, "agent-runner")
 	}
