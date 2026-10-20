@@ -38,7 +38,11 @@ const (
 // State is the render state. Treat it as immutable: Reduce and the other
 // transitions return a new State and never write through the old one.
 type State struct {
-	Seq              uint64
+	// Seq is the last event sequence applied. A fresh server's snapshot has
+	// Seq 0, so it cannot tell whether a snapshot has arrived; Loaded does.
+	Seq uint64
+	// Loaded is set once a snapshot has been applied.
+	Loaded           bool
 	HerdrUnavailable bool
 	Budget           server.BudgetStatus
 	// ExtraUsage is the snapshot's extra-usage warning flag.
@@ -72,7 +76,7 @@ type State struct {
 // and epic summaries: no snapshot has arrived yet, or it has tickets and none
 // carries a rendered status.
 func (s State) OlderServer() bool {
-	if s.Seq == 0 {
+	if !s.Loaded {
 		return true
 	}
 	return len(s.Tickets) > 0 && !slices.ContainsFunc(s.Tickets, func(t server.TicketInfo) bool {
@@ -162,6 +166,7 @@ type Toast struct {
 func (s State) ApplySnapshot(snap server.Snapshot) State {
 	next := State{
 		Seq:              snap.Seq,
+		Loaded:           true,
 		HerdrUnavailable: snap.HerdrUnavailable,
 		Budget:           snap.Budget,
 		ExtraUsage:       snap.ExtraUsage,

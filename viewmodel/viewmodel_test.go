@@ -42,6 +42,7 @@ func TestOlderServer(t *testing.T) {
 		want bool
 	}{
 		{"no snapshot yet", viewmodel.State{}, true},
+		{"fresh server snapshot (seq 0)", viewmodel.State{}.ApplySnapshot(server.Snapshot{}), false},
 		{"tickets without rendered status", snapshot(), true},
 		{"tickets with rendered status", withRendered, false},
 	}
