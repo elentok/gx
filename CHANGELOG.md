@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.35.3 - 2026-10-20
+
+- Fixed the release build: the web UI's canned snapshot fixture now carries `has_repair`, so `make web-build` type-checks. v0.35.1 and v0.35.2 were tagged but their release builds failed, so this is the first release with the changes since v0.35.0.
+
 ## v0.35.2 - 2026-10-20
 
 - Fixed the v0.35.1 release build. macOS binaries are now built on a macOS runner with cgo, so they get the FSEvents store watch. Without cgo, the server falls back to fsnotify.
