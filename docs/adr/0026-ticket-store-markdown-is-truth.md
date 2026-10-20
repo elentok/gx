@@ -28,3 +28,7 @@ iteration handles, locks.
   never produce a wrong one.
 - Queue state, locks and `gx.log` are server-owned and live in the per-OS state dir, never in the
   store.
+
+## Amendment
+
+The conversation between agents and people (questions, answers, park rounds) lives in a per-ticket `<NN-slug>.jsonl` log next to the markdown. The markdown stays the truth for everything it holds.

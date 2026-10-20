@@ -24,3 +24,7 @@ cap. Queue order is plain FIFO, with no fair-share between projects.
   decision, without a restart.
 - An `investigate` node takes the slot its parked parent freed.
 - `max-concurrent-epics` is gone: a one-off is also a root, so counting epics measures nothing.
+
+## Amendment
+
+An agent that waits for an answer releases its slot after a grace period. A release cap limits how many waiting agents can hold released slots at once.

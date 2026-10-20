@@ -139,8 +139,9 @@ fixed set of user-facing states, each with its own icon:
   blocker that is still **blocking** (see Ticket Dependencies). Needs-answer, needs-repair, and
   done tickets keep their own state regardless of `blocked_by`.
 - **Needs-answer** — raw `Status: needs-answer`; a person is being asked for something — an answer
-  or a decision — and nothing is broken. Written either by an agent that stops to ask, or by gx's
-  own interactive-prompt gate when a pane blocks on an involuntary prompt. Says nothing about
+  or a decision — and nothing is broken. Written by gx when an agent asks through `gx tickets ask`
+  (the agent keeps waiting live), or when gx's own guess finds a ticket that stopped without
+  commits. Says nothing about
   whether an iteration survives; that's **Reclaim**'s question. _Avoid_: Needs-info (retired
   name, see ADR 0018).
 - **Needs-repair** — raw `Status: needs-repair`; gx hit a fault it can't resolve on its own and a
@@ -169,19 +170,18 @@ visible state described here. _Avoid_: Stalled, Human-clearable (retired names, 
 Paused (that's the operator-driven whole-queue toggle), Settled (removed from the vocabulary
 entirely — see ADR 0017).
 
-**Unpark** — clearing a parked ticket back to the frontier: a person (or, for a `blocked-pane` or
-`self-reported` park, gx itself once the pane is live and unblocked) writes `status: open`. A
-`zero-commit` park never auto-unparks on liveness alone — it requires a person to look at the
-ticket and flip its status by hand, or new commits to appear on its branch while the pane is live.
+**Unpark** — clearing a parked ticket back to the frontier: a person writes `status: open`, or answers the
+question (see **Answered**), which resumes the waiting agent. A `zero-commit` park never
+auto-unparks on liveness alone — it requires a person to look at the ticket and flip its status by
+hand.
 Not `resume` — the pause `Gate` already owns that verb — and not `clear` — the Queue tab's
 clear-checked/-complete keymaps already own that verb, and mean deleting tickets from the queue.
 
-**Park kind** (`park_kind` frontmatter field, `needs-answer` and `needs-repair` parks; value is the park event's kind) — which of three things
-caused a `needs-answer` park: `blocked-pane` (a genuinely blocked interactive prompt — pane stays
-live), `self-reported` (the agent itself asked a real question via `iteration_status:
-needs-answer` — its pane/worktree/tab is already released by this point, unlike the other two),
-or `zero-commit` (gx's own uncertain guess: no commits, no self-report, pane left alive for
-inspection). A ticket parked before this field existed carries no `park_kind` and is treated as
+**Park kind** (`park_kind` frontmatter field, `needs-answer` and `needs-repair` parks; value is the park event's kind) — which of two things
+caused a `needs-answer` park of the server: `self-reported` (the agent itself asked a real question
+via `gx tickets ask` — its pane stays live while it waits, and the slot is released after a grace
+period, see ADR 0032), or `zero-commit` (gx's own uncertain guess: no commits, no self-report,
+pane left alive for inspection). `blocked-pane` is not a park kind of the server. A ticket parked before this field existed carries no `park_kind` and is treated as
 `zero-commit` — the conservative default. A `needs-repair` park also stamps it (any events kind), but unpark keeps its
 liveness-only rule for it, ignoring the field. Cleared on claim; the event keeps the history. _Avoid_: "gate park", "announce-and-stop park"
 (retired informal names — collided with the already-established `Gate` type and its `.gates()`
