@@ -2,7 +2,7 @@ import { Box, Button, Text, Textarea } from "@chakra-ui/react";
 import { useState } from "react";
 import { ActionAnswer, type DetailOption, type TicketDetail } from "../generated/server";
 import { Badge } from "../ui/badge/Badge";
-import { postAnswer, type PostAnswer } from "./answer";
+import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer";
 
 interface Choice {
   id: string;
@@ -25,10 +25,13 @@ export function AnswerForm({
   detail,
   post = postAnswer,
   onSent,
+  onStale,
 }: {
   detail: TicketDetail;
   post?: PostAnswer;
-  onSent?: () => void;
+  onSent?: (sent: Sent) => void;
+  /** The question changed under the person: refetch so the current one shows. */
+  onStale?: () => void;
 }) {
   const { latest } = detail;
   const [choice, setChoice] = useState("");
@@ -36,8 +39,17 @@ export function AnswerForm({
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [sentSeq, setSentSeq] = useState<number | null>(null);
+  const [seenState, setSeenState] = useState(detail.state);
 
-  if (!latest || !detail.actions.includes(ActionAnswer)) return null;
+  // A new question clears the pick and the text; the note stays so a stale refusal loses nothing.
+  if (seenState !== detail.state) {
+    setSeenState(detail.state);
+    setChoice("");
+    setText("");
+  }
+
+  if (!latest || !detail.actions.includes(ActionAnswer) || sentSeq === latest.seq) return null;
 
   const isText = latest.kind !== "yes-no" && latest.kind !== "options";
   const ready = isText ? text.trim() !== "" : choice !== "";
@@ -54,8 +66,15 @@ export function AnswerForm({
         ...(note.trim() ? { note } : {}),
       };
       const res = await post(body);
-      if ("refused" in res) setError(res.message);
-      else onSent?.();
+      if ("refused" in res) {
+        setError(
+          res.reason === "agent-not-ready" ? `${res.message} Approve the agent's prompt first, then send again.` : res.message,
+        );
+        if (res.reason === ReasonStale) onStale?.();
+      } else {
+        setSentSeq(latest.seq);
+        onSent?.(sentOf(latest.seq, detail.address, res));
+      }
     } catch {
       setError("Could not send the answer. Try again.");
     } finally {
