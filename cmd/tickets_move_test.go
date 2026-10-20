@@ -117,6 +117,23 @@ func TestExecute_TicketsMove_NewIDAndTitlePrefixFollowTarget(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsMove_CarriesLogAlong(t *testing.T) {
+	f := setupMoveProject(t)
+	const log = "{\"a\":1}\n{\"b\":2}\n"
+	testutil.WriteFile(t, filepath.Join(f.project, "src", "issues"), "01-first.jsonl", log)
+
+	if _, err := runIn(t, f.repo, "tickets", "move", "src/01", "dst", "--slug", "renamed"); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(f.project, "dst", "issues", "03-renamed.jsonl"))
+	if err != nil || string(got) != log {
+		t.Errorf("moved log = %q, %v; want %q", got, err, log)
+	}
+	if _, err := os.Stat(filepath.Join(f.project, "src", "issues", "01-first.jsonl")); !os.IsNotExist(err) {
+		t.Errorf("old log still there: %v", err)
+	}
+}
+
 func TestExecute_TicketsMove_Refusals(t *testing.T) {
 	f := setupMoveProject(t)
 	other := addProject(t, filepath.Dir(f.project), "elsewhere", filepath.Join(t.TempDir(), "x"))

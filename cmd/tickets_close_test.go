@@ -162,6 +162,24 @@ func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsClose_SweepLeavesLogBesideArchivedTicket(t *testing.T) {
+	f := setupCloseProject(t)
+	fu := filepath.Join(f.project, followUpsEpic, "issues")
+	testutil.WriteFile(t, fu, "05-kept.md", "---\nid: \"05\"\nstatus: cancelled\ntype: research\n---\n\n# 05 — Kept\n")
+	const log = "{\"a\":1}\n{\"b\":2}\n"
+	testutil.WriteFile(t, fu, "05-kept.jsonl", log)
+	if _, err := runIn(t, f.repo, "tickets", "close", "--sweep"); err != nil {
+		t.Fatalf("sweep: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(f.project, followUpsArchivedEpic, "issues", "03-kept.jsonl"))
+	if err != nil || string(got) != log {
+		t.Errorf("archived log = %q, %v; want %q", got, err, log)
+	}
+	if _, err := os.Stat(filepath.Join(fu, "05-kept.jsonl")); !os.IsNotExist(err) {
+		t.Errorf("old log still there: %v", err)
+	}
+}
+
 func TestExecute_TicketsClose_SweepMovesDoneAndCancelled(t *testing.T) {
 	for _, flag := range []string{"--sweep", "--done"} {
 		t.Run(flag, func(t *testing.T) {

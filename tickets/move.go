@@ -427,12 +427,18 @@ func ResumeMove(root string, from, to Address, oldPath, newPath string) error {
 	return p.finish()
 }
 
-// finish rewrites the inbound refs, then deletes the old file.
+// finish rewrites the inbound refs, carries the log along, then deletes the
+// old file. Removing the old file last keeps a resumed move able to find the
+// log: a crash before that point re-runs this, and an already-renamed log is
+// skipped.
 func (p MovePlan) finish() error {
 	for _, e := range p.inbound {
 		if _, err := RewriteRefsInFile(e.path, e.fn); err != nil {
 			return err
 		}
+	}
+	if err := os.Rename(LogPath(p.OldPath), LogPath(p.NewPath)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("moving log: %w", err)
 	}
 	return os.Remove(p.OldPath)
 }
