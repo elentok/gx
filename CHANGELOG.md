@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.35.2 - 2026-10-20
+
+- Fixed the v0.35.1 release build. macOS binaries are now built on a macOS runner with cgo, so they get the FSEvents store watch. Without cgo, the server falls back to fsnotify.
+- Fixed CI: regenerated the web types, which were stale after `EpicSummary` gained `HasRepair`.
+- Updated the CI actions (`setup-node`, `pnpm/action-setup`, `upload-artifact`) to versions that run on Node.js 24.
+
 ## v0.35.1 - 2026-10-20
 
 - Fixed the server running out of file descriptors on macOS. The ticket store watch now uses FSEvents (one stream for the whole tree) instead of kqueue, which opened one fd per file in every watched directory (~2000 entries). Other platforms keep fsnotify, and its directory walk now skips `.git`.
