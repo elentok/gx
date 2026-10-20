@@ -83,6 +83,16 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 	}
 }
 
+func TestConfigReload_ReportsMaxOneOffAgentsChange(t *testing.T) {
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+	servertest.WriteConfig(t, path, store, map[string]any{"execution-queue": map[string]any{"max-one-off-agents": 7}})
+	if res := reload(t, h); res.Refused || !slices.Contains(res.Changed, "execution-queue.max-one-off-agents") {
+		t.Fatalf("reload = %+v, want max-one-off-agents changed", res)
+	}
+}
+
 func waitRuns(ctx context.Context, t *testing.T, h *servertest.Harness, n int) {
 	t.Helper()
 	for len(h.Server.Runs()) != n {

@@ -23,7 +23,7 @@ var projectKeys = map[string]map[string]bool{
 	"skills":          nil,
 	"notifications":   nil,
 	"evolve":          nil,
-	"execution-queue": {"max-agents-per-epic": true},
+	"execution-queue": {"max-agents-per-epic": true, "max-one-off-agents": true},
 }
 
 // checkProjectKeys rejects any key outside the whitelist, naming it. Global-only
@@ -66,6 +66,9 @@ func checkProjectKeys(data []byte) error {
 func (c Config) WithProject(pf ProjectFile) Config {
 	if pf.ExecutionQueue != nil && pf.ExecutionQueue.MaxAgentsPerEpic != nil {
 		c.ExecutionQueue.MaxConcurrentTicketsPerEpic = clampExecutionQueueLimit(*pf.ExecutionQueue.MaxAgentsPerEpic)
+	}
+	if pf.ExecutionQueue != nil && pf.ExecutionQueue.MaxOneOffAgents != nil {
+		c.ExecutionQueue.MaxOneOffAgents = clampExecutionQueueLimit(*pf.ExecutionQueue.MaxOneOffAgents)
 	}
 	if a := pf.Agents; a != nil {
 		c.Agents.Claude = overlayAgent(c.Agents.Claude, a.Claude)

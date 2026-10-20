@@ -71,6 +71,12 @@
           "minimum": 1,
           "default": 4
         },
+        "max-one-off-agents": {
+          "type": "integer",
+          "description": "Maximum agents that may run concurrently across one project's one-off tickets. Default: 3.",
+          "minimum": 1,
+          "default": 3
+        },
         "retry-storm-launches": {
           "type": "integer",
           "description": "Consecutive failed launches of one ticket before it is parked needs-repair as retry-exhausted. Default: 3.",
@@ -92,6 +98,7 @@
       "default": {
         "max-agents-per-epic": 2,
         "max-agents": 4,
+        "max-one-off-agents": 3,
         "retry-storm-launches": 3,
         "spin-cycles": 3,
         "spin-window": "5m"

@@ -258,6 +258,33 @@ func TestLoadExecutionQueueConfigClampsLimitsToOne(t *testing.T) {
 	}
 }
 
+func TestLoadMaxOneOffAgents(t *testing.T) {
+	cases := []struct {
+		name, json string
+		want       int
+	}{
+		{"default", `{}`, 3},
+		{"global value", `{"execution-queue":{"max-one-off-agents":5}}`, 5},
+		{"non-positive is clamped", `{"execution-queue":{"max-one-off-agents":0}}`, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			prev := userConfigDirFn
+			userConfigDirFn = func() (string, error) { return tmp, nil }
+			t.Cleanup(func() { userConfigDirFn = prev })
+			writeBudgetConfig(t, tmp, tc.json)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if got := cfg.ExecutionQueue.MaxOneOffAgents; got != tc.want {
+				t.Fatalf("MaxOneOffAgents = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
 func writeBudgetConfig(t *testing.T, tmp string, body string) {
 	t.Helper()
 	dir := filepath.Join(tmp, "gx")

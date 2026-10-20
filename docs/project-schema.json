@@ -62,6 +62,9 @@
       "properties": {
         "max-agents-per-epic": {
           "$ref": "config-schema.json#/properties/execution-queue/properties/max-agents-per-epic"
+        },
+        "max-one-off-agents": {
+          "$ref": "config-schema.json#/properties/execution-queue/properties/max-one-off-agents"
         }
       }
     }

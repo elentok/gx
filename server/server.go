@@ -94,6 +94,9 @@ type Settings struct {
 	// MaxAgentsPerRoot caps live agents of one root (config
 	// execution-queue.max-agents-per-epic). Zero means the default.
 	MaxAgentsPerRoot int
+	// MaxOneOffAgents caps live agents across one project's one-offs (config
+	// execution-queue.max-one-off-agents).
+	MaxOneOffAgents int
 
 	// Chat names the chat destinations the server notifies; empty means none.
 	Chat ralphloop.ServerChatConfig
@@ -139,6 +142,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		StorePushRemote:     cfg.TicketStore.PushRemote,
 		MaxAgents:           cfg.ExecutionQueue.MaxAgents,
 		MaxAgentsPerRoot:    cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic,
+		MaxOneOffAgents:     cfg.ExecutionQueue.MaxOneOffAgents,
 		Chat: ralphloop.ServerChatConfig{
 			TelegramBotToken: cfg.Notifications.Telegram.BotToken,
 			TelegramChatID:   cfg.Notifications.Telegram.ChatID,

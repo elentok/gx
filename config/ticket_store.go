@@ -60,6 +60,7 @@ type ProjectFile struct {
 	Evolve         *bool `json:"evolve,omitempty"`
 	ExecutionQueue *struct {
 		MaxAgentsPerEpic *int `json:"max-agents-per-epic,omitempty"`
+		MaxOneOffAgents  *int `json:"max-one-off-agents,omitempty"`
 	} `json:"execution-queue,omitempty"`
 }
 

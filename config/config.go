@@ -220,6 +220,7 @@ func Parse(data []byte) (Config, error) {
 		ExecutionQueue        *struct {
 			MaxAgentsPerEpic   *int    `json:"max-agents-per-epic"`
 			MaxAgents          *int    `json:"max-agents"`
+			MaxOneOffAgents    *int    `json:"max-one-off-agents"`
 			RetryStormLaunches *int    `json:"retry-storm-launches"`
 			SpinCycles         *int    `json:"spin-cycles"`
 			SpinWindow         *string `json:"spin-window"`
@@ -337,6 +338,9 @@ func Parse(data []byte) (Config, error) {
 		}
 		if raw.ExecutionQueue.MaxAgents != nil {
 			cfg.ExecutionQueue.MaxAgents = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxAgents)
+		}
+		if raw.ExecutionQueue.MaxOneOffAgents != nil {
+			cfg.ExecutionQueue.MaxOneOffAgents = clampExecutionQueueLimit(*raw.ExecutionQueue.MaxOneOffAgents)
 		}
 		if raw.ExecutionQueue.RetryStormLaunches != nil {
 			cfg.ExecutionQueue.RetryStormLaunches = clampExecutionQueueLimit(*raw.ExecutionQueue.RetryStormLaunches)

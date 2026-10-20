@@ -267,6 +267,7 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `input-modal-bottom`       | integer \| `"N%"` \| `"center"` | `"5%"`    | Vertical position of text-input overlays. An integer is a fixed line count from the bottom; a percentage string (e.g. `"10%"`) is relative to screen height; `"center"` centers the overlay. |
 | `name-aliases`             | object                          | `{}`      | Map of exact worktree full-names to display aliases, applied before the normal dash-segment compression.                                                                                     |
 | `execution-queue.max-agents-per-epic` | integer (≥1) | `2` | Maximum agents that may run concurrently within one epic. |
+| `execution-queue.max-one-off-agents` | integer (≥1) | `3` | Maximum agents that may run concurrently across one project's one-off tickets. A project's `project.json` can override it. |
 | `execution-queue.retry-storm-launches` | integer (≥1) | `3` | Consecutive failed launches of one ticket before it is parked `needs-repair` as `retry-exhausted`. |
 | `execution-queue.spin-cycles` | integer (≥1) | `3` | Park/re-claim cycles of one ticket within `spin-window` before it is quarantined `needs-repair` as `spinning`. |
 | `execution-queue.spin-window` | duration string | `"5m"` | Window for counting `spin-cycles` (Go duration, e.g. `"90s"`). Unparsable or non-positive values keep the default. |

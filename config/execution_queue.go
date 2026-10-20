@@ -5,6 +5,7 @@ import "time"
 const (
 	defaultExecutionQueueConcurrency = 2
 	defaultMaxAgents                 = 4
+	defaultMaxOneOffAgents           = 3
 	defaultRetryStormLaunches        = 3
 	defaultSpinCycles                = 3
 	defaultSpinWindow                = 5 * time.Minute
@@ -17,6 +18,8 @@ type ExecutionQueueConfig struct {
 	MaxConcurrentEpics int `json:"-"`
 	// MaxAgents caps live agents across every project (the daemon's slot cap).
 	MaxAgents int `json:"max-agents"`
+	// MaxOneOffAgents caps live agents across one project's one-off tickets.
+	MaxOneOffAgents int `json:"max-one-off-agents"`
 	// RetryStormLaunches is how many consecutive failed launches park a ticket
 	// as retry-exhausted.
 	RetryStormLaunches int `json:"retry-storm-launches"`
@@ -33,6 +36,7 @@ func DefaultExecutionQueueConfig() ExecutionQueueConfig {
 		MaxConcurrentTicketsPerEpic: defaultExecutionQueueConcurrency,
 		MaxConcurrentEpics:          defaultExecutionQueueConcurrency,
 		MaxAgents:                   defaultMaxAgents,
+		MaxOneOffAgents:             defaultMaxOneOffAgents,
 		RetryStormLaunches:          defaultRetryStormLaunches,
 		SpinCycles:                  defaultSpinCycles,
 		SpinWindow:                  defaultSpinWindow,

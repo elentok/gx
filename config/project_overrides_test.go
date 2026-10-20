@@ -98,6 +98,24 @@ func TestWithProject_NotificationsReplaceTheGlobalBlock(t *testing.T) {
 	}
 }
 
+func TestWithProject_MaxOneOffAgents(t *testing.T) {
+	global := Config{ExecutionQueue: DefaultExecutionQueueConfig()}
+	global.ExecutionQueue.MaxOneOffAgents = 6
+	for body, want := range map[string]int{
+		`{"execution-queue": {"max-one-off-agents": 2}}`: 2,
+		`{"execution-queue": {"max-one-off-agents": 0}}`: 1,
+		`{}`: 6,
+	} {
+		pf, err := ReadProjectFile(writeProjectJSON(t, body))
+		if err != nil {
+			t.Fatalf("%s: %v", body, err)
+		}
+		if got := global.WithProject(pf).ExecutionQueue.MaxOneOffAgents; got != want {
+			t.Errorf("%s: MaxOneOffAgents = %d, want %d", body, got, want)
+		}
+	}
+}
+
 func TestWithProject_OverridesOnlyThatCopy(t *testing.T) {
 	global := Config{
 		ExecutionQueue: DefaultExecutionQueueConfig(),
