@@ -429,15 +429,15 @@ func (h *Headless) awaitNotBusy(ss *headlessSession) (agentrunner.Status, error)
 
 // awaitSlash waits for a "/" command sent once; it is never resent, since most
 // commands start no turn and a resend would run them twice. Delivered means
-// a lifecycle event for uuid, a turn that began, a dialog that blocked claude,
-// or claude still idle after N.
+// uuid started (a bare queued event is too early: Turn moves on started), a
+// turn that began, a dialog that blocked claude, or claude still idle after N.
 func (h *Headless) awaitSlash(ss *headlessSession, uuid string, turn int) error {
 	deadline := time.NewTimer(h.WaitN())
 	defer deadline.Stop()
 	for {
 		h.mu.Lock()
 		capErr := ss.track.capabilityErr()
-		moved := ss.track.hasLifecycle(uuid) || ss.track.turn > turn || ss.track.blocked
+		moved := ss.track.started(uuid) || ss.track.turn > turn || ss.track.blocked
 		exited, busy, changed := ss.track.exited, ss.track.busy(), ss.changed
 		h.mu.Unlock()
 		switch {

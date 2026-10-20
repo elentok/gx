@@ -107,12 +107,6 @@ func (t *tracker) busy() bool {
 	return t.working || t.queued()
 }
 
-// hasLifecycle reports whether claude sent any lifecycle event for uuid.
-func (t *tracker) hasLifecycle(uuid string) bool {
-	_, ok := t.commands[uuid]
-	return ok
-}
-
 // permission is a tool-use request waiting for an allow or deny.
 type permission struct {
 	requestID string
