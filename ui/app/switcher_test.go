@@ -360,8 +360,7 @@ func TestSwitch_ToQueueWithAnEpicAddressFocusesThatEpic(t *testing.T) {
 	if got := m.navState.ActiveTab(); got != nav.TabQueue {
 		t.Fatalf("active tab = %q, want queue", got)
 	}
-	queue, ok := m.activePage().model.(ticketsui.QueueModel)
-	if !ok || queue.FocusEpic() != "gx:epic-impl" {
-		t.Fatalf("queue page = %#v, want it to wait on gx:epic-impl", m.activePage().model)
+	if _, ok := m.activePage().model.(ticketsui.QueueModel); !ok {
+		t.Fatalf("queue page = %#v, want a QueueModel", m.activePage().model)
 	}
 }

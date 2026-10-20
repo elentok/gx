@@ -713,17 +713,14 @@ func (m QueueModel) WithFocusEpic(address string) QueueModel {
 	return m
 }
 
-// FocusEpic is the epic the tab still waits to select; "" once it did.
-func (m QueueModel) FocusEpic() string { return m.focusEpic }
-
 // selectFocusEpic selects the focus epic's header once the rows hold it; until
-// then the request waits for the next delivery.
+// then the request waits for the next delivery. The address is the epic's Path.
 func (m *QueueModel) selectFocusEpic() {
 	if m.focusEpic == "" {
 		return
 	}
 	for i, e := range m.queueTree.Entries() {
-		if e.Value.kind == nodeEpicName && (e.Value.epic.Path == m.focusEpic || e.Value.epic.Name == m.focusEpic) {
+		if e.Value.kind == nodeEpicName && e.Value.epic.Path == m.focusEpic {
 			m.queueTree.SetSelectedIndex(i)
 			m.focusEpic = ""
 			return
