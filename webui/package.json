@@ -13,7 +13,8 @@
     "@chakra-ui/react": "^3.0.0",
     "@emotion/react": "^11.14.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router": "^8.5.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.0",

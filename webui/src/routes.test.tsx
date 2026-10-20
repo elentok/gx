@@ -1,0 +1,145 @@
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import { afterEach, expect, test } from "vitest";
+import { ConnectionContext, createConnection, type Connection, type ConnectionState } from "./connection";
+import { appRoutes } from "./routes";
+import type { Snapshot } from "./snapshot";
+import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail";
+import { renderThemed } from "./ui/render";
+
+afterEach(cleanup);
+
+const emptySnapshot: Snapshot = {
+  seq: 1,
+  budget: { day: "", total: 0, soft_limit: 0, hard_limit: 0, budget_paused: false, hard_latched: false },
+  tickets: [],
+  pending: [],
+  sessions: [],
+  epics: [],
+  recently_finished: [],
+};
+
+const detailOf = (address: string): TicketDetail => ({
+  address,
+  title: `Title of ${address}`,
+  status: "open",
+  answered: false,
+  rounds: [],
+  chat: [],
+  actions: [],
+});
+
+const okFor: FetchDetail = async (address) => ({ kind: "ok", detail: detailOf(address) });
+
+// A connection that never touches the network: the state is whatever the test sets.
+function fakeConnection(connected: boolean) {
+  const state: ConnectionState = { snapshot: emptySnapshot, connected, loadedOnce: true, tick: 0 };
+  return {
+    getState: () => state,
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+  } as unknown as Connection;
+}
+
+function renderAt(path: string, fetchDetail: FetchDetail, conn: Connection = fakeConnection(true)) {
+  const router = createMemoryRouter(appRoutes(fetchDetail), { initialEntries: [path] });
+  return renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+}
+
+test("the root route shows the Queue", async () => {
+  renderAt("/", okFor);
+  expect(await screen.findByRole("heading", { name: "Queue" })).toBeTruthy();
+});
+
+test("an unknown hash shows the Queue", async () => {
+  renderAt("/nonsense/here", okFor);
+  expect(await screen.findByRole("heading", { name: "Queue" })).toBeTruthy();
+});
+
+test("a ticket route shows a skeleton, then the ticket whose address is in the hash", async () => {
+  let resolve!: (r: DetailResult) => void;
+  const requested: string[] = [];
+  renderAt("/t/gx:e/01", (address) => {
+    requested.push(address);
+    return new Promise((r) => (resolve = r));
+  });
+  expect(await screen.findByRole("status", { name: "Loading ticket" })).toBeTruthy();
+  expect(requested).toEqual(["gx:e/01"]);
+  await act(async () => resolve({ kind: "ok", detail: detailOf("gx:e/01") }));
+  expect(await screen.findByRole("heading", { name: "Title of gx:e/01" })).toBeTruthy();
+  expect(screen.queryByRole("status", { name: "Loading ticket" })).toBeNull();
+});
+
+test("a 404 shows Ticket not found", async () => {
+  renderAt("/t/gx:e/99", async () => ({ kind: "not-found" }));
+  expect(await screen.findByText("Ticket not found")).toBeTruthy();
+});
+
+test("a failed refetch keeps the last page, and the Offline strip shows", async () => {
+  let calls = 0;
+  const conn = fakeConnection(false);
+  let listener: ((a: string | undefined) => void) | undefined;
+  (conn as unknown as { onEvent: unknown }).onEvent = (l: typeof listener) => {
+    listener = l;
+    return () => {};
+  };
+  renderAt(
+    "/t/gx:e/01",
+    async (address) => {
+      if (++calls > 1) throw new Error("down");
+      return { kind: "ok", detail: detailOf(address) };
+    },
+    conn,
+  );
+  expect(await screen.findByRole("heading", { name: "Title of gx:e/01" })).toBeTruthy();
+  await act(async () => listener?.("gx:e/01"));
+  await waitFor(() => expect(calls).toBe(2));
+  expect(screen.getByRole("heading", { name: "Title of gx:e/01" })).toBeTruthy();
+  expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
+});
+
+// jsdom's AbortSignal is rejected by the router's Request, so a click cannot navigate here.
+test("the back link points at the Queue", async () => {
+  renderAt("/t/gx:e/01", okFor);
+  expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/");
+});
+
+function eventFrame(seq: number, address: string) {
+  return `id: ${seq}\nevent: ticket-changed\ndata: ${JSON.stringify({ seq, type: "ticket-changed", address })}\n\n`;
+}
+
+test("an event for the page's address refetches the detail once, another address does not", async () => {
+  let push!: (chunk: string) => void;
+  const conn = createConnection({
+    fetchSnapshot: async () => emptySnapshot,
+    openStream: async () =>
+      (async function* () {
+        for (;;) yield await new Promise<string>((r) => (push = r));
+      })(),
+  });
+  conn.start();
+  const fetched: string[] = [];
+  renderAt(
+    "/t/gx:e/01",
+    async (address) => {
+      fetched.push(address);
+      return { kind: "ok", detail: detailOf(address) };
+    },
+    conn,
+  );
+  await screen.findByRole("heading", { name: "Title of gx:e/01" });
+  await waitFor(() => expect(push).toBeDefined());
+  expect(fetched).toHaveLength(1);
+
+  await act(async () => push(eventFrame(2, "gx:e/02")));
+  await act(async () => push(eventFrame(3, "gx:e/01")));
+  await waitFor(() => expect(fetched).toHaveLength(2));
+  // The foreign event came first and was processed, so a stray refetch would show as 3 by now.
+  await act(async () => push(eventFrame(4, "gx:e/02")));
+  expect(fetched).toEqual(["gx:e/01", "gx:e/01"]);
+  conn.stop();
+});

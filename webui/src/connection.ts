@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { fetchSnapshot, type Snapshot } from "./snapshot";
 
 export const BACKOFF_MIN_MS = 1000;
@@ -41,12 +41,28 @@ async function openEventStream(url: string, signal: AbortSignal): Promise<AsyncI
   })();
 }
 
+function eventAddress(block: string): string | undefined {
+  const line = /^data: ?(.*)$/m.exec(block)?.[1];
+  if (!line) return undefined;
+  try {
+    const address = JSON.parse(line).address;
+    return typeof address === "string" && address !== "" ? address : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export type EventListener = (address: string | undefined) => void;
+
+export type Connection = ReturnType<typeof createConnection>;
+
 export function createConnection(deps: ConnectionDeps = {}) {
   const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot;
   const openStream = deps.openStream ?? openEventStream;
 
   let state: ConnectionState = { snapshot: null, connected: true, loadedOnce: false, tick: 0 };
   const listeners = new Set<() => void>();
+  const eventListeners = new Set<EventListener>();
   let gen = 0;
   let abort: AbortController | null = null;
   let backoff = BACKOFF_MIN_MS;
@@ -141,8 +157,11 @@ export function createConnection(deps: ConnectionDeps = {}) {
         arm(g);
         const blocks = (buf + chunk).split("\n\n");
         buf = blocks.pop() ?? "";
-        // Events carry no payload: each one just means "snapshot is stale".
-        if (blocks.some((b) => /^event:/m.test(b))) void refresh(g);
+        // Events carry no state: each one just means "snapshot is stale". The address, when
+        // there is one, only lets a ticket page tell whether the event is about it.
+        const events = blocks.filter((b) => /^event:/m.test(b));
+        if (events.length > 0) void refresh(g);
+        for (const b of events) eventListeners.forEach((l) => l(eventAddress(b)));
       }
       if (g === gen) fail();
     } catch {
@@ -194,6 +213,10 @@ export function createConnection(deps: ConnectionDeps = {}) {
       listeners.add(l);
       return () => listeners.delete(l);
     },
+    onEvent(l: EventListener) {
+      eventListeners.add(l);
+      return () => eventListeners.delete(l);
+    },
     start() {
       document.addEventListener("visibilitychange", onVisibility);
       window.addEventListener("online", onOnline);
@@ -212,13 +235,25 @@ export function createConnection(deps: ConnectionDeps = {}) {
   };
 }
 
-export function useLiveConnection(deps?: ConnectionDeps): ConnectionState {
-  const ref = useRef<ReturnType<typeof createConnection>>(undefined);
+export function useConnection(deps?: ConnectionDeps): Connection {
+  const ref = useRef<Connection>(undefined);
   ref.current ??= createConnection(deps);
   const conn = ref.current;
   useEffect(() => {
     conn.start();
     return () => conn.stop();
   }, [conn]);
+  return conn;
+}
+
+export function useConnectionState(conn: Connection): ConnectionState {
   return useSyncExternalStore(conn.subscribe, conn.getState);
+}
+
+export const ConnectionContext = createContext<Connection | null>(null);
+
+export function useConnectionContext(): Connection {
+  const conn = useContext(ConnectionContext);
+  if (!conn) throw new Error("ConnectionContext is missing");
+  return conn;
 }
