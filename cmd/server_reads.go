@@ -697,6 +697,7 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	nudge.Flags().BoolVar(&nudgeJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(nudge)
+	cmd.AddCommand(newTicketsAnswerCmd(deps{}, true))
 
 	var followJSON bool
 	follow := &cobra.Command{

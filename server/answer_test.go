@@ -78,6 +78,80 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	}
 }
 
+func TestAnswer_NotAnswerable(t *testing.T) {
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	for name, park := range map[string]func(*schema.Ticket){
+		"zero-commit park": func(tk *schema.Ticket) {
+			tk.Status, tk.ParkKind = schema.StatusNeedsAnswer, schema.ParkKindZeroCommit
+		},
+		"needs-repair": func(tk *schema.Ticket) {
+			tk.Status, tk.ParkKind = schema.StatusNeedsRepair, schema.ParkKindSelfReported
+		},
+	} {
+		if err := schema.UpdateTicket(ticketPath, park); err != nil {
+			t.Fatal(err)
+		}
+		res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, Choice: "a"})
+		if err != nil || res.Reason != server.ReasonNotAnswerable {
+			t.Errorf("%s: %+v, %v; want %s", name, res, err, server.ReasonNotAnswerable)
+		}
+	}
+	if n := answerCount(t, ticketPath); n != 0 {
+		t.Errorf("refusals logged %d park.answer lines, want 0", n)
+	}
+	if got := fake.Prompts("epic-a-iter-01"); len(got) != 0 {
+		t.Errorf("refusals prompted the agent: %q", got)
+	}
+}
+
+func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
+	h, ticketPath, fake := startWaitingRestartFake(t, 5)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	h.Server.RecordSpend("spent", 6)
+	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	if err != nil || res.Reason != server.ReasonBudgetLimit {
+		t.Fatalf("answer = %+v, %v; want %s", res, err, server.ReasonBudgetLimit)
+	}
+	if n := answerCount(t, ticketPath); n != 0 {
+		t.Errorf("park.answer lines = %d, want 0", n)
+	}
+	if got := fake.Prompts("epic-a-iter-01"); len(got) != 0 {
+		t.Errorf("budget refusal prompted the agent: %q", got)
+	}
+}
+
+// A finish that arrived after a zero-commit park is adopted by the answer
+// verb, as it is by unpark: the reply is not delivered.
+func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
+	p := parkZeroCommit(t, false)
+	commitAgentWork(t, p.wtPath)
+	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
+		t.Fatal(err)
+	}
+	res, err := p.h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, Choice: "a"})
+	if err != nil || res.Refused || res.Outcome != server.OutcomeAdopted {
+		t.Fatalf("answer = %+v, %v; want adopted", res, err)
+	}
+	if n := answerCount(t, p.ticketPath); n != 0 {
+		t.Errorf("park.answer lines = %d, want 0", n)
+	}
+}
+
+func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	if err != nil || res.Outcome != server.OutcomeDelivered {
+		t.Fatalf("answer = %+v, %v; want delivered", res, err)
+	}
+	fake.SetState("epic-a-iter-01", agentrunner.StateIdle, "")
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
+	waitStatus(t, ticketPath, schema.StatusDone)
+}
+
 func TestAnswer_Refusals(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
