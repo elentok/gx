@@ -21,6 +21,9 @@ func TestLandOne_TrailerOnly_ParksAmbiguousLand(t *testing.T) {
 	path := ticketPath(scratchDir, "epic", "01-a.md")
 	repo := t.TempDir()
 	gitIn(t, repo, "init", "-b", "epic")
+	// testutil.CommitAll runs plain git, which has no identity on CI runners.
+	gitIn(t, repo, "config", "user.email", "test@test.com")
+	gitIn(t, repo, "config", "user.name", "test")
 	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
 	base := gitIn(t, repo, "rev-parse", "HEAD")
 	gitIn(t, repo, "checkout", "-b", "iter")
