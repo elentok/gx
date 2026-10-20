@@ -26,7 +26,9 @@ state and runs the next step. There is no phase field: the detection list below 
 
 This skill does not vendor its helpers. `wayfinder`, `to-spec`, `grilling` and `domain-modeling`
 must exist in the agent's skill root (`~/.claude/skills/` for Claude, `~/.codex/skills/` for Codex).
-If any is missing, stop. Name the missing ones and say they come from
+Check each with a test that follows symlinks, such as `test -f ~/.claude/skills/<name>/SKILL.md`.
+Never grep a directory listing: the skills are often symlinks, and compacting `ls` wrappers (rtk)
+hide them. If any is missing, stop. Name the missing ones and say they come from
 `https://github.com/mattpocock/skills`. Do not continue without them.
 
 `wayfinder` and `to-spec` set `disable-model-invocation: true`, so the Skill tool can't reach
