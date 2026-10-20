@@ -97,24 +97,52 @@ func epicAddress(addr string) string {
 	return epicPart
 }
 
+// designRef names the conversation and ticket of a Design session that just
+// went idle.
+type designRef struct {
+	Conversation, Ticket string
+}
+
+// lastAssistantText reads the session's last assistant message from its claude
+// transcript. A missing transcript (a codex session, or one not written yet)
+// stays silent; real errors and an ambiguous id are logged.
+func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
+	if conversationID == "" {
+		return "", false
+	}
+	projects, err := harness.ClaudeProjectsDir()
+	if err != nil {
+		s.log.Warn("design actionable: claude projects dir", "session", id, "err", err)
+		return "", false
+	}
+	paths, err := transcript.FindByIDIn(projects, conversationID)
+	if err != nil {
+		s.log.Warn("design actionable: find transcript", "session", id, "err", err)
+		return "", false
+	}
+	if len(paths) > 1 {
+		s.log.Warn("design actionable: several transcripts", "session", id, "conversation", conversationID, "count", len(paths))
+	}
+	if len(paths) != 1 {
+		return "", false
+	}
+	text, ok, err := transcript.LastAssistantText(paths[0])
+	if err != nil {
+		s.log.Warn("design actionable: read transcript", "session", id, "err", err)
+	}
+	return text, ok && err == nil
+}
+
 // detectDesignActionable raises the grilling or run-end Actionable when a
 // Design session's last assistant message holds its marker. Like an
 // agent-raised one, the person's next input clears it. A harness without a
 // claude transcript (codex) never matches.
-func (s *Server) detectDesignActionable(dir, id, conversationID, ticket string) {
-	projects, err := harness.ClaudeProjectsDir()
-	if err != nil || conversationID == "" {
+func (s *Server) detectDesignActionable(dir, id string, design designRef) {
+	text, ok := s.lastAssistantText(id, design.Conversation)
+	if !ok {
 		return
 	}
-	paths, err := transcript.FindByIDIn(projects, conversationID)
-	if err != nil || len(paths) != 1 {
-		return
-	}
-	text, ok, err := transcript.LastAssistantText(paths[0])
-	if err != nil || !ok {
-		return
-	}
-	a, ok := designActionable(text, ticket)
+	a, ok := designActionable(text, design.Ticket)
 	if !ok {
 		return
 	}

@@ -669,7 +669,8 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 		switch msg.Type {
 		case nativerunner.StreamStatus:
 			st := sessionStatusOf(msg.Status)
-			var prompt, signal, designConv, designTicket string
+			var prompt, signal string
+			var design designRef
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
@@ -685,7 +686,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
 					if st.State == SessionIdle && prev.State != SessionIdle && m.Design {
-						designConv, designTicket = m.ConversationID, m.Ticket
+						design = designRef{m.ConversationID, m.Ticket}
 					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
@@ -705,8 +706,8 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				return changed
 			})
 			first.noteState(st.State)
-			if designConv != "" {
-				s.detectDesignActionable(dir, id, designConv, designTicket)
+			if design.Conversation != "" {
+				s.detectDesignActionable(dir, id, design)
 			}
 			if prompt != "" {
 				first.start(signal, prompt)
