@@ -141,5 +141,12 @@ func printTicket(a tickets.Address, t tickets.Ticket, jsonOut bool, w io.Writer)
 	if !strings.HasSuffix(t.Body, "\n") {
 		fmt.Fprintln(w)
 	}
+	events, err := tickets.ReadLog(t.Path)
+	if err != nil {
+		return err
+	}
+	if rounds := tickets.RenderRounds(events); rounds != "" {
+		fmt.Fprintf(w, "\n%s", rounds)
+	}
 	return nil
 }

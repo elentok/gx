@@ -255,6 +255,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	}
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
 	cmd.AddCommand(showCmd)
+	cmd.AddCommand(newTicketsLogCmd(d))
 	cmd.AddCommand(newTicketsSetCmd(d))
 	var migrateToStore, migrateDryRun bool
 	var migrateProject string
