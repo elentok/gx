@@ -2,7 +2,6 @@ package server
 
 import (
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/elentok/gx/tickets"
@@ -27,26 +26,26 @@ func (s *Server) sweepOneOffs() {
 		return
 	}
 	moved := false
+	now := time.Now()
 	for _, dir := range dirs {
-		epics, _ := s.idx.epicsOf(dir)
-		for _, e := range epics {
-			if filepath.Base(e.Path) != OneOffsEpic {
+		live, archived, err := tickets.LoadOneOffs(dir)
+		if err != nil {
+			s.log.Warn("sweep one-offs", "dir", dir, "err", err)
+			continue
+		}
+		for _, t := range live.Tickets {
+			if !tickets.IsTerminalStatus(t.Status) {
 				continue
 			}
-			for _, t := range e.Tickets {
-				if t.Status != string(schema.StatusDone) && t.Status != string(schema.StatusCancelled) {
-					continue
-				}
-				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: OneOffsEpic, ID: t.Identifier}
-				if _, live := s.registry.tracked(addr.String()); live {
-					continue
-				}
-				if err := archiveOneOff(dir, addr, t, time.Now()); err != nil {
-					s.log.Warn("archive one-off", "ticket", addr.String(), "err", err)
-					continue
-				}
-				moved = true
+			addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: OneOffsEpic, ID: t.Identifier}
+			if _, tracked := s.registry.tracked(addr.String()); tracked {
+				continue
 			}
+			if err := archiveOneOff(dir, archived, addr, t, now); err != nil {
+				s.log.Warn("archive one-off", "ticket", addr.String(), "err", err)
+				continue
+			}
+			moved = true
 		}
 	}
 	if moved {
@@ -79,22 +78,17 @@ func (s *Server) dequeueIdleOneOffs(dir string) {
 // oneOffsLive reports whether a one-off is still pending, or its run is tracked.
 // Failed, parked and needs-* tickets are not terminal, so they count.
 func (s *Server) oneOffsLive(dir string, root rootRef) bool {
-	epics, err := tickets.Load(dir)
+	live, _, err := tickets.LoadOneOffs(dir)
 	if err != nil {
 		return true
 	}
-	for _, e := range epics {
-		if filepath.Base(e.Path) != OneOffsEpic {
-			continue
+	for _, t := range live.Tickets {
+		addr := tickets.Address{Project: root.Project, Epic: OneOffsEpic, ID: t.Identifier}
+		if _, tracked := s.registry.tracked(addr.String()); tracked {
+			return true
 		}
-		for _, t := range e.Tickets {
-			addr := tickets.Address{Project: root.Project, Epic: OneOffsEpic, ID: t.Identifier}
-			if _, tracked := s.registry.tracked(addr.String()); tracked {
-				return true
-			}
-			if t.Status != string(schema.StatusDone) && t.Status != string(schema.StatusCancelled) {
-				return true
-			}
+		if !tickets.IsTerminalStatus(t.Status) {
+			return true
 		}
 	}
 	return false
@@ -104,7 +98,7 @@ func (s *Server) oneOffsLive(dir string, root rootRef) bool {
 // epic on the first move. The archive copy is written before the original is
 // removed; a copy already there (its Resolution names addr) means an earlier
 // move was cut short, so only its leftovers are finished.
-func archiveOneOff(projectDir string, addr tickets.Address, t tickets.Ticket, now time.Time) error {
+func archiveOneOff(projectDir string, archived tickets.Epic, addr tickets.Address, t tickets.Ticket, now time.Time) error {
 	archivePath := filepath.Join(projectDir, OneOffsArchivedEpic)
 	if err := ensureDraftEpic(archivePath); err != nil {
 		return err
@@ -117,22 +111,13 @@ func archiveOneOff(projectDir string, addr tickets.Address, t tickets.Ticket, no
 
 	// The index may be a scan behind: only a ticket still terminal on disk moves.
 	tk, err := schema.ParseTicket(t.Path)
-	if err != nil || (tk.Status != schema.StatusDone && tk.Status != schema.StatusCancelled) {
+	if err != nil || !tickets.IsTerminalStatus(string(tk.Status)) {
 		return nil
 	}
-	epics, err := tickets.Load(projectDir)
-	if err != nil {
-		return err
-	}
-	for _, e := range epics {
-		if filepath.Base(e.Path) != OneOffsArchivedEpic {
-			continue
-		}
-		for _, c := range e.Tickets {
-			if resolutionNames(c.Body, addr) {
-				to := tickets.Address{Project: addr.Project, Epic: OneOffsArchivedEpic, ID: c.Identifier}
-				return tickets.ResumeMove(projectDir, addr, to, t.Path, c.Path)
-			}
+	for _, c := range archived.Tickets {
+		if tickets.NamesOriginal(c.Body, addr) {
+			to := tickets.Address{Project: addr.Project, Epic: OneOffsArchivedEpic, ID: c.Identifier}
+			return tickets.ResumeMove(projectDir, addr, to, t.Path, c.Path)
 		}
 	}
 	completed := tk.FinishedAt
@@ -144,16 +129,4 @@ func archiveOneOff(projectDir string, addr tickets.Address, t tickets.Ticket, no
 		return err
 	}
 	return tickets.ApplyMove(p)
-}
-
-// resolutionNames reports whether a ticket body's Resolution records addr as its
-// original address.
-func resolutionNames(body string, addr tickets.Address) bool {
-	want := "- original: " + addr.String()
-	for _, line := range strings.Split(schema.Section(body, "Resolution"), "\n") {
-		if strings.TrimSpace(line) == want {
-			return true
-		}
-	}
-	return false
 }

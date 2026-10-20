@@ -11,17 +11,57 @@ import (
 // the old address in the ticket's Resolution as "- original: <address>".
 const ArchivedOneOffsEpic = "one-offs-archived"
 
+// OneOffsEpic is where one-offs are submitted.
+const OneOffsEpic = "one-offs"
+
+// OriginalLine is the Resolution line recording the address a ticket was moved
+// from, without a trailing newline. NamesOriginal is its matcher.
+func OriginalLine(addr Address) string {
+	return "- original: " + addr.String()
+}
+
+// NamesOriginal reports whether a ticket body's Resolution records addr as its
+// original address.
+func NamesOriginal(body string, addr Address) bool {
+	want := OriginalLine(addr)
+	for line := range strings.SplitSeq(schema.Section(body, "Resolution"), "\n") {
+		if strings.TrimSpace(line) == want {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTerminalStatus reports whether a raw ticket status is done or cancelled.
+func IsTerminalStatus(status string) bool {
+	return status == string(schema.StatusDone) || status == string(schema.StatusCancelled)
+}
+
+// LoadOneOffs loads the project's one-offs epic and its archive. A missing epic
+// comes back as the zero Epic.
+func LoadOneOffs(projectDir string) (live, archived Epic, err error) {
+	epics, err := Load(projectDir)
+	if err != nil {
+		return Epic{}, Epic{}, err
+	}
+	for _, e := range epics {
+		switch e.Name {
+		case OneOffsEpic:
+			live = e
+		case ArchivedOneOffsEpic:
+			archived = e
+		}
+	}
+	return live, archived, nil
+}
+
 // archivedFrom is the tickets of the archive epic whose Resolution names addr
 // as their original.
 func archivedFrom(archive Epic, addr Address) []Ticket {
-	want := "- original: " + addr.String()
 	var found []Ticket
 	for _, t := range archive.Tickets {
-		for line := range strings.SplitSeq(schema.Section(t.Body, "Resolution"), "\n") {
-			if strings.TrimSpace(line) == want {
-				found = append(found, t)
-				break
-			}
+		if NamesOriginal(t.Body, addr) {
+			found = append(found, t)
 		}
 	}
 	return found

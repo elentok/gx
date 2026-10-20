@@ -357,13 +357,12 @@ func (s *Server) liveDuplicate(projectDir, key string) (*duplicate, error) {
 		return nil, err
 	}
 	for _, e := range epics {
-		if filepath.Base(e.Path) == OneOffsArchivedEpic {
+		if e.Name == OneOffsArchivedEpic {
 			continue
 		}
 		for _, t := range e.Tickets {
-			terminal := t.Status == string(schema.StatusDone) || t.Status == string(schema.StatusCancelled)
-			if t.Unique == key && !terminal {
-				return &duplicate{epic: filepath.Base(e.Path), id: t.DisplayNumber()}, nil
+			if t.Unique == key && !tickets.IsTerminalStatus(t.Status) {
+				return &duplicate{epic: e.Name, id: t.DisplayNumber()}, nil
 			}
 		}
 	}
@@ -503,7 +502,7 @@ const oneOffFile = "01-one-off.md"
 // The epics holding one-off tickets: every ticket in OneOffsEpic is a one-off,
 // whoever wrote it. OneOffsArchivedEpic is where finished ones are moved.
 const (
-	OneOffsEpic         = "one-offs"
+	OneOffsEpic         = tickets.OneOffsEpic
 	OneOffsArchivedEpic = tickets.ArchivedOneOffsEpic
 )
 
@@ -552,17 +551,12 @@ func writeOneOffTicket(projectDir, slug string, tk schema.Ticket, prompt string)
 	} else if n, err := strconv.Atoi(id); err == nil {
 		next = n
 	}
-	all, err := tickets.Load(projectDir)
+	_, archived, err := tickets.LoadOneOffs(projectDir)
 	if err != nil {
 		return "", "", err
 	}
-	for _, e := range all {
-		if filepath.Base(e.Path) != OneOffsArchivedEpic {
-			continue
-		}
-		for _, t := range e.Tickets {
-			next = max(next, t.Number+1)
-		}
+	for _, t := range archived.Tickets {
+		next = max(next, t.Number+1)
 	}
 	id = fmt.Sprintf("%02d", next)
 	tk.ID = schema.TicketID(id)

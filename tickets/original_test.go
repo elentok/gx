@@ -12,6 +12,17 @@ func writeArchived(t *testing.T, dir, id, resolution string) {
 		"---\nid: \""+id+"\"\nstatus: done\ntype: implement\n---\n\n## Resolution\n\n"+resolution)
 }
 
+func TestOriginalLine_RoundTrip(t *testing.T) {
+	addr := Address{Project: "gx", Epic: OneOffsEpic, ID: "03"}
+	body := "## Resolution\n\n- reason: done\n" + OriginalLine(addr) + "\n"
+	if !NamesOriginal(body, addr) {
+		t.Fatalf("NamesOriginal did not match its own line in %q", body)
+	}
+	if NamesOriginal(body, Address{Project: "gx", Epic: OneOffsEpic, ID: "04"}) {
+		t.Fatal("NamesOriginal matched another address")
+	}
+}
+
 func TestFindOriginal(t *testing.T) {
 	dir := t.TempDir()
 	writeArchived(t, dir, "01", "- original: p:one-offs/03\n")

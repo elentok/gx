@@ -178,7 +178,7 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 		// which is no stale prose mention.
 		p.body = schema.SetSection(p.body, "Resolution", opts.Resolution)
 	} else if opts.RecordOriginal || opts.AppendOriginal {
-		original := fmt.Sprintf("- original: %s\n", a)
+		original := OriginalLine(a) + "\n"
 		if res := schema.Section(p.body, "Resolution"); res == "" {
 			p.body = schema.SetSection(p.body, "Resolution", original)
 		} else if opts.AppendOriginal && !strings.Contains(res, original) {

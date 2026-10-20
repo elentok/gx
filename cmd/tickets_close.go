@@ -51,7 +51,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if note != "" {
 		resolution += fmt.Sprintf("- note: %s\n", note)
 	}
-	resolution += fmt.Sprintf("- original: %s\n", a)
+	resolution += tickets.OriginalLine(a) + "\n"
 
 	created, err := ensureArchiveEpic(root, filepath.Join(root, followUpsEpic))
 	if err != nil {
