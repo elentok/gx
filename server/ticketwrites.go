@@ -167,7 +167,7 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, err
 		}
-		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, s.queuedAgent(ref.addr.String()), epics); err != nil {
+		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, ticketAgent(ref.ticket, s.queuedAgent(ref.addr.String())), epics); err != nil {
 			return QueueResult{}, err
 		}
 		return QueueResult{}, nil
@@ -181,6 +181,16 @@ func (s *Server) queuedAgent(address string) ralphloop.AgentKind {
 		if it.Address == address {
 			agent = ralphloop.AgentKind(it.Agent)
 		}
+	}
+	return agent
+}
+
+// ticketAgent is the agent the ticket's own frontmatter names, fallback when it
+// names none or one that is not a known agent.
+func ticketAgent(t tickets.Ticket, fallback ralphloop.AgentKind) ralphloop.AgentKind {
+	agent := ralphloop.AgentKind(t.Agent)
+	if t.Agent == "" || ralphloop.ValidateAgentKind(agent) != nil {
+		return fallback
 	}
 	return agent
 }

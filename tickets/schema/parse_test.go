@@ -189,6 +189,25 @@ func TestParseTicket_CommitlessRoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseTicket_AgentRoundTrip(t *testing.T) {
+	path := writeTemp(t, "01-agent.md", "---\nid: \"01\"\nstatus: open\ntype: prompt\nagent: codex\n---\nbody\n")
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Agent != "codex" {
+		t.Fatalf("Agent = %q, want codex", got.Agent)
+	}
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if !strings.Contains(string(marshaled), "agent: codex") {
+		t.Errorf("marshaled ticket = %q, want agent: codex written back", string(marshaled))
+	}
+}
+
 func TestParseTicket_ManualMergeRoundTrip(t *testing.T) {
 	content := "---\nid: \"05\"\nstatus: open\ntype: merge\nmanual: true\n---\nbody\n"
 	path := writeTemp(t, "05-merge.md", content)

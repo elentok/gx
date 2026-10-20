@@ -24,6 +24,10 @@ import (
 // the land or the park, not all-done. An epic with nothing to land is merged
 // as it stands, whatever auto-ff-merge says.
 func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
+	// The one-offs epic is a standing inbox: it never lands, merges or retros.
+	if root.Epic == OneOffsEpic {
+		return
+	}
 	project := root.Project
 	dir, repo, err := s.projectOf(project)
 	if err != nil {

@@ -85,6 +85,9 @@ type Ticket struct {
 	// Unique mirrors schema.Ticket.Unique.
 	Unique string
 
+	// Agent mirrors schema.Ticket.Agent.
+	Agent string
+
 	// ParkKind mirrors schema.Ticket.ParkKind: which of ralph-loop's
 	// needs-answer producers parked this ticket, empty for a ticket parked
 	// before that field existed (or never parked).

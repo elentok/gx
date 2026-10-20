@@ -30,6 +30,7 @@ type ticketYAML struct {
 	Manual                bool         `yaml:"manual,omitempty"`
 	Recover               *bool        `yaml:"recover,omitempty"`
 	Unique                string       `yaml:"unique,omitempty"`
+	Agent                 string       `yaml:"agent,omitempty"`
 	SessionIDs            []string     `yaml:"session_ids,omitempty"`
 	IterationStatus       string       `yaml:"iteration_status,omitempty"`
 	FinishedAt            time.Time    `yaml:"finished_at,omitempty"`
@@ -73,6 +74,7 @@ func (w ticketYAML) toTicket() Ticket {
 		Manual:                w.Manual,
 		NoRecover:             w.Recover != nil && !*w.Recover,
 		Unique:                w.Unique,
+		Agent:                 w.Agent,
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       IterationStatus(w.IterationStatus),
 		FinishedAt:            w.FinishedAt,
@@ -105,6 +107,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Notify:                t.Notify,
 		Manual:                t.Manual,
 		Unique:                t.Unique,
+		Agent:                 t.Agent,
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
 		FinishedAt:            t.FinishedAt,

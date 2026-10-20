@@ -85,7 +85,8 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	}
 	// Every full cap is named, not just the first one hit.
 	var full []string
-	if n, limit := s.registry.countRoot(root), s.perRootLimit(); n >= limit {
+	rootCap := s.perRootLimit(rootOf(addr))
+	if n, limit := s.registry.countRoot(root), rootCap; n >= limit {
 		full = append(full, fmt.Sprintf("epic cap %d/%d", n, limit))
 	}
 	if n, limit, atCap := s.projectAtCap(addr.Project); atCap {
@@ -99,7 +100,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 	switch {
 	case len(full) > 0:
 		ex.Verdict, ex.Reason = VerdictConcurrencyCap, strings.Join(full, ", ")
-	case frontierIndex(e, t) >= s.perRootLimit()-s.registry.countRoot(root):
+	case frontierIndex(e, t) >= rootCap-s.registry.countRoot(root):
 		ex.Verdict, ex.Reason = VerdictWaitingInQueue, "earlier tickets of the epic go first"
 	case ahead >= free:
 		ex.Verdict, ex.Reason = VerdictWaitingInQueue, fmt.Sprintf("%d queued root(s) ahead for %d free slot(s)", ahead, free)

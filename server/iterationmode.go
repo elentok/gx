@@ -33,7 +33,7 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 	if typ == schema.TypeMerge {
 		return iterationMode{feature: true, target: func() (string, error) { return s.landTarget(addr) }}
 	}
-	m := iterationMode{commitless: addr.Project == ScratchProject || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
+	m := iterationMode{commitless: addr.Project == ScratchProject || addr.Epic == OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.commitless && (addr.Project == ScratchProject || s.investigatesWithoutVCS(addr, t)) {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}

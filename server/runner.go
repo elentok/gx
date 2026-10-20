@@ -251,8 +251,16 @@ func (s *Server) claimRootAfterAdoption(item QueueItem) (bool, error) {
 	return s.claimRoot(item)
 }
 
-// perRootLimit is how many agents one root may run at once.
-func (s *Server) perRootLimit() int {
+// perRootLimit is how many agents one root may run at once. The one-offs root
+// uses the one-off cap instead of the per-root one; old single-ticket one-off
+// epics are roots of their own and keep the per-root cap.
+func (s *Server) perRootLimit(root rootRef) int {
+	if root.Epic == OneOffsEpic {
+		if n := s.settings.Load().MaxOneOffAgents; n > 0 {
+			return n
+		}
+		return config.DefaultExecutionQueueConfig().MaxOneOffAgents
+	}
 	if n := s.settings.Load().MaxAgentsPerRoot; n > 0 {
 		return n
 	}
@@ -290,7 +298,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		return false, err
 	}
 	root := rootOf(addr)
-	if s.registry.countRoot(root.String()) >= s.perRootLimit() {
+	if s.registry.countRoot(root.String()) >= s.perRootLimit(root) {
 		return false, nil
 	}
 	if _, _, atCap := s.projectAtCap(addr.Project); atCap {
@@ -334,7 +342,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.refused.set(ticketAddr, false)
-		return s.claimAndLaunch(root, addr, t, repo, ralphloop.AgentKind(item.Agent), loaded)
+		return s.claimAndLaunch(root, addr, t, repo, ticketAgent(t, ralphloop.AgentKind(item.Agent)), loaded)
 	}
 	return false, nil
 }

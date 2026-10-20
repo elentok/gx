@@ -103,6 +103,7 @@ type TicketOpts struct {
 	BlockedBy []string
 	Base      string
 	Status    string // default "open"
+	Agent     string // the ticket's agent: frontmatter field, omitted when empty
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -136,6 +137,9 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 	}
 	if opts.Base != "" {
 		fm += "base: " + opts.Base + "\n"
+	}
+	if opts.Agent != "" {
+		fm += "agent: " + opts.Agent + "\n"
 	}
 	fm += "---\n\n# " + slug + "\n"
 	if err := os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644); err != nil {

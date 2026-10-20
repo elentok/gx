@@ -172,6 +172,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string) Tic
 	ticket.Manual = parsed.Manual
 	ticket.NoRecover = parsed.NoRecover
 	ticket.Unique = parsed.Unique
+	ticket.Agent = parsed.Agent
 	ticket.ParkKind = parsed.ParkKind
 	ticket.Mutes = parsed.Mutes
 	ticket.Base = parsed.Base

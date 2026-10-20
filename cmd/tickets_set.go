@@ -59,6 +59,8 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
 
 Other frontmatter fields:
   category (enum): bug, idea. Optional on any ticket.
+  agent (string): the agent that runs the ticket (claude, codex). Read at claim; a missing
+    or unknown value runs the project's default agent. Written when the ticket is created.
   type evolve: a commitless, top-level-only ticket (it may not have a parent).
 
 Epic frontmatter fields:

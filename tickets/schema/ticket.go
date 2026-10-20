@@ -253,6 +253,10 @@ type Ticket struct {
 	// Unique is a one-off submit's dedupe key: a submit in the same project with
 	// the same key is refused while this ticket is not done or cancelled.
 	Unique string
+	// Agent names the agent that runs the ticket, picked by whoever wrote it.
+	// The server reads it at claim; empty or unknown falls back to the queue
+	// item's agent, then the project default.
+	Agent string
 	// IterationStatus is the agent's latest self-reported claim state (see
 	// the IterationStatus type doc). Never checked by Validate: the enum rule
 	// is enforced only by the CLI write path that sets it.

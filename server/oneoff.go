@@ -468,14 +468,31 @@ func defaultOneOffName(prompt string) string {
 // oneOffFile is the name of a one-off's single ticket; nothing else writes it.
 const oneOffFile = "01-one-off.md"
 
-// isOneOffTicket reports whether ticketPath is a one-off's ticket.
-func isOneOffTicket(ticketPath string) bool {
-	return filepath.Base(ticketPath) == oneOffFile
+// The epics holding one-off tickets: every ticket in OneOffsEpic is a one-off,
+// whoever wrote it. OneOffsArchivedEpic is where finished ones are moved.
+const (
+	OneOffsEpic         = "one-offs"
+	OneOffsArchivedEpic = "one-offs-archived"
+)
+
+func isOneOffsEpicName(name string) bool {
+	return name == OneOffsEpic || name == OneOffsArchivedEpic
 }
 
-// IsOneOffEpic reports whether e is a one-off: its single ticket is the one
-// writeOneOffTicket wrote.
+// isOneOffTicket reports whether ticketPath (project/epic/issues/file) is a
+// one-off's ticket: in a one-offs epic, or the single ticket of an old
+// one-epic-per-one-off submit.
+func isOneOffTicket(ticketPath string) bool {
+	epic := filepath.Base(filepath.Dir(filepath.Dir(ticketPath)))
+	return isOneOffsEpicName(epic) || filepath.Base(ticketPath) == oneOffFile
+}
+
+// IsOneOffEpic reports whether e is a one-off epic: one of the one-offs epics,
+// or an old single-ticket epic whose ticket is the one writeOneOffTicket wrote.
 func IsOneOffEpic(e tickets.Epic) bool {
+	if isOneOffsEpicName(filepath.Base(e.Path)) {
+		return true
+	}
 	for _, t := range e.Tickets {
 		if isOneOffTicket(t.FilePath()) {
 			return true
