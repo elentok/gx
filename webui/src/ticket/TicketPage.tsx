@@ -8,6 +8,7 @@ import type { Sent } from "./answer";
 import { AnswerForm } from "./AnswerForm";
 import { AnswerResult } from "./AnswerResult";
 import { useTicketDetail, type FetchDetail } from "./detail";
+import { PermissionCard } from "./PermissionCard";
 import { TicketReading } from "./TicketReading";
 import { UnparkForm } from "./UnparkForm";
 
@@ -28,6 +29,7 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
         ) : detail ? (
           <>
             <TicketReading detail={detail} />
+            <PermissionCard detail={detail} onDone={refetch} onStale={refetch} />
             <AnswerResult detail={detail} sent={sent} />
             <AnswerForm
               detail={detail}

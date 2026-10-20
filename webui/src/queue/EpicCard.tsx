@@ -39,6 +39,7 @@ export function EpicCard({ epic }: { epic: EpicView }) {
           href={t.href}
           hint={t.hint}
           state={t.state}
+          linkLabel={t.linkLabel}
         />
       ))}
       {epic.reason && (

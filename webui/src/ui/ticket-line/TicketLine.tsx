@@ -11,9 +11,21 @@ interface TicketLineProps {
   href?: string;
   hint?: string;
   state?: string;
+  // The link's words; "Answer →" unless the row asks for something else.
+  linkLabel?: string;
 }
 
-export function TicketLine({ id, title, reason, tone = "muted", unclipped, href, hint, state }: TicketLineProps) {
+export function TicketLine({
+  id,
+  title,
+  reason,
+  tone = "muted",
+  unclipped,
+  href,
+  hint,
+  state,
+  linkLabel = "Answer →",
+}: TicketLineProps) {
   return (
     <Box data-tone={tone}>
       <Box display="flex" gap="2" alignItems="baseline">
@@ -46,7 +58,7 @@ export function TicketLine({ id, title, reason, tone = "muted", unclipped, href,
       )}
       {href && (
         <Link href={href} fontSize="sm" color="tone.parked.fg">
-          Answer →
+          {linkLabel}
         </Link>
       )}
     </Box>

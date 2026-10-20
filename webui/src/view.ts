@@ -11,6 +11,7 @@ export interface TicketLineView {
   href?: string;
   hint?: string;
   state?: string;
+  linkLabel?: string;
 }
 
 export interface EpicView {
@@ -80,9 +81,17 @@ function parkedLine(t: SummaryTicket, queue: string[]): TicketLineView {
   return { ...base, tone: "parked", detail: t.reason };
 }
 
+function activeLine(t: SummaryTicket): TicketLineView {
+  const base = { address: t.address, id: shortId(t.address), title: t.title };
+  if (t.needs_approval) {
+    return { ...base, tone: "parked", state: "needs approval", href: `#/t/${t.address}`, linkLabel: "Review →" };
+  }
+  return { ...base, tone: "muted" };
+}
+
 function ticketLines(epic: EpicSummary, queue: string[]): TicketLineView[] {
   return [
-    ...epic.active.map((t): TicketLineView => ({ address: t.address, id: shortId(t.address), title: t.title, tone: "muted" })),
+    ...epic.active.map(activeLine),
     ...epic.parked.map((t) => parkedLine(t, queue)),
   ];
 }

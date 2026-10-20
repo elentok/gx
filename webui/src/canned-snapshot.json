@@ -150,7 +150,10 @@
           "address": "gx:run2/01",
           "title": "Second active",
           "status": "claimed",
-          "claimed_at": "2026-10-19T08:00:00Z"
+          "claimed_at": "2026-10-19T08:00:00Z",
+          "answerable": false,
+          "answered": false,
+          "needs_approval": true
         }
       ],
       "parked": [],

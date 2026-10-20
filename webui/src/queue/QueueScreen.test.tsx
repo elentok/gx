@@ -46,7 +46,16 @@ describe("QueueScreen", () => {
     renderThemed(<QueueScreen state={state()} />);
     expect(screen.getByText("worktree has uncommitted changes")).toBeTruthy();
     expect(screen.getByText(REPAIR_HINT)).toBeTruthy();
-    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: /Answer/ })).not.toBeNull();
+    expect(screen.getByText("worktree has uncommitted changes").closest("[data-tone]")?.querySelector("a")).toBeNull();
+  });
+
+  it("shows a needs-approval row linking to its ticket page", () => {
+    renderThemed(<QueueScreen state={state()} />);
+    const row = screen.getByText("Second active").closest("[data-tone]")!;
+    expect(row.textContent).toContain("needs approval");
+    expect(screen.getByRole("link", { name: "Review →" }).getAttribute("href")).toBe("#/t/gx:run2/01");
+    expect(screen.getByText("Active one").closest("[data-tone]")?.querySelector("a")).toBeNull();
   });
 
   it("shows an answered row in the waiting tone with its queue position", () => {
