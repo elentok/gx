@@ -391,6 +391,7 @@ log shows no open question on the web. A second run changes nothing.`,
 	followUpCmd.AddCommand(followUpAddCmd)
 	cmd.AddCommand(followUpCmd)
 	cmd.AddCommand(newTicketsEpicCmd(d))
+	cmd.AddCommand(newTicketsAskCmd(d))
 	var sectionJSON bool
 	sectionCmd := &cobra.Command{
 		Use:   "section <addr|path> <heading> <content|->",

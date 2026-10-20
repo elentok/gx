@@ -73,6 +73,13 @@ func LogPath(ticketPath string) string {
 // torn last line left by a crashed writer, and writes the whole line in one
 // write() on an O_APPEND file. It returns the event as written.
 func AppendLog(ticketPath string, ev LogEvent) (LogEvent, error) {
+	return AppendLogIf(ticketPath, ev, nil)
+}
+
+// AppendLogIf is AppendLog with a guard that sees the existing events under the
+// ticket lock. A guard error writes nothing and is returned as is, so a
+// check-then-append cannot race another writer.
+func AppendLogIf(ticketPath string, ev LogEvent, guard func([]LogEvent) error) (LogEvent, error) {
 	if err := validateLogEvent(ev); err != nil {
 		return LogEvent{}, err
 	}
@@ -87,6 +94,11 @@ func AppendLog(ticketPath string, ev LogEvent) (LogEvent, error) {
 	events, validLen, err := readLog(logPath)
 	if err != nil {
 		return LogEvent{}, err
+	}
+	if guard != nil {
+		if err := guard(events); err != nil {
+			return LogEvent{}, err
+		}
 	}
 	if err := os.Truncate(logPath, validLen); err != nil && !os.IsNotExist(err) {
 		return LogEvent{}, fmt.Errorf("trimming torn line of %s: %w", logPath, err)

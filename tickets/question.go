@@ -96,6 +96,12 @@ func ParseQuestionLenient(body string) Question {
 	return parsed
 }
 
+// QuestionBlock is the raw YAML of body's gx-question block, or "" without one.
+func QuestionBlock(body string) string {
+	_, block, _ := splitQuestion(body)
+	return strings.TrimSpace(block)
+}
+
 // splitQuestion extracts the free-text parts and the raw block. The returned
 // Question is always free text (Kind QuestionText).
 func splitQuestion(body string) (q Question, block string, hasBlock bool) {

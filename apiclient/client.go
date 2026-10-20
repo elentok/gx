@@ -291,6 +291,12 @@ func (c *Client) EpicMerge(ctx context.Context, address string) (server.QueueRes
 	return c.queueWriteTo(ctx, "/v1/epics/merge", server.QueueRequest{Address: address})
 }
 
+// TicketAsk records an agent's question (a "## Question" + "## Handoff" body)
+// on a ticket and flags it needs-answer.
+func (c *Client) TicketAsk(ctx context.Context, address, body string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/ask", server.QueueRequest{Address: address, Text: body})
+}
+
 // TicketNudge types text into the live pane of a ticket's iteration.
 func (c *Client) TicketNudge(ctx context.Context, address, text string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/nudge", server.QueueRequest{Address: address, Text: text})

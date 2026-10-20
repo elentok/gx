@@ -548,6 +548,7 @@ var routeTable = []struct {
 	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketUnmute)(w, r) }},
 	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketCancel)(w, r) }},
 	{"POST /v1/tickets/nudge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketNudge)(w, r) }},
+	{"POST /v1/tickets/ask", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketAsk)(w, r) }},
 	{"POST /v1/tickets/approve", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketApprove)(w, r) }},
 	{"POST /v1/tickets/relaunch", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketRelaunch)(w, r) }},
 	{"POST /v1/epics/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.epicMerge)(w, r) }},
