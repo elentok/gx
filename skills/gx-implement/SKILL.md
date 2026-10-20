@@ -175,6 +175,10 @@ run `gofmt -l .`: files on main that are already unformatted are out of scope. N
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 
+Commit first. Report `finished` only after the commit has succeeded, in a later tool call - never in
+the same parallel block as the commit. A rejected commit (a hook, a failed check) next to a
+`finished` report leaves the ticket finished with nothing committed.
+
 Once done, run `gx tickets set <addr> --iteration-status finished`. This report can only _start_ a
 landing, never conclude one: gx adopts it and decides `status: done` itself from its own commit
 count and cherry-pick outcome — never write `--status done` yourself, even paired with
