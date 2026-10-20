@@ -520,6 +520,32 @@ func TestEpic_RenderedStatus_CodeReviewBlockedByUnfinishedForkSubtree(t *testing
 	}
 }
 
+func TestEpic_RenderedStatus_CodeReviewDoesNotWaitOnItsOwnFixTickets(t *testing.T) {
+	parent := "09"
+	grandchild := "09a"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "claimed"},
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 9, Identifier: "09a", Status: "open", Parent: &parent},
+		{Number: 9, Identifier: "09b", Status: "open", Parent: &grandchild},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[0]); got != StatusClaimed {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusClaimed: its own fix tickets can't start before it is done", got)
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewStillWaitsOnUnrelatedSiblingOfItsFixTickets(t *testing.T) {
+	parent := "09"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "claimed"},
+		{Number: 1, Identifier: "01", Status: "open"},
+		{Number: 9, Identifier: "09a", Status: "open", Parent: &parent},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[0]); got != StatusBlocked {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusBlocked: 01 is not one of its fix tickets", got)
+	}
+}
+
 func TestEpic_RenderedStatus_CodeReviewTicketsDontBlockEachOther(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},

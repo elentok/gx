@@ -235,10 +235,36 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 		if other.Number == t.Number && other.Identifier == t.Identifier {
 			continue
 		}
+		// A fix ticket the review forked can't start until the review is
+		// done (ParentDone), so waiting on it would block both forever.
+		if e.descendsFrom(other, t) {
+			continue
+		}
 		_, suffix := splitBlockedByToken(other.Identifier)
 		tokens = append(tokens, siblingKey(other.Number, suffix))
 	}
 	return tokens
+}
+
+// descendsFrom reports whether t is in ancestor's fork subtree, following
+// Parent links upward. The step bound keeps a malformed cycle from looping.
+func (e Epic) descendsFrom(t, ancestor Ticket) bool {
+	index := e.byNumberAndSuffix()
+	for range len(e.Tickets) {
+		if t.Parent == nil {
+			return false
+		}
+		num, letters := splitBlockedByToken(*t.Parent)
+		parent, ok := index[siblingKey(num, letters)]
+		if !ok {
+			return false
+		}
+		if ticketKey(parent) == ticketKey(ancestor) {
+			return true
+		}
+		t = parent
+	}
+	return false
 }
 
 // Blocking is the refactor's single predicate: t counts as blocking anything
