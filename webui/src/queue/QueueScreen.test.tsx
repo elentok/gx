@@ -5,6 +5,7 @@ import canned from "../canned-snapshot.json";
 import { OFFLINE_DELAY_MS, type ConnectionState } from "../connection";
 import type { Snapshot } from "../snapshot";
 import { renderThemed } from "../ui/render";
+import { REPAIR_HINT } from "../view";
 import { QueueScreen } from "./QueueScreen";
 
 const snap = canned as unknown as Snapshot;
@@ -32,6 +33,26 @@ describe("QueueScreen", () => {
     const reason = screen.getByText("blocked cycle");
     expect(reason.hasAttribute("data-reason")).toBe(true);
     expect(getComputedStyle(reason).getPropertyValue("-webkit-line-clamp")).toBe("2");
+  });
+
+  it("links an answerable row to its ticket route, unclipped", () => {
+    renderThemed(<QueueScreen state={state()} />);
+    expect(screen.getByRole("link", { name: "Answer →" }).getAttribute("href")).toBe("#/t/gx:wait/03");
+    const summary = screen.getByText("Which option do you want?");
+    expect(getComputedStyle(summary).getPropertyValue("-webkit-line-clamp")).not.toBe("2");
+  });
+
+  it("shows a repair row's reason and TUI hint with no link", () => {
+    renderThemed(<QueueScreen state={state()} />);
+    expect(screen.getByText("worktree has uncommitted changes")).toBeTruthy();
+    expect(screen.getByText(REPAIR_HINT)).toBeTruthy();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("shows an answered row in the waiting tone with its queue position", () => {
+    renderThemed(<QueueScreen state={state()} />);
+    const state_ = screen.getByText("Answered · #2 in queue");
+    expect(state_.closest("[data-tone]")?.getAttribute("data-tone")).toBe("waiting");
   });
 
   it("renders finished rows without progress bars", () => {

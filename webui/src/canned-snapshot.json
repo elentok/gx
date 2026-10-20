@@ -28,7 +28,18 @@
       ]
     }
   ],
-  "pending": [],
+  "pending": [
+    {
+      "address": "gx:other/02",
+      "agent": "",
+      "verdict": "waiting in queue"
+    },
+    {
+      "address": "gx:wait/04",
+      "agent": "",
+      "verdict": "waiting in queue"
+    }
+  ],
   "sessions": [],
   "epics": [
     {
@@ -61,6 +72,14 @@
           "answerable": true,
           "answered": false,
           "needs_approval": false
+        },
+        {
+          "address": "gx:wait/04",
+          "title": "Answered one",
+          "status": "open",
+          "answerable": false,
+          "answered": true,
+          "needs_approval": false
         }
       ],
       "has_repair": false
@@ -84,7 +103,8 @@
         {
           "address": "gx:run/04",
           "title": "Parked one",
-          "status": "needs-repair"
+          "status": "needs-repair",
+          "reason": "worktree has uncommitted changes"
         }
       ],
       "has_repair": true

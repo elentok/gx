@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import canned from "./canned-snapshot.json";
 import type { QueueMode, Snapshot } from "./snapshot";
-import { snapshotView } from "./view";
+import { REPAIR_HINT, snapshotView } from "./view";
 
 const now = new Date("2026-10-19T12:00:00Z");
 const snap = canned as Snapshot;
@@ -33,9 +33,28 @@ describe("snapshotView", () => {
       ["gx:run/03", "03", "muted"],
       ["gx:run/04", "04", "parked"],
     ]);
-    expect(byName("wait").tickets.map((t) => [t.address, t.tone, t.detail])).toEqual([
-      ["gx:wait/03", "parked", "needs a person"],
+    expect(byName("wait").tickets.map((t) => [t.address, t.tone])).toEqual([
+      ["gx:wait/03", "parked"],
+      ["gx:wait/04", "waiting"],
     ]);
+  });
+
+  it("gives an answerable row its summary and a ticket route", () => {
+    expect(byName("wait").tickets[0]).toMatchObject({
+      detail: "Which option do you want?",
+      href: "#/t/gx:wait/03",
+    });
+  });
+
+  it("gives a repair row its reason and a hint, with no link", () => {
+    const row = byName("run").tickets[1];
+    expect(row).toMatchObject({ detail: "worktree has uncommitted changes", hint: REPAIR_HINT });
+    expect(row.href).toBeUndefined();
+  });
+
+  it("shows an answered row as amber with its queue position", () => {
+    expect(byName("wait").tickets[1]).toMatchObject({ tone: "waiting", state: "Answered · #2 in queue" });
+    expect(byName("wait").tickets[1].href).toBeUndefined();
   });
 
   it("formats recently finished rows", () => {

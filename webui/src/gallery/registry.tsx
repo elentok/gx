@@ -43,6 +43,20 @@ export const galleryEntries: GalleryEntry[] = [
       ...perTone((tone) => <TicketLine id={ticket.address} title={ticket.title} tone={tone} />),
       { label: "with reason", node: <TicketLine id={ticket.address} title={ticket.title} reason="Blocked by 01" /> },
       { label: "clamped reason", node: <TicketLine id={ticket.address} title={ticket.title} reason={longReason} /> },
+      {
+        label: "answerable",
+        node: (
+          <TicketLine id={ticket.address} title={ticket.title} tone="parked" reason={longReason} unclipped href="#/t/gx:demo/02" />
+        ),
+      },
+      {
+        label: "needs repair",
+        node: <TicketLine id={ticket.address} title={ticket.title} tone="parked" reason="Worktree is dirty" hint="Fix it in the TUI" />,
+      },
+      {
+        label: "answered",
+        node: <TicketLine id={ticket.address} title={ticket.title} tone="waiting" state="Answered · #2 in queue" />,
+      },
     ],
   },
   {

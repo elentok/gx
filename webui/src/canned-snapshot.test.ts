@@ -54,9 +54,11 @@ describe("canned snapshot", () => {
     }
   });
 
-  it("parks tickets in a parked status", () => {
+  it("parks tickets in a parked status, or open once answered", () => {
     for (const e of snap.epics) {
-      for (const t of e.parked) expect(["needs-answer", "needs-repair"]).toContain(t.status);
+      for (const t of e.parked) {
+        expect(t.answered ? ["open"] : ["needs-answer", "needs-repair"]).toContain(t.status);
+      }
     }
   });
 });

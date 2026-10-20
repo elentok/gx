@@ -35,6 +35,10 @@ export function EpicCard({ epic }: { epic: EpicView }) {
           title={t.title}
           reason={t.detail}
           tone={t.tone}
+          unclipped={t.href !== undefined}
+          href={t.href}
+          hint={t.hint}
+          state={t.state}
         />
       ))}
       {epic.reason && (

@@ -7,6 +7,10 @@ export interface TicketLineView {
   title: string;
   tone: Tone;
   detail?: string;
+  // Hash route to the ticket page; set only when a person's reply can go to the question.
+  href?: string;
+  hint?: string;
+  state?: string;
 }
 
 export interface EpicView {
@@ -58,21 +62,32 @@ export function epicBadge(state: EpicState, mode?: QueueMode): string {
 
 const shortId = (address: string) => address.slice(address.lastIndexOf("/") + 1);
 
-function ticketLines(epic: EpicSummary): TicketLineView[] {
-  const line = (t: SummaryTicket, tone: Tone, detail?: string): TicketLineView => ({
-    address: t.address,
-    id: shortId(t.address),
-    title: t.title,
-    tone,
-    detail,
-  });
+export const REPAIR_HINT = "Fix it in the TUI";
+
+function parkedLine(t: SummaryTicket, queue: string[]): TicketLineView {
+  const base = { address: t.address, id: shortId(t.address), title: t.title };
+  if (t.status === "needs-repair") {
+    return { ...base, tone: "parked", detail: t.reason, hint: REPAIR_HINT };
+  }
+  if (t.answered) {
+    // The agent is gone; the ticket is in the queue for a slot.
+    const place = queue.indexOf(t.address) + 1;
+    return { ...base, tone: "waiting", state: place > 0 ? `Answered · #${place} in queue` : "Answered" };
+  }
+  if (t.answerable) {
+    return { ...base, tone: "parked", detail: t.summary ?? t.reason, href: `#/t/${t.address}` };
+  }
+  return { ...base, tone: "parked", detail: t.reason };
+}
+
+function ticketLines(epic: EpicSummary, queue: string[]): TicketLineView[] {
   return [
-    ...epic.active.map((t) => line(t, "muted")),
-    ...epic.parked.map((t) => line(t, "parked", t.reason)),
+    ...epic.active.map((t): TicketLineView => ({ address: t.address, id: shortId(t.address), title: t.title, tone: "muted" })),
+    ...epic.parked.map((t) => parkedLine(t, queue)),
   ];
 }
 
-export function epicView(epic: EpicSummary, mode?: QueueMode): EpicView {
+export function epicView(epic: EpicSummary, mode?: QueueMode, queue: string[] = []): EpicView {
   return {
     address: epic.address,
     name: epic.name,
@@ -82,7 +97,7 @@ export function epicView(epic: EpicSummary, mode?: QueueMode): EpicView {
     done: epic.done,
     total: epic.total,
     reason: epic.reason,
-    tickets: ticketLines(epic),
+    tickets: ticketLines(epic, queue),
   };
 }
 
@@ -118,8 +133,9 @@ export function finishedView(f: FinishedEpic, now: Date): FinishedView {
 }
 
 export function snapshotView(snap: Snapshot, now: Date): SnapshotView {
+  const queue = snap.pending.map((p) => p.address);
   return {
-    epics: sortEpics(snap.epics).map((e) => epicView(e, snap.mode)),
+    epics: sortEpics(snap.epics).map((e) => epicView(e, snap.mode, queue)),
     recentlyFinished: snap.recently_finished.map((f) => finishedView(f, now)),
   };
 }
