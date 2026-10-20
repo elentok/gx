@@ -228,6 +228,22 @@
           "default": false,
           "description": "Also listen on loopback TCP (127.0.0.1:7421), serving the same routes as the socket. No auth."
         },
+        "web": {
+          "type": "object",
+          "description": "Web UI listener settings.",
+          "properties": {
+            "dev-frontend": {
+              "type": "boolean",
+              "default": false,
+              "description": "Dev only: serve the web UI from the Vite dev server at dev-url instead of the embedded build. /v1 stays on gx. Startup-only."
+            },
+            "dev-url": {
+              "type": "string",
+              "default": "http://127.0.0.1:5173",
+              "description": "Loopback http URL of the Vite dev server used when dev-frontend is true."
+            }
+          }
+        },
         "tab-env": {
           "type": "array",
           "description": "KEY=VALUE entries set on every iteration tab's shell, to override what the shell rc would decide (e.g. PATH). Default: empty.",

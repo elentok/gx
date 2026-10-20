@@ -241,6 +241,8 @@ type Config struct {
 	// WebAddr, when set, adds a separate read-only HTTP listener for the web UI.
 	// A bind failure is reported in the handshake and never stops the server.
 	WebAddr string
+	// WebDevURL, when set with WebAddr, proxies the web UI's non-API requests to a Vite dev server.
+	WebDevURL string
 
 	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
 	ExtraUsageCheck func() subscription.State
@@ -297,6 +299,7 @@ type Server struct {
 	tcp         net.Listener // nil unless Config.TCPAddr is set
 	http        *http.Server
 	web         net.Listener // nil unless Config.WebAddr is set and bound
+	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
 	webHTTP     *http.Server
 	webErr      string // why the web bind failed
 	logf        *rotatingFile

@@ -1,9 +1,12 @@
 package server
 
 import (
+	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"path"
 	"strings"
 
@@ -21,6 +24,16 @@ func (s *Server) bindWeb() {
 		s.webErr = "web token: " + err.Error()
 		s.log.Error("web token unavailable", "err", err)
 		return
+	}
+	if s.cfg.WebDevURL != "" {
+		proxy, err := devFrontendProxy(s.cfg.WebDevURL)
+		if err != nil {
+			s.webErr = err.Error()
+			s.log.Error("web dev frontend rejected", "err", err)
+			return
+		}
+		s.webDev = proxy
+		s.log.Warn("web UI is served from a dev frontend", "url", s.cfg.WebDevURL)
 	}
 	ln, err := net.Listen("tcp", s.cfg.WebAddr)
 	if err != nil {
@@ -61,10 +74,34 @@ func (s *Server) webHandler() http.Handler {
 			s.streamEvents(w, r)
 		case strings.HasPrefix(r.URL.Path, "/v1/"):
 			http.NotFound(w, r)
+		case s.webDev != nil:
+			s.webDev.ServeHTTP(w, r)
 		default:
 			static.ServeHTTP(w, r)
 		}
 	})
+}
+
+// devFrontendProxy forwards requests to a Vite dev server on loopback. The
+// Host header is rewritten so Vite accepts it, and websocket upgrades pass
+// through for hot reload. Only loopback targets are allowed, so the read-only
+// listener cannot be pointed at other hosts.
+func devFrontendProxy(raw string) (http.Handler, error) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "http" || u.Host == "" {
+		return nil, fmt.Errorf("server.web.dev-url %q must be an http URL", raw)
+	}
+	host := u.Hostname()
+	if host != "localhost" && !(net.ParseIP(host) != nil && net.ParseIP(host).IsLoopback()) {
+		return nil, fmt.Errorf("server.web.dev-url %q must be a loopback address", raw)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(u)
+	direct := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		direct(r)
+		r.Host = u.Host
+	}
+	return proxy, nil
 }
 
 // serveAsset serves the file at the request path. A path with no file gets
