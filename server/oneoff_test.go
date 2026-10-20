@@ -40,8 +40,8 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
-	if !strings.HasPrefix(res.Address, "proj:fix-the-flaky-test-") || !strings.HasSuffix(res.Address, "/01") {
-		t.Fatalf("address = %q, want proj:fix-the-flaky-test-<suffix>/01", res.Address)
+	if res.Address != "proj:one-offs/01" {
+		t.Fatalf("address = %q, want proj:one-offs/01", res.Address)
 	}
 	q, err := h.Client.QueueItems(ctx)
 	if err != nil || len(q) != 2 || q[1].Address != res.Address || q[1].Agent != "claude" {
@@ -53,16 +53,16 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 		t.Fatal(err)
 	}
 	epicDir := filepath.Join(h.TicketStore, a.Project, a.Epic)
-	files, _ := filepath.Glob(filepath.Join(epicDir, "issues", "01-*.md"))
+	files, _ := filepath.Glob(filepath.Join(epicDir, "issues", "01-fix-the-flaky-test.md"))
 	if len(files) != 1 {
 		t.Fatalf("ticket files = %v", files)
 	}
 	raw, _ := os.ReadFile(files[0])
-	if !strings.Contains(string(raw), "type: prompt") || !strings.Contains(string(raw), "fix the flaky test please") {
+	if !strings.Contains(string(raw), "type: prompt") || !strings.Contains(string(raw), "fix the flaky test please") || !strings.Contains(string(raw), "agent: claude") {
 		t.Fatalf("ticket = %s", raw)
 	}
-	if epicMD, err := os.ReadFile(filepath.Join(epicDir, "ticket.md")); err != nil || !strings.Contains(string(epicMD), "status: open") {
-		t.Fatalf("epic ticket.md = %q, %v; want status: open", epicMD, err)
+	if epicMD, err := os.ReadFile(filepath.Join(epicDir, "ticket.md")); err != nil || !strings.Contains(string(epicMD), "status: draft") {
+		t.Fatalf("epic ticket.md = %q, %v; want status: draft", epicMD, err)
 	}
 	log, _ := os.ReadFile(ralphloop.RunLogPath(filepath.Join(h.TicketStore, a.Project), a.Epic))
 	if !strings.Contains(string(log), `"type":"submitted"`) || !strings.Contains(string(log), res.Address) {
@@ -78,8 +78,11 @@ func TestOneOff_NoProjectLandsInScratchAndHonoursNameAndAgent(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
-	if !strings.HasPrefix(res.Address, "scratch:my-job/") {
-		t.Fatalf("address = %q, want scratch:my-job/…", res.Address)
+	if res.Address != "scratch:one-offs/01" {
+		t.Fatalf("address = %q, want scratch:one-offs/01", res.Address)
+	}
+	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "scratch", "one-offs", "issues", "01-my-job.md")); len(files) != 1 {
+		t.Fatalf("ticket files = %v, want 01-my-job.md", files)
 	}
 	q, _ := h.Client.QueueItems(ctx)
 	if len(q) != 1 || q[0].Address != res.Address || q[0].Agent != "codex" {
@@ -112,7 +115,7 @@ func readOneOffTicket(t *testing.T, h *servertest.Harness, addr string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, _ := filepath.Glob(filepath.Join(h.TicketStore, a.Project, a.Epic, "issues", "01-*.md"))
+	files, _ := filepath.Glob(filepath.Join(h.TicketStore, a.Project, a.Epic, "issues", a.ID+"-*.md"))
 	if len(files) != 1 {
 		t.Fatalf("ticket files = %v", files)
 	}
@@ -180,8 +183,11 @@ func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
-	if res.Address != "proj:from-file/01" {
-		t.Errorf("address = %q; want the frontmatter name", res.Address)
+	if res.Address != "proj:one-offs/01" {
+		t.Errorf("address = %q; want proj:one-offs/01", res.Address)
+	}
+	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "01-from-file.md")); len(files) != 1 {
+		t.Errorf("ticket files = %v; want the frontmatter name as slug", files)
 	}
 	raw := readOneOffTicket(t, h, res.Address)
 	for _, want := range []string{"type: prompt", "expected_context_window: 90000", "build it from the file"} {
@@ -220,8 +226,8 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 	if q, _ := h.Client.QueueItems(ctx); len(q) != 0 {
 		t.Errorf("queue = %+v; want empty", q)
 	}
-	if _, err := os.Stat(filepath.Join(h.TicketStore, "proj", "refused-job")); err == nil {
-		t.Error("a refused submit left an epic behind")
+	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "*refused-job*")); len(files) != 0 {
+		t.Errorf("a refused submit left %v behind", files)
 	}
 }
 
@@ -237,8 +243,8 @@ func TestOneOff_InvalidAgentLeavesNoTicketAndRetryIsNotDuplicateLive(t *testing.
 	if err != nil || !res.Refused || res.Reason != server.ReasonInvalidAgent {
 		t.Fatalf("got %+v, %v; want refusal %s", res, err, server.ReasonInvalidAgent)
 	}
-	if _, err := os.Stat(filepath.Join(h.TicketStore, "proj", "bad-agent-job")); err == nil {
-		t.Error("a refused submit left an epic (and its submitted event) behind")
+	if files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "*bad-agent-job*")); len(files) != 0 {
+		t.Errorf("a refused submit left %v behind", files)
 	}
 	req.Agent = ""
 	res, err = h.Client.OneOff(ctx, req)
@@ -257,10 +263,10 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 	if err != nil || first.Refused {
 		t.Fatalf("retro: %+v, %v", first, err)
 	}
-	if first.Address != "proj:evolve-epic-a-20261010-1405/01" {
-		t.Errorf("address = %q, want the dated epic name", first.Address)
+	if first.Address != "proj:one-offs/01" {
+		t.Errorf("address = %q, want proj:one-offs/01", first.Address)
 	}
-	files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "evolve-epic-a-20261010-1405", "issues", "01-*.md"))
+	files, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "one-offs", "issues", "01-evolve-epic-a-20261010-1405.md"))
 	if len(files) != 1 {
 		t.Fatalf("ticket files = %v", files)
 	}
@@ -275,6 +281,51 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 	res, err := h.Client.OneOff(ctx, again)
 	if err != nil || !res.Refused || res.Reason != server.ReasonDuplicateLive || res.Address != first.Address {
 		t.Errorf("second retro: %+v, %v; want duplicate-live naming %s", res, err, first.Address)
+	}
+}
+
+func TestOneOff_NumbersAboveTheArchiveAndQueuesTheRootOnce(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
+	servertest.WriteTicket(t, store, "proj", server.OneOffsArchivedEpic, "07", "old", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+	ctx := context.Background()
+	if _, err := h.Client.QueuePause(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "one", Cwd: repo, Name: "a"})
+	if err != nil || first.Refused || first.Address != "proj:one-offs/08" {
+		t.Fatalf("first = %+v, %v; want proj:one-offs/08", first, err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+		t.Fatalf("queue epic-a: %+v, %v", res, err)
+	}
+	second, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "two", Cwd: repo, Name: "b"})
+	if err != nil || second.Refused || second.Address != "proj:one-offs/09" {
+		t.Fatalf("second = %+v, %v; want proj:one-offs/09", second, err)
+	}
+	if q, _ := h.Client.QueueItems(ctx); len(q) != 2 || q[0].Address != first.Address {
+		t.Fatalf("queue = %+v; want the one-offs root queued once, still first", q)
+	}
+}
+
+func TestOneOff_FrontMovesAQueuedRootToTheHead(t *testing.T) {
+	h, repo := startOneOffHarness(t)
+	ctx := context.Background()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+		t.Fatalf("queue epic-a: %+v, %v", res, err)
+	}
+	first, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "one", Cwd: repo})
+	if err != nil || first.Refused {
+		t.Fatalf("first = %+v, %v", first, err)
+	}
+	if res, err := h.Client.OneOff(ctx, server.OneOffRequest{Prompt: "two", Cwd: repo, Front: true}); err != nil || res.Refused {
+		t.Fatalf("front = %+v, %v", res, err)
+	}
+	if q, _ := h.Client.QueueItems(ctx); len(q) != 2 || q[0].Address != first.Address || q[1].Address != "proj:epic-a/01" {
+		t.Fatalf("queue = %+v; want one-offs then epic-a", q)
 	}
 }
 

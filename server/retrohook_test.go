@@ -27,7 +27,7 @@ func (f *schedFixture) completeEpic(t *testing.T) []string {
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
-	retros, err := filepath.Glob(filepath.Join(f.store, "proj", "evolve-"+schedEpic+"-*"))
+	retros, err := filepath.Glob(filepath.Join(f.store, "proj", server.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 	t.Helper()
 	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
 		// A submitted retro launches too; it is commitless, so it commits nothing.
-		if strings.Contains(p.Address, "evolve-") {
+		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
 		commitWork(t, p, id)
@@ -126,7 +126,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		var err error
-		retros, err = filepath.Glob(filepath.Join(f.store, "proj", "evolve-"+schedEpic+"-*"))
+		retros, err = filepath.Glob(filepath.Join(f.store, "proj", server.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,7 +140,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 
 func TestRetroHook_SubmitsWhenTheLandNeedsARebase(t *testing.T) {
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
-		if strings.Contains(p.Address, "evolve-") {
+		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
 		commitWork(t, p, id)
@@ -173,7 +173,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 // A land error parks the root, and that park is the epic's final outcome.
 func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
-		if strings.Contains(p.Address, "evolve-") {
+		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
 		commitWork(t, p, id)

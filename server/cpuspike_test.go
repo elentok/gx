@@ -45,11 +45,7 @@ func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 	if err != nil || res.Address == "" {
 		t.Fatalf("CPUSpike = %+v, %v; want a filed ticket", res, err)
 	}
-	epics, _ := filepath.Glob(filepath.Join(store, server.OutboxProject, "cpu-spike-tui-*"))
-	if len(epics) != 1 {
-		t.Fatalf("cpu-spike epics = %v, want one", epics)
-	}
-	issues, _ := filepath.Glob(filepath.Join(epics[0], "issues", "*.md"))
+	issues, _ := filepath.Glob(filepath.Join(store, server.OutboxProject, server.OneOffsEpic, "issues", "*-cpu-spike-tui-*.md"))
 	if len(issues) != 1 {
 		t.Fatalf("issues = %v, want one", issues)
 	}
@@ -74,8 +70,8 @@ func TestCPUSpike_OnlyLoggedOutsideMaintainerMode(t *testing.T) {
 			if err != nil || res.Address != "" || res.Message == "" {
 				t.Fatalf("CPUSpike = %+v, %v; want no ticket and a reason", res, err)
 			}
-			if epics, _ := filepath.Glob(filepath.Join(store, server.OutboxProject, "cpu-spike-*")); len(epics) != 0 {
-				t.Fatalf("cpu-spike epics = %v, want none", epics)
+			if issues, _ := filepath.Glob(filepath.Join(store, server.OutboxProject, server.OneOffsEpic, "issues", "*cpu-spike-*")); len(issues) != 0 {
+				t.Fatalf("cpu-spike tickets = %v, want none", issues)
 			}
 		})
 	}

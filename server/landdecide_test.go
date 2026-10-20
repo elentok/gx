@@ -83,7 +83,7 @@ func TestLandDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 func TestLandDecide_RepeatNeedsRebaseParkIsQuiet(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
-		if strings.Contains(p.Address, "evolve-") {
+		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
 		commitWork(t, p, id)

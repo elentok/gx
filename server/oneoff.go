@@ -1,14 +1,14 @@
 package server
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -165,11 +165,13 @@ func oneOffRefusal(reason, msg string) OneOffResult {
 
 // oneOffPlan is a fully validated submit, ready to write.
 type oneOffPlan struct {
-	project, dir, epic, prompt string
-	addr                       tickets.Address
-	tk                         schema.Ticket
-	agent                      string
-	front                      bool
+	project, dir, epic, slug, prompt string
+	// addr and path are set once the ticket is written.
+	addr  tickets.Address
+	path  string
+	tk    schema.Ticket
+	agent string
+	front bool
 }
 
 // oneOff creates a top-level ticket carrying the prompt and appends it to the
@@ -181,8 +183,8 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	if res, err := s.oneOffValidate(req, &plan); err != nil || res.Refused {
 		return res, err
 	}
-	if res, err := oneOffWrite(plan); err != nil || res.Refused {
-		return res, err
+	if err := oneOffWrite(&plan); err != nil {
+		return OneOffResult{}, err
 	}
 	return s.oneOffEnqueue(plan)
 }
@@ -231,20 +233,19 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 		return oneOffRefusal(ReasonUnknownProj, "no project "+project+" in the ticket store"), nil
 	}
 
-	epic := req.Name
-	if epic == "" {
-		epic = defaultOneOffName(prompt)
+	slug := req.Name
+	if slug == "" {
+		slug = defaultOneOffName(prompt)
 	}
-	addr := tickets.Address{Project: project, Epic: epic, ID: "01"}
-	if _, err := tickets.ParseAddress(addr.String(), tickets.AddressContext{}); err != nil {
-		return oneOffRefusal(ReasonInvalidAddress, "name "+epic+" is not usable in a ticket address"), nil
+	if _, err := tickets.ParseAddress(tickets.Address{Project: project, Epic: slug, ID: "01"}.String(), tickets.AddressContext{}); err != nil {
+		return oneOffRefusal(ReasonInvalidAddress, "name "+slug+" is not usable in a ticket address"), nil
 	}
 	if dup, err := s.liveDuplicate(dir, req.Unique); err != nil {
 		return OneOffResult{}, err
 	} else if dup != nil {
 		return dup.refusal(project, dir)
 	}
-	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
+	tk := schema.Ticket{Status: schema.StatusOpen, Type: typ, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
 	if refused := s.oneOffOptionsRefusal(project, req); refused != nil {
 		return *refused, nil
 	}
@@ -258,27 +259,30 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 	if bad != nil {
 		return oneOffRefusal(bad.Reason, bad.Message), nil
 	}
-	*plan = oneOffPlan{project: project, dir: dir, epic: epic, prompt: prompt, addr: addr, tk: tk, agent: string(agent), front: req.Front}
+	tk.Agent = string(agent)
+	*plan = oneOffPlan{project: project, dir: dir, epic: OneOffsEpic, slug: slug, prompt: prompt, tk: tk, agent: string(agent), front: req.Front}
 	return OneOffResult{}, nil
 }
 
-// oneOffWrite puts the ticket on disk.
-func oneOffWrite(p oneOffPlan) (OneOffResult, error) {
-	if err := writeOneOffTicket(p.dir, p.epic, p.tk, p.prompt); err != nil {
-		if os.IsExist(err) {
-			return oneOffRefusal(ReasonNameTaken, p.project+":"+p.epic+" already exists"), nil
-		}
-		return OneOffResult{}, err
+// oneOffWrite puts the ticket on disk in the shared epic and records its address
+// and path on the plan.
+func oneOffWrite(p *oneOffPlan) error {
+	path, id, err := writeOneOffTicket(p.dir, p.slug, p.tk, p.prompt)
+	if err != nil {
+		return err
 	}
-	return OneOffResult{}, nil
+	p.addr = tickets.Address{Project: p.project, Epic: p.epic, ID: id}
+	p.path = path
+	return nil
 }
 
 // oneOffEnqueue queues the written ticket and only then records `submitted`.
-// Any failure removes the epic dir again so nothing unqueued stays behind.
+// Any failure removes the new ticket file again so nothing unqueued stays
+// behind; the shared epic stays.
 func (s *Server) oneOffEnqueue(p oneOffPlan) (OneOffResult, error) {
 	res, err := s.oneOffQueue(p)
 	if err != nil || res.Refused {
-		if rmErr := os.RemoveAll(filepath.Join(p.dir, p.epic)); rmErr != nil {
+		if rmErr := os.Remove(p.path); rmErr != nil {
 			s.log.Warn("remove unqueued one-off", "ticket", p.addr.String(), "err", rmErr)
 		}
 		if refreshErr := s.idx.refresh(s.cfg.TicketStore); refreshErr != nil {
@@ -299,7 +303,15 @@ func (s *Server) oneOffQueue(p oneOffPlan) (OneOffResult, error) {
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		return OneOffResult{}, err
 	}
-	q, err := s.queueAdd(QueueRequest{Address: p.addr.String(), Agent: p.agent, Front: p.front})
+	// The shared epic is queued once, as a root: a later submit only moves it.
+	root := rootOf(p.addr)
+	var q QueueResult
+	var err error
+	if s.rootQueued(root) {
+		q, err = s.withExtraUsage(s.queueRaise(root, p.front))
+	} else {
+		q, err = s.queueAdd(QueueRequest{Address: p.addr.String(), Agent: p.agent, Front: p.front})
+	}
 	if err != nil {
 		return OneOffResult{}, err
 	}
@@ -307,6 +319,25 @@ func (s *Server) oneOffQueue(p oneOffPlan) (OneOffResult, error) {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
 	return OneOffResult{Address: p.addr.String(), Status: OneOffStatusQueued}, nil
+}
+
+// queueRaise moves every queued item of root to the head, keeping their order.
+// Without front the queue is left as it is.
+func (s *Server) queueRaise(root rootRef, front bool) (QueueResult, error) {
+	return s.writeQueue(root.String(), func(items []QueueItem) ([]QueueItem, *QueueResult) {
+		if !front {
+			return items, nil
+		}
+		var head, rest []QueueItem
+		for _, it := range items {
+			if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
+				head = append(head, it)
+			} else {
+				rest = append(rest, it)
+			}
+		}
+		return append(head, rest...), nil
+	})
 }
 
 // duplicate is the live ticket a submit's dedupe key collides with.
@@ -326,6 +357,9 @@ func (s *Server) liveDuplicate(projectDir, key string) (*duplicate, error) {
 		return nil, err
 	}
 	for _, e := range epics {
+		if filepath.Base(e.Path) == OneOffsArchivedEpic {
+			continue
+		}
 		for _, t := range e.Tickets {
 			terminal := t.Status == string(schema.StatusDone) || t.Status == string(schema.StatusCancelled)
 			if t.Unique == key && !terminal {
@@ -449,8 +483,8 @@ func within(root, p string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// defaultOneOffName is the prompt's first words plus a short random suffix, so
-// two submits of the same prompt never collide.
+// defaultOneOffName is the prompt's first words. The ticket number keeps two
+// submits of the same prompt apart.
 func defaultOneOffName(prompt string) string {
 	words := strings.Fields(strings.ToLower(prompt))
 	if len(words) > oneOffNameWords {
@@ -460,9 +494,7 @@ func defaultOneOffName(prompt string) string {
 	if slug == "" {
 		slug = "one-off"
 	}
-	var b [3]byte
-	_, _ = rand.Read(b[:])
-	return slug + "-" + hex.EncodeToString(b[:])
+	return slug
 }
 
 // oneOffFile is the name of a one-off's single ticket; nothing else writes it.
@@ -501,33 +533,52 @@ func IsOneOffEpic(e tickets.Epic) bool {
 	return false
 }
 
-// writeOneOffTicket creates the epic directory and its single ticket. The
-// directory creation is the uniqueness check: an existing epic is os.ErrExist.
-func writeOneOffTicket(projectDir, epic string, tk schema.Ticket, prompt string) error {
-	epicDir := filepath.Join(projectDir, epic)
-	if err := os.MkdirAll(projectDir, 0o755); err != nil {
-		return err
+// writeOneOffTicket adds the ticket to the shared one-offs epic, creating the
+// epic as a draft on the first submit. The id is above the highest in both
+// one-offs epics, so an archived number is never reused.
+func writeOneOffTicket(projectDir, slug string, tk schema.Ticket, prompt string) (path, id string, err error) {
+	epicDir := filepath.Join(projectDir, OneOffsEpic)
+	if err := ensureDraftEpic(epicDir); err != nil {
+		return "", "", err
 	}
-	if err := os.Mkdir(epicDir, 0o755); err != nil {
-		return err
+	epic, unlock, err := tickets.LoadLockedEpic(epicDir)
+	if err != nil {
+		return "", "", err
 	}
-	issues := filepath.Join(epicDir, "issues")
-	if err := os.Mkdir(issues, 0o755); err != nil {
-		return err
+	defer unlock()
+	next := 1
+	if id, err := tickets.NextTicketID(*epic, ""); err != nil {
+		return "", "", err
+	} else if n, err := strconv.Atoi(id); err == nil {
+		next = n
 	}
-	if err := tickets.WriteEpicTicketMD(epicDir, schema.StatusOpen); err != nil {
-		return err
+	all, err := tickets.Load(projectDir)
+	if err != nil {
+		return "", "", err
 	}
+	for _, e := range all {
+		if filepath.Base(e.Path) != OneOffsArchivedEpic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			next = max(next, t.Number+1)
+		}
+	}
+	id = fmt.Sprintf("%02d", next)
+	tk.ID = schema.TicketID(id)
 	out, err := schema.MarshalTicket(tk, "\n"+prompt+"\n")
 	if err != nil {
-		return err
+		return "", "", err
 	}
-	path := filepath.Join(issues, oneOffFile)
+	path = filepath.Join(epicDir, "issues", fmt.Sprintf("%s-%s.md", id, slug))
 	if err := os.WriteFile(path, out, 0o644); err != nil {
-		return err
+		return "", "", err
 	}
-	_, err = schema.ParseTicket(path)
-	return err
+	if _, err := schema.ParseTicket(path); err != nil {
+		_ = os.Remove(path)
+		return "", "", err
+	}
+	return path, id, nil
 }
 
 func (s *Server) oneOffHandler(w http.ResponseWriter, r *http.Request) {

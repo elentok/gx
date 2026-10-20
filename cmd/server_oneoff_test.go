@@ -66,6 +66,32 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	}
 }
 
+func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.OneOffRequest
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(server.OneOffResult{Address: "gx:one-offs/12", Status: server.OneOffStatusQueued})
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	var out bytes.Buffer
+	req := server.OneOffRequest{Prompt: "x", Name: "foo"}
+	if err := runServerOneOff(context.Background(), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
+		t.Fatal(err)
+	}
+	if got.Name != "foo" || !strings.Contains(out.String(), "gx:one-offs/12") {
+		t.Errorf("name = %q, output = %q; want foo and gx:one-offs/12", got.Name, out.String())
+	}
+}
+
 func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
 	for _, flag := range []string{"commits", "base"} {
 		if newServerOneOffCmd().Flag(flag) != nil {
