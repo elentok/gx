@@ -81,6 +81,9 @@ type trackedRun struct {
 	// StartedAt is when the claim launched; it survives a restart with the
 	// registry file. Zero for a run an older server recorded.
 	StartedAt time.Time `json:"started_at,omitzero"`
+	// WaitingSince is when the agent asked a question and went idle, still
+	// alive for the answer. Zero while it works.
+	WaitingSince time.Time `json:"waiting_since,omitzero"`
 	// State is runLaunching from the claim until the agent has started and
 	// been prompted, so a crash in between leaves a handle reclaim can see.
 	State string `json:"state,omitempty"`
@@ -314,6 +317,17 @@ func (r *runRegistry) deleteLocked(address string) {
 	delete(r.released, address)
 	delete(r.budgetStops, address)
 	r.save()
+}
+
+// markWaiting flags the run at address as waiting for an answer since at.
+func (r *runRegistry) markWaiting(address string, at time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t, ok := r.runs[address]; ok {
+		t.WaitingSince = at
+		r.runs[address] = t
+		r.save()
+	}
 }
 
 func (r *runRegistry) put(t trackedRun) {

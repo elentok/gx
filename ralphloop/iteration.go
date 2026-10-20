@@ -313,6 +313,9 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 	if err != nil {
 		return err
 	}
+	if adopted && p.KeepAskedAgent {
+		return nil
+	}
 	if adopted {
 		// The branch is what makes a later resume able to land both sides of
 		// the answer boundary in one pick (see runIteration's branch-reuse
@@ -385,6 +388,9 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 			adopted, err := adoptNeedsAnswerReport(p, path, pane, sessionID)
 			if err != nil {
 				return err
+			}
+			if adopted && p.KeepAskedAgent {
+				return nil
 			}
 			if adopted {
 				return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), false)

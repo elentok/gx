@@ -696,6 +696,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		}
 		defer s.lands.end()
 		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
+		one.KeepAskedAgent = keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
@@ -709,6 +710,11 @@ func (s *Server) settleRun(rc runContext, err error) {
 	}
 	if !out.Landed {
 		// The finish path already wrote the park; tell a person its own reason.
+		if one.KeepAskedAgent && out.Kind == events.SelfReported {
+			// The agent waits idle for the answer: its run, worktree and session stay.
+			keepRun = true
+			s.registry.markWaiting(ticketAddr, time.Now())
+		}
 		s.events.publish(EventIterationParked, ticketAddr)
 		if !s.holdParkForRecovery(addr, one.Ticket.Path, out.Kind, out.Reason) {
 			s.notifyPark(addr, one.Ticket.Path, out.Kind, out.Reason)
@@ -726,6 +732,12 @@ func (s *Server) settleRun(rc runContext, err error) {
 	s.notifyDone(addr, one.Ticket.Path)
 	s.fileFollowUp(addr, one.Ticket.Path)
 	s.completeRootIfDone(root, one)
+}
+
+// keepsAskedAgent reports whether run's agent stays alive after it asks: a
+// Claude agent on a native runner. Herdr-hosted and Codex runs clean up as before.
+func keepsAskedAgent(run Run) bool {
+	return run.Agent == string(ralphloop.AgentClaude) && run.Runner != "" && run.Runner != runnerHerdr
 }
 
 // notifyDone tells chat a ticket landed. A one-off stays silent: it speaks

@@ -66,16 +66,17 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
-		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(),
+		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(), KeepAskedAgent: o.KeepAskedAgent,
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
 	stranded, err := parkStrandedCommits(d, p, w, pane, sessionID)
 	if err != nil {
 		return FinishOutcome{}, err
 	}
-	adopted := false
+	adopted, asked := false, false
 	if !stranded {
-		adopted, err = adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
+		asked, err = adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
+		adopted = asked
 		if err == nil && !adopted {
 			adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID)
 		}
@@ -85,6 +86,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 	}
 	switch {
 	case stranded:
+	case asked && p.KeepAskedAgent:
 	case !adopted:
 		if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
 			return FinishOutcome{}, fmt.Errorf("marking ticket needs-answer: %w", err)

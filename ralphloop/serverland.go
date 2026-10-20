@@ -45,6 +45,8 @@ type OneIteration struct {
 	// under; empty leaves the agent's own default.
 	Model  string
 	Effort string
+	// KeepAskedAgent: see iterationParams.KeepAskedAgent.
+	KeepAskedAgent bool
 	// Sink hears the finish path's events; nil hears nothing.
 	Sink EventSink
 }
@@ -147,6 +149,7 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		Model:           o.Model,
 		Effort:          o.Effort,
 		Skill:           defaultWorkerSkill,
+		KeepAskedAgent:  o.KeepAskedAgent,
 		Ticket:          o.Ticket,
 		ScratchDir:      o.ScratchDir,
 		WorktreeLock:    &worktreeLock,

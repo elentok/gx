@@ -36,7 +36,10 @@ type iterationParams struct {
 	Model  string
 	Effort string
 	Skill  string
-	Ticket tickets.Ticket
+	// KeepAskedAgent leaves the worktree, pane and session in place when the
+	// agent's needs-answer report is adopted: the agent waits idle for the answer.
+	KeepAskedAgent bool
+	Ticket         tickets.Ticket
 	// ScratchDir locates this run's run-log.jsonl (see eventlog.go);
 	// logEvent no-ops if it's empty. The epic name half of that path is
 	// FeatureBranch, not a separate field — Run names the feature branch
