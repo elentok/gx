@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/osnotify"
@@ -46,6 +47,8 @@ type Harness struct {
 	// Player.
 	Sounds    *Sounds
 	herdrDown atomic.Bool
+
+	extraRunners []agentrunner.Runner
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -447,6 +450,22 @@ func (h *Harness) Restart(t *testing.T) {
 	h.serve(t)
 }
 
+// DropAgentsAtCleanup adds runners whose agents cleanup drops before it waits
+// for runs to settle, for runners the config only reaches by name.
+func (h *Harness) DropAgentsAtCleanup(rs ...agentrunner.Runner) {
+	h.extraRunners = append(h.extraRunners, rs...)
+}
+
+// runners is every runner cleanup drops the agents of. RunnerFor is asked with
+// empty names, which the test doubles that set it ignore.
+func (h *Harness) runners() []agentrunner.Runner {
+	rs := append([]agentrunner.Runner{h.cfg.Runner}, h.extraRunners...)
+	if h.cfg.RunnerFor != nil {
+		rs = append(rs, h.cfg.RunnerFor("", ""))
+	}
+	return rs
+}
+
 func (h *Harness) serve(t *testing.T) {
 	t.Helper()
 	srv, err := server.New(h.cfg)
@@ -469,7 +488,13 @@ func (h *Harness) serve(t *testing.T) {
 			t.Errorf("server: %v", err)
 		}
 		// Runs outlive Stop and still write to the ticket store; let them end
-		// before t.TempDir's cleanup removes it.
+		// before t.TempDir's cleanup removes it. Their wait on an agent never
+		// ends on its own, so drop the agents first.
+		for _, r := range h.runners() {
+			if sa, ok := r.(interface{ StopAll() }); ok {
+				sa.StopAll()
+			}
+		}
 		if !srv.WaitSettled(10 * time.Second) {
 			t.Logf("servertest: a run was still settling 10s after stop")
 		}

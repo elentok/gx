@@ -205,6 +205,16 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	}
 }
 
+// StopAll drops every session, so a Wait on one ends with ErrNotFound. A test
+// that stops its server calls it: agents outlive the server, and a settle still
+// waiting on one would otherwise run until the test's own deadline.
+func (r *Runner) StopAll() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sessions = nil
+	r.notify()
+}
+
 func (r *Runner) Interrupt(s agentrunner.Session) error {
 	r.mu.Lock()
 	ss, err := r.live(s)
