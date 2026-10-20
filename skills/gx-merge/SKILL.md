@@ -101,7 +101,7 @@ only runs when one is checked out for `branch`:
   ticket mode the server recreates the feature worktree before launch, so
   this should not happen there; if the current worktree is not on `branch`
   (`git branch --show-current`), stop with the same reason.
-- **`git status --porcelain` in `worktree_path` is non-empty** — **stop:
+- **`rtk proxy git status --porcelain` in `worktree_path` is non-empty** — **stop:
   `feature worktree <worktree_path> is dirty: <files>`**. Never commit,
   stash or discard someone else's changes.
 - Otherwise continue.
@@ -117,7 +117,7 @@ skill — same conversation/context, not a detached sub-agent, matching
 
 - Skip its checks step; Step 4 below runs them once the rebase is done.
 - When a hunk can't be resolved without inventing behaviour, don't force it:
-  note the conflicting files (`git diff --name-only --diff-filter=U`), run
+  note the conflicting files (`rtk proxy git diff --name-only --diff-filter=U`), run
   `git rebase --abort` **first** so the worktree is clean on the pre-rebase
   branch, then **stop: `unresolvable rebase conflict in <files>`**.
 
@@ -129,7 +129,9 @@ rebased diff.
 Discover this repo's automated checks the same way
 `gx-resolving-merge-conflicts` does — don't hardcode a check command here —
 and run them in order: typecheck, tests, lint/format. Each failure kind has
-its own path; all paths run in both modes.
+its own path; all paths run in both modes. Run format checks through `rtk proxy`, or only on the
+files the branch changed (`rtk proxy git diff --name-only <target>...HEAD`): a repo-wide
+`gofmt -l` lists files the branch never touched.
 
 ### Typecheck or lint failure: one fixer
 
