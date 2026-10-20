@@ -57,14 +57,14 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	p, err := archiveTicket(root, a, src, moveOpts{archive: true, resolution: resolution})
+	p, err := archiveTicket(root, a, src, tickets.MoveOpts{Archive: true, Resolution: resolution})
 	if err != nil {
 		if created {
 			_ = os.RemoveAll(filepath.Join(root, followUpsArchivedEpic))
 		}
 		return err
 	}
-	pingServer(p.newPath)
+	pingServer(p.NewPath)
 	return printMove(w, p, false, "")
 }
 
@@ -111,12 +111,12 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 	}
 	for _, t := range swept {
 		a := tickets.Address{Project: project, Epic: followUpsEpic, ID: t.Identifier}
-		opts := moveOpts{archive: true, recordOriginal: t.Status == string(schema.StatusCancelled)}
+		opts := tickets.MoveOpts{Archive: true, RecordOriginal: t.Status == string(schema.StatusCancelled)}
 		p, err := archiveTicket(root, a, t, opts)
 		if err != nil {
 			return err
 		}
-		pingServer(p.newPath)
+		pingServer(p.NewPath)
 		if err := printMove(w, p, false, ""); err != nil {
 			return err
 		}
@@ -139,19 +139,19 @@ func ensureArchiveEpic(root, followUpsPath string) (bool, error) {
 }
 
 // archiveTicket moves src into the archive epic under both epic locks.
-func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts moveOpts) (movePlan, error) {
+func archiveTicket(root string, a tickets.Address, src tickets.Ticket, opts tickets.MoveOpts) (tickets.MovePlan, error) {
 	srcEpicPath := filepath.Join(root, a.Epic)
-	unlock, err := lockEpics(srcEpicPath, filepath.Join(root, followUpsArchivedEpic))
+	unlock, err := tickets.LockEpics(srcEpicPath, filepath.Join(root, followUpsArchivedEpic))
 	if err != nil {
-		return movePlan{}, err
+		return tickets.MovePlan{}, err
 	}
 	defer unlock()
 
-	p, err := planMove(root, a, src, followUpsArchivedEpic, "", opts)
+	p, err := tickets.PlanMove(root, a, src, followUpsArchivedEpic, "", opts)
 	if err != nil {
-		return movePlan{}, err
+		return tickets.MovePlan{}, err
 	}
-	return p, applyMove(p)
+	return p, tickets.ApplyMove(p)
 }
 
 func newTicketsCloseCmd(d deps) *cobra.Command {
