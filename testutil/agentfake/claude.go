@@ -107,6 +107,7 @@ func SendControl(stdin string, c Control) error {
 
 // Claude runs the fake claude over stdin and stdout and exits.
 func Claude() {
+	go exitWithParent()
 	sessionID := os.Args[slices.Index(os.Args, "--session-id")+1]
 	init, err := initEvent(sessionID)
 	if err != nil {
@@ -118,6 +119,19 @@ func Claude() {
 		os.Exit(1)
 	}
 	os.Exit(0)
+}
+
+// exitWithParent ends the fake once the process that started it is gone. It
+// talks over pipes, so unlike the pty-hosted fakes nothing hangs up on it when
+// a test binary is killed before its cleanup, and it would otherwise wait on
+// its stdin FIFO forever.
+func exitWithParent() {
+	parent := os.Getppid()
+	for range time.Tick(200 * time.Millisecond) {
+		if os.Getppid() != parent {
+			os.Exit(1)
+		}
+	}
 }
 
 // initEvent is the doctor's recorded init event, re-keyed to sessionID.
