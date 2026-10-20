@@ -27,6 +27,12 @@ type SummaryTicket struct {
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
 	Recovery  string    `json:"recovery,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
+	// Summary is the open question's summary line, or the park reason without one.
+	Summary string `json:"summary,omitempty"`
+	// Answerable is set when a person's reply can go to the open question.
+	Answerable bool `json:"answerable"`
+	// Answered is set on an open ticket whose latest question has an answer.
+	Answered bool `json:"answered"`
 }
 
 // EpicSummary is one epic holding a queue item, as the web page's cards show it.
@@ -71,14 +77,31 @@ func (s *Server) epicSummaries(all []TicketInfo) []EpicSummary {
 		if i < 0 || epics[i].IsMap || !epics[i].MergedAt.IsZero() {
 			continue
 		}
-		out = append(out, summarizeEpic(root, epics[i], s.registry.startedAtOf, recoveryOf))
+		out = append(out, summarizeEpic(root, epics[i], s.registry.startedAtOf, recoveryOf, readLogLenient))
 	}
 	return out
 }
 
+// readLogLenient reads a ticket's log for the snapshot, where an unreadable log
+// only costs the question details.
+func readLogLenient(t tickets.Ticket) []tickets.LogEvent {
+	evs, _ := tickets.ReadLog(t.Path)
+	return evs
+}
+
+// answeredLatest reports whether the latest question has an answer.
+func answeredLatest(evs []tickets.LogEvent) bool {
+	rounds := tickets.Rounds(evs)
+	if len(rounds) == 0 {
+		return false
+	}
+	end := rounds[len(rounds)-1].End
+	return end != nil && end.Type == tickets.EventParkAnswer
+}
+
 // summarizeEpic applies the state rules, first match wins. A claimed ticket
 // counts as runnable, but only one with a server claim time counts as running.
-func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string) EpicSummary {
+func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) EpicSummary {
 	sum := EpicSummary{
 		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
 		Active: []SummaryTicket{}, Parked: []SummaryTicket{},
@@ -90,8 +113,19 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		switch {
 		case isParked(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.ParkReason(e, t)
+			open := tickets.OpenQuestion(logOf(t))
+			info.Summary = info.Reason
+			if open != nil {
+				info.Summary = open.Summary
+			}
+			info.Answerable = status == tickets.StatusNeedsAnswer && open != nil
 			sum.Parked = append(sum.Parked, info)
 			sum.HasRepair = sum.HasRepair || status == tickets.StatusNeedsRepair || status == tickets.StatusError
+		case status == tickets.StatusOpen && answeredLatest(logOf(t)):
+			// An answered gone-agent ticket is open again until gx claims it, yet a
+			// person still wants to see it was answered.
+			info.Answered = true
+			sum.Parked = append(sum.Parked, info)
 		case status == tickets.StatusClaimed:
 			if at, ok := claimedAt(addr); ok {
 				info.ClaimedAt = at

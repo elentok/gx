@@ -186,6 +186,18 @@ export interface SummaryTicket {
   claimed_at?: string;
   recovery?: string;
   reason?: string;
+  /**
+   * Summary is the open question's summary line, or the park reason without one.
+   */
+  summary?: string;
+  /**
+   * Answerable is set when a person's reply can go to the open question.
+   */
+  answerable: boolean;
+  /**
+   * Answered is set on an open ticket whose latest question has an answer.
+   */
+  answered: boolean;
 }
 /**
  * EpicSummary is one epic holding a queue item, as the web page's cards show it.

@@ -88,7 +88,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 					tc.epic.Tickets[i].Body = parkedBody
 				}
 			}
-			got := summarizeEpic(root, tc.epic, claimed, recovering)
+			got := summarizeEpic(root, tc.epic, claimed, recovering, noLog)
 			if got.State != tc.wantState {
 				t.Fatalf("state = %q, want %q", got.State, tc.wantState)
 			}
@@ -128,7 +128,7 @@ func TestSummarizeEpic_ParkedDetails(t *testing.T) {
 				return RecoveryEscalated
 			}
 			return ""
-		})
+		}, noLog)
 	if len(got.Parked) != 2 {
 		t.Fatalf("parked = %+v", got.Parked)
 	}
@@ -141,13 +141,48 @@ func TestSummarizeEpic_ParkedDetails(t *testing.T) {
 	}
 }
 
+func noLog(tickets.Ticket) []tickets.LogEvent { return nil }
+
+func TestSummarizeEpic_ParkedEntriesCarrySummaryAnswerableAnswered(t *testing.T) {
+	root := rootRef{Project: "proj", Epic: "epic"}
+	asked := summaryTicket("01", "needs-answer")
+	asked.Body = "## Needs Answer\n\nfallback line\n"
+	repair := summaryTicket("02", "needs-repair")
+	repair.Body = "## Needs Repair\n\nthe repair reason\n"
+	answered := summaryTicket("03", "open")
+	question := func(seq int, summary string) tickets.LogEvent {
+		return tickets.LogEvent{Type: tickets.EventParkQuestion, Seq: seq, Summary: summary}
+	}
+	logs := map[string][]tickets.LogEvent{
+		"01": {question(1, "which one?")},
+		"03": {question(1, "old"), {Type: tickets.EventParkAnswer, Seq: 2, Question: 1}},
+	}
+	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{asked, repair, answered}}
+	got := summarizeEpic(root, epic,
+		func(string) (time.Time, bool) { return time.Time{}, false },
+		func(string) string { return "" },
+		func(tk tickets.Ticket) []tickets.LogEvent { return logs[tk.Identifier] })
+	if len(got.Parked) != 3 {
+		t.Fatalf("parked = %+v", got.Parked)
+	}
+	if p := got.Parked[0]; p.Summary != "which one?" || !p.Answerable || p.Answered {
+		t.Errorf("asked = %+v", p)
+	}
+	if p := got.Parked[1]; p.Summary != "the repair reason" || p.Answerable || p.Answered {
+		t.Errorf("repair = %+v", p)
+	}
+	if p := got.Parked[2]; p.Answerable || !p.Answered {
+		t.Errorf("answered = %+v", p)
+	}
+}
+
 func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T) {
 	none := func(string) (time.Time, bool) { return time.Time{}, false }
 	noRecovery := func(string) string { return "" }
 	root := rootRef{Project: "proj", Epic: OneOffsEpic}
 
 	allDone := tickets.Epic{Name: OneOffsEpic, Tickets: []tickets.Ticket{summaryTicket("01", "done")}}
-	got := summarizeEpic(root, allDone, none, noRecovery)
+	got := summarizeEpic(root, allDone, none, noRecovery, noLog)
 	if got.State == EpicStateAwaitingMerge || got.Done != 0 || got.Total != 0 {
 		t.Errorf("all-done one-offs = state %q done %d total %d", got.State, got.Done, got.Total)
 	}
@@ -155,7 +190,7 @@ func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T)
 	broken := tickets.Epic{Name: OneOffsEpic, Tickets: []tickets.Ticket{
 		summaryTicket("01", "done"), summaryTicket("02", "needs-repair"), summaryTicket("03", "needs-answer"),
 	}}
-	got = summarizeEpic(root, broken, none, noRecovery)
+	got = summarizeEpic(root, broken, none, noRecovery, noLog)
 	if got.State != EpicStateParked || len(got.Parked) != 2 {
 		t.Errorf("one-offs with needs-* = state %q parked %+v", got.State, got.Parked)
 	}
@@ -176,7 +211,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 		// A last ticket blocked on itself keeps blocked-only shapes honest.
 		epic := tickets.Epic{Name: "epic", Tickets: ts}
 		kind, stuck := deadlockKind(epic)
-		got := summarizeEpic(root, epic, none, noRecovery)
+		got := summarizeEpic(root, epic, none, noRecovery, noLog)
 		if want := stuck && kind == events.BlockedCycle; (got.State == EpicStateDeadlocked) != want {
 			t.Errorf("%v: state %q, deadlockKind %q/%v", statuses, got.State, kind, stuck)
 		}

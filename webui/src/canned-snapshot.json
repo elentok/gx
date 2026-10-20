@@ -56,7 +56,10 @@
           "title": "Stuck one",
           "status": "needs-answer",
           "recovery": "pending",
-          "reason": "needs a person"
+          "reason": "needs a person",
+          "summary": "Which option do you want?",
+          "answerable": true,
+          "answered": false
         }
       ],
       "has_repair": false
