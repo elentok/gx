@@ -31,7 +31,7 @@ type streamFake struct {
 	snapErr   error
 	snapshots int
 	streams   []*fakeStream
-	mode      string
+	mode      server.QueueMode
 	sessions  []server.SessionInfo
 	queue     []server.QueueItem
 	queueGets int

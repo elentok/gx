@@ -41,7 +41,7 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 	hadFinished := len(m.finished) > 0
 	m.finished = st.RecentlyFinished
 	m.herdrDown, m.serverBudget = st.HerdrUnavailable, st.Budget
-	m.paused = st.Mode == server.ModePaused
+	m.paused = st.Mode == server.QueueModePaused
 	m.checked = make(map[string]bool, len(st.Queue))
 	m.checkOrder = make(map[string]uint64, len(st.Queue))
 	for i, addr := range st.Queue {
@@ -103,7 +103,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 	running := map[string]bool{}
 	for _, epic := range m.epics {
 		sum := m.summaries[epic.Name]
-		if sum.State != server.StateRunning {
+		if sum.State != server.EpicStateRunning {
 			continue
 		}
 		active := make(map[string]time.Time, len(sum.Active))

@@ -541,7 +541,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 	t.Run("running", func(t *testing.T) {
 		m := base
 		m.runningEpics = map[string]bool{"alpha": true}
-		m.summaries = map[string]server.EpicSummary{"alpha": {State: server.StateRunning, Total: 1}}
+		m.summaries = map[string]server.EpicSummary{"alpha": {State: server.EpicStateRunning, Total: 1}}
 		got := m.queueHeaderTitle()
 		if !strings.HasPrefix(got, "Queue · 0 of 1 done · ") || !strings.HasSuffix(got, " implementing... · today $0.00") {
 			t.Fatalf("title = %q, want \"Queue · 0 of 1 done · <spinner> implementing... · today $0.00\"", got)

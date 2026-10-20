@@ -29,7 +29,7 @@ func queuedTicket(status string, claimedAt time.Time) []server.TicketInfo {
 // runningEpic is the server's summary of gx:alpha once 01 is claimed.
 func runningEpic() []server.EpicSummary {
 	return []server.EpicSummary{{
-		Address: "gx:alpha", Name: "alpha", State: server.StateRunning, Total: 1,
+		Address: "gx:alpha", Name: "alpha", State: server.EpicStateRunning, Total: 1,
 		Active: []server.SummaryTicket{{Address: "gx:alpha/01", Title: "Zeta ticket", ClaimedAt: time.Now()}},
 	}}
 }
@@ -91,7 +91,7 @@ func TestQueueStream_ModeChangeFromAnotherClientShows(t *testing.T) {
 	openQueueTab(h)
 
 	f.mu.Lock()
-	f.mode = server.ModePaused
+	f.mode = server.QueueModePaused
 	f.mu.Unlock()
 	f.stream(0).ch <- server.Event{Seq: 11, Type: server.EventQueueChanged}
 	h.pump()

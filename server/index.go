@@ -88,9 +88,9 @@ type Snapshot struct {
 	// Pending is every queue entry with its explain verdict, so a client never
 	// asks per row. Filled in by the handler, like HerdrUnavailable.
 	Pending []PendingRow `json:"pending"`
-	// Mode is ModeRunning, ModePaused or ModeDraining; filled in by the handler.
+	// Mode is QueueModeRunning, QueueModePaused or QueueModeDraining; filled in by the handler.
 	// Empty from a server that predates it.
-	Mode string `json:"mode,omitempty"`
+	Mode QueueMode `json:"mode,omitempty"`
 	// AFK is set while AFK mode sends session banners to chat too; filled in by
 	// the handler.
 	AFK bool `json:"afk,omitempty"`

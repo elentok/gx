@@ -1,8 +1,9 @@
-import type { EpicState, EpicSummary, FinishedEpic, Snapshot, SummaryTicket } from "./snapshot";
+import type { EpicState, EpicSummary, FinishedEpic, QueueMode, Snapshot, SummaryTicket } from "./snapshot";
 import type { Tone } from "./ui/tone";
 
 export interface TicketLineView {
   address: string;
+  id: string;
   title: string;
   tone: Tone;
   detail?: string;
@@ -34,42 +35,32 @@ export interface SnapshotView {
   recentlyFinished: FinishedView[];
 }
 
-// Display order of the states; Array.prototype.sort is stable, so the
-// server's order holds within a state.
-const STATE_ORDER: EpicState[] = ["parked", "deadlocked", "running", "waiting", "awaiting-merge"];
-
-const TONES: Record<EpicState, Tone> = {
-  parked: "parked",
-  deadlocked: "deadlocked",
-  running: "running",
-  waiting: "waiting",
-  "awaiting-merge": "muted",
+// order is the display order; Array.prototype.sort is stable, so the server's
+// order holds within a state. The labels must match epicStateLabels in
+// ui/tickets/queue_header.go.
+const STATES: Record<EpicState, { order: number; tone: Tone; label: string }> = {
+  parked: { order: 0, tone: "parked", label: "Parked" },
+  deadlocked: { order: 1, tone: "deadlocked", label: "Deadlocked" },
+  running: { order: 2, tone: "running", label: "Running" },
+  waiting: { order: 3, tone: "waiting", label: "Waiting for a slot" },
+  "awaiting-merge": { order: 4, tone: "muted", label: "Awaiting merge" },
 };
-
-const LABELS: Record<EpicState, string> = {
-  parked: "Parked",
-  deadlocked: "Deadlocked",
-  running: "Running",
-  waiting: "Waiting for a slot",
-  "awaiting-merge": "Awaiting merge",
-};
-
-export function epicTone(state: EpicState): Tone {
-  return TONES[state];
-}
 
 // Only Waiting changes with the queue mode: a paused or draining queue is why
 // nothing starts. A running epic keeps its label.
-export function epicBadge(state: EpicState, mode?: string): string {
+export function epicBadge(state: EpicState, mode?: QueueMode): string {
   if (state === "waiting" && (mode === "paused" || mode === "draining")) {
     return `Waiting: queue ${mode}`;
   }
-  return LABELS[state];
+  return STATES[state].label;
 }
+
+const shortId = (address: string) => address.slice(address.lastIndexOf("/") + 1);
 
 function ticketLines(epic: EpicSummary): TicketLineView[] {
   const line = (t: SummaryTicket, tone: Tone, detail?: string): TicketLineView => ({
     address: t.address,
+    id: shortId(t.address),
     title: t.title,
     tone,
     detail,
@@ -80,12 +71,12 @@ function ticketLines(epic: EpicSummary): TicketLineView[] {
   ];
 }
 
-export function epicView(epic: EpicSummary, mode?: string): EpicView {
+export function epicView(epic: EpicSummary, mode?: QueueMode): EpicView {
   return {
     address: epic.address,
     name: epic.name,
     project: epic.project,
-    tone: epicTone(epic.state),
+    tone: STATES[epic.state].tone,
     badge: epicBadge(epic.state, mode),
     done: epic.done,
     total: epic.total,
@@ -95,7 +86,7 @@ export function epicView(epic: EpicSummary, mode?: string): EpicView {
 }
 
 export function sortEpics(epics: EpicSummary[]): EpicSummary[] {
-  return [...epics].sort((a, b) => STATE_ORDER.indexOf(a.state) - STATE_ORDER.indexOf(b.state));
+  return [...epics].sort((a, b) => STATES[a.state].order - STATES[b.state].order);
 }
 
 const UNITS: [string, number][] = [

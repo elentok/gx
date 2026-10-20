@@ -248,7 +248,7 @@ func TestQueueServerMode_PausedFollowsDeliveredMode(t *testing.T) {
 		t.Fatal("paused before any mode change")
 	}
 
-	st := viewmodel.State{Mode: server.ModePaused}
+	st := viewmodel.State{Mode: server.QueueModePaused}
 	next, _ := m.WithServerState(&st, ServerLinkUp)
 
 	if !next.(QueueModel).paused {

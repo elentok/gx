@@ -1,4 +1,4 @@
-.PHONY: build web-build web-dev web-test install test test-race e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-test web-types install test test-race e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -20,6 +20,10 @@ web-dev:
 
 web-test:
 	cd webui && pnpm install --frozen-lockfile && pnpm test
+
+# Regenerates webui/src/generated/server.ts from the server's wire types.
+web-types:
+	go run github.com/gzuidhof/tygo@v0.2.21 generate
 
 install:
 	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .

@@ -181,9 +181,9 @@ func (m Model) titleGroups(shape titleShape, name string) (left, right []titleSe
 func queueSegments(q ticketsui.QueueStatus, icons ui.IconSet, bar bool) []titleSegment {
 	icon, color := icons.QueueRunning, ui.ColorGreen
 	switch q.Mode {
-	case server.ModePaused:
+	case server.QueueModePaused:
 		icon, color = icons.QueuePaused, ui.ColorYellow
-	case server.ModeDraining:
+	case server.QueueModeDraining:
 		icon, color = icons.QueueDraining, ui.ColorOrange
 	}
 	sp := titleSegment{" ", titleBgStyle}

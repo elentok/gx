@@ -48,7 +48,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.QueuePause(ctx); err != nil || res.Refused || res.Mode != server.ModePaused {
+	if res, err := h.Client.QueuePause(ctx); err != nil || res.Refused || res.Mode != server.QueueModePaused {
 		t.Fatalf("pause: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -60,7 +60,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	registerLaunch(h)
 	expectNoRun(t, h)
 
-	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused || res.Mode != server.ModeRunning {
+	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused || res.Mode != server.QueueModeRunning {
 		t.Fatalf("resume: %+v, %v", res, err)
 	}
 	expectRun(t, h)
@@ -70,7 +70,7 @@ func TestDrain_StartsNothingNewAndEndsOnResume(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Refused || res.Mode != server.ModeDraining {
+	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Refused || res.Mode != server.QueueModeDraining {
 		t.Fatalf("drain: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -90,12 +90,12 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 	steps := []struct {
 		name string
 		do   func(context.Context) (server.QueueResult, error)
-		want string
+		want server.QueueMode
 	}{
-		{"initial", nil, server.ModeRunning},
-		{"pause", h.Client.QueuePause, server.ModePaused},
-		{"resume", h.Client.QueueResume, server.ModeRunning},
-		{"drain", h.Client.QueueDrain, server.ModeDraining},
+		{"initial", nil, server.QueueModeRunning},
+		{"pause", h.Client.QueuePause, server.QueueModePaused},
+		{"resume", h.Client.QueueResume, server.QueueModeRunning},
+		{"drain", h.Client.QueueDrain, server.QueueModeDraining},
 	}
 	for _, st := range steps {
 		if st.do != nil {

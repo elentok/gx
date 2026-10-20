@@ -29,6 +29,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Web types are current
+        if: runner.os == 'Linux'
+        run: |
+          make web-types
+          git diff --exit-code webui/src/generated
+
       - name: Web tests
         run: make web-test
 

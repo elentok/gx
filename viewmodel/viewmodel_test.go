@@ -228,17 +228,17 @@ func TestReduce_QueueChangedRefetchesQueue(t *testing.T) {
 
 func TestApplySnapshot_CarriesEpicSummaries(t *testing.T) {
 	st := viewmodel.State{}.ApplySnapshot(server.Snapshot{
-		Epics: []server.EpicSummary{{Address: "gx:e", State: server.StateParked, Done: 1, Total: 3}},
+		Epics: []server.EpicSummary{{Address: "gx:e", State: server.EpicStateParked, Done: 1, Total: 3}},
 	})
 
-	if len(st.Epics) != 1 || st.Epics[0].State != server.StateParked || st.Epics[0].Total != 3 {
+	if len(st.Epics) != 1 || st.Epics[0].State != server.EpicStateParked || st.Epics[0].Total != 3 {
 		t.Errorf("Epics = %+v, want the snapshot's parked summary", st.Epics)
 	}
 }
 
 func TestApplySnapshot_CarriesQueueMode(t *testing.T) {
-	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 20, Mode: server.ModeDraining})
-	if s.Mode != server.ModeDraining {
+	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 20, Mode: server.QueueModeDraining})
+	if s.Mode != server.QueueModeDraining {
 		t.Fatalf("mode = %q", s.Mode)
 	}
 }

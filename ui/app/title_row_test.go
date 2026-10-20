@@ -210,7 +210,7 @@ func assertGolden(t *testing.T, name, text string) {
 
 // withQueue gives m an epic of seven tickets, three done, the fourth claimed;
 // running decides whether the server holds a run for the claimed one.
-func withQueue(m Model, mode string, running bool) Model {
+func withQueue(m Model, mode server.QueueMode, running bool) Model {
 	statuses := []string{"done", "done", "done", "claimed", "open", "open", "open"}
 	m.stream.vm.Tickets = nil
 	for i, st := range statuses {
@@ -230,14 +230,14 @@ func TestTitleRow_QueueStatus(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name    string
-		mode    string
+		mode    server.QueueMode
 		running bool
 		want    string
 	}{
-		{"running", server.ModeRunning, true, "▶ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
-		{"paused", server.ModePaused, false, "‖ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
-		{"draining", server.ModeDraining, true, "↓ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
-		{"queued but idle", server.ModeRunning, false, "gx › worktrees ▾ agents 2 ● ? help"},
+		{"running", server.QueueModeRunning, true, "▶ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"paused", server.QueueModePaused, false, "‖ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"draining", server.QueueModeDraining, true, "↓ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
+		{"queued but idle", server.QueueModeRunning, false, "gx › worktrees ▾ agents 2 ● ? help"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -253,7 +253,7 @@ func TestTitleRow_QueueStatus(t *testing.T) {
 
 func TestTitleRow_QueueBarDropsFirst(t *testing.T) {
 	t.Parallel()
-	m := withQueue(titleModel(t, false, 44, connUp, 2), server.ModeRunning, true)
+	m := withQueue(titleModel(t, false, 44, connUp, 2), server.QueueModeRunning, true)
 	got := strings.Join(strings.Fields(titleText(m)), " ")
 	if want := "gx › worktrees ▾ ▶ 3/7 agents 2 ● ?"; got != want {
 		t.Errorf("title = %q, want %q", got, want)

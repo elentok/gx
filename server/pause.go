@@ -11,11 +11,13 @@ import (
 
 const pauseFileName = "queue-mode.json"
 
-// Queue modes, as reported in QueueResult.Mode.
+// QueueMode is the queue's mode, as reported in QueueResult.Mode.
+type QueueMode string
+
 const (
-	ModeRunning  = "running"
-	ModePaused   = "paused"
-	ModeDraining = "draining"
+	QueueModeRunning  QueueMode = "running"
+	QueueModePaused   QueueMode = "paused"
+	QueueModeDraining QueueMode = "draining"
 )
 
 // pauseState gates claiming. A pause is persisted so a restart does not start
@@ -66,20 +68,20 @@ func (p *pauseState) blocked() bool {
 }
 
 // currentMode is mode for callers that do not already hold the lock.
-func (p *pauseState) currentMode() string {
+func (p *pauseState) currentMode() QueueMode {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.mode()
 }
 
-func (p *pauseState) mode() string {
+func (p *pauseState) mode() QueueMode {
 	switch {
 	case p.paused:
-		return ModePaused
+		return QueueModePaused
 	case p.draining:
-		return ModeDraining
+		return QueueModeDraining
 	}
-	return ModeRunning
+	return QueueModeRunning
 }
 
 // save writes through a rename so a crash never leaves a torn file.

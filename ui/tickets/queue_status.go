@@ -12,8 +12,8 @@ import (
 // QueueStatus is the queue at a glance, for the title row: its mode and the
 // done/total ticket counts of the epics it is working on.
 type QueueStatus struct {
-	// Mode is server.ModeRunning, ModePaused or ModeDraining.
-	Mode        string
+	// Mode is server.QueueModeRunning, QueueModePaused or QueueModeDraining.
+	Mode        server.QueueMode
 	Done, Total int
 }
 
@@ -40,9 +40,9 @@ func QueueStatusOf(vm viewmodel.State) (s QueueStatus, ok bool) {
 	}
 	s.Mode = vm.Mode
 	if s.Mode == "" {
-		s.Mode = server.ModeRunning
+		s.Mode = server.QueueModeRunning
 	}
-	held := s.Mode != server.ModeRunning && len(vm.Queue) > 0
+	held := s.Mode != server.QueueModeRunning && len(vm.Queue) > 0
 	return s, s.Total > 0 && (running || held)
 }
 

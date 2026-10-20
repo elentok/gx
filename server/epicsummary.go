@@ -7,13 +7,15 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// EpicSummary.State values.
+// EpicState is EpicSummary.State.
+type EpicState string
+
 const (
-	StateAwaitingMerge = "awaiting-merge"
-	StateRunning       = "running"
-	StateWaiting       = "waiting"
-	StateParked        = "parked"
-	StateDeadlocked    = "deadlocked"
+	EpicStateAwaitingMerge EpicState = "awaiting-merge"
+	EpicStateRunning       EpicState = "running"
+	EpicStateWaiting       EpicState = "waiting"
+	EpicStateParked        EpicState = "parked"
+	EpicStateDeadlocked    EpicState = "deadlocked"
 )
 
 // SummaryTicket is one ticket in an EpicSummary: an active one carries
@@ -29,12 +31,12 @@ type SummaryTicket struct {
 
 // EpicSummary is one epic holding a queue item, as the web page's cards show it.
 type EpicSummary struct {
-	Address string `json:"address"`
-	Name    string `json:"name"`
-	Project string `json:"project"`
-	State   string `json:"state"`
-	Done    int    `json:"done"`
-	Total   int    `json:"total"`
+	Address string    `json:"address"`
+	Name    string    `json:"name"`
+	Project string    `json:"project"`
+	State   EpicState `json:"state"`
+	Done    int       `json:"done"`
+	Total   int       `json:"total"`
 	// Active is the running tickets, listed only while the epic is Running.
 	Active []SummaryTicket `json:"active"`
 	Parked []SummaryTicket `json:"parked"`
@@ -95,19 +97,19 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 	}
 	switch epicStateOf(e) {
 	case epicDone:
-		sum.State = StateAwaitingMerge
+		sum.State = EpicStateAwaitingMerge
 	case epicRunnable:
-		sum.State = StateWaiting
+		sum.State = EpicStateWaiting
 		if len(sum.Active) > 0 {
-			sum.State = StateRunning
+			sum.State = EpicStateRunning
 		}
 	case epicParked:
-		sum.State = StateParked
+		sum.State = EpicStateParked
 	case epicCycle:
-		sum.State = StateDeadlocked
+		sum.State = EpicStateDeadlocked
 		sum.Reason = cycleReason(root, e)
 	}
-	if sum.State != StateRunning {
+	if sum.State != EpicStateRunning {
 		sum.Active = []SummaryTicket{}
 	}
 	return sum

@@ -32,7 +32,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 	cases := []struct {
 		name       string
 		epic       tickets.Epic
-		wantState  string
+		wantState  EpicState
 		wantDone   int
 		wantActive []string
 		wantParked []string
@@ -41,42 +41,42 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 		{
 			name:      "awaiting merge beats everything",
 			epic:      tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{summaryTicket("01", "done"), summaryTicket("02", "done")}},
-			wantState: StateAwaitingMerge, wantDone: 2,
+			wantState: EpicStateAwaitingMerge, wantDone: 2,
 		},
 		{
 			name: "running: claimed with a server claim time",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "done"), summaryTicket("02", "claimed"), summaryTicket("03", "needs-repair"),
 			}},
-			wantState: StateRunning, wantDone: 1, wantActive: []string{"proj:epic/02"}, wantParked: []string{"proj:epic/03"},
+			wantState: EpicStateRunning, wantDone: 1, wantActive: []string{"proj:epic/02"}, wantParked: []string{"proj:epic/03"},
 		},
 		{
 			name: "claimed without a claim time is runnable, so waiting",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "claimed"), summaryTicket("03", "needs-answer"),
 			}},
-			wantState: StateWaiting, wantParked: []string{"proj:epic/03"},
+			wantState: EpicStateWaiting, wantParked: []string{"proj:epic/03"},
 		},
 		{
 			name: "waiting: an open unblocked ticket",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "done"), summaryTicket("04", "open"),
 			}},
-			wantState: StateWaiting, wantDone: 1,
+			wantState: EpicStateWaiting, wantDone: 1,
 		},
 		{
 			name: "parked: nothing runnable, draft and error count as parked",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "draft"), summaryTicket("03", "needs-repair"), summaryTicket("04", "nonsense"),
 			}},
-			wantState: StateParked, wantParked: []string{"proj:epic/01", "proj:epic/03", "proj:epic/04"},
+			wantState: EpicStateParked, wantParked: []string{"proj:epic/01", "proj:epic/03", "proj:epic/04"},
 		},
 		{
 			name: "deadlocked: only blocked tickets, reason names what they wait on",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "open", "02"), summaryTicket("02", "open", "01"),
 			}},
-			wantState:  StateDeadlocked,
+			wantState:  EpicStateDeadlocked,
 			wantReason: "proj:epic/01 waits on proj:epic/02; proj:epic/02 waits on proj:epic/01",
 		},
 	}
@@ -153,10 +153,10 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 		epic := tickets.Epic{Name: "epic", Tickets: ts}
 		kind, stuck := deadlockKind(epic)
 		got := summarizeEpic(root, epic, none, noRecovery)
-		if want := stuck && kind == events.BlockedCycle; (got.State == StateDeadlocked) != want {
+		if want := stuck && kind == events.BlockedCycle; (got.State == EpicStateDeadlocked) != want {
 			t.Errorf("%v: state %q, deadlockKind %q/%v", statuses, got.State, kind, stuck)
 		}
-		if want := stuck && kind == events.AllParked; (got.State == StateParked) != want {
+		if want := stuck && kind == events.AllParked; (got.State == EpicStateParked) != want {
 			t.Errorf("%v: state %q, deadlockKind %q/%v", statuses, got.State, kind, stuck)
 		}
 	}

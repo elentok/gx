@@ -47,12 +47,12 @@ var (
 )
 
 // epicStateLabels must match LABELS in webui/src/view.ts.
-var epicStateLabels = map[string]string{
-	server.StateParked:        "Parked",
-	server.StateDeadlocked:    "Deadlocked",
-	server.StateRunning:       "Running",
-	server.StateWaiting:       "Waiting for a slot",
-	server.StateAwaitingMerge: "Awaiting merge",
+var epicStateLabels = map[server.EpicState]string{
+	server.EpicStateParked:        "Parked",
+	server.EpicStateDeadlocked:    "Deadlocked",
+	server.EpicStateRunning:       "Running",
+	server.EpicStateWaiting:       "Waiting for a slot",
+	server.EpicStateAwaitingMerge: "Awaiting merge",
 }
 
 // epicStatusLine picks an epic header's status-line icon, text, and color from
@@ -60,11 +60,11 @@ var epicStateLabels = map[string]string{
 // deadlocked epic.
 func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
 	switch sum.State {
-	case server.StateAwaitingMerge:
+	case server.EpicStateAwaitingMerge:
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
-	case server.StateRunning:
+	case server.EpicStateRunning:
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
-	case server.StateParked:
+	case server.EpicStateParked:
 		// Red once a parked ticket is broken, since a fault outranks a question.
 		for _, t := range sum.Parked {
 			if t.Status == tickets.StatusNeedsRepair.Word() || t.Status == tickets.StatusError.Word() {
@@ -72,14 +72,14 @@ func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph strin
 			}
 		}
 		return icons.Warning, epicStateLabels[sum.State], epicStatusParkedAnswerStyle
-	case server.StateDeadlocked:
+	case server.EpicStateDeadlocked:
 		text = epicStateLabels[sum.State]
 		if sum.Reason != "" {
 			text += ": " + sum.Reason
 		}
 		return icons.Warning, text, epicStatusParkedRepairStyle
 	default:
-		return icons.EpicQueued, epicStateLabels[server.StateWaiting], lipgloss.NewStyle()
+		return icons.EpicQueued, epicStateLabels[server.EpicStateWaiting], lipgloss.NewStyle()
 	}
 }
 
@@ -343,7 +343,7 @@ func (m QueueModel) queueRunStateTitle() string {
 // reports running.
 func (m QueueModel) runningProgress() (done, total int) {
 	for _, sum := range m.summaries {
-		if sum.State == server.StateRunning {
+		if sum.State == server.EpicStateRunning {
 			done += sum.Done
 			total += sum.Total
 		}

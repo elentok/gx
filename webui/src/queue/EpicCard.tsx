@@ -5,8 +5,6 @@ import { Card } from "../ui/card/Card";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 
-const shortId = (address: string) => address.slice(address.lastIndexOf("/") + 1);
-
 export function EpicCard({ epic }: { epic: EpicView }) {
   return (
     <Card tone={epic.tone}>
@@ -33,7 +31,7 @@ export function EpicCard({ epic }: { epic: EpicView }) {
       {epic.tickets.map((t) => (
         <TicketLine
           key={t.address}
-          id={shortId(t.address)}
+          id={t.id}
           title={t.title}
           reason={t.detail}
           tone={t.tone}

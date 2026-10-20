@@ -8,6 +8,16 @@ import {
 } from "./connection";
 import type { Snapshot } from "./snapshot";
 
+const emptySnapshot = (seq: number): Snapshot => ({
+  seq,
+  budget: { day: "", total: 0, soft_limit: 0, hard_limit: 0, budget_paused: false, hard_latched: false },
+  tickets: [],
+  pending: [],
+  sessions: [],
+  epics: [],
+  recently_finished: [],
+});
+
 interface FakeStream {
   url: string;
   signal: AbortSignal;
@@ -23,7 +33,7 @@ function setup(opts: { snapshotFails?: () => boolean } = {}) {
     fetchSnapshot: async () => {
       log.push("snapshot");
       if (opts.snapshotFails?.()) throw new Error("down");
-      return { seq: ++seq, tickets: [], epics: [], recently_finished: [] } satisfies Snapshot;
+      return emptySnapshot(++seq);
     },
     openStream: async (url, signal) => {
       log.push(`events ${url}`);
@@ -210,7 +220,7 @@ test("a burst of events runs one refresh in flight plus one trailing, never out 
     fetchSnapshot: async () => {
       const seq = ++calls;
       if (seq > 1) await new Promise<void>((resolve) => pending.push({ seq, resolve }));
-      return { seq, tickets: [], epics: [], recently_finished: [] } satisfies Snapshot;
+      return emptySnapshot(seq);
     },
     openStream: async () => {
       const queue: string[] = [];
@@ -250,7 +260,7 @@ test("a burst of events runs one refresh in flight plus one trailing, never out 
 test("a connect that never resolves trips the watchdog after 45s", async () => {
   const signals: AbortSignal[] = [];
   const conn = createConnection({
-    fetchSnapshot: async () => ({ seq: 1, tickets: [], epics: [], recently_finished: [] }),
+    fetchSnapshot: async () => emptySnapshot(1),
     openStream: (_url, signal) => {
       signals.push(signal);
       return new Promise<AsyncIterable<string>>(() => {});

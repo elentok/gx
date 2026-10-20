@@ -1,0 +1,15 @@
+# Generates the web UI's view of the server wire types: `make web-types`.
+packages:
+  - path: "github.com/elentok/gx/server"
+    output_path: "webui/src/generated/server.ts"
+    include_files:
+      - budget.go
+      - epicsummary.go
+      - index.go
+      - pause.go
+      - recentlyfinished.go
+      - sessions.go
+      - verdicts.go
+    type_mappings:
+      time.Time: "string"
+    enum_style: "union"

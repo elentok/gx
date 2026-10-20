@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import canned from "./canned-snapshot.json";
-import type { Snapshot } from "./snapshot";
+import type { QueueMode, Snapshot } from "./snapshot";
 import { snapshotView } from "./view";
 
 const now = new Date("2026-10-19T12:00:00Z");
 const snap = canned as Snapshot;
-const view = (mode?: string) => snapshotView({ ...snap, mode }, now);
-const byName = (name: string, mode?: string) => view(mode).epics.find((e) => e.name === name)!;
+const view = (mode?: QueueMode) => snapshotView({ ...snap, mode }, now);
+const byName = (name: string, mode?: QueueMode) => view(mode).epics.find((e) => e.name === name)!;
 
 describe("snapshotView", () => {
   it("orders epics by state and keeps server order within a state", () => {
@@ -29,9 +29,9 @@ describe("snapshotView", () => {
   });
 
   it("lists active tickets before parked ones, and only Parked for Waiting", () => {
-    expect(byName("run").tickets.map((t) => [t.address, t.tone])).toEqual([
-      ["gx:run/03", "muted"],
-      ["gx:run/04", "parked"],
+    expect(byName("run").tickets.map((t) => [t.address, t.id, t.tone])).toEqual([
+      ["gx:run/03", "03", "muted"],
+      ["gx:run/04", "04", "parked"],
     ]);
     expect(byName("wait").tickets.map((t) => [t.address, t.tone, t.detail])).toEqual([
       ["gx:wait/03", "parked", "needs a person"],

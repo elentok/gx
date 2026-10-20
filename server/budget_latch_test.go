@@ -80,7 +80,7 @@ func TestBudgetLatch_IsIndependentOfUserPause(t *testing.T) {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
 	// Draining a paused queue keeps the pause, so its mode reads the user pause.
-	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Mode != server.ModePaused {
+	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Mode != server.QueueModePaused {
 		t.Fatalf("mode = %+v, %v; want paused after the budget latch cleared", res, err)
 	}
 }
