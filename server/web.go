@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io/fs"
+	"mime"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -57,13 +58,23 @@ func (s *Server) WebURL() string {
 	return "http://" + s.web.Addr().String()
 }
 
-// webHandler is the read-only mux: the snapshot, the event stream and the
-// embedded assets. Every other request is a 404.
+// webHandler is the web mux: the snapshot, the event stream and the embedded
+// assets, plus the allowlisted writes. Every other request is a 404.
 func (s *Server) webHandler() http.Handler {
 	assets := webui.Assets()
 	static := serveAsset(http.FileServerFS(assets), assets)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
+			if reason := checkWriteRequest(r); reason != "" {
+				http.Error(w, reason, http.StatusForbidden)
+				return
+			}
+			for _, route := range routeTable {
+				if route.pattern == r.Method+" "+r.URL.Path && webPOSTAllowlist[route.pattern] {
+					route.handler(s, w, r)
+					return
+				}
+			}
 			http.NotFound(w, r)
 			return
 		}
@@ -80,6 +91,29 @@ func (s *Server) webHandler() http.Handler {
 			static.ServeHTTP(w, r)
 		}
 	})
+}
+
+// webPOSTAllowlist names the "METHOD /path" routeTable entries the web mux
+// serves besides the read-only GETs. Later tickets add their routes here.
+var webPOSTAllowlist = map[string]bool{}
+
+// checkWriteRequest returns why a non-GET request is refused, or "". It is the
+// CSRF guard: a cross-site form post cannot set a JSON content type, and a
+// cross-site fetch cannot forge a same-host Origin. Origin and Host are
+// compared on host and port; the scheme is ignored.
+func checkWriteRequest(r *http.Request) string {
+	origin := r.Header.Get("Origin")
+	if origin == "" || origin == "null" {
+		return "missing or opaque Origin"
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" || !strings.EqualFold(u.Host, r.Host) {
+		return "Origin does not match Host"
+	}
+	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		return "Content-Type must be application/json"
+	}
+	return ""
 }
 
 // devFrontendProxy forwards requests to a Vite dev server on loopback. The

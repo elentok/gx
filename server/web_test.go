@@ -73,6 +73,77 @@ func webDo(t *testing.T, h *servertest.Harness, method, url string) (int, string
 	return webDoCookie(t, method, url, login(t, h.StateDir, "http://"+base))
 }
 
+// webSend sends an authenticated request with the given headers and an empty JSON body.
+func webSend(t *testing.T, h *servertest.Harness, method, url string, headers map[string]string) int {
+	t.Helper()
+	base, _, _ := strings.Cut(url[len("http://"):], "/")
+	req, err := http.NewRequest(method, url, strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(login(t, h.StateDir, "http://"+base))
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
+	h, base := startWeb(t)
+	host := strings.TrimPrefix(base, "http://")
+	hostname, port, _ := net.SplitHostPort(host)
+	otherPort := "http://" + hostname + ":1"
+	if port == "1" {
+		otherPort = "http://" + hostname + ":2"
+	}
+	js := "application/json"
+	cases := []struct {
+		name    string
+		headers map[string]string
+		want    int
+	}{
+		{"no origin", map[string]string{"Content-Type": js}, 403},
+		{"other host", map[string]string{"Origin": "http://evil.example", "Content-Type": js}, 403},
+		{"other port", map[string]string{"Origin": otherPort, "Content-Type": js}, 403},
+		{"null origin", map[string]string{"Origin": "null", "Content-Type": js}, 403},
+		{"text/plain", map[string]string{"Origin": base, "Content-Type": "text/plain"}, 403},
+		{"no content type", map[string]string{"Origin": base}, 403},
+		{"valid", map[string]string{"Origin": base, "Content-Type": js}, 404},
+		{"scheme ignored", map[string]string{"Origin": "https://" + host, "Content-Type": js}, 404},
+		{"charset param", map[string]string{"Origin": base, "Content-Type": js + "; charset=utf-8"}, 404},
+	}
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+		for _, tc := range cases {
+			for _, path := range []string{"/v1/snapshot", "/nope"} {
+				if got := webSend(t, h, method, base+path, tc.headers); got != tc.want {
+					t.Errorf("%s %s (%s) = %d, want %d", method, path, tc.name, got, tc.want)
+				}
+			}
+		}
+	}
+}
+
+func TestWeb_GetNeedsNoOrigin(t *testing.T) {
+	h, base := startWeb(t)
+	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
+		t.Errorf("GET without Origin = %d, want 200", code)
+	}
+}
+
+// The token check runs before the Origin check, so an unauthenticated write is
+// 401 even with a bad Origin.
+func TestWeb_WriteTokenCheckComesFirst(t *testing.T) {
+	_, base := startWeb(t)
+	if code, _ := webDoCookie(t, http.MethodPost, base+"/nope", nil); code != http.StatusUnauthorized {
+		t.Errorf("unauthenticated POST = %d, want 401", code)
+	}
+}
+
 func TestWeb_OffByDefault(t *testing.T) {
 	hs, err := servertest.Start(t).Client.Handshake(context.Background())
 	if err != nil || hs.WebURL != "" || hs.WebError != "" {
@@ -101,18 +172,19 @@ func TestWeb_SnapshotIsServed(t *testing.T) {
 
 func TestWeb_EverythingElseIs404(t *testing.T) {
 	h, base := startWeb(t)
+	validWrite := map[string]string{"Origin": base, "Content-Type": "application/json"}
 	for _, pattern := range server.RoutePatterns() {
 		method, path, _ := strings.Cut(pattern, " ")
 		if pattern == "GET /v1/snapshot" || pattern == "GET /v1/events" {
 			continue
 		}
-		if code, _ := webDo(t, h, method, base+path); code != http.StatusNotFound {
+		if code := webSend(t, h, method, base+path, validWrite); code != http.StatusNotFound {
 			t.Errorf("%s = %d, want 404", pattern, code)
 		}
 	}
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
 		for _, path := range []string{"/v1/snapshot", "/v1/events", "/"} {
-			if code, _ := webDo(t, h, method, base+path); code != http.StatusNotFound {
+			if code := webSend(t, h, method, base+path, validWrite); code != http.StatusNotFound {
 				t.Errorf("%s %s = %d, want 404", method, path, code)
 			}
 		}
