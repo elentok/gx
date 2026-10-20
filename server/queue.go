@@ -93,6 +93,9 @@ type QueueRequest struct {
 	Text string `json:"text,omitempty"`
 	// Decision is allow or deny, for answering a blocked permission request.
 	Decision string `json:"decision,omitempty"`
+	// RequestID names the permission request a decision answers; empty answers
+	// whatever is open (the TUI and CLI).
+	RequestID string `json:"request_id,omitempty"`
 	// Choice, Note, State and Source are an answer's choice (an option id, yes or
 	// no), its note, the state token of the question it answers and where it
 	// came from (cli or web). A free-text answer uses Text.

@@ -146,14 +146,17 @@ func newServerAgentsCmd() *cobra.Command {
 		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
 			return cl.AgentInterrupt(ctx, args[0])
 		}))
-	cmd.AddCommand(agentsWriteCmd("answer <project:epic/NN> <allow|deny> [reason]", "answer the permission request a ticket's agent waits on", cobra.RangeArgs(2, 3),
+	var requestID string
+	answer := agentsWriteCmd("answer <project:epic/NN> <allow|deny> [reason]", "answer the permission request a ticket's agent waits on", cobra.RangeArgs(2, 3),
 		func(ctx context.Context, cl *apiclient.Client, args []string) (server.QueueResult, error) {
-			var text string
+			req := server.QueueRequest{Address: args[0], Decision: args[1], RequestID: requestID, Source: "cli"}
 			if len(args) == 3 {
-				text = args[2]
+				req.Text = args[2]
 			}
-			return cl.AgentAnswer(ctx, args[0], args[1], text)
-		}))
+			return cl.AgentAnswerRequest(ctx, req)
+		})
+	answer.Flags().StringVar(&requestID, "request-id", "", "answer only this permission request; refused if the open one differs")
+	cmd.AddCommand(answer)
 	return cmd
 }
 

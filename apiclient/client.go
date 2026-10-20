@@ -321,7 +321,13 @@ func (c *Client) AgentInterrupt(ctx context.Context, address string) (server.Que
 
 // AgentAnswer allows or denies the permission request a ticket's agent waits on.
 func (c *Client) AgentAnswer(ctx context.Context, address, decision, text string) (server.QueueResult, error) {
-	return c.queueWriteTo(ctx, "/v1/agents/answer", server.QueueRequest{Address: address, Decision: decision, Text: text})
+	return c.AgentAnswerRequest(ctx, server.QueueRequest{Address: address, Decision: decision, Text: text})
+}
+
+// AgentAnswerRequest is AgentAnswer with the full request: the request ID of the
+// prompt being answered and the source of the decision.
+func (c *Client) AgentAnswerRequest(ctx context.Context, req server.QueueRequest) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/agents/answer", req)
 }
 
 // TicketChanged pings the server that a direct write changed address's file.

@@ -64,6 +64,12 @@ type LogEvent struct {
 	Reason   string           `json:"reason,omitempty"`
 }
 
+// ClipLogText cuts text to MaxLogTextChars and says whether it cut anything.
+func ClipLogText(text string) (string, bool) {
+	clipped := clipRunes(text, MaxLogTextChars)
+	return clipped, clipped != text
+}
+
 // LogPath is the log beside the ticket file at ticketPath.
 func LogPath(ticketPath string) string {
 	return strings.TrimSuffix(ticketPath, ".md") + ".jsonl"
