@@ -1,9 +1,7 @@
 package server
 
 import (
-	"errors"
 	"io/fs"
-	"mime"
 	"net"
 	"net/http"
 	"path"
@@ -13,7 +11,8 @@ import (
 )
 
 // bindWeb opens the web listener. A failure is recorded for the handshake and
-// never stops the server.
+// never stops the server. New calls it once, before anything can read s.web or
+// s.webErr, so the writes need no lock.
 func (s *Server) bindWeb() {
 	if s.cfg.WebAddr == "" {
 		return
@@ -49,6 +48,7 @@ func (s *Server) WebURL() string {
 // embedded assets. Every other request is a 404.
 func (s *Server) webHandler() http.Handler {
 	assets := webui.Assets()
+	static := serveAsset(http.FileServerFS(assets), assets)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.NotFound(w, r)
@@ -62,33 +62,21 @@ func (s *Server) webHandler() http.Handler {
 		case strings.HasPrefix(r.URL.Path, "/v1/"):
 			http.NotFound(w, r)
 		default:
-			serveAsset(w, r, assets)
+			static.ServeHTTP(w, r)
 		}
 	})
 }
 
 // serveAsset serves the file at the request path. A path with no file gets
 // index.html, so the single-page app can own its client-side routes.
-func serveAsset(w http.ResponseWriter, r *http.Request, assets fs.FS) {
-	name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-	if name == "" || name == "index.html" {
-		name = "index.html"
-	} else if info, err := fs.Stat(assets, name); err != nil || info.IsDir() {
-		name = "index.html"
-	}
-	data, err := fs.ReadFile(assets, name)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			http.NotFound(w, r)
-			return
+func serveAsset(files http.Handler, assets fs.FS) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		if info, err := fs.Stat(assets, name); name != "" && (err != nil || info.IsDir()) {
+			r2 := r.Clone(r.Context())
+			r2.URL.Path = "/"
+			r = r2
 		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ct := mime.TypeByExtension(path.Ext(name))
-	if ct == "" {
-		ct = http.DetectContentType(data)
-	}
-	w.Header().Set("Content-Type", ct)
-	_, _ = w.Write(data)
+		files.ServeHTTP(w, r)
+	})
 }
