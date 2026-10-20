@@ -43,7 +43,10 @@ var gxQuestions = map[events.Kind]string{
 	events.AmbiguousBase:      "Several blockers have different branches. Pick the base branch.",
 }
 
-var errQuestionOpen = errors.New("open question")
+var (
+	errQuestionOpen = errors.New("open question")
+	errQuestionGone = errors.New("question no longer open")
+)
 
 // logGxQuestion writes the by-gx park.question for kind before the status
 // flips. A ticket that already has an open question keeps it.
@@ -66,6 +69,39 @@ func logGxQuestion(ticketPath string, kind events.Kind) error {
 		return nil
 	})
 	if errors.Is(err, errQuestionOpen) {
+		return nil
+	}
+	return err
+}
+
+// Reasons a park.closed names: what ended the question without an answer.
+const (
+	CloseBudgetKilled = "budget-killed"
+	CloseRelaunch     = "relaunch"
+)
+
+// CloseOpenQuestion writes park.closed with reason for the ticket's open
+// question, so the log ends it before the status moves on. A ticket without an
+// open question is left alone.
+func CloseOpenQuestion(ticketPath, reason string) error {
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		return err
+	}
+	q := tickets.OpenQuestion(evs)
+	if q == nil {
+		return nil
+	}
+	// The guard re-checks under the ticket lock: an answer may have landed since the read.
+	_, err = tickets.AppendLogIf(ticketPath, tickets.LogEvent{
+		Type: tickets.EventParkClosed, Question: q.Seq, Reason: reason,
+	}, func(evs []tickets.LogEvent) error {
+		if cur := tickets.OpenQuestion(evs); cur == nil || cur.Seq != q.Seq {
+			return errQuestionGone
+		}
+		return nil
+	})
+	if errors.Is(err, errQuestionGone) {
 		return nil
 	}
 	return err

@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 )
 
 // startWithLeftover starts a server on a fake runner whose ticket 01 label is
@@ -95,6 +96,41 @@ func TestRelaunch_IdleLeftoverIsLeftToTheLaunch(t *testing.T) {
 
 	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 		t.Fatalf("relaunch = %+v, %v", res, err)
+	}
+}
+
+// A relaunch ends the ticket's open question with park.closed{relaunch}; with no
+// open question it writes nothing.
+func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
+	h, _, _, path := startWithLeftover(t, agentrunner.StateIdle)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "gx", Summary: "q?"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("relaunch = %+v, %v", res, err)
+	}
+	evs, err := tickets.ReadLog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) != 2 || evs[1].Type != tickets.EventParkClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" {
+		t.Errorf("log = %+v, want the question then park.closed{question 1, relaunch}", evs)
+	}
+}
+
+func TestRelaunch_WithoutQuestionWritesNoLog(t *testing.T) {
+	h, _, _, path := startWithLeftover(t, agentrunner.StateIdle)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("relaunch = %+v, %v", res, err)
+	}
+	if evs, _ := tickets.ReadLog(path); len(evs) != 0 {
+		t.Errorf("log = %+v, want empty", evs)
 	}
 }
 

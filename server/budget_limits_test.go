@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -290,8 +291,42 @@ func TestBudget_HardLimitParksAQuietRunBudgetKilledToo(t *testing.T) {
 
 func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64, ticket servertest.TicketOpts) {
 	t.Helper()
+	runBudgetKill(t, cost, ticket, nil)
+}
+
+// A hard-limit kill closes the run's open question with budget-killed, before
+// the park status.
+func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
+	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, func(path string) {
+		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "gx", Summary: "q?"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	evs, err := tickets.ReadLog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evs) != 2 || evs[1].Type != tickets.EventParkClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" {
+		t.Errorf("log = %+v, want the question then park.closed{question 1, budget-killed}", evs)
+	}
+}
+
+func TestBudget_HardLimitKillWithoutQuestionWritesNoLog(t *testing.T) {
+	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, nil)
+	if evs, _ := tickets.ReadLog(path); len(evs) != 0 {
+		t.Errorf("log = %+v, want empty", evs)
+	}
+}
+
+// runBudgetKill runs one ticket past the hard limit, seeding its log first
+// when seed is set, and returns the ticket's path once it is parked.
+func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOpts, seed func(path string)) string {
+	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", ticket)
+	if seed != nil {
+		seed(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
+	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
@@ -328,6 +363,7 @@ func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64, ticket s
 	if live, _ := fake.List("epic-a"); len(live) != 0 {
 		t.Errorf("sessions still live after budget kill: %v", live)
 	}
+	return path
 }
 
 // startBudgetRuns launches n runs of epic-a, one fake session each, with the

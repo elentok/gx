@@ -577,6 +577,9 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 	if closeErr == nil {
 		closeErr = r.Stop(t.Session)
 	}
+	if err := ralphloop.CloseOpenQuestion(t.TicketPath, ralphloop.CloseBudgetKilled); err != nil {
+		closeErr = errors.Join(closeErr, err)
+	}
 	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached", t.Run)
 	return errors.Join(closeErr, parkErr)
 }
