@@ -1,4 +1,4 @@
-.PHONY: build web-build web-dev web-dev-proxy web-test web-types install test test-race e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-dev-proxy web-test web-types install test test-race test-short test-server e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -41,8 +41,20 @@ install:
 # herdrrunner runs under it too, for its concurrent use of the herdr fake.
 RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor ./agentrunner/herdrrunner
 
+# The server package alone is most of the runtime and can't use t.Parallel (its
+# harness mutates PATH/HOME), so it runs sharded across processes instead; see
+# scripts/test-shards.sh. Everything else runs as a normal `go test`.
 test: test-race
-	go test ./... -timeout=10m
+	go test $$(go list ./... | grep -Fvx github.com/elentok/gx/server) -timeout=10m
+	scripts/test-shards.sh ./server
+
+# test-server runs only the sharded server package (TEST_SHARDS=N, default 5).
+test-server:
+	scripts/test-shards.sh ./server
+
+# test-short skips the slow server package for the inner loop.
+test-short:
+	go test -short $$(go list ./... | grep -Fvx github.com/elentok/gx/server) -timeout=10m
 
 test-race:
 	go test -race $(RACE_PKGS) -timeout=10m

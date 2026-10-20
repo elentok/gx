@@ -8,6 +8,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/elentok/gx/claudedoctor"
 )
@@ -65,10 +67,29 @@ type Control struct {
 
 const controlType = "agentfake_control"
 
+// fifoOpenWait bounds how long SendControl waits for the agent to open its end
+// of the FIFO.
+const fifoOpenWait = 5 * time.Second
+
+// openFIFOWriter opens the FIFO at path for writing without blocking. A plain
+// O_WRONLY open waits forever when the agent has died, so a test that races an
+// agent's exit would hang until the package timeout; ENXIO means no reader yet.
+func openFIFOWriter(path string) (*os.File, error) {
+	for deadline := time.Now().Add(fifoOpenWait); ; time.Sleep(10 * time.Millisecond) {
+		fd, err := syscall.Open(path, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+		if err == nil {
+			return os.NewFile(uintptr(fd), path), nil
+		}
+		if err != syscall.ENXIO || time.Now().After(deadline) {
+			return nil, &os.PathError{Op: "open", Path: path, Err: err}
+		}
+	}
+}
+
 // SendControl writes c to the agent's stdin FIFO. One write of a short line
 // is atomic, so it never interleaves with gx's own writes.
 func SendControl(stdin string, c Control) error {
-	f, err := os.OpenFile(stdin, os.O_WRONLY, 0)
+	f, err := openFIFOWriter(stdin)
 	if err != nil {
 		return err
 	}

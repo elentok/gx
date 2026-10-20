@@ -52,29 +52,19 @@ jobs:
         run: brew install git-delta
 
       - name: Test
-        # -timeout=10m (per package): the server package's tests run serially and
-        # sum to ~260s on ubuntu (mostly the 6s chat batch flush), so 5m timed out
-        # on the slower macOS runner — no single test hung. Still fails a truly hung test well before the
-        # job's overall time limit, but leaves
-        # headroom for CI runners' lower core counts, where concurrency-
-        # sensitive tests (e.g. park/resume against a permit cap) can
-        # legitimately take longer than on a local dev machine. 2m proved too
-        # tight and produced runner-only timeout failures on tests that pass
-        # reliably (and fast) locally.
+        # make test runs the race packages, then every other package, then the
+        # server package sharded across processes (scripts/test-shards.sh). Each
+        # step keeps -timeout=10m per package/shard: CI runners' lower core counts
+        # give concurrency-sensitive tests (e.g. park/resume against a permit cap)
+        # more room to legitimately run long; 2m and 5m both timed out on tests
+        # that pass reliably (and fast) locally.
         # A commit's detached auto maintenance can outlive a test and break
         # its t.TempDir cleanup; testutil's init sets the same for local runs.
         env:
           GIT_CONFIG_COUNT: "1"
           GIT_CONFIG_KEY_0: maintenance.auto
           GIT_CONFIG_VALUE_0: "false"
-        run: go test ./... -timeout=10m
-
-      - name: Test (race)
-        env:
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: maintenance.auto
-          GIT_CONFIG_VALUE_0: "false"
-        run: make test-race
+        run: make test
 
       - name: Build
         run: go build ./...
