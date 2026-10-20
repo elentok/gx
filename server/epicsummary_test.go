@@ -37,6 +37,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 		wantActive []string
 		wantParked []string
 		wantReason string
+		wantRepair bool
 	}{
 		{
 			name:      "awaiting merge beats everything",
@@ -48,7 +49,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "done"), summaryTicket("02", "claimed"), summaryTicket("03", "needs-repair"),
 			}},
-			wantState: EpicStateRunning, wantDone: 1, wantActive: []string{"proj:epic/02"}, wantParked: []string{"proj:epic/03"},
+			wantState: EpicStateRunning, wantDone: 1, wantActive: []string{"proj:epic/02"}, wantParked: []string{"proj:epic/03"}, wantRepair: true,
 		},
 		{
 			name: "claimed without a claim time is runnable, so waiting",
@@ -69,7 +70,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "draft"), summaryTicket("03", "needs-repair"), summaryTicket("04", "nonsense"),
 			}},
-			wantState: EpicStateParked, wantParked: []string{"proj:epic/01", "proj:epic/03", "proj:epic/04"},
+			wantState: EpicStateParked, wantParked: []string{"proj:epic/01", "proj:epic/03", "proj:epic/04"}, wantRepair: true,
 		},
 		{
 			name: "deadlocked: only blocked tickets, reason names what they wait on",
@@ -102,6 +103,9 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 			}
 			if addrs := summaryAddresses(got.Parked); !equalStrings(addrs, tc.wantParked) {
 				t.Errorf("parked = %v, want %v", addrs, tc.wantParked)
+			}
+			if got.HasRepair != tc.wantRepair {
+				t.Errorf("has_repair = %v, want %v", got.HasRepair, tc.wantRepair)
 			}
 			if got.Reason != tc.wantReason {
 				t.Errorf("reason = %q, want %q", got.Reason, tc.wantReason)

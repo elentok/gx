@@ -66,10 +66,8 @@ func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph strin
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
 	case server.EpicStateParked:
 		// Red once a parked ticket is broken, since a fault outranks a question.
-		for _, t := range sum.Parked {
-			if t.Status == tickets.StatusNeedsRepair.Word() || t.Status == tickets.StatusError.Word() {
-				return icons.Warning, epicStateLabels[sum.State], epicStatusParkedRepairStyle
-			}
+		if sum.HasRepair {
+			return icons.Warning, epicStateLabels[sum.State], epicStatusParkedRepairStyle
 		}
 		return icons.Warning, epicStateLabels[sum.State], epicStatusParkedAnswerStyle
 	case server.EpicStateDeadlocked:

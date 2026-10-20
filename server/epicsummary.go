@@ -40,6 +40,9 @@ type EpicSummary struct {
 	// Active is the running tickets, listed only while the epic is Running.
 	Active []SummaryTicket `json:"active"`
 	Parked []SummaryTicket `json:"parked"`
+	// HasRepair is set when a parked ticket is broken (needs-repair or error), so
+	// both clients show a fault in the alarm color instead of a question.
+	HasRepair bool `json:"has_repair"`
 	// Reason names what holds a Deadlocked epic.
 	Reason string `json:"reason,omitempty"`
 }
@@ -88,6 +91,7 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		case isParked(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.ParkReason(e, t)
 			sum.Parked = append(sum.Parked, info)
+			sum.HasRepair = sum.HasRepair || status == tickets.StatusNeedsRepair || status == tickets.StatusError
 		case status == tickets.StatusClaimed:
 			if at, ok := claimedAt(addr); ok {
 				info.ClaimedAt = at

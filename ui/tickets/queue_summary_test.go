@@ -45,7 +45,7 @@ func TestEpicStatusLine_DeadlockedShowsReason(t *testing.T) {
 func TestEpicStatusLine_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
-	repair := server.EpicSummary{State: server.EpicStateParked, Parked: []server.SummaryTicket{
+	repair := server.EpicSummary{State: server.EpicStateParked, HasRepair: true, Parked: []server.SummaryTicket{
 		{Status: "needs-answer"}, {Status: "needs-repair"},
 	}}
 	answer := server.EpicSummary{State: server.EpicStateParked, Parked: []server.SummaryTicket{{Status: "needs-answer"}}}
