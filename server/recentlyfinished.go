@@ -1,7 +1,8 @@
 package server
 
 import (
-	"sort"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/tickets"
@@ -32,21 +33,16 @@ func (i *index) recentlyFinished(limit int) []FinishedEpic {
 			}
 			f := FinishedEpic{
 				Address: rootRef{Project: project, Epic: e.Name}.String(),
-				Name:    e.Name, Project: project, Total: len(e.Tickets), CompletedAt: e.CompletedAt,
-			}
-			for _, t := range e.Tickets {
-				if e.RenderedStatus(t) == tickets.StatusDone {
-					f.Done++
-				}
+				Name:    e.Name, Project: project, Done: e.DoneCount(), Total: e.TotalCount(), CompletedAt: e.CompletedAt,
 			}
 			out = append(out, f)
 		}
 	}
-	sort.Slice(out, func(a, b int) bool {
-		if !out[a].CompletedAt.Equal(out[b].CompletedAt) {
-			return out[a].CompletedAt.After(out[b].CompletedAt)
+	slices.SortFunc(out, func(a, b FinishedEpic) int {
+		if c := b.CompletedAt.Compare(a.CompletedAt); c != 0 {
+			return c
 		}
-		return out[a].Address < out[b].Address
+		return strings.Compare(a.Address, b.Address)
 	})
 	if len(out) > limit {
 		out = out[:limit]

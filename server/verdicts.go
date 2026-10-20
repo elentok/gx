@@ -43,14 +43,14 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 	claimed := t.Status == "claimed" || s.registry.has(addr.String())
 	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
-	case "stalled":
-		return Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Status} // needs-answer, needs-repair or draft
-	case "unclaimed":
+	case ralphloop.DecisionStalled:
+		return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // needs-answer, needs-repair or draft
+	case ralphloop.DecisionUnclaimed:
 		if path, missing := s.unavailablePath(addr.Project); missing {
 			return Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}
 		}
 		return s.scheduleVerdict(e, t, addr)
-	case "blocked":
+	case ralphloop.DecisionBlocked:
 		// The scheduler's reason lists only Blocked by: tokens, so a fork child
 		// held by its parent alone would explain as blocked by nothing.
 		if !e.ParentDone(t) {
@@ -62,7 +62,7 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 			}
 		}
 	}
-	return Explanation{Address: addr.String(), Verdict: d.Decision, Reason: d.Reason}
+	return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Reason}
 }
 
 // scheduleVerdict explains an unclaimed ticket that nothing in the store blocks:

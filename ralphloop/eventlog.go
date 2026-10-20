@@ -47,6 +47,20 @@ const (
 	notifyKindBatch = "batch"
 )
 
+// Decision is a ticket's scheduling disposition in one scheduler scan.
+type Decision string
+
+const (
+	DecisionClaimed    Decision = "claimed"
+	DecisionOutOfScope Decision = "out-of-scope"
+	DecisionDone       Decision = "done"
+	DecisionError      Decision = "error"
+	DecisionStalled    Decision = "stalled"
+	DecisionFrontier   Decision = "frontier"
+	DecisionBlocked    Decision = "blocked"
+	DecisionUnclaimed  Decision = "unclaimed"
+)
+
 // ScanDecision records one ticket's scheduling disposition for a single
 // scheduler-scan log line, in Epic.Tickets order — every ticket
 // loadNamedEpic returned at the moment claimNext evaluated the frontier, not
@@ -64,7 +78,7 @@ type ScanDecision struct {
 	// "out-of-scope" (RunScope.Contains is false — e.g. a code-review
 	// ticket's child missing its own parent: back-edge), "blocked", or
 	// "settled" (already done/needs-answer/needs-repair).
-	Decision string `json:"decision"`
+	Decision Decision `json:"decision"`
 	// Reason elaborates Decision — e.g. UnresolvedBlockers's tokens for
 	// "blocked". Empty when Decision is self-explanatory.
 	Reason string `json:"reason,omitempty"`

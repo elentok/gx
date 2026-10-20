@@ -75,7 +75,7 @@ func (s *Server) epicSummaries(all []TicketInfo) []EpicSummary {
 // counts as runnable, but only one with a server claim time counts as running.
 func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string) EpicSummary {
 	sum := EpicSummary{
-		Address: root.String(), Name: e.Name, Project: root.Project, Total: len(e.Tickets),
+		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
 		Active: []SummaryTicket{}, Parked: []SummaryTicket{},
 	}
 	for _, t := range e.Tickets {
@@ -83,8 +83,6 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
 		info := SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
 		switch {
-		case status == tickets.StatusDone:
-			sum.Done++
 		case isParked(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.ParkReason(e, t)
 			sum.Parked = append(sum.Parked, info)

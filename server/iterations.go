@@ -134,7 +134,7 @@ func (s *Server) queue(w http.ResponseWriter, _ *http.Request) {
 			for _, d := range ralphloop.EpicQueue(e) {
 				list = append(list, QueueEntry{
 					Address:  project + ":" + epicName + "/" + d.Ticket,
-					Decision: d.Decision, Reason: d.Reason,
+					Decision: string(d.Decision), Reason: d.Reason,
 				})
 			}
 		}

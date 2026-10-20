@@ -1033,23 +1033,23 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 	d := ScanDecision{Ticket: t.Identifier, Status: status.Word()}
 	switch {
 	case claimed:
-		d.Decision = "claimed"
+		d.Decision = DecisionClaimed
 	case !scope.Contains(t, epic):
-		d.Decision = "out-of-scope"
+		d.Decision = DecisionOutOfScope
 	case status.Terminal():
-		d.Decision = "done"
+		d.Decision = DecisionDone
 	case status == tickets.StatusError:
-		d.Decision = "error"
+		d.Decision = DecisionError
 		d.Reason = cmp.Or(t.ReadErr, t.GraphErr, t.BlockedByErr, "unrecognized status "+t.Status)
 	case epic.IsParked(t):
-		d.Decision = "stalled"
+		d.Decision = DecisionStalled
 	case inFrontier:
-		d.Decision = "frontier"
+		d.Decision = DecisionFrontier
 	case status == tickets.StatusBlocked:
-		d.Decision = "blocked"
+		d.Decision = DecisionBlocked
 		d.Reason = strings.Join(epic.UnresolvedBlockers(t), ", ")
 	default:
-		d.Decision = "unclaimed"
+		d.Decision = DecisionUnclaimed
 	}
 	return d
 }
