@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -372,7 +373,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 		{
 			name:       "claude default",
 			wantKind:   "claude",
-			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools},
+			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt", harness.GXSystemPrompt},
 			wantPrefix: "/implement ",
 		},
 		{
@@ -389,7 +390,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 				Claude: config.AgentConfig{Model: "sonnet", Effort: "medium"},
 			},
 			wantKind:   "claude",
-			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet", "--effort", "medium"},
+			wantArgs:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt", harness.GXSystemPrompt, "--model", "sonnet", "--effort", "medium"},
 			wantPrefix: "/implement ",
 		},
 		{
@@ -472,26 +473,26 @@ func TestAgentArgs_ModelAndEffort(t *testing.T) {
 		{
 			name:  "claude both empty unchanged",
 			agent: AgentClaude,
-			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools},
+			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt", harness.GXSystemPrompt},
 		},
 		{
 			name:   "claude both set",
 			agent:  AgentClaude,
 			model:  "sonnet",
 			effort: "medium",
-			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet", "--effort", "medium"},
+			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt", harness.GXSystemPrompt, "--model", "sonnet", "--effort", "medium"},
 		},
 		{
 			name:  "claude model only",
 			agent: AgentClaude,
 			model: "sonnet",
-			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--model", "sonnet"},
+			want:  []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt", harness.GXSystemPrompt, "--model", "sonnet"},
 		},
 		{
 			name:   "claude effort only",
 			agent:  AgentClaude,
 			effort: "medium",
-			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--effort", "medium"},
+			want:   []string{"--permission-mode", "auto", "--settings", claudeGuardSettings, "--disallowedTools", agentrunner.LoopDisallowedTools, "--append-system-prompt", harness.GXSystemPrompt, "--effort", "medium"},
 		},
 		{
 			name:  "codex both empty unchanged",

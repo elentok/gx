@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/tickets"
@@ -216,6 +217,7 @@ func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []st
 	args := []string{
 		"--permission-mode", "auto", "--settings", claudeGuardSettings,
 		"--disallowedTools", agentrunner.LoopDisallowedTools,
+		"--append-system-prompt", harness.GXSystemPrompt,
 	}
 	if model != "" {
 		args = append(args, "--model", model)

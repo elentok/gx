@@ -356,6 +356,9 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 	if want := "--disallowedTools " + agentrunner.LoopDisallowedTools; !strings.Contains(claude.Cmdline, want) {
 		t.Errorf("claude cmdline %q lacks %q", claude.Cmdline, want)
 	}
+	if got := strings.Count(claude.Cmdline, "--append-system-prompt"); got != 1 {
+		t.Errorf("claude cmdline %q has --append-system-prompt %d times, want 1", claude.Cmdline, got)
+	}
 }
 
 func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
@@ -380,6 +383,9 @@ func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
 	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
 	if !strings.Contains(claude.Cmdline, "--resume "+prev) || strings.Contains(claude.Cmdline, "--session-id") {
 		t.Errorf("claude cmdline %q, want --resume %s and no --session-id", claude.Cmdline, prev)
+	}
+	if !strings.Contains(claude.Cmdline, "--append-system-prompt") {
+		t.Errorf("claude cmdline %q lacks --append-system-prompt on resume", claude.Cmdline)
 	}
 }
 

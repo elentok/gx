@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
@@ -270,6 +271,7 @@ func TestHeadless_StartLaunchesDetachedClaude(t *testing.T) {
 		"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--session-id", s.SessionID, "--permission-mode", "auto", "--permission-prompt-tool", "stdio",
 		"--model", "opus", "--disallowedTools", agentrunner.LoopDisallowedTools,
+		"--append-system-prompt", gxharness.GXSystemPrompt,
 	}
 	if !slices.Equal(rec.Args, wantArgs) {
 		t.Errorf("args = %q\nwant %q", rec.Args, wantArgs)

@@ -344,24 +344,24 @@ always a plain `--status done`; the children carry the rest.
 
 ## Announce-and-stop
 
+<!-- gx-system-prompt:begin -->
 Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`.
+
+1. Commit what is green. Work already done is not discarded while the question waits.
+2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections:
+   - `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then optional detail. A person should be able to answer in one pass without reading the diff.
+   - `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and why, and what you do with each answer.
+3. End your turn. The agent keeps its worktree, pane and slot while it waits.
+
+After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.
+<!-- gx-system-prompt:end -->
+
+The block above is also the GX system prompt gx appends to every loop agent's Claude launch; a test
+keeps the two copies equal. The question can also carry an optional `gx-question` block (below).
 
 Interactive tools block the pane and write nothing gx can read. A question asked that way is
 invisible by construction. `gx tickets ask` records the question in the ticket's log, where gx, the
 web UI, the TUI and the CLI all read it.
-
-### Asking
-
-1. **Commit what is green.** Work already done is not discarded while the question waits.
-2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections:
-   - `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then
-     optional detail, then an optional `gx-question` block (below). A person should be able to answer
-     in one pass without reading the diff.
-   - `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and
-     why, and what you do with each answer.
-3. **End your turn.** The agent keeps its worktree, pane and slot while it waits.
-
-After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.
 
 `ask` validates the body, appends one `park.question` to the ticket log, sets
 `iteration_status: needs-answer` and returns at once. It writes nothing and refuses with a reason

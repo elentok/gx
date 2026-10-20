@@ -400,11 +400,11 @@ var ptyHarness = func() harness.Harness {
 }()
 
 func ptyLaunchArgs(extra []string) []string {
-	return agentrunner.WithLoopDisallowedTools(append([]string{
+	return harness.WithGXSystemPrompt(agentrunner.WithLoopDisallowedTools(append([]string{
 		"--permission-mode", "auto",
 		// The main screen keeps a scrollback to read back.
 		"--settings", `{"tui":"default"}`,
-	}, extra...))
+	}, extra...)))
 }
 
 // killLaunch SIGKILLs each nonzero pid's whole session unchecked. Only a

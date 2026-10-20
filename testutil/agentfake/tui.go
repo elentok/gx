@@ -133,6 +133,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	fs.String("permission-mode", "", "")
 	fs.String("settings", "", "")
 	fs.String("disallowedTools", "", "")
+	fs.String("append-system-prompt", "", "")
 	if err := fs.Parse(args); err != nil {
 		return tuiOptions{}, err
 	}

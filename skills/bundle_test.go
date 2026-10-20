@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -268,6 +269,19 @@ func TestTrackerAnnounceAndStopUsesAsk(t *testing.T) {
 		if strings.Contains(raw, banned) {
 			t.Errorf("gx-local-tracker.md still says %q", banned)
 		}
+	}
+}
+
+// TestTrackerEqualsGXSystemPrompt pins that the tracker's marked block is
+// byte-for-byte the constant gx appends to every loop agent's system prompt.
+func TestTrackerEqualsGXSystemPrompt(t *testing.T) {
+	raw := readFile(t, "gx-local-tracker.md")
+	block := regexp.MustCompile(`(?s)<!-- gx-system-prompt:begin -->\n(.*?)\n<!-- gx-system-prompt:end -->`).FindStringSubmatch(raw)
+	if block == nil {
+		t.Fatal("gx-local-tracker.md has no gx-system-prompt block")
+	}
+	if block[1] != harness.GXSystemPrompt {
+		t.Errorf("tracker block differs from harness.GXSystemPrompt\ntracker:\n%s\nconstant:\n%s", block[1], harness.GXSystemPrompt)
 	}
 }
 
