@@ -18,7 +18,8 @@ describe("theme", () => {
       expect(Object.keys(tokens[group] ?? {}), group).not.toHaveLength(0);
     }
     const colors = tokens.colors as Record<string, any>;
-    for (const name of ["surface", "border", "text"]) expect(colors[name], name).toBeDefined();
+    for (const name of ["surface", "text"]) expect(colors[name], name).toBeDefined();
+expect(themeConfig.theme!.semanticTokens!.colors!.border).toBeDefined();
     expect(colors.text.muted).toBeDefined();
     expect(colors.text.dim).toBeDefined();
   });

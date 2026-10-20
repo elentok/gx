@@ -3,11 +3,11 @@ import { TONES, type Tone } from "./tone";
 
 // The only file allowed to hold raw colors and font names; see raw-style.test.ts.
 const toneColors: Record<Tone, { fg: string; bg: string }> = {
-  running: { fg: "#3fb97a", bg: "rgba(63, 185, 122, 0.16)" },
-  waiting: { fg: "#e0a43a", bg: "rgba(224, 164, 58, 0.16)" },
-  parked: { fg: "#e5574f", bg: "rgba(229, 87, 79, 0.16)" },
-  deadlocked: { fg: "#e5574f", bg: "rgba(229, 87, 79, 0.16)" },
-  muted: { fg: "#8b94a1", bg: "rgba(139, 148, 161, 0.14)" },
+  running: { fg: "#55d996", bg: "rgba(85, 217, 150, 0.16)" },
+  waiting: { fg: "#f2b845", bg: "rgba(242, 184, 69, 0.16)" },
+  parked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
+  deadlocked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
+  muted: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.14)" },
 };
 
 const toneTokens = Object.fromEntries(
@@ -23,14 +23,19 @@ export const themeConfig = defineConfig({
     },
   },
   theme: {
+    // border is semantic so it replaces Chakra's built-in light/dark "border" token.
+    semanticTokens: {
+      colors: {
+        border: { DEFAULT: { value: "#3d4654" } },
+      },
+    },
     tokens: {
       colors: {
-        surface: { DEFAULT: { value: "#0e1116" }, raised: { value: "#151a21" } },
-        border: { DEFAULT: { value: "#262d38" } },
+        surface: { DEFAULT: { value: "#0a0d11" }, raised: { value: "#141920" } },
         text: {
-          DEFAULT: { value: "#e6e9ee" },
-          muted: { value: "#9aa4b2" },
-          dim: { value: "#626c7a" },
+          DEFAULT: { value: "#ffffff" },
+          muted: { value: "#c9d0da" },
+          dim: { value: "#a3acba" },
         },
         tone: toneTokens,
       },
@@ -39,11 +44,11 @@ export const themeConfig = defineConfig({
         text: { value: "'Saira', sans-serif" },
       },
       fontSizes: {
-        xs: { value: "11px" },
-        sm: { value: "12px" },
-        md: { value: "14px" },
-        lg: { value: "16px" },
-        xl: { value: "20px" },
+        xs: { value: "13px" },
+        sm: { value: "14px" },
+        md: { value: "15px" },
+        lg: { value: "17px" },
+        xl: { value: "22px" },
       },
       spacing: {
         1: { value: "4px" },

@@ -18,7 +18,7 @@ export function QueueScreen({ state }: { state: ConnectionState }) {
   return (
     <Box>
       {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-      <Box p="4">
+      <Box p="4" maxW="1000px" mx="auto">
         <Box display="flex" alignItems="center" justifyContent="space-between" mb="4">
           <Heading as="h1" fontFamily="condensed" textTransform="uppercase" size="lg">
             Queue
