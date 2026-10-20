@@ -1,0 +1,23 @@
+{
+  "address": "gx:demo/12",
+  "title": "Pick a storage backend",
+  "status": "parked",
+  "park_kind": "question",
+  "answered": false,
+  "rounds": [
+    { "seq": 1, "by": "agent", "summary": "Which database?", "outcome": "answered" },
+    { "seq": 2, "by": "gx", "summary": "Retry the migration?", "outcome": "closed" }
+  ],
+  "latest": {
+    "seq": 3,
+    "by": "agent",
+    "summary": "Which backend?",
+    "outcome": "open",
+    "kind": "text",
+    "text": "Should the cache live in Redis or in process memory?",
+    "handoff": "I compared both; Redis survives restarts."
+  },
+  "chat": [{ "from": "agent", "text": "Should the cache live in Redis or in process memory?" }],
+  "state": "tok-1",
+  "actions": ["answer"]
+}
