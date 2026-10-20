@@ -53,7 +53,8 @@ the model's own reading of a conversation. `gx-bump` sets the same flag for the 
 reason: cutting a release - running tests, committing a changelog entry, tagging and pushing - is
 deliberate, explicit-invoke-only, never something to trigger on the model's own reading of a
 conversation. `gx-one-off` sets the same flag: the server launches it for `type: prompt` tickets,
-never the model on its own. `gx-evolve` sets it too: the server launches it for `type: evolve`
+never the model on its own. One-offs never commit: `gx server one-off` has no `--commits` or
+`--base`. `gx-evolve` sets it too: the server launches it for `type: evolve`
 retros, never the model on its own. `gx-resolve-follow-ups` sets it as well: draining a follow-ups
 epic closes, moves and creates tickets in bulk, so a person starts it, never the model. `gx-design`
 sets it too: a person walks one epic through map, review and implement. `gx-to-tickets`, `gx-tdd`,

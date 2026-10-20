@@ -19,6 +19,9 @@ commands.
 4. Report with `gx tickets set <addr> --iteration-status finished --commitless true`. A one-off never
    lands a commit; without `--commitless true` the run looks stalled.
 
+Submitting a one-off takes no `--commits` or `--base`, and a `--file` payload with a `commits:` or
+`base:` key is refused with `option-removed`. For work that commits, create a normal ticket.
+
 If only a person can answer, follow the tracker's announce-and-stop rule: write `## Needs Answer`
 and `## Handoff`, report `--iteration-status needs-answer`, and exit. Never call an interactive
 prompt.

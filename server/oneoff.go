@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,8 +24,7 @@ import (
 const (
 	ReasonEmptyPrompt   = "empty-prompt"
 	ReasonUnknownProj   = "unknown-project"
-	ReasonNoCommits     = "commits-unsupported"
-	ReasonBadBase       = "invalid-base"
+	ReasonOptionRemoved = "option-removed"
 	ReasonBadBlocker    = "invalid-blocker"
 	ReasonBadWindow     = "invalid-context-window"
 	ReasonBadFile       = "invalid-file"
@@ -50,13 +50,9 @@ type OneOffRequest struct {
 	Cwd   string `json:"cwd,omitempty"`
 	Name  string `json:"name,omitempty"`
 	Agent string `json:"agent,omitempty"`
-	// Type is the ticket type: "prompt" (default), "evolve" or "diagnose"; the
-	// last two are commitless by design and so cannot be combined with Commits.
+	// Type is the ticket type: "prompt" (default), "evolve" or "diagnose". A
+	// one-off never commits.
 	Type string `json:"type,omitempty"`
-	// Commits makes the ticket type implement (prompt otherwise); a project without a VCS refuses it.
-	Commits bool `json:"commits,omitempty"`
-	// Base overrides the derived base; only a commit-landing ticket has one.
-	Base string `json:"base,omitempty"`
 	// BlockedBy are addresses of tickets in the same project.
 	BlockedBy             []string `json:"blocked_by,omitempty"`
 	ExpectedContextWindow int      `json:"expected_context_window,omitempty"`
@@ -94,12 +90,20 @@ type oneOffFileFrontmatter struct {
 	Project               string   `yaml:"project"`
 	Name                  string   `yaml:"name"`
 	Agent                 string   `yaml:"agent"`
-	Commits               bool     `yaml:"commits"`
-	Base                  string   `yaml:"base"`
 	BlockedBy             []string `yaml:"blocked_by"`
 	ExpectedContextWindow int      `yaml:"expected_context_window"`
 	Front                 bool     `yaml:"front"`
 	Unique                string   `yaml:"unique"`
+}
+
+// removedFileKeys are payload keys one-offs no longer accept.
+var removedFileKeys = []string{"commits", "base"}
+
+// removedKeyError is a payload frontmatter key one-offs no longer accept.
+type removedKeyError struct{ key string }
+
+func (e removedKeyError) Error() string {
+	return "the " + e.key + " key is no longer supported: a one-off never commits"
 }
 
 // applyFile merges the payload file into req; anything already set on req wins.
@@ -114,6 +118,15 @@ func (req *OneOffRequest) applyFile() error {
 		if err := yaml.Unmarshal([]byte(yamlPart), &fm); err != nil {
 			return err
 		}
+		var keys map[string]any
+		if err := yaml.Unmarshal([]byte(yamlPart), &keys); err != nil {
+			return err
+		}
+		for _, k := range removedFileKeys {
+			if _, ok := keys[k]; ok {
+				return removedKeyError{k}
+			}
+		}
 	} else {
 		body = string(raw)
 	}
@@ -126,9 +139,7 @@ func (req *OneOffRequest) applyFile() error {
 	setIfEmpty(&req.Project, fm.Project)
 	setIfEmpty(&req.Name, fm.Name)
 	setIfEmpty(&req.Agent, fm.Agent)
-	setIfEmpty(&req.Base, fm.Base)
 	setIfEmpty(&req.Unique, fm.Unique)
-	req.Commits = req.Commits || fm.Commits
 	req.Front = req.Front || fm.Front
 	if len(req.BlockedBy) == 0 {
 		req.BlockedBy = fm.BlockedBy
@@ -181,6 +192,10 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResult, error) {
 	if req.File != "" {
 		if err := req.applyFile(); err != nil {
+			var removed removedKeyError
+			if errors.As(err, &removed) {
+				return oneOffRefusal(ReasonOptionRemoved, err.Error()), nil
+			}
 			return oneOffRefusal(ReasonBadFile, err.Error()), nil
 		}
 		if req.Unique == "" && !req.NoUnique {
@@ -203,13 +218,7 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 	typ := schema.TypePrompt
 	switch schema.TicketType(req.Type) {
 	case "", schema.TypePrompt:
-		if req.Commits {
-			typ = schema.TypeImplement
-		}
 	case schema.TypeEvolve, schema.TypeDiagnose:
-		if req.Commits {
-			return oneOffRefusal(ReasonBadType, "a "+req.Type+" ticket is commitless: --commits does not apply"), nil
-		}
 		typ = schema.TicketType(req.Type)
 	default:
 		return oneOffRefusal(ReasonBadType, "type "+req.Type+" is not supported by a one-off"), nil
@@ -235,8 +244,8 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 	} else if dup != nil {
 		return dup.refusal(project, dir)
 	}
-	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Base: req.Base, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
-	if refused := s.oneOffOptionsRefusal(project, dir, tk, req); refused != nil {
+	tk := schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: typ, Notify: req.Notify, Unique: req.Unique, ExpectedContextWindow: req.ExpectedContextWindow}
+	if refused := s.oneOffOptionsRefusal(project, req); refused != nil {
 		return *refused, nil
 	}
 	for _, b := range req.BlockedBy {
@@ -360,22 +369,13 @@ func (s *Server) notifyResult(addr tickets.Address, ticketPath string) {
 
 // oneOffOptionsRefusal checks the submit options before anything is written. A
 // blocker must be a ticket of the same project (no cross-project blocking).
-func (s *Server) oneOffOptionsRefusal(project, dir string, tk schema.Ticket, req OneOffRequest) *OneOffResult {
+func (s *Server) oneOffOptionsRefusal(project string, req OneOffRequest) *OneOffResult {
 	refuse := func(reason, msg string) *OneOffResult {
 		r := oneOffRefusal(reason, msg)
 		return &r
 	}
-	if req.Commits {
-		pf, err := config.ReadProjectFile(dir)
-		if err == nil && pf.VCS != nil && *pf.VCS == config.VCSNone {
-			return refuse(ReasonNoCommits, project+" has no VCS, so its tickets never commit")
-		}
-	}
 	if req.ExpectedContextWindow < 0 {
 		return refuse(ReasonBadWindow, "expected context window must be non-negative")
-	}
-	if req.Base != "" && tk.IsCommitless() {
-		return refuse(ReasonBadBase, "--base needs --commits: a commitless ticket has no branch to base")
 	}
 	if len(req.BlockedBy) == 0 {
 		return nil

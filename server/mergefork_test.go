@@ -208,33 +208,3 @@ func TestMergeFork_DirtyTrunkAfterAMergeTicketParksWithoutAnother(t *testing.T) 
 	}
 	f.assertRootQueued(t)
 }
-
-func TestMergeFork_CommitsOneOffForksAMergeTicketQuietly(t *testing.T) {
-	chat, count := chatRecorder(t)
-	var merges atomic.Int32
-	evs, _, repo := startCommitsOneOffWith(t, false, func(p servertest.Prompt, store, repo string) {
-		if isMergeTurn(p) {
-			merges.Add(1)
-			rebaseAndFinish(t, store, p)
-			return
-		}
-		commitWork(t, p, "work")
-		moveMain(t, repo, "work")
-	}, chat)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
-	time.Sleep(10 * testFlushInterval) // a notice would follow the event within a flush
-
-	if got := merges.Load(); got != 1 {
-		t.Errorf("merge turns = %d, want 1", got)
-	}
-	if got := gitOut(t, repo, "rev-parse", "main"); got != gitOut(t, repo, "rev-parse", "oneoff") {
-		t.Errorf("main %s is not the one-off's rebased branch tip", got)
-	}
-	for _, s := range []string{epicMergedText, epicNotMergedText, "Merge oneoff onto main"} {
-		if got := count(s); got != 0 {
-			t.Errorf("%q sent %d times for a one-off, want none", s, got)
-		}
-	}
-}

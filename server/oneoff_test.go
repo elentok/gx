@@ -136,17 +136,17 @@ func TestOneOff_FrontQueuesAtHead(t *testing.T) {
 	}
 }
 
-func TestOneOff_CommitsOptionsLandInFrontmatter(t *testing.T) {
+func TestOneOff_OptionsLandInFrontmatter(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	res, err := h.Client.OneOff(context.Background(), server.OneOffRequest{
-		Prompt: "build it", Cwd: repo, Commits: true, Base: "main",
+		Prompt: "build it", Cwd: repo,
 		BlockedBy: []string{"proj:epic-a/01"}, ExpectedContextWindow: 40000,
 	})
 	if err != nil || res.Refused {
 		t.Fatalf("one-off: %+v, %v", res, err)
 	}
 	raw := readOneOffTicket(t, h, res.Address)
-	for _, want := range []string{"type: implement", "base: main", "epic-a/01", "expected_context_window: 40000"} {
+	for _, want := range []string{"type: prompt", "epic-a/01", "expected_context_window: 40000"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("ticket lacks %q:\n%s", want, raw)
 		}
@@ -172,7 +172,7 @@ func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	ctx := context.Background()
 	file := filepath.Join(t.TempDir(), "payload.md")
-	payload := "---\ncommits: true\nbase: main\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
+	payload := "---\nexpected_context_window: 40000\nname: from-file\n---\nbuild it from the file\n"
 	if err := os.WriteFile(file, []byte(payload), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 		t.Errorf("address = %q; want the frontmatter name", res.Address)
 	}
 	raw := readOneOffTicket(t, h, res.Address)
-	for _, want := range []string{"type: implement", "base: main", "expected_context_window: 90000", "build it from the file"} {
+	for _, want := range []string{"type: prompt", "expected_context_window: 90000", "build it from the file"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("ticket lacks %q:\n%s", want, raw)
 		}
@@ -207,8 +207,6 @@ func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 		req    server.OneOffRequest
 		reason string
 	}{
-		{"commits in a vcs none project", server.OneOffRequest{Prompt: "x", Commits: true}, server.ReasonNoCommits},
-		{"base without commits", server.OneOffRequest{Prompt: "x", Cwd: repo, Base: "main"}, server.ReasonBadBase},
 		{"unknown blocker", server.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"proj:epic-a/09"}}, server.ReasonBadBlocker},
 		{"cross-project blocker", server.OneOffRequest{Prompt: "x", Cwd: repo, BlockedBy: []string{"scratch:e/01"}}, server.ReasonBadBlocker},
 	}
@@ -283,9 +281,8 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 func TestOneOff_RefusesBadTypes(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	for name, req := range map[string]server.OneOffRequest{
-		"unknown type":        {Prompt: "x", Cwd: repo, Type: "research"},
-		"evolve and commit":   {Prompt: "x", Cwd: repo, Type: "evolve", Commits: true},
-		"diagnose and commit": {Prompt: "x", Cwd: repo, Type: "diagnose", Commits: true},
+		"unknown type": {Prompt: "x", Cwd: repo, Type: "research"},
+		"implement":    {Prompt: "x", Cwd: repo, Type: "implement"},
 	} {
 		res, err := h.Client.OneOff(context.Background(), req)
 		if err != nil || !res.Refused || res.Reason != server.ReasonBadType {

@@ -66,6 +66,14 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	}
 }
 
+func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
+	for _, flag := range []string{"commits", "base"} {
+		if newServerOneOffCmd().Flag(flag) != nil {
+			t.Errorf("--%s still exists; a one-off never commits", flag)
+		}
+	}
+}
+
 func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
 	cl := dupServer(t, "needs-answer")
 	var out, errOut bytes.Buffer

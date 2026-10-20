@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -98,20 +97,5 @@ func TestEpicNotice_NeedsRebaseParkSendsNotMerged(t *testing.T) {
 	}
 	if got := count(epicMergedText); got != 0 {
 		t.Errorf("%q sent %d times, want none", epicMergedText, got)
-	}
-}
-
-func TestEpicNotice_CommitsOneOffSendsNeither(t *testing.T) {
-	chat, count := chatRecorder(t)
-	evs, _, _, _ := startCommitsOneOff(t, false, chat)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
-	time.Sleep(10 * testFlushInterval) // the notice would follow the event within a flush
-
-	for _, s := range []string{epicMergedText, epicNotMergedText} {
-		if got := count(s); got != 0 {
-			t.Errorf("%q sent %d times for a one-off, want none", s, got)
-		}
 	}
 }
