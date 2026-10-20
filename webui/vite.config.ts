@@ -29,6 +29,8 @@ export default defineConfig({
     },
   ],
   server: {
+    // gx server proxies to http://127.0.0.1:5173; Vite's default "localhost" can bind only ::1.
+    host: "127.0.0.1",
     proxy: useRealServer ? { "/v1": "http://127.0.0.1:7421" } : undefined,
   },
   build: {
