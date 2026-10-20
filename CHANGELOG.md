@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.35.0 - 2026-10-20
+
+- Added a web UI, served by the server's web listener with the UI embedded in the release build.
+  - Token auth protects the listener. `gx web-token` and `gx web-url` print the token and the URL. gx warns when the listener binds an empty host.
+  - The Queue screen shows epic cards, a Recently finished list and live status. It stays live over `/v1/events` (with an SSE heartbeat) and reconnects with backoff, a watchdog and an offline delay.
+  - The snapshot now carries epic summaries, recently finished epics and the rendered ticket status. `recently-finished = 0` lists none; unset still defaults to 5.
+  - The UI has a design system of tokens and primitives (Badge, ProgressBar, TicketLine, Card, Chip, LiveDot, Strip, EmptyState).
+- Changed the TUI to read the Queue tab, Recently finished list, queue rows, preview and ticket menu from the server's epic summaries and status.
+  - The header shows state labels and the deadlocked reason. The Parked tone and park reason are red.
+  - Added states for older servers and no server, and a Web UI line in the help.
+- Added a Queue epic header with a counter, a progress bar and a Status line (elapsed, agent time, cost, compacts). Epic states now have icons and colours. Added `ui.ProgressBar`, also used for the Claude status line context bar and the title row queue bar.
+- Added Actionable detection for gx-design sessions. An Actionable is raised when a Design session idles on a grilling question or ends its run. It can queue the epic and open the Queue tab on it. Actions ask for confirmation first, and gx switches to the Queue tab after adding tickets to the queue.
+- Improved first prompts to agent sessions. They are sent when the agent reports ready or goes idle, with vim-mode ready-to-type detection for Claude, typing rules for Claude and Codex, and a draft check. The input is fully cleared before retyping. First-prompt failures raise an Actionable. "Start session" prefills the trunk checkout.
+- Added "Go to design session..." to map ticket menus (map tickets only). Open maps is split into "Maps in progress" and "Open maps".
+- Hardened the agent runners:
+  - Added a `runner-wait` config knob for every runner.
+  - Interrupt picks its key by state and clears the restored prompt with one Ctrl+C.
+  - Runners have a busy guard and a single-send rule for slash commands.
+  - A Herdr deny with a reason holds the session blocked, and a failed deny reports that the reason was not delivered.
+  - nudge and interrupt are refused with `agent-not-ready` when the runner is not ready, and ralph-loop retries Interrupt.
+  - The budget stop runs Interrupts in parallel inside the grace period.
+- Added `GX_SERVER_LOG_LEVEL` to set the server log level.
+- Added a `y` key that copies the visible notifications to the clipboard.
+- Added `--category` to `gx tickets follow-up add`. It refuses when the body frontmatter sets a category too.
+- Added a PreToolUse hook that rejects `sed -i` and heredoc file writes in ralph-loop Claude sessions.
+- Improved the Agents tab. Mouse clicks, drags and releases are forwarded to agents that report the mouse. When the selected session goes away, the session above it is selected.
+- Improved the digest export. Long tool results keep their head and tail.
+- Improved the Queue tab by caching the rendered preview and glamour renderers. Clicking a tree node's expand/collapse icon now toggles it.
+- Changed the agent skills:
+  - gx-design: open design questions go back to the map before the spec is written. Grilling questions and the Next line print last. Grilling tickets load the grilling skills.
+  - gx-implement: one check per call, failures are re-run with `rtk proxy`, unseen results are never reported, and `-timeout 60s` is required with `-run`.
+  - gx-code-review: passes `--parent` on `gx tickets add`.
+- Fixed the transcript lookup. It falls back to a session-id search when the derived transcript path is missing.
+- Fixed the hard-limit grace expiry reporting "0 agents stopped" when a budget poll stopped the run first.
+- Fixed slash commands such as `/clear` counting as delivered on "queued" instead of "started" in the native runner.
+- Internal: one shared parked rule across server, ralph-loop and the Queue tab. Tests no longer read the real Claude config or `~/.config`, several test flakes are fixed, and the server test suite is about 40% faster. Refactors of the session-prompting and herdr runner code. Added specs, ADRs and glossary terms.
+
 ## v0.34.6 - 2026-10-19
 
 - Changed the Agents tab key for removing a session from `X` to `d`. This matches the delete key in the Worktrees and Stash tabs. `X` was next to `x` (stop), which made mistakes easy. `X` no longer does anything.
