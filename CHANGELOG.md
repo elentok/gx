@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.35.4 - 2026-10-20
+
+- Added one-offs, a lightweight inbox for tickets that do not belong to a project epic.
+  - Submitting a one-off puts it in a shared `one-offs` epic. gx detects one-offs by that epic name and tracks their age per ticket.
+  - A one-off runs in a scratch directory when the project has no VCS. A one-off that makes no commits is allowed.
+  - Ended one-offs are archived and stamped with `completed_at`. References to an archived one-off, such as `blocked_by`, follow its original address, so dependents still unblock.
+  - The one-offs root leaves the queue while it is idle, and its card shows no done/total count.
+  - Recently finished one-offs appear in the snapshot. The TUI and web UI show a one-off marker on them.
+  - New config key `execution-queue.max-one-off-agents` caps how many one-off agents run at once.
+  - Removed the `--commits` and `--base` flags and the no-VCS check from one-off submission.
+- Fixed a code-review ticket waiting on its own fix tickets.
+- Fixed the runner claiming an investigation that a late finish had already completed.
+- Fixed the native runner showing the deny-reason lock before attach input is held.
+- Changed the web UI dev server (Vite) to bind to `127.0.0.1`.
+- Internal:
+  - Moved the ticket-move engine into its own package, `tickets`.
+  - Sharded the server tests across processes, and CI now runs through `make test`.
+  - Fixed flaky tests: the grace-test fixture now waits for a launched run, the fake claude agent exits when its parent dies, and the ambiguous-land test sets a git identity.
+  - Changed the view model to track a received snapshot with `Loaded` instead of `Seq`.
+  - Added the one-offs spec, ADRs and glossary terms.
+
 ## v0.35.3 - 2026-10-20
 
 - Fixed the release build: the web UI's canned snapshot fixture now carries `has_repair`, so `make web-build` type-checks. v0.35.1 and v0.35.2 were tagged but their release builds failed, so this is the first release with the changes since v0.35.0.
