@@ -212,6 +212,10 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	}
 	defer unlock()
 	one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
+	if err := tickets.CloseOpenQuestion(lf.path, "adopted"); err != nil {
+		s.log.Warn("late finish: close question", "ticket", addr, "err", err)
+		return false
+	}
 	out, err := mode.finish(deps, one, wt, pane)
 	if err != nil {
 		if perr := s.parkTicket(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {

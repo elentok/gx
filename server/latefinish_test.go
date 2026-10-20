@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -180,6 +181,25 @@ func TestLateFinish_LandsLateCommit(t *testing.T) {
 			t.Error("live agent not stopped after landing")
 		}
 	})
+}
+
+func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
+	p := parkZeroCommit(t, true)
+	evs, err := tickets.ReadLog(p.ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := tickets.OpenQuestion(evs)
+	if q == nil {
+		t.Fatal("zero-commit park left no open question")
+	}
+	p.report(t, p.finishedLate(true))
+	p.adopted(t)
+	evs, _ = tickets.ReadLog(p.ticketPath)
+	last := evs[len(evs)-1]
+	if last.Type != tickets.EventParkClosed || last.Question != q.Seq || last.Reason != "adopted" {
+		t.Errorf("last event = %+v, want park.closed{question: %d, reason: adopted}", last, q.Seq)
+	}
 }
 
 func TestLateFinish_ClosesCommitless(t *testing.T) {

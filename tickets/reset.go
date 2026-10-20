@@ -13,6 +13,11 @@ import (
 // section are left as written. A non-empty note is appended to "## Comments"
 // in the same write, so the file never shows the reset without its note.
 func Reset(path string, now time.Time, note string) error {
+	// Before the status write, so a crash between them leaves a closed question
+	// on a still-parked ticket rather than an open one on an open ticket.
+	if err := CloseOpenQuestion(path, "reset"); err != nil {
+		return err
+	}
 	return schema.UpdateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusOpen
 		t.IterationStatus = ""

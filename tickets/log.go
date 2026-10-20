@@ -3,6 +3,7 @@ package tickets
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -80,10 +81,19 @@ func AppendLog(ticketPath string, ev LogEvent) (LogEvent, error) {
 // ticket lock. A guard error writes nothing and is returned as is, so a
 // check-then-append cannot race another writer.
 func AppendLogIf(ticketPath string, ev LogEvent, guard func([]LogEvent) error) (LogEvent, error) {
-	if err := validateLogEvent(ev); err != nil {
-		return LogEvent{}, err
-	}
+	return appendLogWith(ticketPath, func(evs []LogEvent) (LogEvent, error) {
+		if guard != nil {
+			if err := guard(evs); err != nil {
+				return LogEvent{}, err
+			}
+		}
+		return ev, nil
+	})
+}
 
+// appendLogWith appends the event mk builds from the existing events, all under
+// the ticket lock.
+func appendLogWith(ticketPath string, mk func([]LogEvent) (LogEvent, error)) (LogEvent, error) {
 	unlock, err := schema.LockTicket(ticketPath)
 	if err != nil {
 		return LogEvent{}, err
@@ -95,10 +105,12 @@ func AppendLogIf(ticketPath string, ev LogEvent, guard func([]LogEvent) error) (
 	if err != nil {
 		return LogEvent{}, err
 	}
-	if guard != nil {
-		if err := guard(events); err != nil {
-			return LogEvent{}, err
-		}
+	ev, err := mk(events)
+	if err != nil {
+		return LogEvent{}, err
+	}
+	if err := validateLogEvent(ev); err != nil {
+		return LogEvent{}, err
 	}
 	if err := os.Truncate(logPath, validLen); err != nil && !os.IsNotExist(err) {
 		return LogEvent{}, fmt.Errorf("trimming torn line of %s: %w", logPath, err)
@@ -199,6 +211,25 @@ func validateLogEvent(ev LogEvent) error {
 		return fmt.Errorf("park.question by agent needs a handoff")
 	}
 	return nil
+}
+
+var errNoOpenQuestion = errors.New("no open question")
+
+// CloseOpenQuestion writes park.closed{question, reason} for the ticket's open
+// question, for a path that leaves needs-answer without a person's answer. A
+// ticket with no open question (a pre-migration one) gets no write and no error.
+func CloseOpenQuestion(ticketPath, reason string) error {
+	_, err := appendLogWith(ticketPath, func(evs []LogEvent) (LogEvent, error) {
+		open := OpenQuestion(evs)
+		if open == nil {
+			return LogEvent{}, errNoOpenQuestion
+		}
+		return LogEvent{Type: EventParkClosed, Question: open.Seq, Reason: reason}, nil
+	})
+	if errors.Is(err, errNoOpenQuestion) {
+		return nil
+	}
+	return err
 }
 
 // ParkRound is a park.question and the event that ended it, if any.

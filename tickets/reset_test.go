@@ -105,3 +105,39 @@ func TestReset_NoteLandsInSameWrite(t *testing.T) {
 		t.Fatalf("reset and note not both present:\n%s", raw)
 	}
 }
+
+func TestReset_ClosesOpenQuestion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "05-thing.md")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-answer\ntype: implement\n---\n\n# 05 — Thing\n")
+	q, err := AppendLog(path, LogEvent{Type: EventParkQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Reset(path, time.Now(), ""); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+
+	evs, _ := ReadLog(path)
+	if len(evs) != 2 || evs[1].Type != EventParkClosed || evs[1].Question != q.Seq || evs[1].Reason != "reset" {
+		t.Fatalf("log = %+v, want park.closed{question: %d, reason: reset}", evs, q.Seq)
+	}
+	// A second reset has no open question: no write, no error.
+	if err := Reset(path, time.Now(), ""); err != nil {
+		t.Fatalf("second Reset: %v", err)
+	}
+	if evs, _ = ReadLog(path); len(evs) != 2 {
+		t.Fatalf("log grew without an open question: %+v", evs)
+	}
+}
+
+func TestReset_NoQuestionWritesNoLog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "05-thing.md")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
+	if err := Reset(path, time.Now(), ""); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if _, err := os.Stat(LogPath(path)); !os.IsNotExist(err) {
+		t.Fatalf("log exists after reset with no question: %v", err)
+	}
+}
