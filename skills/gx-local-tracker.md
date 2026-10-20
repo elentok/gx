@@ -204,7 +204,7 @@ The gx server is the only scheduler. Orchestration statuses are written by it al
 | `draft`, `open` | authors and agents, via `gx tickets set --status` |
 | `claimed` | the server, at claim time, before the agent's prompt is sent |
 | `done` | the server, after its own commit count and cherry-pick check |
-| `needs-answer` | the server, when an agent reports `--iteration-status needs-answer` |
+| `needs-answer` | the server, when an agent runs `gx tickets ask` |
 | `needs-repair` | the server, when it hits a fault it can't resolve |
 | `cancelled` | the server, via `gx server tickets cancel` (also cancels non-terminal descendants); `gx tickets close`, for a follow-up only |
 
@@ -327,8 +327,7 @@ the same way: `--iteration-status finished --commitless true`.
 Other outcomes gx writes:
 
 - **`needs-answer`** — work is stalled on information only a human can supply. The agent reports
-  `--iteration-status needs-answer` after writing the sections described under Announce-and-stop.
-  gx also parks `needs-answer` itself in a few cases (`blocked-pane`, `zero-commit`, two or more
+  `gx tickets ask`, described under Announce-and-stop, and gx parks the ticket. gx also parks `needs-answer` itself in a few cases (`blocked-pane`, `zero-commit`, two or more
   unlanded blockers with no `base`), recording `park_kind`.
 - **`needs-repair`** — something needs human judgment before work can continue (e.g. a crashed
   iteration, a handle mismatch, repeated launch failures `retry-exhausted`, a park/re-claim loop
@@ -345,30 +344,84 @@ always a plain `--status done`; the children carry the rest.
 
 ## Announce-and-stop
 
-An agent running under the loop **never calls an interactive prompt.** Interactive tools block the
-pane and write nothing to disk, and on-disk ticket status is gx's only observation channel, so a
-question asked that way is invisible by construction.
+Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`.
 
-When an agent needs something only a person can supply, it follows this rule instead:
+Interactive tools block the pane and write nothing gx can read. A question asked that way is
+invisible by construction. `gx tickets ask` records the question in the ticket's log, where gx, the
+web UI, the TUI and the CLI all read it.
+
+### Asking
 
 1. **Commit what is green.** Work already done is not discarded while the question waits.
-2. Write a **`## Needs Answer`** section: the question, the options weighed, and what the agent would
-   do with each answer, opening with a one-line summary. A person should be able to answer in one
-   pass without reading the diff.
-3. Write a **`## Handoff`** section: what is done, what is left, which files were touched, and which
-   skills the next agent should invoke, referencing by path. This is what makes the discarded context
-   recoverable.
-4. Report `--iteration-status needs-answer`.
-5. **Exit**, releasing the worktree, tab, and concurrency permit.
+2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections:
+   - `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then
+     optional detail, then an optional `gx-question` block (below). A person should be able to answer
+     in one pass without reading the diff.
+   - `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and
+     why, and what you do with each answer.
+3. **End your turn.** The agent keeps its worktree, pane and slot while it waits.
 
-This is **not a fork**. No child ticket is created; the same ticket resumes later. The resuming agent
-**retires both sections into `## Comments`** and must not re-ask the same question without new
-information, answering once has to be enough.
+After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.
 
-Answering is one edit: a person appends under `## Needs Answer` and sets `status: open`. There is no
-dedicated command for it.
+`ask` validates the body, appends one `park.question` to the ticket log, sets
+`iteration_status: needs-answer` and returns at once. It writes nothing and refuses with a reason
+when the body is invalid, the handoff is empty, the ticket is unknown, or an earlier question is
+still open. It works for every ticket type. Do not write `--iteration-status needs-answer` yourself
+and do not put the question in a body section. `gx tickets set --status open` and
+`--iteration-status needs-answer` refuse when no matching open question exists, and name the verb to
+use.
 
-Scope is **voluntary** asks only — a question the agent itself decides it needs answered. An
+When the server is down, `ask` refuses with `server-not-running`. Retry `ask` after a minute and do not end your turn.
+
+This is **not a fork**. No child ticket is created; the same ticket resumes. Do not re-ask a question
+the log already answers. One answer has to be enough.
+
+### The question block
+
+An optional fenced block in the `## Question` text, marked ` ```gx-question `, holds YAML. This is
+the one definition of the format. No block means a free-text question.
+
+```gx-question
+type: options          # yes-no | options | text
+recommended: b         # optional: an option id, or yes / no
+options:               # options only: 2 to 6 entries
+  - id: a
+    label: Keep the old route
+    consequence: I leave the handler as it is.   # optional
+  - id: b
+    label: Replace it
+```
+
+- `yes-no` has fixed labels "Yes" and "No". It takes optional one-line `yes:` and `no:` consequences.
+- `options` takes `id`, `label` and an optional `consequence` per entry. Ids are unique.
+- `recommended` names one value. The UI shows a "Recommended" badge and preselects nothing.
+- Every type allows a free-text note from the person.
+- `ask` fails with the reason on bad YAML, an unknown type, duplicate ids, or a `recommended` outside
+  the options.
+
+### Answers, the log and the park rounds
+
+- A person replies with `gx tickets answer <addr> [--choice x] --body -` (or in the web UI). The body
+  is the note, or the text for a free-text question. gx appends a `park.answer` and delivers it to your
+  session. The ticket goes back to `claimed`.
+- If your agent is gone (crash, kill, budget stop), the answer reopens the ticket and shows it as
+  **answered**. That state is derived, never stored: `status` is `open` and the latest question has an
+  answer. It clears when gx claims the ticket. The next claim tries to resume your last session, and
+  falls back to a cold start from the latest question and its handoff.
+- `gx tickets show <addr>` ends with a generated **Park rounds** block: earlier rounds on one line
+  each, the latest in full with its question, handoff and answer.
+- `gx tickets log <addr> [--type ...]` prints the raw log events. `show` never prints raw events.
+- A claim after a plain unpark (no answer) cold-starts from the handoff.
+
+### Plain unpark
+
+- `unpark` on a live, waiting `self-reported` park refuses and names `gx tickets answer`. It neither
+  kills the agent nor sends a prompt.
+- `unpark` on a `self-reported` park whose agent is gone is allowed. gx writes `park.closed`, sets the
+  ticket `open`, and the next claim cold-starts from the handoff. No `park.answer` is logged, so the
+  ticket is not **answered**.
+
+Scope is **voluntary** asks only: a question the agent itself decides it needs answered. An
 involuntary interactive prompt gx catches from outside (herdr reporting the pane as `blocked`) is the
 orchestrator gate's problem, not the agent's, and follows a different path.
 
@@ -390,9 +443,9 @@ intervention gx observed from outside, commits that vanished before landing), it
 live agent to author one. Writing a synthetic one would produce a section that reads as if an agent
 wrote it, when nothing did.
 
-Both park sections — this one and `## Needs Answer` above — carry a required one-line reason, so the
-Queue can say *why* a ticket is parked without anyone opening the file. That requirement is
-**write-conditional**: it is enforced by the write path that sets the status, never by the loader.
+The `## Needs Repair` section carries a required one-line reason, and a question carries its summary
+line, so the Queue can say *why* a ticket is parked without anyone opening the file. That requirement
+is **write-conditional**: it is enforced by the write path that sets the status, never by the loader.
 Enforcing it at load time would reject a hand-authored ticket that never wrote the section, making the
 loader fail on a file it merely observes rather than one it produced.
 

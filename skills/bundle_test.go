@@ -242,6 +242,35 @@ func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
 	}
 }
 
+// TestTrackerAnnounceAndStopUsesAsk pins that the tracker teaches `gx tickets
+// ask` and no longer tells an agent to hand-write the retired park sections.
+func TestTrackerAnnounceAndStopUsesAsk(t *testing.T) {
+	raw := readFile(t, "gx-local-tracker.md")
+	for _, want := range []string{
+		"gx tickets ask",
+		"gx tickets answer",
+		"gx tickets log",
+		"Park rounds",
+		"Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`.",
+		"After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.",
+		"Retry `ask` after a minute and do not end your turn",
+	} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("gx-local-tracker.md does not contain %q", want)
+		}
+	}
+	for _, banned := range []string{
+		"write a `## Needs Answer` section",
+		"Write a **`## Needs Answer`**",
+		"Write a **`## Handoff`**",
+		"Answering is one edit",
+	} {
+		if strings.Contains(raw, banned) {
+			t.Errorf("gx-local-tracker.md still says %q", banned)
+		}
+	}
+}
+
 // TestInvestigateUnattendedVerbs pins that the unattended gx-investigate grant
 // is the matched entry's verbs and nothing else: a fixed list in the skill
 // would block an entry's own verbs (R3's land) or grant ones it doesn't list.
