@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -30,7 +31,34 @@ func runTicketsValidate(path string, w, stderr io.Writer) error {
 			return err
 		}
 	}
+	if err := validateTicketLog(path, ticket, stderr); err != nil {
+		return err
+	}
 	fmt.Fprintf(w, "%s: valid ticket (id=%s, status=%s)\n", ticketLabel(path), ticket.ID, ticket.Status)
+	return nil
+}
+
+// validateTicketLog checks the ticket's log: a malformed middle line is an
+// error (ReadLog skips a torn last line), a needs-answer ticket must have an
+// open latest question, and an over-long question summary only warns. This
+// lives here rather than in schema.Validate, which stays free of log checks.
+func validateTicketLog(path string, ticket schema.Ticket, stderr io.Writer) error {
+	events, err := tickets.ReadLog(path)
+	if err != nil {
+		return err
+	}
+	if ticket.Status == schema.StatusNeedsAnswer && tickets.OpenQuestion(events) == nil {
+		return fmt.Errorf("%s: status is needs-answer but the log has no open question", ticketLabel(path))
+	}
+	for _, ev := range events {
+		if ev.Type != tickets.EventParkQuestion {
+			continue
+		}
+		if n := utf8.RuneCountInString(ev.Summary); n > tickets.MaxLogSummaryChars {
+			fmt.Fprintf(stderr, "warning: %s: question %d summary is %d characters, max %d\n",
+				ticketLabel(path), ev.Seq, n, tickets.MaxLogSummaryChars)
+		}
+	}
 	return nil
 }
 

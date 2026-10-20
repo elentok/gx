@@ -78,6 +78,7 @@ func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04a-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-answer\ntype: implement\nparent: \"04\"\n---\nBody.\n")
+	writeLogFile(t, path, logQuestionLine)
 
 	var stdout, stderr bytes.Buffer
 	if err := execute([]string{"tickets", "validate", path}, deps{stdout: &stdout, stderr: &stderr}); err != nil {
