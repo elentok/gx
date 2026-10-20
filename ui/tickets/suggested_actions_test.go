@@ -41,8 +41,8 @@ func TestTicketMenuItems_SuggestableItemsBuiltOnce(t *testing.T) {
 				t.Errorf("%s: %s groups = %v, want [%v]", tt.name, label, groups, group)
 			}
 		}
-		if got, want := hasItem(items, "Answer…"), tt.name == "needs-answer"; got != want {
-			t.Errorf("%s: Answer… shown = %v, want %v", tt.name, got, want)
+		if hasItem(items, "Answer…") {
+			t.Errorf("%s: menu offers Answer…", tt.name)
 		}
 	}
 }

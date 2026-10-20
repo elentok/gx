@@ -253,10 +253,6 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueueMouseMotion(msg)
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
-	case answerEditorFinishedMsg:
-		var cmd tea.Cmd
-		m.confirm, cmd = handleAnswerEditorFinished(m.confirm, msg)
-		return m, cmd
 	case watchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, m.watch.tick()

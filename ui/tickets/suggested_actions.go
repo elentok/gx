@@ -37,13 +37,9 @@ const investigateSkill = "gx-investigate"
 // and unclearable from the Tickets tab.
 const actionUnmuteReopen = serverVerbUnmute
 
-// actionAnswer opens $EDITOR at the ticket's "## Needs Answer" heading (see
-// cmdAnswerThen).
-const actionAnswer = "answer"
-
-// answerSuggested, investigateSuggested and unmuteSuggested decide which
+// resumeSuggested, investigateSuggested and unmuteSuggested decide which
 // ticket Context menu items move to Suggested.
-func answerSuggested(status tickets.RenderedStatus) bool {
+func resumeSuggested(status tickets.RenderedStatus) bool {
 	return status == tickets.StatusNeedsAnswer
 }
 

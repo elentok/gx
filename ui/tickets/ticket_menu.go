@@ -91,7 +91,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		return it
 	}
 	parked := isParkedStatus(in.ticket.Status)
-	answer := answerSuggested(in.rendered)
+	answer := resumeSuggested(in.rendered)
 
 	var items []contextmenu.Item[ticketTarget]
 	if in.isMap && in.session != "" {
@@ -99,9 +99,6 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	}
 	if in.isMap && in.rendered == tickets.StatusOpen {
 		items = append(items, pick(startSessionLabel, "", actionStartSession, contextmenu.Suggested, ""))
-	}
-	if answer {
-		items = append(items, pick("Answer…", "", actionAnswer, contextmenu.Suggested, ""))
 	}
 
 	current := schema.Status(strings.ToLower(strings.TrimSpace(in.ticket.Status)))
@@ -331,5 +328,5 @@ func (m Model) handleTicketMenuPick(msg ticketMenuPickMsg) (tea.Model, tea.Cmd) 
 	if cmd, ok := ticketMenuEditCopy(msg.action, m.yankTicketSummary, m.yankTicketFilePath, m.cmdEditSelectedFile); ok {
 		return m, cmd
 	}
-	return m, dispatchMenuAction(m.serverAPI, m.link, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
+	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }

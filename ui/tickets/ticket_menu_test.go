@@ -89,12 +89,12 @@ func TestTicketMenu_GroupsAndParkByAddress(t *testing.T) {
 	m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
 
 	view := m.ticketMenu.View()
-	for _, want := range []string{"Suggested", "Status", "Server", `Ticket "First"`, "Answer…", "Set draft", "Park", "Transcript"} {
+	for _, want := range []string{"Suggested", "Status", "Server", `Ticket "First"`, resumeLabel, "Set draft", "Park", "Transcript"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("menu view lacks %q:\n%s", want, view)
 		}
 	}
-	if !strings.Contains(m.View().Content, "Answer…") {
+	if !strings.Contains(m.View().Content, resumeLabel) {
 		t.Error("tab view does not overlay the menu")
 	}
 

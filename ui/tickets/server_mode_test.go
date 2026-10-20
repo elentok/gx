@@ -2,8 +2,6 @@ package tickets
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -506,33 +504,16 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 	}
 }
 
-// Seam D: with no live pane the menu offers Answer…, which writes the ticket
-// file directly; its resume pings the server and then unparks.
-func TestServerMode_AnswerEditsFileThenPingsAndUnparks(t *testing.T) {
-	var calls []string
-	m := openAnswerMenu(t, fakeServerAPI{calls: &calls})
-	if view := m.ticketMenu.View(); !strings.Contains(view, "Answer…") {
-		t.Fatalf("menu lacks Answer…:\n%s", view)
+// A needs-answer ticket's menu has no Answer… action: answering is the web
+// UI's job, and the TUI only offers Resume.
+func TestServerMode_NeedsAnswerMenuHasNoAnswerAction(t *testing.T) {
+	m := openAnswerMenu(t, fakeServerAPI{})
+	view := m.ticketMenu.View()
+	if strings.Contains(view, "Answer…") {
+		t.Fatalf("menu offers Answer…:\n%s", view)
 	}
-	store := t.TempDir()
-	dir := filepath.Join(store, "gx", "alpha", "issues")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	want := filepath.Join(dir, "01-first.md")
-	if err := os.WriteFile(want, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := ticketFile(store, "gx:alpha/01"); err != nil || got != want {
-		t.Fatalf("ticketFile = %q, %v", got, err)
-	}
-
-	m.settings.TicketStore = store
-	if msg, ok := cmdServerResumeAnswered(m.serverAPI, "gx:alpha/01")().(serverWriteMsg); !ok || msg.problem != "" {
-		t.Fatalf("resume result = %+v", msg)
-	}
-	if !slices.Equal(calls, []string{"changed gx:alpha/01", "unpark gx:alpha/01"}) {
-		t.Fatalf("calls = %v", calls)
+	if !strings.Contains(view, resumeLabel) {
+		t.Fatalf("menu lacks %s:\n%s", resumeLabel, view)
 	}
 }
 

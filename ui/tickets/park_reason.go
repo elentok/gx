@@ -11,13 +11,9 @@ import (
 // blockedBySuffix's unbounded text today.
 const parkReasonMaxRunes = 60
 
-// needsAnswerHeading/needsRepairHeading are the literal headings
-// markNeedsAnswerWithReasonAndStub/markNeedsRepairWithReason
-// (ralphloop/claim.go) append to a parked ticket's body.
-const (
-	needsAnswerHeading = tickets.NeedsAnswerHeading
-	needsRepairHeading = tickets.NeedsRepairHeading
-)
+// needsRepairHeading is the literal heading markNeedsRepairWithReason
+// (ralphloop/claim.go) appends to a parked ticket's body.
+const needsRepairHeading = tickets.NeedsRepairHeading
 
 // needsAnswerHint is rendered under the preview's "Park rounds" heading.
 const needsAnswerHint = "Answer in the web UI or run `gx tickets answer <addr>`."
