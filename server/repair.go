@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // RepairRequest is the body of the repair verbs; each uses the fields it needs.
@@ -227,11 +228,47 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 			return repairOK(repair.UnparkResult{Ticket: id, Status: repair.UnparkAdopted})
 		}
 	}
+	if res, refused, err := s.unparkSelfReported(epicPath, id); refused || err != nil {
+		return res, err
+	}
 	res, err := repair.Unpark(epicPath, id, time.Now())
 	if err != nil {
 		return repairRefusal(err), nil
 	}
 	return repairOK(res)
+}
+
+// unparkSelfReported applies the rule for a self-reported park: a live waiting
+// agent keeps its question, so unpark refuses and names the answer verb; a gone
+// agent's question is closed before the status moves on. Other tickets and kinds
+// pass through untouched. A direct run has no runner to ask and reads every
+// agent as gone, since no server is running to wait on an answer.
+func (s *Server) unparkSelfReported(epicPath, id string) (RepairResult, bool, error) {
+	_, t, err := repair.FindEpicTicket(epicPath, id)
+	if err != nil {
+		return RepairResult{}, false, nil
+	}
+	tk, err := schema.ParseTicket(t.Path)
+	if err != nil || tk.Status != schema.StatusNeedsAnswer || tk.ParkKind != schema.ParkKindSelfReported {
+		return RepairResult{}, false, nil
+	}
+	dir := filepath.Dir(epicPath)
+	address := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}.String()
+	if s.registry != nil {
+		gone, err := s.agentGone(address)
+		if err != nil {
+			return RepairResult{}, false, err
+		}
+		if !gone {
+			msg := fmt.Sprintf("%s has a live agent waiting on its question; reply with `gx tickets answer`", address)
+			return repairRefusal(&repair.RefusalError{Reason: ReasonAgentWaiting, Message: msg}), true, nil
+		}
+		s.registry.delete(address)
+	}
+	if err := ralphloop.CloseOpenQuestion(t.Path, ralphloop.CloseUnparked); err != nil {
+		return RepairResult{}, false, fmt.Errorf("close question of %s: %w", address, err)
+	}
+	return RepairResult{}, false, nil
 }
 
 func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {

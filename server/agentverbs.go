@@ -18,6 +18,9 @@ const (
 	ReasonRequestChanged = "request-changed"
 	ReasonNotApprovable  = "not-approvable"
 	ReasonAgentGone      = "agent-gone"
+	// ReasonAgentWaiting is the refusal of a plain unpark on a live waiting
+	// self-reported park. It is public (ADR 0028) and named in the tracker text.
+	ReasonAgentWaiting = "agent-waiting"
 	// ReasonNotDelivered: a deny closed the dialog but its reason never reached the agent.
 	ReasonNotDelivered = "reason-not-delivered"
 )

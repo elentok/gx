@@ -78,6 +78,7 @@ func logGxQuestion(ticketPath string, kind events.Kind) error {
 const (
 	CloseBudgetKilled = "budget-killed"
 	CloseRelaunch     = "relaunch"
+	CloseUnparked     = "unparked"
 )
 
 // CloseOpenQuestion writes park.closed with reason for the ticket's open
