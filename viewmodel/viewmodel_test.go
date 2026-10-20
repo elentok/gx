@@ -31,6 +31,27 @@ func reduce(t *testing.T, s viewmodel.State, evs ...server.Event) viewmodel.Stat
 	return s
 }
 
+func TestOlderServer(t *testing.T) {
+	withRendered := viewmodel.State{}.ApplySnapshot(server.Snapshot{
+		Seq:     1,
+		Tickets: []server.TicketInfo{{Address: "gx:e/01", Status: "open", RenderedStatus: "open"}},
+	})
+	cases := []struct {
+		name string
+		st   viewmodel.State
+		want bool
+	}{
+		{"no snapshot yet", viewmodel.State{}, true},
+		{"tickets without rendered status", snapshot(), true},
+		{"tickets with rendered status", withRendered, false},
+	}
+	for _, c := range cases {
+		if got := c.st.OlderServer(); got != c.want {
+			t.Errorf("%s: OlderServer() = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestReduce_EffectPerEventType(t *testing.T) {
 	const resnap = viewmodel.EffectResnapshot
 	cases := []struct {

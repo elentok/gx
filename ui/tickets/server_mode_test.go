@@ -139,6 +139,9 @@ func (f fakeServerAPI) QueueItems(context.Context) ([]server.QueueItem, error)  
 // always sends rendered_status: a ticket without one gets its raw status word.
 // A snapshot with none at all reads as an older server's.
 func withRenderedStatus(snap server.Snapshot) server.Snapshot {
+	if snap.Seq == 0 {
+		snap.Seq = 1
+	}
 	snap.Tickets = slices.Clone(snap.Tickets)
 	for i := range snap.Tickets {
 		if snap.Tickets[i].RenderedStatus == "" {

@@ -69,8 +69,12 @@ type State struct {
 }
 
 // OlderServer reports a snapshot from a server that predates rendered status
-// and epic summaries: it has tickets, none carrying a rendered status.
+// and epic summaries: no snapshot has arrived yet, or it has tickets and none
+// carries a rendered status.
 func (s State) OlderServer() bool {
+	if s.Seq == 0 {
+		return true
+	}
 	return len(s.Tickets) > 0 && !slices.ContainsFunc(s.Tickets, func(t server.TicketInfo) bool {
 		return t.RenderedStatus != ""
 	})
