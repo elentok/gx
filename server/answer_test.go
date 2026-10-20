@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -150,6 +151,58 @@ func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 	fake.SetState("epic-a-iter-01", agentrunner.StateIdle, "")
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
 	waitStatus(t, ticketPath, schema.StatusDone)
+}
+
+// requireQueued checks the outcome of an answer to a gone agent: logged,
+// reopened, answered, and nothing launched.
+func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake *headlessFake, res server.QueueResult, err error) {
+	t.Helper()
+	if err != nil || res.Refused || res.Outcome != server.OutcomeQueued {
+		t.Fatalf("answer = %+v, %v; want queued", res, err)
+	}
+	if n := answerCount(t, ticketPath); n != 1 {
+		t.Errorf("park.answer lines = %d, want 1", n)
+	}
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil || tk.Status != schema.StatusOpen {
+		t.Errorf("ticket = %+v, %v; want open", tk, err)
+	}
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil || !tickets.Answered(tk.Status, evs) {
+		t.Errorf("Answered = false (%v), want true", err)
+	}
+	if runs := h.Server.Runs(); len(runs) != 0 {
+		t.Errorf("Runs() = %+v, want none", runs)
+	}
+	if got := fake.Prompts("epic-a-iter-01"); len(got) > 1 {
+		t.Errorf("prompts = %q, want at most the one racing prompt", got)
+	}
+}
+
+func TestAnswer_GoneAgentQueues(t *testing.T) {
+	// The hard limit is spent: a queued answer skips the budget refusal.
+	h, ticketPath, fake := startWaitingRestartFake(t, 5)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	h.Server.RecordSpend("spent", 6)
+	sess, ok, err := fake.Find("epic-a-iter-01")
+	if err != nil || !ok {
+		t.Fatalf("Find = %v, %v", ok, err)
+	}
+	if err := fake.Stop(sess); err != nil {
+		t.Fatal(err)
+	}
+	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	requireQueued(t, h, ticketPath, fake, res, err)
+}
+
+func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	fake.DieAfterPrompt("epic-a-iter-01", agentrunner.SessionDied("claude exited (code 1)"))
+	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	requireQueued(t, h, ticketPath, fake, res, err)
 }
 
 func TestAnswer_Refusals(t *testing.T) {

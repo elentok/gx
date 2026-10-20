@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/elentok/gx/agentrunner"
@@ -27,6 +28,7 @@ const (
 const (
 	OutcomeDelivered = "delivered"
 	OutcomeAdopted   = "adopted"
+	OutcomeQueued    = "queued"
 )
 
 // maxAnswerChars caps a note, and the text of a free-text answer.
@@ -109,6 +111,7 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 		}
 		address := ref.addr.String()
 		var run trackedRun
+		var queued bool
 		_, err := tickets.AppendLogFrom(ref.ticket.Path, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
 			t, err := schema.ParseTicket(ref.ticket.Path)
 			if err != nil {
@@ -137,22 +140,34 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 			if bad != nil {
 				return refuse(*bad)
 			}
-			if res, refused := s.budgetRefusal(); refused {
-				return refuse(res)
-			}
-			var ok bool
-			if run, ok = s.registry.tracked(address); !ok || run.WaitingSince.IsZero() {
-				return refuse(refusal(ReasonIterationNotLive, "no live agent is waiting on "+address))
-			}
-			runner, err := s.runnerOf(run.Run)
-			if err != nil {
+			if queued, err = s.agentGone(address); err != nil {
 				return tickets.LogEvent{}, err
 			}
-			if err := runner.Prompt(run.Session, answerFrame(open.Seq, answer, note)); err != nil {
-				if errors.Is(err, agentrunner.ErrNotReady) {
-					return refuse(refusal(ReasonAgentNotReady, err.Error()))
+			if !queued {
+				// The budget check guards live delivery only: a queued answer
+				// launches nothing.
+				if res, refused := s.budgetRefusal(); refused {
+					return refuse(res)
 				}
-				return tickets.LogEvent{}, fmt.Errorf("prompt %s: %w", address, err)
+				run, _ = s.registry.tracked(address)
+				runner, err := s.runnerOf(run.Run)
+				if err != nil {
+					return tickets.LogEvent{}, err
+				}
+				err = runner.Prompt(run.Session, answerFrame(open.Seq, answer, note))
+				switch {
+				case errors.Is(err, agentrunner.ErrNotReady):
+					return refuse(refusal(ReasonAgentNotReady, err.Error()))
+				case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
+					queued = true
+				case err != nil:
+					return tickets.LogEvent{}, fmt.Errorf("prompt %s: %w", address, err)
+				default:
+					// The agent can die right after taking the prompt.
+					if queued, err = s.agentGone(address); err != nil {
+						return tickets.LogEvent{}, err
+					}
+				}
 			}
 			ev := tickets.LogEvent{Type: tickets.EventParkAnswer, Source: req.Source, Question: open.Seq, Choice: answer, Note: note}
 			if q.Kind == tickets.QuestionText {
@@ -167,6 +182,15 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("answer %s: %w", ref.addr, err)
 		}
+		if queued {
+			// Open again for gx to claim; the dead run has nothing to settle.
+			s.registry.delete(address)
+			if err := ralphloop.UnparkTicket(ref.ticket.Path, time.Now()); err != nil {
+				return QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
+			}
+			s.rescan()
+			return QueueResult{Outcome: OutcomeQueued}, nil
+		}
 		if err := ralphloop.Claim(ref.ticket.Path); err != nil {
 			return QueueResult{}, fmt.Errorf("claim %s: %w", ref.addr, err)
 		}
@@ -176,6 +200,24 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 		s.rescan()
 		return QueueResult{Outcome: OutcomeDelivered}, nil
 	})
+}
+
+// agentGone reports that no live agent is waiting on address: its run is not
+// tracked as waiting, or its session is missing or died.
+func (s *Server) agentGone(address string) (bool, error) {
+	run, ok := s.registry.tracked(address)
+	if !ok || run.WaitingSince.IsZero() {
+		return true, nil
+	}
+	runner, err := s.runnerOf(run.Run)
+	if err != nil {
+		return false, err
+	}
+	_, err = runner.Status(run.Session)
+	if errors.Is(err, agentrunner.ErrNotFound) || errors.Is(err, agentrunner.ErrSessionDied) {
+		return true, nil
+	}
+	return false, err
 }
 
 // resettleWaiting ends a run's wait for an answer and settles it as a normal
