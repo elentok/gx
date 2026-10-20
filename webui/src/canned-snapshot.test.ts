@@ -23,8 +23,15 @@ const RECOVERY_WORDS = ["pending", "escalated"];
 
 describe("canned snapshot", () => {
   it("addresses epics as project:epic", () => {
-    for (const e of [...snap.epics, ...snap.recently_finished]) {
+    const finishedEpics = snap.recently_finished.filter((f) => !f.one_off);
+    for (const e of [...snap.epics, ...finishedEpics]) {
       expect(e.address).toBe(`${e.project}:${e.name}`);
+    }
+  });
+
+  it("addresses finished one-offs as project:epic/id", () => {
+    for (const f of snap.recently_finished.filter((f) => f.one_off)) {
+      expect(f.address).toMatch(new RegExp(`^${f.project}:[^/]+/[^/]+$`));
     }
   });
 

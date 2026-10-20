@@ -27,6 +27,23 @@ func TestQueueFinished_RendersDimLine(t *testing.T) {
 	}
 }
 
+func TestQueueFinished_OneOffShowsMarkerNotProgress(t *testing.T) {
+	now := time.Now()
+	snap := server.Snapshot{Seq: 1, RecentlyFinished: []server.FinishedEpic{
+		{Name: "fix-flaky-test", Project: "gx", OneOff: true, CompletedAt: now.Add(-time.Hour)},
+	}}
+	m, _ := deliverQueue(t, snap, nil)
+	m.now = func() time.Time { return now }
+
+	body := strings.Join(m.queueBody(100), "\n")
+	if want := "fix-flaky-test gx one-off finished 1h ago"; !strings.Contains(body, want) {
+		t.Errorf("queue body = %q, want it to contain %q", body, want)
+	}
+	if strings.Contains(body, "0/0") {
+		t.Errorf("queue body = %q, want no done/total for a one-off", body)
+	}
+}
+
 func TestQueueFinished_TickRerendersRelativeTime(t *testing.T) {
 	now := time.Now()
 	m := finishedQueue(t, now)

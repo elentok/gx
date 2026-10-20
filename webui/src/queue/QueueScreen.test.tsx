@@ -40,6 +40,13 @@ describe("QueueScreen", () => {
     expect(screen.getAllByText(/finished .* ago|finished just now/).length).toBe(snap.recently_finished.length);
   });
 
+  it("marks finished one-offs and shows no done/total for them", () => {
+    renderThemed(<QueueScreen state={state()} />);
+    expect(screen.getAllByText("one-off")).toHaveLength(1);
+    expect(screen.getAllByText("4/4")).toHaveLength(1);
+    expect(screen.queryByText("0/0")).toBeNull();
+  });
+
   it("shows All quiet only after the first snapshot", () => {
     const empty = { ...snap, epics: [], recently_finished: [] };
     const before = renderThemed(<QueueScreen state={state({ snapshot: null, loadedOnce: false })} />);

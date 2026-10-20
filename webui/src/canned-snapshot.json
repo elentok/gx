@@ -140,7 +140,17 @@
       "project": "gx",
       "done": 4,
       "total": 4,
-      "completed_at": "2026-10-19T10:00:00Z"
+      "completed_at": "2026-10-19T10:00:00Z",
+      "one_off": false
+    },
+    {
+      "address": "gx:one-offs/07",
+      "name": "fix-flaky-test",
+      "project": "gx",
+      "done": 0,
+      "total": 0,
+      "completed_at": "2026-10-19T11:00:00Z",
+      "one_off": true
     }
   ]
 }

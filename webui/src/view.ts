@@ -27,6 +27,7 @@ export interface FinishedView {
   project: string;
   done: number;
   total: number;
+  oneOff: boolean;
   finished: string;
 }
 
@@ -111,6 +112,7 @@ export function finishedView(f: FinishedEpic, now: Date): FinishedView {
     project: f.project,
     done: f.done,
     total: f.total,
+    oneOff: f.one_off,
     finished: when === "just now" ? "finished just now" : `finished ${when}`,
   };
 }

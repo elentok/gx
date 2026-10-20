@@ -9,7 +9,7 @@ export function RecentlyFinishedRow({ row }: { row: FinishedView }) {
       </Text>
       <Text as="span">{row.project}</Text>
       <Text as="span" fontFamily="condensed">
-        {row.done}/{row.total}
+        {row.oneOff ? "one-off" : `${row.done}/${row.total}`}
       </Text>
       <Text as="span">{row.finished}</Text>
     </Box>

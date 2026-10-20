@@ -16,8 +16,12 @@ func (m QueueModel) finishedLines() []string {
 		if ago != "now" {
 			ago += " ago"
 		}
+		progress := fmt.Sprintf("%d/%d", f.Done, f.Total)
+		if f.OneOff {
+			progress = "one-off"
+		}
 		lines = append(lines, ui.StyleDim.Render(
-			fmt.Sprintf("  %s %s %d/%d finished %s", f.Name, f.Project, f.Done, f.Total, ago)))
+			fmt.Sprintf("  %s %s %s finished %s", f.Name, f.Project, progress, ago)))
 	}
 	return lines
 }
