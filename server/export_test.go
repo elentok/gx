@@ -17,6 +17,7 @@ var (
 	RecoveryState  = recoveryState
 	GuardRailStop  = guardRailStop
 	HardGraceTitle = hardGraceTitle
+	TicketAgent    = ticketAgent
 )
 
 // LaunchingRuns counts runs whose agent has no session yet, which a budget
