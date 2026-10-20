@@ -41,7 +41,21 @@ func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events
 		s.holdPark(addr, status, kind, reason)
 		return
 	}
-	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, fmt.Sprintf("%s: %s", kind, reason), s.epicCounts(addr.Project, addr.Epic))
+	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, parkChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
+}
+
+// parkChatDetail is the chat line for a park. A self-reported park shows the
+// agent's own question summary, which says more than the generic reason. It
+// falls back to the generic line when the ticket has no open question.
+func parkChatDetail(ticketPath string, kind events.Kind, reason string) string {
+	if kind == events.SelfReported && ticketPath != "" {
+		if evs, err := tickets.ReadLog(ticketPath); err == nil {
+			if q := tickets.OpenQuestion(evs); q != nil && q.Summary != "" {
+				return q.Summary
+			}
+		}
+	}
+	return fmt.Sprintf("%s: %s", kind, reason)
 }
 
 // finishSink carries the finish path's chat-worthy events the outcome cannot

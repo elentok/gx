@@ -242,6 +242,31 @@ func TestNotifyPark_ShowsRealStatusKindAndReason(t *testing.T) {
 	}
 }
 
+func TestNotifyPark_SelfReportedShowsQuestionSummary(t *testing.T) {
+	s, wait := chatServer(t, 0, 0)
+	path := filepath.Join(t.TempDir(), "01-x.md")
+	if err := os.WriteFile(path, []byte("---\nid: \"01\"\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	summary := "Should the cache be per-project?"
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{
+		Type: tickets.EventParkQuestion, By: "agent", Summary: summary, Handoff: "h",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	s.notifyPark(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported needs-answer via iteration_status")
+
+	s.chat.Close()
+	all := strings.Join(wait(-1), "\n")
+	if !strings.Contains(all, summary) {
+		t.Errorf("chat lacks the question summary: %s", all)
+	}
+	if strings.Contains(all, "agent reported needs-answer") {
+		t.Errorf("generic reason leaked: %s", all)
+	}
+}
+
 func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	s.herdr.unavailable = true
