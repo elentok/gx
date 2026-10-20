@@ -62,6 +62,7 @@ type LogEvent struct {
 	Decision string           `json:"decision,omitempty"`
 	Shown    *PermissionShown `json:"shown,omitempty"`
 	Reason   string           `json:"reason,omitempty"`
+	Base     string           `json:"base,omitempty"`
 }
 
 // ClipLogText cuts text to MaxLogTextChars and says whether it cut anything.

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
@@ -36,7 +38,22 @@ type RepairRequest struct {
 	Reason       string `json:"reason,omitempty"`
 	Force        bool   `json:"force,omitempty"`
 	DeleteBranch bool   `json:"delete_branch,omitempty"`
+
+	// unpark
+	Base  string `json:"base,omitempty"`
+	State string `json:"state,omitempty"`
+	// RequireState is set by the web mux, never by a client: the unpark then
+	// needs a State token that still matches the park round.
+	RequireState bool `json:"-"`
 }
+
+// ReasonBadBase refuses an unpark whose base is not one of the competing blockers.
+const ReasonBadBase = "bad-base"
+
+// zeroCommitPrompt is what a live agent receives when a person unparks its
+// zero-commit finish.
+const zeroCommitPrompt = "A person reviewed your finish with no commits and wants you to continue. " +
+	"Finish the work, or report `--iteration-status finished --commitless true`."
 
 // RepairResult is what every repair verb returns: the verb's own result in
 // Data, or a refusal carrying the repair package's stable reason code.
@@ -221,21 +238,168 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if _, t, err := repair.FindEpicTicket(epicPath, id); err == nil {
-		dir := filepath.Dir(epicPath)
-		addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}
-		if s.adoptFirst(dir, addr, t.Path) {
-			return repairOK(repair.UnparkResult{Ticket: id, Status: repair.UnparkAdopted})
+	dir := filepath.Dir(epicPath)
+	addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}
+	_, t, ferr := repair.FindEpicTicket(epicPath, id)
+	if ferr != nil {
+		// Not a ticket of this epic: the plain unpark reports why.
+		res, err := repair.Unpark(epicPath, id, time.Now(), "")
+		if err != nil {
+			return repairRefusal(err), nil
 		}
+		return repairOK(res)
+	}
+	tk, perr := schema.ParseTicket(t.Path)
+	parked := perr == nil && tk.Status == schema.StatusNeedsAnswer
+	zeroCommit := parked && tk.ParkKind == schema.ParkKindZeroCommit
+	// Every refusal runs before the first state change.
+	if parked && req.RequireState {
+		if res, refused := unparkStale(t.Path, tk, req.State); refused {
+			return res, nil
+		}
+	}
+	if req.Base != "" {
+		if blockers := s.ambiguousBlockers(addr); !slices.Contains(blockers, req.Base) {
+			msg := fmt.Sprintf("base %q is not one of the competing blockers (%s)", req.Base, strings.Join(blockers, ", "))
+			return repairRefusal(&repair.RefusalError{Reason: ReasonBadBase, Message: msg}), nil
+		}
+	}
+	if s.adoptFirst(dir, addr, t.Path) {
+		res := repair.UnparkResult{Ticket: id, Status: repair.UnparkAdopted}
+		if zeroCommit {
+			res.Message = repair.MessageAdopted
+		}
+		return repairOK(res)
 	}
 	if res, refused, err := s.unparkSelfReported(epicPath, id); refused || err != nil {
 		return res, err
 	}
-	res, err := repair.Unpark(epicPath, id, time.Now())
+	if zeroCommit {
+		prompted, err := s.promptLiveAgent(dir, addr, zeroCommitPrompt)
+		if err != nil {
+			return repairRefusal(err), nil
+		}
+		if prompted {
+			return repairOK(repair.UnparkResult{Ticket: id, Status: repair.UnparkPrompted, Message: repair.MessagePrompted})
+		}
+	}
+	if parked && req.RequireState && tk.ParkKind != schema.ParkKindSelfReported {
+		if err := logUnparkAnswer(t.Path, req.Base); err != nil {
+			return RepairResult{}, fmt.Errorf("log unpark of %s: %w", addr, err)
+		}
+	}
+	res, err := repair.Unpark(epicPath, id, time.Now(), req.Base)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
+	if zeroCommit {
+		res.Message = repair.MessageReopened
+	}
 	return repairOK(res)
+}
+
+// unparkStale refuses an unpark whose token no longer names the ticket's open
+// question and status; a park without an open question has no round to name.
+func unparkStale(ticketPath string, t schema.Ticket, state string) (RepairResult, bool) {
+	evs, err := tickets.ReadLog(ticketPath)
+	if err == nil {
+		if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.Status) == state {
+			return RepairResult{}, false
+		}
+	}
+	return repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "the park changed; review the current one"}), true
+}
+
+// logUnparkAnswer records the person's unpark as the answer to the open
+// question. A ticket without an open question logs nothing.
+func logUnparkAnswer(ticketPath, base string) error {
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		return err
+	}
+	open := tickets.OpenQuestion(evs)
+	if open == nil {
+		return nil
+	}
+	_, err = tickets.AppendLogIf(ticketPath, tickets.LogEvent{
+		Type: tickets.EventParkAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: base,
+	}, func(evs []tickets.LogEvent) error {
+		if cur := tickets.OpenQuestion(evs); cur == nil || cur.Seq != open.Seq {
+			return errUnparkQuestionGone
+		}
+		return nil
+	})
+	if errors.Is(err, errUnparkQuestionGone) {
+		return nil
+	}
+	return err
+}
+
+var errUnparkQuestionGone = errors.New("question no longer open")
+
+// ambiguousBlockers lists the blockers a ticket parked on an ambiguous base
+// has to choose between, recomputed from the epics; none when it is not ambiguous.
+func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
+	dir, err := s.projectDir(addr.Project)
+	if err != nil {
+		return nil
+	}
+	epics, err := tickets.LoadResolved(addr.Project, dir)
+	if err != nil {
+		return nil
+	}
+	for _, e := range epics {
+		if filepath.Base(e.Path) != addr.Epic {
+			continue
+		}
+		for _, t := range e.Tickets {
+			if t.Identifier != addr.ID {
+				continue
+			}
+			var amb *tickets.AmbiguousBaseError
+			if _, err := tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); errors.As(err, &amb) {
+				return amb.Blockers
+			}
+			if _, err := tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t, s.landingOnLanded(addr.Project)); errors.As(err, &amb) {
+				return amb.Blockers
+			}
+		}
+	}
+	return nil
+}
+
+// promptLiveAgent sends text to the iteration's agent when it is still
+// running, and reports whether it did. A direct run has no runner and finds none.
+func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) (bool, error) {
+	if s.registry == nil {
+		return false, nil
+	}
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
+	runner := s.runnerFor(addr.Project)
+	if park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID); ok {
+		if park.Label != "" {
+			label = park.Label
+		}
+		if r := s.runnerForRun(Run{Address: addr.String(), Runner: park.Runner}); park.Runner != "" && r != nil {
+			runner = r
+		}
+	}
+	if runner == nil {
+		return false, nil
+	}
+	sess, ok, err := runner.Find(label)
+	if err != nil || !ok {
+		return false, err
+	}
+	switch err := runner.Prompt(sess, text); {
+	case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
+		return false, nil
+	case errors.Is(err, agentrunner.ErrNotReady):
+		return false, &repair.RefusalError{Reason: ReasonAgentNotReady, Message: err.Error()}
+	case err != nil:
+		return false, fmt.Errorf("prompt %s: %w", addr, err)
+	}
+	return true, nil
 }
 
 // unparkSelfReported applies the rule for a self-reported park: a live waiting
@@ -291,12 +455,22 @@ func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {
 // repairWrite adapts a repair verb to a POST handler. Refusals are results, so
 // they answer 200; only a malformed body or a failure to encode is an HTTP error.
 func repairWrite(do func(RepairRequest) (RepairResult, error)) http.HandlerFunc {
+	return repairWriteAs(false, do)
+}
+
+// repairWriteWeb is repairWrite for the web mux: the request needs a state token.
+func repairWriteWeb(do func(RepairRequest) (RepairResult, error)) http.HandlerFunc {
+	return repairWriteAs(true, do)
+}
+
+func repairWriteAs(web bool, do func(RepairRequest) (RepairResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req RepairRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		req.RequireState = web
 		res, err := do(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

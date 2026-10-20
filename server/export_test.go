@@ -85,6 +85,12 @@ func (s *Server) SetLandedProbe(f func(repo, ancestor, descendant string) (bool,
 	s.landedProbe = f
 }
 
+// UnparkAsWeb is the unpark the web mux serves: it needs a state token.
+func (s *Server) UnparkAsWeb(req RepairRequest) (RepairResult, error) {
+	req.RequireState = true
+	return s.repairUnpark(req)
+}
+
 // Rescan rescans the store now, as a ping or the watch would.
 func (s *Server) Rescan() { s.rescan() }
 

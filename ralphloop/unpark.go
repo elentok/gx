@@ -178,8 +178,17 @@ func parkedTicketHasNewCommits(d Deps, worktreeDir, epicName string, t tickets.T
 // unparkAnswered can't safely auto-clear on its own (an announce-and-stop
 // park's live-but-idle pane looks identical to an answered gate park).
 func UnparkTicket(path string, now time.Time) error {
+	return UnparkTicketWithBase(path, now, "")
+}
+
+// UnparkTicketWithBase is UnparkTicket that also writes base: onto the ticket,
+// the person's pick for an ambiguous-base park; "" leaves it alone.
+func UnparkTicketWithBase(path string, now time.Time, base string) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusOpen
+		if base != "" {
+			t.Base = base
+		}
 		*body = schema.DemoteSection(*body, "## Needs Answer", now)
 	})
 }
