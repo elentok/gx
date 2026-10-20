@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -56,7 +57,9 @@ func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, dryRun bool, w i
 // result — every ticket's frontmatter plus every epic's parent graph —
 // before writing anything, so a result that would be invalid leaves every
 // file untouched and this returns that validation error unchanged. It then
-// backfills merged_at on already-landed epics (see tickets.BackfillMergedAt).
+// backfills merged_at on already-landed epics (see tickets.BackfillMergedAt)
+// and moves live "## Needs Answer" sections into the ticket log (see
+// tickets.MigrateParkSections).
 func runTicketsMigrate(scratchRoot string, w io.Writer) error {
 	result, err := tickets.Migrate(scratchRoot)
 	if err != nil {
@@ -64,6 +67,11 @@ func runTicketsMigrate(scratchRoot string, w io.Writer) error {
 	}
 	backfilled, err := tickets.BackfillMergedAt(scratchRoot, epicLandedUnder(scratchRoot))
 	changes := append(result.Changes, backfilled...)
+	if err == nil {
+		var parked []tickets.MigrationChange
+		parked, err = tickets.MigrateParkSections(scratchRoot, time.Now())
+		changes = append(changes, parked...)
+	}
 
 	if len(changes) == 0 && err == nil {
 		fmt.Fprintln(w, "no changes")

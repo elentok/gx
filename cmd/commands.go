@@ -262,7 +262,14 @@ func newTicketsCmd(d deps) *cobra.Command {
 	migrateCmd := &cobra.Command{
 		Use:   "migrate <path>",
 		Short: "rewrite every ticket under a tracker root into the post-refactor frontmatter shape, or (--to-store) copy it into the ticket store",
-		Args:  cobra.ExactArgs(1),
+		Long: `Rewrite every ticket under a tracker root into the post-refactor shape.
+
+Run it by hand once after upgrading; gx does not run it at server start. It
+also moves each live "## Needs Answer" and "## Handoff" section into the
+ticket's log as a park.question (plus a park.answer when the ticket was
+answered by hand and is open again). Until it has run, an old ticket without a
+log shows no open question on the web. A second run changes nothing.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if !migrateToStore {
 				return runTicketsMigrate(args[0], c.OutOrStdout())
