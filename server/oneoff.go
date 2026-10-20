@@ -504,7 +504,7 @@ const oneOffFile = "01-one-off.md"
 // whoever wrote it. OneOffsArchivedEpic is where finished ones are moved.
 const (
 	OneOffsEpic         = "one-offs"
-	OneOffsArchivedEpic = "one-offs-archived"
+	OneOffsArchivedEpic = tickets.ArchivedOneOffsEpic
 )
 
 func isOneOffsEpicName(name string) bool {

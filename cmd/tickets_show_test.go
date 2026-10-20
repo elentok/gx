@@ -66,6 +66,25 @@ func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_FollowsArchivedOneOff(t *testing.T) {
+	repo, project := setupShowProject(t)
+	archived := filepath.Join(project, tickets.ArchivedOneOffsEpic)
+	if err := os.MkdirAll(filepath.Join(archived, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.EnsureEpicTicketMD(t, archived)
+	testutil.WriteFile(t, filepath.Join(archived, "issues"), "01-one-off.md",
+		"---\nid: \"01\"\nstatus: done\ntype: prompt\n---\n\n# 01 — Moved\n\n## Resolution\n\n- original: mine:one-offs/07\n")
+
+	out, err := runIn(t, repo, "tickets", "show", "mine:one-offs/07")
+	if err != nil {
+		t.Fatalf("show old address: %v", err)
+	}
+	if !strings.HasPrefix(out, "mine:one-offs-archived/01  ") {
+		t.Errorf("printed %q, want the archived address", out)
+	}
+}
+
 func TestExecute_TicketsShow_RendersWidenedBlocker(t *testing.T) {
 	repo, project := setupShowProject(t)
 	other := filepath.Join(project, "other", "issues")

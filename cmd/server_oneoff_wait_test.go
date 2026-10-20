@@ -25,6 +25,9 @@ type fakeSource struct {
 	failFirst     int
 	snaps         int
 	investigation bool
+	// gone drops the ticket from every snapshot, as after an archive move.
+	gone  bool
+	moved movedLookup
 }
 
 const investigationAddr = "gx:p/1a"
@@ -40,6 +43,9 @@ func (f *fakeSource) Snapshot(context.Context) (server.Snapshot, error) {
 		t.Recovery = f.recoveries[i]
 	}
 	snap := server.Snapshot{Seq: uint64(f.snaps), Tickets: []server.TicketInfo{t}}
+	if f.gone {
+		snap.Tickets = nil
+	}
 	if f.investigation {
 		snap.Tickets = append(snap.Tickets, server.TicketInfo{Address: investigationAddr, Status: "claimed", Type: "investigate", Parent: "gx:p/1"})
 	}
@@ -72,7 +78,7 @@ func runWaitTimeout(t *testing.T, f *fakeSource, timeout time.Duration) (stdout 
 	var out, errOut bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	err := runOneOffWait(ctx, f, &out, &errOut, "gx:p/1", timeout)
+	err := runOneOffWait(ctx, f, f.moved, &out, &errOut, "gx:p/1", timeout)
 	var exitErr *ExitError
 	if errors.As(err, &exitErr) {
 		return out.String(), exitErr.Code
@@ -149,5 +155,28 @@ func TestOneOffWait_SurvivesServerRestart(t *testing.T) {
 	f := &fakeSource{statuses: []string{"claimed", "needs-repair"}, failFirst: 3}
 	if _, code := runWait(t, f); code != 4 {
 		t.Errorf("code = %d; want 4 after the outage", code)
+	}
+}
+
+func TestOneOffWait_PrintsResultAfterTheTicketIsArchived(t *testing.T) {
+	old := waitRetry
+	t.Cleanup(func() { waitRetry = old })
+	waitRetry = time.Millisecond
+	file := filepath.Join(t.TempDir(), "01.md")
+	body := "---\nid: 1\nstatus: done\ntype: prompt\n---\n\n## Result\n\nall good\n"
+	if err := os.WriteFile(file, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The first snapshots fail (a restart), then the old address is gone.
+	f := &fakeSource{statuses: []string{"claimed"}, failFirst: 2, gone: true,
+		moved: func(address string) (server.TicketInfo, bool) {
+			if address != "gx:p/1" {
+				return server.TicketInfo{}, false
+			}
+			return server.TicketInfo{Address: "gx:one-offs-archived/1", Status: "done", File: file}, true
+		}}
+	out, code := runWait(t, f)
+	if code != 0 || strings.TrimSpace(out) != "all good" {
+		t.Errorf("code = %d, out = %q; want 0 and the Result", code, out)
 	}
 }

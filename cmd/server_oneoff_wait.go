@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -42,9 +43,9 @@ type eventSource interface {
 // stream or a dead server is not an end: it re-snapshots after a pause, so a
 // restart mid-wait only delays the answer. Events carry no status, so any
 // event for the ticket just triggers a fresh snapshot.
-func waitForTicket(ctx context.Context, src eventSource, address string) (server.TicketInfo, error) {
+func waitForTicket(ctx context.Context, src eventSource, moved movedLookup, address string) (server.TicketInfo, error) {
 	for {
-		if t, ok, err := waitOnce(ctx, src, address); err != nil && ctx.Err() == nil {
+		if t, ok, err := waitOnce(ctx, src, moved, address); err != nil && ctx.Err() == nil {
 			select {
 			case <-time.After(waitRetry):
 			case <-ctx.Done():
@@ -58,8 +59,32 @@ func waitForTicket(ctx context.Context, src eventSource, address string) (server
 	}
 }
 
+// movedLookup finds where an address went once it is gone from the server's
+// snapshot: an ended one-off is archived under a new address. nil looks nowhere.
+type movedLookup func(address string) (server.TicketInfo, bool)
+
+// archivedLookup is the movedLookup that reads the store, so it needs no
+// server and works across a restart.
+func archivedLookup(cwd string) movedLookup {
+	return func(address string) (server.TicketInfo, bool) {
+		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
+		if err != nil || a.Project == "" {
+			return server.TicketInfo{}, false
+		}
+		root, err := projectRoot(cwd, a.Project)
+		if err != nil {
+			return server.TicketInfo{}, false
+		}
+		moved, t, err := tickets.FindOriginal(a.Project, root, a)
+		if err != nil {
+			return server.TicketInfo{}, false
+		}
+		return server.TicketInfo{Address: moved.String(), Status: t.Status, File: t.Path}, true
+	}
+}
+
 // waitOnce takes one snapshot and streams from it until the ticket changes.
-func waitOnce(ctx context.Context, src eventSource, address string) (server.TicketInfo, bool, error) {
+func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address string) (server.TicketInfo, bool, error) {
 	snap, err := src.Snapshot(ctx)
 	if err != nil {
 		return server.TicketInfo{}, false, err
@@ -67,6 +92,7 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 	// The ticket's forks include its investigations, whose progress is its
 	// recovery's.
 	watched := map[string]bool{address: true}
+	present := false
 	for _, t := range snap.Tickets {
 		if t.Parent == address {
 			watched[t.Address] = true
@@ -74,8 +100,16 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 		if t.Address != address {
 			continue
 		}
+		present = true
 		if _, stop := waitExitCodes[t.Status]; stop && t.Recovery != server.RecoveryPending {
 			return t, true, nil
+		}
+	}
+	if !present && moved != nil {
+		if t, ok := moved(address); ok {
+			if _, stop := waitExitCodes[t.Status]; stop {
+				return t, true, nil
+			}
 		}
 	}
 	sctx, cancel := context.WithCancel(ctx)
@@ -95,13 +129,13 @@ func waitOnce(ctx context.Context, src eventSource, address string) (server.Tick
 // runOneOffWait waits for address, prints its ## Result, and maps its status to
 // the exit code. A parked ticket has no result worth printing. A positive
 // timeout only stops this waiter: the server is never told, so the ticket runs on.
-func runOneOffWait(ctx context.Context, src eventSource, w, errW io.Writer, address string, timeout time.Duration) error {
+func runOneOffWait(ctx context.Context, src eventSource, moved movedLookup, w, errW io.Writer, address string, timeout time.Duration) error {
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	t, err := waitForTicket(ctx, src, address)
+	t, err := waitForTicket(ctx, src, moved, address)
 	if errors.Is(err, context.DeadlineExceeded) {
 		fmt.Fprintf(errW, "%s: still running after %s; it keeps running\n", address, timeout)
 		return &ExitError{Code: exitWaitTimeout}

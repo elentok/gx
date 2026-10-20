@@ -111,6 +111,24 @@ func TestEvolveRun_EvolvedEpicNeedsForce(t *testing.T) {
 	}
 }
 
+func TestEvolveRun_NamesTheArchivedRetroTicket(t *testing.T) {
+	t.Parallel()
+	f := newEvolveFixture(t, config.EvolveContributor, false, "evolved_at: 2026-01-02T03:04:05Z\nevolve_ticket: proj:one-offs/09\n")
+	archived := filepath.Join(f.env.storePath, "proj", tickets.ArchivedOneOffsEpic)
+	if err := os.MkdirAll(filepath.Join(archived, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	moved := "---\nid: \"01\"\nstatus: done\ntype: evolve\n---\n\n## Resolution\n\n- original: proj:one-offs/09\n"
+	if err := os.WriteFile(filepath.Join(archived, "issues", "01-one-off.md"), []byte(moved), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	err := runEvolveRun(context.Background(), f.env, &out, &errOut, "proj:epic", false)
+	if err == nil || !strings.Contains(err.Error(), "retro proj:one-offs-archived/01") {
+		t.Fatalf("err = %v, want one naming the archived retro ticket", err)
+	}
+}
+
 func TestEvolveSkip_StampsBothFieldsAndNoTicket(t *testing.T) {
 	t.Parallel()
 	f := newEvolveFixture(t, config.EvolveContributor, false, "")

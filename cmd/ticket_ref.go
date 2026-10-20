@@ -15,6 +15,23 @@ import (
 // address that names nothing is refused with a tickets.AddressError carrying
 // a stable code.
 func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
+	a, t, err := lookupTicket(cwd, addr)
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || (ae.Code != tickets.CodeUnknownTicket && ae.Code != tickets.CodeUnknownEpic) {
+		return a, t, err
+	}
+	// An archived one-off keeps answering to its old address.
+	root, rootErr := projectRoot(cwd, a.Project)
+	if rootErr != nil {
+		return a, t, err
+	}
+	if moved, mt, ferr := tickets.FindOriginal(a.Project, root, a); ferr == nil || !isUnknownTicket(ferr) {
+		return moved, mt, ferr
+	}
+	return a, t, err
+}
+
+func lookupTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 	cwdRoot, rootErr := ticketRoot(cwd)
 	ctxProject := ""
 	if rootErr == nil {
@@ -49,6 +66,11 @@ func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 		return a, tickets.Ticket{}, &tickets.AddressError{Code: tickets.CodeUnknownTicket, Msg: fmt.Sprintf("no ticket %s in epic %q", a.ID, a.Epic)}
 	}
 	return a, tickets.Ticket{}, &tickets.AddressError{Code: tickets.CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q in project %q", a.Epic, a.Project)}
+}
+
+func isUnknownTicket(err error) bool {
+	var ae *tickets.AddressError
+	return errors.As(err, &ae) && ae.Code == tickets.CodeUnknownTicket
 }
 
 // projectRoot is the one resolver for a `project:` address prefix: the ticket

@@ -104,7 +104,8 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 	if d.err != nil || !d.follow {
 		return d.err
 	}
-	return runOneOffWait(ctx, cl, resultW, errW, res.Address, timeout)
+	cwd, _ := os.Getwd()
+	return runOneOffWait(ctx, cl, archivedLookup(cwd), resultW, errW, res.Address, timeout)
 }
 
 // oneOffDecision is what a submit result means for the process, independent of

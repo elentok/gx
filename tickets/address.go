@@ -10,18 +10,19 @@ import (
 // Reason codes carried by AddressError. They are the stable, machine-readable
 // part of a refusal; the message is for humans and may change.
 const (
-	CodeMalformedAddress = "malformed-address"
-	CodeEpicRequired     = "epic-required"
-	CodeUnknownProject   = "unknown-project"
-	CodeUnknownEpic      = "unknown-epic"
-	CodeUnknownTicket    = "unknown-ticket"
-	CodeCategoryRequired = "category-required"
-	CodeCategoryConflict = "category-conflict"
-	CodeNotFollowUpsEpic = "not-follow-ups-epic"
-	CodeSectionRequired  = "section-required"
-	CodeStatusOverride   = "status-override"
-	CodeTypeOverride     = "type-override"
-	CodeEpicJSON         = "epic-json-unsupported" // `tickets show --json` on an epic
+	CodeMalformedAddress  = "malformed-address"
+	CodeEpicRequired      = "epic-required"
+	CodeUnknownProject    = "unknown-project"
+	CodeUnknownEpic       = "unknown-epic"
+	CodeUnknownTicket     = "unknown-ticket"
+	CodeAmbiguousOriginal = "ambiguous-original" // several archived tickets claim one old address
+	CodeCategoryRequired  = "category-required"
+	CodeCategoryConflict  = "category-conflict"
+	CodeNotFollowUpsEpic  = "not-follow-ups-epic"
+	CodeSectionRequired   = "section-required"
+	CodeStatusOverride    = "status-override"
+	CodeTypeOverride      = "type-override"
+	CodeEpicJSON          = "epic-json-unsupported" // `tickets show --json` on an epic
 
 	// `tickets move` refusals.
 	CodeMoveStatus       = "move-status"

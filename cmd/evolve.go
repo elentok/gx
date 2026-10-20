@@ -118,12 +118,31 @@ func runEvolveRun(ctx context.Context, env evolveEnv, w, errW io.Writer, arg str
 		return err
 	}
 	if !t.epic.EvolvedAt.IsZero() && !force {
-		return fmt.Errorf("epic %s:%s was already evolved at %s; pass --force to run it again", t.project, t.name, t.epic.EvolvedAt.Format(time.RFC3339))
+		return fmt.Errorf("epic %s:%s was already evolved at %s%s; pass --force to run it again", t.project, t.name, t.epic.EvolvedAt.Format(time.RFC3339), evolveTicketNote(env, t))
 	}
 	if err := submitRetro(ctx, env, w, errW, t.project, t.name); err != nil {
 		return err
 	}
 	return evolveReminder(env, t.mode, w)
+}
+
+// evolveTicketNote names the epic's retro ticket as " (retro <address>)",
+// following it to its archived address when the one-off has been moved; "" when
+// the epic has none.
+func evolveTicketNote(env evolveEnv, t evolveTarget) string {
+	if t.epic.EvolveTicket == "" {
+		return ""
+	}
+	addr, err := tickets.ParseAddress(t.epic.EvolveTicket, tickets.AddressContext{})
+	if err != nil || addr.Project == "" {
+		return " (retro " + t.epic.EvolveTicket + ")"
+	}
+	if dir, err := tickets.ProjectDirByName(env.storePath, addr.Project); err == nil {
+		if moved, _, err := tickets.FindOriginal(addr.Project, dir, addr); err == nil {
+			return " (retro " + moved.String() + ")"
+		}
+	}
+	return " (retro " + addr.String() + ")"
 }
 
 // submitRetro is the submit step `run` and `all` share.
