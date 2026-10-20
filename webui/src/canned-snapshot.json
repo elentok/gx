@@ -39,7 +39,8 @@
       "done": 3,
       "total": 3,
       "active": [],
-      "parked": []
+      "parked": [],
+      "has_repair": false
     },
     {
       "address": "gx:wait",
@@ -57,7 +58,8 @@
           "recovery": "pending",
           "reason": "needs a person"
         }
-      ]
+      ],
+      "has_repair": false
     },
     {
       "address": "gx:run",
@@ -80,7 +82,8 @@
           "title": "Parked one",
           "status": "needs-repair"
         }
-      ]
+      ],
+      "has_repair": true
     },
     {
       "address": "gx:dead",
@@ -91,7 +94,8 @@
       "total": 2,
       "active": [],
       "parked": [],
-      "reason": "blocked cycle"
+      "reason": "blocked cycle",
+      "has_repair": false
     },
     {
       "address": "gx:park",
@@ -107,7 +111,8 @@
           "title": "Parked only",
           "status": "needs-answer"
         }
-      ]
+      ],
+      "has_repair": false
     },
     {
       "address": "gx:run2",
@@ -124,7 +129,8 @@
           "claimed_at": "2026-10-19T08:00:00Z"
         }
       ],
-      "parked": []
+      "parked": [],
+      "has_repair": false
     }
   ],
   "recently_finished": [
