@@ -38,6 +38,14 @@ func ReadWebToken(stateDir string) (string, error) {
 	return token, nil
 }
 
+func newWebToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(raw), nil
+}
+
 // loadOrCreateWebToken keeps the token across restarts, so bookmarked links and
 // cookies stay valid until the file changes.
 func loadOrCreateWebToken(stateDir string) (string, error) {
@@ -45,11 +53,10 @@ func loadOrCreateWebToken(stateDir string) (string, error) {
 	if err == nil || !errors.Is(err, fs.ErrNotExist) {
 		return token, err
 	}
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
+	token, err = newWebToken()
+	if err != nil {
 		return "", err
 	}
-	token = hex.EncodeToString(raw)
 	f, err := os.OpenFile(WebTokenPath(stateDir), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return "", err
@@ -61,11 +68,10 @@ func loadOrCreateWebToken(stateDir string) (string, error) {
 // RotateWebToken replaces the token file. The web listener reads the file on
 // every request, so the running server drops all old cookies at once.
 func RotateWebToken(stateDir string) (string, error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
+	token, err := newWebToken()
+	if err != nil {
 		return "", err
 	}
-	token := hex.EncodeToString(raw)
 	// Rename keeps a concurrent request from reading a half-written file.
 	tmp := WebTokenPath(stateDir) + ".tmp"
 	if err := os.WriteFile(tmp, []byte(token+"\n"), 0o600); err != nil {
@@ -91,6 +97,11 @@ func sameSecret(a, b string) bool {
 
 // requireToken lets a request through when it carries the session cookie. A
 // valid ?t= starts a session and redirects to the app root; anything else is a 401.
+//
+// Plain HTTP means anyone on the LAN can sniff the ?t= link and the cookie, and
+// the cookie cannot be Secure. It lives 365 days, so rotating the token is the
+// only revocation. The file is read on every request so rotation takes effect
+// at once; do not cache it. Security design: map gx:webui-security.
 func requireToken(stateDir string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := ReadWebToken(stateDir)
