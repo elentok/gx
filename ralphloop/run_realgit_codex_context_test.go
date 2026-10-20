@@ -702,7 +702,7 @@ type needsRepairSink struct {
 	reason string
 }
 
-func (s *needsRepairSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+func (s *needsRepairSink) TicketNeedsHuman(identifier, epicName, status string, _ eventsc.Kind, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.paused = true

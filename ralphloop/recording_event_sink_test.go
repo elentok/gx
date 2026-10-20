@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"sync"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -56,7 +57,7 @@ func (s *recordingEventSink) TicketReattached(identifier, label, cwd, sessionID 
 	s.record(LiveEvent{Kind: LiveEventTicketReattached, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
-func (s *recordingEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+func (s *recordingEventSink) TicketNeedsHuman(identifier, epicName, status string, _ events.Kind, reason string) {
 	s.record(LiveEvent{Kind: LiveEventTicketNeedsHuman, Identifier: identifier, EpicName: epicName, Status: status, Reason: reason})
 }
 

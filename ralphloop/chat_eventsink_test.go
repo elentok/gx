@@ -218,7 +218,9 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 		{"IterationPaused", func(s *chatEventSink) { s.IterationPaused("04", "iter-04", PauseRateLimit, "rate limited") }},
 		{"IterationResumed", func(s *chatEventSink) { s.IterationResumed("04", "iter-04", PauseRateLimit) }},
 		{"IterationFinished", func(s *chatEventSink) { s.IterationFinished(ticket, "epic", stats) }},
-		{"TicketNeedsHuman", func(s *chatEventSink) { s.TicketNeedsHuman("04", "epic", "needs-answer", "no commits landed") }},
+		{"TicketNeedsHuman", func(s *chatEventSink) {
+			s.TicketNeedsHuman("04", "epic", "needs-answer", "zero-commit", "no commits landed")
+		}},
 		{"EpicParked", func(s *chatEventSink) { s.EpicParked("epic", []StalledTicket{{Identifier: "04"}}) }},
 		{"EpicComplete", func(s *chatEventSink) { s.EpicComplete("epic", 5, 300) }},
 	}
@@ -272,7 +274,7 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 	sink.IterationPaused("01", "iter-01", PauseRateLimit, "rate limited")
 	sink.IterationResumed("01", "iter-01", PauseRateLimit)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{})
-	sink.TicketNeedsHuman("01", "epic", "needs-answer", "no commits landed")
+	sink.TicketNeedsHuman("01", "epic", "needs-answer", "zero-commit", "no commits landed")
 	sink.EpicParked("epic", []StalledTicket{{Identifier: "01"}})
 	sink.EpicComplete("epic", 1, 0)
 
@@ -300,14 +302,14 @@ func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
 	sink, transport := newFakeChatSink(t, &recordingSink{})
 
 	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
-	sink.TicketNeedsHuman("04", "epic", "needs-repair", "agent blocked on permission prompt")
+	sink.TicketNeedsHuman("04", "epic", "needs-repair", "blocked-pane", "agent blocked on permission prompt")
 	sink.flush()
 
 	got := waitForSentCount(transport, 1)
 	if len(got) != 1 {
 		t.Fatalf("sent = %v, want exactly 1 message for the park", got)
 	}
-	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-repair", "agent blocked on permission prompt", EpicCounts{}).String()
+	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-repair", "blocked-pane", "agent blocked on permission prompt", EpicCounts{}).String()
 	if got[0] != want {
 		t.Errorf("sent[0] = %q, want %q", got[0], want)
 	}

@@ -212,7 +212,7 @@ func (s *Server) parkRoot(root rootRef, one ralphloop.OneIteration, dir string, 
 		return
 	}
 	if s.chat.Enabled() {
-		s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), reason, ralphloop.CountsOf(e))
+		s.chat.Park(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusNeedsAnswer), events.Kind(kind), reason, ralphloop.CountsOf(e))
 	}
 	// Only a needs-rebase park, the one without a kind, is the
 	// epic's outcome; any other park waits on a person's fix and then lands.

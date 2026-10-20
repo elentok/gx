@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -159,12 +160,12 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerC
 // Park notifies that a person must look at a ticket the server could not land.
 // Every message starts with the project name: one server notifies for many.
 // override is the project's own notification block, nil to use the global one.
-func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, ticketPath, identifier, status, reason string, counts EpicCounts) {
+func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, ticketPath, identifier, status string, kind events.Kind, reason string, counts EpicCounts) {
 	if c == nil {
 		return
 	}
 	for _, s := range c.projectSinks(override) {
-		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, reason, counts)
+		body := s.style.ticketNeedsHumanText(identifier, project+"/"+epic, status, kind, reason, counts)
 		s.sendIn(s.style.chatStyle.Bold(project), body, notifyKindTicketNeedsHuman, ticketPath, identifier)
 	}
 }
@@ -196,7 +197,7 @@ func (f finishSink) ConflictResolutionStarted(identifier string) {
 	}
 }
 
-func (f finishSink) TicketNeedsHuman(identifier, _, status, reason string) {
+func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.Kind, reason string) {
 	if f.c == nil || identifier == f.ticketID {
 		return
 	}
@@ -204,7 +205,7 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status, reason string) {
 	// The child's path never reaches the sink, so a mute lands on the epic.
 	source := epicSource(f.project + "/" + f.epic)
 	for _, s := range f.c.projectSinks(f.override) {
-		body := s.style.ticketNeedsHumanText(identifier, f.project+"/"+f.epic, status, reason, counts)
+		body := s.style.ticketNeedsHumanText(identifier, f.project+"/"+f.epic, status, kind, reason, counts)
 		s.sendIn(s.style.chatStyle.Bold(f.project), body, notifyKindTicketNeedsHuman, source, identifier)
 	}
 }

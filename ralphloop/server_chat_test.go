@@ -13,9 +13,9 @@ func TestServerChat_ParksGoToTheirOwnDestinationAndSharedTargetsShareABatch(t *t
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 
 	own := &ServerChatConfig{SlackWebhookURL: other.URL}
-	c.Park("alpha", nil, "e", "/t/1.md", "01", "needs-answer", "r", EpicCounts{})
-	c.Park("beta", own, "e", "/t/2.md", "02", "needs-answer", "r", EpicCounts{})
-	c.Park("gamma", own, "e", "/t/3.md", "03", "needs-answer", "r", EpicCounts{})
+	c.Park("alpha", nil, "e", "/t/1.md", "01", "needs-answer", "zero-commit", "r", EpicCounts{})
+	c.Park("beta", own, "e", "/t/2.md", "02", "needs-answer", "zero-commit", "r", EpicCounts{})
+	c.Park("gamma", own, "e", "/t/3.md", "03", "needs-answer", "zero-commit", "r", EpicCounts{})
 	c.Close()
 
 	g := globalReqs()
@@ -32,9 +32,9 @@ func TestServerChat_MultiProjectBatchGroupsUnderOneHeaderPerProject(t *testing.T
 	srv, reqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 
-	c.Park("alpha", nil, "e", "/t/1.md", "A1", "needs-answer", "r", EpicCounts{})
-	c.Park("beta", nil, "e", "/t/2.md", "B1", "needs-answer", "r", EpicCounts{})
-	c.Park("alpha", nil, "e", "/t/3.md", "A2", "needs-answer", "r", EpicCounts{})
+	c.Park("alpha", nil, "e", "/t/1.md", "A1", "needs-answer", "zero-commit", "r", EpicCounts{})
+	c.Park("beta", nil, "e", "/t/2.md", "B1", "needs-answer", "zero-commit", "r", EpicCounts{})
+	c.Park("alpha", nil, "e", "/t/3.md", "A2", "needs-answer", "zero-commit", "r", EpicCounts{})
 	c.Close()
 
 	got := reqs()
@@ -59,7 +59,7 @@ func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 
 	// An override naming no destination mutes the project; it must not fall
 	// back to the global webhook.
-	c.Park("quiet", &ServerChatConfig{}, "e", "/t/1.md", "01", "needs-answer", "r", EpicCounts{})
+	c.Park("quiet", &ServerChatConfig{}, "e", "/t/1.md", "01", "needs-answer", "zero-commit", "r", EpicCounts{})
 	c.Close()
 
 	if got := globalReqs(); len(got) != 0 {
@@ -70,7 +70,7 @@ func TestServerChat_OverrideReplacesGlobalWithoutMerging(t *testing.T) {
 func TestServerChat_ParkShowsTheEpicCounts(t *testing.T) {
 	global, globalReqs := fakeSlackServer(t, 200)
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: global.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
-	c.Park("alpha", nil, "e", "/t/1.md", "01", "needs-answer", "needs rebase", EpicCounts{Done: 5, Total: 7})
+	c.Park("alpha", nil, "e", "/t/1.md", "01", "needs-answer", "", "needs rebase", EpicCounts{Done: 5, Total: 7})
 	c.Close()
 
 	g := globalReqs()

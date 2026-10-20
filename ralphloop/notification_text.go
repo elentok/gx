@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/chatmarkup"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -151,7 +152,7 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 //	{reason}
 //	{counts line}
 //	[gx] {epic}/{ticket}
-func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status, reason string, counts EpicCounts) chatmarkup.Text {
+func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status string, kind events.Kind, reason string, counts EpicCounts) chatmarkup.Text {
 	emoji, headline := "\U0001f198", "needs answer"
 	if status != "needs-answer" {
 		emoji, headline = "\U0001f6d1", "needs repair"

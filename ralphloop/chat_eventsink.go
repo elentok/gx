@@ -578,10 +578,10 @@ func (s *chatEventSink) IterationFinished(ticket tickets.Ticket, epicName string
 	s.send(s.style.iterationFinishedText(ticket, epicName, stats), notifyKindIterationFinished, ticket.Path, ticket.Identifier)
 }
 
-func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
-	s.EventSink.TicketNeedsHuman(identifier, epicName, status, reason)
+func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
+	s.EventSink.TicketNeedsHuman(identifier, epicName, status, kind, reason)
 	counts := loadEpicCounts(s.scratchDir, epicName)
-	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
+	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, kind, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
 }
 
 func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {

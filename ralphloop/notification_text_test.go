@@ -131,7 +131,7 @@ func TestTelegramStyleIterationResumedText_LabelInDetailNotIdentity(t *testing.T
 
 func TestTelegramStyleTicketNeedsHumanText_DistinctFromIterationPausedText(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "No commits landed; marked needs-answer.", EpicCounts{Done: 3, Total: 5}).String()
+	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "zero-commit", "No commits landed; marked needs-answer.", EpicCounts{Done: 3, Total: 5}).String()
 	want := "\U0001f198 *needs answer*\n\nNo commits landed; marked needs\\-answer\\.\n3 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/04"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -143,7 +143,7 @@ func TestTelegramStyleTicketNeedsHumanText_DistinctFromIterationPausedText(t *te
 
 func TestTelegramStyleTicketNeedsHumanText_NeedsRepairUsesDifferentLabel(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-repair", "Codex is waiting for operator intervention", EpicCounts{Done: 3, Total: 5}).String()
+	got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-repair", "blocked-pane", "Codex is waiting for operator intervention", EpicCounts{Done: 3, Total: 5}).String()
 	want := "\U0001f6d1 *needs repair*\n\nCodex is waiting for operator intervention\n3 done · 5 total\n\\[gx\\] ui\\-tree\\-migration/04"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -152,7 +152,7 @@ func TestTelegramStyleTicketNeedsHumanText_NeedsRepairUsesDifferentLabel(t *test
 
 func TestSlackStyleTicketNeedsHumanText_NoEscaping(t *testing.T) {
 	t.Parallel()
-	got := slackStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "No commits landed; marked needs-answer.", EpicCounts{Done: 3, Total: 5}).String()
+	got := slackStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "zero-commit", "No commits landed; marked needs-answer.", EpicCounts{Done: 3, Total: 5}).String()
 	want := "\U0001f198 *needs answer*\n\nNo commits landed; marked needs-answer.\n3 done · 5 total\n[gx] ui-tree-migration/04"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
@@ -220,7 +220,7 @@ func TestTelegramStyle_OverflowParkedIdentifiersEscapesPlus(t *testing.T) {
 
 	t.Run("ticketNeedsHumanText", func(t *testing.T) {
 		t.Parallel()
-		got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "No commits landed; marked needs-answer.", counts).String()
+		got := telegramStyle.ticketNeedsHumanText("04", "ui-tree-migration", "needs-answer", "zero-commit", "No commits landed; marked needs-answer.", counts).String()
 		want := "\U0001f198 *needs answer*\n\nNo commits landed; marked needs\\-answer\\.\n" + countsLine + "\n\\[gx\\] ui\\-tree\\-migration/04"
 		if got != want {
 			t.Errorf("text = %q, want %q", got, want)

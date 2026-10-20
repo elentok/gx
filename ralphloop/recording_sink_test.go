@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -61,7 +62,7 @@ func (s *recordingSink) TicketReattached(identifier, label, cwd, sessionID strin
 	s.mu.Unlock()
 	s.record("TicketReattached")
 }
-func (s *recordingSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+func (s *recordingSink) TicketNeedsHuman(identifier, epicName, status string, _ events.Kind, reason string) {
 	s.mu.Lock()
 	s.ticketNeedsHumanCalls = append(s.ticketNeedsHumanCalls, [4]string{identifier, epicName, status, reason})
 	s.mu.Unlock()

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/agentrunner"
+	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -127,7 +128,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 				reattach(t)
 				reattached = append(reattached, t)
 			} else {
-				sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", "no live iteration found")
+				sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", eventsc.Kind(t.ParkKind), "no live iteration found")
 			}
 			continue
 		}

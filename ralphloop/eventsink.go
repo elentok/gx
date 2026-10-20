@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -93,7 +94,7 @@ type EventSink interface {
 	// from status, not a plumbing fork into separate events the way
 	// TicketNeedsAnswer/TicketStillNeedsRepair/the park-flavored
 	// IterationPaused used to be.
-	TicketNeedsHuman(identifier, epicName, status, reason string)
+	TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string)
 
 	// TicketClaimed reports that ticket was claimed off the frontier for a
 	// fresh iteration.
@@ -233,11 +234,12 @@ type EventSink interface {
 // tests exercising pause/resume plumbing) without wiring up a real sink.
 type noopEventSink struct{}
 
-func (noopEventSink) EpicStarted(epicName string, done, total int)                 {}
-func (noopEventSink) TicketReverted(identifier string)                             {}
-func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string)    {}
-func (noopEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {}
-func (noopEventSink) TicketClaimed(ticket tickets.Ticket)                          {}
+func (noopEventSink) EpicStarted(epicName string, done, total int)              {}
+func (noopEventSink) TicketReverted(identifier string)                          {}
+func (noopEventSink) TicketReattached(identifier, label, cwd, sessionID string) {}
+func (noopEventSink) TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string) {
+}
+func (noopEventSink) TicketClaimed(ticket tickets.Ticket) {}
 func (noopEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sessionID string, agent AgentKind, paneID string) {
 }
 func (noopEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {}

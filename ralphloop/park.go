@@ -148,6 +148,6 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	if req.Type == events.ManualLand {
 		return reason, writeErr // a land needs no human
 	}
-	sink.TicketNeedsHuman(req.Ticket, req.EpicName, string(req.Type), reason)
+	sink.TicketNeedsHuman(req.Ticket, req.EpicName, string(req.Type), req.Kind, reason)
 	return reason, writeErr
 }

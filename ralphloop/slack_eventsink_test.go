@@ -133,7 +133,7 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{Completed: 1, Total: 3})
-	sink.TicketNeedsHuman("02", "epic", "needs-answer", "no commits landed")
+	sink.TicketNeedsHuman("02", "epic", "needs-answer", "zero-commit", "no commits landed")
 	sink.IterationPaused("03", "iter-03", PauseRateLimit, "rate limit hit")
 	sink.EpicParked("epic", []StalledTicket{{Identifier: "03"}})
 	sink.EpicComplete("epic", 1, 300)

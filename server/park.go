@@ -41,7 +41,7 @@ func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events
 		s.holdPark(addr, status, kind, reason)
 		return
 	}
-	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, fmt.Sprintf("%s: %s", kind, reason), s.epicCounts(addr.Project, addr.Epic))
+	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, fmt.Sprintf("%s: %s", kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 
 // finishSink carries the finish path's chat-worthy events the outcome cannot

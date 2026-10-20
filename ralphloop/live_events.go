@@ -1,6 +1,9 @@
 package ralphloop
 
-import "github.com/elentok/gx/tickets"
+import (
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets"
+)
 
 // LiveEventKind identifies which EventSink method produced a LiveEvent, so a
 // channel consumer can switch on it without depending on bubbletea (that
@@ -128,7 +131,7 @@ func (s *ChannelEventSink) TicketReattached(identifier, label, cwd, sessionID st
 	s.emit(LiveEvent{Kind: LiveEventTicketReattached, Identifier: identifier, Label: label, Cwd: cwd, SessionID: sessionID})
 }
 
-func (s *ChannelEventSink) TicketNeedsHuman(identifier, epicName, status, reason string) {
+func (s *ChannelEventSink) TicketNeedsHuman(identifier, epicName, status string, _ events.Kind, reason string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketNeedsHuman, Identifier: identifier, EpicName: epicName, Status: status, Reason: reason})
 }
 
