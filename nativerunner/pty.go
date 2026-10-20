@@ -95,9 +95,12 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 	if err := removeAll(dir, []string{HolderSocketFile, ExitCodeFile}); err != nil {
 		return agentrunner.Session{}, err
 	}
-	sessionID, err := NewUUID()
-	if err != nil {
-		return agentrunner.Session{}, err
+	sessionID := opts.ResumeSessionID
+	if sessionID == "" {
+		var err error
+		if sessionID, err = NewUUID(); err != nil {
+			return agentrunner.Session{}, err
+		}
 	}
 	cmd, err := p.spawn(opts, dir, sessionID)
 	if err != nil {
@@ -361,7 +364,15 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 		}
 		holder = []string{exe, "agent-holder"}
 	}
-	launch := ptyHarness.Launch(harness.LaunchOptions{SessionID: sessionID, Args: ptyLaunchArgs(opts.Args), Env: opts.Env})
+	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: ptyLaunchArgs(opts.Args), Env: opts.Env}
+	var launch harness.Command
+	if opts.ResumeSessionID != "" {
+		// --resume and --session-id fail together, so claude gets only --resume.
+		// The holder still takes --session-id below.
+		launch, _ = ptyHarness.Resume(opts.ResumeSessionID, launchOpts)
+	} else {
+		launch = ptyHarness.Launch(launchOpts)
+	}
 	if p.Claude != "" {
 		launch.Name = p.Claude
 	}

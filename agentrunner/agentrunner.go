@@ -50,6 +50,10 @@ type StartOptions struct {
 	// NoAdopt makes a live session with the label ErrLabelTaken whatever its
 	// cwd, so the launch always gets a fresh agent and prompt.
 	NoAdopt bool
+	// ResumeSessionID names a previous Claude session to continue instead of
+	// starting a new one; the session keeps that id. Only the pty runner
+	// resumes: headless, herdr and Codex ignore it and cold-start.
+	ResumeSessionID string
 }
 
 type Status struct {

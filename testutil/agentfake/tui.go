@@ -129,14 +129,22 @@ type tuiOptions struct {
 func parseTUIArgs(args []string) (tuiOptions, error) {
 	fs := flag.NewFlagSet("claude", flag.ContinueOnError)
 	sessionID := fs.String("session-id", "", "")
+	resume := fs.String("resume", "", "")
 	fs.String("permission-mode", "", "")
 	fs.String("settings", "", "")
 	fs.String("disallowedTools", "", "")
 	if err := fs.Parse(args); err != nil {
 		return tuiOptions{}, err
 	}
+	// Real claude fails with both unless --fork-session; --resume keeps the id.
+	if *sessionID != "" && *resume != "" {
+		return tuiOptions{}, errors.New("agentfake: --session-id and --resume are exclusive")
+	}
 	if *sessionID == "" {
-		return tuiOptions{}, errors.New("agentfake: --session-id is required")
+		*sessionID = *resume
+	}
+	if *sessionID == "" {
+		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
 	return tuiOptions{
 		sessionID: *sessionID,

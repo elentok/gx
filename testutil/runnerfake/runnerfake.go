@@ -17,6 +17,7 @@ type session struct {
 	epic           string
 	cwd            string
 	args           []string
+	resumeID       string
 	status         agentrunner.Status
 	promptErr      error
 	answerErr      error
@@ -126,10 +127,11 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 		id, sessionID = r.IDs(opts.Label)
 	}
 	ss := &session{
-		Session: agentrunner.Session{Label: opts.Label, ID: id, SessionID: sessionID},
-		epic:    opts.Epic,
-		cwd:     opts.Cwd,
-		args:    slices.Clone(opts.Args),
+		Session:  agentrunner.Session{Label: opts.Label, ID: id, SessionID: sessionID},
+		epic:     opts.Epic,
+		cwd:      opts.Cwd,
+		args:     slices.Clone(opts.Args),
+		resumeID: opts.ResumeSessionID,
 	}
 	ss.status = agentrunner.Status{State: agentrunner.StateIdle, SessionID: ss.SessionID}
 	r.sessions = append(r.sessions, ss)
@@ -451,6 +453,17 @@ func (r *Runner) Args(label string) []string {
 		return slices.Clone(ss.args)
 	}
 	return nil
+}
+
+// ResumeSessionID returns the ResumeSessionID the latest session started with
+// label was given, including a stopped one.
+func (r *Runner) ResumeSessionID(label string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ss := r.history[label]; ss != nil {
+		return ss.resumeID
+	}
+	return ""
 }
 
 // Answers returns the answers sent to the latest session started with label,

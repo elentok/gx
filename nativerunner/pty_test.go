@@ -355,6 +355,31 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 	}
 }
 
+func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
+	p := newPty(t)
+	const prev = "0b1f6c2e-5d1a-4a53-9a57-0c8f2f7f3a11"
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude", ResumeSessionID: prev})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	if s.SessionID != prev {
+		t.Errorf("SessionID = %q, want the resumed %q", s.SessionID, prev)
+	}
+	data, err := os.ReadFile(filepath.Join(p.Root, "e-01", nativerunner.MetaFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta nativerunner.Meta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		t.Fatal(err)
+	}
+	claude, _, _ := nativerunner.PS.Lookup(meta.PID)
+	if !strings.Contains(claude.Cmdline, "--resume "+prev) || strings.Contains(claude.Cmdline, "--session-id") {
+		t.Errorf("claude cmdline %q, want --resume %s and no --session-id", claude.Cmdline, prev)
+	}
+}
+
 func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
