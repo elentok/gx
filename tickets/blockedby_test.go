@@ -65,6 +65,26 @@ func TestResolveCrossEpic_BadRefIsError(t *testing.T) {
 	}
 }
 
+func TestResolveCrossEpic_BlockerFollowsArchivedOneOff(t *testing.T) {
+	epics := func(status string) []Epic {
+		return []Epic{
+			{Name: ArchivedOneOffsEpic, Tickets: []Ticket{{
+				Number: 1, Identifier: "01", Status: status, Commitless: true,
+				Body: "## Resolution\n\n- original: p:one-offs/07\n",
+			}}},
+			{Name: "c", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"one-offs/07"}}}},
+		}
+	}
+	c := func(status string) Epic { return ResolveCrossEpic("p", EpicRelease{}, epics(status))[1] }
+
+	if e := c("done"); e.RenderedStatus(e.Tickets[0]) != StatusOpen {
+		t.Errorf("done archived blocker: got %v, want open (%q)", e.RenderedStatus(e.Tickets[0]), e.Tickets[0].BlockedByErr)
+	}
+	if e := c("open"); e.RenderedStatus(e.Tickets[0]) != StatusBlocked {
+		t.Errorf("unfinished archived blocker: got %v, want blocked", e.RenderedStatus(e.Tickets[0]))
+	}
+}
+
 func TestFlagDanglingBlockers_QualifiedRefFailsClosed(t *testing.T) {
 	for name, epic := range map[string]Epic{
 		"ticket ref": {Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01"}}}},

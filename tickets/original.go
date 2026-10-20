@@ -11,6 +11,22 @@ import (
 // the old address in the ticket's Resolution as "- original: <address>".
 const ArchivedOneOffsEpic = "one-offs-archived"
 
+// archivedFrom is the tickets of the archive epic whose Resolution names addr
+// as their original.
+func archivedFrom(archive Epic, addr Address) []Ticket {
+	want := "- original: " + addr.String()
+	var found []Ticket
+	for _, t := range archive.Tickets {
+		for line := range strings.SplitSeq(schema.Section(t.Body, "Resolution"), "\n") {
+			if strings.TrimSpace(line) == want {
+				found = append(found, t)
+				break
+			}
+		}
+	}
+	return found
+}
+
 // FindOriginal looks up the ticket an archived one-off was moved from addr to:
 // the one in one-offs-archived whose Resolution names addr as its original.
 // It works from the store dir alone, so a client needs no server. No match is
@@ -20,19 +36,10 @@ func FindOriginal(project, projectDir string, addr Address) (Address, Ticket, er
 	if err != nil {
 		return Address{}, Ticket{}, err
 	}
-	want := "- original: " + addr.String()
 	var found []Ticket
 	for _, e := range epics {
-		if e.Name != ArchivedOneOffsEpic {
-			continue
-		}
-		for _, t := range e.Tickets {
-			for line := range strings.SplitSeq(schema.Section(t.Body, "Resolution"), "\n") {
-				if strings.TrimSpace(line) == want {
-					found = append(found, t)
-					break
-				}
-			}
+		if e.Name == ArchivedOneOffsEpic {
+			found = append(found, archivedFrom(e, addr)...)
 		}
 	}
 	switch len(found) {

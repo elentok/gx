@@ -60,17 +60,29 @@ func (s *Server) findTicket(address string) (ticketRef, bool, error) {
 	if err != nil {
 		return ticketRef{}, false, err
 	}
-	for _, e := range epics {
-		if filepath.Base(e.Path) != addr.Epic {
-			continue
-		}
-		for _, t := range e.Tickets {
-			if t.Identifier == addr.ID {
-				return ticketRef{addr: addr, projectDir: projectDir, repo: repo, ticket: t, epic: e}, true, nil
+	find := func(addr tickets.Address) (ticketRef, bool) {
+		for _, e := range epics {
+			if filepath.Base(e.Path) != addr.Epic {
+				continue
+			}
+			for _, t := range e.Tickets {
+				if t.Identifier == addr.ID {
+					return ticketRef{addr: addr, projectDir: projectDir, repo: repo, ticket: t, epic: e}, true
+				}
 			}
 		}
+		return ticketRef{}, false
 	}
-	return ticketRef{}, false, nil
+	if ref, ok := find(addr); ok {
+		return ref, true, nil
+	}
+	// An archived one-off is still reachable by the address it was moved from.
+	moved, _, err := tickets.FindOriginal(addr.Project, projectDir, addr)
+	if err != nil {
+		return ticketRef{}, false, nil
+	}
+	ref, ok := find(moved)
+	return ref, ok, nil
 }
 
 // ticketWrite resolves the request's ticket and applies the refusals every
@@ -202,6 +214,10 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+		}
+		// An archived one-off, found by its old address, is already over.
+		if ref.addr.Epic == OneOffsArchivedEpic {
+			return refusal(ReasonTicketDone, ref.addr.String()+" is archived"), nil
 		}
 		targets := cancelTargets(ref)
 		addrs := make([]tickets.Address, len(targets))

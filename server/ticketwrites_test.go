@@ -205,6 +205,29 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	}
 }
 
+func TestCancel_OldOneOffAddressResolvesTheArchivedTicket(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", server.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Status: "cancelled"})
+	path := filepath.Join(store, "proj", server.OneOffsArchivedEpic, "issues", "01-a.md")
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("\n## Resolution\n\n- original: proj:one-offs/07\n"); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	res, err := h.Client.TicketCancel(ctx, "proj:one-offs/07", false)
+	if err != nil || !res.Refused || res.Reason != server.ReasonTicketDone {
+		t.Fatalf("cancel = %+v, %v; want %s refusal (not unknown-ticket)", res, err, server.ReasonTicketDone)
+	}
+}
+
 func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 	h, path := startTicketWrites(t)
 	issues := filepath.Dir(path)

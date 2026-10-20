@@ -115,6 +115,9 @@ func (g *projectGraph) resolve(epic, ref string) (string, error) {
 	num, letters := splitBlockedByToken(token)
 	key := target + "/" + siblingKey(num, letters)
 	if _, ok := g.tickets[key]; !ok {
+		if moved, ok := g.archivedOriginal(Address{Project: g.project, Epic: target, ID: token}); ok {
+			return moved, nil
+		}
 		where := "this epic"
 		if target != epic {
 			where = fmt.Sprintf("epic %q", target)
@@ -122,6 +125,20 @@ func (g *projectGraph) resolve(epic, ref string) (string, error) {
 		return "", fmt.Errorf("%q names no ticket in %s", ref, where)
 	}
 	return key, nil
+}
+
+// archivedOriginal is the node key of the archived one-off that was moved from
+// addr, so a blocker naming the old address keeps working. Ambiguous or no
+// match is not found.
+func (g *projectGraph) archivedOriginal(addr Address) (string, bool) {
+	archive, ok := g.epics[ArchivedOneOffsEpic]
+	if !ok {
+		return "", false
+	}
+	if found := archivedFrom(archive, addr); len(found) == 1 {
+		return nodeKey(ArchivedOneOffsEpic, found[0]), true
+	}
+	return "", false
 }
 
 // resolveBlocker is resolve widened to blocked_by's whole-epic tokens: a
