@@ -750,13 +750,14 @@ caps. `--front` sets queue position only. See ADR 0032.
 
 ## One-offs
 
-**One-off** — a top-level ticket with no children, usually submitted from outside gx with `gx
-server one-off "<prompt>"` (or `--file <path>`). It defaults to `type: prompt` (commitless);
-`--commits` makes it `type: implement`, which lands through the project's landing policy like an
-epic. The project is `--project`, else the one owning the current directory, else `scratch`. A
-one-off is a queue root and counts against the same caps as an epic. _Avoid_: standalone ticket,
-job. There is one verb and no spool: when the server is down the submit is refused, never queued
-for later. See ADR 0033.
+**One-off** — a commitless ticket in the project's `one-offs` epic, usually submitted from outside gx
+with `gx server one-off "<prompt>"` (or `--file <path>`). It is `type: prompt` unless `--type` says
+`evolve` or `diagnose`, and it lands no commits. The project is `--project`, else the one owning the
+current directory, else `scratch`. One-offs share one **one-off cap** (`max-one-off-agents`) instead
+of the per-root cap, and still count against the global and project caps. A `done` or `cancelled`
+one-off moves to `one-offs-archived`; one that failed or is parked stays in `one-offs` until a
+person closes it. _Avoid_: standalone ticket, job. There is one verb and no spool: when the server
+is down the submit is refused, never queued for later. See ADR 0033.
 
 **Dedupe key** — the key (`--unique <key>`; with `--file`, by default the file's absolute,
 symlink-resolved path; `--no-unique` opts out; a plain prompt has none) that refuses a live
