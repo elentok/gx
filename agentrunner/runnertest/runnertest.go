@@ -545,6 +545,21 @@ func received(t *testing.T, h Harness, s agentrunner.Session) string {
 	return h.Received(t, s)
 }
 
+// receivedSince is what the agent received after before, once done accepts it
+// or a second passes. Interrupt returns when its last key is sent, and the
+// agent logs keys on its own path, so a read right after can miss the last one.
+func receivedSince(t *testing.T, h Harness, s agentrunner.Session, before string, done func(string) bool) string {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		keys := strings.TrimPrefix(received(t, h, s), before)
+		if done(keys) || time.Now().After(deadline) {
+			return keys
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 // busyPromptWaitsThenSends: a prompt to a busy agent waits for idle, then
 // sends once.
 func busyPromptWaitsThenSends(t *testing.T, h Harness) {
@@ -660,7 +675,7 @@ func interruptBusyCtrlC(t *testing.T, h Harness) {
 	if err := h.Runner.Interrupt(s); err != nil {
 		t.Fatalf("Interrupt: %v", err)
 	}
-	keys := strings.TrimPrefix(received(t, h, s), before)
+	keys := receivedSince(t, h, s, before, func(keys string) bool { return strings.Count(keys, "\x03") >= 2 })
 	if strings.Count(keys, "\x03") != 2 || strings.Contains(keys, "\x1b") {
 		t.Fatalf("agent received %q on Interrupt, want two Ctrl+C and no Esc", keys)
 	}
@@ -686,7 +701,7 @@ func interruptBlockedEsc(t *testing.T, h Harness) {
 	if err := h.Runner.Interrupt(s); err != nil {
 		t.Fatalf("Interrupt: %v", err)
 	}
-	keys := strings.TrimPrefix(received(t, h, s), before)
+	keys := receivedSince(t, h, s, before, func(keys string) bool { return len(keys) >= len("\x1b\x03") })
 	if keys != "\x1b\x03" {
 		t.Fatalf("agent received %q on Interrupt, want Esc then one Ctrl+C", keys)
 	}
