@@ -57,9 +57,8 @@ Skill tool, because a skill with `disable-model-invocation: true` (the default o
 listed there, and the quality axis used to degrade silently into a manual review.
 
 If any name resolves to no file, don't review with a partial list. Follow
-[gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop rule: write `## Needs Answer`
-(which names didn't resolve, and the two paths tried for each) and `## Handoff`, report
-`--iteration-status needs-answer`, and exit.
+[gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop rule: run `gx tickets ask`, with the question naming which names didn't resolve
+and the two paths tried for each, and end your turn.
 
 ## 3. Run both axes as independent parallel subagents
 

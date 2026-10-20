@@ -128,10 +128,9 @@ When either trigger fires:
 ## When only a person can answer
 
 Follow [gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop rule: never call an
-interactive prompt. Commit whatever is green first, then write the `## Needs Answer` and
-`## Handoff` sections, report `--iteration-status needs-answer`, and exit. This is not a fork —
-the same ticket resumes once a person answers, and the resuming agent retires both sections into
-`## Comments` before continuing.
+interactive prompt. Commit whatever is green first, then run `gx tickets ask` (wording and syntax
+are in the tracker) and end your turn. This is not a fork — the same ticket resumes once a person
+answers.
 
 ## Record deliberate spec deviations
 

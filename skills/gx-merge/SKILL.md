@@ -40,13 +40,13 @@ Every stop below says **stop: `<reason>`**. How to stop depends on the mode:
 - **Manual** — report the reason (with any output it names) and end the run.
 - **Ticket** — follow [gx-local-tracker.md](../gx-local-tracker.md)'s
   announce-and-stop rule:
-  1. `gx tickets section <addr> "Needs Answer" -` — open with the reason as a
-     one-line summary, then the detail (check output, file list) and what a
-     person can do about it.
-  2. `gx tickets section <addr> Handoff -` — the state of the feature
-     worktree (rebase aborted, or rebased branch kept and at which commit),
-     any fixer commit, and any follow-ups already filed.
-  3. `gx tickets set <addr> --iteration-status needs-answer`, then exit.
+  1. `gx tickets ask <addr> --body -` — the `## Question` opens with the
+     reason as a one-line summary, then the detail (check output, file list)
+     and what a person can do about it.
+  2. The `## Handoff` in the same body states the feature worktree (rebase
+     aborted, or rebased branch kept and at which commit), any fixer commit,
+     and any follow-ups already filed.
+  3. End your turn.
 
 Leave trunk untouched at every stop. Never push to a remote at any point in
 this flow — pushing stays an explicit, separate action for the user.

@@ -243,6 +243,17 @@ func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
 	}
 }
 
+// TestBundleHasNoNeedsAnswerSectionWrite pins that no skill tells an agent to
+// park by hand-writing the retired sections; `gx tickets ask` is the one route.
+func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
+	banned := regexp.MustCompile(`gx tickets section [^\n]*"?(Needs Answer|Handoff)|write (the )?` + "`## (Needs Answer|Handoff)`")
+	for _, rel := range bundleMarkdownFiles(t) {
+		if loc := banned.FindString(readFile(t, rel)); loc != "" {
+			t.Errorf("%s still instructs the section write: %q", rel, loc)
+		}
+	}
+}
+
 // TestTrackerAnnounceAndStopUsesAsk pins that the tracker teaches `gx tickets
 // ask` and no longer tells an agent to hand-write the retired park sections.
 func TestTrackerAnnounceAndStopUsesAsk(t *testing.T) {
@@ -374,7 +385,7 @@ func TestCodeReviewReadsQualitySkillsByPath(t *testing.T) {
 	if strings.Contains(raw, "Skill(skill:") {
 		t.Error("gx-code-review must not tell subagents to invoke review skills via the Skill tool")
 	}
-	for _, want := range []string{"`skills/<name>/SKILL.md`", "`~/.claude/skills/<name>/SKILL.md`", "--iteration-status needs-answer"} {
+	for _, want := range []string{"`skills/<name>/SKILL.md`", "`~/.claude/skills/<name>/SKILL.md`", "gx tickets ask"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("gx-code-review must name %s", want)
 		}

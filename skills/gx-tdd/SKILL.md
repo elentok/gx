@@ -38,7 +38,7 @@ means agreed in the ticket, not negotiated live:
   when a minimal public seam is unambiguous from the acceptance criteria alone (e.g. "add a `Foo()`
   function returning X" has exactly one seam). If picking the seam requires a judgment call — several
   plausible boundaries, or the acceptance criteria don't pin down what's observable — that's material
-  ambiguity: stop and set the ticket to `needs-answer` (see
+  ambiguity: stop and run `gx tickets ask` (see
   [gx-local-tracker.md](../gx-local-tracker.md)) rather than guessing.
 - **A live human is present** (not running under ralph-loop) — you may still ask "What's the public
   interface, and which seams should we test?" if the ticket's declared seams seem wrong or
@@ -48,7 +48,8 @@ means agreed in the ticket, not negotiated live:
 three named backends, or one of three actions) counts as a gap. A weak check such as `cmd != nil`
 or "did not error" does not cover a seam that names specific behavior. If you find a seam cannot be
 observed (e.g. the code returns an opaque `tea.Cmd`), do not skip it and finish. Commit what is
-green, then park the ticket `needs-answer`: the `## Needs Answer` section names the seam and why it
+green, then park the ticket with `gx tickets ask` (see
+[gx-local-tracker.md](../gx-local-tracker.md)): the question names the seam and why it
 cannot be observed, so the ticket author can approve a different seam.
 
 You can't test everything — agreeing the seams up front (in the ticket) is how testing effort lands

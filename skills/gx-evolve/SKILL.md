@@ -121,6 +121,6 @@ sections. No repo file.
 `--commitless true` is always correct, including when nothing was filed. Never write `--status
 done`; landing status is gx's alone to set.
 
-If only a person can answer, follow the tracker's announce-and-stop rule: write `## Needs Answer`
-and `## Handoff`, report `--iteration-status needs-answer`, and exit. Never call an interactive
-prompt. Finish with zero background shells.
+If only a person can answer, follow the tracker's announce-and-stop rule
+([gx-local-tracker.md](../gx-local-tracker.md)): run `gx tickets ask` and end your turn. Never call
+an interactive prompt. Finish with zero background shells.

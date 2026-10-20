@@ -22,8 +22,8 @@ commands.
 Submitting a one-off takes no `--commits` or `--base`, and a `--file` payload with a `commits:` or
 `base:` key is refused with `option-removed`. For work that commits, create a normal ticket.
 
-If only a person can answer, follow the tracker's announce-and-stop rule: write `## Needs Answer`
-and `## Handoff`, report `--iteration-status needs-answer`, and exit. Never call an interactive
-prompt.
+If only a person can answer, follow the tracker's announce-and-stop rule
+([gx-local-tracker.md](../gx-local-tracker.md)): run `gx tickets ask` and end your turn. Never call
+an interactive prompt.
 
 Finish with zero background shells.
