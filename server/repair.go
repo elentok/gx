@@ -254,7 +254,11 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 	zeroCommit := parked && tk.ParkKind == schema.ParkKindZeroCommit
 	// Every refusal runs before the first state change.
 	if parked && req.RequireState {
-		if res, refused := unparkStale(t.Path, tk, req.State); refused {
+		res, refused, err := unparkStale(t.Path, tk, req.State)
+		if err != nil {
+			return RepairResult{}, err
+		}
+		if refused {
 			return res, nil
 		}
 	}
@@ -283,14 +287,21 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 			return repairOK(repair.UnparkResult{Ticket: id, Status: repair.UnparkPrompted, Message: repair.MessagePrompted})
 		}
 	}
+	var res repair.UnparkResult
 	if parked && req.RequireState && tk.ParkKind != schema.ParkKindSelfReported {
-		if err := logUnparkAnswer(t.Path, req.Base); err != nil {
-			return RepairResult{}, fmt.Errorf("log unpark of %s: %w", addr, err)
+		var refused *RepairResult
+		res, refused, err = unparkAnswered(t.Path, id, req)
+		if refused != nil {
+			return *refused, nil
 		}
-	}
-	res, err := repair.Unpark(epicPath, id, time.Now(), req.Base)
-	if err != nil {
-		return repairRefusal(err), nil
+		if err != nil {
+			return RepairResult{}, fmt.Errorf("unpark of %s: %w", addr, err)
+		}
+	} else {
+		res, err = repair.Unpark(epicPath, id, time.Now(), req.Base)
+		if err != nil {
+			return repairRefusal(err), nil
+		}
 	}
 	if zeroCommit {
 		res.Message = repair.MessageReopened
@@ -300,42 +311,56 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 
 // unparkStale refuses an unpark whose token no longer names the ticket's open
 // question and status; a park without an open question has no round to name.
-func unparkStale(ticketPath string, t schema.Ticket, state string) (RepairResult, bool) {
-	evs, err := tickets.ReadLog(ticketPath)
-	if err == nil {
-		if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.Status) == state {
-			return RepairResult{}, false
-		}
-	}
-	return repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "the park changed; review the current one"}), true
-}
-
-// logUnparkAnswer records the person's unpark as the answer to the open
-// question. A ticket without an open question logs nothing.
-func logUnparkAnswer(ticketPath, base string) error {
+func unparkStale(ticketPath string, t schema.Ticket, state string) (RepairResult, bool, error) {
 	evs, err := tickets.ReadLog(ticketPath)
 	if err != nil {
-		return err
+		return RepairResult{}, false, fmt.Errorf("read log of %s: %w", ticketPath, err)
 	}
-	open := tickets.OpenQuestion(evs)
-	if open == nil {
-		return nil
+	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.Status) == state {
+		return RepairResult{}, false, nil
 	}
-	_, err = tickets.AppendLogIf(ticketPath, tickets.LogEvent{
-		Type: tickets.EventParkAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: base,
-	}, func(evs []tickets.LogEvent) error {
-		if cur := tickets.OpenQuestion(evs); cur == nil || cur.Seq != open.Seq {
-			return errUnparkQuestionGone
-		}
-		return nil
-	})
-	if errors.Is(err, errUnparkQuestionGone) {
-		return nil
-	}
-	return err
+	return staleUnparkRefusal(), true, nil
 }
 
-var errUnparkQuestionGone = errors.New("question no longer open")
+func staleUnparkRefusal() RepairResult {
+	return repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "the park changed; review the current one"})
+}
+
+// unparkRefused carries a refusal out of the lock-held append callback.
+type unparkRefused struct{ res RepairResult }
+
+func (e unparkRefused) Error() string { return "unpark refused" }
+
+// unparkAnswered logs the person's unpark as the answer to the open question
+// and reopens the ticket under one ticket lock. The state token is checked
+// again under the lock, and a refusal or a failed reopen appends nothing, so a
+// failure never leaves an answered question on a parked ticket.
+func unparkAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResult, *RepairResult, error) {
+	_, err := tickets.AppendLogFrom(ticketPath, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
+		t, err := schema.ParseTicket(ticketPath)
+		if err != nil {
+			return tickets.LogEvent{}, err
+		}
+		open := tickets.OpenQuestion(evs)
+		if t.Status != schema.StatusNeedsAnswer || open == nil || answerState(*open, t.Status) != req.State {
+			return tickets.LogEvent{}, unparkRefused{staleUnparkRefusal()}
+		}
+		if err := ralphloop.UnparkTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
+			return tickets.LogEvent{}, unparkRefused{repairRefusal(err)}
+		}
+		return tickets.LogEvent{
+			Type: tickets.EventParkAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: req.Base,
+		}, nil
+	})
+	var refused unparkRefused
+	if errors.As(err, &refused) {
+		return repair.UnparkResult{}, &refused.res, nil
+	}
+	if err != nil {
+		return repair.UnparkResult{}, nil, err
+	}
+	return repair.UnparkResult{Ticket: id, Status: "open"}, nil, nil
+}
 
 // ambiguousBlockers lists the blockers a ticket parked on an ambiguous base
 // has to choose between, recomputed from the epics; none when it is not ambiguous.

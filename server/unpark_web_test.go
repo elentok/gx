@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -226,5 +227,63 @@ func TestUnpark_CLIWithoutATokenStillWorks(t *testing.T) {
 	}
 	if got := answerEvents(t, e.ticket); len(got) != 0 {
 		t.Errorf("the CLI path logged %+v", got)
+	}
+}
+
+func TestWebUnpark_AFailedReopenLeavesNoAnswerAndTheNextUnparkWorks(t *testing.T) {
+	e := startAnswerEnv(t, nil)
+	state := parkEnvZeroCommit(t, e)
+	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Dir(e.ticket)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	restored := false
+	restore := func() {
+		if !restored {
+			restored = true
+			if err := os.Chmod(dir, 0o755); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	defer restore()
+
+	if res, err := e.h.Server.UnparkAsWeb(server.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
+		t.Fatalf("unpark = %+v; want a failure", res)
+	}
+	restore()
+	if got := answerEvents(t, e.ticket); len(got) != 0 {
+		t.Errorf("failed unpark logged %+v", got)
+	}
+
+	out := unparkResult(t, webUnpark(t, e.h, server.RepairRequest{State: state}))
+	if out.Status != "open" {
+		t.Errorf("retry = %+v; want open", out)
+	}
+	if got := answerEvents(t, e.ticket); len(got) != 1 {
+		t.Errorf("answers = %+v; want one", got)
+	}
+}
+
+func TestWebUnpark_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
+	e := startAnswerEnv(t, nil)
+	state := parkEnvZeroCommit(t, e)
+
+	logPath := tickets.LogPath(e.ticket)
+	if err := os.Chmod(logPath, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(logPath, 0o644)
+
+	res, err := e.h.Server.UnparkAsWeb(server.RepairRequest{Address: answerAddr, State: state})
+	if err == nil {
+		t.Fatalf("unpark = %+v; want an error", res)
+	}
+	if res.Refused {
+		t.Errorf("unpark = %+v; a read error must not be a stale refusal", res)
 	}
 }

@@ -184,13 +184,24 @@ func UnparkTicket(path string, now time.Time) error {
 // UnparkTicketWithBase is UnparkTicket that also writes base: onto the ticket,
 // the person's pick for an ambiguous-base park; "" leaves it alone.
 func UnparkTicketWithBase(path string, now time.Time, base string) error {
-	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
+	return rewriteTicket(path, false, unparkMutation(now, base))
+}
+
+// UnparkTicketWithBaseLocked is UnparkTicketWithBase for a caller that already
+// holds the ticket lock, so the unpark can share one lock with a log append.
+func UnparkTicketWithBaseLocked(path string, now time.Time, base string) error {
+	return rewriteTicketLocked(path, false, unparkMutation(now, base))
+}
+
+func unparkMutation(now time.Time, base string) func(*schema.Ticket, *string) error {
+	return func(t *schema.Ticket, body *string) error {
 		t.Status = schema.StatusOpen
 		if base != "" {
 			t.Base = base
 		}
 		*body = schema.DemoteSection(*body, "## Needs Answer", now)
-	})
+		return nil
+	}
 }
 
 // UnmuteTicket clears the ticket at path's Mutes field and demotes any "##

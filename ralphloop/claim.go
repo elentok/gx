@@ -195,7 +195,12 @@ func rewriteTicket(path string, repair bool, mutate func(*schema.Ticket, *string
 		return err
 	}
 	defer unlock()
+	return rewriteTicketLocked(path, repair, mutate)
+}
 
+// rewriteTicketLocked is rewriteTicket for a caller that already holds the
+// ticket lock.
+func rewriteTicketLocked(path string, repair bool, mutate func(*schema.Ticket, *string) error) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
