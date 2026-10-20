@@ -124,7 +124,11 @@ type holderServer struct {
 	// on the watcher's own changes and on output, which drives the rest.
 	changes signalHub
 	ops     []string
-	// denying is set while a deny-reason step runs; keys is refused meanwhile.
+	// denyStep is claimed for a whole deny-reason step, so only one runs.
+	denyStep atomic.Bool
+	// denying is set while a step runs, once attach input is held; keys is
+	// refused meanwhile. A client that sees it may type at once, so it must
+	// not show before the hold or that input would reach claude ahead of Esc.
 	denying atomic.Bool
 	// exited closes once the child has exited and exitCode is set.
 	exited   chan struct{}
@@ -231,13 +235,15 @@ func (h *holderServer) denyReason(reason string) error {
 		return errors.New("deny-reason needs claude's pid status")
 	}
 	// A second deny-reason would press its own Esc into the first one's step.
-	if !h.denying.CompareAndSwap(false, true) {
+	if !h.denyStep.CompareAndSwap(false, true) {
 		return ErrHolderDenyBusy
 	}
+	defer h.denyStep.Store(false)
 	h.pid.Hold()
 	defer h.pid.Release()
 	// Attach input waits for the step's bytes; terminal replies do not.
 	h.scr.HoldInput()
+	h.denying.Store(true)
 	defer func() {
 		h.denying.Store(false)
 		h.scr.ReleaseInput()
