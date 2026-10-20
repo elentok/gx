@@ -90,19 +90,32 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	}
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
+	resumeID := one.ResumeSessionID
 	start := func() (agentrunner.Session, error) {
 		return ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
-			Label: label,
-			Epic:  ticket.Epic,
-			Cwd:   cwd,
-			Kind:  agentrunner.Kind(agent),
-			Args:  ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
-			Env:   s.settings.Load().TabEnv,
+			Label:           label,
+			Epic:            ticket.Epic,
+			Cwd:             cwd,
+			Kind:            agentrunner.Kind(agent),
+			Args:            ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
+			Env:             s.settings.Load().TabEnv,
+			ResumeSessionID: resumeID,
 		}, launchPrompt(agent, launchSkill(t), investigatePrompt(t), ticket.String()), func(attempt int, decision string) {
 			s.logEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}
 	session, err := start()
+	if err != nil && resumeID != "" && !errors.Is(err, agentrunner.ErrLabelTaken) {
+		// The conversation may be gone or unreadable: the agent starts over
+		// from the ticket's latest round and handoff. A session that came up
+		// before the error is stopped so only one of the two attempts lives.
+		s.log.Warn("resume failed, cold-starting", "ticket", ticket.String(), "session", resumeID, "err", err)
+		if session.Label != "" {
+			_ = deps.Runner.Stop(session)
+		}
+		resumeID = ""
+		session, err = start()
+	}
 	if errors.Is(err, agentrunner.ErrLabelTaken) {
 		if h := s.labelHolder(deps.Runner, ticket, label, err); h.stale {
 			if serr := deps.Runner.Stop(h.Session); serr != nil {
@@ -121,8 +134,31 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	if err != nil {
 		return Run{}, err
 	}
+	path := "cold-start"
+	if resumeID != "" {
+		path = "resumed"
+	}
+	s.logEvent(ticket, ralphloop.Event{
+		Type: string(events.IterationStarted), Agent: agent, Label: label, Cwd: cwd,
+		AgentSession: session.SessionID, Path: path,
+	})
 	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
+}
+
+// answeredSession is the last agent session of a ticket whose latest question
+// has an answer, "" for any other ticket. Call it before the claim: claiming
+// clears the answered state.
+func answeredSession(t tickets.Ticket) string {
+	st, err := schema.ParseTicket(t.Path)
+	if err != nil || len(st.SessionIDs) == 0 {
+		return ""
+	}
+	evs, err := tickets.ReadLog(t.Path)
+	if err != nil || !tickets.Answered(st.Status, evs) {
+		return ""
+	}
+	return st.SessionIDs[len(st.SessionIDs)-1]
 }
 
 // logEvent appends ev to ticket's run log, best effort.

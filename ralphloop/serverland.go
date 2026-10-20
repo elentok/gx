@@ -45,6 +45,9 @@ type OneIteration struct {
 	// under; empty leaves the agent's own default.
 	Model  string
 	Effort string
+	// ResumeSessionID is the session the server's launch asks a runner to
+	// continue; "" starts the agent cold.
+	ResumeSessionID string
 	// KeepAskedAgent: see iterationParams.KeepAskedAgent.
 	KeepAskedAgent bool
 	// Sink hears the finish path's events; nil hears nothing.

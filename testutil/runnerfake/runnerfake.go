@@ -54,8 +54,12 @@ type Runner struct {
 	// Adopt makes Start return a live session of the same label and cwd, as
 	// an adapter whose sessions outlive gx may, instead of ErrLabelTaken.
 	Adopt bool
+	// ResumeErr fails every Start that asks to resume a session, as a pty
+	// runner does when claude cannot resume it.
+	ResumeErr error
 
 	mu        sync.Mutex
+	starts    []agentrunner.StartOptions // every Start attempt, failed ones too
 	nextID    int
 	sessions  []*session // live sessions, in start order
 	history   map[string]*session
@@ -110,8 +114,12 @@ func (r *Runner) byLabel(label string) *session {
 func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.starts = append(r.starts, opts)
 	if err := r.startErrs[opts.Label]; err != nil {
 		return agentrunner.Session{}, err
+	}
+	if opts.ResumeSessionID != "" && r.ResumeErr != nil {
+		return agentrunner.Session{}, r.ResumeErr
 	}
 	for _, ss := range r.sessions {
 		if ss.Label == opts.Label {
@@ -483,6 +491,20 @@ func (r *Runner) ResumeSessionID(label string) string {
 		return ss.resumeID
 	}
 	return ""
+}
+
+// ResumeIDs is the ResumeSessionID of each Start attempt of label, in order,
+// failed attempts included.
+func (r *Runner) ResumeIDs(label string) []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var ids []string
+	for _, o := range r.starts {
+		if o.Label == label {
+			ids = append(ids, o.ResumeSessionID)
+		}
+	}
+	return ids
 }
 
 // Answers returns the answers sent to the latest session started with label,

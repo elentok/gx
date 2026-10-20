@@ -144,6 +144,9 @@ type Event struct {
 	// ResolvedBase (iteration-started only) is the base (ref + SHA) the claim
 	// resolved; `gx tickets validate` compares it with the ticket's stamp.
 	ResolvedBase string `json:"resolved_base,omitempty"`
+	// Path (iteration-started only, from the server's claim) is how the agent
+	// began: "resumed" on its earlier conversation, else "cold-start".
+	Path string `json:"path,omitempty"`
 	// Scan (scheduler-scan events only) is every ticket's disposition for
 	// this claimNext pass — see ScanDecision.
 	Scan []ScanDecision `json:"scan,omitempty"`

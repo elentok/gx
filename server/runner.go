@@ -435,6 +435,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	if err != nil {
 		return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 	}
+	answered := answeredSession(t)
 	if err := ralphloop.ClaimWithBase(t.Path, resolvedBase); err != nil {
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
@@ -447,6 +448,10 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	}
 	deps := s.depsFor(ticket.Project)
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
+	// Only Claude on the pty runner resumes; every other claim starts cold.
+	if agent == ralphloop.AgentClaude && deps.Runner.Name() == string(agentrunner.ChoicePTY) {
+		one.ResumeSessionID = answered
+	}
 	mode := s.iterationModeFor(ticket, t)
 	if mode.commitless && mode.scratchDir == "" {
 		if mode.ref, err = s.commitlessRef(ticket, t, repo, epics); err != nil {
