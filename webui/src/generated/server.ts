@@ -97,6 +97,11 @@ export interface EpicSummary {
   active: SummaryTicket[];
   parked: SummaryTicket[];
   /**
+   * HasRepair is set when a parked ticket is broken (needs-repair or error), so
+   * both clients show a fault in the alarm color instead of a question.
+   */
+  has_repair: boolean;
+  /**
    * Reason names what holds a Deadlocked epic.
    */
   reason?: string;
