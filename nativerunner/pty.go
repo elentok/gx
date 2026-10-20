@@ -510,8 +510,27 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 		}
 	case ClaudeWaiting:
 		st.State, st.BlockedReason = agentrunner.StateBlocked, claude.WaitingFor
+		// Only here, on demand: the screen is never read on a timer for it.
+		if claude.WaitingFor == permissionPrompt {
+			d, err := p.screenDialog(ss)
+			if err != nil {
+				return agentrunner.Status{}, err
+			}
+			if d.Approvable {
+				st.Pending = &agentrunner.Pending{ID: d.ID, Tool: d.Header, Description: d.Body}
+			}
+		}
 	}
 	return st, nil
+}
+
+// screenDialog parses the dialog on the holder's screen right now.
+func (p *Pty) screenDialog(ss *ptySession) (claudeui.Dialog, error) {
+	rows, _, err := ss.holder.Screen(0)
+	if err != nil {
+		return claudeui.Dialog{}, p.died(ss, err)
+	}
+	return claudeui.ParseDialog(rows), nil
 }
 
 func (p *Pty) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {
@@ -863,7 +882,9 @@ const permissionPrompt = "permission prompt"
 // Answer presses Enter to allow a permission prompt or Esc to deny any
 // dialog, and returns once Turn moved. Allow on any other dialog is
 // ErrInvalidDecision: its options aren't known, but Esc always cancels it.
-// Deny with a reason also sends the reason as claude's next prompt.
+// Deny with a reason also sends the reason as claude's next prompt. With a
+// RequestID, the screen is re-read first and anything but that approvable
+// dialog is ErrRequestMismatch, before any key is sent.
 func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	ss, err := p.live(s)
 	if err != nil {
@@ -875,6 +896,15 @@ func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	}
 	if claude == nil || claude.Status != ClaudeWaiting {
 		return fmt.Errorf("%w: answer on a session that is not blocked", agentrunner.ErrNotReady)
+	}
+	if a.RequestID != "" {
+		d, err := p.screenDialog(ss)
+		if err != nil {
+			return err
+		}
+		if !d.Approvable || d.ID != a.RequestID {
+			return fmt.Errorf("%w: %s", agentrunner.ErrRequestMismatch, a.RequestID)
+		}
 	}
 	var key string
 	switch a.Decision {

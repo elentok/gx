@@ -226,6 +226,8 @@ type tui struct {
 	fast bool
 	// dialogNext makes the next "/" command open a dialog.
 	dialogNext bool
+	// dialog replaces the default waiting rows while set by ActionBlock.
+	dialog []string
 	// trustYes is whether the trust dialog's cursor is on "Yes"; arrow
 	// collects an arrow key's escape sequence.
 	trustYes bool
@@ -490,6 +492,7 @@ func (t *tui) handleControl(c Control) error {
 		if waitingFor == "" {
 			waitingFor = "permission prompt"
 		}
+		t.dialog = c.Dialog
 		return t.setStatus(StatusWaiting, waitingFor)
 	case ActionStall:
 		t.stalled = true
@@ -605,6 +608,9 @@ func (t *tui) draw() {
 			"Do you want to proceed?",
 			"❯ 1. Yes",
 			"  2. No",
+		}
+		if t.dialog != nil {
+			rows = t.dialog
 		}
 	case t.pid.Status == StatusBusy:
 		title = workingTitle

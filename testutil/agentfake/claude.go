@@ -48,6 +48,10 @@ type Control struct {
 	Running  bool   `json:"running,omitempty"`
 	// WaitingFor is the dialog an ActionBlock shows on the TUI fake.
 	WaitingFor string `json:"waiting_for,omitempty"`
+	// Dialog is the screen rows an ActionBlock shows on the TUI fake in place
+	// of its bare "Do you want to proceed?" prompt, for a test that needs a
+	// dialog claudeui can parse.
+	Dialog []string `json:"dialog,omitempty"`
 	// Code is the ActionExit exit code of the TUI fake and the fake program.
 	Code int `json:"code,omitempty"`
 	// State, Kind and Message are the OSC 7501 report an ActionReport makes
