@@ -93,6 +93,32 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 	}
 }
 
+func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *testing.T) {
+	store := t.TempDir()
+	proj := filepath.Join(store, "proj")
+	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "open"} {
+		servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
+	}
+	for id, blocker := range map[string]string{"01": "one-offs/01", "02": "one-offs/02", "03": "one-offs/03"} {
+		servertest.WriteTicketWith(t, store, "proj", "feature", id, "after", servertest.TicketOpts{BlockedBy: []string{blocker}})
+	}
+	h := startSweep(t, store)
+	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "01-t01.md"), false)
+	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "02-t02.md"), false)
+
+	// "blocked" is the scheduler's word for a ticket with an unresolved blocker;
+	// an unblocked one falls through to the queue verdicts.
+	for id, want := range map[string]string{"01": "not queued", "02": "not queued", "03": "blocked"} {
+		ex, err := h.Client.Explain(context.Background(), "proj:feature/"+id)
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		if ex.Verdict != want {
+			t.Errorf("feature/%s: explain = %+v, want verdict %q", id, ex, want)
+		}
+	}
+}
+
 func oneOffsQueued(t *testing.T, h *servertest.Harness) bool {
 	t.Helper()
 	q, err := h.Client.QueueItems(context.Background())
