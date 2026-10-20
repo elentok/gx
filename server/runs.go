@@ -408,7 +408,8 @@ func (s *Server) parkUnreclaimed(t trackedRun, cause error) {
 // reclaimHeadless takes over a headless iteration: a live agent keeps running
 // on the adopted session, a finished one lands as if it had just finished, and
 // one that died with the server down is reopened when it left nothing behind,
-// else parks needs-repair with its dir kept.
+// else parks needs-repair with its dir kept. A live agent that was waiting for
+// an answer stays waiting and unsettled.
 func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
@@ -454,6 +455,12 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 	deps.GateReleased = s.registry.gateReleased(t.Address)
 	if verdict == nativerunner.VerdictFinished {
 		s.goSettle(func() { s.settleRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}, nil) })
+		return nil
+	}
+	if !t.WaitingSince.IsZero() {
+		// Idle on purpose, waiting for an answer: finishing it now would land
+		// or park it for going quiet. The budget hard limit still reaches it
+		// through the registry.
 		return nil
 	}
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
