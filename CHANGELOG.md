@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.35.1 - 2026-10-20
+
+- Fixed the server running out of file descriptors on macOS. The ticket store watch now uses FSEvents (one stream for the whole tree) instead of kqueue, which opened one fd per file in every watched directory (~2000 entries). Other platforms keep fsnotify, and its directory walk now skips `.git`.
+- Added a web UI dev frontend proxy.
+  - New config keys `server.web.dev-frontend` (default off) and `server.web.dev-url` (default `http://127.0.0.1:5173`).
+  - With `dev-frontend` on, the web listener forwards non-`/v1` GET requests to the Vite dev server, including websocket upgrades for hot reload. `/v1` stays local.
+  - Only loopback targets are accepted; anything else fails the web bind. A reload that changes either key warns that a restart is needed.
+  - Added the Makefile target `web-dev-proxy`.
+- Improved the web UI readability. Font sizes go up one step, text/muted/dim contrast is higher (dim text passes AA), the surface is darker, tone colors are brighter and card borders are a subdued slate. The Queue content is capped at 1000px and centered on wide screens.
+- Fixed the Queue tab matching the focused epic: it now matches by Path only.
+- Fixed leader `1`-`8` so they switch tabs outside the Agents tab.
+- Fixed `OlderServer` so it is true before any snapshot has arrived.
+- Changed the server to send `HasRepair` on `EpicSummary`, so the TUI no longer string-matches for it.
+- Changed the agent skills:
+  - gx-implement: commits before reporting finished, never in the same block.
+  - Skills list merge conflicts and the format check now go through `rtk proxy`.
+- Internal:
+  - Web types are generated from the server with tygo. `EpicState` and `QueueMode` are typed, and the web view tables are folded into one `STATES` table.
+  - Web assets are served with `http.FileServerFS` and an SPA fallback.
+  - Typed scan `Decision` constants, a shared `Epic.DoneCount` in server summaries, and `slices.SortFunc`.
+  - Design detection I/O is split from the meta write, and the design ref is grouped.
+  - The `newWebToken` generator is shared, and the plain-HTTP cookie risk is documented.
+  - Documented that web tests run only through `make web-test`.
+
 ## v0.35.0 - 2026-10-20
 
 - Added a web UI, served by the server's web listener with the UI embedded in the release build.
