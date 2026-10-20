@@ -9,13 +9,26 @@ before:
     - test -f webui/dist/index.html
 
 builds:
-  - binary: gx
+  - id: linux
+    binary: gx
     env:
       - CGO_ENABLED=0
     ldflags:
       - -s -w -X github.com/elentok/gx/version.version={{.Version}}
     goos:
       - linux
+    goarch:
+      - amd64
+      - arm64
+
+  # cgo: the server's store watch uses FSEvents on macOS. Needs a macOS runner.
+  - id: darwin
+    binary: gx
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w -X github.com/elentok/gx/version.version={{.Version}}
+    goos:
       - darwin
     goarch:
       - amd64
