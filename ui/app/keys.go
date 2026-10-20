@@ -46,7 +46,10 @@ func Bindings() []keys.Binding {
 
 func (m Model) hintsForPrefix(prefix string) []keys.Binding {
 	if m.isLeader(prefix) {
-		return []keys.Binding{{Seq: []string{"o"}, Title: "last active tab"}}
+		return []keys.Binding{
+			{Seq: []string{"1-8"}, Title: "switch gx tab"},
+			{Seq: []string{"o"}, Title: "last active tab"},
+		}
 	}
 	if prefix != "g" {
 		return nil

@@ -293,6 +293,29 @@ func TestLeaderOSwitchesToTheLastTabOutsideAgents(t *testing.T) {
 	}
 }
 
+func TestLeaderDigitSwitchesTabOutsideAgents(t *testing.T) {
+	t.Parallel()
+	repoDir := testutil.TempRepo(t)
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		t.Fatalf("FindRepo: %v", err)
+	}
+
+	m := New(*repo, Settings{
+		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
+		ActiveWorktreePath: repoDir,
+	})
+	updated, _ := m.Update(tea.KeyPressMsg{Code: 'a', Mod: tea.ModCtrl})
+	updated, _ = updated.(Model).Update(tea.KeyPressMsg{Code: '3', Text: "3"})
+	got := updated.(Model)
+	if got.navState.ActiveTab() != nav.TabStatus {
+		t.Fatalf("expected leader 3 to open status, got %q", got.navState.ActiveTab())
+	}
+	if got.keyPrefix != "" {
+		t.Fatalf("expected the leader to clear, prefix=%q", got.keyPrefix)
+	}
+}
+
 func TestShellChordDirectTabSwitchClearsHistory(t *testing.T) {
 	t.Parallel()
 	repoDir := testutil.TempRepo(t)

@@ -165,6 +165,9 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		if key == "o" {
 			return m, nav.SwitchLast(), true
 		}
+		if next, cmd, ok := m.switchTabByDigit(key); ok {
+			return next, cmd, true
+		}
 		return m, nil, true
 	}
 	// The Agents tab runs its own leader, with more actions.
@@ -222,33 +225,20 @@ func (m Model) handleShellChordKey(msg tea.KeyPressMsg) (Model, tea.Cmd, bool) {
 		m.keyPrefix = "g"
 		return m, nil, true
 	}
-	switch key {
-	case "1":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabWorktrees})
-		return next, cmd, true
-	case "2":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabLog})
-		return next, cmd, true
-	case "3":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStatus})
-		return next, cmd, true
-	case "4":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabStash})
-		return next, cmd, true
-	case "5":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabPRs})
-		return next, cmd, true
-	case "6":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabTickets})
-		return next, cmd, true
-	case "7":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabQueue})
-		return next, cmd, true
-	case "8":
-		next, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
+	if next, cmd, ok := m.switchTabByDigit(key); ok {
 		return next, cmd, true
 	}
 	return m, nil, false
+}
+
+// switchTabByDigit switches to the nth tab for key "n", in tabSpecs order.
+func (m Model) switchTabByDigit(key string) (Model, tea.Cmd, bool) {
+	specs := m.tabSpecs()
+	if len(key) != 1 || key[0] < '1' || int(key[0]-'1') >= len(specs) {
+		return m, nil, false
+	}
+	next, cmd := m.switchTab(nav.ViewState{Tab: specs[key[0]-'1'].id})
+	return next, cmd, true
 }
 
 // isLeader reports whether key is one of the Agents tab's leader keys, which
