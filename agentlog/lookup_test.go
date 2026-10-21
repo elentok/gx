@@ -215,12 +215,15 @@ func herdrWith(it agentlog.HerdrIteration, ok bool) func(context.Context, string
 }
 
 func TestAgentLog_HerdrClaude(t *testing.T) {
-	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: "claude", Transcript: "/t/s.jsonl"}, true)}
+	// The transcript lives under a temp dir: transcript.Resolve globs the grandparent of a missing path, and
+	// a path like /t/s.jsonl would make it glob the filesystem root (it hangs opening /home on macOS).
+	transcriptPath := filepath.Join(t.TempDir(), "projects", "p", "s.jsonl")
+	loc := agentlog.Locator{StateDir: t.TempDir(), Herdr: herdrWith(agentlog.HerdrIteration{Agent: "claude", Transcript: transcriptPath}, true)}
 	l, err := loc.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l.Path != "/t/s.jsonl" || l.Offset != 0 || l.Ended() {
+	if l.Path != transcriptPath || l.Offset != 0 || l.Ended() {
 		t.Errorf("got %+v (ended %v)", l, l.Ended())
 	}
 }
