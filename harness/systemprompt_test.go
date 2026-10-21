@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/harness"
@@ -28,5 +29,13 @@ func TestClaudeLaunchAndResume_OmitGXSystemPrompt(t *testing.T) {
 		if slices.Contains(cmd.Args, "--append-system-prompt") {
 			t.Errorf("%s args %q carry --append-system-prompt", name, cmd.Args)
 		}
+	}
+}
+
+// herdr refuses a launch argument with a newline (invalid_agent_argument), so
+// the prompt must stay on one line.
+func TestGXSystemPrompt_IsOneLine(t *testing.T) {
+	if strings.ContainsAny(harness.GXSystemPrompt, "\r\n") {
+		t.Errorf("GXSystemPrompt contains a newline: %q", harness.GXSystemPrompt)
 	}
 }

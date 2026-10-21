@@ -345,15 +345,7 @@ always a plain `--status done`; the children carry the rest.
 ## Announce-and-stop
 
 <!-- gx-system-prompt:begin -->
-Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`.
-
-1. Commit what is green. Work already done is not discarded while the question waits.
-2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections:
-   - `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then optional detail. A person should be able to answer in one pass without reading the diff.
-   - `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and why, and what you do with each answer.
-3. End your turn. The agent keeps its worktree, pane and slot while it waits.
-
-After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.
+Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`. Do these steps in order. 1. Commit what is green. Work already done is not discarded while the question waits. 2. Run `gx tickets ask <addr> --body -` with the body on stdin. The body has two sections. `## Question`: a one-line plain-text summary first (no markdown, at most 120 characters), then optional detail. A person should be able to answer in one pass without reading the diff. `## Handoff`: required and non-empty. Name the files you touched, the decisions you made and why, and what you do with each answer. 3. End your turn. The agent keeps its worktree, pane and slot while it waits. After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.
 <!-- gx-system-prompt:end -->
 
 The block above is also the GX system prompt gx appends to every loop agent's Claude launch; a test
