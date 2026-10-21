@@ -120,7 +120,7 @@ func TestServerStatus_PrintsWebURLWithToken(t *testing.T) {
 	if err := runServerStatusWith(context.Background(), h.Client, false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if want := "web: " + hs.WebURL + "/?t=" + token + "\n"; !strings.Contains(out.String(), want) {
+	if want := "web: " + hs.WebURL + "/?gx_token=" + token + "\n"; !strings.Contains(out.String(), want) {
 		t.Errorf("status = %q, want line %q", out.String(), want)
 	}
 }

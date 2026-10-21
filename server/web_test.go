@@ -36,7 +36,7 @@ func login(t *testing.T, stateDir, base string) *http.Cookie {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := noRedirect.Get(base + "/?t=" + token)
+	resp, err := noRedirect.Get(base + "/?gx_token=" + token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,13 +192,33 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 	}
 }
 
+// Vite appends ?t=<timestamp> to modules it reloaded; that is not a login
+// attempt, so a signed-in browser still gets the module.
+func TestWeb_ViteTimestampParamIsNotATokenAttempt(t *testing.T) {
+	h, base := startWeb(t)
+	cookie := login(t, h.StateDir, base)
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", cookie); code == http.StatusUnauthorized {
+		t.Errorf("status %d with a valid cookie, want the request let through", code)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", nil); code != http.StatusUnauthorized {
+		t.Errorf("status %d without a cookie, want 401", code)
+	}
+	token, err := server.ReadWebToken(h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/?t="+token, nil); code != http.StatusUnauthorized {
+		t.Errorf("status %d for the old ?t= link, want 401", code)
+	}
+}
+
 func TestWeb_ValidTokenSetsCookieAndRedirects(t *testing.T) {
 	h, base := startWeb(t)
 	token, err := server.ReadWebToken(h.StateDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := noRedirect.Get(base + "/some/route?t=" + token)
+	resp, err := noRedirect.Get(base + "/some/route?gx_token=" + token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +241,7 @@ func TestWeb_ValidTokenSetsCookieAndRedirects(t *testing.T) {
 
 func TestWeb_BadOrMissingTokenIs401(t *testing.T) {
 	_, base := startWeb(t)
-	for _, path := range []string{"/", "/?t=nope", "/v1/snapshot", "/v1/events", "/v1/snapshot?t=nope"} {
+	for _, path := range []string{"/", "/?gx_token=nope", "/v1/snapshot", "/v1/events", "/v1/snapshot?gx_token=nope"} {
 		code, body := webDoCookie(t, http.MethodGet, base+path, nil)
 		if code != http.StatusUnauthorized || body == "" {
 			t.Errorf("GET %s = %d %q, want 401 with a page", path, code, body)
@@ -283,7 +303,7 @@ func TestWeb_RotateInvalidatesCookiesOfRunningServer(t *testing.T) {
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/", old); code != http.StatusUnauthorized {
 		t.Errorf("old cookie after rotate = %d, want 401", code)
 	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/?t="+before, nil); code != http.StatusUnauthorized {
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/?gx_token="+before, nil); code != http.StatusUnauthorized {
 		t.Errorf("old token after rotate = %d, want 401", code)
 	}
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/", login(t, h.StateDir, base)); code != http.StatusOK {

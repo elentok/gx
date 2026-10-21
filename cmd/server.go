@@ -233,7 +233,7 @@ func runServerStatusWith(ctx context.Context, c *apiclient.Client, jsonOut bool,
 			if terr != nil {
 				return terr
 			}
-			info.WebURL = n.WebURL + "/?t=" + token
+			info.WebURL = n.WebURL + "/?gx_token=" + token
 		}
 		if b, berr := c.Budget(ctx); berr == nil {
 			info.Budget = &b

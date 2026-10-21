@@ -46,7 +46,7 @@ func TestWebToken_PrintsTheCurrentTokenAndRotateReplacesIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signIn := webGet(t, hs.WebURL+"/?t="+old)
+	signIn := webGet(t, hs.WebURL+"/?gx_token="+old)
 	if len(signIn.Cookies()) != 1 {
 		t.Fatalf("sign-in set %d cookies, want 1", len(signIn.Cookies()))
 	}
@@ -86,7 +86,7 @@ func TestWebURL_QRFlagPrintsAQRForTheTokenedURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantURL := hs.WebURL + "/?t=" + token
+	wantURL := hs.WebURL + "/?gx_token=" + token
 
 	var plain bytes.Buffer
 	if err := runWebURL(context.Background(), h.Client, h.StateDir, false, &plain); err != nil {

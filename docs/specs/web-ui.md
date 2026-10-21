@@ -106,7 +106,7 @@ rule serves both. This also fixes the two TUI bugs above.
 - The web mux allows only `GET /v1/snapshot`, `GET /v1/events` and the embedded assets. Everything else returns 404. The listener has no write route.
 - A token is always required, including on Tailscale. It is 32 random bytes stored in the server state directory with mode 0600. It never expires.
 - `gx server web-token --rotate` replaces the token and invalidates all cookies. `gx server web-url --qr` prints a QR code of the URL with the token.
-- The first request with a valid `?t=` sets a cookie (`HttpOnly`, `SameSite=Strict`, one year) and redirects to `/`. The SSE stream authenticates with that cookie.
+- The first request with a valid `?gx_token=` sets a cookie (`HttpOnly`, `SameSite=Strict`, one year) and redirects to `/`. The SSE stream authenticates with that cookie.
 - A bad or missing token gets a 401 with a short plain page. There is no rate limit, because a 32-byte token cannot be guessed.
 - Deferred to `gx:web-ui-v2`: a Host header check against DNS rebinding, TLS and a `Secure` cookie, and token expiry.
 

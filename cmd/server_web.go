@@ -89,7 +89,7 @@ func runWebURL(ctx context.Context, c *apiclient.Client, stateDir string, showQR
 	if err != nil {
 		return err
 	}
-	url := hs.WebURL + "/?t=" + token
+	url := hs.WebURL + "/?gx_token=" + token
 	if showQR {
 		art, err := renderQR(url)
 		if err != nil {

@@ -16,7 +16,10 @@ import (
 )
 
 const (
-	webCookieName   = "gx_web"
+	webCookieName = "gx_web"
+	// webTokenParam is the query parameter of the sign-in link. It is namespaced
+	// because the Vite dev frontend appends its own ?t=<timestamp> to modules.
+	webTokenParam   = "gx_token"
 	webCookieMaxAge = 365 * 24 * 60 * 60
 )
 
@@ -96,9 +99,9 @@ func sameSecret(a, b string) bool {
 }
 
 // requireToken lets a request through when it carries the session cookie. A
-// valid ?t= starts a session and redirects to the app root; anything else is a 401.
+// valid ?gx_token= starts a session and redirects to the app root; anything else is a 401.
 //
-// Plain HTTP means anyone on the LAN can sniff the ?t= link and the cookie, and
+// Plain HTTP means anyone on the LAN can sniff the ?gx_token= link and the cookie, and
 // the cookie cannot be Secure. It lives 365 days, so rotating the token is the
 // only revocation. The file is read on every request so rotation takes effect
 // at once; do not cache it. Security design: map gx:webui-security.
@@ -110,7 +113,7 @@ func requireToken(stateDir string, next http.Handler) http.Handler {
 			return
 		}
 		want := webCookieValue(token)
-		if t := r.URL.Query().Get("t"); t != "" {
+		if t := r.URL.Query().Get(webTokenParam); t != "" {
 			if !sameSecret(t, token) {
 				unauthorized(w)
 				return
