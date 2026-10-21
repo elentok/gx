@@ -225,6 +225,8 @@ can link to it. Nothing links to a map epic yet.
   shape open for it and decides nothing.
 - The ticket page.
 - Actions on the epic page, such as queue, park or launch. The page is read-only.
+  Amended by `web-epics-page.md`: the epic page gains a `Queue` button for a queueable epic. Park and
+  launch stay out of scope.
 - A backfill of `## Summary` for existing epics.
 - Token counts on the page or in the payload.
 
