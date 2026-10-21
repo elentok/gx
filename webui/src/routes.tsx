@@ -2,23 +2,14 @@ import { createHashRouter, redirect, useParams, type RouteObject } from "react-r
 import { useConnectionContext, useConnectionState } from "./connection";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
-import { ConnectedTopBar } from "./nav/ConnectedTopBar";
+import { EpicsPage } from "./epics/EpicsPage";
+import type { FetchEpicList } from "./epics/list";
 import { QueueScreen } from "./queue/QueueScreen";
 import type { FetchDetail } from "./ticket/detail";
 import { TicketPage } from "./ticket/TicketPage";
-import { PageContainer } from "./ui/PageContainer";
 
 function QueueRoute() {
   return <QueueScreen state={useConnectionState(useConnectionContext())} />;
-}
-
-// Placeholder until the Epics page lands.
-function EpicsRoute() {
-  return (
-    <PageContainer>
-      <ConnectedTopBar active="epics" />
-    </PageContainer>
-  );
 }
 
 function TicketRoute({ fetchDetail }: { fetchDetail?: FetchDetail }) {
@@ -31,10 +22,14 @@ function EpicRoute({ fetchDetail }: { fetchDetail?: FetchEpicDetail }) {
   return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} />;
 }
 
-export function appRoutes(fetchDetail?: FetchDetail, fetchEpicDetail?: FetchEpicDetail): RouteObject[] {
+export function appRoutes(
+  fetchDetail?: FetchDetail,
+  fetchEpicDetail?: FetchEpicDetail,
+  fetchEpicList?: FetchEpicList,
+): RouteObject[] {
   return [
     { path: "/q", element: <QueueRoute /> },
-    { path: "/epics", element: <EpicsRoute /> },
+    { path: "/epics", element: <EpicsPage fetchList={fetchEpicList} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchDetail} /> },
     { path: "/e/*", element: <EpicRoute fetchDetail={fetchEpicDetail} /> },
     // "/" and an unknown hash go to the Queue.
