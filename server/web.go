@@ -81,6 +81,8 @@ func (s *Server) webHandler() http.Handler {
 			s.snapshot(w, r)
 		case r.URL.Path == "/v1/tickets/detail":
 			s.detail(w, r)
+		case r.URL.Path == "/v1/epics/detail":
+			s.epicDetail(w, r)
 		case r.URL.Path == "/v1/events":
 			s.streamEvents(w, r)
 		case strings.HasPrefix(r.URL.Path, "/v1/"):
