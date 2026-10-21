@@ -54,6 +54,17 @@ type EpicDetail struct {
 	AgentTime int             `json:"agent_time"`
 	CostTotal float64         `json:"cost_total"`
 	Rows      []EpicDetailRow `json:"rows"`
+	// Queueable is set when the Queue action applies; see epicQueueable.
+	Queueable bool `json:"queueable"`
+}
+
+// epicQueueable reports whether an epic can be queued: an unqueued, unmerged
+// loop epic that still has an open ticket. The epic list shares this rule.
+func epicQueueable(e tickets.Epic, queued bool) bool {
+	if e.IsMap || queued || !e.MergedAt.IsZero() {
+		return false
+	}
+	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })
 }
 
 func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +96,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 	d := EpicDetail{
 		Address: root.String(), Kind: EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
+		Queueable: epicQueueable(e, s.rootQueued(root)),
 	}
 	if e.IsMap {
 		d.Kind, d.Summary = EpicKindMap, schema.Section(e.Body, "Destination")

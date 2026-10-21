@@ -51,7 +51,7 @@ func newServerEpicsCmd() *cobra.Command {
 }
 
 func printEpicDetail(w io.Writer, d server.EpicDetail) error {
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d/%d\n", d.Address, d.Kind, d.State, d.Done, d.Total); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d/%d\tqueueable=%t\n", d.Address, d.Kind, d.State, d.Done, d.Total, d.Queueable); err != nil {
 		return err
 	}
 	for _, r := range d.Rows {

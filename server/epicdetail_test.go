@@ -163,6 +163,27 @@ func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_Queueable(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+		writeEpicFiles(t, store, "ready", "---\nstatus: open\n---\n", open)
+		writeEpicFiles(t, store, "queued", "---\nstatus: open\n---\n", open)
+		writeEpicFiles(t, store, "merged", "---\nstatus: open\nmerged_at: 2026-01-02T11:00:00Z\n---\n", open)
+		writeEpicFiles(t, store, "noopen", "---\nstatus: open\n---\n", done)
+		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n", open)
+	})
+	if res, err := h.Client.QueueAdd(t.Context(), "proj:queued", ""); err != nil || res.Refused {
+		t.Fatalf("queue add = %+v, %v", res, err)
+	}
+	for epic, want := range map[string]bool{"ready": true, "queued": false, "merged": false, "noopen": false, "atlas": false} {
+		code, d, body := getEpicDetail(t, h, base, "proj:"+epic)
+		if code != http.StatusOK || d.Queueable != want {
+			t.Errorf("%s = %d, queueable %v, want %v (%s)", epic, code, d.Queueable, want, body)
+		}
+	}
+}
+
 func TestEpicDetail_MapEpic(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\nstarted_at: 2026-01-01T10:00:00Z\n---\n\n## Destination\n\nReach the sea.\n",

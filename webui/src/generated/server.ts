@@ -235,6 +235,10 @@ export interface EpicDetail {
   agent_time: number /* int */;
   cost_total: number /* float64 */;
   rows: EpicDetailRow[];
+  /**
+   * Queueable is set when the Queue action applies; see epicQueueable.
+   */
+  queueable: boolean;
 }
 
 //////////

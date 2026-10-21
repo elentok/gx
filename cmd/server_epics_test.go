@@ -11,6 +11,17 @@ import (
 	"github.com/elentok/gx/server"
 )
 
+func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
+	var out bytes.Buffer
+	d := server.EpicDetail{Address: "proj:epic", Kind: server.EpicKindLoop, Done: 1, Total: 2, Queueable: true}
+	if err := printEpicDetail(&out, d); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:epic\tloop\t\t1/2\tqueueable=true\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
 func TestServerEpicsMerge_RejectsNonEpicAddresses(t *testing.T) {
 	for _, args := range [][]string{{}, {"proj:epic/01"}, {"epic"}, {"proj:a", "proj:b"}} {
 		root := newRootCmd(deps{})
