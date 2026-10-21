@@ -266,6 +266,11 @@ type Ticket struct {
 	// after a park from one already on file. gx's own finished write
 	// (MarkBuiltAwaitingLand) leaves it alone.
 	IterationFinishedAt time.Time
+	// ClaimedAt is when the ticket last entered claimed; DoneAt is when it
+	// entered done. Both are gx-stamped on the status transition and read-only
+	// through `tickets set`. A new claim clears DoneAt.
+	ClaimedAt time.Time
+	DoneAt    time.Time
 	// CompletedAt is when the server archived a one-off that ended done; the
 	// archive sweep stamps it, and a cancelled one gets none.
 	CompletedAt time.Time

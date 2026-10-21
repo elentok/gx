@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -91,7 +92,11 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 			if err != nil {
 				return MigrationResult{}, fmt.Errorf("parsing %s: %w", ticketPath, err)
 			}
-			newTicket, notes := migrateTicket(old)
+			info, err := issueEntry.Info()
+			if err != nil {
+				return MigrationResult{}, fmt.Errorf("stat %s: %w", ticketPath, err)
+			}
+			newTicket, notes := migrateTicket(old, info.ModTime().UTC())
 
 			files = append(files, migratedTicketFile{
 				path:      ticketPath,
@@ -217,7 +222,7 @@ func migratedStatusOf(s schema.Status) schema.Status {
 // the edge every other consumer (Epic.ValidateParentGraph,
 // Epic.UnresolvedBlockers) already treats as authoritative, so discarding
 // children never loses information a correct graph needs.
-func migrateTicket(old schema.RawTicket) (schema.Ticket, []string) {
+func migrateTicket(old schema.RawTicket, mtime time.Time) (schema.Ticket, []string) {
 	out := old.Ticket
 	var notes []string
 
@@ -250,5 +255,35 @@ func migrateTicket(old schema.RawTicket) (schema.Ticket, []string) {
 		out.Status = migrated
 	}
 
-	return out, notes
+	return backfillStatusTimes(out, notes, mtime)
+}
+
+// backfillStatusTimes stamps claimed_at and done_at on a ticket that reached
+// those states before gx recorded them. Sources, best first: done_at from
+// completed_at or iteration_finished_at; claimed_at from
+// iteration_finished_at; both fall back to the file's mtime. An open, draft or
+// cancelled ticket gets neither field.
+func backfillStatusTimes(t schema.Ticket, notes []string, mtime time.Time) (schema.Ticket, []string) {
+	switch t.Status {
+	case schema.StatusOpen, schema.StatusDraft, schema.StatusCancelled:
+		return t, notes
+	}
+	if done := firstNonZero(t.CompletedAt, t.IterationFinishedAt, mtime); t.Status == schema.StatusDone && t.DoneAt.IsZero() && !done.IsZero() {
+		t.DoneAt = done
+		notes = append(notes, "done_at backfilled")
+	}
+	if claimed := firstNonZero(t.IterationFinishedAt, mtime); t.ClaimedAt.IsZero() && !claimed.IsZero() {
+		t.ClaimedAt = claimed
+		notes = append(notes, "claimed_at backfilled")
+	}
+	return t, notes
+}
+
+func firstNonZero(times ...time.Time) time.Time {
+	for _, tm := range times {
+		if !tm.IsZero() {
+			return tm
+		}
+	}
+	return time.Time{}
 }

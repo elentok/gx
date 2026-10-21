@@ -148,7 +148,7 @@ func convertTicketFile(path string, raw []byte) []byte {
 	if err != nil {
 		return raw
 	}
-	t, notes := migrateTicket(old)
+	t, notes := migrateTicket(old, time.Time{})
 	if t.Type == schema.TypeTask {
 		t.Type = schema.TypeImplement
 		notes = append(notes, "type: task -> implement")

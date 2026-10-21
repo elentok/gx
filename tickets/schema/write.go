@@ -39,7 +39,9 @@ func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
 	}
 	body := ParseBody(string(raw))
 
+	before := t.Status
 	mutate(&t, &body)
+	t.StampStatusChange(before, time.Now().UTC())
 
 	if err := Validate(t); err != nil {
 		return err
@@ -50,6 +52,22 @@ func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
 		return err
 	}
 	return fsutil.WriteFileAtomic(path, out)
+}
+
+// StampStatusChange stamps ClaimedAt or DoneAt when t.Status just moved from
+// before into claimed or done. An unchanged status stamps nothing, so a
+// rewrite of a done ticket keeps its original DoneAt. A new claim clears DoneAt.
+func (t *Ticket) StampStatusChange(before Status, now time.Time) {
+	if t.Status == before {
+		return
+	}
+	switch t.Status {
+	case StatusClaimed:
+		t.ClaimedAt = now
+		t.DoneAt = time.Time{}
+	case StatusDone:
+		t.DoneAt = now
+	}
 }
 
 // ClearIterationStatus removes path's iteration_status, leaving Status and

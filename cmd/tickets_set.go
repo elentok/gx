@@ -57,6 +57,10 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
     machine-written only
   iteration_finished_at (RFC3339 timestamp) — stamped when an agent reports
     --iteration-status finished, cleared otherwise
+  claimed_at (RFC3339 timestamp) — stamped on every move into claimed, including a
+    re-claim after a reset or unpark; cleared with done_at
+  done_at (RFC3339 timestamp) — stamped when the ticket moves into done, cleared by
+    a new claim
   exported_at (RFC3339 timestamp) — when gx exported the ticket
 
 Other frontmatter fields:

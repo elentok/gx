@@ -59,6 +59,42 @@ func TestClaim_RewritesStatus(t *testing.T) {
 	}
 }
 
+func TestClaimAndDone_StampClaimedAtAndDoneAt(t *testing.T) {
+	t.Parallel()
+	path := writeFrontmatterTicket(t, "open")
+	before := time.Now().UTC().Add(-time.Second)
+	if err := Claim(path); err != nil {
+		t.Fatalf("Claim: %v", err)
+	}
+	got := mustParse(t, path)
+	if got.ClaimedAt.Before(before) || !got.DoneAt.IsZero() {
+		t.Fatalf("after claim ClaimedAt = %v, DoneAt = %v, want stamped claim and no done", got.ClaimedAt, got.DoneAt)
+	}
+
+	for name, markDone := range map[string]func(string) error{
+		"MarkDone":             MarkDone,
+		"MarkDoneWithMetadata": func(p string) error { return MarkDoneWithMetadata(p, 0, "") },
+		"MarkChildDone":        MarkChildDone,
+	} {
+		if err := Claim(path); err != nil {
+			t.Fatalf("%s: re-claim: %v", name, err)
+		}
+		if err := markDone(path); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got := mustParse(t, path); got.DoneAt.Before(before) || got.ClaimedAt.Before(before) {
+			t.Errorf("%s: ClaimedAt = %v, DoneAt = %v, want both stamped", name, got.ClaimedAt, got.DoneAt)
+		}
+	}
+
+	if err := Claim(path); err != nil {
+		t.Fatalf("re-claim: %v", err)
+	}
+	if got := mustParse(t, path); !got.DoneAt.IsZero() {
+		t.Errorf("DoneAt = %v after a fresh claim, want cleared", got.DoneAt)
+	}
+}
+
 func TestClaimWithBase_StampsEveryClaim(t *testing.T) {
 	t.Parallel()
 	path := writeFrontmatterTicket(t, "open")

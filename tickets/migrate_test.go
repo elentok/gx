@@ -4,12 +4,52 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/elentok/gx/tickets/schema"
 )
+
+func TestMigrate_BackfillsClaimedAtAndDoneAtOnce(t *testing.T) {
+	dir := t.TempDir()
+	issues := filepath.Join(dir, "my-epic", "issues")
+	donePath := filepath.Join(issues, "01-done.md")
+	openPath := filepath.Join(issues, "02-open.md")
+	writeFile(t, donePath, "---\nid: \"01\"\nstatus: done\ntype: implement\ncompleted_at: 2026-01-02T03:04:05Z\n---\nBody.\n")
+	writeFile(t, openPath, "---\nid: \"02\"\nstatus: open\ntype: implement\n---\nBody.\n")
+
+	result, err := Migrate(dir)
+	if err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if len(result.Changes) != 1 || result.Changes[0].Path != donePath {
+		t.Fatalf("Changes = %v, want only the done ticket", result.Changes)
+	}
+
+	done, err := schema.ParseTicket(donePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	if !done.DoneAt.Equal(want) || done.ClaimedAt.IsZero() {
+		t.Errorf("DoneAt = %v, ClaimedAt = %v, want done_at %v and a claimed_at", done.DoneAt, done.ClaimedAt, want)
+	}
+	if open, _ := schema.ParseTicket(openPath); !open.ClaimedAt.IsZero() || !open.DoneAt.IsZero() {
+		t.Errorf("open ticket got ClaimedAt = %v, DoneAt = %v, want none", open.ClaimedAt, open.DoneAt)
+	}
+
+	again, err := Migrate(dir)
+	if err != nil {
+		t.Fatalf("second Migrate: %v", err)
+	}
+	if len(again.Changes) != 0 {
+		t.Errorf("second run Changes = %v, want none", again.Changes)
+	}
+}
 
 func TestMigrate_IterationStatusRoundTripsUnchanged(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "my-epic", "issues", "01-first-ticket.md")
-	original := "---\nid: \"01\"\nstatus: done\ntype: implement\niteration_status: working\n---\nBody.\n"
+	original := "---\nid: \"01\"\nstatus: done\ntype: implement\niteration_status: working\nclaimed_at: 2026-01-02T03:04:05Z\ndone_at: 2026-01-02T03:04:05Z\n---\nBody.\n"
 	writeFile(t, path, original)
 
 	result, err := Migrate(dir)

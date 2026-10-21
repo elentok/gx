@@ -49,6 +49,11 @@ func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
 	if !strings.Contains(ticketsSchemaText, "completed_at") {
 		t.Error("schema text missing completed_at")
 	}
+	for _, field := range []string{"claimed_at", "done_at"} {
+		if !strings.Contains(ticketsSchemaText, field) {
+			t.Errorf("schema text missing %s", field)
+		}
+	}
 	if !strings.Contains(ticketsSchemaText, "parent") {
 		t.Error("schema text missing parent")
 	}
@@ -275,6 +280,9 @@ func TestExecute_TicketsSet_MapEpicClaimsAndCloses(t *testing.T) {
 	raw, _ := os.ReadFile(path)
 	if !strings.Contains(string(raw), "status: done") || !strings.Contains(string(raw), "commitless: true") {
 		t.Errorf("ticket = %q, want done + commitless", raw)
+	}
+	if !strings.Contains(string(raw), "\nclaimed_at: ") || !strings.Contains(string(raw), "\ndone_at: ") {
+		t.Errorf("ticket = %q, want claimed_at and done_at stamped", raw)
 	}
 
 	err := execute([]string{"tickets", "set", path, "--status=needs-repair"}, d)

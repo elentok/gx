@@ -32,6 +32,10 @@ func Claim(path string) error { return ClaimWithBase(path, "") }
 func ClaimWithBase(path, resolvedBase string) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusClaimed
+		// Stamped here as well because a re-claim of an already-claimed ticket
+		// is not a status change.
+		t.ClaimedAt = time.Now().UTC()
+		t.DoneAt = time.Time{}
 		if resolvedBase != "" {
 			t.ResolvedBase = resolvedBase
 		}
@@ -218,9 +222,11 @@ func rewriteTicketLocked(path string, repair bool, mutate func(*schema.Ticket, *
 	}
 	body := schema.ParseBody(string(raw))
 
+	before := t.Status
 	if err := mutate(&t, &body); err != nil {
 		return err
 	}
+	t.StampStatusChange(before, time.Now().UTC())
 
 	if repair {
 		if err := schema.Validate(t); err != nil {
