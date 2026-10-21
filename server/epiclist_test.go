@@ -2,7 +2,11 @@ package server_test
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -107,6 +111,101 @@ func TestEpicList_RowFields(t *testing.T) {
 	m := byName["merged"]
 	if m.CompletedAt.IsZero() || m.MergedAt.IsZero() || m.Queueable {
 		t.Errorf("merged = %+v", m)
+	}
+}
+
+func TestEpicList_BlockedByEpicsIgnoresMerged(t *testing.T) {
+	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "live", "---\nstatus: open\n---\n", open)
+		writeEpicFiles(t, store, "landed", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
+		writeEpicFiles(t, store, "waiter", "---\nstatus: open\nblocked_by: [live, \"proj:landed\", ghost]\n---\n", open)
+		writeEpicFiles(t, store, "free", "---\nstatus: open\nblocked_by: [landed]\n---\n", open)
+	})
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	byName := map[string]server.EpicListRow{}
+	for _, r := range getEpicList(t, code, body).Epics {
+		byName[r.Name] = r
+	}
+	if got := byName["waiter"].BlockedByEpics; !slices.Equal(got, []string{"proj:live"}) {
+		t.Errorf("waiter blocked_by_epics = %v, want [proj:live]", got)
+	}
+	if got := byName["free"].BlockedByEpics; len(got) != 0 {
+		t.Errorf("free blocked_by_epics = %v, want none", got)
+	}
+}
+
+func TestEpicList_LastActivityIsTheNewestStamp(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "busy", "---\nstatus: open\nkind: map\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "done", "claimed_at: 2026-01-01T10:00:00Z\ndone_at: 2026-01-03T10:00:00Z\n", "A"),
+			"02-b.md": issueMD("02", "claimed", "claimed_at: 2026-01-02T10:00:00Z\n", "B"),
+		})
+		writeEpicFiles(t, store, "idle", "---\nstatus: open\nkind: map\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	})
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	byName := map[string]server.EpicListRow{}
+	for _, r := range getEpicList(t, code, body).Epics {
+		byName[r.Name] = r
+	}
+	if got := byName["busy"].LastActivityAt.Format("2006-01-02T15:04:05Z"); got != "2026-01-03T10:00:00Z" {
+		t.Errorf("busy last_activity_at = %s", got)
+	}
+	if !byName["idle"].LastActivityAt.IsZero() {
+		t.Errorf("idle last_activity_at = %v, want zero", byName["idle"].LastActivityAt)
+	}
+}
+
+func TestEpicList_FollowUpCounts(t *testing.T) {
+	loop := "---\nstatus: open\n---\n"
+	followUps := map[string]string{
+		"01-a.md": issueMD("01", "draft", "", "A"),
+		"02-b.md": issueMD("02", "open", "", "B"),
+		"03-c.md": issueMD("03", "done", "", "C"),
+		"04-d.md": issueMD("04", "cancelled", "", "D"),
+	}
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "follow-ups", loop, followUps)
+		writeEpicFiles(t, store, "work", loop, map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+		// "empty" has a follow-ups epic with nothing open; "none" has no such epic.
+		for project, epics := range map[string]map[string]map[string]string{
+			"other": {"follow-ups": {"01-a.md": issueMD("01", "open", "", "A")}},
+			"empty": {"follow-ups": {"01-a.md": issueMD("01", "done", "", "A")}},
+			"none":  {"work": {"01-a.md": issueMD("01", "open", "", "A")}},
+		} {
+			for epic, issues := range epics {
+				writeProjectEpic(t, store, project, epic, loop, issues)
+			}
+		}
+	})
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	got := map[string]int{}
+	for _, f := range getEpicList(t, code, body).FollowUps {
+		got[f.Project] = f.Open
+	}
+	if want := map[string]int{"proj": 2, "other": 1}; !maps.Equal(got, want) {
+		t.Errorf("follow_ups = %v, want %v: %s", got, want, body)
+	}
+}
+
+func writeProjectEpic(t *testing.T, store, project, epic, ticketMD string, issues map[string]string) {
+	t.Helper()
+	dir := filepath.Join(store, project, epic)
+	if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		filepath.Join(store, project, "project.json"): `{"name":"` + project + `"}`,
+		filepath.Join(dir, "ticket.md"):               ticketMD,
+	}
+	for name, content := range issues {
+		files[filepath.Join(dir, "issues", name)] = content
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

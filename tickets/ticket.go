@@ -98,6 +98,10 @@ type Ticket struct {
 	// tripped a throttle for this ticket, oldest first.
 	Mutes []schema.MuteRecord
 
+	// ClaimedAt and DoneAt mirror schema.Ticket's fields of the same names.
+	ClaimedAt time.Time
+	DoneAt    time.Time
+
 	// Base and ResolvedBase mirror schema.Ticket's fields of the same names.
 	Base         string
 	ResolvedBase string

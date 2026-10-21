@@ -286,12 +286,33 @@ export interface EpicListRow {
    * Queueable is set when the Queue action applies; see epicQueueable.
    */
   queueable: boolean;
+  /**
+   * BlockedByEpics are the addresses of the epics named in blocked_by that
+   * have not merged yet.
+   */
+  blocked_by_epics: string[];
+  /**
+   * LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
+   */
+  last_activity_at?: string;
+}
+/**
+ * FollowUpCount is the number of draft and open tickets in one project's
+ * follow-ups epic.
+ */
+export interface FollowUpCount {
+  project: string;
+  open: number /* int */;
 }
 /**
  * EpicList is the /v1/epics payload.
  */
 export interface EpicList {
   epics: EpicListRow[];
+  /**
+   * FollowUps lists only the projects with at least one open follow-up.
+   */
+  follow_ups: FollowUpCount[];
 }
 
 //////////

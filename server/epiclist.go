@@ -49,11 +49,25 @@ type EpicListRow struct {
 	Queued bool `json:"queued"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
 	Queueable bool `json:"queueable"`
+	// BlockedByEpics are the addresses of the epics named in blocked_by that
+	// have not merged yet.
+	BlockedByEpics []string `json:"blocked_by_epics"`
+	// LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
+	LastActivityAt time.Time `json:"last_activity_at,omitzero"`
+}
+
+// FollowUpCount is the number of draft and open tickets in one project's
+// follow-ups epic.
+type FollowUpCount struct {
+	Project string `json:"project"`
+	Open    int    `json:"open"`
 }
 
 // EpicList is the /v1/epics payload.
 type EpicList struct {
 	Epics []EpicListRow `json:"epics"`
+	// FollowUps lists only the projects with at least one open follow-up.
+	FollowUps []FollowUpCount `json:"follow_ups"`
 }
 
 // epicListed reports whether the Epics page can show e: one-offs, follow-ups
@@ -113,20 +127,73 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	list := EpicList{Epics: []EpicListRow{}}
+	list := EpicList{Epics: []EpicListRow{}, FollowUps: []FollowUpCount{}}
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		epics, err := s.projectEpics(project)
 		if err != nil {
 			continue
 		}
+		merged := map[string]bool{}
+		for _, e := range epics {
+			merged[e.Name] = !e.MergedAt.IsZero()
+			if e.Name == followUpsEpicName {
+				if open := openFollowUps(e); open > 0 {
+					list.FollowUps = append(list.FollowUps, FollowUpCount{Project: project, Open: open})
+				}
+			}
+		}
 		for _, e := range epics {
 			if epicListed(e) {
-				list.Epics = append(list.Epics, s.epicListRow(project, e))
+				row := s.epicListRow(project, e)
+				row.BlockedByEpics = unmergedBlockers(project, e, merged)
+				list.Epics = append(list.Epics, row)
 			}
 		}
 	}
 	writeJSON(w, list)
+}
+
+// openFollowUps counts the draft and open tickets of a follow-ups epic.
+func openFollowUps(e tickets.Epic) int {
+	return len(slices.DeleteFunc(slices.Clone(e.Tickets), func(t tickets.Ticket) bool {
+		return t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen)
+	}))
+}
+
+// unmergedBlockers returns the addresses of the epics in e's blocked_by that
+// exist in the project and have not merged. Ticket refs are not epic blockers.
+func unmergedBlockers(project string, e tickets.Epic, merged map[string]bool) []string {
+	out := []string{}
+	for _, ref := range e.BlockedBy {
+		if strings.Contains(ref, "/") {
+			continue
+		}
+		name := ref
+		if p, n, ok := tickets.ParseEpicAddress(ref); ok {
+			if p != project {
+				continue
+			}
+			name = n
+		}
+		if isMerged, exists := merged[name]; exists && !isMerged {
+			out = append(out, rootRef{Project: project, Epic: name}.String())
+		}
+	}
+	return out
+}
+
+// lastActivity is the newest claimed_at or done_at across e's tickets.
+func lastActivity(e tickets.Epic) time.Time {
+	var newest time.Time
+	for _, t := range e.Tickets {
+		for _, at := range []time.Time{t.ClaimedAt, t.DoneAt} {
+			if at.After(newest) {
+				newest = at
+			}
+		}
+	}
+	return newest
 }
 
 func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
@@ -137,6 +204,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 		Done: e.DoneCount(), Total: e.TotalCount(),
 		CompletedAt: e.CompletedAt, MergedAt: e.MergedAt, CreatedAt: e.CreatedAt,
 		Queued: queued, Queueable: epicQueueable(e, queued),
+		LastActivityAt: lastActivity(e),
 	}
 	if e.IsMap {
 		row.Kind = EpicKindMap
