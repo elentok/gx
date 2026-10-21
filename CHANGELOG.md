@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.35.6 - 2026-10-21
+
+- Added the server version to the Queue header in the web UI.
+- Changed the web sign-in link parameter from `t` to `gx_token`. Existing sign-in links that use `?t=` need to be regenerated.
+
 ## v0.35.5 - 2026-10-21
 
 - Added web UI support for unparking tickets.
