@@ -55,8 +55,8 @@ export function statSentence(d: EpicDetail): string {
     d.state && epicBadge(d.state),
     done,
     d.wall_clock !== undefined && `took ${formatDuration(d.wall_clock)}`,
-    d.cost_total !== undefined && formatCost(d.cost_total),
-    d.agent_time !== undefined && `${formatDuration(d.agent_time)} of agent time`,
+    formatCost(d.cost_total),
+    `${formatDuration(d.agent_time)} of agent time`,
   ]
     .filter(Boolean)
     .join(" · ");

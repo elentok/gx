@@ -189,6 +189,21 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_LoopEpicWithoutCostKeepsZeroTotals(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	})
+	code, _, body := getEpicDetail(t, h, base, "proj:work")
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	for _, want := range []string{`"agent_time":0`, `"cost_total":0`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %s: %s", want, body)
+		}
+	}
+}
+
 func TestEpicDetail_UnknownAddress(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})

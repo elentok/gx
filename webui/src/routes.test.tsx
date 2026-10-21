@@ -120,6 +120,8 @@ const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   summary: "",
   done: 0,
   total: 0,
+  agent_time: 0,
+  cost_total: 0,
   rows: [],
   ...over,
 });
@@ -212,6 +214,11 @@ test("a loop epic shows the stat sentence with no token counts", async () => {
   );
   expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $1.75 · 2m of agent time")).toBeTruthy();
   expect(screen.queryByText(/token/i)).toBeNull();
+});
+
+test("a loop epic with zero cost and agent time still shows both in the stat sentence", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "running", total: 6, done: 2, wall_clock: 4000, cost_total: 0, agent_time: 0, rows: loopRows }));
+  expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $0.00 · 0s of agent time")).toBeTruthy();
 });
 
 test("the done fold counts done tickets and adds cancelled only when above zero", async () => {
@@ -335,12 +342,12 @@ test("a running row's elapsed time and a running epic's wall clock tick", async 
     const rows = [rowOf("01", "claimed", { claimed_at: "2026-01-01T09:58:00Z" })];
     renderAt("/e/gx:e", okFor, conn, epicFetch({ state: "running", total: 1, wall_clock: 600, rows }));
     expect(await screen.findByText("claimed · 2m")).toBeTruthy();
-    expect(screen.getByText("Running · 0 of 1 done · took 10m")).toBeTruthy();
+    expect(screen.getByText("Running · 0 of 1 done · took 10m · $0.00 · 0s of agent time")).toBeTruthy();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(TICK_MS * 2);
     });
     expect(screen.getByText("claimed · 4m")).toBeTruthy();
-    expect(screen.getByText("Running · 0 of 1 done · took 12m")).toBeTruthy();
+    expect(screen.getByText("Running · 0 of 1 done · took 12m · $0.00 · 0s of agent time")).toBeTruthy();
     conn.stop();
   } finally {
     vi.useRealTimers();

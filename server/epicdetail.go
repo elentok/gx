@@ -48,10 +48,11 @@ type EpicDetail struct {
 	Done  int `json:"done"`
 	Total int `json:"total"`
 	// WallClock runs from the epic's started_at to completed_at, or to now while
-	// it runs. AgentTime and CostTotal add up landed tickets only.
+	// it runs; it is absent before the first claim. AgentTime and CostTotal add up
+	// landed tickets only and are always sent, so a zero total still shows.
 	WallClock int             `json:"wall_clock,omitempty"`
-	AgentTime int             `json:"agent_time,omitempty"`
-	CostTotal float64         `json:"cost_total,omitempty"`
+	AgentTime int             `json:"agent_time"`
+	CostTotal float64         `json:"cost_total"`
 	Rows      []EpicDetailRow `json:"rows"`
 }
 

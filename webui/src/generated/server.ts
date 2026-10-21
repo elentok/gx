@@ -228,11 +228,12 @@ export interface EpicDetail {
   total: number /* int */;
   /**
    * WallClock runs from the epic's started_at to completed_at, or to now while
-   * it runs. AgentTime and CostTotal add up landed tickets only.
+   * it runs; it is absent before the first claim. AgentTime and CostTotal add up
+   * landed tickets only and are always sent, so a zero total still shows.
    */
   wall_clock?: number /* int */;
-  agent_time?: number /* int */;
-  cost_total?: number /* float64 */;
+  agent_time: number /* int */;
+  cost_total: number /* float64 */;
   rows: EpicDetailRow[];
 }
 
