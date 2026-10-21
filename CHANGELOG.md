@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.35.7 - 2026-10-21
+
+- Added an epic details page to the web UI, at `#/e/<project:epic>`.
+  - It shows the epic summary, a progress bar split by ticket status, and one line with the state, done count, wall-clock time, cost and agent time. Cost and agent time count landed tickets only.
+  - Done tickets sit in a closed `✓ N done` list, nested under their parent. Live tickets are tinted blocks that nest forks, show what blocks them, and show the question and an `Answer →` link when a ticket needs an answer.
+  - The page refetches when the epic or one of its tickets changes, and running tickets count up their elapsed time.
+  - The epic name on an active Queue card and on a Recently finished row links to the page.
+  - New route `GET /v1/epics/detail` and a `gx server epics detail` command return the same data.
+- Added a `finished` epic state for epics that are merged. Completed but unmerged epics stay `awaiting-merge`.
+- Changed `gx-to-tickets` to write a short `## Summary` on every new `-impl` epic. The epic page shows it.
+- Fixed loop launches that failed with `invalid_agent_argument`. herdr rejects launch arguments with a newline, so the GX system prompt is now one line, and Claude loop launches read it from a file in the user cache dir.
+- Fixed `TestAgentLog_HerdrClaude` hanging on macOS. It now keeps its fake transcript path under a temp dir, not the filesystem root.
+
 ## v0.35.6 - 2026-10-21
 
 - Added the server version to the Queue header in the web UI.
