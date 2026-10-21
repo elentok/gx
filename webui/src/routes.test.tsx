@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test } from "vitest";
 import { ConnectionContext, createConnection, type Connection, type ConnectionState } from "./connection";
 import { appRoutes } from "./routes";
+import type { EpicDetail, FetchEpicDetail } from "./epic/detail";
 import type { Snapshot } from "./snapshot";
 import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail";
 import { renderThemed } from "./ui/render";
@@ -41,8 +42,13 @@ function fakeConnection(connected: boolean) {
   } as unknown as Connection;
 }
 
-function renderAt(path: string, fetchDetail: FetchDetail, conn: Connection = fakeConnection(true)) {
-  const router = createMemoryRouter(appRoutes(fetchDetail), { initialEntries: [path] });
+function renderAt(
+  path: string,
+  fetchDetail: FetchDetail,
+  conn: Connection = fakeConnection(true),
+  fetchEpic?: FetchEpicDetail,
+) {
+  const router = createMemoryRouter(appRoutes(fetchDetail, fetchEpic), { initialEntries: [path] });
   return renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
@@ -106,6 +112,58 @@ test("a failed refetch keeps the last page, and the Offline strip shows", async 
 test("the back link points at the Queue", async () => {
   renderAt("/t/gx:e/01", okFor);
   expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/");
+});
+
+const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
+  address: "gx:e",
+  kind: "loop",
+  summary: "",
+  done: 0,
+  total: 0,
+  rows: [],
+  ...over,
+});
+
+const epicFetch = (over?: Partial<EpicDetail>): FetchEpicDetail => async () => ({ kind: "ok", detail: epicOf(over) });
+
+test("an epic route shows a skeleton, then the name and summary", async () => {
+  let resolve!: (r: Awaited<ReturnType<FetchEpicDetail>>) => void;
+  const requested: string[] = [];
+  renderAt("/e/gx:e", okFor, undefined, (address) => {
+    requested.push(address);
+    return new Promise((r) => (resolve = r));
+  });
+  expect(await screen.findByRole("status", { name: "Loading epic" })).toBeTruthy();
+  expect(requested).toEqual(["gx:e"]);
+  await act(async () => resolve({ kind: "ok", detail: epicOf({ summary: "Ship the thing", total: 2 }) }));
+  expect(await screen.findByRole("heading", { name: "e" })).toBeTruthy();
+  expect(screen.getByText("Ship the thing")).toBeTruthy();
+  expect(screen.queryByText("No tickets yet")).toBeNull();
+});
+
+test("an unknown epic shows Epic not found", async () => {
+  renderAt("/e/gx:nope", okFor, undefined, async () => ({ kind: "not-found" }));
+  expect(await screen.findByText("Epic not found")).toBeTruthy();
+});
+
+test("an empty epic shows No tickets yet, and an empty summary renders nothing", async () => {
+  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch());
+  expect(await screen.findByText("No tickets yet")).toBeTruthy();
+  expect(container.querySelectorAll("p")).toHaveLength(1);
+});
+
+test("the Queue, ticket and epic pages all render inside the shared container", async () => {
+  const q = renderAt("/", okFor);
+  await screen.findByRole("heading", { name: "Queue" });
+  expect(q.container.querySelector("[data-page-container]")).toBeTruthy();
+  cleanup();
+  const t = renderAt("/t/gx:e/01", okFor);
+  await screen.findByRole("heading", { name: "Title of gx:e/01" });
+  expect(t.container.querySelector("[data-page-container]")).toBeTruthy();
+  cleanup();
+  const e = renderAt("/e/gx:e", okFor, undefined, epicFetch());
+  await screen.findByText("No tickets yet");
+  expect(e.container.querySelector("[data-page-container]")).toBeTruthy();
 });
 
 function eventFrame(seq: number, address: string) {

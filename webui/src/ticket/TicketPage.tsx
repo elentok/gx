@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { EmptyState } from "../ui/empty-state/EmptyState";
+import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import type { Sent } from "./answer";
 import { AnswerForm } from "./AnswerForm";
@@ -22,7 +23,7 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
   return (
     <Box>
       {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-      <Box p="4" maxW="1000px" mx="auto">
+      <PageContainer>
         <Link to="/">← Queue</Link>
         {notFound ? (
           <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
@@ -59,7 +60,7 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
             <Skeleton height="5" width="30%" />
           </Box>
         )}
-      </Box>
+      </PageContainer>
     </Box>
   );
 }

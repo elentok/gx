@@ -15,16 +15,24 @@ export const fetchDetail: FetchDetail = async (address) => {
   return { kind: "ok", detail: await res.json() };
 };
 
-export interface DetailState {
-  detail: TicketDetail | null;
+export interface DetailState<T = TicketDetail> {
+  detail: T | null;
   notFound: boolean;
   /** Re-reads the detail; call it after each POST. */
   refetch: () => void;
 }
 
-// A failed fetch keeps the last detail on screen: the Offline strip says why it may be stale.
 export function useTicketDetail(address: string, conn: Connection, fetcher: FetchDetail = fetchDetail): DetailState {
-  const [state, setState] = useState<{ address: string; detail: TicketDetail | null; notFound: boolean }>({
+  return useDetail(address, conn, fetcher);
+}
+
+// A failed fetch keeps the last detail on screen: the Offline strip says why it may be stale.
+export function useDetail<T>(
+  address: string,
+  conn: Connection,
+  fetcher: (address: string) => Promise<{ kind: "ok"; detail: T } | { kind: "not-found" }>,
+): DetailState<T> {
+  const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>({
     address,
     detail: null,
     notFound: false,

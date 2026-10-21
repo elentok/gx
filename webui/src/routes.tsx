@@ -1,5 +1,7 @@
 import { createHashRouter, useParams, type RouteObject } from "react-router";
 import { useConnectionContext, useConnectionState } from "./connection";
+import type { FetchEpicDetail } from "./epic/detail";
+import { EpicPage } from "./epic/EpicPage";
 import { QueueScreen } from "./queue/QueueScreen";
 import type { FetchDetail } from "./ticket/detail";
 import { TicketPage } from "./ticket/TicketPage";
@@ -14,10 +16,15 @@ function TicketRoute({ fetchDetail }: { fetchDetail?: FetchDetail }) {
   return <TicketPage address={address} fetchDetail={fetchDetail} />;
 }
 
-export function appRoutes(fetchDetail?: FetchDetail): RouteObject[] {
+function EpicRoute({ fetchDetail }: { fetchDetail?: FetchEpicDetail }) {
+  return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} />;
+}
+
+export function appRoutes(fetchDetail?: FetchDetail, fetchEpicDetail?: FetchEpicDetail): RouteObject[] {
   return [
     { path: "/", element: <QueueRoute /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchDetail} /> },
+    { path: "/e/*", element: <EpicRoute fetchDetail={fetchEpicDetail} /> },
     // An unknown hash shows the Queue.
     { path: "*", element: <QueueRoute /> },
   ];

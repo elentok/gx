@@ -3,6 +3,7 @@ import type { ConnectionState } from "../connection";
 import { Chip } from "../ui/chip/Chip";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
+import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import { snapshotView } from "../view";
 import { EpicCard } from "./EpicCard";
@@ -18,7 +19,7 @@ export function QueueScreen({ state }: { state: ConnectionState }) {
   return (
     <Box>
       {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-      <Box p="4" maxW="1000px" mx="auto">
+      <PageContainer>
         <Box display="flex" alignItems="center" justifyContent="space-between" mb="4">
           <Heading as="h1" fontFamily="condensed" textTransform="uppercase" size="lg">
             Queue
@@ -53,7 +54,7 @@ export function QueueScreen({ state }: { state: ConnectionState }) {
             ))}
           </Box>
         )}
-      </Box>
+      </PageContainer>
     </Box>
   );
 }
