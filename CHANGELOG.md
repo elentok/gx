@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.35.5 - 2026-10-21
+
+- Added web UI support for unparking tickets.
+  - New web Unpark forms and answer results let you answer a parked ticket and reopen it from the browser.
+  - New web permission card for permission requests.
+  - The web unpark answer-and-reopen is atomic. The answer and the reopen run under one ticket lock, so a failed unpark leaves no answered log on a parked ticket. The state token is checked again under the lock, and a log read error is now an error, not a stale refusal.
+- Added a nudge for idle agents. An agent that has neither asked a question nor reported finished gets one fixed nudge after `execution-queue.stalled-nudge-delay` (default 2m), logged as `stall-nudged`.
+- Removed the TUI `m` answer flow. Answering now happens in the web UI.
+
 ## v0.35.4 - 2026-10-20
 
 - Added one-offs, a lightweight inbox for tickets that do not belong to a project epic.
