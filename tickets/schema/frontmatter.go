@@ -33,7 +33,7 @@ type ticketYAML struct {
 	Agent                 string       `yaml:"agent,omitempty"`
 	SessionIDs            []string     `yaml:"session_ids,omitempty"`
 	IterationStatus       string       `yaml:"iteration_status,omitempty"`
-	FinishedAt            time.Time    `yaml:"finished_at,omitempty"`
+	IterationFinishedAt   time.Time    `yaml:"iteration_finished_at,omitempty"`
 	CompletedAt           time.Time    `yaml:"completed_at,omitempty"`
 	ParkKind              string       `yaml:"park_kind,omitempty"`
 	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
@@ -52,7 +52,16 @@ type ticketYAML struct {
 	// populated list. omitempty keeps a zero node out of anything marshaled
 	// back.
 	Children yaml.Node `yaml:"children,omitempty"`
+
+	// LegacyFinishedAt is the pre-rename key for IterationFinishedAt. Reads
+	// fall back to it so an unmigrated ticket keeps working; writes never
+	// emit it (zero is omitted), so `gx tickets migrate` is just a re-marshal.
+	LegacyFinishedAt time.Time `yaml:"finished_at,omitempty"`
 }
+
+// hasLegacyFinishedAt reports whether the frontmatter still used the
+// pre-rename `finished_at` key.
+func (w ticketYAML) hasLegacyFinishedAt() bool { return !w.LegacyFinishedAt.IsZero() }
 
 // hasChildren reports whether the frontmatter carried a `children:` key at
 // all. An absent key leaves the node at its zero value, the one kind YAML
@@ -78,7 +87,7 @@ func (w ticketYAML) toTicket() Ticket {
 		Agent:                 w.Agent,
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       IterationStatus(w.IterationStatus),
-		FinishedAt:            w.FinishedAt,
+		IterationFinishedAt:   w.IterationFinishedAt,
 		CompletedAt:           w.CompletedAt,
 		ParkKind:              ParkKind(w.ParkKind),
 		Mutes:                 copyMutes(w.Mutes),
@@ -86,6 +95,9 @@ func (w ticketYAML) toTicket() Ticket {
 		ResolvedBase:          w.ResolvedBase,
 		Category:              Category(w.Category),
 		ExportedAt:            w.ExportedAt,
+	}
+	if t.IterationFinishedAt.IsZero() {
+		t.IterationFinishedAt = w.LegacyFinishedAt
 	}
 	if w.Parent != "" {
 		id := TicketID(w.Parent)
@@ -112,7 +124,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Agent:                 t.Agent,
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
-		FinishedAt:            t.FinishedAt,
+		IterationFinishedAt:   t.IterationFinishedAt,
 		CompletedAt:           t.CompletedAt,
 		ParkKind:              string(t.ParkKind),
 		Mutes:                 copyMutes(t.Mutes),

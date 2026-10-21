@@ -21,7 +21,7 @@ func Reset(path string, now time.Time, note string) error {
 	return schema.UpdateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusOpen
 		t.IterationStatus = ""
-		t.FinishedAt = time.Time{}
+		t.IterationFinishedAt = time.Time{}
 		t.ParkKind = ""
 		t.SessionIDs = nil
 		t.ActualContextWindow = 0

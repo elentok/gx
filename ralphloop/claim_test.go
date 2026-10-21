@@ -108,7 +108,7 @@ func TestClaim_RacingCLIWriteKeepsClaimed(t *testing.T) {
 
 func TestClaim_ClearsIterationStatus(t *testing.T) {
 	t.Parallel()
-	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\nfinished_at: 2026-01-02T03:04:05Z\ntype: implement\n---\n# Ticket\n\nBody.\n")
+	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: finished\niteration_finished_at: 2026-01-02T03:04:05Z\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
 		t.Fatalf("Claim: %v", err)
 	}
@@ -117,8 +117,8 @@ func TestClaim_ClearsIterationStatus(t *testing.T) {
 		t.Errorf("IterationStatus = %q, want cleared", ticket.IterationStatus)
 	}
 	// A claimed ticket's old finish must never read as a late finish.
-	if !ticket.FinishedAt.IsZero() || strings.Contains(mustRead(t, path), "finished_at") {
-		t.Errorf("FinishedAt = %v, want cleared", ticket.FinishedAt)
+	if !ticket.IterationFinishedAt.IsZero() || strings.Contains(mustRead(t, path), "finished_at") {
+		t.Errorf("IterationFinishedAt = %v, want cleared", ticket.IterationFinishedAt)
 	}
 	if ticket.Status != schema.StatusClaimed {
 		t.Errorf("Status = %q, want %q", ticket.Status, schema.StatusClaimed)

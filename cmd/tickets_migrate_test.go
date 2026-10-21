@@ -39,6 +39,7 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		// The no-silent-stalls rename's own legacy park spellings.
 		"07-legacy-needs-info.md":      "---\nid: \"07\"\nstatus: needs-info\ntype: implement\n---\nBody.\n",
 		"08-legacy-needs-attention.md": "---\nid: \"08\"\nstatus: needs-attention\ntype: implement\n---\nBody.\n",
+		"09-legacy-finished-at.md":     "---\nid: \"09\"\nstatus: open\ntype: implement\nfinished_at: 2026-01-02T03:04:05Z\n---\nBody.\n",
 	})
 	alreadyNewPath := filepath.Join(issuesDir, "04-already-new.md")
 	alreadyNewBefore, err := os.ReadFile(alreadyNewPath)
@@ -62,7 +63,8 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		"06-scalar-children.md: children removed",
 		"07-legacy-needs-info.md: status: needs-info -> needs-answer",
 		"08-legacy-needs-attention.md: status: needs-attention -> needs-repair",
-		"7 file(s) changed",
+		"09-legacy-finished-at.md: finished_at renamed to iteration_finished_at",
+		"8 file(s) changed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout = %q, want it to contain %q", out, want)
@@ -86,6 +88,14 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	}
 	if strings.Contains(string(rootRaw), "children:") {
 		t.Errorf("01-root.md = %q, want children field removed", string(rootRaw))
+	}
+
+	finishedRaw, err := os.ReadFile(filepath.Join(issuesDir, "09-legacy-finished-at.md"))
+	if err != nil {
+		t.Fatalf("reading migrated finished-at ticket: %v", err)
+	}
+	if !strings.Contains(string(finishedRaw), "\niteration_finished_at: 2026-01-02T03:04:05Z") || strings.Contains(string(finishedRaw), "\nfinished_at:") {
+		t.Errorf("09-legacy-finished-at.md = %q, want finished_at renamed to iteration_finished_at", string(finishedRaw))
 	}
 
 	blockedRaw, err := os.ReadFile(filepath.Join(issuesDir, "05-self-blocked.md"))

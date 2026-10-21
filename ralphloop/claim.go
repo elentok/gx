@@ -36,7 +36,7 @@ func ClaimWithBase(path, resolvedBase string) error {
 			t.ResolvedBase = resolvedBase
 		}
 		t.IterationStatus = ""
-		t.FinishedAt = time.Time{}
+		t.IterationFinishedAt = time.Time{}
 		t.ParkKind = ""
 		*body = schema.DemoteSection(*body, "## Needs Repair", time.Now())
 	})

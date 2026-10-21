@@ -55,6 +55,8 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   elapsed_time — stamped by ralphloop at land time
   mutes — notification throttles tripped for this ticket (event type + timestamp),
     machine-written only
+  iteration_finished_at (RFC3339 timestamp) — stamped when an agent reports
+    --iteration-status finished, cleared otherwise
   exported_at (RFC3339 timestamp) — when gx exported the ticket
 
 Other frontmatter fields:
@@ -363,9 +365,9 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 			changed = append(changed, fmt.Sprintf("%s=%s", f.field, value))
 		}
 		if c.Flags().Changed("iteration-status") {
-			t.FinishedAt = time.Time{}
+			t.IterationFinishedAt = time.Time{}
 			if t.IterationStatus == schema.IterationStatusFinished {
-				t.FinishedAt = time.Now().UTC()
+				t.IterationFinishedAt = time.Now().UTC()
 			}
 		}
 	})

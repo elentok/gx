@@ -116,7 +116,7 @@ func (p zeroCommitParked) report(t *testing.T, mutate func(*schema.Ticket)) {
 func (p zeroCommitParked) finishedLate(commitless bool) func(*schema.Ticket) {
 	return func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
-		tk.FinishedAt = p.park.Time.Add(time.Second)
+		tk.IterationFinishedAt = p.park.Time.Add(time.Second)
 		tk.Commitless = commitless
 	}
 }
@@ -316,13 +316,16 @@ func TestLateFinish_FailedConditionStaysParked(t *testing.T) {
 			return func(tk *schema.Ticket) { p.finishedLate(true)(tk); tk.ParkKind = schema.ParkKindSelfReported }
 		}},
 		{"finished before park", true, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.FinishedAt = p.park.Time.Add(-time.Second) }
+			return func(tk *schema.Ticket) {
+				p.finishedLate(false)(tk)
+				tk.IterationFinishedAt = p.park.Time.Add(-time.Second)
+			}
 		}},
 		{"no finished report", false, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { tk.FinishedAt = p.park.Time.Add(time.Second); tk.Commitless = true }
+			return func(tk *schema.Ticket) { tk.IterationFinishedAt = p.park.Time.Add(time.Second); tk.Commitless = true }
 		}},
 		{"late commit without finished", true, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { tk.FinishedAt = p.park.Time.Add(time.Second) }
+			return func(tk *schema.Ticket) { tk.IterationFinishedAt = p.park.Time.Add(time.Second) }
 		}},
 		{"zero commits without commitless", false, func(p zeroCommitParked) func(*schema.Ticket) {
 			return p.finishedLate(false)

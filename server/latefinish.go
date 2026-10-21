@@ -123,10 +123,10 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 		return lateFinish{}, false
 	}
 	park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
-	if !ok || park.Type != string(t.Status) || park.Kind != string(t.ParkKind) || !t.FinishedAt.After(park.Time) {
+	if !ok || park.Type != string(t.Status) || park.Kind != string(t.ParkKind) || !t.IterationFinishedAt.After(park.Time) {
 		return lateFinish{}, false
 	}
-	return lateFinish{dir: dir, addr: addr, path: path, park: park, finishedAt: t.FinishedAt, commitless: t.IsCommitless()}, true
+	return lateFinish{dir: dir, addr: addr, path: path, park: park, finishedAt: t.IterationFinishedAt, commitless: t.IsCommitless()}, true
 }
 
 // adoptLateFinish lands a late finish with commits, or closes a commitless one

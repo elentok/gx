@@ -225,6 +225,10 @@ func migrateTicket(old schema.RawTicket) (schema.Ticket, []string) {
 		notes = append(notes, "children removed")
 	}
 
+	if old.HasLegacyFinishedAt {
+		notes = append(notes, "finished_at renamed to iteration_finished_at")
+	}
+
 	if out.Parent != nil && len(out.BlockedBy) > 0 {
 		var kept []schema.TicketID
 		for _, b := range out.BlockedBy {

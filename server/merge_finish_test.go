@@ -113,7 +113,7 @@ func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 	})
 	if err := schema.UpdateTicket(f.ticketFile(t, "01"), func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
-		tk.FinishedAt = park.Time.Add(time.Second)
+		tk.IterationFinishedAt = park.Time.Add(time.Second)
 	}); err != nil {
 		t.Fatal(err)
 	}

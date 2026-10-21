@@ -58,6 +58,6 @@ func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
 func ClearIterationStatus(path string) error {
 	return UpdateTicket(path, func(t *Ticket) {
 		t.IterationStatus = ""
-		t.FinishedAt = time.Time{}
+		t.IterationFinishedAt = time.Time{}
 	})
 }

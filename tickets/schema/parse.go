@@ -50,6 +50,8 @@ type RawTicket struct {
 	// HasChildren reports the retired `children` key's presence, whatever
 	// value shape it had.
 	HasChildren bool
+	// HasLegacyFinishedAt reports the pre-rename `finished_at` key's presence.
+	HasLegacyFinishedAt bool
 }
 
 // ParseTicketRaw is ParseTicketFromRaw without the trailing Validate call and
@@ -68,7 +70,7 @@ func ParseTicketRaw(raw, path string) (RawTicket, error) {
 		return RawTicket{}, fmt.Errorf("parsing frontmatter in %s: %w", path, err)
 	}
 
-	return RawTicket{Ticket: wire.toTicket(), HasChildren: wire.hasChildren()}, nil
+	return RawTicket{Ticket: wire.toTicket(), HasChildren: wire.hasChildren(), HasLegacyFinishedAt: wire.hasLegacyFinishedAt()}, nil
 }
 
 // ParseBody returns raw's markdown body: the content after the frontmatter

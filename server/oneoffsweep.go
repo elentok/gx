@@ -120,7 +120,7 @@ func archiveOneOff(projectDir string, archived tickets.Epic, addr tickets.Addres
 			return tickets.ResumeMove(projectDir, addr, to, t.Path, c.Path)
 		}
 	}
-	completed := tk.FinishedAt
+	completed := tk.IterationFinishedAt
 	if completed.IsZero() {
 		completed = now.UTC()
 	}
