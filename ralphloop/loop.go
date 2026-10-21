@@ -217,7 +217,13 @@ func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []st
 	args := []string{
 		"--permission-mode", "auto", "--settings", claudeGuardSettings,
 		"--disallowedTools", agentrunner.LoopDisallowedTools,
-		"--append-system-prompt", harness.GXSystemPrompt,
+	}
+	// herdr types the launch command into a shell, so keep it short: the
+	// prompt goes in a file when one can be written.
+	if f := harness.GXSystemPromptFile(); f != "" {
+		args = append(args, "--append-system-prompt-file", f)
+	} else {
+		args = append(args, "--append-system-prompt", harness.GXSystemPrompt)
 	}
 	if model != "" {
 		args = append(args, "--model", model)

@@ -1,6 +1,10 @@
 package harness
 
-import "slices"
+import (
+	"os"
+	"path/filepath"
+	"slices"
+)
 
 // GXSystemPrompt is the text gx appends to the system prompt of every Claude
 // loop (ticket) agent, on launch and on resume. skills/gx-local-tracker.md
@@ -17,4 +21,35 @@ func WithGXSystemPrompt(args []string) []string {
 		return args
 	}
 	return append(args, "--append-system-prompt", GXSystemPrompt)
+}
+
+// GXSystemPromptFile writes GXSystemPrompt to a file in the user cache dir and
+// returns its path, for claude's --append-system-prompt-file. A herdr launch
+// types the whole command line into a shell, so a file keeps that line short.
+// It returns "" when the file cannot be written; callers then pass the text
+// inline.
+func GXSystemPromptFile() string {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	dir = filepath.Join(dir, "gx")
+	path := filepath.Join(dir, "system-prompt.md")
+	if cur, err := os.ReadFile(path); err == nil && string(cur) == GXSystemPrompt {
+		return path
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ""
+	}
+	tmp, err := os.CreateTemp(dir, "system-prompt-*.tmp")
+	if err != nil {
+		return ""
+	}
+	_, werr := tmp.WriteString(GXSystemPrompt)
+	cerr := tmp.Close()
+	if werr != nil || cerr != nil || os.Rename(tmp.Name(), path) != nil {
+		os.Remove(tmp.Name())
+		return ""
+	}
+	return path
 }

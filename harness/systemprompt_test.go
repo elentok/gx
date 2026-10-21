@@ -1,6 +1,7 @@
 package harness_test
 
 import (
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -37,5 +38,24 @@ func TestClaudeLaunchAndResume_OmitGXSystemPrompt(t *testing.T) {
 func TestGXSystemPrompt_IsOneLine(t *testing.T) {
 	if strings.ContainsAny(harness.GXSystemPrompt, "\r\n") {
 		t.Errorf("GXSystemPrompt contains a newline: %q", harness.GXSystemPrompt)
+	}
+}
+
+func TestGXSystemPromptFile_HoldsThePrompt(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	path := harness.GXSystemPromptFile()
+	if path == "" {
+		t.Fatal("no file written")
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != harness.GXSystemPrompt {
+		t.Errorf("file = %q, want the prompt", got)
+	}
+	if again := harness.GXSystemPromptFile(); again != path {
+		t.Errorf("second call = %q, want %q", again, path)
 	}
 }
