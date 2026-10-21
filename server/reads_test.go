@@ -237,6 +237,18 @@ func TestSnapshot_CarriesMutes(t *testing.T) {
 	}
 }
 
+func TestSnapshot_CarriesTheServerBuild(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir())
+
+	snap, err := h.Client.Snapshot(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.Build != "test-build" {
+		t.Errorf("build = %q, want the server's build", snap.Build)
+	}
+}
+
 func TestSnapshot_CarriesTheEpicsMergedAt(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

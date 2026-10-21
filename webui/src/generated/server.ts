@@ -326,6 +326,11 @@ export interface TicketInfo {
 export interface Snapshot {
   seq: number /* uint64 */;
   /**
+   * Build is the server's own version, filled in by the handler. Empty from a
+   * server that predates it.
+   */
+  build?: string;
+  /**
    * HerdrUnavailable is set while herdr isn't answering; the server's own
    * view, filled in by the handler rather than the index.
    */

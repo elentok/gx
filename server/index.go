@@ -76,6 +76,9 @@ type TicketInfo struct {
 // index state they were read at.
 type Snapshot struct {
 	Seq uint64 `json:"seq"`
+	// Build is the server's own version, filled in by the handler. Empty from a
+	// server that predates it.
+	Build string `json:"build,omitempty"`
 	// HerdrUnavailable is set while herdr isn't answering; the server's own
 	// view, filled in by the handler rather than the index.
 	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`

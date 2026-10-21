@@ -28,6 +28,14 @@ describe("QueueScreen", () => {
     expect(screen.getByText("Waiting for a slot")).toBeTruthy();
   });
 
+  it("shows the server build in the header, and nothing when the server sends none", () => {
+    const { unmount } = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, build: "v1.2.3" } })} />);
+    expect(screen.getByTestId("server-build").textContent).toBe("v1.2.3");
+    unmount();
+    renderThemed(<QueueScreen state={state({ snapshot: { ...snap, build: undefined } })} />);
+    expect(screen.queryByTestId("server-build")).toBeNull();
+  });
+
   it("shows the deadlock reason clamped to two lines", () => {
     renderThemed(<QueueScreen state={state()} />);
     const reason = screen.getByText("blocked cycle");

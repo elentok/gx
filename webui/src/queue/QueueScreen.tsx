@@ -1,4 +1,4 @@
-import { Box, Heading } from "@chakra-ui/react";
+import { Box, Heading, Text } from "@chakra-ui/react";
 import type { ConnectionState } from "../connection";
 import { Chip } from "../ui/chip/Chip";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -24,6 +24,11 @@ export function QueueScreen({ state }: { state: ConnectionState }) {
             Queue
           </Heading>
           <Box display="flex" alignItems="center" gap="2">
+            {snapshot?.build && (
+              <Text fontSize="xs" color="text.muted" data-testid="server-build">
+                {snapshot.build}
+              </Text>
+            )}
             {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
             <LiveDot tone={connected ? "running" : "muted"} label={connected ? "Live" : "Offline"} />
           </Box>
