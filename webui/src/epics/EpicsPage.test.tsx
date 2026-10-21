@@ -237,7 +237,53 @@ test("a failed refetch keeps the last list", async () => {
   expect(screen.queryByText("Could not load epics")).toBeNull();
 });
 
-const stubQueueAdd = (reply: () => Promise<Response>) => {
+function stateConn() {
+  const subs = new Set<() => void>();
+  let current = state;
+  const c = {
+    getState: () => current,
+    subscribe: (l: () => void) => {
+      subs.add(l);
+      return () => subs.delete(l);
+    },
+    onEvent: () => () => {},
+  } as unknown as Connection;
+  return {
+    conn: c,
+    setConnected: (connected: boolean) => {
+      current = { ...current, connected };
+      subs.forEach((l) => l());
+    },
+  };
+}
+
+test("the list refetches when the connection comes back", async () => {
+  const { conn: c, setConnected } = stateConn();
+  let calls = 0;
+  renderEpics(async () => listOf([row(++calls === 1 ? "old" : "new")]), c);
+  await screen.findByRole("link", { name: "old" });
+  act(() => setConnected(false));
+  expect(calls).toBe(1);
+  act(() => setConnected(true));
+  expect(await screen.findByRole("link", { name: "new" })).toBeTruthy();
+  expect(calls).toBe(2);
+});
+
+test("a failed first fetch is retried when the connection comes back", async () => {
+  const { conn: c, setConnected } = stateConn();
+  let calls = 0;
+  renderEpics(async () => {
+    if (++calls === 1) throw new Error("down");
+    return listOf([row("x")]);
+  }, c);
+  await screen.findByText("Could not load epics");
+  act(() => setConnected(false));
+  act(() => setConnected(true));
+  expect(await screen.findByRole("region", { name: "Ready to queue" })).toBeTruthy();
+  expect(calls).toBe(2);
+});
+
+const stubQueueAdd =(reply: () => Promise<Response>) => {
   const f = vi.fn((_url: string, _init: RequestInit) => reply());
   vi.stubGlobal("fetch", f);
   return f;

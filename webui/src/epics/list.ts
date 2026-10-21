@@ -48,8 +48,16 @@ export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Conne
       clearTimeout(timer);
       timer = setTimeout(retry, REFETCH_DEBOUNCE_MS);
     });
+    // A reconnect takes a new snapshot without notifying event listeners, so watch `connected` itself.
+    let wasConnected = conn.getState().connected;
+    const offState = conn.subscribe(() => {
+      const { connected } = conn.getState();
+      if (connected && !wasConnected) retry();
+      wasConnected = connected;
+    });
     return () => {
       off();
+      offState();
       clearTimeout(timer);
     };
   }, [conn, retry]);
