@@ -4,6 +4,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { QueueButton } from "../epics/QueueButton";
 import { BackLink } from "../nav/BackLink";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
+import { Markdown } from "../markdown/Markdown";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -106,7 +107,7 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
                 <QueueButton address={address} state={detail.state ?? ""} onQueued={refetch} />
               </Box>
             )}
-            {detail.summary && <Text mt="2">{detail.summary}</Text>}
+            {detail.summary && <Markdown mt="2">{detail.summary}</Markdown>}
             {detail.total === 0 ? (
               <Text mt="4" color="text.muted">
                 No tickets yet
