@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Link, Text } from "@chakra-ui/react";
 import type { EpicView } from "../view";
 import { Badge } from "../ui/badge/Badge";
 import { Card } from "../ui/card/Card";
@@ -15,7 +15,9 @@ export function EpicCard({ epic }: { epic: EpicView }) {
         </Text>
       </Box>
       <Text fontFamily="condensed" fontSize="xl" fontWeight="600" mb="2">
-        {epic.name}
+        <Link href={`#/e/${epic.address}`} color="inherit">
+          {epic.name}
+        </Link>
       </Text>
       <Box display="flex" alignItems="center" gap="2" mb="2">
         <Box flex="1">

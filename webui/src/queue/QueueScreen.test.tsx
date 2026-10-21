@@ -85,6 +85,16 @@ describe("QueueScreen", () => {
     expect(screen.queryByText("0/0")).toBeNull();
   });
 
+  it("links the epic name on a card and a finished row to the epic page, not the whole card, and not for one-offs", () => {
+    renderThemed(<QueueScreen state={state()} />);
+    const card = screen.getByText("Active one").closest("[data-tone]")!;
+    expect(screen.getByRole("link", { name: "run" }).getAttribute("href")).toBe("#/e/gx:run");
+    expect(card.parentElement?.tagName).not.toBe("A");
+    expect(screen.getByRole("link", { name: "old" }).getAttribute("href")).toBe("#/e/gx:old");
+    expect(screen.queryByRole("link", { name: "fix-flaky-test" })).toBeNull();
+    expect(screen.getByText("fix-flaky-test")).toBeTruthy();
+  });
+
   it("shows All quiet only after the first snapshot", () => {
     const empty = { ...snap, epics: [], recently_finished: [] };
     const before = renderThemed(<QueueScreen state={state({ snapshot: null, loadedOnce: false })} />);
