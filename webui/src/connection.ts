@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
 import { fetchSnapshot, type Snapshot } from "./snapshot";
+import type { SnapshotCache } from "./snapshotCache";
 
 export const BACKOFF_MIN_MS = 1000;
 export const BACKOFF_MAX_MS = 15000;
@@ -19,6 +20,8 @@ export interface ConnectionState {
 export interface ConnectionDeps {
   fetchSnapshot?: () => Promise<Snapshot>;
   openStream?: (url: string, signal: AbortSignal) => Promise<AsyncIterable<string>>;
+  /** Seeds the first render with the last snapshot and saves each new one. */
+  cache?: SnapshotCache;
 }
 
 // The server's heartbeat is an SSE comment line, which EventSource never surfaces, so
@@ -60,7 +63,8 @@ export function createConnection(deps: ConnectionDeps = {}) {
   const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot;
   const openStream = deps.openStream ?? openEventStream;
 
-  let state: ConnectionState = { snapshot: null, connected: true, loadedOnce: false, tick: 0 };
+  const cached = deps.cache?.load() ?? null;
+  let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, tick: 0 };
   const listeners = new Set<() => void>();
   const eventListeners = new Set<EventListener>();
   let gen = 0;
@@ -76,6 +80,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
 
   function set(patch: Partial<ConnectionState>) {
     state = { ...state, ...patch };
+    if (patch.snapshot) deps.cache?.save(patch.snapshot);
     listeners.forEach((l) => l());
   }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Connection } from "../connection";
 import type { EpicList } from "../generated/server";
+import { readPageCache, writePageCache } from "../pageCache";
 
 export type { EpicList };
 
@@ -22,7 +23,7 @@ export interface EpicListState {
 export const REFETCH_DEBOUNCE_MS = 500;
 
 export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Connection): EpicListState {
-  const [list, setList] = useState<EpicList | null>(null);
+  const [list, setList] = useState<EpicList | null>(() => readPageCache<EpicList>("epics"));
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -31,7 +32,11 @@ export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Conne
     let live = true;
     setFailed(false);
     fetcher().then(
-      (l) => live && setList(l),
+      (l) => {
+        if (!live) return;
+        setList(l);
+        writePageCache("epics", l);
+      },
       () => live && setFailed(true),
     );
     return () => {

@@ -12,3 +12,16 @@ React and Chakra app embedded in the gx binary. `make web-dev` serves it with a 
 4. Add an entry to `src/gallery/registry.tsx` with one case per tone and per state.
    Open it at `/gallery.html` in `make web-dev`. The gallery is not part of the production build.
 5. Write a render test with `renderThemed` from `src/ui/render.tsx`. Cover each tone and each state.
+
+## Adding a page
+
+A page that shows server data must repaint from the last copy after a reload. iOS Safari drops a
+tab that sat in the background, and without a cache the reload shows a blank page or skeleton
+until the fetch lands.
+
+1. Read the first state with `readPageCache(key, id)` from `src/pageCache.ts` and save every fresh
+   result with `writePageCache(key, value, id)`. `id` is the address a detail page shows; it keeps
+   one entry per key, so storage stays small.
+2. For a detail page, call `useDetail` with a `cacheKey`. The list pages use `useEpicList` as the example.
+3. Keep fetching on mount. The cached copy is only the first paint, so the page never trusts it.
+4. `src/test-setup.ts` clears `sessionStorage` after each test.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Connection } from "../connection";
 import type { TicketDetail } from "../generated/server";
+import { readPageCache, writePageCache } from "../pageCache";
 
 export type { TicketDetail };
 
@@ -23,7 +24,7 @@ export interface DetailState<T = TicketDetail> {
 }
 
 export function useTicketDetail(address: string, conn: Connection, fetcher: FetchDetail = fetchDetail): DetailState {
-  return useDetail(address, conn, fetcher);
+  return useDetail(address, conn, fetcher, false, "ticket");
 }
 
 // A failed fetch keeps the last detail on screen: the Offline strip says why it may be stale.
@@ -33,12 +34,14 @@ export function useDetail<T>(
   fetcher: (address: string) => Promise<{ kind: "ok"; detail: T } | { kind: "not-found" }>,
   // An epic's detail also goes stale when one of its tickets (`address/NN`) changes.
   includeChildren = false,
+  // Names the sessionStorage entry that repaints this page after a reload.
+  cacheKey?: string,
 ): DetailState<T> {
-  const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>({
+  const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>(() => ({
     address,
-    detail: null,
+    detail: cacheKey ? readPageCache<T>(cacheKey, address) : null,
     notFound: false,
-  });
+  }));
   const latest = useRef(0);
 
   const refetch = useCallback(() => {
@@ -46,6 +49,7 @@ export function useDetail<T>(
     fetcher(address).then(
       (r) => {
         if (n !== latest.current) return;
+        if (cacheKey && r.kind === "ok") writePageCache(cacheKey, r.detail, address);
         setState(
           r.kind === "ok"
             ? { address, detail: r.detail, notFound: false }
@@ -54,7 +58,7 @@ export function useDetail<T>(
       },
       () => {},
     );
-  }, [address, fetcher]);
+  }, [address, fetcher, cacheKey]);
 
   useEffect(() => {
     refetch();

@@ -300,3 +300,17 @@ test("the last snapshot stays on drop", async () => {
   expect(conn.getState().snapshot?.seq).toBeGreaterThanOrEqual(1);
   conn.stop();
 });
+
+test("a cached snapshot is the first state and each fresh one is saved", async () => {
+  let saved: Snapshot | null = emptySnapshot(7);
+  const conn = createConnection({
+    cache: { load: () => saved, save: (s) => (saved = s) },
+    fetchSnapshot: async () => emptySnapshot(8),
+    openStream: async () => (async function* () {})(),
+  });
+  expect(conn.getState()).toMatchObject({ snapshot: { seq: 7 }, loadedOnce: true });
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(saved?.seq).toBe(8);
+  conn.stop();
+});
