@@ -1,4 +1,5 @@
 import { Box, Heading, Skeleton, Text } from "@chakra-ui/react";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -7,20 +8,36 @@ import { Strip } from "../ui/strip/Strip";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
-import { detailLine, foldedTail, isCancelled, isFolded, segmentsOf, statSentence, toneOf } from "./rows";
+import {
+  detailLine,
+  foldedTail,
+  idOf,
+  isCancelled,
+  isFolded,
+  nestLive,
+  rowContext,
+  segmentsOf,
+  statSentence,
+  toneOf,
+} from "./rows";
 
-function EpicBody({ detail }: { detail: EpicDetail }) {
+function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
   const folded = detail.rows.filter(isFolded);
-  const live = detail.rows.filter((r) => !isFolded(r));
   const cancelled = folded.filter(isCancelled).length;
-  const idOf = (address: string) => address.slice(address.lastIndexOf("/") + 1);
+  const ctx = rowContext(detail, now);
+  // The server's wall clock is as of the fetch, so a running epic adds the time since then.
+  const fetchedAt = useMemo(() => Date.now(), [detail]);
+  const wallClock =
+    detail.state === "running" && detail.wall_clock !== undefined
+      ? detail.wall_clock + Math.max(0, (now - fetchedAt) / 1000)
+      : detail.wall_clock;
   return (
     <>
       <Box mt="4">
         <SegmentedBar segments={segmentsOf(detail.rows)} value={detail.done} label="Epic progress" />
       </Box>
       <Text mt="2" fontSize="sm" color="text.muted">
-        {statSentence(detail)}
+        {statSentence({ ...detail, wall_clock: wallClock })}
       </Text>
       {folded.length > 0 && (
         <Box as="details" mt="4">
@@ -32,7 +49,7 @@ function EpicBody({ detail }: { detail: EpicDetail }) {
               key={r.address}
               id={idOf(r.address)}
               title={r.title}
-              reason={foldedTail(r, detail.kind)}
+              reason={foldedTail(r, ctx)}
               tone="muted"
               unclipped
             />
@@ -40,9 +57,17 @@ function EpicBody({ detail }: { detail: EpicDetail }) {
         </Box>
       )}
       <Box mt="4" display="flex" flexDirection="column" gap="2">
-        {live.map((r) => (
-          <Box key={r.address} p="3" borderRadius="md" bg={`tone.${toneOf(r)}.bg`}>
-            <TicketLine id={idOf(r.address)} title={r.title} reason={detailLine(r, detail.kind)} tone={toneOf(r)} unclipped />
+        {nestLive(detail.rows).map(({ row: r, indent }) => (
+          <Box key={r.address} data-indent={indent} ml={indent * 6} p="3" borderRadius="md" bg={`tone.${toneOf(r)}.bg`}>
+            <TicketLine
+              id={idOf(r.address)}
+              title={r.title}
+              reason={detailLine(r, ctx)}
+              tone={toneOf(r)}
+              unclipped
+              hint={r.needs_answer ? r.question : undefined}
+              href={r.needs_answer ? `#/t/${r.address}` : undefined}
+            />
           </Box>
         ))}
       </Box>
@@ -74,7 +99,7 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
                 No tickets yet
               </Text>
             ) : (
-              <EpicBody detail={detail} />
+              <EpicBody detail={detail} now={Date.now()} />
             )}
           </Box>
         ) : (

@@ -31,6 +31,8 @@ export function useDetail<T>(
   address: string,
   conn: Connection,
   fetcher: (address: string) => Promise<{ kind: "ok"; detail: T } | { kind: "not-found" }>,
+  // An epic's detail also goes stale when one of its tickets (`address/NN`) changes.
+  includeChildren = false,
 ): DetailState<T> {
   const [state, setState] = useState<{ address: string; detail: T | null; notFound: boolean }>({
     address,
@@ -57,13 +59,13 @@ export function useDetail<T>(
   useEffect(() => {
     refetch();
     const off = conn.onEvent((a) => {
-      if (a === address) refetch();
+      if (a === address || (includeChildren && a?.startsWith(`${address}/`))) refetch();
     });
     return () => {
       off();
       latest.current++;
     };
-  }, [address, conn, refetch]);
+  }, [address, conn, refetch, includeChildren]);
 
   // Another ticket's detail must never show under this address while it loads.
   const mine = state.address === address;

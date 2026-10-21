@@ -20,5 +20,5 @@ export function useEpicDetail(
   conn: Connection,
   fetcher: FetchEpicDetail = fetchEpicDetail,
 ): DetailState<EpicDetail> {
-  return useDetail(address, conn, fetcher);
+  return useDetail(address, conn, fetcher, true);
 }

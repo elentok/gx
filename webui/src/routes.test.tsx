@@ -1,7 +1,7 @@
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test } from "vitest";
-import { ConnectionContext, createConnection, type Connection, type ConnectionState } from "./connection";
+import { afterEach, expect, test, vi } from "vitest";
+import { ConnectionContext, createConnection, TICK_MS, type Connection, type ConnectionState } from "./connection";
 import { appRoutes } from "./routes";
 import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail";
 import type { Snapshot } from "./snapshot";
@@ -266,5 +266,104 @@ test("an event for the page's address refetches the detail once, another address
   // The foreign event came first and was processed, so a stray refetch would show as 3 by now.
   await act(async () => push(eventFrame(4, "gx:e/02")));
   expect(fetched).toEqual(["gx:e/01", "gx:e/01"]);
+  conn.stop();
+});
+
+test("live forks nest under a live parent, the indent stops at 2, and a fork of a folded parent sits at the top", async () => {
+  const rows = [
+    rowOf("01", "open"),
+    rowOf("02", "open", { parent: "gx:e/01" }),
+    rowOf("03", "open", { parent: "gx:e/02" }),
+    rowOf("04", "open", { parent: "gx:e/03" }),
+    rowOf("05", "done"),
+    rowOf("06", "open", { parent: "gx:e/05" }),
+    rowOf("07", "done", { parent: "gx:e/01" }),
+  ];
+  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 7, done: 2, rows }));
+  await screen.findByText("Title 01");
+  const live = [...container.querySelectorAll("[data-indent]")].map((el) => [
+    el.querySelector("span + span")?.textContent,
+    el.getAttribute("data-indent"),
+  ]);
+  expect(live).toEqual([
+    ["Title 01", "0"],
+    ["Title 02", "1"],
+    ["Title 03", "2"],
+    ["Title 04", "2"],
+    ["Title 06", "0"],
+  ]);
+  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 01", "open · fork of 05"]);
+});
+
+test("a blocked row lists its blockers, cross-epic ones as epic/NN", async () => {
+  const rows = [
+    rowOf("02", "blocked", { blockers: ["04", "other-epic/06"] }),
+    rowOf("03", "blocked", { blockers: ["04"] }),
+  ];
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }));
+  expect(await screen.findByText("blocked · after 04 and other-epic/06")).toBeTruthy();
+  expect(screen.getByText("blocked · after 04")).toBeTruthy();
+});
+
+test("a needs-answer row shows its question and an Answer link to the ticket page; other rows have no link", async () => {
+  const rows = [
+    rowOf("02", "needs-answer", { needs_answer: true, question: "Which database?" }),
+    rowOf("03", "needs-repair"),
+  ];
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }));
+  expect(await screen.findByText("Which database?")).toBeTruthy();
+  const links = screen.getAllByRole("link", { name: "Answer →" });
+  expect(links.map((l) => l.getAttribute("href"))).toEqual(["#/t/gx:e/02"]);
+});
+
+test("a running row's elapsed time and a running epic's wall clock tick", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
+    const conn = createConnection({ fetchSnapshot: async () => emptySnapshot, openStream: () => new Promise(() => {}) });
+    conn.start();
+    const rows = [rowOf("01", "claimed", { claimed_at: "2026-01-01T09:58:00Z" })];
+    renderAt("/e/gx:e", okFor, conn, epicFetch({ state: "running", total: 1, wall_clock: 600, rows }));
+    expect(await screen.findByText("claimed · 2m")).toBeTruthy();
+    expect(screen.getByText("Running · 0 of 1 done · took 10m")).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TICK_MS * 2);
+    });
+    expect(screen.getByText("claimed · 4m")).toBeTruthy();
+    expect(screen.getByText("Running · 0 of 1 done · took 12m")).toBeTruthy();
+    conn.stop();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("the epic page refetches on an event for the epic or one of its tickets, not for another epic", async () => {
+  let push!: (chunk: string) => void;
+  const conn = createConnection({
+    fetchSnapshot: async () => emptySnapshot,
+    openStream: async () =>
+      (async function* () {
+        for (;;) yield await new Promise<string>((r) => (push = r));
+      })(),
+  });
+  conn.start();
+  let fetched = 0;
+  renderAt("/e/gx:e", okFor, conn, async () => {
+    fetched++;
+    return { kind: "ok", detail: epicOf() };
+  });
+  await screen.findByText("No tickets yet");
+  await waitFor(() => expect(push).toBeDefined());
+  expect(fetched).toBe(1);
+
+  await act(async () => push(eventFrame(2, "gx:e/03")));
+  await waitFor(() => expect(fetched).toBe(2));
+  await act(async () => push(eventFrame(3, "gx:e")));
+  await waitFor(() => expect(fetched).toBe(3));
+  // Same-prefix and foreign addresses must not match; the last event is processed after them.
+  await act(async () => push(eventFrame(4, "gx:e2/01")));
+  await act(async () => push(eventFrame(5, "gx:other/01")));
+  await act(async () => push(eventFrame(6, "gx:e/04")));
+  await waitFor(() => expect(fetched).toBe(4));
   conn.stop();
 });
