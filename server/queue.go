@@ -254,9 +254,6 @@ func resolveAgent(name string) (ralphloop.AgentKind, *QueueResult) {
 // epicRefusal checks that an epic address names an epic with a ticket left to
 // run, or returns the refusal.
 func (s *Server) epicRefusal(addr string, project, epic string) *QueueResult {
-	if r := s.mapEpicRefusal(addr); r != nil {
-		return r
-	}
 	epics, err := s.projectEpics(project)
 	if err != nil {
 		r := refusal(ReasonUnknownTicket, "no epic "+addr)
@@ -267,11 +264,19 @@ func (s *Server) epicRefusal(addr string, project, epic string) *QueueResult {
 		r := refusal(ReasonUnknownTicket, "no epic "+addr)
 		return &r
 	}
-	if !slices.ContainsFunc(epics[i].Tickets, func(t tickets.Ticket) bool { return !t.IsTerminal() }) {
-		r := refusal(ReasonNoOpenTickets, addr+" has no open ticket")
-		return &r
+	e := epics[i]
+	var r QueueResult
+	switch {
+	case e.IsMap:
+		r = refusal(ReasonMapEpic, addr+" is a map epic; its tickets are resolved by hand, not scheduled")
+	case !e.MergedAt.IsZero():
+		r = refusal(ReasonAlreadyMerged, addr+" is already merged")
+	case !epicQueueable(e, false):
+		r = refusal(ReasonNoOpenTickets, addr+" has no open ticket")
+	default:
+		return nil
 	}
-	return nil
+	return &r
 }
 
 func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
