@@ -146,7 +146,9 @@ func clearByInput(t *testing.T, h *servertest.Harness, id string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer att.Close()
+	// Closing right after the send can drop the key before the holder reads it, so the
+	// attachment lives until the test ends.
+	t.Cleanup(func() { att.Close() })
 	if err := att.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
 		t.Fatal(err)
 	}
