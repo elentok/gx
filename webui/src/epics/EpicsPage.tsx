@@ -9,7 +9,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import { useEpicList, type FetchEpicList } from "./list";
-import { postQueueAdd } from "./queue";
+import { QueueButton } from "./QueueButton";
 import { searchEpics, sectionsOf, stateBadge, timePart } from "./view";
 
 const Dim = ({ children }: { children: string }) => (
@@ -19,38 +19,6 @@ const Dim = ({ children }: { children: string }) => (
 );
 
 const epicLink = (address: string) => `#/e/${address}`;
-
-function QueueButton({ row, onQueued }: { row: EpicListRow; onQueued: () => void }) {
-  const [pending, setPending] = useState(false);
-  const [refusal, setRefusal] = useState<string>();
-
-  async function queue() {
-    setPending(true);
-    setRefusal(undefined);
-    try {
-      const res = await postQueueAdd({ address: row.address, state: row.state });
-      if (res.refused) setRefusal(res.message || res.reason);
-      else onQueued();
-    } catch {
-      setRefusal("Could not queue the epic");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <>
-      <Button tone="running" disabled={pending} onClick={queue}>
-        {pending ? "Queueing…" : "Queue"}
-      </Button>
-      {refusal && (
-        <Text as="span" role="alert" color="text.muted">
-          {refusal}
-        </Text>
-      )}
-    </>
-  );
-}
 
 function EpicRow({
   row,
@@ -91,7 +59,7 @@ function EpicRow({
           ))}
         </Text>
       )}
-      {!withBadge && row.queueable && <QueueButton row={row} onQueued={onQueued} />}
+      {!withBadge && row.queueable && <QueueButton address={row.address} state={row.state} onQueued={onQueued} />}
     </Box>
   );
 }

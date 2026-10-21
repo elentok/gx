@@ -1,4 +1,4 @@
-import { act, cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, createConnection, TICK_MS, type Connection, type ConnectionState } from "./connection";
@@ -150,6 +150,7 @@ const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   agent_time: 0,
   cost_total: 0,
   rows: [],
+  queueable: false,
   ...over,
 });
 
@@ -431,4 +432,36 @@ test("the epic page refetches on an event for the epic or one of its tickets, no
   await act(async () => push(eventFrame(6, "gx:e/04")));
   await waitFor(() => expect(fetched).toBe(4));
   conn.stop();
+});
+
+test("the epic page shows Queue only for a queueable epic", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ queueable: false }));
+  await screen.findByRole("heading", { name: "e" });
+  expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
+  cleanup();
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ queueable: true, state: "waiting" }));
+  expect(await screen.findByRole("button", { name: "Queue" })).toBeTruthy();
+});
+
+test("the epic page Queue posts, then refetches; a refusal shows inline", async () => {
+  const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ queue: [] })));
+  vi.stubGlobal("fetch", post);
+  let fetched = 0;
+  renderAt("/e/gx:e", okFor, undefined, async () => {
+    fetched++;
+    return { kind: "ok", detail: epicOf({ queueable: fetched === 1, state: "waiting" }) };
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Queue" }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Queue" })).toBeNull());
+  expect(JSON.parse(post.mock.calls[0]![1].body as string)).toEqual({ address: "gx:e", state: "waiting" });
+  expect(fetched).toBe(2);
+  cleanup();
+  post.mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ refused: true, reason: "already-queued", message: "already in the queue" })),
+  );
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ queueable: true, state: "waiting" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Queue" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("already in the queue");
+  vi.unstubAllGlobals();
 });

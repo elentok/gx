@@ -1,6 +1,7 @@
 import { Box, Heading, Skeleton, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
+import { QueueButton } from "../epics/QueueButton";
 import { BackLink } from "../nav/BackLink";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -83,7 +84,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
 export function EpicPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchEpicDetail }) {
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
-  const { detail, notFound } = useEpicDetail(address, conn, fetchDetail);
+  const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
 
   return (
     <Box>
@@ -99,6 +100,11 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
             <Heading as="h1" fontFamily="condensed" fontSize="2xl">
               {address.slice(address.indexOf(":") + 1)}
             </Heading>
+            {detail.queueable && (
+              <Box mt="2" display="flex" alignItems="center" gap="2">
+                <QueueButton address={address} state={detail.state ?? ""} onQueued={refetch} />
+              </Box>
+            )}
             {detail.summary && <Text mt="2">{detail.summary}</Text>}
             {detail.total === 0 ? (
               <Text mt="4" color="text.muted">
