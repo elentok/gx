@@ -29,7 +29,7 @@ web-test:
 web-types:
 	go run github.com/gzuidhof/tygo@v0.2.21 generate
 
-install:
+install: web-build
 	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
 
 # -timeout=10m (per package; the server package alone sums to ~100s): legitimate tests (incl. real-git/production-style) finish in a few seconds each
