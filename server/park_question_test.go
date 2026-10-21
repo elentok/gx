@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/events"
@@ -21,7 +22,8 @@ func assertGxQuestion(t *testing.T, ticketPath string, kind events.Kind, summary
 		t.Fatalf("log = %+v, want one event", evs)
 	}
 	got := evs[0]
-	if got.Type != tickets.EventParkQuestion || got.By != "gx" || got.ParkKind != string(kind) || got.Summary != summary || got.Text != summary {
+	// The text is the fixed summary, then the park reason when it adds detail.
+	if got.Type != tickets.EventParkQuestion || got.By != "gx" || got.ParkKind != string(kind) || got.Summary != summary || !strings.HasPrefix(got.Text, summary) {
 		t.Errorf("event = %+v, want a by-gx %s question %q", got, kind, summary)
 	}
 }
