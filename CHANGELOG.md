@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.35.8 - 2026-10-21
+
+- Added an Epics page to the web UI, at `#/epics`.
+  - It lists epics by lifecycle: ready to queue, designing, waiting to design and recently finished. A search box finds any epic by name, and a header line shows the follow-up counts.
+  - A `Queue` button on each ready epic, and on the epic page, queues the epic. The list refreshes live and refetches after the connection comes back.
+  - A shared top bar links the Queue and Epics pages. The Queue moved to `#/q`, and `#/` redirects there.
+  - New route `GET /v1/epics` and a `gx server epics --json` command return the same data, including blockers, last activity and follow-up counts. The epic detail payload gets a `queueable` flag.
+  - `gx server queue add` accepts an epic address and refuses an epic with no open ticket with `no-open-tickets`.
+- Added `claimed_at` and `done_at` to tickets, and `created_at` and `completed_at` to epics. `gx tickets migrate` backfills them. The ticket field `finished_at` is now `iteration_finished_at`.
+- Changed the web UI to render the epic summary as markdown, and to show a centered spinner while a page loads instead of skeleton rows.
+- Fixed the web UI showing a blank page after a reload. Pages now repaint from a copy in `sessionStorage` while fresh data loads, and the page background is dark before the bundle loads.
+- Fixed the epic page back link. It now goes back in history after in-app navigation.
+- Changed `make install` to build the web UI first.
+
 ## v0.35.7 - 2026-10-21
 
 - Added an epic details page to the web UI, at `#/e/<project:epic>`.
