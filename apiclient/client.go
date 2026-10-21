@@ -209,6 +209,13 @@ func (c *Client) Detail(ctx context.Context, address string) (server.TicketDetai
 	return d, err
 }
 
+// Epics returns every epic the Epics page lists.
+func (c *Client) Epics(ctx context.Context) (server.EpicList, error) {
+	var l server.EpicList
+	err := c.get(ctx, "/v1/epics", &l)
+	return l, err
+}
+
 // EpicDetail returns an epic's state, progress and ticket rows.
 func (c *Client) EpicDetail(ctx context.Context, address string) (server.EpicDetail, error) {
 	var d server.EpicDetail

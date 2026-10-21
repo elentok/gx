@@ -22,6 +22,28 @@ func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
 	}
 }
 
+func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
+	var out bytes.Buffer
+	l := server.EpicList{Epics: []server.EpicListRow{
+		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListReady, Done: 1, Total: 2, Queueable: true},
+		{Address: "proj:b", Kind: server.EpicKindMap, State: server.EpicListDesigning},
+	}}
+	if err := printEpicList(&out, l); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
+func TestServerEpicsList_HasJSONFlag(t *testing.T) {
+	root := newRootCmd(deps{})
+	c, _, err := root.Find([]string{"server", "epics"})
+	if err != nil || c.Flags().Lookup("json") == nil || c.RunE == nil {
+		t.Errorf("server epics = %v, err %v; want a runnable verb with --json", c, err)
+	}
+}
+
 func TestServerEpicsMerge_RejectsNonEpicAddresses(t *testing.T) {
 	for _, args := range [][]string{{}, {"proj:epic/01"}, {"epic"}, {"proj:a", "proj:b"}} {
 		root := newRootCmd(deps{})

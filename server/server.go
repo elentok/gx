@@ -539,6 +539,7 @@ var routeTable = []struct {
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
 	{"GET /v1/tickets/detail", (*Server).detail},
+	{"GET /v1/epics", (*Server).epicList},
 	{"GET /v1/epics/detail", (*Server).epicDetail},
 	{"GET /v1/iterations", (*Server).iterations},
 	{"POST /v1/tickets/changed", (*Server).ticketChanged},

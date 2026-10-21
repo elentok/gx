@@ -11,10 +11,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newServerEpicsCmd holds the verbs that take an epic address; every
-// `gx server tickets` verb takes a ticket address.
+// newServerEpicsCmd lists the epics and holds the verbs that take an epic
+// address; every `gx server tickets` verb takes a ticket address.
 func newServerEpicsCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "epics", Short: "act on a whole epic through the gx server"}
+	var listJSON bool
+	cmd := &cobra.Command{
+		Use:   "epics",
+		Short: "list every epic the Epics page shows, or act on a whole epic through the gx server",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverRead(c.Context(), listJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (server.EpicList, error) {
+					return cl.Epics(ctx)
+				},
+				printEpicList)
+		},
+	}
+	cmd.Flags().BoolVar(&listJSON, "json", false, "emit structured JSON instead of human-readable text")
 	var jsonOut bool
 	merge := &cobra.Command{
 		Use:   "merge <project:epic>",
@@ -48,6 +61,15 @@ func newServerEpicsCmd() *cobra.Command {
 	detail.Flags().BoolVar(&detailJSON, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(detail)
 	return cmd
+}
+
+func printEpicList(w io.Writer, l server.EpicList) error {
+	for _, e := range l.Epics {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d/%d\tqueueable=%t\n", e.Address, e.Kind, e.State, e.Done, e.Total, e.Queueable); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func printEpicDetail(w io.Writer, d server.EpicDetail) error {

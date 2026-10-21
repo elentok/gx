@@ -242,6 +242,59 @@ export interface EpicDetail {
 }
 
 //////////
+// source: epiclist.go
+
+/**
+ * EpicListState is EpicListRow.State. It is wider than EpicState: it also
+ * names the epics the Epics page lists that no queue item holds.
+ */
+export type EpicListState = string;
+export const EpicListReady: EpicListState = "ready";
+export const EpicListDesigning: EpicListState = "designing";
+export const EpicListWaitingToDesign: EpicListState = "waiting-to-design";
+export const EpicListFinished: EpicListState = "finished";
+export const EpicListQueued: EpicListState = "queued";
+export const EpicListRunning: EpicListState = "running";
+export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
+export const EpicListParked: EpicListState = "parked";
+export const EpicListDeadlocked: EpicListState = "deadlocked";
+export const EpicListDraft: EpicListState = "draft";
+/**
+ * EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
+ * nothing to queue, yet not finished.
+ */
+export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
+/**
+ * EpicListRow is one epic of the /v1/epics payload.
+ */
+export interface EpicListRow {
+  address: string;
+  project: string;
+  name: string;
+  kind: string;
+  state: EpicListState;
+  done: number /* int */;
+  total: number /* int */;
+  completed_at?: string;
+  merged_at?: string;
+  created_at?: string;
+  /**
+   * Queued is set while a queue item holds the epic.
+   */
+  queued: boolean;
+  /**
+   * Queueable is set when the Queue action applies; see epicQueueable.
+   */
+  queueable: boolean;
+}
+/**
+ * EpicList is the /v1/epics payload.
+ */
+export interface EpicList {
+  epics: EpicListRow[];
+}
+
+//////////
 // source: epicsummary.go
 
 /**
