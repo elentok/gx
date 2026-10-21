@@ -1,4 +1,4 @@
-import { Box, Heading, Skeleton, Text } from "@chakra-ui/react";
+import { Box, Heading, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { QueueButton } from "../epics/QueueButton";
@@ -6,6 +6,7 @@ import { BackLink } from "../nav/BackLink";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
+import { Spinner } from "../ui/spinner/Spinner";
 import { Strip } from "../ui/strip/Strip";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
@@ -115,10 +116,7 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
             )}
           </Box>
         ) : (
-          <Box mt="4" role="status" aria-label="Loading epic" display="flex" flexDirection="column" gap="2">
-            <Skeleton height="8" width="60%" />
-            <Skeleton height="5" width="30%" />
-          </Box>
+          <Spinner label="Loading epic" />
         )}
       </PageContainer>
     </Box>

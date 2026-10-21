@@ -80,7 +80,7 @@ first write action in the web UI. The page updates live.
     reload.
 34. As a person typing in the search box or scrolled down, I want a refetch not to reset my search
     text or scroll position.
-35. As a person on first load, I want skeleton rows, so that the page does not look empty or broken.
+35. As a person on first load, I want a centered spinner, so that the page does not look empty or broken.
 36. As a person whose server link drops, I want the last list to stay on screen, so that a blip does
     not blank the page. The Offline dot tells me it may be stale.
 37. As a person whose first load fails, I want "Could not load epics" and a `Retry` button, so that I
@@ -252,12 +252,12 @@ first write action in the web UI. The page updates live.
 - The page refetches `GET /v1/epics` on every server event, debounced to one fetch per burst of about
   500 ms. It does no address matching, since the page spans many epics. It reuses the existing event
   connection.
-- First load shows skeleton rows (`role="status"`, "Loading epics") under the real top bar and search
+- First load shows a centered spinner (`role="status"`, "Loading epics") under the real top bar and search
   box, with no section badges until data arrives.
 - A failed refetch with data on screen keeps the last list. The Offline dot says it may be stale, and
   the list refetches on reconnect.
 - A failed first fetch shows the inline line "Could not load epics" and a `Retry` button. It also
-  retries on the next event or reconnect. It does not stay a skeleton.
+  retries on the next event or reconnect. It does not stay a spinner.
 - A refetch never resets the search text or the scroll position.
 
 **Layout**
@@ -286,7 +286,7 @@ first write action in the web UI. The page updates live.
   tests. It covers the sections and their order, empty sections hidden, row parts and time wording,
   the `after <epic-name>` note, the header follow-ups line (one project, several, none), search
   (case-insensitive substring, flat list with state badges, "No match", clearing), the `Queue`
-  button (pending, refusal inline, immediate refetch), the skeleton, the failed first fetch with
+  button (pending, refusal inline, immediate refetch), the spinner, the failed first fetch with
   `Retry`, the kept list on a failed refetch, and a debounced refetch on a server event that keeps
   the search text. Fake timers cover the debounce. Scroll position is not tested in jsdom; the test
   checks only that the search text and the rendered rows stay.

@@ -66,6 +66,15 @@ Beauty is a requirement, not polish. A feature that works but looks cluttered is
   dialog or a modal.
 - When unsure, render the screen (e.g. in tmux) and look at it before calling the work done.
 
+## Web UI
+
+Before adding or changing a page or component in `webui/`, read `webui/README.md`. Two rules apply
+to every page:
+
+- A page that shows server data repaints from a `sessionStorage` copy after a reload
+  (`webui/src/pageCache.ts`).
+- A page without data yet shows the centered `Spinner`, never skeleton placeholders.
+
 ## UI
 
 - See ./design-system.md for UI work

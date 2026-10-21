@@ -79,7 +79,7 @@ test("the epic and ticket pages mark no tab", async () => {
   expect(screen.queryByRole("link", { current: "page" })).toBeNull();
 });
 
-test("a ticket route shows a skeleton, then the ticket whose address is in the hash", async () => {
+test("a ticket route shows a spinner, then the ticket whose address is in the hash", async () => {
   let resolve!: (r: DetailResult) => void;
   const requested: string[] = [];
   renderAt("/t/gx:e/01", (address) => {
@@ -156,7 +156,7 @@ const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
 
 const epicFetch = (over?: Partial<EpicDetail>): FetchEpicDetail => async () => ({ kind: "ok", detail: epicOf(over) });
 
-test("an epic route shows a skeleton, then the name and summary", async () => {
+test("an epic route shows a spinner, then the name and summary", async () => {
   let resolve!: (r: Awaited<ReturnType<FetchEpicDetail>>) => void;
   const requested: string[] = [];
   renderAt("/e/gx:e", okFor, undefined, (address) => {
@@ -171,7 +171,7 @@ test("an epic route shows a skeleton, then the name and summary", async () => {
   expect(screen.queryByText("No tickets yet")).toBeNull();
 });
 
-test("a malformed epic address shows Epic not found, not the skeleton", async () => {
+test("a malformed epic address shows Epic not found, not the spinner", async () => {
   vi.stubGlobal("fetch", async () => new Response("bad address", { status: 400 }));
   try {
     renderAt("/e/nocolon", okFor);

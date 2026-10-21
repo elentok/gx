@@ -1,10 +1,11 @@
-import { Box, Skeleton, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { BackLink } from "../nav/BackLink";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
+import { Spinner } from "../ui/spinner/Spinner";
 import { Strip } from "../ui/strip/Strip";
 import type { Sent } from "./answer";
 import { AnswerForm } from "./AnswerForm";
@@ -59,10 +60,7 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
             />
           </>
         ) : (
-          <Box mt="4" role="status" aria-label="Loading ticket" display="flex" flexDirection="column" gap="2">
-            <Skeleton height="8" width="60%" />
-            <Skeleton height="5" width="30%" />
-          </Box>
+          <Spinner label="Loading ticket" />
         )}
       </PageContainer>
     </Box>

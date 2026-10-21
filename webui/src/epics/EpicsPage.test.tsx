@@ -176,7 +176,7 @@ test("no sections shows No epics yet with the design hint", async () => {
   expect(screen.getByText(/\/gx-design/)).toBeTruthy();
 });
 
-test("the first load shows skeleton rows under the search box", async () => {
+test("the first load shows a spinner under the search box", async () => {
   renderEpics(() => new Promise(() => {}));
   expect(await screen.findByRole("status", { name: "Loading epics" })).toBeTruthy();
   expect(screen.getByRole("searchbox", { name: "Search epics" })).toBeTruthy();

@@ -8,6 +8,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
+import { Spinner } from "../ui/spinner/Spinner";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
@@ -31,6 +32,7 @@ const perTone = (render: (tone: Tone) => ReactNode): GalleryCase[] =>
 
 // Add one entry per primitive; the gallery page renders every case.
 export const galleryEntries: GalleryEntry[] = [
+  { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Badge", cases: perTone((tone) => <Badge tone={tone}>{tone}</Badge>) },
   {
     name: "ProgressBar",

@@ -1,4 +1,4 @@
-import { Box, Heading, Input, Link, Skeleton, Text } from "@chakra-ui/react";
+import { Box, Heading, Input, Link, Text } from "@chakra-ui/react";
 import { Fragment, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { EpicListRow, FollowUpCount } from "../generated/server";
@@ -7,6 +7,7 @@ import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
+import { Spinner } from "../ui/spinner/Spinner";
 import { Strip } from "../ui/strip/Strip";
 import { useEpicList, type FetchEpicList } from "./list";
 import { QueueButton } from "./QueueButton";
@@ -118,11 +119,7 @@ export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
             </Button>
           </Box>
         ) : !list ? (
-          <Box mt="6" role="status" aria-label="Loading epics" display="flex" flexDirection="column" gap="2">
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} height="6" width={`${70 - i * 10}%`} />
-            ))}
-          </Box>
+          <Spinner label="Loading epics" />
         ) : searching ? (
           <Box mt="4">
             {searchEpics(list.epics, query).map((r) => (

@@ -16,7 +16,7 @@ React and Chakra app embedded in the gx binary. `make web-dev` serves it with a 
 ## Adding a page
 
 A page that shows server data must repaint from the last copy after a reload. iOS Safari drops a
-tab that sat in the background, and without a cache the reload shows a blank page or skeleton
+tab that sat in the background, and without a cache the reload shows a blank page or spinner
 until the fetch lands.
 
 1. Read the first state with `readPageCache(key, id)` from `src/pageCache.ts` and save every fresh
@@ -25,3 +25,5 @@ until the fetch lands.
 2. For a detail page, call `useDetail` with a `cacheKey`. The list pages use `useEpicList` as the example.
 3. Keep fetching on mount. The cached copy is only the first paint, so the page never trusts it.
 4. `src/test-setup.ts` clears `sessionStorage` after each test.
+5. While a page has no data yet, show `Spinner` from `src/ui/spinner/Spinner.tsx` with a label such
+   as "Loading epics". It centers itself both ways. Do not draw skeleton placeholders.
