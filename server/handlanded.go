@@ -13,7 +13,7 @@ import (
 func (s *Server) stampHandLanded() {
 	queued := map[rootRef]bool{}
 	for _, item := range s.queued.list() {
-		if addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{}); err == nil {
+		if addr, err := parseQueuedAddress(item.Address); err == nil {
 			queued[rootOf(addr)] = true
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ const (
 	ReasonBadPosition      = "bad-position"
 	ReasonTicketLive       = "ticket-live"
 	ReasonMapEpic          = "map-epic"
+	ReasonNoOpenTickets    = "no-open-tickets"
 	ReasonAlreadyMerged    = "already-merged"
 	ReasonMergePending     = "merge-pending"
 	ReasonNotComplete      = "not-complete"
@@ -193,7 +195,7 @@ func (s *Server) mapEpicRefusal(address string) *QueueResult {
 
 // inMapEpic reports whether address names a ticket (or root) of a map epic.
 func (s *Server) inMapEpic(address string) bool {
-	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	a, err := parseQueuedAddress(address)
 	if err != nil {
 		return false
 	}
@@ -249,22 +251,55 @@ func resolveAgent(name string) (ralphloop.AgentKind, *QueueResult) {
 	return agent, nil
 }
 
+// epicRefusal checks that an epic address names an epic with a ticket left to
+// run, or returns the refusal.
+func (s *Server) epicRefusal(addr string, project, epic string) *QueueResult {
+	if r := s.mapEpicRefusal(addr); r != nil {
+		return r
+	}
+	epics, err := s.projectEpics(project)
+	if err != nil {
+		r := refusal(ReasonUnknownTicket, "no epic "+addr)
+		return &r
+	}
+	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic })
+	if i < 0 {
+		r := refusal(ReasonUnknownTicket, "no epic "+addr)
+		return &r
+	}
+	if !slices.ContainsFunc(epics[i].Tickets, func(t tickets.Ticket) bool { return !t.IsTerminal() }) {
+		r := refusal(ReasonNoOpenTickets, addr+" has no open ticket")
+		return &r
+	}
+	return nil
+}
+
 func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
-	addr, bad := canonical(req.Address)
-	if bad != nil {
-		return *bad, nil
+	project, epic, isEpic := tickets.ParseEpicAddress(req.Address)
+	addr := req.Address
+	if !isEpic {
+		var bad *QueueResult
+		if addr, bad = canonical(req.Address); bad != nil {
+			return *bad, nil
+		}
 	}
 	agent, badAgent := resolveAgent(req.Agent)
 	if badAgent != nil {
 		return *badAgent, nil
 	}
 	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
-		if !s.hasTicket(addr) {
-			r := refusal(ReasonUnknownTicket, "no ticket "+addr)
-			return nil, &r
-		}
-		if r := s.mapEpicRefusal(addr); r != nil {
-			return nil, r
+		if isEpic {
+			if r := s.epicRefusal(addr, project, epic); r != nil {
+				return nil, r
+			}
+		} else {
+			if !s.hasTicket(addr) {
+				r := refusal(ReasonUnknownTicket, "no ticket "+addr)
+				return nil, &r
+			}
+			if r := s.mapEpicRefusal(addr); r != nil {
+				return nil, r
+			}
 		}
 		for _, it := range items {
 			if it.Address == addr {

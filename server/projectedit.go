@@ -40,7 +40,7 @@ func refuseProject(reason, msg string) (ProjectResult, error) {
 // projectBusy reports a queued or running ticket of project.
 func (s *Server) projectBusy(project string) (address string, busy bool) {
 	inProject := func(addr string) bool {
-		a, err := tickets.ParseAddress(addr, tickets.AddressContext{})
+		a, err := parseQueuedAddress(addr)
 		return err == nil && a.Project == project
 	}
 	for _, it := range s.queued.list() {

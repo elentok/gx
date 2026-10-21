@@ -80,7 +80,7 @@ func (s *Server) checkTrunks() {
 	seen := map[string]bool{}
 	defer s.trunkMissing.keepOnly(seen)
 	for _, item := range s.queued.list() {
-		addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
+		addr, err := parseQueuedAddress(item.Address)
 		if err != nil || seen[addr.Project] {
 			continue
 		}

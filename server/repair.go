@@ -183,7 +183,7 @@ func (s *Server) landInQueue(req RepairRequest) (RepairResult, error) {
 
 func (s *Server) rootQueued(root rootRef) bool {
 	for _, it := range s.queued.list() {
-		if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
+		if a, err := parseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
 			return true
 		}
 	}

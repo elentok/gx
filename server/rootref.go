@@ -26,6 +26,15 @@ func (r rootRef) String() string { return r.Project + ":" + r.Epic }
 
 func rootOf(addr tickets.Address) rootRef { return rootRef{Project: addr.Project, Epic: addr.Epic} }
 
+// parseQueuedAddress parses a queue entry: a ticket address, or an epic address
+// ("project:epic"), which comes back with an empty ID.
+func parseQueuedAddress(s string) (tickets.Address, error) {
+	if project, epic, ok := tickets.ParseEpicAddress(s); ok {
+		return tickets.Address{Project: project, Epic: epic}, nil
+	}
+	return tickets.ParseAddress(s, tickets.AddressContext{})
+}
+
 // removeRoot drops every queued ticket of root and reports whether any went.
 func (q *queueStore) removeRoot(root rootRef) (bool, error) {
 	return q.removeRootIf(root, func() bool { return true })
@@ -38,7 +47,7 @@ func (q *queueStore) removeRootIf(root rootRef, drop func() bool) (bool, error) 
 	defer q.mu.Unlock()
 	kept := make([]QueueItem, 0, len(q.items))
 	for _, it := range q.items {
-		if a, err := tickets.ParseAddress(it.Address, tickets.AddressContext{}); err == nil && rootOf(a) == root {
+		if a, err := parseQueuedAddress(it.Address); err == nil && rootOf(a) == root {
 			continue
 		}
 		kept = append(kept, it)

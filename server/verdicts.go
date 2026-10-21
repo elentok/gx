@@ -152,7 +152,7 @@ func frontierIndex(e tickets.Epic, t tickets.Ticket) int {
 func (s *Server) rootsAhead(root string) (ahead int, queued bool) {
 	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
-		a, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
+		a, err := parseQueuedAddress(item.Address)
 		if err != nil {
 			continue
 		}
@@ -201,8 +201,9 @@ func (s *Server) pendingRows() []PendingRow {
 		return epics, err
 	}
 	for _, item := range s.queued.list() {
-		addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
-		if err != nil {
+		addr, err := parseQueuedAddress(item.Address)
+		// An epic entry has no single ticket to explain.
+		if err != nil || addr.ID == "" {
 			continue
 		}
 		ex, err := s.explainQueued(addr, epicsOf)

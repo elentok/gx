@@ -391,8 +391,8 @@ func newServerQueueCmd() *cobra.Command {
 
 	var agent string
 	add := &cobra.Command{
-		Use:   "add <project:epic/NN>",
-		Short: "append a ticket to the server-wide queue",
+		Use:   "add <project:epic/NN | project:epic>",
+		Short: "append a ticket, or a whole epic, to the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {

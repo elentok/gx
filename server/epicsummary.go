@@ -63,7 +63,7 @@ func (s *Server) epicSummaries(all []TicketInfo) []EpicSummary {
 	seen := map[rootRef]bool{}
 	recoveryOf := func(addr string) string { return recoveryState(s.parkHold.state(addr), addr, all) }
 	for _, item := range s.queued.list() {
-		addr, err := tickets.ParseAddress(item.Address, tickets.AddressContext{})
+		addr, err := parseQueuedAddress(item.Address)
 		if err != nil {
 			continue
 		}
