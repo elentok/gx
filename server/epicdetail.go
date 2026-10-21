@@ -89,7 +89,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 	if e.IsMap {
 		d.Kind, d.Summary = EpicKindMap, schema.Section(e.Body, "Destination")
 	} else {
-		d.State = summarizeEpic(root, e, s.registry.startedAtOf, func(string) string { return "" }, readLogLenient).State
+		d.State = epicStateFor(root, e, s.registry.startedAtOf)
 	}
 	addr := func(id string) string {
 		return tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()

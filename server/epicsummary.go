@@ -157,28 +157,42 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 	if oneOffs {
 		sum.Done, sum.Total = 0, 0
 	}
-	switch epicStateOf(e) {
-	case epicDone:
-		sum.State = EpicStateAwaitingMerge
-		if !e.MergedAt.IsZero() {
-			sum.State = EpicStateFinished
-		}
-		if oneOffs {
-			sum.State = EpicStateWaiting
-		}
-	case epicRunnable:
-		sum.State = EpicStateWaiting
-		if len(sum.Active) > 0 {
-			sum.State = EpicStateRunning
-		}
-	case epicParked:
-		sum.State = EpicStateParked
-	case epicCycle:
-		sum.State = EpicStateDeadlocked
+	sum.State = epicStateFor(root, e, claimedAt)
+	if sum.State == EpicStateDeadlocked {
 		sum.Reason = cycleReason(root, e)
 	}
 	if sum.State != EpicStateRunning {
 		sum.Active = []SummaryTicket{}
 	}
 	return sum
+}
+
+// epicStateFor is the one place that decides an epic's state. Running needs a
+// claimed, non-parked ticket that has a server claim time.
+func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) EpicState {
+	switch epicStateOf(e) {
+	case epicDone:
+		if root.Epic == OneOffsEpic {
+			return EpicStateWaiting
+		}
+		if e.MergedAt.IsZero() {
+			return EpicStateAwaitingMerge
+		}
+		return EpicStateFinished
+	case epicRunnable:
+		for _, t := range e.Tickets {
+			if isParked(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
+				continue
+			}
+			addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
+			if _, ok := claimedAt(addr); ok {
+				return EpicStateRunning
+			}
+		}
+		return EpicStateWaiting
+	case epicParked:
+		return EpicStateParked
+	default:
+		return EpicStateDeadlocked
+	}
 }
