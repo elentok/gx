@@ -209,6 +209,13 @@ func (c *Client) Detail(ctx context.Context, address string) (server.TicketDetai
 	return d, err
 }
 
+// EpicDetail returns an epic's state, progress and ticket rows.
+func (c *Client) EpicDetail(ctx context.Context, address string) (server.EpicDetail, error) {
+	var d server.EpicDetail
+	err := c.get(ctx, "/v1/epics/detail?address="+url.QueryEscape(address), &d)
+	return d, err
+}
+
 // Iterations returns the live iterations.
 func (c *Client) Iterations(ctx context.Context) ([]server.IterationInfo, error) {
 	var l []server.IterationInfo

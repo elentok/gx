@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -30,5 +31,33 @@ func newServerEpicsCmd() *cobra.Command {
 	}
 	merge.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(merge)
+
+	var detailJSON bool
+	detail := &cobra.Command{
+		Use:   "detail <project:epic>",
+		Short: "show an epic's state, progress and ticket rows",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return serverRead(c.Context(), detailJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (server.EpicDetail, error) {
+					return cl.EpicDetail(ctx, args[0])
+				},
+				printEpicDetail)
+		},
+	}
+	detail.Flags().BoolVar(&detailJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(detail)
 	return cmd
+}
+
+func printEpicDetail(w io.Writer, d server.EpicDetail) error {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d/%d\n", d.Address, d.Kind, d.State, d.Done, d.Total); err != nil {
+		return err
+	}
+	for _, r := range d.Rows {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", r.Address, r.RenderedStatus, r.Title); err != nil {
+			return err
+		}
+	}
+	return nil
 }

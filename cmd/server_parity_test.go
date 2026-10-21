@@ -68,20 +68,14 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/link":       "agent link",
 	"POST /v1/sessions/run-action": "agents run-action",
 	"POST /v1/sessions/resume":     "agents resume",
+	"GET /v1/epics/detail":         "server epics detail",
 }
-
-// plannedRoutes are routes whose CLI verb a queued ticket builds: the server op
-// lands first. The verb's ticket moves its entry into routeVerbs.
-var plannedRoutes = map[string]bool{"GET /v1/epics/detail": true}
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {
 	t.Parallel()
 	root := newRootCmd(deps{})
 	patterns := server.RoutePatterns()
 	for _, p := range patterns {
-		if plannedRoutes[p] {
-			continue
-		}
 		verb, ok := routeVerbs[p]
 		if !ok {
 			t.Errorf("route %q has no CLI verb in routeVerbs", p)

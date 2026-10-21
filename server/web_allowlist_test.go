@@ -63,6 +63,17 @@ func TestWeb_DetailIsServed(t *testing.T) {
 	}
 }
 
+func TestWeb_EpicDetailIsServed(t *testing.T) {
+	h, base := startWeb(t)
+	code, _ := webDo(t, h, http.MethodGet, base+"/v1/epics/detail?address=nope:none")
+	if code == http.StatusUnauthorized || code == http.StatusMethodNotAllowed || code == http.StatusForbidden {
+		t.Errorf("GET /v1/epics/detail with cookie = %d, want it routed", code)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/epics/detail", nil); code != http.StatusUnauthorized {
+		t.Errorf("GET /v1/epics/detail without cookie = %d, want 401", code)
+	}
+}
+
 func TestWeb_AnswerAndUnparkNeedAStateToken(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)

@@ -174,6 +174,69 @@ export interface TicketDetail {
 }
 
 //////////
+// source: epicdetail.go
+
+export const EpicKindLoop = "loop";
+export const EpicKindMap = "map";
+/**
+ * Epic kinds of an EpicDetail.
+ */
+export type EpicKind = typeof EpicKindLoop | typeof EpicKindMap;
+/**
+ * EpicDetailRow is one ticket of an EpicDetail. A map epic's rows fill only
+ * Address, Title and RenderedStatus.
+ */
+export interface EpicDetailRow {
+  address: string;
+  title: string;
+  rendered_status: string;
+  type?: string;
+  parent?: string;
+  /**
+   * Elapsed is in seconds and set once the ticket lands; a running row ticks
+   * on the client from ClaimedAt.
+   */
+  elapsed?: number /* int */;
+  cost?: number /* float64 */;
+  claimed_at?: string;
+  /**
+   * Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
+   */
+  blockers?: string[];
+  /**
+   * NeedsAnswer is set on a parked ticket with an open question; Question is its summary line.
+   */
+  needs_answer?: boolean;
+  question?: string;
+}
+/**
+ * EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
+ * the payload carries no token counts.
+ */
+export interface EpicDetail {
+  address: string;
+  kind: string;
+  /**
+   * State is empty for a map epic.
+   */
+  state?: EpicState;
+  summary: string;
+  /**
+   * Done counts cancelled tickets too.
+   */
+  done: number /* int */;
+  total: number /* int */;
+  /**
+   * WallClock runs from the epic's started_at to completed_at, or to now while
+   * it runs. AgentTime and CostTotal add up landed tickets only.
+   */
+  wall_clock?: number /* int */;
+  agent_time?: number /* int */;
+  cost_total?: number /* float64 */;
+  rows: EpicDetailRow[];
+}
+
+//////////
 // source: epicsummary.go
 
 /**

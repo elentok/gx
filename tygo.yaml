@@ -5,6 +5,7 @@ packages:
     include_files:
       - budget.go
       - detail.go
+      - epicdetail.go
       - epicsummary.go
       - index.go
       - pause.go
