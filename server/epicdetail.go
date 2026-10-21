@@ -59,7 +59,7 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
 	root, err := parseRootRef(address)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	epics, err := s.projectEpics(root.Project)

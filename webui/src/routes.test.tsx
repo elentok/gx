@@ -141,6 +141,16 @@ test("an epic route shows a skeleton, then the name and summary", async () => {
   expect(screen.queryByText("No tickets yet")).toBeNull();
 });
 
+test("a malformed epic address shows Epic not found, not the skeleton", async () => {
+  vi.stubGlobal("fetch", async () => new Response("bad address", { status: 400 }));
+  try {
+    renderAt("/e/nocolon", okFor);
+    expect(await screen.findByText("Epic not found")).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("an unknown epic shows Epic not found", async () => {
   renderAt("/e/gx:nope", okFor, undefined, async () => ({ kind: "not-found" }));
   expect(await screen.findByText("Epic not found")).toBeTruthy();

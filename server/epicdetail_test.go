@@ -193,7 +193,7 @@ func TestEpicDetail_UnknownAddress(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 	})
-	for _, address := range []string{"proj:nope", "nope:work"} {
+	for _, address := range []string{"proj:nope", "nope:work", "nocolon", ""} {
 		if code, _, body := getEpicDetail(t, h, base, address); code != http.StatusNotFound {
 			t.Errorf("%s = %d (%s), want 404", address, code, body)
 		}

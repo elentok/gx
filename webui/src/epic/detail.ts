@@ -10,7 +10,7 @@ export type FetchEpicDetail = (address: string) => Promise<EpicDetailResult>;
 
 export const fetchEpicDetail: FetchEpicDetail = async (address) => {
   const res = await fetch(`/v1/epics/detail?address=${encodeURIComponent(address)}`);
-  if (res.status === 404) return { kind: "not-found" };
+  if (res.status === 404 || res.status === 400) return { kind: "not-found" };
   if (!res.ok) throw new Error(`epic detail: HTTP ${res.status}`);
   return { kind: "ok", detail: await res.json() };
 };
