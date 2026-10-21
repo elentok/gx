@@ -188,6 +188,9 @@ Present the proposed breakdown as a numbered list. For each ticket, show:
   not just when a ticket is borderline, so the user can judge granularity against the same number
   that drove the split
 
+Before the list, show the draft epic Summary (written as step 6 describes) so the user can correct
+it with the rest of the breakdown.
+
 Ask the user:
 
 - Does the granularity feel right? (too coarse / too fine)
@@ -212,6 +215,21 @@ gx tickets add <epic-slug> --slug <slug> --type implement --expected-context-win
 
 `--blocked-by` lists the ticket IDs it depends on; leave it out when nothing gates the ticket. Use
 the per-ticket template below as the body — one ticket per call, never a single combined file.
+
+Always write a `## Summary` on the epic as part of publishing. Never skip it, never block publishing
+on it, and never copy a map Destination into it:
+
+```sh
+gx tickets section <project:epic>-impl Summary -
+```
+
+- One paragraph, at most 3 sentences and about 60 words, in B2 English and in `GLOSSARY.md` terms.
+- Say what the epic delivers and why, from the user's view. No ticket numbers, file paths or code
+  names.
+- Source: the spec's Problem Statement and Solution (after review amendments), rewritten, not
+  copied. With no spec, summarize the plan or the conversation. With no clear summary, still write
+  one from whatever is available.
+- An unattended run (step 5 is skipped) publishes the summary as drafted.
 
 Work the **frontier** (see [gx-local-tracker.md](../gx-local-tracker.md)): any ticket whose blockers
 are all done. For a purely linear chain that means top to bottom.
