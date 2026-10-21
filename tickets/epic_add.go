@@ -8,10 +8,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
+
+// ImplEpicSuffix names a map's implementation epic: <map>-impl.
+const ImplEpicSuffix = "-impl"
 
 // KindLoop is the ticket.md `kind:` of an epic the scheduler runs.
 const KindLoop = "loop"
@@ -26,7 +30,7 @@ type EpicFields struct {
 }
 
 // EpicServerStamped are the epic fields only the server writes.
-var EpicServerStamped = []string{"completed_at", "merged_at", "evolved_at", "evolve_skipped", "evolve_ticket"}
+var EpicServerStamped = []string{"created_at", "completed_at", "merged_at", "evolved_at", "evolve_skipped", "evolve_ticket"}
 
 const epicSettableList = "kind, status, provisional_destination"
 
@@ -110,7 +114,11 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 		return "", err
 	}
 
-	fm, err := yaml.Marshal(fields)
+	now := time.Now().UTC()
+	fm, err := yaml.Marshal(struct {
+		EpicFields `yaml:",inline"`
+		CreatedAt  time.Time `yaml:"created_at"`
+	}{fields, now})
 	if err != nil {
 		return "", err
 	}
@@ -129,6 +137,15 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 	_, err = io.WriteString(f, "---\n"+string(fm)+"---\n\n"+text+"\n")
 	if cerr := f.Close(); err == nil {
 		err = cerr
+	}
+	if err != nil {
+		return epicPath, err
+	}
+	// Creating <map>-impl is what completes the map.
+	if mapName, ok := strings.CutSuffix(name, ImplEpicSuffix); ok && fields.Kind == KindLoop {
+		if mapPath := filepath.Join(projectDir, mapName); IsMapEpic(mapPath) {
+			err = StampEpicFields(mapPath, map[string]any{"completed_at": now})
+		}
 	}
 	return epicPath, err
 }

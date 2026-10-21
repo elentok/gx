@@ -72,13 +72,15 @@ never scheduled by the server.
 
 ` + "`tickets set project:epic`" + ` (or ` + "`tickets epic set`" + `) writes an epic's kind (map, loop), status
 (draft, open), provisional_destination and blocked_by (whole-epic tokens such as other or
-project:other: the whole epic waits on them, checked like a ticket's); completed_at, merged_at, evolved_at, evolve_skipped and
+project:other: the whole epic waits on them, checked like a ticket's); created_at, completed_at, merged_at, evolved_at, evolve_skipped and
 evolve_ticket are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
 
 An epic's ticket.md also holds epic-level timing. These fields are gx-managed, not
 settable via ` + "`tickets set`" + `, and unset until gx stamps them.
   started_at (RFC3339 timestamp) — when work on the epic began
-  completed_at (RFC3339 timestamp) — when the epic's last ticket landed
+  created_at (RFC3339 timestamp) — when the epic was created
+  completed_at (RFC3339 timestamp) — when the epic's last ticket landed (a map: when its
+    <map>-impl epic was created)
   merged_at (RFC3339 timestamp) — when the epic's branch landed on its target
     (stamped by the server or ` + "`gx merge`" + `); a merged epic is one with merged_at set
 

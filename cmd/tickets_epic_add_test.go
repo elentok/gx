@@ -54,6 +54,39 @@ func TestRunTicketsEpicAdd_CreatesEpics(t *testing.T) {
 	}
 }
 
+func TestRunTicketsEpicAdd_StampsCreatedAtAndMapCompletedAt(t *testing.T) {
+	cwd, project := setupEpicAddProject(t)
+	for _, arg := range []string{"mine:m", "mine:other"} {
+		kind := "map"
+		if arg == "mine:other" {
+			kind = "loop"
+		}
+		if err := runTicketsEpicAdd(cwd, arg, kind, "open", "", &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if tickets.LoadEpicTicketMD(filepath.Join(project, "m")).CreatedAt.IsZero() {
+		t.Error("new map has no created_at")
+	}
+	if !tickets.LoadEpicTicketMD(filepath.Join(project, "m")).CompletedAt.IsZero() {
+		t.Error("map completed before its impl epic exists")
+	}
+	if err := runTicketsEpicAdd(cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	m := tickets.LoadEpicTicketMD(filepath.Join(project, "m"))
+	impl := tickets.LoadEpicTicketMD(filepath.Join(project, "m-impl"))
+	if impl.CreatedAt.IsZero() || m.CompletedAt.IsZero() || !m.CompletedAt.Equal(impl.CreatedAt) {
+		t.Errorf("map completed_at %v, impl created_at %v; want equal and set", m.CompletedAt, impl.CreatedAt)
+	}
+	if err := runTicketsEpicAdd(cwd, "mine:other-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if !tickets.LoadEpicTicketMD(filepath.Join(project, "other")).CompletedAt.IsZero() {
+		t.Error("a loop epic's completed_at was stamped by its -impl sibling")
+	}
+}
+
 func TestRunTicketsEpicAdd_RefusalsWriteNothing(t *testing.T) {
 	cwd, project := setupEpicAddProject(t)
 	if err := runTicketsEpicAdd(cwd, "mine:exists", "loop", "open", "", &bytes.Buffer{}); err != nil {
@@ -65,6 +98,7 @@ func TestRunTicketsEpicAdd_RefusalsWriteNothing(t *testing.T) {
 		name, arg, kind, body, wantErr string
 	}{
 		{"server-stamped", "mine:x", "loop", "---\ncompleted_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
+		{"created_at", "mine:x", "loop", "---\ncreated_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
 		{"merged_at", "mine:x", "loop", "---\nmerged_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
 		{"merged_at cleared", "mine:x", "loop", "---\nmerged_at:\n---\n\n# X\n", "server-stamped"},
 		{"unknown field", "mine:x", "loop", "---\nbogus: 1\n---\n\n# X\n", "unknown field"},

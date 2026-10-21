@@ -45,6 +45,9 @@ type Epic struct {
 	// it doesn't set the field.
 	StartedAt   time.Time
 	CompletedAt time.Time
+	// CreatedAt is when the epic was created; zero on an epic that predates
+	// the field and hasn't been migrated.
+	CreatedAt time.Time
 	// MergedAt is when the epic's branch landed on its target; a Merged epic
 	// is one with it set.
 	MergedAt time.Time

@@ -64,7 +64,8 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 		"07-legacy-needs-info.md: status: needs-info -> needs-answer",
 		"08-legacy-needs-attention.md: status: needs-attention -> needs-repair",
 		"09-legacy-finished-at.md: finished_at renamed to iteration_finished_at",
-		"8 file(s) changed",
+		"widget-epic/ticket.md: created_at backfilled from file creation time",
+		"9 file(s) changed",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("stdout = %q, want it to contain %q", out, want)

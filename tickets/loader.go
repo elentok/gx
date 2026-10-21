@@ -256,6 +256,7 @@ type ticketMDYAML struct {
 	Base        string     `yaml:"base"`
 	StartedAt   *time.Time `yaml:"started_at"`
 	CompletedAt *time.Time `yaml:"completed_at"`
+	CreatedAt   *time.Time `yaml:"created_at"`
 	MergedAt    *time.Time `yaml:"merged_at"`
 }
 
@@ -304,6 +305,9 @@ func loadEpicTicketMD(epic *Epic) {
 	}
 	if wire.CompletedAt != nil {
 		epic.CompletedAt = *wire.CompletedAt
+	}
+	if wire.CreatedAt != nil {
+		epic.CreatedAt = *wire.CreatedAt
 	}
 	if wire.MergedAt != nil {
 		epic.MergedAt = *wire.MergedAt

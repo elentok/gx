@@ -68,6 +68,11 @@ func runTicketsMigrate(scratchRoot string, w io.Writer) error {
 	backfilled, err := tickets.BackfillMergedAt(scratchRoot, epicLandedUnder(scratchRoot))
 	changes := append(result.Changes, backfilled...)
 	if err == nil {
+		var timed []tickets.MigrationChange
+		timed, err = tickets.BackfillEpicTimes(scratchRoot)
+		changes = append(changes, timed...)
+	}
+	if err == nil {
 		var parked []tickets.MigrationChange
 		parked, err = tickets.MigrateParkSections(scratchRoot, time.Now())
 		changes = append(changes, parked...)
