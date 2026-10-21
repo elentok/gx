@@ -30,4 +30,14 @@ describe("TicketLine", () => {
     expect(style.getPropertyValue("-webkit-line-clamp")).toBe("2");
     expect(style.overflow).toBe("hidden");
   });
+
+  it("puts the reason on the title line when inlineReason is set", () => {
+    const { getByText } = renderThemed(<TicketLine id="a" title="the title" reason="1m · $1.37" inlineReason />);
+    expect(getByText("1m · $1.37").parentElement).toBe(getByText("the title").parentElement);
+  });
+
+  it("puts the reason below the title row by default", () => {
+    const { getByText } = renderThemed(<TicketLine id="a" title="the title" reason="1m · $1.37" />);
+    expect(getByText("1m · $1.37").parentElement).not.toBe(getByText("the title").parentElement);
+  });
 });

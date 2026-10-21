@@ -14,6 +14,7 @@ import {
   idOf,
   isCancelled,
   isFolded,
+  nestFolded,
   nestLive,
   rowContext,
   segmentsOf,
@@ -41,18 +42,20 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
       </Text>
       {folded.length > 0 && (
         <Box as="details" mt="4">
-          <summary>
+          <Box as="summary" color="tone.done.fg">
             ✓ {folded.length - cancelled} done{cancelled > 0 && ` · ${cancelled} cancelled`}
-          </summary>
-          {folded.map((r) => (
-            <TicketLine
-              key={r.address}
-              id={idOf(r.address)}
-              title={r.title}
-              reason={foldedTail(r, ctx)}
-              tone="muted"
-              unclipped
-            />
+          </Box>
+          {nestFolded(detail.rows).map(({ row: r, indent }) => (
+            <Box key={r.address} data-fold-indent={indent} ml={indent * 6}>
+              <TicketLine
+                id={idOf(r.address)}
+                title={r.title}
+                reason={foldedTail(r, ctx)}
+                tone={isCancelled(r) ? "muted" : "done"}
+                unclipped
+                inlineReason
+              />
+            </Box>
           ))}
         </Box>
       )}
@@ -65,6 +68,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
               reason={detailLine(r, ctx)}
               tone={toneOf(r)}
               unclipped
+              inlineReason
               hint={r.needs_answer ? r.question : undefined}
               href={r.needs_answer ? `#/t/${r.address}` : undefined}
             />
@@ -90,7 +94,7 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
         ) : detail ? (
           <Box mt="4">
             {/* The payload has no name field: the epic name is the address after the project. */}
-            <Heading as="h1" fontFamily="condensed" size="lg">
+            <Heading as="h1" fontFamily="condensed" fontSize="2xl">
               {address.slice(address.indexOf(":") + 1)}
             </Heading>
             {detail.summary && <Text mt="2">{detail.summary}</Text>}

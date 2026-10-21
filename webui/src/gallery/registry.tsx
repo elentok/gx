@@ -45,7 +45,7 @@ export const galleryEntries: GalleryEntry[] = [
         label={tone}
         value={4}
         segments={[
-          { key: "done", tone: "muted", count: 4 },
+          { key: "done", tone: "done", count: 4 },
           { key: tone, tone, count: 3 },
           { key: "empty", tone: "waiting", count: 0 },
         ]}

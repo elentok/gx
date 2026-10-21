@@ -50,8 +50,8 @@ can link to it. Nothing links to a map epic yet.
     came from.
 16. As a reader, I want deep fork chains to stop indenting after two levels, so that rows stay readable
     on a phone.
-17. As a reader, I want a done fork in the fold to say `fork of NN`, so that I keep the link to its
-    parent even in a flat list.
+17. As a reader, I want a done fork in the fold nested under its done parent, and to say `fork of NN`
+    when its parent is not in the fold, so that I keep the link to its parent.
 18. As a reader, I want a live fork whose parent is done to sit at the top level with `fork of NN`, so
     that it does not indent under a row that is hidden in the fold.
 19. As a reader, I want a running ticket's elapsed time to tick, so that I see it is alive.
@@ -173,10 +173,11 @@ can link to it. Nothing links to a map epic yet.
     agent time`. It is dimmed. Cost and agent time count landed tickets only. There is no stat grid. N is done plus cancelled and M is every ticket.
     The sentence has no token count. A map epic shows only done and total, with no state word.
   - A native closed `<details>` labelled `✓ N done`, then `· M cancelled` only when M is above 0. N
-    counts done tickets only. It is one flat list of done and cancelled tickets, forks included. Each
-    row shows its id and title in muted text, then elapsed time and cost dimmer. A cancelled row
+    counts done tickets only. It lists done and cancelled tickets, nested by `parent` like the live
+    tickets (same indent cap). Each row shows its id and title, then a dot and the elapsed time and
+    cost, dimmer, on the same line. Done rows use the `done` tone (blue), cancelled rows stay muted. A cancelled row
     shows a muted `cancelled` word instead of elapsed time, plus the cost if there is one. A fork row
-    shows `fork of NN`.
+    shows `fork of NN` only when its parent is not in the fold.
   - Live tickets (everything not done or cancelled) as tinted blocks in ticket order, nested by
     `parent` as described under Nesting.
     Each shows the id in the tone color, the title, and one dim line with the status word, elapsed

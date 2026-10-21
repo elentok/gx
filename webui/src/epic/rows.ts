@@ -18,7 +18,7 @@ const BUCKETS: Record<string, Bucket> = {
 const bucketOf = (row: EpicDetailRow): Bucket => BUCKETS[row.rendered_status] ?? "waiting";
 
 const BUCKET_TONES: Record<Bucket, Tone> = {
-  done: "muted",
+  done: "done",
   running: "running",
   "needs-answer": "parked",
   waiting: "waiting",
@@ -78,11 +78,12 @@ function blockerNote(blockers: string[]): string {
   return `after ${head ? `${head} and ` : ""}${blockers[blockers.length - 1]}`;
 }
 
-// A fork says what it forks from when that parent is not drawn above it: the fork is folded, or its parent is.
+// A fork says what it forks from when that parent is not drawn above it: the parent sits in the other group,
+// or is not in the epic. A fork nested under its parent in the same group needs no note.
 function forkNote(row: EpicDetailRow, byAddress: Map<string, EpicDetailRow>): string | undefined {
   if (!row.parent) return undefined;
   const parent = byAddress.get(row.parent);
-  return isFolded(row) || (parent && isFolded(parent)) ? `fork of ${idOf(row.parent)}` : undefined;
+  return !parent || isFolded(parent) !== isFolded(row) ? `fork of ${idOf(row.parent)}` : undefined;
 }
 
 export interface RowContext {
@@ -121,15 +122,15 @@ export function foldedTail(row: EpicDetailRow, ctx: RowContext): string {
 
 export const MAX_INDENT = 2;
 
-// Live rows in display order: each fork follows its parent, indented one level per generation up to MAX_INDENT.
-// A row whose parent is folded or absent starts at the top level.
-export function nestLive(rows: EpicDetailRow[]): { row: EpicDetailRow; indent: number }[] {
-  const live = rows.filter((r) => !isFolded(r));
-  const liveAddresses = new Set(live.map((r) => r.address));
+// Rows of one group (live or folded) in display order: each fork follows its parent, indented one level per
+// generation up to MAX_INDENT. A row whose parent is in the other group or absent starts at the top level.
+function nestGroup(rows: EpicDetailRow[], inGroup: (r: EpicDetailRow) => boolean): { row: EpicDetailRow; indent: number }[] {
+  const group = rows.filter(inGroup);
+  const addresses = new Set(group.map((r) => r.address));
   const children = new Map<string, EpicDetailRow[]>();
   const roots: EpicDetailRow[] = [];
-  for (const r of live) {
-    if (r.parent && liveAddresses.has(r.parent)) children.set(r.parent, [...(children.get(r.parent) ?? []), r]);
+  for (const r of group) {
+    if (r.parent && addresses.has(r.parent)) children.set(r.parent, [...(children.get(r.parent) ?? []), r]);
     else roots.push(r);
   }
   const out: { row: EpicDetailRow; indent: number }[] = [];
@@ -140,3 +141,6 @@ export function nestLive(rows: EpicDetailRow[]): { row: EpicDetailRow; indent: n
   roots.forEach((r) => walk(r, 0));
   return out;
 }
+
+export const nestLive = (rows: EpicDetailRow[]) => nestGroup(rows, (r) => !isFolded(r));
+export const nestFolded = (rows: EpicDetailRow[]) => nestGroup(rows, isFolded);

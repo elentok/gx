@@ -312,6 +312,27 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
   expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 01", "open · fork of 05"]);
 });
 
+test("done forks nest under a done parent in the fold, and only a fork whose parent is elsewhere says fork of", async () => {
+  const rows = [
+    rowOf("01", "done"),
+    rowOf("02", "done", { parent: "gx:e/01" }),
+    rowOf("03", "open"),
+    rowOf("04", "done", { parent: "gx:e/03" }),
+  ];
+  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 4, done: 3, rows }));
+  await screen.findByText("Title 01");
+  const fold = [...container.querySelectorAll("[data-fold-indent]")].map((el) => [
+    el.querySelector("span + span")?.textContent,
+    el.getAttribute("data-fold-indent"),
+  ]);
+  expect(fold).toEqual([
+    ["Title 01", "0"],
+    ["Title 02", "1"],
+    ["Title 04", "0"],
+  ]);
+  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 03"]);
+});
+
 test("a blocked row lists its blockers, cross-epic ones as epic/NN", async () => {
   const rows = [
     rowOf("02", "blocked", { blockers: ["04", "other-epic/06"] }),

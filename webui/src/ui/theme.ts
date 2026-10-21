@@ -7,6 +7,7 @@ const toneColors: Record<Tone, { fg: string; bg: string }> = {
   waiting: { fg: "#f2b845", bg: "rgba(242, 184, 69, 0.16)" },
   parked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
   deadlocked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
+  done: { fg: "#6cb4ff", bg: "rgba(108, 180, 255, 0.16)" },
   muted: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.14)" },
 };
 
@@ -49,6 +50,7 @@ export const themeConfig = defineConfig({
         md: { value: "15px" },
         lg: { value: "17px" },
         xl: { value: "22px" },
+        "2xl": { value: "30px" },
       },
       spacing: {
         1: { value: "4px" },
