@@ -9,6 +9,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import { useEpicList, type FetchEpicList } from "./list";
+import { postQueueAdd } from "./queue";
 import { searchEpics, sectionsOf, stateBadge, timePart } from "./view";
 
 const Dim = ({ children }: { children: string }) => (
@@ -19,7 +20,49 @@ const Dim = ({ children }: { children: string }) => (
 
 const epicLink = (address: string) => `#/e/${address}`;
 
-function EpicRow({ row, now, withBadge }: { row: EpicListRow; now: Date; withBadge?: boolean }) {
+function QueueButton({ row, onQueued }: { row: EpicListRow; onQueued: () => void }) {
+  const [pending, setPending] = useState(false);
+  const [refusal, setRefusal] = useState<string>();
+
+  async function queue() {
+    setPending(true);
+    setRefusal(undefined);
+    try {
+      const res = await postQueueAdd({ address: row.address, state: row.state });
+      if (res.refused) setRefusal(res.message || res.reason);
+      else onQueued();
+    } catch {
+      setRefusal("Could not queue the epic");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <Button tone="running" disabled={pending} onClick={queue}>
+        {pending ? "Queueing…" : "Queue"}
+      </Button>
+      {refusal && (
+        <Text as="span" role="alert" color="text.muted">
+          {refusal}
+        </Text>
+      )}
+    </>
+  );
+}
+
+function EpicRow({
+  row,
+  now,
+  withBadge,
+  onQueued,
+}: {
+  row: EpicListRow;
+  now: Date;
+  withBadge?: boolean;
+  onQueued: () => void;
+}) {
   const badge = stateBadge(row.state);
   // Sections mark only a finished map; search rows mark every map.
   const marked = row.kind === "map" && (withBadge || row.state === "finished");
@@ -48,6 +91,7 @@ function EpicRow({ row, now, withBadge }: { row: EpicListRow; now: Date; withBad
           ))}
         </Text>
       )}
+      {!withBadge && row.queueable && <QueueButton row={row} onQueued={onQueued} />}
     </Box>
   );
 }
@@ -73,8 +117,9 @@ function FollowUps({ counts }: { counts: FollowUpCount[] }) {
 }
 
 export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
-  const { connected } = useConnectionState(useConnectionContext());
-  const { list, failed, retry } = useEpicList(fetchList);
+  const conn = useConnectionContext();
+  const { connected } = useConnectionState(conn);
+  const { list, failed, retry } = useEpicList(fetchList, conn);
   const [query, setQuery] = useState("");
   const now = new Date();
   const searching = query.trim() !== "";
@@ -113,7 +158,7 @@ export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
         ) : searching ? (
           <Box mt="4">
             {searchEpics(list.epics, query).map((r) => (
-              <EpicRow key={r.address} row={r} now={now} withBadge />
+              <EpicRow key={r.address} row={r} now={now} withBadge onQueued={retry} />
             ))}
             {searchEpics(list.epics, query).length === 0 && <EmptyState title="No match" />}
           </Box>
@@ -126,7 +171,7 @@ export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
                 <Badge tone={s.tone}>{s.title}</Badge>
               </Heading>
               {s.rows.map((r) => (
-                <EpicRow key={r.address} row={r} now={now} />
+                <EpicRow key={r.address} row={r} now={now} onQueued={retry} />
               ))}
             </Box>
           ))

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { Connection } from "../connection";
 import type { EpicList } from "../generated/server";
 
 export type { EpicList };
@@ -18,11 +19,14 @@ export interface EpicListState {
   retry: () => void;
 }
 
-export function useEpicList(fetcher: FetchEpicList = fetchEpicList): EpicListState {
+export const REFETCH_DEBOUNCE_MS = 500;
+
+export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Connection): EpicListState {
   const [list, setList] = useState<EpicList | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
+  // A failed refetch keeps the last list: `failed` only shows while nothing is loaded.
   useEffect(() => {
     let live = true;
     setFailed(false);
@@ -36,5 +40,19 @@ export function useEpicList(fetcher: FetchEpicList = fetchEpicList): EpicListSta
   }, [fetcher, attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  useEffect(() => {
+    if (!conn) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = conn.onEvent(() => {
+      clearTimeout(timer);
+      timer = setTimeout(retry, REFETCH_DEBOUNCE_MS);
+    });
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [conn, retry]);
+
   return { list, failed: failed && list === null, retry };
 }

@@ -39,10 +39,23 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
 
 const listOf = (epics: EpicListRow[], follow_ups: EpicList["follow_ups"] = []): EpicList => ({ epics, follow_ups });
 
-function renderEpics(fetchList: FetchEpicList) {
+function eventConn() {
+  const listeners = new Set<() => void>();
+  const c = {
+    getState: () => state,
+    subscribe: () => () => {},
+    onEvent: (l: () => void) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  } as unknown as Connection;
+  return { conn: c, emit: () => listeners.forEach((l) => l()) };
+}
+
+function renderEpics(fetchList: FetchEpicList, withConn: Connection = conn) {
   const router = createMemoryRouter(appRoutes(undefined, undefined, fetchList), { initialEntries: ["/epics"] });
   return renderThemed(
-    <ConnectionContext.Provider value={conn}>
+    <ConnectionContext.Provider value={withConn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
@@ -181,4 +194,83 @@ test("a failed first fetch shows Could not load epics, and Retry fetches again",
   expect(await screen.findByRole("region", { name: "Ready to queue" })).toBeTruthy();
   expect(screen.queryByText("Could not load epics")).toBeNull();
   expect(calls).toBe(2);
+});
+
+test("a burst of events gives one refetch, and search text survives it", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const { conn: c, emit } = eventConn();
+  const fetchList = vi.fn(async () => listOf([row("x")]));
+  renderEpics(fetchList, c);
+  const box = await screen.findByRole("searchbox", { name: "Search epics" });
+  fireEvent.change(box, { target: { value: "x" } });
+  await waitFor(() => expect(fetchList).toHaveBeenCalledTimes(1));
+  act(() => {
+    emit();
+    vi.advanceTimersByTime(200);
+    emit();
+    vi.advanceTimersByTime(200);
+    emit();
+  });
+  expect(fetchList).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    vi.advanceTimersByTime(500);
+  });
+  expect(fetchList).toHaveBeenCalledTimes(2);
+  expect((box as HTMLInputElement).value).toBe("x");
+});
+
+test("a failed refetch keeps the last list", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const { conn: c, emit } = eventConn();
+  let calls = 0;
+  renderEpics(async () => {
+    if (++calls > 1) throw new Error("down");
+    return listOf([row("keep")]);
+  }, c);
+  await screen.findByRole("region", { name: "Ready to queue" });
+  act(() => emit());
+  await act(async () => {
+    vi.advanceTimersByTime(500);
+  });
+  expect(calls).toBe(2);
+  expect(screen.getByRole("link", { name: "keep" })).toBeTruthy();
+  expect(screen.queryByText("Could not load epics")).toBeNull();
+});
+
+const stubQueueAdd = (reply: () => Promise<Response>) => {
+  const f = vi.fn((_url: string, _init: RequestInit) => reply());
+  vi.stubGlobal("fetch", f);
+  return f;
+};
+
+test("Queue shows a pending label, then refetches at once and the row leaves", async () => {
+  let release!: (r: Response) => void;
+  const post = stubQueueAdd(() => new Promise((res) => (release = res)));
+  let queued = false;
+  renderEpics(async () => listOf(queued ? [] : [row("x")]));
+  await screen.findByRole("region", { name: "Ready to queue" });
+  fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+  const pending = await screen.findByRole("button", { name: "Queueing…" });
+  expect((pending as HTMLButtonElement).disabled).toBe(true);
+  const body = JSON.parse(post.mock.calls[0]![1]!.body as string);
+  expect(body.address).toBe("gx:x");
+  expect(body.state).not.toBe("");
+  queued = true;
+  await act(async () => release(new Response(JSON.stringify({ queue: [] }))));
+  await waitFor(() => expect(screen.queryByRole("region")).toBeNull());
+  vi.unstubAllGlobals();
+});
+
+test("a refused Queue shows the reason inline and keeps the row", async () => {
+  stubQueueAdd(
+    async () =>
+      new Response(JSON.stringify({ refused: true, reason: "already-queued", message: "already in the queue" })),
+  );
+  renderEpics(async () => listOf([row("x")]));
+  await screen.findByRole("region", { name: "Ready to queue" });
+  fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("already in the queue");
+  expect(screen.getByRole("link", { name: "x" })).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Queue" }) as HTMLButtonElement).disabled).toBe(false);
+  vi.unstubAllGlobals();
 });
