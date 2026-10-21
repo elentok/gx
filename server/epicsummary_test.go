@@ -45,6 +45,16 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 			wantState: EpicStateAwaitingMerge, wantDone: 2,
 		},
 		{
+			name:      "completed but unmerged stays awaiting merge",
+			epic:      tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), Tickets: []tickets.Ticket{summaryTicket("01", "done")}},
+			wantState: EpicStateAwaitingMerge, wantDone: 1,
+		},
+		{
+			name:      "merged epic is finished",
+			epic:      tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), MergedAt: time.Unix(60, 0), Tickets: []tickets.Ticket{summaryTicket("01", "done")}},
+			wantState: EpicStateFinished, wantDone: 1,
+		},
+		{
 			name: "running: claimed with a server claim time",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
 				summaryTicket("01", "done"), summaryTicket("02", "claimed"), summaryTicket("03", "needs-repair"),

@@ -12,6 +12,7 @@ type EpicState string
 
 const (
 	EpicStateAwaitingMerge EpicState = "awaiting-merge"
+	EpicStateFinished      EpicState = "finished"
 	EpicStateRunning       EpicState = "running"
 	EpicStateWaiting       EpicState = "waiting"
 	EpicStateParked        EpicState = "parked"
@@ -159,6 +160,9 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 	switch epicStateOf(e) {
 	case epicDone:
 		sum.State = EpicStateAwaitingMerge
+		if !e.MergedAt.IsZero() {
+			sum.State = EpicStateFinished
+		}
 		if oneOffs {
 			sum.State = EpicStateWaiting
 		}

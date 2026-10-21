@@ -53,6 +53,7 @@ var epicStateLabels = map[server.EpicState]string{
 	server.EpicStateRunning:       "Running",
 	server.EpicStateWaiting:       "Waiting for a slot",
 	server.EpicStateAwaitingMerge: "Awaiting merge",
+	server.EpicStateFinished:      "Finished",
 }
 
 // epicStatusLine picks an epic header's status-line icon, text, and color from
@@ -60,7 +61,7 @@ var epicStateLabels = map[server.EpicState]string{
 // deadlocked epic.
 func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph string) (icon, text string, style lipgloss.Style) {
 	switch sum.State {
-	case server.EpicStateAwaitingMerge:
+	case server.EpicStateAwaitingMerge, server.EpicStateFinished:
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
 	case server.EpicStateRunning:
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()

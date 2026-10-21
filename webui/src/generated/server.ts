@@ -180,11 +180,12 @@ export interface TicketDetail {
  * EpicState is EpicSummary.State.
  */
 export const EpicStateAwaitingMerge = "awaiting-merge";
+export const EpicStateFinished = "finished";
 export const EpicStateRunning = "running";
 export const EpicStateWaiting = "waiting";
 export const EpicStateParked = "parked";
 export const EpicStateDeadlocked = "deadlocked";
-export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateRunning | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
 /**
  * SummaryTicket is one ticket in an EpicSummary: an active one carries
  * ClaimedAt, a Parked one carries Recovery and its unclipped Park reason.

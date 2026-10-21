@@ -50,6 +50,7 @@ const STATES: Record<EpicState, { order: number; tone: Tone; label: string }> = 
   running: { order: 2, tone: "running", label: "Running" },
   waiting: { order: 3, tone: "waiting", label: "Waiting for a slot" },
   "awaiting-merge": { order: 4, tone: "muted", label: "Awaiting merge" },
+  finished: { order: 5, tone: "muted", label: "Finished" },
 };
 
 // Only Waiting changes with the queue mode: a paused or draining queue is why
