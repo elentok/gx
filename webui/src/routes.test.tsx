@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test } from "vitest";
 import { ConnectionContext, createConnection, type Connection, type ConnectionState } from "./connection";
 import { appRoutes } from "./routes";
-import type { EpicDetail, FetchEpicDetail } from "./epic/detail";
+import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail";
 import type { Snapshot } from "./snapshot";
 import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail";
 import { renderThemed } from "./ui/render";
@@ -164,6 +164,73 @@ test("the Queue, ticket and epic pages all render inside the shared container", 
   const e = renderAt("/e/gx:e", okFor, undefined, epicFetch());
   await screen.findByText("No tickets yet");
   expect(e.container.querySelector("[data-page-container]")).toBeTruthy();
+});
+
+const rowOf = (n: string, rendered_status: string, over: Partial<EpicDetailRow> = {}): EpicDetailRow => ({
+  address: `gx:e/${n}`,
+  title: `Title ${n}`,
+  rendered_status,
+  ...over,
+});
+
+const loopRows = [
+  rowOf("01", "done", { elapsed: 125, cost: 1.5 }),
+  rowOf("02", "cancelled", { cost: 0.25 }),
+  rowOf("03", "claimed", { elapsed: 3700 }),
+  rowOf("04", "needs-repair"),
+  rowOf("05", "draft"),
+  rowOf("06", "blocked", { cost: 0.1 }),
+];
+
+test("an epic page draws the segmented bar without empty segments, cancelled counted as done", async () => {
+  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  await screen.findByRole("progressbar", { name: "Epic progress" });
+  const segments = [...container.querySelectorAll("[data-segment]")].map((s) => [
+    s.getAttribute("data-segment"),
+    (s as HTMLElement).style.width,
+  ]);
+  expect(segments.map(([k]) => k)).toEqual(["done", "running", "waiting", "attention"]);
+  expect(segments[0][1]).toBe(`${(2 / 6) * 100}%`);
+});
+
+test("a loop epic shows the stat sentence with no token counts", async () => {
+  renderAt(
+    "/e/gx:e",
+    okFor,
+    undefined,
+    epicFetch({ state: "running", total: 6, done: 2, wall_clock: 4000, cost_total: 1.75, agent_time: 125, rows: loopRows }),
+  );
+  expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $1.75 · 2m of agent time")).toBeTruthy();
+  expect(screen.queryByText(/token/i)).toBeNull();
+});
+
+test("the done fold counts done tickets and adds cancelled only when above zero", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  expect(await screen.findByText("✓ 1 done · 1 cancelled")).toBeTruthy();
+  expect(screen.getByText("2m · $1.50")).toBeTruthy();
+  expect(screen.getByText("cancelled · $0.25")).toBeTruthy();
+  cleanup();
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 1, done: 1, rows: [rowOf("01", "done")] }));
+  expect(await screen.findByText("✓ 1 done")).toBeTruthy();
+});
+
+test("live tickets show their status word, elapsed time and cost; the draft word shows on drafts", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  expect(await screen.findByText("claimed · 1h 1m")).toBeTruthy();
+  expect(screen.getByText("needs-repair")).toBeTruthy();
+  expect(screen.getByText("draft")).toBeTruthy();
+  expect(screen.getByText("blocked · $0.10")).toBeTruthy();
+});
+
+test("a map epic shows only N of M done and rows with title and status", async () => {
+  renderAt(
+    "/e/gx:m",
+    okFor,
+    undefined,
+    epicFetch({ kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open", { elapsed: 60 })] }),
+  );
+  expect(await screen.findByText("1 of 2 done")).toBeTruthy();
+  expect(screen.getByText("open")).toBeTruthy();
 });
 
 function eventFrame(seq: number, address: string) {

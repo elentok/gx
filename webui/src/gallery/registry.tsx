@@ -6,6 +6,7 @@ import { Chip } from "../ui/chip/Chip";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
+import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TONES, type Tone } from "../ui/tone";
@@ -36,6 +37,20 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "empty", node: <ProgressBar value={0} max={10} /> },
       { label: "full", node: <ProgressBar value={10} max={10} /> },
     ],
+  },
+  {
+    name: "SegmentedBar",
+    cases: perTone((tone) => (
+      <SegmentedBar
+        label={tone}
+        value={4}
+        segments={[
+          { key: "done", tone: "muted", count: 4 },
+          { key: tone, tone, count: 3 },
+          { key: "empty", tone: "waiting", count: 0 },
+        ]}
+      />
+    )),
   },
   {
     name: "TicketLine",

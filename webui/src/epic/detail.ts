@@ -1,8 +1,8 @@
 import type { Connection } from "../connection";
-import type { EpicDetail } from "../generated/server";
+import type { EpicDetail, EpicDetailRow } from "../generated/server";
 import { useDetail, type DetailState } from "../ticket/detail";
 
-export type { EpicDetail };
+export type { EpicDetail, EpicDetailRow };
 
 export type EpicDetailResult = { kind: "ok"; detail: EpicDetail } | { kind: "not-found" };
 
