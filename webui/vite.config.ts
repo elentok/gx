@@ -53,5 +53,6 @@ export default defineConfig({
     environment: "jsdom",
     // Testing Library registers its between-test cleanup only when globals exist.
     globals: true,
+    setupFiles: ["./src/test-setup.ts"],
   },
 });

@@ -1,7 +1,8 @@
 import { Box, Heading, Skeleton, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { Link } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
+import { BackLink } from "../nav/BackLink";
+import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
@@ -88,7 +89,8 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
     <Box>
       {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
       <PageContainer>
-        <Link to="/">← Queue</Link>
+        <ConnectedTopBar />
+        <BackLink to="/q" label="← Queue" />
         {notFound ? (
           <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
         ) : detail ? (

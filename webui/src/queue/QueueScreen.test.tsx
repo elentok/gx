@@ -20,7 +20,7 @@ const state = (patch: Partial<ConnectionState> = {}): ConnectionState => ({
 describe("QueueScreen", () => {
   it("renders a card per epic with its state badge", () => {
     const { container } = renderThemed(<QueueScreen state={state()} />);
-    expect(screen.getByRole("heading", { name: "Queue" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Queue" })).toBeNull();
     expect(container.querySelectorAll("[role=progressbar]")).toHaveLength(snap.epics.length);
     for (const label of ["Running", "Parked", "Deadlocked", "Awaiting merge"]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
@@ -34,6 +34,17 @@ describe("QueueScreen", () => {
     unmount();
     renderThemed(<QueueScreen state={state({ snapshot: { ...snap, build: undefined } })} />);
     expect(screen.queryByTestId("server-build")).toBeNull();
+  });
+
+  it("shows the Paused or Draining chip and the Live or Offline dot in the top bar", () => {
+    const paused = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "paused" } })} />);
+    expect(paused.getByText("Paused")).toBeTruthy();
+    expect(paused.getByRole("status", { name: "Live" })).toBeTruthy();
+    expect(paused.getByRole("link", { name: "Queue" }).getAttribute("aria-current")).toBe("page");
+    paused.unmount();
+    const draining = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "draining" }, connected: false })} />);
+    expect(draining.getByText("Draining")).toBeTruthy();
+    expect(draining.getByRole("status", { name: "Offline" })).toBeTruthy();
   });
 
   it("shows the deadlock reason clamped to two lines", () => {

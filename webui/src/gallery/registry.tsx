@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
 import { Badge } from "../ui/badge/Badge";
+import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
 import { Chip } from "../ui/chip/Chip";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -9,6 +10,7 @@ import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
+import { TopBar } from "../ui/top-bar/TopBar";
 import { TONES, type Tone } from "../ui/tone";
 
 export interface GalleryCase {
@@ -83,6 +85,31 @@ export const galleryEntries: GalleryEntry[] = [
         </Card>
       )),
       { label: "no title", node: <Card>{ticket.title}</Card> },
+    ],
+  },
+  {
+    name: "Button",
+    cases: [
+      ...perTone((tone) => <Button tone={tone}>{tone}</Button>),
+      ...(["solid", "tinted", "outline", "ghost"] as const).map((variant) => ({
+        label: variant,
+        node: <Button variant={variant}>{variant}</Button>,
+      })),
+      { label: "md", node: <Button size="md">md</Button> },
+      { label: "disabled", node: <Button disabled>disabled</Button> },
+    ],
+  },
+  {
+    name: "TopBar",
+    cases: [
+      ...perTone((tone) => <TopBar active="queue" tone={tone} build="v1.2.3" connected />),
+      { label: "Queue active", node: <TopBar active="queue" build="v1.2.3" connected /> },
+      { label: "Epics active", node: <TopBar active="epics" build="v1.2.3" connected /> },
+      { label: "none active", node: <TopBar build="v1.2.3" connected /> },
+      { label: "Paused", node: <TopBar active="queue" build="v1.2.3" mode="paused" connected /> },
+      { label: "Draining", node: <TopBar active="queue" build="v1.2.3" mode="draining" connected /> },
+      { label: "Offline", node: <TopBar active="queue" build="v1.2.3" connected={false} /> },
+      { label: "no build string", node: <TopBar active="queue" connected /> },
     ],
   },
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },

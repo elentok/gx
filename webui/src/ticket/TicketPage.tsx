@@ -1,7 +1,8 @@
 import { Box, Skeleton, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { Link } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
+import { BackLink } from "../nav/BackLink";
+import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
@@ -19,12 +20,15 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
   const [unparked, setUnparked] = useState("");
+  // A ticket address is <project>:<epic>/<id>.
+  const epicAddress = address.slice(0, address.lastIndexOf("/"));
 
   return (
     <Box>
       {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
       <PageContainer>
-        <Link to="/">← Queue</Link>
+        <ConnectedTopBar />
+        <BackLink to={`/e/${epicAddress}`} label={`← ${epicAddress.slice(epicAddress.indexOf(":") + 1)}`} />
         {notFound ? (
           <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
         ) : detail ? (

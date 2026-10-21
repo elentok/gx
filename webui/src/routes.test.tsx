@@ -56,14 +56,27 @@ function renderAt(
   );
 }
 
-test("the root route shows the Queue", async () => {
-  renderAt("/", okFor);
-  expect(await screen.findByRole("heading", { name: "Queue" })).toBeTruthy();
+const currentTab = () => screen.getByRole("link", { current: "page" }).textContent;
+
+test.each(["/", "/q", "/nonsense/here"])("%s shows the Queue with the Queue tab marked and no h1", async (path) => {
+  renderAt(path, okFor);
+  await waitFor(() => expect(currentTab()).toBe("Queue"));
+  expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 });
 
-test("an unknown hash shows the Queue", async () => {
-  renderAt("/nonsense/here", okFor);
-  expect(await screen.findByRole("heading", { name: "Queue" })).toBeTruthy();
+test("the Epics route marks the Epics tab", async () => {
+  renderAt("/epics", okFor);
+  await waitFor(() => expect(currentTab()).toBe("Epics"));
+});
+
+test("the epic and ticket pages mark no tab", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch());
+  await screen.findByText("No tickets yet");
+  expect(screen.queryByRole("link", { current: "page" })).toBeNull();
+  cleanup();
+  renderAt("/t/gx:e/01", okFor);
+  await screen.findByRole("heading", { name: "Title of gx:e/01" });
+  expect(screen.queryByRole("link", { current: "page" })).toBeNull();
 });
 
 test("a ticket route shows a skeleton, then the ticket whose address is in the hash", async () => {
@@ -108,10 +121,24 @@ test("a failed refetch keeps the last page, and the Offline strip shows", async 
   expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
 });
 
-// jsdom's AbortSignal is rejected by the router's Request, so a click cannot navigate here.
-test("the back link points at the Queue", async () => {
+test("after a direct load the ticket back link falls back to its epic", async () => {
   renderAt("/t/gx:e/01", okFor);
-  expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/");
+  expect((await screen.findByRole("link", { name: "← e" })).getAttribute("href")).toBe("/e/gx:e");
+});
+
+test("after a direct load the epic back link falls back to the Queue", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch());
+  expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/q");
+});
+
+test("a page reached inside the app has a ← Back link", async () => {
+  const router = createMemoryRouter(appRoutes(okFor, epicFetch()), { initialEntries: ["/q", "/e/gx:e"], initialIndex: 1 });
+  renderThemed(
+    <ConnectionContext.Provider value={fakeConnection(true)}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+  expect(await screen.findByRole("link", { name: "← Back" })).toBeTruthy();
 });
 
 const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
@@ -165,8 +192,8 @@ test("an empty epic shows No tickets yet, and an empty summary renders nothing",
 });
 
 test("the Queue, ticket and epic pages all render inside the shared container", async () => {
-  const q = renderAt("/", okFor);
-  await screen.findByRole("heading", { name: "Queue" });
+  const q = renderAt("/q", okFor);
+  await screen.findByRole("link", { name: "Queue" });
   expect(q.container.querySelector("[data-page-container]")).toBeTruthy();
   cleanup();
   const t = renderAt("/t/gx:e/01", okFor);
