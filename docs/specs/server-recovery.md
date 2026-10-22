@@ -277,7 +277,7 @@ both herdr and headless runners.
     caller including claim-time `resolveBase`, so that where an epic starts and where it lands always
     agree.
 75. As a developer, I want a `rootRefs` error in `completeEpic` to park the root visibly
-    (trunk-missing, or `land-error` with the `gx server epics merge` hint), so that an all-done epic
+    (trunk-missing, or `land-error` with the "merge again" hint), so that an all-done epic
     never strands silently in the queue and gx never locks on an empty target.
 76. As a developer, I want `landEpic` to decide under the lock and its caller to send notices and the
     retro after unlock, so that claiming in other epics is never blocked by a land's side effects.
@@ -465,7 +465,7 @@ plumbing.
   adopted as today (stamp from `merge-base(feature, ref)`) and keeps its base.
 - `completeEpic` never locks on an empty target. A `rootRefs` error parks the root like `landRoot`
   does: trunk missing → trunk-missing state; else a `land-error` park with the
-  `gx server epics merge` hint.
+  "merge again" hint.
 - `landEpic` returns a decision (merged, already, removed, park kind, sendNotice, submitRetro).
   Stamps, `removeRoot` and git stay under `trunkLocks`; the caller sends notices and runs
   `submitRetro` after unlock.

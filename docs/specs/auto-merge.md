@@ -46,13 +46,15 @@ From the person's view:
 - If the merge needs a person (an unresolvable conflict, a real test failure), the merge ticket
   parks `needs-answer` with the reason, like any other ticket.
 - If trunk keeps moving, the server tries one more merge ticket, then parks the root ("needs
-  rebase … run gx server epics merge <project:epic>").
+  rebase … then merge again").
 - A dirty trunk checkout, or any other land error, parks the root with a reason that names the fix.
-  Nothing sits in the queue looking stuck.
+  Nothing sits in the queue looking stuck. The epic shows "Merge blocked" with that reason, and
+  "Merging" while a merge ticket is open (see `epic-land-visibility.md`).
 - Each epic records `merged_at` when it lands. Dependents wait for the land, the Tickets tab shows
   merged epics apart from complete-but-unmerged ones, and chat tells the two apart.
-- A person can ask for a merge at any time with `gx server epics merge <project:epic>` or the
-  `m` menu, even with `auto-ff-merge` off.
+- A person can ask for a merge at any time with `gx server epics merge <project:epic>`, the
+  `m` menu or the web Merge button, even with `auto-ff-merge` off. The same three ways merge again
+  after a failed land.
 - Cross-epic `blocked_by` waits on a whole epic. A reference to one commitful ticket in another epic
   is widened to that whole epic.
 
@@ -85,7 +87,7 @@ From the person's view:
 
 10. As a project owner, I want a second merge ticket if trunk moved again during the first, so that
     one unlucky race does not need me.
-11. As a project owner, I want the root to park ("needs rebase … run gx server epics merge <project:epic>") once the epic has
+11. As a project owner, I want the root to park ("needs rebase … then merge again") once the epic has
     two merge tickets and still cannot fast-forward, so that gx never loops forever.
 12. As a project owner, I want a non-ff caused by another epic's land to count against the cap like
     any other non-ff, so that the cap is simple and predictable.
@@ -128,8 +130,8 @@ From the person's view:
 ### Dirty trunk and other land errors
 
 27. As a project owner whose trunk checkout has local changes that block the ff, I want the root
-    parked with "trunk dirty: `<target>` checked out at `<dir>` has local changes in `<files>`;
-    commit or discard them, then run gx server epics merge `<project:epic>`", so that I know exactly what to fix.
+    parked with "uncommitted changes on `<target>` (`<files>`) clash with `<epic>`; commit or
+    discard them, then merge again", so that I know exactly what to fix.
 28. As a project owner, I want local changes that do not overlap the land to be ignored, so that a
     dirty trunk only matters when git actually refuses.
 29. As a project owner, I want the file list in the dirty-trunk reason capped at about five, then
@@ -139,7 +141,7 @@ From the person's view:
 31. As a project owner, I want a dirty trunk hit after a merge ticket to leave the merge ticket
     `done` and not use up the retry cap, so that the cap only counts real rebases.
 32. As a project owner, I want any other land error to park the root with "land failed: `<git
-    error>`; fix it, then run gx server epics merge `<project:epic>`", so that no root ever sits all-done in the queue
+    error>`; fix it, then merge again", so that no root ever sits all-done in the queue
     looking stuck.
 33. As a Queue or chat reader, I want `dirty-trunk` and `land-error` event kinds on the root-park
     event, so that they are told apart from "needs rebase".
@@ -346,9 +348,10 @@ From the person's view:
   chat park as needs-answer, reason text, root stays queued. No ticket gets a status or
   `park_kind`. New event kinds on `root-parked`: `dirty-trunk` and `land-error`.
 - Reason texts:
-  - Dirty trunk: `trunk dirty: <target> checked out at <dir> has local changes in <files>; commit
-    or discard them, then run gx server epics merge <project:epic>`. File list capped at about 5, then `+N more`.
-  - Other: `land failed: <git error>; fix it, then run gx server epics merge <project:epic>`.
+  - Dirty trunk: `uncommitted changes on <target> (<files>) clash with <epic>; commit or discard
+    them, then merge again`. Only clashing files are listed, capped at about 5, then `+N more`.
+  - Other: `land failed: <git error>; fix it, then merge again`.
+  - "Merge again" means `gx server epics merge <project:epic>` or the web Merge button.
 - A merge ticket never touches trunk. If the land after it hits a dirty trunk, the merge ticket
   stays `done`, the root parks as above, and no merge ticket is forked (cap untouched).
 - The server never removes `<worktreeDir>/<epic>` or the `<epic>` branch after any land (merge
