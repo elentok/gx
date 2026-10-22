@@ -315,17 +315,20 @@ func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
 }
 
 var (
-	slashCallRe     = regexp.MustCompile("(?:^|[\\s(`'\"])/([a-z][a-z0-9-]*)(?:[\\s)`'\".,;:]|$)")
+	slashCallRe     = regexp.MustCompile("(?m)(?:^|\\s)[(`'\"]?/([a-z][a-z0-9-]*)(?:[\\s)`'\".,;:]|$)")
 	skillToolCallRe = regexp.MustCompile(`Skill\(|skill:\s*"([^"]+)"`)
 	skillLinkRe     = regexp.MustCompile(`\]\(([^)]*SKILL\.md)\)`)
 )
 
-// notSkillCalls are slash tokens that are not skill invocations: harness
-// built-ins, ticket types, and URL paths or placeholders used in examples.
+// notSkillCalls are slash tokens that are not skill invocations.
 var notSkillCalls = map[string]bool{
+	// Claude Code built-in commands.
 	"clear": true, "new": true, "compact": true,
+	// The spec names these as ticket types, so they stay mentionable.
 	"grilling": true, "research": true, "prototype": true,
-	"name": true, "command": true, "the": true, "zero-commit": true,
+	// Placeholders in prose ("an explicit `/command`", "a `/name` invocation").
+	"command": true, "name": true,
+	// Route paths in example code and quotes (UI.md, mocking.md).
 	"orders": true, "settings": true,
 }
 
@@ -334,7 +337,6 @@ var notSkillCalls = map[string]bool{
 // relative SKILL.md link leaving the bundle.
 func outsideBundleCalls(rel, text string, bundleSkills map[string]bool) []string {
 	var bad []string
-	text = stripFencedBlocks(text)
 	for _, m := range slashCallRe.FindAllStringSubmatch(text, -1) {
 		if !bundleSkills[m[1]] && !notSkillCalls[m[1]] {
 			bad = append(bad, "/"+m[1])
@@ -388,12 +390,19 @@ func TestOutsideBundleCallGuardCatchesBadInput(t *testing.T) {
 		"Use /wayfinder to plan.",
 		`Skill(skill: "wayfinder")`,
 		"See [x](../wayfinder/SKILL.md).",
+		"```\n/wayfinder\n```",
+		"```\nSkill(skill: \"wayfinder\")\n```",
 	} {
 		if len(outsideBundleCalls("gx-tdd/SKILL.md", text, names)) == 0 {
 			t.Errorf("guard missed %q", text)
 		}
 	}
-	for _, text := range []string{"Run `/gx-tdd`, `/clear` or /compact.", "[x](../gx-tdd/SKILL.md)"} {
+	for _, text := range []string{
+		"Run `/gx-tdd`, `/clear` or /compact.",
+		"[x](../gx-tdd/SKILL.md)",
+		"see background_task.go/the loop",
+		"https://example.com/orders and needs-answer/zero-commit",
+	} {
 		if got := outsideBundleCalls("gx-tdd/SKILL.md", text, names); len(got) != 0 {
 			t.Errorf("guard flagged %q: %v", text, got)
 		}
