@@ -235,8 +235,12 @@ the row can't go stale between a park and a restart.
 
 **Question block** — the optional fenced `gx-question` YAML block in a question's text. It gives the
 question's type (`yes-no`, `options` or `text`), its options, and which option is recommended. A
-question without one is a free-text question. Not the `Park reason`, which is the question's summary
-line.
+question without one is a free-text question. A question in a **Grilling round** carries one too.
+Not the `Park reason`, which is the question's summary line.
+
+**Grilling round** — the numbered `❓ **Qn**` questions an agent asks a person in one turn. The person
+answers them together, in one prompt. Each question may carry a **Question block**. Not a **Park
+round**, which is one question a paused ticket asks.
 
 **Answered** — a ticket that is `open` again after a person answered its `needs-answer` park and that
 gx has not yet claimed. It is derived, never written: the ticket's latest question has an answer. It
