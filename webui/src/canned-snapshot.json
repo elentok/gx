@@ -102,7 +102,7 @@
       "parked": [
         {
           "address": "gx:run/04",
-          "title": "Parked one",
+          "title": "Paused one",
           "status": "needs-repair",
           "reason": "worktree has uncommitted changes"
         }
@@ -113,30 +113,38 @@
       "address": "gx:dead",
       "name": "dead",
       "project": "gx",
-      "state": "deadlocked",
+      "state": "paused",
       "done": 0,
       "total": 2,
       "active": [],
       "parked": [],
-      "reason": "blocked cycle",
+      "reason": "Dependency deadlock",
+      "detail": "blocked cycle",
       "has_repair": false
     },
     {
       "address": "gx:park",
       "name": "park",
       "project": "gx",
-      "state": "parked",
+      "state": "paused",
       "done": 0,
       "total": 2,
       "active": [],
       "parked": [
         {
           "address": "gx:park/01",
-          "title": "Parked only",
+          "title": "Paused only",
+          "status": "needs-answer"
+        },
+        {
+          "address": "gx:park/02",
+          "title": "Also paused",
           "status": "needs-answer"
         }
       ],
-      "has_repair": false
+      "has_repair": false,
+      "reason": "needs a person",
+      "more": 1
     },
     {
       "address": "gx:run2",

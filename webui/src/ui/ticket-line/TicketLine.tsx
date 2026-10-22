@@ -82,7 +82,7 @@ export function TicketLine({
         <Text
           data-reason
           fontSize="sm"
-          color={tone === "parked" ? "tone.parked.fg" : "text.muted"}
+          color={tone === "paused" ? "tone.paused.fg" : "text.muted"}
           lineClamp={unclipped ? undefined : "2"}
         >
           {reason}
@@ -94,7 +94,7 @@ export function TicketLine({
         </Text>
       )}
       {href && (
-        <Link href={href} fontSize="sm" color="tone.parked.fg">
+        <Link href={href} fontSize="sm" color="tone.paused.fg">
           {linkLabel}
         </Link>
       )}

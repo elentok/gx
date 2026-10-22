@@ -53,7 +53,7 @@ export function EpicCard({ epic, onMerged }: { epic: EpicView; onMerged: () => v
           {epic.reason}
         </Text>
       )}
-      {epic.state === "merge-blocked" && (
+      {epic.mergeBlocked && (
         <Box mt="2" display="flex" alignItems="center" gap="2">
           <MergeButton address={epic.address} state={epic.state} onMerged={onMerged} />
         </Box>

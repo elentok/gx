@@ -71,7 +71,7 @@ export function PermissionCard({
       gap="2"
     >
       <Box display="flex" gap="2" alignItems="center">
-        <Badge tone="parked">Needs approval</Badge>
+        <Badge tone="paused">Needs approval</Badge>
         {card.tool && <Text fontWeight="600">{card.tool}</Text>}
       </Box>
       {card.description && <Text>{card.description}</Text>}

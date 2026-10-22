@@ -259,8 +259,8 @@ test("a waiting epic says Not queued until it holds a queue item", async () => {
 });
 
 test("a Merge blocked epic shows its label and land-block reason; a Merging epic its label", async () => {
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merge-blocked", total: 1, done: 1, land_block_reason: "rebase clash in a.go" }));
-  expect(await screen.findByText(/^Merge blocked · 1 of 1 done/)).toBeTruthy();
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", total: 1, done: 1, land_block_reason: "rebase clash in a.go" }));
+  expect(await screen.findByText(/^Paused · 1 of 1 done/)).toBeTruthy();
   expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
   cleanup();
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merging", total: 2, done: 1 }));
@@ -493,8 +493,8 @@ test("the epic page Queue posts, then refetches; a refusal shows inline", async 
 });
 
 test("the epic page shows Merge only for Awaiting merge and Merge blocked", async () => {
-  for (const state of ["awaiting-merge", "merge-blocked"] as const) {
-    renderAt("/e/gx:e", okFor, undefined, epicFetch({ state }));
+  for (const patch of [{ state: "awaiting-merge" }, { state: "paused", land_block_reason: "rebase clash" }] as const) {
+    renderAt("/e/gx:e", okFor, undefined, epicFetch(patch));
     expect(await screen.findByRole("button", { name: "Merge" })).toBeTruthy();
     cleanup();
   }
@@ -532,7 +532,7 @@ test("the epic page Merge shows a refusal and an HTTP error inline", async () =>
       new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })),
   );
   vi.stubGlobal("fetch", post);
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merge-blocked" }));
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", land_block_reason: "rebase clash" }));
   fireEvent.click(await screen.findByRole("button", { name: "Merge" }));
   expect((await screen.findByRole("alert")).textContent).toBe("the epic changed");
   post.mockImplementation(async () => new Response("boom", { status: 500 }));

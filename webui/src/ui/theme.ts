@@ -5,7 +5,7 @@ import { TONES, type Tone } from "./tone";
 const toneColors: Record<Tone, { fg: string; bg: string }> = {
   running: { fg: "#6cb4ff", bg: "rgba(108, 180, 255, 0.16)" },
   waiting: { fg: "#f2b845", bg: "rgba(242, 184, 69, 0.16)" },
-  parked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
+  paused: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
   deadlocked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
   done: { fg: "#55d996", bg: "rgba(85, 217, 150, 0.16)" },
   muted: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.14)" },

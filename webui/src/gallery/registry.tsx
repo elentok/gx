@@ -81,12 +81,12 @@ export const galleryEntries: GalleryEntry[] = [
       {
         label: "answerable",
         node: (
-          <TicketLine id={ticket.address} title={ticket.title} tone="parked" reason={longReason} unclipped href="#/t/gx:demo/02" />
+          <TicketLine id={ticket.address} title={ticket.title} tone="paused" reason={longReason} unclipped href="#/t/gx:demo/02" />
         ),
       },
       {
         label: "needs repair",
-        node: <TicketLine id={ticket.address} title={ticket.title} tone="parked" reason="Worktree is dirty" hint="Fix it in the TUI" />,
+        node: <TicketLine id={ticket.address} title={ticket.title} tone="paused" reason="Worktree is dirty" hint="Fix it in the TUI" />,
       },
       {
         label: "answered",

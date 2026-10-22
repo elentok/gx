@@ -22,7 +22,7 @@ const bucketOf = (row: EpicDetailRow): Bucket => BUCKETS[row.rendered_status] ??
 const BUCKET_TONES: Record<Bucket, Tone> = {
   done: "done",
   running: "running",
-  "needs-answer": "parked",
+  "needs-answer": "paused",
   waiting: "waiting",
   children: "muted",
   attention: "deadlocked",

@@ -46,8 +46,8 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
               onStale={refetch}
             />
             {unparked && (
-              <Text role="status" aria-label="Unpark result" mt="4">
-                Unparked · {unparked}
+              <Text role="status" aria-label="Resume result" mt="4">
+                Resumed ·{unparked}
               </Text>
             )}
             <UnparkForm

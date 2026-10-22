@@ -48,7 +48,7 @@ export function UnparkForm({
         onDone?.(unparkWords(res.data));
       }
     } catch {
-      setError("Could not unpark. Try again.");
+      setError("Could not resume. Try again.");
     } finally {
       setPending(false);
     }
@@ -64,7 +64,7 @@ export function UnparkForm({
       display="flex"
       flexDirection="column"
       gap="2"
-      aria-label="Unpark"
+      aria-label="Resume"
       role="form"
     >
       {bases.length > 0 && (
@@ -87,7 +87,7 @@ export function UnparkForm({
       )}
       {error && <Text role="alert">{error}</Text>}
       <Button disabled={!ready || pending} onClick={send}>
-        Unpark
+        Resume
       </Button>
     </Box>
   );

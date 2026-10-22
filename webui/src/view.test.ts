@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import canned from "./canned-snapshot.json";
 import type { QueueMode, Snapshot } from "./snapshot";
-import { REPAIR_HINT, snapshotView } from "./view";
+import { REPAIR_HINT, epicView, snapshotView } from "./view";
 
 const now = new Date("2026-10-19T12:00:00Z");
 const snap = canned as Snapshot;
@@ -10,12 +10,12 @@ const byName = (name: string, mode?: QueueMode) => view(mode).epics.find((e) => 
 
 describe("snapshotView", () => {
   it("orders epics by state and keeps server order within a state", () => {
-    expect(view().epics.map((e) => e.name)).toEqual(["park", "dead", "run", "run2", "wait", "await"]);
+    expect(view().epics.map((e) => e.name)).toEqual(["dead", "park", "run", "run2", "wait", "await"]);
   });
 
   it("maps state to tone and badge", () => {
-    expect(byName("park")).toMatchObject({ tone: "parked", badge: "Parked" });
-    expect(byName("dead")).toMatchObject({ tone: "deadlocked", badge: "Deadlocked", reason: "blocked cycle" });
+    expect(byName("park")).toMatchObject({ tone: "paused", badge: "Paused", reason: "needs a person (+1 more)" });
+    expect(byName("dead")).toMatchObject({ tone: "paused", badge: "Paused", reason: "Dependency deadlock" });
     expect(byName("run")).toMatchObject({ tone: "running", badge: "Running" });
     expect(byName("wait")).toMatchObject({ tone: "waiting", badge: "Waiting for a slot" });
     expect(byName("await")).toMatchObject({ tone: "muted", badge: "Awaiting merge" });
@@ -28,13 +28,19 @@ describe("snapshotView", () => {
     expect(byName("run", "paused").badge).toBe("Running");
   });
 
-  it("lists active tickets before parked ones, and only Parked for Waiting", () => {
+  it("keeps the merge action on a Paused epic whose merge failed", () => {
+    const blocked = { ...snap.epics[0]!, state: "paused" as const, reason: "Merge blocked", merge_blocked: true };
+    expect(epicView(blocked)).toMatchObject({ badge: "Paused", mergeBlocked: true });
+    expect(byName("dead").mergeBlocked).toBe(false);
+  });
+
+  it("lists active tickets before paused ones, and only Paused for Waiting", () => {
     expect(byName("run").tickets.map((t) => [t.address, t.id, t.tone])).toEqual([
       ["gx:run/03", "03", "muted"],
-      ["gx:run/04", "04", "parked"],
+      ["gx:run/04", "04", "paused"],
     ]);
     expect(byName("wait").tickets.map((t) => [t.address, t.tone])).toEqual([
-      ["gx:wait/03", "parked"],
+      ["gx:wait/03", "paused"],
       ["gx:wait/04", "waiting"],
     ]);
   });

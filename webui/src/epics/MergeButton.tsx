@@ -1,8 +1,9 @@
 import { EpicActionButton } from "./EpicActionButton";
 import { postEpicMerge } from "./queue";
 
-/** The states a person can merge from: a done epic whose merge has not started, or whose land parked. */
-export const isMergeable = (state: string | undefined) => state === "awaiting-merge" || state === "merge-blocked";
+/** The states a person can merge from: a done epic whose merge has not started, or whose merge paused. */
+export const isMergeable = (state: string | undefined, mergeBlocked: boolean) =>
+  state === "awaiting-merge" || (state === "paused" && mergeBlocked);
 
 export function MergeButton({ address, state, onMerged }: { address: string; state: string; onMerged: () => void }) {
   return (

@@ -22,15 +22,16 @@ describe("QueueScreen", () => {
     const { container } = renderThemed(<QueueScreen state={state()} />);
     expect(screen.queryByRole("heading", { name: "Queue" })).toBeNull();
     expect(container.querySelectorAll("[role=progressbar]")).toHaveLength(snap.epics.length);
-    for (const label of ["Running", "Parked", "Deadlocked", "Awaiting merge"]) {
+    for (const label of ["Running", "Paused", "Awaiting merge"]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
+    expect(screen.queryByText(/parked|deadlocked/i)).toBeNull();
     expect(screen.getByText("Waiting for a slot")).toBeTruthy();
   });
 
-  it("labels a Merge blocked card with its reason and a Merging card with its live agent", () => {
+  it("labels a merge-blocked card Paused with its reason and a Merging card with its live agent", () => {
     const base = snap.epics[0];
-    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "merge-blocked", active: [], parked: [], reason: "rebase clash in a.go" };
+    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "paused", active: [], parked: [], reason: "rebase clash in a.go", merge_blocked: true };
     const merging = {
       ...base,
       address: "gx:merging",
@@ -42,16 +43,16 @@ describe("QueueScreen", () => {
     };
     const epics = [blocked, merging] as unknown as Snapshot["epics"];
     const { container } = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, epics } })} />);
-    expect(screen.getByText("Merge blocked")).toBeTruthy();
+    expect(screen.getByText("Paused")).toBeTruthy();
     expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
     expect(screen.getByText("Merging")).toBeTruthy();
     expect(screen.getByText("Merge agent").closest("[data-tone]")?.querySelector("[role=img]")).not.toBeNull();
     expect(container.querySelectorAll("[data-live]")).toHaveLength(1);
   });
 
-  it("shows Merge on a Merge blocked card only, posts it, and re-reads after", async () => {
+  it("shows Merge on a merge-blocked card only, posts it, and re-reads after", async () => {
     const base = snap.epics[0];
-    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "merge-blocked", active: [], parked: [] };
+    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "paused", active: [], parked: [], merge_blocked: true };
     const awaiting = { ...base, address: "gx:awaiting", name: "awaiting-epic", state: "awaiting-merge", active: [], parked: [] };
     const epics = [blocked, awaiting] as unknown as Snapshot["epics"];
     const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ merge_ticket: "gx:blocked/09" })));
@@ -63,13 +64,13 @@ describe("QueueScreen", () => {
     fireEvent.click(buttons[0]!);
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(post.mock.calls[0]![0]).toBe("/v1/epics/merge");
-    expect(JSON.parse(post.mock.calls[0]![1].body as string)).toEqual({ address: "gx:blocked", state: "merge-blocked" });
+    expect(JSON.parse(post.mock.calls[0]![1].body as string)).toEqual({ address: "gx:blocked", state: "paused" });
     vi.unstubAllGlobals();
   });
 
   it("shows a Merge refusal inline on the card and does not re-read", async () => {
     const base = snap.epics[0];
-    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "merge-blocked", active: [], parked: [] };
+    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "paused", active: [], parked: [], merge_blocked: true };
     vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })));
     const onChanged = vi.fn();
     renderThemed(<QueueScreen state={state({ snapshot: { ...snap, epics: [blocked] as unknown as Snapshot["epics"] } })} onChanged={onChanged} />);
@@ -89,7 +90,7 @@ describe("QueueScreen", () => {
 
   it("shows the Paused or Draining chip and the Live or Offline dot in the top bar", () => {
     const paused = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "paused" } })} />);
-    expect(paused.getByText("Paused")).toBeTruthy();
+    expect(paused.getAllByText("Paused").length).toBeGreaterThan(0);
     expect(paused.getByRole("status", { name: "Live" })).toBeTruthy();
     expect(paused.getByRole("link", { name: "Queue" }).getAttribute("aria-current")).toBe("page");
     paused.unmount();
@@ -100,7 +101,7 @@ describe("QueueScreen", () => {
 
   it("shows the deadlock reason clamped to two lines", () => {
     renderThemed(<QueueScreen state={state()} />);
-    const reason = screen.getByText("blocked cycle");
+    const reason = screen.getByText("Dependency deadlock");
     expect(reason.hasAttribute("data-reason")).toBe(true);
     expect(getComputedStyle(reason).getPropertyValue("-webkit-line-clamp")).toBe("2");
   });
@@ -178,8 +179,11 @@ describe("QueueScreen", () => {
   });
 
   it("shows the Paused chip only when the queue is paused", () => {
+    const running = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "running" } })} />);
+    const epicBadges = running.getAllByText("Paused").length;
+    running.unmount();
     renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "paused" } })} />);
-    expect(screen.getByText("Paused")).toBeTruthy();
+    expect(screen.getAllByText("Paused")).toHaveLength(epicBadges + 1);
   });
 
   it("shows the Offline strip when disconnected", () => {

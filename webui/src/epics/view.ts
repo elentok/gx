@@ -53,10 +53,9 @@ const STATE_BADGES: Record<string, { label: string; tone: Tone }> = {
   queued: { label: "Queued", tone: "running" },
   running: { label: "Running", tone: "running" },
   "awaiting-merge": { label: "Awaiting merge", tone: "waiting" },
-  "merge-blocked": { label: "Merge blocked", tone: "parked" },
+  "merge-blocked": { label: "Merge blocked", tone: "paused" },
   merging: { label: "Merging", tone: "running" },
-  parked: { label: "Parked", tone: "parked" },
-  deadlocked: { label: "Deadlocked", tone: "deadlocked" },
+  paused: { label: "Paused", tone: "paused" },
   draft: { label: "Draft", tone: "muted" },
   "no-open-tickets": { label: "No open tickets", tone: "muted" },
 };

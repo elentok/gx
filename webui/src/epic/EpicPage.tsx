@@ -108,7 +108,7 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
             <Heading as="h1" fontFamily="condensed" fontSize="2xl">
               {address.slice(address.indexOf(":") + 1)}
             </Heading>
-            {detail.state === "merge-blocked" && detail.land_block_reason && (
+            {detail.state === "paused" && detail.land_block_reason && (
               <Text data-reason mt="2" fontSize="sm" color="text.muted">
                 {detail.land_block_reason}
               </Text>
@@ -118,7 +118,7 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
                 <QueueButton address={address} state={detail.state ?? ""} onQueued={refetch} />
               </Box>
             )}
-            {isMergeable(detail.state) && (
+            {isMergeable(detail.state, !!detail.land_block_reason) && (
               <Box mt="2" display="flex" alignItems="center" gap="2">
                 <MergeButton address={address} state={detail.state ?? ""} onMerged={refetch} />
               </Box>

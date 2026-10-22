@@ -27,6 +27,8 @@ export interface EpicView {
   done: number;
   total: number;
   reason?: string;
+  /** A Paused epic whose last merge failed, so the card keeps offering the merge. */
+  mergeBlocked: boolean;
   tickets: TicketLineView[];
 }
 
@@ -49,14 +51,12 @@ export interface SnapshotView {
 // order holds within a state. The labels must match epicStateLabels in
 // ui/tickets/queue_header.go.
 const STATES: Record<EpicState, { order: number; tone: Tone; label: string }> = {
-  parked: { order: 0, tone: "parked", label: "Parked" },
-  deadlocked: { order: 1, tone: "deadlocked", label: "Deadlocked" },
-  "merge-blocked": { order: 2, tone: "parked", label: "Merge blocked" },
-  running: { order: 3, tone: "running", label: "Running" },
-  merging: { order: 4, tone: "running", label: "Merging" },
-  waiting: { order: 5, tone: "waiting", label: "Waiting for a slot" },
-  "awaiting-merge": { order: 6, tone: "muted", label: "Awaiting merge" },
-  finished: { order: 7, tone: "muted", label: "Finished" },
+  paused: { order: 0, tone: "paused", label: "Paused" },
+  running: { order: 1, tone: "running", label: "Running" },
+  merging: { order: 2, tone: "running", label: "Merging" },
+  waiting: { order: 3, tone: "waiting", label: "Waiting for a slot" },
+  "awaiting-merge": { order: 4, tone: "muted", label: "Awaiting merge" },
+  finished: { order: 5, tone: "muted", label: "Finished" },
 };
 
 // Only Waiting changes with the queue mode: a paused or draining queue is why
@@ -75,7 +75,7 @@ export const REPAIR_HINT = "Fix it in the TUI";
 function parkedLine(t: SummaryTicket, queue: string[]): TicketLineView {
   const base = { address: t.address, id: shortId(t.address), title: t.title };
   if (t.status === "needs-repair") {
-    return { ...base, tone: "parked", detail: t.reason, hint: REPAIR_HINT };
+    return { ...base, tone: "paused", detail: t.reason, hint: REPAIR_HINT };
   }
   if (t.answered) {
     // The agent is gone; the ticket is in the queue for a slot.
@@ -83,15 +83,15 @@ function parkedLine(t: SummaryTicket, queue: string[]): TicketLineView {
     return { ...base, tone: "waiting", state: place > 0 ? `Answered · #${place} in queue` : "Answered" };
   }
   if (t.answerable) {
-    return { ...base, tone: "parked", detail: t.summary ?? t.reason, href: `#/t/${t.address}` };
+    return { ...base, tone: "paused", detail: t.summary ?? t.reason, href: `#/t/${t.address}` };
   }
-  return { ...base, tone: "parked", detail: t.reason };
+  return { ...base, tone: "paused", detail: t.reason };
 }
 
 function activeLine(t: SummaryTicket): TicketLineView {
   const base = { address: t.address, id: shortId(t.address), title: t.title };
   if (t.needs_approval) {
-    return { ...base, tone: "parked", state: "needs approval", href: `#/t/${t.address}`, linkLabel: "Review →" };
+    return { ...base, tone: "paused", state: "needs approval", href: `#/t/${t.address}`, linkLabel: "Review →" };
   }
   return { ...base, tone: "muted", live: true };
 }
@@ -114,7 +114,8 @@ export function epicView(epic: EpicSummary, mode?: QueueMode, queue: string[] = 
     live: epic.state === "running" || epic.state === "merging",
     done: epic.done,
     total: epic.total,
-    reason: epic.reason,
+    reason: epic.reason && epic.more ? `${epic.reason} (+${epic.more} more)` : epic.reason,
+    mergeBlocked: epic.merge_blocked === true,
     tickets: ticketLines(epic, queue),
   };
 }
