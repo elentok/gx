@@ -62,6 +62,11 @@ function EpicRow({
           ))}
         </Text>
       )}
+      {row.state === "merge-blocked" && row.land_block_reason && (
+        <Text as="span" color="text.muted">
+          {row.land_block_reason}
+        </Text>
+      )}
       {!withBadge && row.queueable && <QueueButton address={row.address} state={row.state} onQueued={onQueued} />}
     </Box>
   );

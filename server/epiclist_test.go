@@ -38,7 +38,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		writeEpicFiles(t, store, "queued", loop, open)
 		writeEpicFiles(t, store, "awaiting", loop, done)
 		writeEpicFiles(t, store, "parked", loop, parked)
-		writeEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_reason: conflict\n---\n", done)
+		writeEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict\n---\n", done)
 		writeEpicFiles(t, store, "merging", loop, map[string]string{
 			"01-a.md": issueMD("01", "done", "", "A"),
 			"02-m.md": strings.Replace(issueMD("02", "open", "", "M"), "type: implement", "type: merge", 1),
@@ -91,6 +91,15 @@ func TestEpicList_SectionRules(t *testing.T) {
 		}
 		if r.State != w.state || r.Kind != w.kind {
 			t.Errorf("%s = state %q kind %q, want %q %q", addr, r.State, r.Kind, w.state, w.kind)
+		}
+	}
+	for addr, r := range got {
+		kind, reason := "", ""
+		if addr == "proj:blocked" {
+			kind, reason = "self-reported", "conflict"
+		}
+		if r.LandBlockKind != kind || r.LandBlockReason != reason {
+			t.Errorf("%s land block = %q %q, want %q %q", addr, r.LandBlockKind, r.LandBlockReason, kind, reason)
 		}
 	}
 	if len(got) != len(want) {

@@ -106,6 +106,12 @@ test("a blocked ready row names its blockers as links", async () => {
   expect(within(region).getByRole("link", { name: "b" }).getAttribute("href")).toBe("#/e/blog:b");
 });
 
+test("a Merge blocked row shows the land-block reason", async () => {
+  await loaded(listOf([row("x", { state: "merge-blocked", land_block_reason: "conflict in a.go" })]));
+  fireEvent.change(screen.getByRole("searchbox", { name: "Search epics" }), { target: { value: "x" } });
+  expect(screen.getByText("conflict in a.go")).toBeTruthy();
+});
+
 test("Recently finished is capped at 10 rows, newest first", async () => {
   const epics = Array.from({ length: 12 }, (_, i) => row(`e${i}`, { state: "finished", merged_at: hoursAgo(i + 1) }));
   await loaded(listOf(epics));

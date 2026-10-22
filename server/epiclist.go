@@ -56,6 +56,10 @@ type EpicListRow struct {
 	BlockedByEpics []string `json:"blocked_by_epics"`
 	// LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
 	LastActivityAt time.Time `json:"last_activity_at,omitzero"`
+	// LandBlockKind and LandBlockReason are set only on a Merge blocked row;
+	// see EpicDetail.
+	LandBlockKind   string `json:"land_block_kind,omitempty"`
+	LandBlockReason string `json:"land_block_reason,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -216,5 +220,8 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 		row.Kind = EpicKindMap
 	}
 	row.State = epicListState(e, queued, epicStateFor(root, e, s.registry.startedAtOf))
+	if row.State == EpicListMergeBlocked {
+		row.LandBlockKind, row.LandBlockReason = e.LandBlockKind, e.LandBlockReason
+	}
 	return row
 }

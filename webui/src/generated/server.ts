@@ -308,6 +308,12 @@ export interface EpicListRow {
    * LastActivityAt is the newest claimed_at or done_at of the epic's tickets.
    */
   last_activity_at?: string;
+  /**
+   * LandBlockKind and LandBlockReason are set only on a Merge blocked row;
+   * see EpicDetail.
+   */
+  land_block_kind?: string;
+  land_block_reason?: string;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's
