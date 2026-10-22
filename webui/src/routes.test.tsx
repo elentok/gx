@@ -353,7 +353,7 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
   const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 7, done: 2, rows }));
   await screen.findByText("Title 01");
   const live = [...container.querySelectorAll("[data-indent]")].map((el) => [
-    el.querySelector("span + span")?.textContent,
+    [...el.querySelectorAll("span")].find((s) => s.textContent?.startsWith("Title"))?.textContent,
     el.getAttribute("data-indent"),
   ]);
   expect(live).toEqual([

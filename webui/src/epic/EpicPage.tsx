@@ -16,6 +16,7 @@ import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
 import {
   detailLine,
   foldedTail,
+  iconOf,
   idOf,
   isCancelled,
   isFolded,
@@ -65,9 +66,9 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
           ))}
         </Box>
       )}
-      <Box mt="4" display="flex" flexDirection="column" gap="2">
+      <Box mt="4" display="flex" flexDirection="column" gap="3">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
-          <Box key={r.address} data-indent={indent} ml={indent * 6} p="3" borderRadius="md" bg={`tone.${toneOf(r)}.bg`}>
+          <Box key={r.address} data-indent={indent} ml={indent * 6}>
             <TicketLine
               id={idOf(r.address)}
               title={r.title}
@@ -78,6 +79,8 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
               hint={r.needs_answer ? r.question : undefined}
               href={r.needs_answer ? `#/t/${r.address}` : undefined}
               live={isRunning(r)}
+              icon={iconOf(r)}
+              toneTitle
             />
           </Box>
         ))}

@@ -1,6 +1,8 @@
+import { Box } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
 import { Arc } from "../ui/arc/Arc";
+import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
@@ -35,6 +37,16 @@ const perTone = (render: (tone: Tone) => ReactNode): GalleryCase[] =>
 export const galleryEntries: GalleryEntry[] = [
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
+  {
+    name: "StatusIcon",
+    cases: perTone((tone) => (
+      <Box display="flex" gap="2">
+        {(Object.keys(STATUS_LABELS) as StatusKind[]).map((kind) => (
+          <StatusIcon key={kind} kind={kind} tone={tone} />
+        ))}
+      </Box>
+    )),
+  },
   { name: "Badge", cases: perTone((tone) => <Badge tone={tone}>{tone}</Badge>) },
   {
     name: "ProgressBar",

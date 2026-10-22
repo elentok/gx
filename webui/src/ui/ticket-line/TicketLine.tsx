@@ -1,5 +1,6 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import { Arc } from "../arc/Arc";
+import { StatusIcon, type StatusKind } from "../status-icon/StatusIcon";
 import type { Tone } from "../tone";
 
 interface TicketLineProps {
@@ -18,6 +19,9 @@ interface TicketLineProps {
   linkLabel?: string;
   // Puts a spinning arc before the id while an agent works the ticket.
   live?: boolean;
+  // Shows a status icon before the id, and colors the title with the tone instead of plain text.
+  icon?: StatusKind;
+  toneTitle?: boolean;
 }
 
 export function TicketLine({
@@ -32,19 +36,30 @@ export function TicketLine({
   inlineReason,
   linkLabel = "Answer →",
   live,
+  icon,
+  toneTitle,
 }: TicketLineProps) {
   return (
     <Box data-tone={tone}>
       <Box display={inlineReason ? "block" : "flex"} gap="2" alignItems="baseline">
-        {live && (
-          <Box as="span" mr={inlineReason ? "2" : undefined} alignSelf="center" display="inline-flex">
-            <Arc label="Running" />
+        {(live || icon) && (
+          <Box as="span" mr={inlineReason ? "2" : undefined} alignSelf="center" verticalAlign="middle" position="relative" top="-1px" display="inline-flex" w="4" h="4" alignItems="center" justifyContent="center">
+            {live ? <Arc label="Running" /> : <StatusIcon kind={icon!} tone={tone} />}
           </Box>
         )}
-        <Text as="span" fontFamily="condensed" fontSize="sm" color={`tone.${tone}.fg`} mr={inlineReason ? "2" : undefined}>
+        <Text
+          as="span"
+          fontFamily="condensed"
+          fontSize="sm"
+          color={`tone.${tone}.fg`}
+          mr={inlineReason ? (toneTitle ? "1" : "2") : undefined}
+          // Ids differ in width, so a tone-titled list gives them one column to start the titles at the same x.
+          display={toneTitle ? "inline-block" : undefined}
+          minW={toneTitle ? "5" : undefined}
+        >
           {id}
         </Text>
-        <Text as="span" fontSize="md" color="text">
+        <Text as="span" fontSize="md" color={toneTitle ? `tone.${tone}.fg` : "text"}>
           {title}
         </Text>
         {state && (

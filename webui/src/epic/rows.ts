@@ -1,20 +1,22 @@
 import type { EpicDetail, EpicDetailRow } from "./detail";
 import type { Segment } from "../ui/progress-bar/SegmentedBar";
+import type { StatusKind } from "../ui/status-icon/StatusIcon";
 import type { Tone } from "../ui/tone";
 import { epicBadge } from "../view";
 
-type Bucket = "done" | "running" | "needs-answer" | "waiting" | "attention";
+type Bucket = "done" | "running" | "needs-answer" | "waiting" | "children" | "attention";
 
 const BUCKETS: Record<string, Bucket> = {
   done: "done",
   cancelled: "done",
   claimed: "running",
   "needs-answer": "needs-answer",
+  "waiting-for-children": "children",
   "needs-repair": "attention",
   error: "attention",
 };
 
-// Everything else (blocked, open, draft, waiting-for-children) waits.
+// Everything else (blocked, open, draft) waits. A row waiting for children is not stuck, so it is muted.
 const bucketOf = (row: EpicDetailRow): Bucket => BUCKETS[row.rendered_status] ?? "waiting";
 
 const BUCKET_TONES: Record<Bucket, Tone> = {
@@ -22,9 +24,20 @@ const BUCKET_TONES: Record<Bucket, Tone> = {
   running: "running",
   "needs-answer": "parked",
   waiting: "waiting",
+  children: "muted",
   attention: "deadlocked",
 };
 
+const BUCKET_ICONS: Record<Bucket, StatusKind | undefined> = {
+  done: "done",
+  running: undefined,
+  "needs-answer": "needs-answer",
+  waiting: "waiting",
+  children: "children",
+  attention: "attention",
+};
+
+export const iconOf = (row: EpicDetailRow) => BUCKET_ICONS[bucketOf(row)];
 export const isCancelled = (row: EpicDetailRow) => row.rendered_status === "cancelled";
 export const isFolded = (row: EpicDetailRow) => bucketOf(row) === "done";
 export const isRunning = (row: EpicDetailRow) => bucketOf(row) === "running";
