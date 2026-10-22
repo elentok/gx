@@ -339,13 +339,13 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 		want map[string]string // label -> key hint or dim reason
 	}{
 		{"live", "live", func(m Model) Model { return m }, map[string]string{
-			"Stop": "x", "Resume": "running", "Remove": "running", "Mark read": "nothing unread", "Run Action": "no action",
+			"Stop": "x", "Restore session": "running", "Remove": "running", "Mark read": "nothing unread", "Run Action": "no action",
 		}},
 		{"live unread with an action", "live", func(m Model) Model {
 			return withUnread(withAction(m, "live", "go on"), "live")
 		}, map[string]string{"Stop": "x", "Run Action": "a"}},
 		{"exited", "done", func(m Model) Model { return m }, map[string]string{
-			"Stop": "exited", "Resume": "r", "Remove": "d",
+			"Stop": "exited", "Restore session": "r", "Remove": "d",
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -378,7 +378,7 @@ func TestActions_MenuListsEveryItemWithItsKeyOrWhyNot(t *testing.T) {
 func TestActions_MenuDimItemMakesNoCall(t *testing.T) {
 	f := &fakeSessionClient{}
 	m, _ := act(t, actionModel(t, f, "live"), letter("m"))
-	m, _ = pick(t, m, "resume")
+	m, _ = pick(t, m, "restore")
 	if !m.menu.IsOpen || len(calls(f)) != 0 {
 		t.Fatalf("Enter on a dim Resume closed the menu or called; calls = %v", calls(f))
 	}
@@ -390,7 +390,7 @@ func TestActions_MenuItemsMakeTheirSessionCalls(t *testing.T) {
 		prep       func(Model) Model
 		want       string
 	}{
-		{"resume", "done", func(m Model) Model { return m }, "resume done"},
+		{"restore", "done", func(m Model) Model { return m }, "resume done"},
 		{"run", "live", func(m Model) Model { return withAction(m, "live", "go on") }, ""},
 		{"remove", "live", func(m Model) Model {
 			return withSession(m, "live", func(s *server.SessionInfo) { s.Status.State = server.SessionExited })
@@ -454,7 +454,7 @@ func TestActions_WhichKeyListsThem(t *testing.T) {
 	m := actionModel(t, &fakeSessionClient{}, "live")
 	m = update1(t, m, ctrlA)
 	view := plainView(m)
-	for _, want := range []string{"stop session", "remove session", "resume session", "run action"} {
+	for _, want := range []string{"stop session", "remove session", "restore session", "run action"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("which-key lacks %q:\n%s", want, view)
 		}

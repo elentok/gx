@@ -260,8 +260,10 @@ func Parse(data []byte) (Config, error) {
 			} `json:"codex"`
 			LeaderKey       json.RawMessage `json:"leader-key"`
 			FocusSidebarKey json.RawMessage `json:"focus-sidebar-key"`
-			ResumeOnStart   *bool           `json:"resume-on-start"`
-			Banners         *struct {
+			ResumeOnStart   *bool           `json:"restore-sessions-on-start"`
+			// OldResumeOnStart is the hidden alias for one release.
+			OldResumeOnStart *bool `json:"resume-on-start"`
+			Banners          *struct {
 				Enabled *bool `json:"enabled"`
 			} `json:"banners"`
 			Sounds *struct {
@@ -420,6 +422,9 @@ func Parse(data []byte) (Config, error) {
 		}
 		if keys, ok := parseKeys(raw.Agents.FocusSidebarKey); ok {
 			cfg.Agents.FocusSidebarKey = keys
+		}
+		if raw.Agents.OldResumeOnStart != nil {
+			cfg.Agents.ResumeOnStart = *raw.Agents.OldResumeOnStart
 		}
 		if raw.Agents.ResumeOnStart != nil {
 			cfg.Agents.ResumeOnStart = *raw.Agents.ResumeOnStart

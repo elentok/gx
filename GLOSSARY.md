@@ -286,10 +286,12 @@ investigate agent decides. _Avoid_: zombie, orphan pane.
 one the loop launches for an iteration. `gx server` keeps it alive while no TUI is open. _Avoid_:
 "chat", "agent" alone (an agent is the program in the session, not the session).
 
-**Resume (interactive session)** — relaunch an Exited interactive session on its latest
+**Restore (interactive session)** — relaunch an Exited interactive session on its latest
 conversation, in the same dir, keeping the same session (name, Unread, Actionable). A person does it
-by hand, or gx does it once on server start for sessions that were live before. Not the queue's
-resume, which belongs to the pause **Gate**. _Avoid_: restart (sounds like a fresh conversation).
+by hand, or gx does it once on server start for sessions that were live before
+(`agents.restore-sessions-on-start`; the old `resume-on-start` key is a hidden alias). Not the
+queue's resume, which belongs to the pause **Gate**. _Avoid_: resume, restart (sounds like a fresh
+conversation).
 
 **Session ticket** — the map epic or map ticket an interactive session was started from. Set once,
 when the session is created, and shown with the session. It never changes the ticket's status: the

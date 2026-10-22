@@ -22,10 +22,27 @@ func TestParseAgentsSessionKeysDefaultWhenAbsent(t *testing.T) {
 	}
 }
 
+func TestParseAgentsResumeOnStartAlias(t *testing.T) {
+	cfg, err := Parse([]byte(`{"agents":{"resume-on-start":false}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Agents.ResumeOnStart {
+		t.Error("old resume-on-start key = false was ignored")
+	}
+	cfg, err = Parse([]byte(`{"agents":{"resume-on-start":false,"restore-sessions-on-start":true}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Agents.ResumeOnStart {
+		t.Error("new key should win over the old alias")
+	}
+}
+
 func TestParseAgentsSessionKeysSetValues(t *testing.T) {
 	cfg, err := Parse([]byte(`{"agents":{
 		"leader-key":"ctrl+b",
-		"resume-on-start":false,
+		"restore-sessions-on-start":false,
 		"banners":{"enabled":false},
 		"sounds":{"enabled":false,"done":"sounds/done.aiff","attention":"/abs/attention.aiff"},
 		"claude-args":["--verbose","--add-dir","/tmp"]

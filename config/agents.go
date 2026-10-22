@@ -32,7 +32,7 @@ type AgentsConfig struct {
 	// FocusSidebarKey lists the keys that leave the Agents terminal for the
 	// sidebar, read like LeaderKey.
 	FocusSidebarKey []string            `json:"focus-sidebar-key"`
-	ResumeOnStart   bool                `json:"resume-on-start"`
+	ResumeOnStart   bool                `json:"restore-sessions-on-start"`
 	Banners         AgentsBannersConfig `json:"banners"`
 	Sounds          AgentsSoundsConfig  `json:"sounds"`
 	ClaudeArgs      []string            `json:"claude-args,omitempty"`

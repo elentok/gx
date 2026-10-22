@@ -35,7 +35,7 @@ var (
 	keyCreate        = key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "new session"))
 	keyStop          = key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "stop session"))
 	keyRemove        = key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "remove session"))
-	keyResume        = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "resume session"))
+	keyResume        = key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restore session"))
 	keyRunAction     = key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "run action"))
 	keyMenu          = key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "session menu"))
 	keyHelp          = key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help"))

@@ -174,7 +174,7 @@ func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInf
 	}
 	return []contextmenu.Item[server.SessionInfo]{
 		item("Stop", "x", "x", reason(live, "exited")),
-		item("Resume", "r", "r", reason(!live, "running")),
+		item("Restore session", "r", "r", reason(!live, "running")),
 		item("Remove", "d", "d", reason(!live, "running")),
 		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
 		item("Run Action", "a", "a", reason(len(actionSteps(s.Actionable)) > 0, "no action")),

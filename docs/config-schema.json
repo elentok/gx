@@ -487,10 +487,14 @@
           ],
           "default": "ctrl+q"
         },
+        "restore-sessions-on-start": {
+          "type": "boolean",
+          "description": "Restore the interactive sessions that were running when the server last stopped. Default: true.",
+          "default": true
+        },
         "resume-on-start": {
           "type": "boolean",
-          "description": "Resume the interactive sessions that were running when the server last stopped. Default: true.",
-          "default": true
+          "description": "Deprecated alias for restore-sessions-on-start."
         },
         "banners": {
           "type": "object",

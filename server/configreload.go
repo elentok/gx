@@ -177,7 +177,7 @@ func changedKeys(old, next Settings) []string {
 		{"notifications.slack.webhook-url", old.Chat.SlackWebhookURL, next.Chat.SlackWebhookURL},
 		{"ticket-store.commit-debounce", old.StoreCommitDebounce, next.StoreCommitDebounce},
 		{"ticket-store.push-remote", old.StorePushRemote, next.StorePushRemote},
-		{"agents.resume-on-start", old.AgentsResumeOnStart, next.AgentsResumeOnStart},
+		{"agents.restore-sessions-on-start", old.AgentsResumeOnStart, next.AgentsResumeOnStart},
 		{"agents.banners.enabled", old.AgentsBanners, next.AgentsBanners},
 		{"agents.sounds", old.AgentsSounds, next.AgentsSounds},
 		{"agents.claude-args", old.AgentsClaudeArgs, next.AgentsClaudeArgs},
