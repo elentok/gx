@@ -128,6 +128,45 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 	}
 }
 
+// awaitTicketChanged waits for a ticket-changed event naming addr.
+func awaitTicketChanged(t *testing.T, ctx context.Context, evs <-chan server.Event, addr, why string) {
+	t.Helper()
+	for {
+		select {
+		case ev := <-evs:
+			if ev.Type == server.EventTicketChanged && ev.Address == addr {
+				return
+			}
+		case <-ctx.Done():
+			t.Fatalf("no ticket-changed for %s %s", addr, why)
+		}
+	}
+}
+
+// An open page learns of a prompt only from an event: the card and the
+// "needs approval" row are read when a page fetches, and nothing else makes it
+// fetch.
+func TestPermissionCard_BlockAndClearPublishTicketChanged(t *testing.T) {
+	h, fake := startBlockedClaimed(t, false, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fake.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "req-1", Tool: "Bash"})
+	awaitTicketChanged(t, ctx, evs, answerAddr, "when the agent blocked")
+
+	// Answered in the TUI: the server sends nothing, the agent just moves on.
+	fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
+	awaitTicketChanged(t, ctx, evs, answerAddr, "when the block cleared")
+}
+
 func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{ID: "req-2", Tool: "ExitPlanMode", NotApprovable: true})
 	d, err := h.Client.Detail(context.Background(), answerAddr)

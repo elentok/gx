@@ -668,7 +668,44 @@ func (s *Server) prepareAndLaunch(
 // finishRun waits for the agent to settle, then lands (or parks) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(rc runContext) {
-	s.settleRun(rc, ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session))
+	stop := make(chan struct{})
+	go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
+	err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
+	close(stop)
+	s.settleRun(rc, err)
+}
+
+// blockWatchPoll bounds each Wait of watchBlocked. A herdr Wait is one herdr
+// process, so a short poll would cost an idle server a process per tick.
+const blockWatchPoll = 30 * time.Second
+
+// watchBlocked publishes a ticket change each time the agent enters or leaves
+// a blocked state, until stop closes or the session ends. The settle wait
+// never returns on a block (a blocked iteration stays running), and the
+// permission card is read only when a page fetches, so without this an open
+// page never shows the prompt.
+func (s *Server) watchBlocked(r agentrunner.Runner, sess agentrunner.Session, addr string, stop <-chan struct{}) {
+	blocked := false
+	for {
+		until := []agentrunner.State{agentrunner.StateBlocked}
+		if blocked {
+			until = []agentrunner.State{agentrunner.StateWorking, agentrunner.StateIdle, agentrunner.StateDone}
+		}
+		_, err := r.Wait(sess, until, blockWatchPoll)
+		select {
+		case <-stop:
+			return
+		default:
+		}
+		if errors.Is(err, agentrunner.ErrTimeout) {
+			continue
+		}
+		if err != nil {
+			return
+		}
+		blocked = !blocked
+		s.events.publish(EventTicketChanged, addr)
+	}
 }
 
 // runContext is everything settling one claimed iteration needs.
