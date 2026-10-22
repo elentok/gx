@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.35.9 - 2026-10-22
+
+- Added land visibility for epics, so a stuck or running merge no longer looks like `Awaiting merge`.
+  - A new `merge-blocked` epic state shows when a land is refused. The reason is stored, and the clash message lists only the clashing files and uses per-kind "merge again" wording.
+  - A new `merging` epic state shows while a merge runs.
+  - The epic list row and the epic detail payload carry the land-block kind and reason.
+  - The web UI shows `Merge blocked` and `Merging` states with the reason, on the epic page, the Epics page and the Queue card. The Queue tab in the TUI labels both states too.
+  - A `Merge` button on the epic page and on the `Merge blocked` Queue card starts the merge. It uses a new merge route, which refuses one-off epics and checks the epic state first.
+- Added vendored skills: gx now bundles its own copies of upstream skills (`gx-grilling`, `gx-domain-modeling`, `gx-unslop`, `gx-research`, `gx-prototype`, `gx-wayfinder`, `gx-to-spec`, `gx-verify` and the `gx-thermo-nuclear-code-quality-review` review default), with credit to upstream for `gx-tdd`, `gx-to-tickets`, `gx-implement` and `gx-resolving-merge-conflicts`.
+  - A manifest records each skill's origin, and a test checks that every vendored skill has a manifest row.
+  - The sync script has a `--check` report, a `--merge` strategy, a port diff, a license gate and a missing-path report.
+  - Guards reject bundled skills that call other skills that are not in the bundle (this includes fenced code) and reject leftover conflict markers.
+  - Bundled skills are linked by relative path. `gx.md` documents their origins.
+  - A new `sync-vendored-skills` agent skill runs the sync.
+  - `gx-verify` has a TS/JS row and skips checks when a tool is missing.
+- Added a home screen icon and favicon to the web UI.
+- Changed the web UI to animate running epics and tickets.
+- Changed the Queue tab to show an epic queued by its epic address, and the epic page to show `Not queued` for an unqueued epic.
+- Changed the `gx-to-tickets` template to drop the ticket number from the H1.
+- Fixed the server not publishing `ticket-changed` when a live agent blocks or unblocks, so the web UI now updates right away.
+- Fixed the ralph loop not counting commits an agent made on a detached HEAD.
+- Fixed a white band behind the answer and unpark forms in the web UI.
+
 ## v0.35.8 - 2026-10-21
 
 - Added an Epics page to the web UI, at `#/epics`.
