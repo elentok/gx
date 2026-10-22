@@ -39,6 +39,8 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 		{server.EpicStateWaiting, icons.EpicQueued, "Waiting for a slot"},
 		{server.EpicStateParked, icons.Warning, "Parked"},
 		{server.EpicStateDeadlocked, icons.Warning, "Deadlocked"},
+		{server.EpicStateMergeBlocked, icons.Warning, "Merge blocked"},
+		{server.EpicStateMerging, "S", "Merging"},
 	}
 	for _, tt := range tests {
 		icon, text, _ := epicStatusLine(icons, server.EpicSummary{State: tt.state}, "S")
@@ -53,6 +55,17 @@ func TestEpicStatusLine_DeadlockedShowsReason(t *testing.T) {
 	_, text, _ := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.EpicStateDeadlocked, Reason: "01 waits on itself"}, "")
 	if text != "Deadlocked: 01 waits on itself" {
 		t.Errorf("text = %q, want the label followed by the reason", text)
+	}
+}
+
+func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
+	t.Parallel()
+	_, text, style := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.EpicStateMergeBlocked, Reason: "trunk dirty"}, "")
+	if text != "Merge blocked: trunk dirty" {
+		t.Errorf("text = %q, want the label followed by the reason", text)
+	}
+	if style.Render("x") != epicStatusProblemStyle.Render("x") {
+		t.Errorf("merge blocked should use the warning style")
 	}
 }
 

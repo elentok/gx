@@ -53,6 +53,8 @@ var epicStateLabels = map[server.EpicState]string{
 	server.EpicStateRunning:       "Running",
 	server.EpicStateWaiting:       "Waiting for a slot",
 	server.EpicStateAwaitingMerge: "Awaiting merge",
+	server.EpicStateMergeBlocked:  "Merge blocked",
+	server.EpicStateMerging:       "Merging",
 	server.EpicStateFinished:      "Finished",
 }
 
@@ -63,8 +65,14 @@ func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph strin
 	switch sum.State {
 	case server.EpicStateAwaitingMerge, server.EpicStateFinished:
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
-	case server.EpicStateRunning:
+	case server.EpicStateRunning, server.EpicStateMerging:
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
+	case server.EpicStateMergeBlocked:
+		text = epicStateLabels[sum.State]
+		if sum.Reason != "" {
+			text += ": " + sum.Reason
+		}
+		return icons.Warning, text, epicStatusProblemStyle
 	case server.EpicStateParked:
 		// Red once a parked ticket is broken, since a fault outranks a question.
 		if sum.HasRepair {
