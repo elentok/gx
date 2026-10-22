@@ -101,7 +101,7 @@ func newPreviewFocus() previewFocus {
 // (identifying which row is being previewed) differs from the value passed
 // on the previous call — not on every resize/refresh. contentFor's second
 // and third return values are an optional scroll-target line index (e.g. a
-// parked ticket's park section — see renderTicketPreview): when the
+// paused ticket's pause section — see renderTicketPreview): when the
 // selection just changed and a target is reported, the viewport centers on
 // it instead of the usual GotoTop.
 //

@@ -150,10 +150,10 @@ func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 	}
 }
 
-func TestServerMode_DrainKeyIsFinishAndPause(t *testing.T) {
+func TestServerMode_FinishAndPauseKeyIsFinishAndPause(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
-	next, _ := m.handleServerDrainKey()
+	next, _ := m.handleServerFinishAndPauseKey()
 	m = next.(Model)
 	if !m.confirm.IsOpen {
 		t.Fatal("confirm not open")

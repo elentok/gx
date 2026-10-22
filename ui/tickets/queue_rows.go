@@ -37,7 +37,7 @@ type queueRow struct {
 // heterogeneous node — this sum type plus buildQueueEntries' idFn/childrenFn
 // is what makes one tree.Model[queueNode] stand in for buildQueueLines'
 // former hand-spliced header/blank/error strings interleaved with the ticket
-// rows. A ticket's park-reason subtext is not a node of its own — it's a
+// rows. A ticket's pause-reason subtext is not a node of its own — it's a
 // second physical line on the ticket's own entry (queueTicketReasonLine, set
 // as Entry.Body in buildQueueEntries).
 type queueNodeKind int
@@ -66,7 +66,7 @@ type queueNode struct {
 // queueEntriesCache memoizes buildQueueEntries' output (see QueueModel.
 // entriesCache) against the four inputs that actually change its structure.
 // Anything read live at draw time instead (running-epic elapsed seconds,
-// spinner frame, parked/stalled state — queueRenderOpts' Label callback) is
+// spinner frame, paused/stalled state — queueRenderOpts' Label callback) is
 // excluded on purpose: it doesn't affect which entries exist, only how a
 // cached entry's row text renders, so it can't go stale from reusing this
 // cache.

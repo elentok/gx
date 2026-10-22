@@ -12,13 +12,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// actionResume is the server's unpark, under the one "Resume" label every
-// menu shares. The "m" menu offers it for the park kind the server
-// can't safely auto-clear — an announce-and-stop (zero-commit) park's
-// live-but-idle pane looks identical to an answered gate park, so a person
+// actionResume is the server's resume, under the one "Resume" label every
+// menu shares. The "m" menu offers it for the pause kind the server
+// can't safely auto-clear — an announce-and-stop (zero-commit) pause's
+// live-but-idle pane looks identical to an answered gate pause, so a person
 // confirms it explicitly here instead.
 const (
-	actionResume = serverVerbUnpark
+	actionResume = serverVerbResume
 	resumeLabel  = "Resume"
 )
 
@@ -31,9 +31,9 @@ const actionInvestigate = "investigate"
 const investigateSkill = "gx-investigate"
 
 // actionUnmuteReopen is offered on any ticket carrying a non-empty Mutes
-// field, independent of status — a mute that tripped with no parkTicket
+// field, independent of status — a mute that tripped with no pausing-a-ticket
 // callback (see ralphloop.muteSource) never moves the ticket to
-// needs-repair, so gating on status alone would leave that mute invisible
+// paused (repair), so gating on status alone would leave that mute invisible
 // and unclearable from the Tickets tab.
 const actionUnmuteReopen = serverVerbUnmute
 
@@ -68,7 +68,7 @@ func ticketHasSuggestedActions(in ticketMenuInput) bool {
 // starts claude there in auto-permission mode with a /gx-investigate prompt
 // for ticketID, mirroring ralphloop's TabCreate -> AgentStart -> AgentPrompt
 // launch sequence (see ralphloop/iteration.go, ralphloop/launch.go) without
-// ralph-loop's iteration lifecycle (worktree creation, land, finish) — this
+// ralph-loop's iteration lifecycle (worktree creation, merge, finish) — this
 // is a one-shot investigation session, not a tracked iteration.
 func cmdLaunchInvestigate(worktreeRoot, epicName, ticketID string) tea.Cmd {
 	return func() tea.Msg {

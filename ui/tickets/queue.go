@@ -63,7 +63,7 @@ type QueueModel struct {
 	// pointer so the cache survives QueueModel being copied by value on every
 	// Update: buildQueueEntries only depends on m.epics/m.checked/
 	// m.hideComplete/collapsed-IDs (see queueEntriesCache), everything else
-	// live (running-epic elapsed time, spinner frame, parked/stalled state)
+	// live (running-epic elapsed time, spinner frame, paused/stalled state)
 	// is read straight from the model by queueRenderOpts' Label callback at
 	// draw time, not baked into the cached entries — so reusing a cached
 	// tree when none of those four inputs changed is safe even mid-run.

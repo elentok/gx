@@ -49,7 +49,7 @@ const (
 )
 
 // sectionCollapsedByDefault marks the sections holding finished work: they
-// start collapsed so what still needs landing stays on screen.
+// start collapsed so what still needs merging stays on screen.
 var sectionCollapsedByDefault = map[sidebarSection]bool{
 	sectionComplete:     true,
 	sectionMerged:       true,

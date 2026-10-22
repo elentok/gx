@@ -27,7 +27,7 @@ type liveTicketState struct {
 	pauseKind ralphloop.PauseKind
 	reason    string
 	phase     livePhase
-	// waitingOn is the conflict-resolution child a landing ticket waits on;
+	// waitingOn is the conflict-resolution child a merging ticket waits on;
 	// when set it replaces the phase text.
 	waitingOn string
 	// startedAt is this ticket's own start time, stamped when its iteration
@@ -121,7 +121,7 @@ func appendBlockedBySuffix(line, suffix string) string {
 // paused. ok is false if live has neither (the zero value, which shouldn't
 // reach here since callers only look live up on a present map entry, but
 // keeps this function total). base is the bare icon/spinner+title; suffix is
-// the phase/label text (running) or pause reason (paused/needs-repair),
+// the phase/label text (running) or pause reason (paused/paused (repair)),
 // returned separately so the caller can place it where it needs to. prefix is
 // the caller's own leading-column indent (e.g. the Tickets tab's checkbox
 // column vs. the Queue tab's bare indent), so a live row's indent matches its
@@ -131,7 +131,7 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 
 	switch {
 	case live.paused && live.pauseKind == ralphloop.PauseRepair:
-		base = prefix + statusNeedsRepairStyle.Render(icons.TicketNeedsRepair) + " " + title
+		base = prefix + statusPausedRepairStyle.Render(icons.TicketPausedRepair) + " " + title
 		return base, live.reason, true
 
 	case live.paused:

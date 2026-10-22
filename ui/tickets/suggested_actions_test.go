@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
 )
 
@@ -19,9 +20,9 @@ func TestTicketMenuItems_SuggestableItemsBuiltOnce(t *testing.T) {
 	}{
 		{"open", ticketMenuInput{rendered: tickets.StatusOpen}, home},
 		{"claimed", ticketMenuInput{rendered: tickets.StatusClaimed}, home},
-		{"needs-answer", ticketMenuInput{rendered: tickets.StatusPausedAnswer, ticket: tickets.Ticket{Status: "needs-answer"}},
+		{"paused (answer)", ticketMenuInput{rendered: tickets.StatusPausedAnswer, ticket: tickets.Ticket{Status: string(schema.StatusPaused)}},
 			want{contextmenu.Suggested, contextmenu.Suggested, contextmenu.Server}},
-		{"needs-repair", ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: "needs-repair"}},
+		{"paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}},
 			want{contextmenu.Server, contextmenu.Suggested, contextmenu.Server}},
 		{"error", ticketMenuInput{rendered: tickets.StatusError}, want{contextmenu.Server, contextmenu.Suggested, contextmenu.Server}},
 		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}},
@@ -58,15 +59,15 @@ func TestTicketHasSuggestedActions_AgreesWithMenu(t *testing.T) {
 		{"claimed", ticketMenuInput{rendered: tickets.StatusClaimed}, false},
 		{"done", ticketMenuInput{rendered: tickets.StatusDone}, false},
 		{"blocked", ticketMenuInput{rendered: tickets.StatusBlocked}, false},
-		{"needs-answer", ticketMenuInput{rendered: tickets.StatusPausedAnswer}, true},
-		{"needs-answer herdr down", ticketMenuInput{rendered: tickets.StatusPausedAnswer, herdrDown: true}, true},
-		{"needs-repair", ticketMenuInput{rendered: tickets.StatusPausedRepair}, true},
-		{"needs-repair herdr down", ticketMenuInput{rendered: tickets.StatusPausedRepair, herdrDown: true}, false},
+		{"paused (answer)", ticketMenuInput{rendered: tickets.StatusPausedAnswer}, true},
+		{"paused (answer) herdr down", ticketMenuInput{rendered: tickets.StatusPausedAnswer, herdrDown: true}, true},
+		{"paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair}, true},
+		{"paused (repair) herdr down", ticketMenuInput{rendered: tickets.StatusPausedRepair, herdrDown: true}, false},
 		{"error herdr down", ticketMenuInput{rendered: tickets.StatusError, herdrDown: true}, false},
 		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}}, true},
 		{"muted open server down", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}, serverReason: serverNotRunning}, false},
 		{"open on a map", ticketMenuInput{rendered: tickets.StatusOpen, isMap: true}, true},
-		{"archived needs-repair", ticketMenuInput{rendered: tickets.StatusPausedRepair, archived: true}, false},
+		{"archived paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair, archived: true}, false},
 	} {
 		menu := slices.ContainsFunc(ticketMenuItems(tt.in), func(it contextmenu.Item[ticketTarget]) bool {
 			return it.Group == contextmenu.Suggested && it.Disabled == ""

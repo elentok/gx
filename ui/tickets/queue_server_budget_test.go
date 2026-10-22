@@ -38,7 +38,7 @@ func TestQueueServerMode_HeaderColourBands(t *testing.T) {
 			got := budgetTotalStyle(tc.total, 50)
 			var name string
 			switch got.GetForeground() {
-			case epicStatusParkedRepairStyle.GetForeground():
+			case epicStatusPausedRepairStyle.GetForeground():
 				name = "alarm"
 			case epicStatusProblemStyle.GetForeground():
 				name = "warning"

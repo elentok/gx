@@ -100,11 +100,11 @@ func (r *focusReporter) report(rep server.FocusReport) {
 	r.last, r.pending = rep, true
 	if !r.sending {
 		r.sending = true
-		go r.drain()
+		go r.flushPending()
 	}
 }
 
-func (r *focusReporter) drain() {
+func (r *focusReporter) flushPending() {
 	for {
 		r.mu.Lock()
 		if !r.pending {

@@ -36,7 +36,7 @@ type fakeServerAPI struct {
 	queue []server.QueueItem
 }
 
-// verb records the maintenance verbs ("drain", "pause", "resume", "override",
+// verb records the maintenance verbs ("pause", "resume", "override",
 // "remove <addr>") so a test can assert which one a key reached; removeRes and
 // budget are what QueueRemove and Budget return.
 func (f fakeServerAPI) verb(v string) {
@@ -82,7 +82,7 @@ func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (serve
 }
 
 func (f fakeServerAPI) TicketPause(_ context.Context, address, _ string) (server.QueueResult, error) {
-	f.record("park " + address)
+	f.record("pause " + address)
 	return server.QueueResult{}, nil
 }
 
@@ -352,8 +352,8 @@ func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
 	}
 }
 
-// Seam D: "enter" on a parked row issues unpark.
-func TestServerMode_EnterUnparksAParkedRow(t *testing.T) {
+// Seam D: "enter" on a paused row issues resume.
+func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
@@ -364,10 +364,10 @@ func TestServerMode_EnterUnparksAParkedRow(t *testing.T) {
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
-		t.Fatal("enter on a parked row issued nothing")
+		t.Fatal("enter on a paused row issued nothing")
 	}
 	cmd()
-	if want := []string{"unpark gx:alpha/02"}; !slices.Equal(calls, want) {
+	if want := []string{"resume gx:alpha/02"}; !slices.Equal(calls, want) {
 		t.Fatalf("calls = %v, want %v", calls, want)
 	}
 }
@@ -477,7 +477,7 @@ func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
 }
 
 // Seam D: on herdr, Go to pane jumps to the tab from the iterations read, and
-// Resume issues unpark.
+// Resume issues resume.
 func TestServerMode_GoToPaneAndResume(t *testing.T) {
 	focused := fakeFocus(t)
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
@@ -491,17 +491,17 @@ func TestServerMode_GoToPaneAndResume(t *testing.T) {
 	}
 
 	_, cmd = chooseTicketMenuItem(t, pressMenuKey(t, m), resumeLabel)
-	if msg, ok := cmd().(serverWriteMsg); !ok || msg.verb != serverVerbUnpark {
+	if msg, ok := cmd().(serverWriteMsg); !ok || msg.verb != serverVerbResume {
 		t.Fatalf("resume result = %+v", msg)
 	}
-	if !slices.Equal(calls, []string{"unpark gx:alpha/01"}) {
+	if !slices.Equal(calls, []string{"resume gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }
 
-// A needs-answer ticket's menu has no Answer… action: answering is the web
+// A paused (answer) ticket's menu has no Answer… action: answering is the web
 // UI's job, and the TUI only offers Resume.
-func TestServerMode_NeedsAnswerMenuHasNoAnswerAction(t *testing.T) {
+func TestServerMode_PausedAnswerMenuHasNoAnswerAction(t *testing.T) {
 	m := openAnswerMenu(t, fakeServerAPI{})
 	view := m.ticketMenu.View()
 	if strings.Contains(view, "Answer…") {
@@ -512,7 +512,7 @@ func TestServerMode_NeedsAnswerMenuHasNoAnswerAction(t *testing.T) {
 	}
 }
 
-func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
+func TestEpicsFromViewModel_KeepsTheDoneMetrics(t *testing.T) {
 	vm := applySnapshot(viewmodel.State{}, server.Snapshot{Tickets: []server.TicketInfo{
 		{Address: "proj:epic-a/01", Status: "done", ActualContextWindow: 66395, ElapsedTime: 316, Compactions: 2},
 	}})
@@ -522,7 +522,7 @@ func TestEpicsFromViewModel_KeepsTheLandingMetrics(t *testing.T) {
 	}
 	got := epics[0].Tickets[0]
 	if got.ActualContextWindow != 66395 || got.ElapsedTime != 316 || got.Compactions != 2 {
-		t.Errorf("ticket = %+v, want the landing metrics so the summary can add them up", got)
+		t.Errorf("ticket = %+v, want the done metrics so the summary can add them up", got)
 	}
 }
 

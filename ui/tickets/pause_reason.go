@@ -5,25 +5,25 @@ import (
 	"github.com/elentok/gx/ui"
 )
 
-// parkReasonMaxRunes caps the ellipsized Park reason subtext, rather than
+// pauseReasonMaxRunes caps the ellipsized Pause reason subtext, rather than
 // threading the panel's exact width through renderQueueTicketRow — RenderPanel's
 // own ansi.Truncate still applies as a backstop on narrow terminals, same as
 // blockedBySuffix's unbounded text today.
-const parkReasonMaxRunes = 60
+const pauseReasonMaxRunes = 60
 
-// needsRepairHeading is the literal heading markNeedsRepairWithReason
-// (ralphloop/claim.go) appends to a parked ticket's body.
-const needsRepairHeading = tickets.LegacyRepairHeading
+// pausedRepairHeading is the literal heading markNeedsRepairWithReason
+// (ralphloop/claim.go) appends to a paused ticket's body.
+const pausedRepairHeading = tickets.LegacyRepairHeading
 
-// needsAnswerHint is rendered under the preview's "Park rounds" heading.
-const needsAnswerHint = "Answer in the web UI or run `gx tickets answer <addr>`."
+// pausedAnswerHint is rendered under the preview's "Pause rounds" heading.
+const pausedAnswerHint = "Answer in the web UI or run `gx tickets answer <addr>`."
 
 // rowTitle is a list row's "<num> <title>". The title is a ticket's whole `#`
 // heading, which can be long; capping it here (same reasoning as
-// parkReasonMaxRunes) keeps the row's suffix and metrics visible instead of
+// pauseReasonMaxRunes) keeps the row's suffix and metrics visible instead of
 // losing them to the panel's own clip.
 func rowTitle(icons ui.IconSet, t tickets.Ticket) string {
-	return t.DisplayNumber() + " " + ellipsize(t.Title, parkReasonMaxRunes, icons.Ellipsis)
+	return t.DisplayNumber() + " " + ellipsize(t.Title, pauseReasonMaxRunes, icons.Ellipsis)
 }
 
 // ellipsize caps text to maxRunes runes, appending ellipsisIcon when

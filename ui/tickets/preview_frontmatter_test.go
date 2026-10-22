@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func TestTicketFrontmatterFields_ShowsIDAndExpectedContextWindowUntilLanded(t *testing.T) {
+func TestTicketFrontmatterFields_ShowsIDAndExpectedContextWindowUntilDone(t *testing.T) {
 	t.Parallel()
 	tk := tickets.Ticket{
 		Identifier:            "01-preview-missing-fields",
@@ -34,11 +34,11 @@ func TestTicketFrontmatterFields_ShowsIDAndExpectedContextWindowUntilLanded(t *t
 		t.Fatalf("expected id field in preview fields, got %q", id)
 	}
 	if contextWindow != "Expected: 15.0k tok" {
-		t.Fatalf("expected 'Expected: 15.0k tok' context-window field before landing, got %q", contextWindow)
+		t.Fatalf("expected 'Expected: 15.0k tok' context-window field before done, got %q", contextWindow)
 	}
 }
 
-func TestTicketFrontmatterFields_ActualContextWindowReplacesExpectedOnceLanded(t *testing.T) {
+func TestTicketFrontmatterFields_ActualContextWindowReplacesExpectedOnceDone(t *testing.T) {
 	t.Parallel()
 	tk := tickets.Ticket{
 		Identifier:            "01-preview-missing-fields",
@@ -58,7 +58,7 @@ func TestTicketFrontmatterFields_ActualContextWindowReplacesExpectedOnceLanded(t
 		}
 	}
 	if found != 1 {
-		t.Fatalf("expected exactly one context-window field once landed, got %d", found)
+		t.Fatalf("expected exactly one context-window field once done, got %d", found)
 	}
 	if contextWindow != "19.8k tok" {
 		t.Fatalf("expected actual context window to replace the expected one, got %q", contextWindow)

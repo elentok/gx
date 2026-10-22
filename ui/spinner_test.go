@@ -2,7 +2,7 @@ package ui
 
 import "testing"
 
-func TestProgressSpinnerFillsAndDrainsAtDocumentedCodepoints(t *testing.T) {
+func TestProgressSpinnerFillsAndEmptiesAtDocumentedCodepoints(t *testing.T) {
 	want := []string{
 		"\U000F0A9E", "\U000F0A9F", "\U000F0AA0", "\U000F0AA1",
 		"\U000F0AA2", "\U000F0AA3", "\U000F0AA4", "\U000F0AA5",

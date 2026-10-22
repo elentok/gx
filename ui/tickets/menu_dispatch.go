@@ -15,7 +15,7 @@ const serverNotRunning = "server not running"
 // server.
 func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
 	switch result.Action {
-	case actionResume, actionUnmuteReopen, serverVerbPark, serverVerbCancel, serverVerbRelaunch:
+	case actionResume, actionUnmuteReopen, serverVerbPause, serverVerbCancel, serverVerbRelaunch:
 		return cmdServerWrite(api, result.Action, result.Path)
 	case actionMerge:
 		if api == nil {

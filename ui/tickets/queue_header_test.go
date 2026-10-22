@@ -404,7 +404,7 @@ func TestEpicStatusRowElapsedAndAgentParts(t *testing.T) {
 		{"minute resolution", 134 * time.Minute,
 			tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{{Identifier: "01", Status: "open"}}},
 			[]string{"2h 14m elapsed"}, nil},
-		{"agent time sums landed tickets", 45 * time.Minute,
+		{"agent time sums done tickets", 45 * time.Minute,
 			tickets.Epic{StartedAt: started, Tickets: []tickets.Ticket{
 				{Identifier: "01", Status: "done", ElapsedTime: 600}, {Identifier: "02", Status: "open"}}},
 			[]string{"45m elapsed · 10m agent"}, []string{"· $"}},
@@ -450,7 +450,7 @@ func TestEpicStatusRowAgentTimeIncludesLiveRunningTicket(t *testing.T) {
 
 	got := statusRowAt(started.Add(45*time.Minute), m, epic)
 	if !strings.Contains(got, "45m elapsed · 25m agent") {
-		t.Errorf("want 10m landed + 15m live = 25m agent: %q", got)
+		t.Errorf("want 10m done + 15m live = 25m agent: %q", got)
 	}
 }
 

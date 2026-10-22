@@ -523,20 +523,20 @@ func toastTexts(cmd tea.Cmd) []notify.NotifyMsg {
 	return nil
 }
 
-func TestServerStream_ParkToastsOnLiveEventsOnly(t *testing.T) {
+func TestServerStream_PauseToastsOnLiveEventsOnly(t *testing.T) {
 	h, f := newStreamHarness(t)
 	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
-	h.probeUp() // the snapshot holds a parked ticket: state, not news
+	h.probeUp() // the snapshot holds a paused ticket: state, not news
 
-	park := server.Event{Seq: 11, Type: server.EventIterationPaused, Address: "gx:alpha/01"}
+	pause := server.Event{Seq: 11, Type: server.EventIterationPaused, Address: "gx:alpha/01"}
 	events := h.m.stream.streamEvents
-	next, cmd := h.m.Update(streamEventMsg{ev: park, events: events})
+	next, cmd := h.m.Update(streamEventMsg{ev: pause, events: events})
 	if got := toastTexts(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {
-		t.Fatalf("live park toasts = %+v", got)
+		t.Fatalf("live pause toasts = %+v", got)
 	}
 
 	// The same event replayed after a reconnect is a duplicate: no toast.
-	_, cmd = next.(Model).Update(streamEventMsg{ev: park, events: events})
+	_, cmd = next.(Model).Update(streamEventMsg{ev: pause, events: events})
 	if got := toastTexts(cmd); len(got) != 0 {
 		t.Fatalf("replayed event toasted: %+v", got)
 	}

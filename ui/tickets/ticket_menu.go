@@ -46,8 +46,8 @@ type ticketMenuInput struct {
 
 const (
 	ticketFinished = "ticket is finished"
-	alreadyParked  = "already parked"
-	notParked      = "not parked"
+	alreadyPaused  = "already paused"
+	notPaused      = "not paused"
 	notMuted       = "not muted"
 	herdrDownText  = "herdr not running"
 	noAgentLog     = "no agent log"
@@ -90,7 +90,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		}
 		return it
 	}
-	parked := isRepairPause(in.ticket)
+	paused := isRepairPause(in.ticket)
 	answer := resumeSuggested(in.rendered)
 
 	var items []contextmenu.Item[ticketTarget]
@@ -115,11 +115,11 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 
 	// An answer pause's action clears an announce-and-stop pause, which "enter"
 	// does not (see isRepairPause), so it gets no hint.
-	resumeKey := reasonIf(parked || !answer, "enter")
+	resumeKey := reasonIf(paused || !answer, "enter")
 	unmute := unmuteSuggested(in.ticket)
 	items = append(items,
-		server("Park", "", serverVerbPark, reasonIf(parked, alreadyParked)),
-		suggest(answer, server(pauseActionLabel(in.ticket.PauseReason), resumeKey, actionResume, reasonIf(!parked && !answer, notParked))),
+		server("Pause", "", serverVerbPause, reasonIf(paused, alreadyPaused)),
+		suggest(answer, server(pauseActionLabel(in.ticket.PauseReason), resumeKey, actionResume, reasonIf(!paused && !answer, notPaused))),
 		server("Cancel", "", serverVerbCancel, ""),
 		server("Relaunch", "", serverVerbRelaunch, ""),
 		// A mute outlives the status (see actionUnmuteReopen), so a finished

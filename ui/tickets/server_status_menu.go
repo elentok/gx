@@ -13,19 +13,19 @@ import (
 
 // Server-write verbs offered by the Context menu's Server group.
 const (
-	serverVerbPark     = "park"
-	serverVerbUnpark   = "unpark"
+	serverVerbPause    = "pause"
+	serverVerbResume   = "resume"
 	serverVerbUnmute   = "unmute"
 	serverVerbCancel   = "cancel"
 	serverVerbRelaunch = "relaunch"
 
-	// serverParkReason is the one-line reason the menu records; the server
+	// serverPauseReason is the one-line reason the menu records; the server
 	// requires one and the menu has no text input.
-	serverParkReason = "parked from the TUI"
+	serverPauseReason = "paused from the TUI"
 )
 
 // serverDirectStatuses are the statuses a person sets directly, in the
-// Context menu's Status group order: the rest (claimed, needs-answer, needs-repair) are orchestration
+// Context menu's Status group order: the rest (claimed, paused (answer), paused (repair)) are orchestration
 // statuses only the server's verbs change.
 var serverDirectStatuses = []schema.Status{schema.StatusOpen, schema.StatusDraft, schema.StatusDone}
 
@@ -60,17 +60,17 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 			err error
 		)
 		switch verb {
-		case serverVerbPark:
-			res, err = api.TicketPause(ctx, address, serverParkReason)
+		case serverVerbPause:
+			res, err = api.TicketPause(ctx, address, serverPauseReason)
 		case serverVerbCancel:
 			res, err = api.TicketCancel(ctx, address, true)
 		case serverVerbRelaunch:
 			res, err = api.TicketRelaunch(ctx, address, false)
 		case serverVerbUnmute:
 			res, err = api.TicketUnmute(ctx, address)
-		case serverVerbUnpark:
+		case serverVerbResume:
 			var rr server.RepairResult
-			rr, err = api.Repair(ctx, serverVerbUnpark, server.RepairRequest{Address: address})
+			rr, err = api.Repair(ctx, serverVerbResume, server.RepairRequest{Address: address})
 			res = server.QueueResult{Refused: rr.Refused, Message: rr.Message}
 		}
 		switch {
@@ -90,9 +90,9 @@ func (msg serverWriteMsg) toast() tea.Cmd {
 	return notify.Success(msg.verb + " done")
 }
 
-// handleServerUnparkEnter is "enter" on a parked row in server mode: it issues
-// unpark. handled is false for any other row so "enter" keeps its usual meaning.
-func (m Model) handleServerUnparkEnter() (cmd tea.Cmd, handled bool) {
+// handleServerResumeEnter is "enter" on a paused row in server mode: it issues
+// resume. handled is false for any other row so "enter" keeps its usual meaning.
+func (m Model) handleServerResumeEnter() (cmd tea.Cmd, handled bool) {
 	r, ok := m.selectedRow()
 	if m.serverAPI == nil || !ok || r.isEpic() {
 		return nil, false
@@ -101,5 +101,5 @@ func (m Model) handleServerUnparkEnter() (cmd tea.Cmd, handled bool) {
 	if !isRepairPause(ticket) {
 		return nil, false
 	}
-	return cmdServerWrite(m.serverAPI, serverVerbUnpark, ticket.Path), true
+	return cmdServerWrite(m.serverAPI, serverVerbResume, ticket.Path), true
 }

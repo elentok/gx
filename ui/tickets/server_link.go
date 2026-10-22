@@ -38,9 +38,9 @@ func (l ServerLink) disabledReason() string {
 // serverBlockedBindings lists every binding that needs a writable server. A
 // new server-backed binding needs an entry here — nothing else enforces that.
 var serverBlockedBindings = map[keys.BindingID]bool{
-	bindingTicketsReplaceQueue: true,
-	bindingTicketsAddToQueue:   true,
-	bindingTicketsDrainReplace: true,
+	bindingTicketsReplaceQueue:   true,
+	bindingTicketsAddToQueue:     true,
+	bindingTicketsFinishAndPause: true,
 }
 
 // serverKeyGuard is the shared no-op check for server-backed keys: blocked

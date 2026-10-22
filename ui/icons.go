@@ -47,12 +47,12 @@ type IconSet struct {
 	CheckboxChecked   string
 	CheckboxUnchecked string
 
-	TicketDraft       string
-	TicketOpen        string
-	TicketClaimed     string
-	TicketBlocked     string
-	TicketNeedsAnswer string
-	TicketNeedsRepair string
+	TicketDraft        string
+	TicketOpen         string
+	TicketClaimed      string
+	TicketBlocked      string
+	TicketPausedAnswer string
+	TicketPausedRepair string
 	// TicketWaitingForChildren marks a ticket whose own Status: is done but
 	// whose fork subtree (see tickets.Epic.Blocking) still has live work —
 	// a computed overlay, distinct from TicketDone (see tickets.RenderedStatus).
@@ -66,7 +66,7 @@ type IconSet struct {
 	TicketPaused string
 
 	// SuggestedAction badges a ticket row that has a "m"-menu suggested action
-	// available (ui/tickets' ticketHasSuggestedActions), e.g. a needs-answer
+	// available (ui/tickets' ticketHasSuggestedActions), e.g. a paused (answer)
 	// ticket's "Resume".
 	SuggestedAction string
 
@@ -137,8 +137,8 @@ func Icons(useNerdFont bool) IconSet {
 			TicketOpen:               "o",
 			TicketClaimed:            "@",
 			TicketBlocked:            "x",
-			TicketNeedsAnswer:        "?",
-			TicketNeedsRepair:        "!",
+			TicketPausedAnswer:       "?",
+			TicketPausedRepair:       "!",
 			TicketWaitingForChildren: "w",
 			TicketDone:               "d",
 			TicketError:              "!!",
@@ -202,8 +202,8 @@ func Icons(useNerdFont bool) IconSet {
 		TicketOpen:               "",
 		TicketClaimed:            "",
 		TicketBlocked:            "",
-		TicketNeedsAnswer:        "",
-		TicketNeedsRepair:        "",
+		TicketPausedAnswer:       "",
+		TicketPausedRepair:       "",
 		TicketWaitingForChildren: "⏳",
 		TicketDone:               "",
 		TicketError:              "",

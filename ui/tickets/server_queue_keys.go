@@ -208,9 +208,9 @@ func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleServerDrainKey is "D" in server mode, an alias of Finish and pause kept
+// handleServerFinishAndPauseKey is "D" in server mode, an alias of Finish and pause kept
 // for one release: stop the server handing out new work; running tickets finish.
-func (m Model) handleServerDrainKey() (tea.Model, tea.Cmd) {
+func (m Model) handleServerFinishAndPauseKey() (tea.Model, tea.Cmd) {
 	api := m.serverAPI
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    finishAndPausePrompt,

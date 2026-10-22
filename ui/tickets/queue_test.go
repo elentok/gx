@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
@@ -166,7 +167,7 @@ func TestQueueModelNestsChildrenUnderParentAndCollapsesWithHL(t *testing.T) {
 func TestQueueModelNestsInvestigateChildUnderOneOff(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeTicket(t, root, "fix-it", "01-prompt.md", "Status: needs-answer\n\nBody.\n")
+	writeTicket(t, root, "fix-it", "01-prompt.md", "Status: paused\nPause reason: blocked-pane\n\nBody.\n")
 	writeRawQueueTicket(t, root, "fix-it", "02-investigate.md", "---\nid: \"02\"\nstatus: open\ntype: investigate\nparent: \"01\"\n---\n\nBody.\n")
 
 	checked := map[string]bool{
@@ -533,7 +534,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if strings.Contains(got, "·") {
 			t.Fatalf("body line = %q, want no redundant \"· enter start\" hint suffix", got)
 		}
-		if want := epicStatusParkedAnswerStyle.Render(got); lines[0] != want {
+		if want := epicStatusPausedAnswerStyle.Render(got); lines[0] != want {
 			t.Fatalf("body line = %q, want orange-styled %q", lines[0], want)
 		}
 	})
@@ -579,7 +580,7 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 		if got := ansi.Strip(lines[0]); got != want {
 			t.Fatalf("body line = %q, want %q", got, want)
 		}
-		if wantStyled := epicStatusParkedAnswerStyle.Render(want); lines[0] != wantStyled {
+		if wantStyled := epicStatusPausedAnswerStyle.Render(want); lines[0] != wantStyled {
 			t.Fatalf("body line = %q, want orange-styled %q", lines[0], wantStyled)
 		}
 
@@ -817,7 +818,7 @@ func selectFirstQueueTicketRow(t *testing.T, m QueueModel) QueueModel {
 
 // TestQueueModelShowsSameStatusAsTicketsTab covers ticket 25's first
 // request: the Queue tab must show each ticket's status icon, blocked-by
-// suffix, and (for a landed ticket) the same elapsed/tokens metrics the
+// suffix, and (for a done ticket) the same elapsed/tokens metrics the
 // Tickets tab renders (view.go's renderTicketRow), not just a bare checkbox
 // and title.
 func TestQueueModelShowsSameStatusAsTicketsTab(t *testing.T) {
@@ -929,14 +930,14 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 }
 
 // TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine covers ticket 03: a
-// parked (needs-answer/needs-repair/claimed) ticket that already carries
+// paused or claimed ticket that already carries
 // non-zero elapsed_time/actual_context_window must show it, not just done
 // tickets.
 func TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 	t.Parallel()
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-		{Identifier: "01", Title: "Parked ticket", Status: "needs-answer", ElapsedTime: 5, ActualContextWindow: 100},
+		{Identifier: "01", Title: "Paused ticket", Status: string(schema.StatusPaused), PauseReason: schema.PauseBlockedPane, ElapsedTime: 5, ActualContextWindow: 100},
 	}}
 
 	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
@@ -951,7 +952,7 @@ func TestRenderQueueTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
 	t.Parallel()
 	var m QueueModel
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-		{Identifier: "01", Title: "Parked ticket", Status: "needs-repair"},
+		{Identifier: "01", Title: "Paused ticket", Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
 	}}
 
 	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)

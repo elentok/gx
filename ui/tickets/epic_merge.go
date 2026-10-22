@@ -15,7 +15,7 @@ import (
 const actionMerge = "merge"
 
 // cmdEpicMerge asks the server to merge epic ("project:epic") and toasts the
-// outcome: a direct land, the forked merge ticket, a park, or the refusal.
+// outcome: a direct merge, the forked merge ticket, a pause, or the refusal.
 func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 	return func() tea.Msg {
 		res, err := api.EpicMerge(context.Background(), epic)
@@ -25,7 +25,7 @@ func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 		case res.Refused:
 			return notify.Error("merge refused: " + res.Message)()
 		case res.Paused:
-			return notify.Error("merge parked: " + res.Message)()
+			return notify.Error("merge paused: " + res.Message)()
 		case res.MergeTicket != "":
 			return notify.Success("merge ticket " + res.MergeTicket + " forked")()
 		}
@@ -33,9 +33,9 @@ func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 	}
 }
 
-// isParkedRoot is a queued epic whose tickets are all done: its land parked,
+// isPausedRoot is a queued epic whose tickets are all done: its merge paused,
 // so the server kept the root in the queue.
-func isParkedRoot(epic tickets.Epic, queued map[string]bool) bool {
+func isPausedRoot(epic tickets.Epic, queued map[string]bool) bool {
 	if !epic.AllDone() {
 		return false
 	}

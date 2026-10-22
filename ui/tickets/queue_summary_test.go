@@ -81,9 +81,9 @@ func TestEpicStatusLine_Colors(t *testing.T) {
 		want string
 	}{
 		{"awaiting-merge", server.EpicSummary{State: server.EpicStateAwaitingMerge}, epicStatusDoneStyle.Render(icons.TicketDone)},
-		{"parked needs-repair", repair, epicStatusParkedRepairStyle.Render(icons.Warning)},
-		{"parked needs-answer", answer, epicStatusParkedAnswerStyle.Render(icons.Warning)},
-		{"deadlocked", server.EpicSummary{State: server.EpicStatePaused, Reason: server.EpicReasonDeadlock}, epicStatusParkedRepairStyle.Render(icons.Warning)},
+		{"paused (repair)", repair, epicStatusPausedRepairStyle.Render(icons.Warning)},
+		{"paused (answer)", answer, epicStatusPausedAnswerStyle.Render(icons.Warning)},
+		{"deadlocked", server.EpicSummary{State: server.EpicStatePaused, Reason: server.EpicReasonDeadlock}, epicStatusPausedRepairStyle.Render(icons.Warning)},
 	} {
 		icon, _, style := epicStatusLine(icons, tt.sum, "")
 		if got := style.Render(icon); got != tt.want {
@@ -94,7 +94,7 @@ func TestEpicStatusLine_Colors(t *testing.T) {
 
 // fixtureSummaries stands in for the server's epic summaries in fixtures that
 // only build tickets: it counts done tickets, lists the claimed ones that have
-// a claim time as active, and the needs-answer/needs-repair ones as parked.
+// a claim time as active, and the paused (answer) and paused (repair) ones as paused.
 func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []server.EpicSummary {
 	var out []server.EpicSummary
 	for _, epic := range epics {
@@ -152,7 +152,7 @@ func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 	}
 }
 
-func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
+func TestQueueServerMode_ShowsPauseReasonFromSummary(t *testing.T) {
 	m := summaryQueue(t,
 		server.EpicSummary{
 			Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Done: 0, Total: 1,
@@ -165,7 +165,7 @@ func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
 
 	body := ansi.Strip(m.View().Content)
 	if !strings.Contains(body, "Which approach, A or B?") {
-		t.Errorf("view lacks the Park reason line:\n%s", body)
+		t.Errorf("view lacks the pause reason line:\n%s", body)
 	}
 	if !strings.Contains(body, "Paused") {
 		t.Errorf("view lacks the paused state label:\n%s", body)

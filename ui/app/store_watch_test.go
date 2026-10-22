@@ -100,7 +100,7 @@ func TestDownMode_ReloadKeyReloadsTicketsAndProbesFromQueue(t *testing.T) {
 	if cmd == nil {
 		t.Fatal(`"R" on the Tickets tab did nothing`)
 	}
-	if got := drain(cmd); !slices.Contains(got, "tickets.epicsLoadedMsg") || slices.Contains(got, "tickets.ResnapshotRequestedMsg") {
+	if got := runCmds(cmd); !slices.Contains(got, "tickets.epicsLoadedMsg") || slices.Contains(got, "tickets.ResnapshotRequestedMsg") {
 		t.Fatalf(`"R" on the Tickets tab produced %v, want a disk reload`, got)
 	}
 
@@ -110,7 +110,7 @@ func TestDownMode_ReloadKeyReloadsTicketsAndProbesFromQueue(t *testing.T) {
 	if cmd == nil {
 		t.Fatal(`"R" on the Queue tab did nothing`)
 	}
-	if got := drain(cmd); !slices.Contains(got, "tickets.ProbeRequestedMsg") {
+	if got := runCmds(cmd); !slices.Contains(got, "tickets.ProbeRequestedMsg") {
 		t.Fatalf(`"R" on the Queue tab produced %v, want a probe request`, got)
 	}
 }
@@ -146,9 +146,9 @@ func TestDownMode_NoClientIgnoresProbeRequest(t *testing.T) {
 	}
 }
 
-// drain runs cmd and any batch it holds, skipping the waits that never return
+// runCmds runs cmd and any batch it holds, skipping the waits that never return
 // on their own (ticks and the store-watch wait), and names what came back.
-func drain(cmd tea.Cmd) []string {
+func runCmds(cmd tea.Cmd) []string {
 	var out []string
 	var walk func(tea.Cmd)
 	walk = func(c tea.Cmd) {

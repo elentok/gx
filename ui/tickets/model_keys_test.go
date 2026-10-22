@@ -11,11 +11,11 @@ import (
 	"github.com/elentok/gx/ui/notify"
 )
 
-func TestDrainKeyListedAsDrainQueue(t *testing.T) {
+func TestFinishAndPauseKeyListedAsFinishAndPauseQueue(t *testing.T) {
 	for _, b := range newTicketsManager().Bindings() {
 		if strings.Join(b.Seq, " ") == "D" {
-			if b.Title != "drain queue" {
-				t.Fatalf("D title = %q, want %q", b.Title, "drain queue")
+			if b.Title != "finish and pause queue" {
+				t.Fatalf("D title = %q, want %q", b.Title, "finish and pause queue")
 			}
 			return
 		}

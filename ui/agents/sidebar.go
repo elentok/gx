@@ -217,7 +217,7 @@ func (m Model) statusIcon(s server.SessionInfo, icons ui.IconSet) string {
 	case server.SessionIdle:
 		return styleIdle.Render(icons.TicketOpen)
 	case server.SessionBlocked:
-		return styleBlocked.Render(icons.TicketNeedsAnswer)
+		return styleBlocked.Render(icons.TicketPausedAnswer)
 	case server.SessionRateLimited:
 		return styleRateLimited.Render(icons.TicketPaused)
 	case server.SessionExited:

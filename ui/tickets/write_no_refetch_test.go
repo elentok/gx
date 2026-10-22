@@ -27,7 +27,7 @@ func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 		"enqueue": serverEnqueuedMsg{problem: "gx:a/01: refused"},
 		"replace": serverReplacedMsg{count: 1},
 		"epic":    epicQueuedMsg{refusals: []string{"gx:a/01: refused"}},
-		"action":  serverDoneMsg{ok: "parked"},
+		"action":  serverDoneMsg{ok: "paused"},
 	} {
 		_, cmd := m.Update(msg)
 		assertOnlyToast(t, name, cmd)

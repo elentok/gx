@@ -139,7 +139,7 @@ func (m *QueueModel) syncServerRunState() tea.Cmd {
 
 // markConflictResolution shows a claimed conflict-resolution child as resolving
 // conflicts and its parent as waiting on it. The child runs inside the
-// parent's land, so the server holds no run (and no claim time) of its own for
+// parent's merge, so the server holds no run (and no claim time) of its own for
 // it; its timer stays blank rather than borrowing the parent's. The child's raw
 // status is checked: its rendered one reads blocked while the parent is not done.
 func markConflictResolution(epic gxtickets.Epic, live map[string]liveTicketState) {

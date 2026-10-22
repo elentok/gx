@@ -72,7 +72,7 @@ func renderViewportWithScrollbar(vp viewport.Model) []string {
 // own preview pane (see queue_preview.go). An epic row gets its own header
 // (name + optional [map] badge + open/total count) followed by its ticket.md
 // body. The second and
-// third return values are the park-section scroll target line index and
+// third return values are the pause-section scroll target line index and
 // whether one exists — always false for an epic row.
 func (m Model) previewContent(width int) (string, int, bool) {
 	r, ok := m.selectedRow()
@@ -91,11 +91,11 @@ func (m Model) previewContent(width int) (string, int, bool) {
 // renderTicketPreview builds one ticket row's preview: its formatted
 // frontmatter block (renderFrontmatterBlock), a thin rule, then the ticket
 // body rendered verbatim through glamour (or a read-error message), with the
-// ticket's park section (if any — see highlightParkSection) highlighted in
+// ticket's pause section (if any — see highlightPauseSection) highlighted in
 // its severity color. Shared verbatim by the Tickets tab (previewContent
 // above) and the Queue tab (queue_preview.go) so both tabs' previews stay
 // identical rather than drifting into two similar-but-slightly-different
-// implementations. The second and third return values are the park
+// implementations. The second and third return values are the pause
 // section's line index within the returned content and whether one was
 // found, for the caller to auto-scroll to.
 func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string, int, bool) {
@@ -113,13 +113,13 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 	}
 
 	prefixLines := strings.Count(b.String(), "\n")
-	body, target, ok := highlightParkSection(renderTicketMarkdown(text, width), status)
+	body, target, ok := highlightPauseSection(renderTicketMarkdown(text, width), status)
 	if ok {
 		target += prefixLines
 	}
 	b.WriteString(body)
 	if status == tickets.StatusPausedAnswer {
-		if block, line, found := renderParkRoundsBlock(ticketLogEvents(t), width); found {
+		if block, line, found := renderPauseRoundsBlock(ticketLogEvents(t), width); found {
 			if !strings.HasSuffix(body, "\n") {
 				b.WriteString("\n")
 			}
@@ -149,12 +149,12 @@ func ticketLogEvents(t tickets.Ticket) []tickets.LogEvent {
 	return events
 }
 
-// renderParkRoundsBlock renders the shared "Park rounds" block (see
+// renderPauseRoundsBlock renders the shared "Pause rounds" block (see
 // tickets.RenderRounds) under the answer hint, with the latest round in
 // orange and earlier rounds plain. line is the latest round's first line
 // within block, for the caller to scroll to; found is false when the log has
-// no park round.
-func renderParkRoundsBlock(events []tickets.LogEvent, width int) (block string, line int, found bool) {
+// no pause round.
+func renderPauseRoundsBlock(events []tickets.LogEvent, width int) (block string, line int, found bool) {
 	rounds := tickets.RenderRounds(events)
 	if rounds == "" {
 		return "", 0, false
@@ -175,31 +175,31 @@ func renderParkRoundsBlock(events []tickets.LogEvent, width int) (block string, 
 			}
 			out = append(out, wrapped)
 			if i == 0 {
-				out = append(out, ui.StyleDim.Render(needsAnswerHint))
+				out = append(out, ui.StyleDim.Render(pausedAnswerHint))
 			}
 		}
 	}
 	return strings.Join(out, "\n") + "\n", line, true
 }
 
-// highlightParkSection finds the needs-repair heading ("## Needs Repair", the
+// highlightPauseSection finds the paused (repair) heading ("## Needs Repair", the
 // literal text markNeedsRepairWithReason appends — see ralphloop/claim.go)
 // within rendered
 // (glamour output, so headings survive verbatim as their own line — see
 // ticketGlamourStyle's H2 prefix in glamour.go) and re-styles that line
 // through the section's end (the next "## " heading, or content end) in the
-// status's severity color: orange for needs-answer, red for needs-repair —
+// status's severity color: orange for paused (answer), red for paused (repair) —
 // deliberately different from the row-icon colors (ColorYellow/ColorRed in
-// view.go), since ticket 20 wants orange for needs-answer in the preview,
+// view.go), since ticket 20 wants orange for paused (answer) in the preview,
 // not yellow. Mirrors highlightPreviewLine's approach of re-styling the
 // ANSI-stripped text in place rather than fighting glamour's own ANSI.
 // Returns rendered unchanged with ok=false for any other status or when the
 // heading isn't found.
-func highlightParkSection(rendered string, status tickets.RenderedStatus) (out string, target int, ok bool) {
+func highlightPauseSection(rendered string, status tickets.RenderedStatus) (out string, target int, ok bool) {
 	if status != tickets.StatusPausedRepair {
 		return rendered, 0, false
 	}
-	heading := needsRepairHeading
+	heading := pausedRepairHeading
 	style := lipgloss.NewStyle().Foreground(ui.ColorRed)
 
 	lines := strings.Split(rendered, "\n")

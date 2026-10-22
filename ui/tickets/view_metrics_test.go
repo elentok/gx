@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -70,13 +71,13 @@ func TestRenderTicketRow_CancelledRendersAsTerminal(t *testing.T) {
 }
 
 // TestRenderTicketRow_NonDoneWithMetricsShowsLine covers ticket 03: a
-// non-done ticket (e.g. parked needs-answer/needs-repair) can already carry
+// non-done ticket (e.g. paused (answer) or paused (repair)) can already carry
 // non-zero elapsed_time/actual_context_window from a prior run, and that
 // data must not be hidden just because the ticket isn't done.
 func TestRenderTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-		{Identifier: "01", Title: "Parked ticket", Status: "needs-answer", ElapsedTime: 754, ActualContextWindow: 45_200},
+		{Identifier: "01", Title: "Paused ticket", Status: string(schema.StatusPaused), PauseReason: schema.PauseBlockedPane, ElapsedTime: 754, ActualContextWindow: 45_200},
 	}}
 	m := newModelForTicketRowTests(epic)
 
@@ -95,7 +96,7 @@ func TestRenderTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 func TestRenderTicketRow_NonDoneWithZeroMetricsOmitsLine(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-		{Identifier: "01", Title: "Parked ticket", Status: "needs-repair"},
+		{Identifier: "01", Title: "Paused ticket", Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
 	}}
 	m := newModelForTicketRowTests(epic)
 
@@ -117,8 +118,8 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 	}{
 		{tickets.StatusOpen, statusOpenStyle},
 		{tickets.StatusClaimed, statusClaimedStyle},
-		{tickets.StatusPausedRepair, statusNeedsRepairStyle},
-		{tickets.StatusPausedAnswer, statusNeedsAnswerStyle},
+		{tickets.StatusPausedRepair, statusPausedRepairStyle},
+		{tickets.StatusPausedAnswer, statusPausedAnswerStyle},
 		{tickets.StatusDone, statusDoneStyle},
 		{tickets.StatusBlocked, statusBlockedStyle},
 		{tickets.StatusWaitingForChildren, statusWaitingForChildrenStyle},
@@ -138,12 +139,12 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 	if _, style := statusIconAndStyle(icons, tickets.StatusOpen); style.GetForeground() != (lipgloss.NoColor{}) {
 		t.Errorf("StatusOpen foreground = %v, want lipgloss.NoColor{} (no override)", style.GetForeground())
 	}
-	// Claimed is orange, needs-repair is red, matching each other's new colors.
+	// Claimed is orange, paused (repair) is red, matching each other's new colors.
 	if _, style := statusIconAndStyle(icons, tickets.StatusClaimed); style.GetForeground() != ui.ColorOrange {
 		t.Errorf("StatusClaimed foreground = %v, want ColorOrange", style.GetForeground())
 	}
 	if _, style := statusIconAndStyle(icons, tickets.StatusPausedRepair); style.GetForeground() != ui.ColorRed {
-		t.Errorf("StatusNeedsRepair foreground = %v, want ColorRed", style.GetForeground())
+		t.Errorf("StatusPausedRepair foreground = %v, want ColorRed", style.GetForeground())
 	}
 }
 
@@ -215,7 +216,7 @@ func TestRenderEpicRow_AppendsCostSummaryDimItalic(t *testing.T) {
 	}
 }
 
-// TestRenderEpicRow_OmitsCostWhenZero covers the case with no landed cost at
+// TestRenderEpicRow_OmitsCostWhenZero covers the case with no recorded cost at
 // all: "took Xm" renders with no "$0.00" suffix.
 func TestRenderEpicRow_OmitsCostWhenZero(t *testing.T) {
 	t.Parallel()
@@ -232,7 +233,7 @@ func TestRenderEpicRow_OmitsCostWhenZero(t *testing.T) {
 }
 
 // TestRenderTicketRow_CostOnlyStillShowsSubtitle covers the per-field
-// omission rule: a ticket with only ActualCost landed (no elapsed/tokens)
+// omission rule: a ticket with only ActualCost recorded (no elapsed/tokens)
 // still shows a subtitle carrying just the cost.
 func TestRenderTicketRow_CostOnlyStillShowsSubtitle(t *testing.T) {
 	t.Parallel()
@@ -249,7 +250,7 @@ func TestRenderTicketRow_CostOnlyStillShowsSubtitle(t *testing.T) {
 
 // TestRenderTicketRow_DoneWithNoMetricsOmitsSubtitle covers the per-field
 // omission rule applying regardless of ticket status: a done ticket that
-// landed no elapsed/tokens/cost at all shows no subtitle, rather than the
+// recorded no elapsed/tokens/cost at all shows no subtitle, rather than the
 // former always-shown "0s · 0 tok".
 func TestRenderTicketRow_DoneWithNoMetricsOmitsSubtitle(t *testing.T) {
 	t.Parallel()

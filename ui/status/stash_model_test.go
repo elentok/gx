@@ -122,7 +122,7 @@ func TestStashAll_StashedResultNotifiesAndRefreshes(t *testing.T) {
 
 	// Enter batches the stash cmd with a spinner tick; flatten the batch and
 	// route the (private) done-msg back through the seam.
-	m, follow := drainBatch(m, cmd)
+	m, follow := runBatch(m, cmd)
 	if m.stash.IsOpen {
 		t.Fatal("expected stash sub-model to close after success")
 	}
@@ -177,10 +177,10 @@ func TestStashStaged_OpensStagedModalWhenStagedChangesExist(t *testing.T) {
 	}
 }
 
-// drainBatch runs cmd, flattening any tea.BatchMsg, and feeds every resulting
+// runBatch runs cmd, flattening any tea.BatchMsg, and feeds every resulting
 // message back through the model's Update. It returns the final model and the
 // last non-nil follow-up cmd produced.
-func drainBatch(m Model, cmd tea.Cmd) (Model, tea.Cmd) {
+func runBatch(m Model, cmd tea.Cmd) (Model, tea.Cmd) {
 	var follow tea.Cmd
 	var walk func(c tea.Cmd)
 	walk = func(c tea.Cmd) {

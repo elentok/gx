@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
 	"github.com/elentok/gx/ui/keys"
@@ -73,7 +74,7 @@ func groupsOf(items []contextmenu.Item[ticketTarget]) []contextmenu.Group {
 
 func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) {
 	var calls []string
-	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), "needs-answer", nil)
+	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), schema.PauseManual, nil)
 	m, ready := requestQueueMenu(t, m)
 
 	tabs := ticketMenuItems(newTicketMenuInput(m.epics[0], m.epics[0].Tickets[0], false, ""))
@@ -94,7 +95,7 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 	if msg, ok := cmd().(serverWriteMsg); !ok || msg.problem != "" {
 		t.Fatalf("resume result = %+v", msg)
 	}
-	if !slices.Equal(calls, []string{"unpark gx:alpha/01"}) {
+	if !slices.Equal(calls, []string{"resume gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 	if m.ticketMenu.IsOpen {
@@ -104,7 +105,7 @@ func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) 
 
 func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
-	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), "needs-repair", muted)
+	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), schema.PauseSpinning, muted)
 	_, cmd := chooseQueueMenuItem(t, openQueueMenu(t, m), "Unmute")
 	cmd()
 	if !slices.Equal(calls, []string{"unmute gx:alpha/01"}) {
@@ -160,7 +161,7 @@ func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	m = next.(QueueModel)
 	m.loaded = true
-	m.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: "needs-repair", Mutes: muted}}}}
+	m.epics = []tickets.Epic{{Name: "alpha", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Title: "First", Path: path, Status: string(schema.StatusPaused), PauseReason: schema.PauseManual, Mutes: muted}}}}
 	m.checked = map[string]bool{path: true}
 	m.clampSelected()
 	m = selectFirstQueueTicketRow(t, m)
@@ -173,8 +174,8 @@ func TestQueueTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 	}
 	updated, _ := m.Update(ready)
 	before, _ := os.ReadFile(path)
-	if _, cmd := chooseQueueMenuItem(t, updated.(QueueModel), "Park"); cmd != nil {
-		t.Error("park issued a cmd")
+	if _, cmd := chooseQueueMenuItem(t, updated.(QueueModel), "Pause"); cmd != nil {
+		t.Error("pause issued a cmd")
 	}
 	if after, _ := os.ReadFile(path); string(after) != string(before) {
 		t.Errorf("ticket file changed:\n%s", after)

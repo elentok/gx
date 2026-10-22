@@ -21,7 +21,7 @@ const (
 	bindingTicketsCancelChord        keys.BindingID = "cancel-chord"
 	bindingTicketsReplaceQueue       keys.BindingID = "replace-queue"
 	bindingTicketsAddToQueue         keys.BindingID = "add-to-queue"
-	bindingTicketsDrainReplace       keys.BindingID = "drain-replace-queue"
+	bindingTicketsFinishAndPause     keys.BindingID = "finish-and-pause-queue"
 	bindingTicketsToggleCheck        keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone     keys.BindingID = "toggle-hide-done"
 	bindingTicketsToggleProjectScope keys.BindingID = "toggle-project-scope"
@@ -39,10 +39,10 @@ const (
 // here to be guarded — nothing else enforces that. The "m" menu is not here:
 // it opens on an archived row with its writes dim.
 var archivedBlockedBindings = map[keys.BindingID]bool{
-	bindingTicketsReplaceQueue: true,
-	bindingTicketsAddToQueue:   true,
-	bindingTicketsDrainReplace: true,
-	bindingTicketsToggleCheck:  true,
+	bindingTicketsReplaceQueue:   true,
+	bindingTicketsAddToQueue:     true,
+	bindingTicketsFinishAndPause: true,
+	bindingTicketsToggleCheck:    true,
 }
 
 // newTicketsManager builds the key manager for the sidebar's "extra"
@@ -62,7 +62,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
 		{ID: bindingTicketsReplaceQueue, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
 		{ID: bindingTicketsAddToQueue, Seq: []string{"a"}, Categories: []string{"Navigation"}, Title: "add to queue"},
-		{ID: bindingTicketsDrainReplace, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "drain queue"},
+		{ID: bindingTicketsFinishAndPause, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "finish and pause queue"},
 		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingTicketsToggleProjectScope, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "cwd project / all projects"},
@@ -143,8 +143,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleServerReplaceKey()
 		case bindingTicketsAddToQueue:
 			return m.handleServerEnqueueKey()
-		case bindingTicketsDrainReplace:
-			return m.handleServerDrainKey()
+		case bindingTicketsFinishAndPause:
+			return m.handleServerFinishAndPauseKey()
 		case bindingTicketsToggleCheck:
 			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:
@@ -182,7 +182,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// ui/tree/ops.go) — the only way ui/tickets learns which single entry
 	// just changed, short of duplicating that binding logic here.
 	if msg.String() == "enter" {
-		if cmd, handled := m.handleServerUnparkEnter(); handled {
+		if cmd, handled := m.handleServerResumeEnter(); handled {
 			return m, cmd
 		}
 	}

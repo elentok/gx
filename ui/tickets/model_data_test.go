@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 )
@@ -101,12 +102,12 @@ func TestDeriveCollapsedSidebar_SearchOverrideIsTransient(t *testing.T) {
 // TestSortedTicketIndexes_PlanOrderIgnoresStatus mirrors
 // TestSortedTickets_PlanOrderIgnoresStatus (flat_test.go) for the sidebar's
 // own sort function: it orders purely by ticket number, not rendered-status
-// group, so a done/needs-repair ticket stays in its plan-order slot
+// group, so a done/paused ticket stays in its plan-order slot
 // instead of jumping to the bottom.
 func TestSortedTicketIndexes_PlanOrderIgnoresStatus(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
-		{Number: 4, Identifier: "04", Status: "needs-repair"},
+		{Number: 4, Identifier: "04", Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 3, Identifier: "03", Status: "open"},
 		{Number: 2, Identifier: "02", Status: "done", Commitless: true},
@@ -151,7 +152,7 @@ func TestModel_TicketRows_NestsInvestigateChildUnderOneOff(t *testing.T) {
 	t.Parallel()
 	parent := "01"
 	epic := tickets.Epic{Path: "epic", Tickets: []tickets.Ticket{
-		{Number: 1, Identifier: "01", Path: "01", Status: "needs-answer", Type: "prompt"},
+		{Number: 1, Identifier: "01", Path: "01", Status: string(schema.StatusPaused), PauseReason: schema.PauseBlockedPane, Type: "prompt"},
 		{Number: 2, Identifier: "02", Path: "02", Status: "open", Type: "investigate", Parent: &parent},
 	}}
 	m := Model{epics: []tickets.Epic{epic}}

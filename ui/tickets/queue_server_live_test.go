@@ -160,7 +160,7 @@ func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
 	}
 }
 
-// A conflict-resolution child runs inside its parent's land, so the server has
+// A conflict-resolution child runs inside its parent's merge, so the server has
 // no run for it: it still shows as resolving, and the parent as waiting on it.
 func TestQueueServerMode_ConflictChildShowsResolvingAndParentWaits(t *testing.T) {
 	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{

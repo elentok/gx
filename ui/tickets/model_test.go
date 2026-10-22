@@ -188,7 +188,7 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-done-ticket.md", "Status: done\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "02-open-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "03-needs-answer-ticket.md", "Status: needs-answer\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "03-paused-answer-ticket.md", "Status: paused\nPause reason: blocked-pane\n\nBody.\n")
 	writeTicket(t, root, "my-epic", "04-blocked-ticket.md", "Status: open\nBlocked by: 02\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
@@ -197,7 +197,7 @@ func TestNewModel_TicketsInPlanOrderWithinEpic(t *testing.T) {
 	m = updated.(Model)
 
 	content := m.View().Content
-	wantOrder := []string{"Done ticket", "Open ticket", "Needs answer ticket", "Blocked ticket"}
+	wantOrder := []string{"Done ticket", "Open ticket", "Paused answer ticket", "Blocked ticket"}
 	lastIdx := -1
 	for _, title := range wantOrder {
 		idx := strings.Index(content, title)
@@ -230,11 +230,11 @@ func TestNewModel_BlockedTicketShowsRawStatusWithoutServer(t *testing.T) {
 	}
 }
 
-func TestNewModel_NeedsAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
+func TestNewModel_PausedAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "my-epic", "01-blocker-ticket.md", "Status: open\n\nBody.\n")
-	writeTicket(t, root, "my-epic", "02-needs-answer-ticket.md", "Status: needs-answer\nBlocked by: 01\n\nBody.\n")
+	writeTicket(t, root, "my-epic", "02-paused-answer-ticket.md", "Status: paused\nPause reason: blocked-pane\nBlocked by: 01\n\nBody.\n")
 
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
@@ -243,7 +243,7 @@ func TestNewModel_NeedsAnswerTicketShowsUnresolvedBlockerSuffix(t *testing.T) {
 
 	content := m.View().Content
 	if !strings.Contains(content, "(blocked by 01)") {
-		t.Fatalf("expected blocked-by suffix on needs-answer ticket, got:\n%s", content)
+		t.Fatalf("expected blocked-by suffix on paused (answer) ticket, got:\n%s", content)
 	}
 }
 
@@ -1135,7 +1135,7 @@ func LegacyTicketToFrontmatter(filename, content string) string {
 		id = id[:idx]
 	}
 
-	status, typ := "open", "implement"
+	status, typ, pauseReason := "open", "implement", ""
 	var blockedBy []string
 	lines := strings.Split(content, "\n")
 	bodyStart := 0
@@ -1144,6 +1144,8 @@ func LegacyTicketToFrontmatter(filename, content string) string {
 		switch {
 		case strings.HasPrefix(line, "Status: "):
 			status = strings.TrimPrefix(line, "Status: ")
+		case strings.HasPrefix(line, "Pause reason: "):
+			pauseReason = strings.TrimPrefix(line, "Pause reason: ")
 		case strings.HasPrefix(line, "Blocked by: "):
 			blockedBy = strings.Split(strings.TrimPrefix(line, "Blocked by: "), ", ")
 		case strings.HasPrefix(line, "Type: "):
@@ -1160,6 +1162,9 @@ func LegacyTicketToFrontmatter(filename, content string) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: %s\n", id, status, typ)
+	if pauseReason != "" {
+		fmt.Fprintf(&b, "pause_reason: %s\n", pauseReason)
+	}
 	if len(blockedBy) > 0 {
 		fmt.Fprintf(&b, "blocked_by: [\"%s\"]\n", strings.Join(blockedBy, "\", \""))
 	}

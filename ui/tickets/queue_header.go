@@ -34,16 +34,16 @@ var (
 	// and the budget total nearing its soft limit.
 	epicStatusProblemStyle = lipgloss.NewStyle().Foreground(ui.ColorYellow)
 
-	// epicStatusParkedAnswerStyle colors a parked epic's header status line
+	// epicStatusPausedAnswerStyle colors a paused epic's header status line
 	// orange when every ticket a human still needs to act on is waiting on a
-	// question (needs-answer) rather than a fault.
-	epicStatusParkedAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
+	// question (paused (answer)) rather than a fault.
+	epicStatusPausedAnswerStyle = lipgloss.NewStyle().Foreground(ui.ColorOrange)
 
-	// epicStatusParkedRepairStyle colors a parked epic's header status line
+	// epicStatusPausedRepairStyle colors a paused epic's header status line
 	// red once any ticket a human still needs to act on is broken
-	// (needs-repair) — red wins over orange when both kinds are present,
+	// (paused (repair)) — red wins over orange when both kinds are present,
 	// since a fault outranks a question.
-	epicStatusParkedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
+	epicStatusPausedRepairStyle = lipgloss.NewStyle().Foreground(ui.ColorRed)
 )
 
 // epicStateLabels must match LABELS in webui/src/view.ts.
@@ -78,9 +78,9 @@ func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph strin
 			return icons.Warning, text, epicStatusProblemStyle
 		// Red once a paused ticket is broken, since a fault outranks a question.
 		case sum.HasRepair || sum.Reason == server.EpicReasonDeadlock:
-			return icons.Warning, text, epicStatusParkedRepairStyle
+			return icons.Warning, text, epicStatusPausedRepairStyle
 		}
-		return icons.Warning, text, epicStatusParkedAnswerStyle
+		return icons.Warning, text, epicStatusPausedAnswerStyle
 	default:
 		return icons.EpicQueued, epicStateLabels[server.EpicStateWaiting], lipgloss.NewStyle()
 	}
@@ -93,7 +93,7 @@ func (m QueueModel) epicStatus(epic tickets.Epic) (icon, text string, style lipg
 	return epicStatusLine(m.icons(), m.summaries[epic.Name], glyph)
 }
 
-// epicElapsedSeconds sums the epic's tickets' landed ElapsedTime, for the
+// epicElapsedSeconds sums the epic's tickets' done ElapsedTime, for the
 // header status line's elapsed part once the epic is fully done.
 func epicElapsedSeconds(epic tickets.Epic) int {
 	total := 0
@@ -103,7 +103,7 @@ func epicElapsedSeconds(epic tickets.Epic) int {
 	return total
 }
 
-// epicCost sums the epic's tickets' landed ActualCost, for the Status line's
+// epicCost sums the epic's tickets' done ActualCost, for the Status line's
 // cost part.
 func epicCost(epic tickets.Epic) float64 {
 	total := 0.0
@@ -238,7 +238,7 @@ func epicElapsedPart(epic tickets.Epic, now time.Time) string {
 	return formatSpan(d) + " elapsed"
 }
 
-// epicAgentPart is the Status line's "<agent> agent" part: landed tickets'
+// epicAgentPart is the Status line's "<agent> agent" part: done tickets'
 // elapsed time plus the live elapsed of running ones (live is the epic's
 // ticket identifier -> running state; nil when the epic isn't running). ""
 // when zero.
@@ -370,7 +370,7 @@ func (m QueueModel) queueHeaderCostSuffix() string {
 
 // budgetTotalStyle picks the live-total's color against softLimit: the
 // default/no-color treatment below 80% of it, epicStatusProblemStyle's
-// warning yellow from 80% up to it, and epicStatusParkedRepairStyle's alarm
+// warning yellow from 80% up to it, and epicStatusPausedRepairStyle's alarm
 // red at or above it — reusing the same colors already used for epic-header
 // warning states (ticket 10) rather than duplicating them. Unstyled entirely
 // when softLimit is 0 (budget disabled) — callers should check that first,
@@ -381,7 +381,7 @@ func budgetTotalStyle(total, softLimit float64) lipgloss.Style {
 	}
 	switch {
 	case total >= softLimit:
-		return epicStatusParkedRepairStyle
+		return epicStatusPausedRepairStyle
 	case total >= 0.8*softLimit:
 		return epicStatusProblemStyle
 	default:
@@ -398,7 +398,7 @@ func budgetTotalStyle(total, softLimit float64) lipgloss.Style {
 // the Queue tab wondering what to do next.
 func (m QueueModel) queueHeaderBodyLines() []string {
 	if m.serverDown() {
-		return []string{epicStatusParkedAnswerStyle.Render(queueServerDownBanner)}
+		return []string{epicStatusPausedAnswerStyle.Render(queueServerDownBanner)}
 	}
 	if m.serverAPI != nil && m.herdrDown {
 		return []string{epicStatusProblemStyle.Render(queueHerdrDownBanner)}
@@ -441,12 +441,12 @@ const queueHerdrDownBanner = "herdr unavailable — the server can't start agent
 func (m QueueModel) queueIdleBodyLine() string {
 	if m.serverAPI != nil {
 		if len(m.checked) == 0 {
-			return epicStatusParkedAnswerStyle.Render("Queue is empty — enqueue tickets from the Tickets tab")
+			return epicStatusPausedAnswerStyle.Render("Queue is empty — enqueue tickets from the Tickets tab")
 		}
-		return epicStatusParkedAnswerStyle.Render("Waiting for the server to claim queued tickets")
+		return epicStatusPausedAnswerStyle.Render("Waiting for the server to claim queued tickets")
 	}
 	if len(m.checkedEpicPlans()) == 0 {
-		return epicStatusParkedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
+		return epicStatusPausedAnswerStyle.Render("No selected tickets — go to the Tickets tab first")
 	}
-	return epicStatusParkedAnswerStyle.Render("Idle — runs start from the server")
+	return epicStatusPausedAnswerStyle.Render("Idle — runs start from the server")
 }

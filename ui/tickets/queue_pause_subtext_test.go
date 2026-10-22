@@ -12,16 +12,18 @@ import (
 
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/tree"
 )
 
-// writeParkedFrontmatterTicket writes a needs-answer/needs-repair ticket with
+// writePausedFrontmatterTicket writes a paused ticket with
 // both a real Parent field (writeFrontmatterTicket doesn't support one) and a
-// park-reason body section (writeTicket doesn't support Parent) — ticket 16
-// needs both at once to test a parked ticket that also has children.
-func writeParkedFrontmatterTicket(t *testing.T, root, epic, filename, id, status, parent, reason string) {
+// pause-reason body section (writeTicket doesn't support Parent) — ticket 16
+// needs both at once to test a paused ticket that also has children.
+// pauseReason is a pause_reason frontmatter value such as "blocked-pane".
+func writePausedFrontmatterTicket(t *testing.T, root, epic, filename, id, pauseReason, parent, reason string) {
 	t.Helper()
 	path := filepath.Join(root, ".scratch", epic, "issues", filename)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -29,12 +31,12 @@ func writeParkedFrontmatterTicket(t *testing.T, root, epic, filename, id, status
 	}
 	testutil.EnsureEpicTicketMD(t, filepath.Dir(filepath.Dir(path)))
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\nid: %q\nstatus: %s\ntype: implement\n", id, status)
+	fmt.Fprintf(&b, "---\nid: %q\nstatus: paused\npause_reason: %s\ntype: implement\n", id, pauseReason)
 	if parent != "" {
 		fmt.Fprintf(&b, "parent: %q\n", parent)
 	}
 	heading := "## Needs Answer"
-	if status == "needs-repair" {
+	if pauseReason == string(schema.PauseSpinning) {
 		heading = "## Needs Repair"
 	}
 	fmt.Fprintf(&b, "---\n\n%s\n\n%s\n", heading, reason)
@@ -43,10 +45,10 @@ func writeParkedFrontmatterTicket(t *testing.T, root, epic, filename, id, status
 	}
 }
 
-// TestQueueModel_DraftRowUnaffectedByParkRendering is acceptance criterion 7:
+// TestQueueModel_DraftRowUnaffectedByPauseRendering is acceptance criterion 7:
 // a draft-status ticket's row must stay visually unchanged by this ticket's
 // work, even when it happens to carry a leftover "## Needs Answer" heading.
-func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
+func TestQueueModel_DraftRowUnaffectedByPauseRendering(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md",
@@ -57,36 +59,36 @@ func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
 	lines := m.queueBody(80)
 	rowText := ansi.Strip(strings.Join(lines, "\n"))
 	if strings.Contains(rowText, "Leftover text that must not surface.") {
-		t.Fatalf("expected draft row to omit park subtext:\n%s", rowText)
+		t.Fatalf("expected draft row to omit pause subtext:\n%s", rowText)
 	}
 }
 
-// TestHighlightParkSection_NeedsRepairRed covers the preview's needs-repair
-// coloring: the heading is red, and needs-answer is left to the rounds block.
-func TestHighlightParkSection_NeedsRepairRed(t *testing.T) {
+// TestHighlightPauseSection_PausedRepairRed covers the preview's paused (repair)
+// coloring: the heading is red, and paused (answer) is left to the rounds block.
+func TestHighlightPauseSection_PausedRepairRed(t *testing.T) {
 	t.Parallel()
-	rendered := "intro\n" + needsRepairHeading + "\nsome reason\n"
-	out, target, ok := highlightParkSection(rendered, tickets.StatusPausedRepair)
+	rendered := "intro\n" + pausedRepairHeading + "\nsome reason\n"
+	out, target, ok := highlightPauseSection(rendered, tickets.StatusPausedRepair)
 	if !ok || target != 1 {
-		t.Fatalf("highlightParkSection() ok=%v target=%d, want ok=true target=1", ok, target)
+		t.Fatalf("highlightPauseSection() ok=%v target=%d, want ok=true target=1", ok, target)
 	}
-	wantRed := lipgloss.NewStyle().Foreground(ui.ColorRed).Render(needsRepairHeading)
+	wantRed := lipgloss.NewStyle().Foreground(ui.ColorRed).Render(pausedRepairHeading)
 	if !strings.Contains(out, wantRed) {
-		t.Fatalf("expected needs-repair heading styled red in:\n%s", out)
+		t.Fatalf("expected paused (repair) heading styled red in:\n%s", out)
 	}
-	if _, _, ok := highlightParkSection(rendered, tickets.StatusPausedAnswer); ok {
-		t.Fatal("needs-answer must not highlight a body section")
+	if _, _, ok := highlightPauseSection(rendered, tickets.StatusPausedAnswer); ok {
+		t.Fatal("paused (answer) must not highlight a body section")
 	}
 }
 
-func TestRenderParkRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
+func TestRenderPauseRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
 	t.Parallel()
 	events := []tickets.LogEvent{
 		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "First?"},
 		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Choice: "yes"},
 		{Seq: 3, Type: tickets.EventPauseQuestion, Summary: "Second?", Text: "detail"},
 	}
-	block, line, ok := renderParkRoundsBlock(events, 80)
+	block, line, ok := renderPauseRoundsBlock(events, 80)
 	if !ok {
 		t.Fatal("found = false, want true")
 	}
@@ -102,29 +104,29 @@ func TestRenderParkRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
 	if strings.Contains(strings.Join(lines[:line], "\n"), orange.Render("1.")) {
 		t.Errorf("earlier rounds must stay plain:\n%q", lines[:line])
 	}
-	if !strings.Contains(lines[1], needsAnswerHint) {
+	if !strings.Contains(lines[1], pausedAnswerHint) {
 		t.Errorf("hint missing under the heading: %q", lines[1])
 	}
 }
 
-func TestRenderParkRoundsBlock_NoRoundsIsNotFound(t *testing.T) {
+func TestRenderPauseRoundsBlock_NoRoundsIsNotFound(t *testing.T) {
 	t.Parallel()
-	if _, _, ok := renderParkRoundsBlock(nil, 80); ok {
+	if _, _, ok := renderPauseRoundsBlock(nil, 80); ok {
 		t.Error("found = true, want false")
 	}
 }
 
-// TestQueueModel_ParkedTicketWithChildren_ReasonRendersDirectlyUnderItself is
-// ticket 16's regression case: a parked ticket that also has children must
+// TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself is
+// ticket 16's regression case: a paused ticket that also has children must
 // show its reason as a second physical line on its own entry, immediately
 // before its children in tree order — not as a trailing sibling node after
 // every child (the bug ticket 16 fixes), and without granting the ticket a
 // fold triangle it wouldn't otherwise have (it already has one, since it has
 // real children).
-func TestQueueModel_ParkedTicketWithChildren_ReasonRendersDirectlyUnderItself(t *testing.T) {
+func TestQueueModel_PausedTicketWithChildren_ReasonRendersDirectlyUnderItself(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeParkedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "needs-answer", "", "Parent needs a decision.")
+	writePausedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "blocked-pane", "", "Parent needs a decision.")
 	writeFrontmatterTicket(t, root, "alpha", "02-b.md", "02", "open", "01")
 	checked := map[string]bool{
 		ticketPath(root, "alpha", "01-a.md"): true,
@@ -155,16 +157,16 @@ func TestQueueModel_ParkedTicketWithChildren_ReasonRendersDirectlyUnderItself(t 
 	}
 }
 
-// TestQueueModel_ParkedLeafTicket_HasChildrenStaysFalse guards the rejected
+// TestQueueModel_PausedLeafTicket_HasChildrenStaysFalse guards the rejected
 // approach this ticket's doc explicitly ruled out: reparenting the reason
-// text under the ticket would make a parked leaf falsely report
+// text under the ticket would make a paused leaf falsely report
 // hasChildren==true (via childrenOf[path] > 0), granting it a fold triangle
 // that could collapse to hide its own reason. Folding the reason into the
 // entry's Body instead must never affect HasChildren.
-func TestQueueModel_ParkedLeafTicket_HasChildrenStaysFalse(t *testing.T) {
+func TestQueueModel_PausedLeafTicket_HasChildrenStaysFalse(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeParkedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "needs-answer", "", "Leaf needs a decision.")
+	writePausedFrontmatterTicket(t, root, "alpha", "01-a.md", "01", "blocked-pane", "", "Leaf needs a decision.")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-a.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
@@ -173,7 +175,7 @@ func TestQueueModel_ParkedLeafTicket_HasChildrenStaysFalse(t *testing.T) {
 		t.Fatalf("expected exactly one ticket entry, got %+v", entries)
 	}
 	if entries[0].HasChildren {
-		t.Fatalf("expected parked leaf ticket to report hasChildren=false, got %+v", entries[0])
+		t.Fatalf("expected paused leaf ticket to report hasChildren=false, got %+v", entries[0])
 	}
 	if len(entries[0].Body) != 1 || !strings.Contains(entries[0].Body[0], "Leaf needs a decision.") {
 		t.Fatalf("expected reason to still render as Body, got %+v", entries[0])

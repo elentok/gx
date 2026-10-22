@@ -3,7 +3,7 @@ package ui
 import "charm.land/bubbles/v2/spinner"
 
 // ProgressSpinner is the circle-slice pie-fill spinner Tickets/Queue and
-// Agents use for in-progress work. Frames fill 1/8 to full then drain back
+// Agents use for in-progress work. Frames fill 1/8 to full then empty back
 // down (rather than cutting straight from full back to 1/8) so the loop point
 // has no visible jump.
 var ProgressSpinner = spinner.Spinner{

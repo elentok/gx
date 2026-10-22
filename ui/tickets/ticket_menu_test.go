@@ -76,10 +76,10 @@ func itemLabels(items []contextmenu.Item[ticketTarget]) []string {
 }
 
 func orchestrationLabels() []string {
-	return []string{resumeLabel, "Unmute & Reopen", "Park", "Cancel", "Relaunch"}
+	return []string{resumeLabel, "Unmute & Reopen", "Pause", "Cancel", "Relaunch"}
 }
 
-func TestTicketMenu_GroupsAndParkByAddress(t *testing.T) {
+func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
@@ -89,7 +89,7 @@ func TestTicketMenu_GroupsAndParkByAddress(t *testing.T) {
 	m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
 
 	view := m.ticketMenu.View()
-	for _, want := range []string{"Suggested", "Status", "Server", `Ticket "First"`, resumeLabel, "Set draft", "Park", "Transcript"} {
+	for _, want := range []string{"Suggested", "Status", "Server", `Ticket "First"`, resumeLabel, "Set draft", "Pause", "Transcript"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("menu view lacks %q:\n%s", want, view)
 		}
@@ -98,14 +98,14 @@ func TestTicketMenu_GroupsAndParkByAddress(t *testing.T) {
 		t.Error("tab view does not overlay the menu")
 	}
 
-	m, cmd := chooseTicketMenuItem(t, m, "Park")
+	m, cmd := chooseTicketMenuItem(t, m, "Pause")
 	if cmd == nil {
-		t.Fatal("park issued no cmd")
+		t.Fatal("pause issued no cmd")
 	}
 	if msg, ok := cmd().(serverWriteMsg); !ok || msg.problem != "" {
-		t.Fatalf("park result = %+v", msg)
+		t.Fatalf("pause result = %+v", msg)
 	}
-	if !slices.Equal(calls, []string{"park gx:alpha/01"}) {
+	if !slices.Equal(calls, []string{"pause gx:alpha/01"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 	if m.ticketMenu.IsOpen {
@@ -203,7 +203,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 			}
 
 			before, _ := os.ReadFile(file)
-			for _, label := range []string{"Park", "Cancel", "Relaunch", "Unmute"} {
+			for _, label := range []string{"Pause", "Cancel", "Relaunch", "Unmute"} {
 				next, cmd := chooseTicketMenuItem(t, m, label)
 				if cmd != nil {
 					t.Errorf("%s issued a cmd", label)
@@ -235,8 +235,8 @@ func TestTicketMenu_ReadOnlyLinkDimsWithItsReason(t *testing.T) {
 	m, _ := serverModelWithStoreTicket(t, fakeServerAPI{}, false)
 	m.link = ServerLinkReadOnly
 	_, ready := requestTicketMenu(t, m)
-	if got, want := itemByLabel(t, ready.items, "Park").Disabled, ServerLinkReadOnly.disabledReason(); got != want {
-		t.Errorf("park disabled = %q, want %q", got, want)
+	if got, want := itemByLabel(t, ready.items, "Pause").Disabled, ServerLinkReadOnly.disabledReason(); got != want {
+		t.Errorf("pause disabled =%q, want %q", got, want)
 	}
 }
 
@@ -257,35 +257,35 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 	}
 
 	done := ticketMenuInput{rendered: tickets.StatusDone, ticket: tickets.Ticket{Status: "done"}, isMap: true}
-	for _, label := range []string{"Park", "Cancel", "Relaunch", resumeLabel, "Unmute & Reopen"} {
+	for _, label := range []string{"Pause", "Cancel", "Relaunch", resumeLabel, "Unmute & Reopen"} {
 		if got := disabled(done, label); got != ticketFinished {
 			t.Errorf("%s on a done ticket = %q, want %q", label, got, ticketFinished)
 		}
 	}
 	done.serverReason = serverNotRunning
-	if got := disabled(done, "Park"); got != serverNotRunning {
-		t.Errorf("park with no server on a done ticket = %q, want the server reason first", got)
+	if got := disabled(done, "Pause"); got != serverNotRunning {
+		t.Errorf("pause with no server on a done ticket = %q, want the server reason first", got)
 	}
 
 	open := ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Status: "open"}}
 	if got := disabled(open, "Unmute & Reopen"); got != notMuted {
 		t.Errorf("unmute = %q, want %q", got, notMuted)
 	}
-	if got := disabled(open, resumeLabel); got != notParked {
-		t.Errorf("resume = %q, want %q", got, notParked)
+	if got := disabled(open, resumeLabel); got != notPaused {
+		t.Errorf("resume = %q, want %q", got, notPaused)
 	}
 	if got := itemByLabel(t, ticketMenuItems(open), resumeLabel).Key; got != "enter" {
 		t.Errorf("resume key = %q, want enter", got)
 	}
 
-	parked := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: "needs-repair"}, herdrDown: true}
-	if got := disabled(parked, "Park"); got != alreadyParked {
-		t.Errorf("park on a parked ticket = %q", got)
+	paused := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}, herdrDown: true}
+	if got := disabled(paused, "Pause"); got != alreadyPaused {
+		t.Errorf("pause on a paused ticket = %q", got)
 	}
-	if got := disabled(parked, resumeLabel); got != "" {
-		t.Errorf("resume on a parked ticket = %q, want enabled", got)
+	if got := disabled(paused, resumeLabel); got != "" {
+		t.Errorf("resume on a paused ticket = %q, want enabled", got)
 	}
-	if got := disabled(parked, "Investigate"); got != herdrDownText {
+	if got := disabled(paused, "Investigate"); got != herdrDownText {
 		t.Errorf("investigate with herdr down = %q", got)
 	}
 }
@@ -351,7 +351,7 @@ func TestTicketMenu_AgentAndEditCopyGroups(t *testing.T) {
 
 func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 	root := t.TempDir()
-	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: needs-repair\n\nBody.\n")
+	writeArchivedTicket(t, root, "old-epic", "01-old-ticket.md", "Status: paused\nPause reason: spinning\n\nBody.\n")
 	m := NewModel(root, ui.Settings{}, keys.New(nil))
 	m = deliverLoad(t, m)
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -383,7 +383,7 @@ func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
 	items := ticketMenuItems(ticketMenuInput{
 		rendered: tickets.StatusPausedRepair,
-		ticket:   tickets.Ticket{Status: "needs-repair"},
+		ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseSpinning},
 		archived: true,
 	})
 	reads := []string{actionWatch, actionTranscript, actionYankSummary, actionYankFilePath}
@@ -410,19 +410,20 @@ func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
 
 func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
 	for _, tt := range []struct {
-		status   string
+		name     string
+		reason   schema.PauseReason
 		rendered tickets.RenderedStatus
 		wantKey  string
 	}{
-		{"needs-answer", tickets.StatusPausedAnswer, ""},
-		{"needs-repair", tickets.StatusPausedRepair, "enter"},
+		{"paused (answer)", "", tickets.StatusPausedAnswer, ""},
+		{"paused (repair)", schema.PauseManual, tickets.StatusPausedRepair, "enter"},
 	} {
 		items := ticketMenuItems(ticketMenuInput{
 			rendered: tt.rendered,
-			ticket:   tickets.Ticket{Status: tt.status},
+			ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: tt.reason},
 		})
 		if got := itemByLabel(t, items, resumeLabel).Key; got != tt.wantKey {
-			t.Errorf("%s: Resume key = %q, want %q", tt.status, got, tt.wantKey)
+			t.Errorf("%s: Resume key = %q, want %q", tt.name, got, tt.wantKey)
 		}
 	}
 }

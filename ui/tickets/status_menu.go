@@ -40,8 +40,8 @@ func statusChangeCmd(api ServerAPI, store string, epic tickets.Epic, ticket tick
 		}
 	}
 	if status == schema.StatusDone {
-		// ADR 0030: a map epic's tickets never land, so a person closes them;
-		// a loop epic's done comes only from the server's landing.
+		// ADR 0030: a map epic's tickets never merge, so a person closes them;
+		// a loop epic's done comes only from the server's merge.
 		if !epic.IsMap {
 			return notify.Error(doneIsSetByServer)
 		}

@@ -296,7 +296,7 @@ func (m Model) pendingSubtext(entry tree.Entry[sidebarNode]) (string, bool) {
 	icons := m.icons()
 	icon, _ := statusIconAndStyle(icons, ticketStatus(m.epicAt(r), t))
 	width := triangleColumnWidth(icons) + 1 + lipgloss.Width(icons.CheckboxUnchecked) + 1 + lipgloss.Width(icon) + 1
-	return strings.Repeat(" ", width) + blockedBySuffixStyle.Render(ellipsize(text, parkReasonMaxRunes, icons.Ellipsis)), true
+	return strings.Repeat(" ", width) + blockedBySuffixStyle.Render(ellipsize(text, pauseReasonMaxRunes, icons.Ellipsis)), true
 }
 
 func (m Model) applyServerRows() Model {
