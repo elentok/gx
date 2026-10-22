@@ -70,6 +70,29 @@ func CommitsAhead(dir, fromExclusive, toRef string) (int, error) {
 	return n, nil
 }
 
+// AttachDetachedHead puts dir's HEAD back on branch when HEAD is detached at a
+// commit branch leads to (a `git checkout HEAD~0` detaches it), moving branch
+// forward to HEAD so commits made while detached count as branch's own. It
+// reports whether it moved branch; an attached HEAD, or one branch does not
+// lead to, is left alone.
+func AttachDetachedHead(dir, branch string) (bool, error) {
+	_, _, err := run(dir, []string{"symbolic-ref", "-q", "HEAD"})
+	if err == nil {
+		return false, nil
+	}
+	if runErr, ok := err.(*RunError); !ok || runErr.Code != 1 {
+		return false, err
+	}
+	ahead, err := IsAncestor(dir, branch, "HEAD")
+	if err != nil || !ahead {
+		return false, err
+	}
+	if _, _, err := run(dir, []string{"switch", "-q", "-C", branch}); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // IsAncestor reports whether ancestor is an ancestor of (or equal to)
 // descendant (git merge-base --is-ancestor). Unlike MergeBase, it needs no
 // second call to compare a computed common ancestor back against a specific

@@ -324,7 +324,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), false)
 	}
 
-	ahead, err := d.CommitsAhead(path, base, branch)
+	ahead, err := iterationCommitsAhead(d, path, base, branch)
 	if err != nil || ahead == 0 {
 		// waitForFinish's own debounce (confirmFinished) already guards against
 		// herdr reporting the agent idle mid-turn, but a commit can still land
@@ -336,7 +336,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		// more before giving up rather than orphaning a commit — or stranding
 		// an otherwise-finished ticket — on a one-off blip.
 		d.Sleep(finishDebounceMs * time.Millisecond)
-		ahead, err = d.CommitsAhead(path, base, branch)
+		ahead, err = iterationCommitsAhead(d, path, base, branch)
 		if err != nil {
 			return fmt.Errorf("counting commits ahead of %s: %w", base, err)
 		}
@@ -441,6 +441,18 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 	}}
 }
 
+// iterationCommitsAhead counts the iteration's commits on branch. An agent
+// that detached HEAD in the worktree (e.g. `git checkout HEAD~0`) commits past
+// branch, so branch is first moved forward to HEAD; otherwise that work would
+// read as a zero-commit finish and never land. The move is best effort: if it
+// fails, the count is the branch's own, as before.
+func iterationCommitsAhead(d Deps, path, base, branch string) (int, error) {
+	if d.AttachDetachedHead != nil {
+		_, _ = d.AttachDetachedHead(path, branch)
+	}
+	return d.CommitsAhead(path, base, branch)
+}
+
 // zeroCommitReason is the zero-commit park's reason. It names a dirty worktree,
 // since uncommitted work there is what a person most needs to know; a status
 // that cannot be read keeps the plain reason.
@@ -521,7 +533,7 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 		return false, 0, "", fmt.Errorf("waiting for %s to finish after corrective retry: %w", label, err)
 	}
 
-	newAhead, err := d.CommitsAhead(path, base, branch)
+	newAhead, err := iterationCommitsAhead(d, path, base, branch)
 	if err != nil {
 		return false, 0, "", fmt.Errorf("counting commits ahead of %s after corrective retry: %w", base, err)
 	}

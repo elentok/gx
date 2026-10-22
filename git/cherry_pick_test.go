@@ -406,3 +406,63 @@ func TestCherryPickInProgress_FalseOutsideCherryPick(t *testing.T) {
 		t.Error("CherryPickInProgress() = true, want false outside a cherry-pick")
 	}
 }
+
+func TestAttachDetachedHead_MovesBranchToDetachedCommit(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+
+	// An agent's `git checkout -q HEAD~0` detaches HEAD; its next commit lands
+	// there and the iteration branch stays behind at its base.
+	testutil.MustGitExported(t, dir, "checkout", "-q", "-b", "iter")
+	testutil.MustGitExported(t, dir, "checkout", "-q", "HEAD~0")
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	head, _ := git.RevParse(dir, "HEAD")
+
+	moved, err := git.AttachDetachedHead(dir, "iter")
+	if err != nil {
+		t.Fatalf("AttachDetachedHead: %v", err)
+	}
+	if !moved {
+		t.Errorf("AttachDetachedHead() moved = false, want true")
+	}
+	if got, _ := git.RevParse(dir, "iter"); got != head {
+		t.Errorf("iter = %q, want the detached commit %q", got, head)
+	}
+	if got, _ := git.CurrentBranch(dir); got != "iter" {
+		t.Errorf("CurrentBranch() = %q, want iter", got)
+	}
+}
+
+func TestAttachDetachedHead_LeavesAttachedHeadAlone(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	testutil.MustGitExported(t, dir, "checkout", "-q", "-b", "iter")
+
+	moved, err := git.AttachDetachedHead(dir, "iter")
+	if err != nil || moved {
+		t.Errorf("AttachDetachedHead() = %v, %v; want false, nil", moved, err)
+	}
+}
+
+func TestAttachDetachedHead_LeavesUnrelatedDetachedHeadAlone(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	base, _ := git.RevParse(dir, "HEAD")
+	testutil.MustGitExported(t, dir, "checkout", "-q", "-b", "iter")
+	testutil.WriteFile(t, dir, "a.txt", "a\n")
+	testutil.CommitAll(t, dir, "add a")
+	iter, _ := git.RevParse(dir, "iter")
+
+	// HEAD detached at a commit the branch does not lead to: moving the
+	// branch there would drop its own commit.
+	testutil.MustGitExported(t, dir, "checkout", "-q", base)
+
+	moved, err := git.AttachDetachedHead(dir, "iter")
+	if err != nil || moved {
+		t.Errorf("AttachDetachedHead() = %v, %v; want false, nil", moved, err)
+	}
+	if got, _ := git.RevParse(dir, "iter"); got != iter {
+		t.Errorf("iter = %q, want it unchanged at %q", got, iter)
+	}
+}

@@ -61,6 +61,10 @@ type Deps struct {
 	RevParse     func(dir, ref string) (string, error)
 	MergeBase    func(dir, refA, refB string) (string, error)
 	CommitsAhead func(dir, fromExclusive, toRef string) (int, error)
+	// AttachDetachedHead moves branch forward to dir's detached HEAD and
+	// checks it out, so commits an agent made after detaching HEAD still count
+	// as the iteration's. nil skips it.
+	AttachDetachedHead func(dir, branch string) (bool, error)
 	// UncommittedChanges lists dir's dirty files, for a zero-commit park's
 	// reason.
 	UncommittedChanges func(dir string) ([]git.Change, error)
@@ -224,6 +228,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RevParse:             git.RevParse,
 		MergeBase:            git.MergeBase,
 		CommitsAhead:         git.CommitsAhead,
+		AttachDetachedHead:   git.AttachDetachedHead,
 		UncommittedChanges:   git.UncommittedChanges,
 		CommitSubjects:       git.CommitSubjects,
 		UnreachableCommits:   git.UnreachableCommits,
