@@ -52,6 +52,29 @@ func TestServerTicketsPauseAndResumeKeepHiddenAliases(t *testing.T) {
 	}
 }
 
+func TestServerQueueDrainIsHiddenButDispatches(t *testing.T) {
+	root := newRootCmd(deps{})
+	c, _, err := root.Find([]string{"server", "queue", "drain"})
+	if err != nil || c.Name() != "drain" {
+		t.Fatalf("gx server queue drain: %v (found %v)", err, c.Name())
+	}
+	if !c.Hidden {
+		t.Error("gx server queue drain is not hidden")
+	}
+	queue, _, _ := root.Find([]string{"server", "queue"})
+	var help bytes.Buffer
+	queue.SetOut(&help)
+	if err := queue.Help(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(help.String(), "drain") {
+		t.Errorf("queue help lists drain:\n%s", help.String())
+	}
+	if !strings.Contains(help.String(), "pause") {
+		t.Errorf("queue help is missing pause:\n%s", help.String())
+	}
+}
+
 func TestRootHelpGroupsCommands(t *testing.T) {
 	root := newRootCmd(deps{})
 	var help bytes.Buffer
