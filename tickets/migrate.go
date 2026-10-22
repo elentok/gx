@@ -34,6 +34,8 @@ type migratedTicketFile struct {
 	body      string
 	newTicket schema.Ticket
 	notes     []string
+	// inMapEpic keeps an old needs-answer / needs-repair status as stored.
+	inMapEpic bool
 }
 
 // Migrate rewrites every ticket under scratchRoot into the post-refactor
@@ -72,6 +74,7 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 		}
 
 		epic := Epic{Name: entry.Name(), Path: epicPath}
+		isMap := IsMapEpic(epicPath)
 
 		for _, issueEntry := range issueEntries {
 			if issueEntry.IsDir() {
@@ -103,6 +106,7 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 				body:      schema.ParseBody(string(raw)),
 				newTicket: newTicket,
 				notes:     notes,
+				inMapEpic: isMap,
 			})
 
 			epic.Tickets = append(epic.Tickets, Ticket{
@@ -155,7 +159,11 @@ func writeMigration(files []migratedTicketFile) (MigrationResult, error) {
 		if len(f.notes) == 0 {
 			continue
 		}
-		out, err := schema.MarshalTicket(f.newTicket, f.body)
+		marshal := schema.MarshalTicket
+		if f.inMapEpic {
+			marshal = schema.MarshalTicketUnshimmed
+		}
+		out, err := marshal(f.newTicket, f.body)
 		if err != nil {
 			return MigrationResult{}, fmt.Errorf("marshaling %s: %w", f.path, err)
 		}

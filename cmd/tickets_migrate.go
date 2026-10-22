@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -59,8 +60,22 @@ func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, dryRun bool, w i
 // file untouched and this returns that validation error unchanged. It then
 // backfills merged_at on already-landed epics (see tickets.BackfillMergedAt)
 // and moves live "## Needs Answer" sections into the ticket log (see
-// tickets.MigrateParkSections).
-func runTicketsMigrate(scratchRoot string, w io.Writer) error {
+// tickets.MigrateParkSections). Last, it rewrites the old needs-answer and
+// needs-repair tickets to paused (see tickets.PlanPauseMigration); with dryRun
+// it only prints that plan.
+func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
+	steps, err := tickets.PlanPauseMigration(scratchRoot)
+	if err != nil {
+		return err
+	}
+	if dryRun {
+		fmt.Fprintln(w, "dry run: pause migration only, nothing written")
+		for _, s := range steps {
+			fmt.Fprintf(w, "%s: %s\n", s.Path, s.Note())
+		}
+		fmt.Fprintf(w, "%d file(s) would change\n", len(steps))
+		return nil
+	}
 	result, err := tickets.Migrate(scratchRoot)
 	if err != nil {
 		return err
@@ -77,6 +92,11 @@ func runTicketsMigrate(scratchRoot string, w io.Writer) error {
 		parked, err = tickets.MigrateParkSections(scratchRoot, time.Now())
 		changes = append(changes, parked...)
 	}
+	if err == nil {
+		var paused []tickets.MigrationChange
+		paused, err = tickets.ApplyPauseMigration(steps)
+		changes = mergeChanges(changes, paused)
+	}
 
 	if len(changes) == 0 && err == nil {
 		fmt.Fprintln(w, "no changes")
@@ -88,6 +108,20 @@ func runTicketsMigrate(scratchRoot string, w io.Writer) error {
 	}
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// mergeChanges adds extra to changes, folding a file that already has an entry
+// into it so the file count stays one per file.
+func mergeChanges(changes, extra []tickets.MigrationChange) []tickets.MigrationChange {
+	for _, e := range extra {
+		i := slices.IndexFunc(changes, func(c tickets.MigrationChange) bool { return c.Path == e.Path })
+		if i < 0 {
+			changes = append(changes, e)
+			continue
+		}
+		changes[i].Notes = append(changes[i].Notes, e.Notes...)
+	}
+	return changes
 }
 
 // epicLandedUnder reports whether an epic of the tracker root's repo has

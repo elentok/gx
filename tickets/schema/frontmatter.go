@@ -251,7 +251,17 @@ func SplitFrontmatter(raw string) (yamlPart, body string, hasFM bool) {
 // writes only the new pause form: an old needs-answer / needs-repair status is
 // written as paused with a reason, and park_kind is never written.
 func MarshalTicket(t Ticket, body string) ([]byte, error) {
-	yamlBytes, err := yaml.Marshal(ticketToYAML(ShimLegacyPause(t)))
+	return marshalTicket(ShimLegacyPause(t), body)
+}
+
+// MarshalTicketUnshimmed is MarshalTicket without the pause shim, for a map-epic
+// ticket: it is never Paused, so an old status stays as stored.
+func MarshalTicketUnshimmed(t Ticket, body string) ([]byte, error) {
+	return marshalTicket(t, body)
+}
+
+func marshalTicket(t Ticket, body string) ([]byte, error) {
+	yamlBytes, err := yaml.Marshal(ticketToYAML(t))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling ticket frontmatter: %w", err)
 	}
