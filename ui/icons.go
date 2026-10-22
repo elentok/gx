@@ -90,9 +90,8 @@ type IconSet struct {
 	ServerHerdrUnavailable string
 
 	// Queue* mark the title row's queue status, one per queue mode.
-	QueueRunning  string
-	QueuePaused   string
-	QueueDraining string
+	QueueRunning string
+	QueuePaused  string
 	// Agents labels the title row's count of sessions that need a person.
 	Agents string
 }
@@ -158,10 +157,9 @@ func Icons(useNerdFont bool) IconSet {
 			ServerReadOnly:         "◐",
 			ServerHerdrUnavailable: "⚠",
 
-			QueueRunning:  "▶",
-			QueuePaused:   "‖",
-			QueueDraining: "↓",
-			Agents:        "agents",
+			QueueRunning: "▶",
+			QueuePaused:  "‖",
+			Agents:       "agents",
 		}
 	}
 	return IconSet{
@@ -224,9 +222,8 @@ func Icons(useNerdFont bool) IconSet {
 		ServerReadOnly:         "\uf233",
 		ServerHerdrUnavailable: "\uf233",
 
-		QueueRunning:  "\uf04b", // fa-play
-		QueuePaused:   "\uf04c", // fa-pause
-		QueueDraining: "\uf252", // fa-hourglass-half
-		Agents:        "\uee0d", // fa-robot
+		QueueRunning: "\uf04b", // fa-play
+		QueuePaused:  "\uf04c", // fa-pause
+		Agents:       "\uee0d", // fa-robot
 	}
 }

@@ -376,17 +376,18 @@ func (c *Client) TicketChanged(ctx context.Context, address string) error {
 	return nil
 }
 
-// QueuePause stops new roots from starting, persisted across restarts.
+// QueuePause is Finish and pause: new roots stop starting and live runs finish.
+// The pause is persisted across restarts.
 func (c *Client) QueuePause(ctx context.Context) (server.QueueResult, error) {
 	return c.queueWrite(ctx, "pause", server.QueueRequest{})
 }
 
-// QueueResume lifts a pause or drain.
+// QueueResume lifts a pause.
 func (c *Client) QueueResume(ctx context.Context) (server.QueueResult, error) {
 	return c.queueWrite(ctx, "resume", server.QueueRequest{})
 }
 
-// QueueDrain stops new roots from starting and lets live runs finish.
+// QueueDrain is an alias of QueuePause, kept for one release.
 func (c *Client) QueueDrain(ctx context.Context) (server.QueueResult, error) {
 	return c.queueWrite(ctx, "drain", server.QueueRequest{})
 }

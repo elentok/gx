@@ -563,8 +563,8 @@ func TestQueueHeaderStateMatchesPrototype(t *testing.T) {
 			t.Fatalf("body lines = %v, want %d line(s)", lines, queueHeaderReservedLines)
 		}
 		got := ansi.Strip(lines[0])
-		if !strings.Contains(got, "Idle") {
-			t.Fatalf("body line = %q, want idle copy for an idle queue", got)
+		if got != "Paused. No tickets running." {
+			t.Fatalf("body line = %q, want the paused copy for a paused queue", got)
 		}
 	})
 

@@ -29,7 +29,6 @@ const (
 	notifyKindIterationPaused   = "iteration-paused"
 	notifyKindIterationResumed  = "iteration-resumed"
 	notifyKindEpicComplete      = "epic-complete"
-	notifyKindDrainComplete     = "drain-complete"
 	notifyKindEpicPaused        = "epic-paused"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
 	notifyKindEpicFailed        = "epic-failed"

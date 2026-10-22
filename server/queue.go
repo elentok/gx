@@ -51,7 +51,7 @@ type QueueItem struct {
 // a refusal (the queue is then untouched).
 type QueueResult struct {
 	Queue []QueueItem `json:"queue,omitempty"`
-	// Mode is set by pause, resume and drain: running, paused or draining.
+	// Mode is set by pause, resume and drain: running or paused.
 	Mode QueueMode `json:"mode,omitempty"`
 	// ExtraUsage is the warning an enqueue carries while the account
 	// auto-purchases extra usage.

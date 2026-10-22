@@ -150,7 +150,7 @@ func TestQueueServerKeys_LiveRefusalIsAnErrorToast(t *testing.T) {
 	}
 }
 
-func TestServerMode_DrainKeyReachesDrainVerb(t *testing.T) {
+func TestServerMode_DrainKeyIsFinishAndPause(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	next, _ := m.handleServerDrainKey()
@@ -162,7 +162,7 @@ func TestServerMode_DrainKeyReachesDrainVerb(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("accept produced no command")
 	}
-	if _, ok := cmd().(serverDoneMsg); !ok || !slices.Equal(calls, []string{"drain"}) {
+	if _, ok := cmd().(serverDoneMsg); !ok || !slices.Equal(calls, []string{"pause"}) {
 		t.Fatalf("calls = %v", calls)
 	}
 }

@@ -66,16 +66,20 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	expectRun(t, h)
 }
 
-func TestDrain_StartsNothingNewAndEndsOnResume(t *testing.T) {
+func TestDrain_IsFinishAndPause(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Refused || res.Mode != server.QueueModeDraining {
+	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Refused || res.Mode != server.QueueModePaused {
 		t.Fatalf("drain: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
+	expectNoRun(t, h)
+
+	h.Restart(t)
+	registerLaunch(h)
 	expectNoRun(t, h)
 
 	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused {
@@ -95,7 +99,7 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 		{"initial", nil, server.QueueModeRunning},
 		{"pause", h.Client.QueuePause, server.QueueModePaused},
 		{"resume", h.Client.QueueResume, server.QueueModeRunning},
-		{"drain", h.Client.QueueDrain, server.QueueModeDraining},
+		{"drain", h.Client.QueueDrain, server.QueueModePaused},
 	}
 	for _, st := range steps {
 		if st.do != nil {

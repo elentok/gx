@@ -120,9 +120,6 @@ func (s *recordingSink) EpicComplete(epicName string, completed int, elapsedSeco
 	s.mu.Unlock()
 	s.record("EpicComplete")
 }
-func (s *recordingSink) DrainComplete(epicName string, completed int, elapsedSeconds int) {
-	s.record("DrainComplete")
-}
 func (s *recordingSink) EpicFailed(epicName string, err error) {
 	s.record("EpicFailed")
 }

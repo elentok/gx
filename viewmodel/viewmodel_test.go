@@ -259,8 +259,8 @@ func TestApplySnapshot_CarriesEpicSummaries(t *testing.T) {
 }
 
 func TestApplySnapshot_CarriesQueueMode(t *testing.T) {
-	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 20, Mode: server.QueueModeDraining})
-	if s.Mode != server.QueueModeDraining {
+	s := snapshot().ApplySnapshot(server.Snapshot{Seq: 20, Mode: server.QueueModePaused})
+	if s.Mode != server.QueueModePaused {
 		t.Fatalf("mode = %q", s.Mode)
 	}
 }

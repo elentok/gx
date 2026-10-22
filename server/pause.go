@@ -15,19 +15,17 @@ const pauseFileName = "queue-mode.json"
 type QueueMode string
 
 const (
-	QueueModeRunning  QueueMode = "running"
-	QueueModePaused   QueueMode = "paused"
-	QueueModeDraining QueueMode = "draining"
+	QueueModeRunning QueueMode = "running"
+	QueueModePaused  QueueMode = "paused"
 )
 
 // pauseState gates claiming. A pause is persisted so a restart does not start
-// work the operator held back; a drain is not, because after a restart there is
-// no live run left to wait for.
+// work the operator held back. Pausing never touches runs already started, so
+// it is also "Finish and pause".
 type pauseState struct {
-	mu       sync.Mutex
-	path     string
-	paused   bool
-	draining bool
+	mu     sync.Mutex
+	path   string
+	paused bool
 }
 
 func openPause(stateDir string) (*pauseState, error) {
@@ -64,7 +62,7 @@ func QueuePaused(stateDir string) (bool, error) {
 func (p *pauseState) blocked() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.paused || p.draining
+	return p.paused
 }
 
 // currentMode is mode for callers that do not already hold the lock.
@@ -75,11 +73,8 @@ func (p *pauseState) currentMode() QueueMode {
 }
 
 func (p *pauseState) mode() QueueMode {
-	switch {
-	case p.paused:
+	if p.paused {
 		return QueueModePaused
-	case p.draining:
-		return QueueModeDraining
 	}
 	return QueueModeRunning
 }
@@ -100,14 +95,14 @@ func (p *pauseState) save() error {
 }
 
 // setMode applies a mode change, persists the pause flag, then publishes.
-func (s *Server) setMode(paused, draining bool) (QueueResult, error) {
+func (s *Server) setMode(paused bool) (QueueResult, error) {
 	p := s.pause
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	prevPaused, prevDraining := p.paused, p.draining
-	p.paused, p.draining = paused, draining
+	prev := p.paused
+	p.paused = paused
 	if err := p.save(); err != nil {
-		p.paused, p.draining = prevPaused, prevDraining
+		p.paused = prev
 		return QueueResult{}, err
 	}
 	s.events.publish(EventQueueChanged, "")
@@ -115,18 +110,11 @@ func (s *Server) setMode(paused, draining bool) (QueueResult, error) {
 	return QueueResult{Queue: s.queued.list(), Mode: p.mode()}, nil
 }
 
-func (s *Server) queuePause() (QueueResult, error)  { return s.setMode(true, false) }
-func (s *Server) queueResume() (QueueResult, error) { return s.setMode(false, false) }
-func (s *Server) queueDrain() (QueueResult, error) {
-	// Draining a paused queue keeps the pause: it is the stronger, persisted hold.
-	return s.setMode(s.pause.isPaused(), true)
-}
+func (s *Server) queuePause() (QueueResult, error)  { return s.setMode(true) }
+func (s *Server) queueResume() (QueueResult, error) { return s.setMode(false) }
 
-func (p *pauseState) isPaused() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.paused
-}
+// queueDrain is the old name of Finish and pause, kept for one release.
+func (s *Server) queueDrain() (QueueResult, error) { return s.queuePause() }
 
 // modeWrite adapts a mode change to a POST handler.
 func (s *Server) modeWrite(do func() (QueueResult, error)) http.HandlerFunc {

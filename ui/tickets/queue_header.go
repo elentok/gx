@@ -403,10 +403,33 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 	if m.serverAPI != nil && m.herdrDown {
 		return []string{epicStatusProblemStyle.Render(queueHerdrDownBanner)}
 	}
+	if m.paused {
+		return []string{epicStatusProblemStyle.Render(queuePausedLine(m.runningTicketCount()))}
+	}
 	if m.queueRunState() == queueRunRunning {
 		return []string{""}
 	}
 	return []string{m.queueIdleBodyLine()}
+}
+
+// queuePausedLine is the header text of a queue the person paused.
+func queuePausedLine(running int) string {
+	switch running {
+	case 0:
+		return "Paused. No tickets running."
+	case 1:
+		return "Paused. 1 ticket still running."
+	}
+	return fmt.Sprintf("Paused. %d tickets still running.", running)
+}
+
+// runningTicketCount is how many tickets the server holds a run for.
+func (m QueueModel) runningTicketCount() int {
+	n := 0
+	for _, sum := range m.summaries {
+		n += len(sum.Active)
+	}
+	return n
 }
 
 // queueHerdrDownBanner is shown in server mode while the server cannot reach

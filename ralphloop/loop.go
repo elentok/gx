@@ -751,48 +751,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			break
 		}
 
-		// A drained gate never admits another claim (see
-		// Gate.claimIfRunning), so once its last in-flight iteration
-		// finishes there is nothing left this run will ever do — end here,
-		// through the same sink.EpicComplete call below that natural
-		// completion reaches, rather than falling into the "no unblocked
-		// tickets left" active==0 error path further down, which assumes an
-		// undrained run is stuck. landing == 0 is required alongside
-		// active == 0 (mirroring the ctx.Err() branch above) since a build
-		// can finish (active decremented) with its outcome still queued in
-		// landJobs, waiting on the land-queue worker's own goroutine —
-		// breaking on active == 0 alone would end the run before that last
-		// build's commits actually land, leaving it iteration_status:
-		// finished but never status: done. Report DrainComplete here,
-		// distinct from EpicComplete, since this branch is only reached when
-		// draining cut the run short of a naturally-settled epic (see
-		// DrainComplete's doc comment) — an operator away from the terminal
-		// needs to know the difference.
-		if gate.isDraining() && active == 0 && landing == 0 {
-			// Check ctx.Err() before emitting DrainComplete: if cancellation
-			// landed between the ctx.Err() check above and this one, break
-			// without the emit so the ctx.Err() check after the loop reports
-			// the caller's own cancellation instead of a drained notification
-			// for a run the registry then records as failed.
-			if ctx.Err() != nil {
-				break
-			}
-			sink.DrainComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
-			// Return directly rather than falling through to the trailing
-			// sink.EpicComplete call below: DrainComplete already announced
-			// this run's end, and skipping that whole call (not just its
-			// chat/toast half) is safe only because of
-			// EventSink.EpicComplete's notification-only invariant (see its
-			// doc comment). Re-check ctx.Err() here since returning directly
-			// skips the same check after the loop — cancellation landing
-			// during the DrainComplete call above must still be reported as
-			// the caller's own cancellation, not folded into a plain nil.
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			return nil
-		}
-
 		if active == 0 {
 			acquirePermit()
 		}
@@ -1012,9 +970,6 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		return err
 	}
 
-	// A drained run already returned above, straight out of the
-	// gate.isDraining() branch — this call is only ever reached by a
-	// naturally-settled epic.
 	sink.EpicComplete(opts.EpicName, completed, int(d.Now().Sub(runStart).Seconds()))
 	return nil
 }

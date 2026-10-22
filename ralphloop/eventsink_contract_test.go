@@ -28,7 +28,6 @@ var chatMembershipVerdicts = map[string]bool{
 	"TicketNeedsHuman":  true,
 	"EpicParked":        true,
 	"EpicComplete":      true,
-	"DrainComplete":     true,
 	// EpicFailed is the one documented exception: it is a chat member, but
 	// no EventSink implementation dispatches it. It fires from the loop
 	// registry's EpicFailureReporter (epic_failure_reporter.go), which
@@ -107,11 +106,8 @@ func TestChatMembershipVerdicts_FailsOnUnmappedMethod(t *testing.T) {
 	}
 }
 
-// TestEpicComplete_ChatSinkIsNotificationOnly pins EventSink.EpicComplete's
-// notification-only invariant (see its doc comment): Run's drain-exit path
-// skips this call wholesale for a drained run rather than only suppressing
-// its chat/toast half, which is only safe as long as no implementer persists
-// state here. chatEventSink is the one implementer with enough behavior
+// TestEpicComplete_ChatSinkIsNotificationOnly pins that EventSink.EpicComplete
+// only notifies and never persists state. chatEventSink is the one implementer with enough behavior
 // (reading scratchDir to render its message) to plausibly grow a write; this
 // snapshots every ticket file's content and mtime around a call and fails if
 // either changed — the shape any future non-notification state transition in

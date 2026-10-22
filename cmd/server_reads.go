@@ -453,9 +453,9 @@ func newServerQueueCmd() *cobra.Command {
 			},
 		}
 	}
-	pause := mode("pause", "stop starting queued roots until resumed (survives a restart)", (*apiclient.Client).QueuePause)
-	resume := mode("resume", "start queued roots again after a pause or drain", (*apiclient.Client).QueueResume)
-	drain := mode("drain", "stop starting queued roots and let live runs finish", (*apiclient.Client).QueueDrain)
+	pause := mode("pause", "finish and pause: start no queued roots, let live runs finish, stay paused until resumed (survives a restart)", (*apiclient.Client).QueuePause)
+	resume := mode("resume", "start queued roots again after a pause", (*apiclient.Client).QueueResume)
+	drain := mode("drain", "alias of pause, removed in a later release", (*apiclient.Client).QueueDrain)
 	for _, c := range []*cobra.Command{add, remove, replace, move, pause, resume, drain} {
 		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 		cmd.AddCommand(c)

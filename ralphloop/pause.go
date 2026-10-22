@@ -39,7 +39,6 @@ type Gate struct {
 	reasons    map[string]string // iteration label -> pause reason
 	wake       chan struct{}
 	parkWake   chan struct{}
-	draining   bool
 	parked     chan struct{}
 	parkedOnce sync.Once
 }
@@ -67,50 +66,6 @@ func (g *Gate) pause(label, reason string) {
 	g.reasons[label] = reason
 }
 
-// Drain permanently stops this Gate from admitting new claims, without
-// interrupting any iteration already past the claim boundary — unlike
-// Pause, it never expects a ForceResume/resume-signal to arrive and clear
-// it. Once every currently in-flight iteration finishes (or immediately, if
-// none are in flight), Run's own active==0 check ends the run through the
-// same code path natural completion takes; isDraining is what that check
-// consults. It also closes wake and parkWake (mirroring ForceResume and
-// WakeParked's lock/close/replace shape), so a run currently parked in
-// waitForResume — nothing in flight, an operator away from the terminal —
-// wakes immediately and re-evaluates isDraining instead of hanging until a
-// ForceResume that Drain doesn't expect to come.
-func (g *Gate) Drain() {
-	g.mu.Lock()
-	if g.draining {
-		// Already draining: wake/parkWake were already closed and replaced
-		// by the first Drain call, so closing them again would panic.
-		g.mu.Unlock()
-		return
-	}
-	g.draining = true
-	wake := g.wake
-	g.wake = make(chan struct{})
-	parkWake := g.parkWake
-	g.parkWake = make(chan struct{})
-	g.mu.Unlock()
-
-	close(wake)
-	close(parkWake)
-}
-
-// isDraining reports whether Drain has been called on this Gate.
-func (g *Gate) isDraining() bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.draining
-}
-
-// IsDraining is isDraining, exported for callers outside this package (e.g.
-// ui/tickets' drain-then-replace combo tests) that need to observe whether
-// Drain landed without a package-internal accessor of their own.
-func (g *Gate) IsDraining() bool {
-	return g.isDraining()
-}
-
 // isPaused reports whether any iteration is currently paused, meaning the
 // scheduler must not claim new tickets right now.
 func (g *Gate) isPaused() bool {
@@ -119,13 +74,13 @@ func (g *Gate) isPaused() bool {
 	return len(g.reasons) > 0
 }
 
-// claimIfRunning serializes the pause/drain transition with the complete
-// claim. Pause and Drain therefore cannot return while a claim admitted
-// before them is still being recorded on disk.
+// claimIfRunning serializes the pause transition with the complete claim.
+// Pause therefore cannot return while a claim admitted before it is still
+// being recorded on disk.
 func (g *Gate) claimIfRunning(claim func() error) (bool, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if g.draining || len(g.reasons) > 0 {
+	if len(g.reasons) > 0 {
 		return false, nil
 	}
 	return true, claim()
@@ -178,7 +133,7 @@ func (g *Gate) waitForResume(ctx context.Context) {
 
 // Parked returns a channel closed the first time a caller actually blocks in
 // waitForResume, letting a test observe that a run's goroutine has parked
-// there instead of racing it with a fixed sleep before calling Drain.
+// there instead of racing it with a fixed sleep.
 func (g *Gate) Parked() <-chan struct{} {
 	return g.parked
 }

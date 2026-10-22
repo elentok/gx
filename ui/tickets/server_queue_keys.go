@@ -33,6 +33,8 @@ type serverRemovedMsg struct {
 	problem string
 }
 
+const finishAndPausePrompt = "Finish and pause the queue? Running tickets finish; nothing new starts."
+
 type serverPauseAction int
 
 const (
@@ -158,7 +160,7 @@ func (m QueueModel) openServerPauseConfirm(b server.BudgetStatus) QueueModel {
 		prompt = "Resume the queue?"
 		accept = cmdServerQueueMode("queue resumed", api.QueueResume)
 	default:
-		prompt = "Pause the queue?"
+		prompt = finishAndPausePrompt
 		accept = cmdServerQueueMode("queue paused", api.QueuePause)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{Prompt: prompt, AcceptCmd: accept})
@@ -206,13 +208,13 @@ func (m QueueModel) updateServerKeys(msg tea.Msg) (QueueModel, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleServerDrainKey is "D" in server mode: stop the server handing out new
-// work; running iterations finish.
+// handleServerDrainKey is "D" in server mode, an alias of Finish and pause kept
+// for one release: stop the server handing out new work; running tickets finish.
 func (m Model) handleServerDrainKey() (tea.Model, tea.Cmd) {
 	api := m.serverAPI
 	m.confirm = m.confirm.Open(confirm.Options{
-		Prompt:    "Drain the queue? Running iterations finish; nothing new starts.",
-		AcceptCmd: cmdServerQueueMode("queue draining", api.QueueDrain),
+		Prompt:    finishAndPausePrompt,
+		AcceptCmd: cmdServerQueueMode("queue paused", api.QueuePause),
 	})
 	return m, nil
 }

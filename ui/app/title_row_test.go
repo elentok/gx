@@ -236,7 +236,6 @@ func TestTitleRow_QueueStatus(t *testing.T) {
 	}{
 		{"running", server.QueueModeRunning, true, "▶ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
 		{"paused", server.QueueModePaused, false, "‖ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
-		{"draining", server.QueueModeDraining, true, "↓ ▰▰▰▱▱▱▱ 3/7 agents 2 ● ? help"},
 		{"queued but idle", server.QueueModeRunning, false, "gx › worktrees ▾ agents 2 ● ? help"},
 	}
 	for _, tc := range cases {

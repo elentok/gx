@@ -26,6 +26,35 @@ func TestEpicBarFillFollowsStateColour(t *testing.T) {
 	}
 }
 
+func TestQueueHeaderPausedLineFollowsRunningCount(t *testing.T) {
+	t.Parallel()
+	m := NewQueueModel("", ui.Settings{}, keys.Manager{})
+	m.paused = true
+	cases := []struct {
+		active []server.SummaryTicket
+		want   string
+	}{
+		{nil, "Paused. No tickets running."},
+		{[]server.SummaryTicket{{Address: "p:e/01"}}, "Paused. 1 ticket still running."},
+		{[]server.SummaryTicket{{Address: "p:e/01"}, {Address: "p:e/02"}, {Address: "p:e/03"}}, "Paused. 3 tickets still running."},
+	}
+	for _, tc := range cases {
+		m.summaries = map[string]server.EpicSummary{"p:e": {Active: tc.active}}
+		lines := m.queueHeaderBodyLines()
+		if got := ansi.Strip(lines[0]); got != tc.want {
+			t.Errorf("header = %q, want %q", got, tc.want)
+		}
+	}
+}
+
+func TestQueueHeaderHasNoPausedLineWhenRunning(t *testing.T) {
+	t.Parallel()
+	m := NewQueueModel("", ui.Settings{}, keys.Manager{})
+	if got := ansi.Strip(m.queueHeaderBodyLines()[0]); strings.HasPrefix(got, "Paused.") {
+		t.Errorf("header = %q, want no paused line while the queue runs", got)
+	}
+}
+
 func TestQueueSpinnerFollowsNerdFontSetting(t *testing.T) {
 	t.Parallel()
 	plain := NewQueueModel("", ui.Settings{UseNerdFontIcons: false}, keys.Manager{})

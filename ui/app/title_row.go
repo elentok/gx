@@ -183,8 +183,6 @@ func queueSegments(q ticketsui.QueueStatus, icons ui.IconSet, bar bool) []titleS
 	switch q.Mode {
 	case server.QueueModePaused:
 		icon, color = icons.QueuePaused, ui.ColorYellow
-	case server.QueueModeDraining:
-		icon, color = icons.QueueDraining, ui.ColorOrange
 	}
 	sp := titleSegment{" ", titleBgStyle}
 	segs := []titleSegment{{icon, titleBgStyle.Foreground(color)}, sp}

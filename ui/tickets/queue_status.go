@@ -12,14 +12,14 @@ import (
 // QueueStatus is the queue at a glance, for the title row: its mode and the
 // done/total ticket counts of the epics it is working on.
 type QueueStatus struct {
-	// Mode is server.QueueModeRunning, QueueModePaused or QueueModeDraining.
+	// Mode is server.QueueModeRunning or QueueModePaused.
 	Mode        server.QueueMode
 	Done, Total int
 }
 
 // QueueStatusOf reads the queue's status from the server state; ok is false
 // when there is nothing to show: no run is live and the queue is not held
-// (paused or draining) with work still in it.
+// (paused) with work still in it.
 func QueueStatusOf(vm viewmodel.State) (s QueueStatus, ok bool) {
 	claimedAt := map[string]time.Time{}
 	for _, t := range vm.Tickets {

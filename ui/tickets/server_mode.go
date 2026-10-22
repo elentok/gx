@@ -32,7 +32,6 @@ type ServerAPI interface {
 	QueueRemove(ctx context.Context, address string) (server.QueueResult, error)
 	QueuePause(ctx context.Context) (server.QueueResult, error)
 	QueueResume(ctx context.Context) (server.QueueResult, error)
-	QueueDrain(ctx context.Context) (server.QueueResult, error)
 	Budget(ctx context.Context) (server.BudgetStatus, error)
 	BudgetOverride(ctx context.Context) (server.BudgetResult, error)
 	TicketPause(ctx context.Context, address, reason string) (server.QueueResult, error)

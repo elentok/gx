@@ -60,11 +60,6 @@ func (f fakeServerAPI) QueueResume(context.Context) (server.QueueResult, error) 
 	return server.QueueResult{Mode: "running"}, nil
 }
 
-func (f fakeServerAPI) QueueDrain(context.Context) (server.QueueResult, error) {
-	f.verb("drain")
-	return server.QueueResult{Mode: "draining"}, nil
-}
-
 func (f fakeServerAPI) Budget(context.Context) (server.BudgetStatus, error) { return f.budget, nil }
 
 func (f fakeServerAPI) BudgetOverride(context.Context) (server.BudgetResult, error) {

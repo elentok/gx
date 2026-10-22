@@ -62,7 +62,7 @@ type State struct {
 	// Pending is each queue entry's explain verdict, as the last snapshot
 	// delivered it.
 	Pending []server.PendingRow
-	// Mode is the queue mode (server.QueueModeRunning, QueueModePaused or QueueModeDraining)
+	// Mode is the queue mode (server.QueueModeRunning, or QueueModePaused)
 	// from the last snapshot.
 	Mode server.QueueMode
 	// AFK is AFK mode from the last snapshot.

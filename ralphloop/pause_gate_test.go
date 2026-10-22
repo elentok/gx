@@ -28,13 +28,10 @@ func TestPauseGate_PauseMarksPausedAndRecordsReason(t *testing.T) {
 	}
 }
 
-func TestPauseGate_Drain_RefusesFutureClaimsWithoutRunningTheClaimFunc(t *testing.T) {
+func TestPauseGate_Pause_RefusesFutureClaimsWithoutRunningTheClaimFunc(t *testing.T) {
+	t.Parallel()
 	g := NewGate()
-	g.Drain()
-
-	if !g.isDraining() {
-		t.Error("isDraining() = false after Drain(), want true")
-	}
+	g.Pause("queue", "finish and pause")
 
 	ran := false
 	admitted, err := g.claimIfRunning(func() error {
@@ -45,52 +42,11 @@ func TestPauseGate_Drain_RefusesFutureClaimsWithoutRunningTheClaimFunc(t *testin
 		t.Fatalf("claimIfRunning() error = %v", err)
 	}
 	if admitted {
-		t.Error("claimIfRunning() admitted = true after Drain(), want false")
+		t.Error("claimIfRunning() admitted = true after Pause(), want false")
 	}
 	if ran {
-		t.Error("claimIfRunning() ran the claim func after Drain(), want it skipped")
+		t.Error("claimIfRunning() ran the claim func after Pause(), want it skipped")
 	}
-}
-
-// TestPauseGate_Drain_WakesWaiterParkedInWaitForResume covers the
-// operator-walks-away scenario: an iteration paused (nothing in flight) and
-// blocked in waitForResume, then drained instead of force-resumed. Without
-// Drain closing g.wake, that goroutine would hang until a ForceResume that
-// Drain never expects to come.
-func TestPauseGate_Drain_WakesWaiterParkedInWaitForResume(t *testing.T) {
-	t.Parallel()
-	g := NewGate()
-	g.pause("iter-01", "breach")
-
-	returned := make(chan struct{})
-	go func() {
-		g.waitForResume(context.Background())
-		close(returned)
-	}()
-
-	select {
-	case <-returned:
-		t.Fatal("waitForResume() returned before Drain()")
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	g.Drain()
-
-	select {
-	case <-returned:
-	case <-time.After(2 * time.Second):
-		t.Fatal("waitForResume() did not return after Drain()")
-	}
-}
-
-// TestPauseGate_Drain_TwiceDoesNotPanic covers a double drain (e.g. the "D"
-// key pressed twice) not panicking on an already-closed wake/parkWake
-// channel.
-func TestPauseGate_Drain_TwiceDoesNotPanic(t *testing.T) {
-	t.Parallel()
-	g := NewGate()
-	g.Drain()
-	g.Drain()
 }
 
 func TestPauseGate_MultiplePausedIterations_AllStayPausedUntilForceResumeClearsLast(t *testing.T) {
