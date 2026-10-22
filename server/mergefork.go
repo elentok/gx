@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// maxMergeTickets is how many merge tickets one run gets before the root parks.
+// maxMergeTickets is how many merge tickets one run gets before the root pauses.
 const maxMergeTickets = 2
 
 // mergeTicketsThisRun counts e's merge tickets from the latest manual one
@@ -34,8 +34,8 @@ func mergeTicketsThisRun(e tickets.Epic) int {
 }
 
 // hasManualMergeTicket reports whether e holds a merge ticket the manual
-// trigger forked. Unmerged, such an epic lands whatever auto-ff-merge says:
-// the rule reads the store, so a retry ticket finishing last still lands.
+// trigger forked. Unmerged, such an epic merges whatever auto-ff-merge says:
+// the rule reads the store, so a retry ticket finishing last still merges.
 func hasManualMergeTicket(e tickets.Epic) bool {
 	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
 		return t.Type == string(schema.TypeMerge) && t.Manual
@@ -44,14 +44,14 @@ func hasManualMergeTicket(e tickets.Epic) bool {
 
 // forkMergeTicket forks a merge ticket into e for its non-ff onto target and
 // returns its id. At the cap, or when the write fails, it forks none and the
-// caller parks the root. A manual ticket, the manual trigger's, skips the cap.
+// caller pauses the root. A manual ticket, the manual trigger's, skips the cap.
 func (s *Server) forkMergeTicket(root rootRef, e tickets.Epic, target string, manual bool) string {
 	if !manual && mergeTicketsThisRun(e) >= maxMergeTickets {
 		return ""
 	}
 	_, id, err := writeNewTicket(e.Path, "", "merge", func(id string) (schema.Ticket, string) {
 		tk := schema.Ticket{ID: schema.TicketID(id), Status: schema.StatusOpen, Type: schema.TypeMerge, Manual: manual}
-		body := fmt.Sprintf("\n# %s — Merge %s onto %s\n\n## What to build\n\nRebase %s onto %s so it can fast-forward. The server lands it once this ticket is done.\n",
+		body := fmt.Sprintf("\n# %s — Merge %s onto %s\n\n## What to build\n\nRebase %s onto %s so it can fast-forward. The server merges it once this ticket is done.\n",
 			id, root.Epic, target, root.Epic, target)
 		return tk, body
 	})

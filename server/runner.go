@@ -28,16 +28,16 @@ const (
 	// EventIterationLaunchFailed streams when the launch failed and the claim
 	// was rolled back.
 	EventIterationLaunchFailed = "iteration-launch-failed"
-	// EventTicketDone streams once the ticket's commits are landed and the file says done.
+	// EventTicketDone streams once the ticket's commits are merged and the file says done.
 	EventTicketDone = "ticket-done"
-	// EventIterationPaused streams when a finished iteration ended without landing
-	// (needs-answer or zero commits).
+	// EventIterationPaused streams when a finished iteration ended without merging
+	// (asking or zero commits).
 	EventIterationPaused = "iteration-paused"
 	// EventTicketPaused streams once a person's pause is written to the ticket file.
 	EventTicketPaused = "ticket-paused"
 	// EventTicketCancelled streams once per ticket a cancel wrote.
 	EventTicketCancelled = "ticket-cancelled"
-	// EventIterationFailed streams when finishing or landing errored; the ticket stays claimed.
+	// EventIterationFailed streams when finishing or merging errored; the ticket stays claimed.
 	EventIterationFailed = "iteration-failed"
 	// EventRootCompleted streams once every ticket of a queued root is done.
 	EventRootCompleted = "root-completed"
@@ -83,16 +83,16 @@ func (r *refusals) has(addr string) bool {
 	return r.addr[addr]
 }
 
-// landGuard lets a stop wait for lands in flight and keeps new ones from
-// starting: a land cut off halfway leaves a ticket the store cannot explain.
-type landGuard struct {
+// mergeGuard lets a stop wait for merges in flight and keeps new ones from
+// starting: a merge cut off halfway leaves a ticket the store cannot explain.
+type mergeGuard struct {
 	mu     sync.Mutex
 	closed bool
 	wg     sync.WaitGroup
 }
 
-// begin reports false once the server is stopping; the caller must then not land.
-func (g *landGuard) begin() bool {
+// begin reports false once the server is stopping; the caller must then not merge.
+func (g *mergeGuard) begin() bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.closed {
@@ -102,11 +102,11 @@ func (g *landGuard) begin() bool {
 	return true
 }
 
-func (g *landGuard) end() { g.wg.Done() }
+func (g *mergeGuard) end() { g.wg.Done() }
 
-// closeAndWait refuses new lands, then reports whether the running ones
+// closeAndWait refuses new merges, then reports whether the running ones
 // finished within timeout.
-func (g *landGuard) closeAndWait(timeout time.Duration) bool {
+func (g *mergeGuard) closeAndWait(timeout time.Duration) bool {
 	g.mu.Lock()
 	g.closed = true
 	g.mu.Unlock()
@@ -120,8 +120,8 @@ func (g *landGuard) closeAndWait(timeout time.Duration) bool {
 	}
 }
 
-// trunkLocks serializes root lands per repo and trunk. Unserialized, two
-// lands into one trunk race on git's own locks and the second fails instead
+// trunkLocks serializes root merges per repo and trunk. Unserialized, two
+// merges into one trunk race on git's own locks and the second fails instead
 // of seeing a clean non-ff.
 type trunkLocks struct {
 	mu    sync.Mutex
@@ -201,7 +201,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 	for {
 		s.checkProjects()
 		s.checkTrunks()
-		s.stampHandLanded()
+		s.stampHandMerged()
 		s.releaseWaitingSlots(time.Now())
 		s.claimNext()
 		s.publishVerdictChanges()
@@ -311,7 +311,7 @@ func (s *Server) concurrencyLimit() int {
 }
 
 // claimRoot reports whether it launched an iteration for item's root. A claim
-// that parked instead (ambiguous base) launched nothing, so it used no slot.
+// that paused instead (ambiguous base) launched nothing, so it used no slot.
 func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	addr, err := parseQueuedAddress(item.Address)
 	if err != nil {
@@ -418,14 +418,14 @@ func (s *Server) projectDir(project string) (string, error) {
 }
 
 // claimAndLaunch writes the claim to the ticket file first, so markdown stays
-// the truth and nothing streams before it is on disk. A failed launch parks the
-// ticket needs-repair rather than leaving a claim with no agent behind it.
-// launched is false when the ticket parked on an ambiguous base: no agent runs.
+// the truth and nothing streams before it is on disk. A failed launch pauses the
+// ticket stuck rather than leaving a claim with no agent behind it.
+// launched is false when the ticket paused on an ambiguous base: no agent runs.
 // epics is the project's loaded epics, for the base derivation.
 func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.Ticket, repo string, agent ralphloop.AgentKind, epics []tickets.Epic) (launched bool, err error) {
 	ticket := tickets.Address{Project: queued.Project, Epic: queued.Epic, ID: t.Identifier}
 	ticketAddr := ticket.String()
-	// The project dir, not the store root: the run log, land lock and
+	// The project dir, not the store root: the run log, merge lock and
 	// conflict-resolution tickets all live under <project>/<epic>.
 	dir, err := s.projectDir(queued.Project)
 	if err != nil {
@@ -435,8 +435,8 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	var ambiguous *tickets.AmbiguousBaseError
 	if errors.As(err, &ambiguous) {
 		reason := "Ambiguous base: choose which of " + strings.Join(ambiguous.Blockers, ", ") + " this ticket starts from, by setting base:."
-		if perr := s.parkTicket(dir, ticket, t.Path, events.AmbiguousBase, reason, Run{}); perr != nil {
-			return false, fmt.Errorf("park %s: %w", ticketAddr, perr)
+		if perr := s.pauseTicket(dir, ticket, t.Path, events.AmbiguousBase, reason, Run{}); perr != nil {
+			return false, fmt.Errorf("pause %s: %w", ticketAddr, perr)
 		}
 		return false, nil
 	}
@@ -483,8 +483,8 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		if taken := (*nameTakenError)(nil); errors.As(err, &taken) {
 			kind, reason = events.AgentNameTaken, "agent name taken: "+taken.reason
 		}
-		if perr := s.parkTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
-			err = errors.Join(err, fmt.Errorf("park: %w", perr))
+		if perr := s.pauseTicket(dir, ticket, t.Path, kind, reason, entry.Run); perr != nil {
+			err = errors.Join(err, fmt.Errorf("pause: %w", perr))
 		}
 		s.events.publish(EventIterationLaunchFailed, ticketAddr)
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
@@ -500,7 +500,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 // resolveBase derives where t starts from. ref is the branch the root epic's
 // feature branch is created from (the epic's refs, not t's), with its
 // "ref@sha" claim stamp; leaf is the
-// unlanded sibling whose branch t starts from instead of the feature tip. A
+// unmerged sibling whose branch t starts from instead of the feature tip. A
 // commitless ticket reads at the feature tip, so everything comes back empty.
 func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string, epics []tickets.Epic) (ref, stamp, leaf string, err error) {
 	if t.Commitless {
@@ -530,9 +530,9 @@ func (s *Server) resolveBase(addr tickets.Address, t tickets.Ticket, repo string
 	return ref, ref + "@" + sha, leaf, nil
 }
 
-// landingOnLanded reports whether the project uses the on-landed landing policy.
+// mergingOnMerged reports whether the project uses the on-merged merging policy.
 // An unreadable project file falls back to the default policy.
-func (s *Server) landingOnLanded(project string) bool {
+func (s *Server) mergingOnMerged(project string) bool {
 	dir, err := s.projectDir(project)
 	if err != nil {
 		return true
@@ -553,9 +553,9 @@ func (s *Server) autoFFMerge(project string) bool {
 }
 
 // rootRefs is where a root's feature branch starts (base: the claim base and
-// the commitless ref) and where it lands (target). Trunk is read on every
-// call, so a landing uses the trunk current then; nothing records it at claim.
-// An explicit base: moves only the start; a derived stacked root also lands
+// the commitless ref) and where it merges (target). Trunk is read on every
+// call, so a merging uses the trunk current then; nothing records it at claim.
+// An explicit base: moves only the start; a derived stacked root also merges
 // on its blocker's branch until that branch reaches trunk.
 func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t tickets.Ticket, repo string) (base, target string, err error) {
 	dir, err := s.projectDir(project)
@@ -563,7 +563,7 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 		return "", "", err
 	}
 	trunk, trunkErr := tickets.Trunk(dir, repo)
-	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.landingOnLanded(project))
+	derived, err := tickets.DeriveRootBase(project, epics, epic, t, s.mergingOnMerged(project))
 	if err != nil {
 		return "", "", err
 	}
@@ -577,16 +577,16 @@ func (s *Server) rootRefs(project string, epics []tickets.Epic, epic string, t t
 		return derived, trunk, nil
 	case trunkErr != nil:
 		// Only a root targeting trunk needs it; a blocker's branch can't have
-		// landed on a trunk that isn't there.
+		// merged on a trunk that isn't there.
 		return derived, derived, nil
 	}
-	ref := retargetIfLanded(derived, trunk, func(a, d string) (bool, error) { return gitIsAncestor(repo, a, d) })
+	ref := retargetIfMerged(derived, trunk, func(a, d string) (bool, error) { return gitIsAncestor(repo, a, d) })
 	return ref, ref, nil
 }
 
 // epicRefs is rootRefs for epic's Root ticket, the one ticket every caller
 // that means "the epic's refs" agrees on, so they all lock the same key. A
-// non-root ticket's base: never moves where the epic starts or lands.
+// non-root ticket's base: never moves where the epic starts or merges.
 func (s *Server) epicRefs(project string, epics []tickets.Epic, epic, repo string) (root tickets.Ticket, base, target string, err error) {
 	if i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic }); i >= 0 && len(epics[i].Tickets) > 0 {
 		root = lowestTicket(epics[i])
@@ -595,8 +595,8 @@ func (s *Server) epicRefs(project string, epics []tickets.Epic, epic, repo strin
 	return root, base, target, err
 }
 
-// landTarget is the target of the root epic addr belongs to.
-func (s *Server) landTarget(addr tickets.Address) (string, error) {
+// mergeTarget is the target of the root epic addr belongs to.
+func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
 	dir, repo, err := s.projectOf(addr.Project)
 	if err != nil {
 		return "", err
@@ -623,11 +623,11 @@ func explicitBase(epics []tickets.Epic, epic string, t tickets.Ticket) bool {
 	return false
 }
 
-// retargetIfLanded is derived, never stored: once the blocker's branch is
+// retargetIfMerged is derived, never stored: once the blocker's branch is
 // reachable from trunk the dependent targets trunk again.
-// An unresolvable branch counts as not landed; never retarget on a guess.
-func retargetIfLanded(ref, trunk string, isAncestor func(ancestor, descendant string) (bool, error)) string {
-	if landed, err := isAncestor(ref, trunk); err == nil && landed {
+// An unresolvable branch counts as not merged; never retarget on a guess.
+func retargetIfMerged(ref, trunk string, isAncestor func(ancestor, descendant string) (bool, error)) string {
+	if merged, err := isAncestor(ref, trunk); err == nil && merged {
 		return trunk
 	}
 	return ref
@@ -665,7 +665,7 @@ func (s *Server) prepareAndLaunch(
 	return run, wt, nil
 }
 
-// finishRun waits for the agent to settle, then lands (or parks) the ticket and
+// finishRun waits for the agent to settle, then merges (or pauses) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(rc runContext) {
 	stop := make(chan struct{})
@@ -719,7 +719,7 @@ type runContext struct {
 	ticketAddr string
 }
 
-// settleRun lands (or parks) an iteration whose wait ended with waitErr. A run
+// settleRun merges (or pauses) an iteration whose wait ended with waitErr. A run
 // found already finished at reattach skips the wait and comes straight here.
 func (s *Server) settleRun(rc runContext, err error) {
 	deps, root, mode, one, wt, run, ticketAddr := rc.deps, rc.root, rc.mode, rc.one, rc.wt, rc.run, rc.ticketAddr
@@ -734,52 +734,52 @@ func (s *Server) settleRun(rc runContext, err error) {
 			}
 		}
 	}()
-	// A run the budget hard limit is stopping never finishes, lands or parks
-	// for its own reason: the first of it and the kill parks it budget-killed.
+	// A run the budget hard limit is stopping never finishes, merges or pauses
+	// for its own reason: the first of it and the kill pauses it budget-killed.
 	if stopping, first := s.registry.claimBudgetStop(ticketAddr); stopping {
 		if t, ok := s.registry.tracked(ticketAddr); ok && first {
-			if perr := s.parkBudgetKilled(t); perr != nil {
+			if perr := s.pauseBudgetKilled(t); perr != nil {
 				s.log.Error("budget kill", "ticket", ticketAddr, "err", perr)
 			}
 		}
 		return
 	}
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
-	if s.parkReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
+	if s.pauseReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
 		return
 	}
 	var out ralphloop.FinishOutcome
 	if err == nil {
 		// A stop that began while the agent settled leaves it for the next
 		// server, which reclaims it from the saved registry: keep it there.
-		if !s.lands.begin() {
+		if !s.merges.begin() {
 			keepRun = true
 			return
 		}
-		defer s.lands.end()
+		defer s.merges.end()
 		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
 		one.KeepAskedAgent = keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)
-		// Park it: a claimed ticket nobody is working on is stuck, not failed.
-		if perr := s.parkTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
-			s.log.Warn("park failed finish", "ticket", ticketAddr, "err", perr)
+		// Pause it: a claimed ticket nobody is working on is stuck, not failed.
+		if perr := s.pauseTicket(one.ScratchDir, addr, one.Ticket.Path, events.IterationError, err.Error(), run); perr != nil {
+			s.log.Warn("pause failed finish", "ticket", ticketAddr, "err", perr)
 		}
 		s.events.publish(EventIterationFailed, ticketAddr)
 		return
 	}
 	if !out.Landed {
-		// The finish path already wrote the park; tell a person its own reason.
+		// The finish path already wrote the pause; tell a person its own reason.
 		if one.KeepAskedAgent && out.Kind == events.SelfReported {
 			// The agent waits idle for the answer: its run, worktree and session stay.
 			keepRun = true
 			s.registry.markWaiting(ticketAddr, time.Now())
 		}
 		s.events.publish(EventIterationPaused, ticketAddr)
-		if !s.holdParkForRecovery(addr, one.Ticket.Path, out.Kind, out.Reason) {
-			s.notifyPark(addr, one.Ticket.Path, out.Kind, out.Reason)
+		if !s.holdPauseForRecovery(addr, one.Ticket.Path, out.Kind, out.Reason) {
+			s.notifyPause(addr, one.Ticket.Path, out.Kind, out.Reason)
 		}
 		return
 	}
@@ -802,7 +802,7 @@ func keepsAskedAgent(run Run) bool {
 	return run.Agent == string(ralphloop.AgentClaude) && run.Runner != "" && run.Runner != runnerHerdr
 }
 
-// notifyDone tells chat a ticket landed. A one-off stays silent: it speaks
+// notifyDone tells chat a ticket merged. A one-off stays silent: it speaks
 // only through notifyResult, when its submit asked for it.
 func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 	if !s.chat.Enabled() || isOneOffTicket(ticketPath) {
@@ -845,7 +845,7 @@ func (s *Server) runnerOf(run Run) (agentrunner.Runner, error) {
 }
 
 // liveSession is the session of address's live iteration and the runner
-// hosting it: a tracked run's own runner, else the configured one (a parked
+// hosting it: a tracked run's own runner, else the configured one (a paused
 // ticket's agent can outlive its run).
 func (s *Server) liveSession(addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
 	runner, err := s.iterationRunner(addr)

@@ -29,7 +29,7 @@ func startDeadlock(t *testing.T, cat recovery.Catalog) *servertest.Harness {
 }
 
 // runLogOf is the run log's epic-level events of typ. The claim loop may
-// launch and park 01 meanwhile; its own events are not the epic's.
+// launch and pause 01 meanwhile; its own events are not the epic's.
 func runLogOf(t *testing.T, h *servertest.Harness, typ events.Type) []ralphloop.Event {
 	t.Helper()
 	log, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
@@ -45,12 +45,12 @@ func runLogOf(t *testing.T, h *servertest.Harness, typ events.Type) []ralphloop.
 	return got
 }
 
-// An epic whose only unblocked ticket is parked logs deadlocked once, however
+// An epic whose only unblocked ticket is paused logs deadlocked once, however
 // many claim passes see it.
-func TestDeadlock_AllParkedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
+func TestDeadlock_AllPausedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 	h := startDeadlock(t, recovery.Catalog{})
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/02", ""); err != nil {
 		t.Fatal(err)
@@ -62,13 +62,13 @@ func TestDeadlock_AllParkedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 	h.Server.ClaimNext()
 	got := runLogOf(t, h, events.Deadlocked)
 	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
-		t.Errorf("deadlocked events = %+v, want one all-parked", got)
+		t.Errorf("deadlocked events = %+v, want one all-paused", got)
 	}
 }
 
-// An epic holding an error ticket is Parked: a person can fix it, so it is not
+// An epic holding an error ticket is Paused: a person can fix it, so it is not
 // a dependency deadlock.
-func TestDeadlock_ErrorTicketParksTheEpic(t *testing.T) {
+func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "bogus"})
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
@@ -81,7 +81,7 @@ func TestDeadlock_ErrorTicketParksTheEpic(t *testing.T) {
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 	got := runLogOf(t, h, events.Deadlocked)
 	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
-		t.Errorf("deadlocked events = %+v, want one all-parked", got)
+		t.Errorf("deadlocked events = %+v, want one all-paused", got)
 	}
 }
 

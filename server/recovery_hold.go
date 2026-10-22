@@ -13,21 +13,21 @@ const (
 	RecoveryEscalated = "escalated"
 )
 
-// recoveryHold keeps a park's chat message back while recovery works on the
+// recoveryHold keeps a pause's chat message back while recovery works on the
 // ticket. Exactly one of three things then happens to it: recovery succeeds
 // and drops it, recovery fails and sends it, or the cap expires and sends it.
 type recoveryHold struct {
 	mu   sync.Mutex
 	held map[string]*time.Timer // ticket address -> cap timer
-	// escalated are the tickets whose held park ended in a failed remedy, until
-	// their next park.
+	// escalated are the tickets whose held pause ended in a failed remedy, until
+	// their next pause.
 	escalated map[string]bool
-	// starting are the parks whose unheld recovery has not yet escalated or
+	// starting are the pauses whose unheld recovery has not yet escalated or
 	// opened its investigation, so a --wait cannot slip out in between.
 	starting map[string]bool
 }
 
-// start marks the park's unheld recovery as under way.
+// start marks the pause's unheld recovery as under way.
 func (h *recoveryHold) start(key string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -84,7 +84,7 @@ func (h *recoveryHold) take(key string) bool {
 	return ok
 }
 
-// escalate marks the ticket's held park as given up on by recovery.
+// escalate marks the ticket's held pause as given up on by recovery.
 func (h *recoveryHold) escalate(key string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -95,17 +95,17 @@ func (h *recoveryHold) escalate(key string) {
 	delete(h.starting, key)
 }
 
-// forget clears an escalation, for a new park of the ticket.
+// forget clears an escalation, for a new pause of the ticket.
 func (h *recoveryHold) forget(key string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.escalated, key)
 }
 
-// recoveryState is a parked ticket's TicketInfo.Recovery: its hold's state,
+// recoveryState is a paused ticket's TicketInfo.Recovery: its hold's state,
 // else what its investigations say. It is read from the index rather than
 // kept, so a server restart mid-investigation still reports it. An open
-// investigation is pending; a parked one is a person's, so recovery escalated.
+// investigation is pending; a paused one is a person's, so recovery escalated.
 func recoveryState(held, address string, all []TicketInfo) string {
 	if held != "" {
 		return held

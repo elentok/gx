@@ -115,26 +115,26 @@ func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
 	}
 }
 
-// assertParkRecordsRun checks the park event names the run's runner, label and
-// session: late-finish adoption reads them after the park drops runs.json.
-func assertParkRecordsRun(t *testing.T, store string, park events.Type, runner string, session agentrunner.Session) {
+// assertPauseRecordsRun checks the pause event names the run's runner, label and
+// session: late-finish adoption reads them after the pause drops runs.json.
+func assertPauseRecordsRun(t *testing.T, store string, pause events.Type, runner string, session agentrunner.Session) {
 	t.Helper()
-	// The park writes the ticket's status before its run-log event.
+	// The pause writes the ticket's status before its run-log event.
 	var logged []ralphloop.Event
 	var i int
 	waitFor(t, func() bool {
 		logged, _, _ = ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-		i = slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(park) })
+		i = slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(pause) })
 		return i >= 0
 	})
 	got := logged[i]
 	if got.Runner != runner || got.Label != session.Label || got.AgentSession != session.SessionID {
-		t.Errorf("park event runner/label/session = %q/%q/%q, want %q/%q/%q",
+		t.Errorf("pause event runner/label/session = %q/%q/%q, want %q/%q/%q",
 			got.Runner, got.Label, got.AgentSession, runner, session.Label, session.SessionID)
 	}
 }
 
-func TestReclaim_DeadClaimWithWorkParks(t *testing.T) {
+func TestReclaim_DeadClaimWithWorkPauses(t *testing.T) {
 	for name, work := range map[string]func(*testing.T, string){"commit": commitAgentWork, "edit": editAgentWork} {
 		t.Run(name, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
@@ -143,7 +143,7 @@ func TestReclaim_DeadClaimWithWorkParks(t *testing.T) {
 				if _, err := os.Stat(wtPath); err != nil {
 					t.Errorf("worktree gone: %v", err)
 				}
-				assertParkRecordsRun(t, store, events.Paused, runnerOf(headless), deadSession)
+				assertPauseRecordsRun(t, store, events.Paused, runnerOf(headless), deadSession)
 			})
 		})
 	}

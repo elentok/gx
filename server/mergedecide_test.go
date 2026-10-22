@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-func TestLandDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *testing.T) {
+func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "landed")
 	writeCompleteEpic(t, store, "landed")
@@ -54,7 +54,7 @@ func TestLandDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *t
 	waitUntil(t, "merged_at after release", func() bool { return strings.Contains(readFile(t, md), "merged_at:") })
 }
 
-func TestLandDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
+func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := retroFixture(t, withEvolve(config.EvolveContributor), chat)
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
@@ -80,7 +80,7 @@ func TestLandDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 	}
 }
 
-func TestLandDecide_RepeatNeedsRebaseParkIsQuiet(t *testing.T) {
+func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
@@ -90,11 +90,11 @@ func TestLandDecide_RepeatNeedsRebaseParkIsQuiet(t *testing.T) {
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")
 	}, withEvolve(config.EvolveContributor), chat)
-	f.parkRoot(t)
+	f.pauseRoot(t)
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Fatalf("%q sent %d times, want once", epicNotMergedText, got)
 	}
-	parks := count("needs rebase")
+	pauses := count("needs rebase")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -105,11 +105,11 @@ func TestLandDecide_RepeatNeedsRebaseParkIsQuiet(t *testing.T) {
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
 	time.Sleep(10 * testFlushInterval)
 
-	if parks != 1 {
-		t.Errorf("first park notice sent %d times, want once", parks)
+	if pauses != 1 {
+		t.Errorf("first pause notice sent %d times, want once", pauses)
 	}
-	if got := count("needs rebase"); got != parks {
-		t.Errorf("park notice sent %d times after the repeat, want %d", got, parks)
+	if got := count("needs rebase"); got != pauses {
+		t.Errorf("pause notice sent %d times after the repeat, want %d", got, pauses)
 	}
 	if got := count(epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)

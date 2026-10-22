@@ -18,9 +18,9 @@ func investigateReport(class string) string {
 	return "\n# 02 — Investigate 01\n\n## Result\n\n### Observed\n\nIt spun.\n\n### Evidence\n\nlog line\n\n### Diagnosis\n\nA loop.\n\n### Proposal\n\n" + class + ": add a rule\n"
 }
 
-// landedInvestigation writes an investigate ticket carrying body into a fresh
+// mergedInvestigation writes an investigate ticket carrying body into a fresh
 // store and returns the server, the store and the ticket's address and path.
-func landedInvestigation(t *testing.T, body string, followUps string) (*Server, string, tickets.Address, string) {
+func mergedInvestigation(t *testing.T, body string, followUps string) (*Server, string, tickets.Address, string) {
 	t.Helper()
 	store := t.TempDir()
 	epicPath := filepath.Join(store, "proj", "epic-a")
@@ -48,7 +48,7 @@ func landedInvestigation(t *testing.T, body string, followUps string) (*Server, 
 func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraft(t *testing.T) {
 	for _, class := range []string{proposalCatalogEntry, proposalOrchestratorFix} {
 		t.Run(class, func(t *testing.T) {
-			s, store, addr, path := landedInvestigation(t, investigateReport(class), "proj:follow-ups")
+			s, store, addr, path := mergedInvestigation(t, investigateReport(class), "proj:follow-ups")
 			s.fileFollowUp(addr, path)
 
 			epicPath := filepath.Join(store, "proj", "follow-ups")
@@ -109,7 +109,7 @@ func followUpTickets(t *testing.T, store string) []tickets.Ticket {
 }
 
 func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
-	s, store, addr, path := landedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
+	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
 	s.fileFollowUp(addr, path)
 	s.fileFollowUp(addr, path)
 
@@ -139,9 +139,9 @@ func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
 }
 
 func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
-	s, store, addr, path := landedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
+	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
 	s.fileFollowUp(addr, path)
-	_, _, _, other := landedInvestigation(t, investigateReport(proposalOrchestratorFix), "proj:follow-ups")
+	_, _, _, other := mergedInvestigation(t, investigateReport(proposalOrchestratorFix), "proj:follow-ups")
 	raw, err := os.ReadFile(other)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
 }
 
 func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
-	s, store, addr, path := landedInvestigation(t, investigateReport(proposalCatalogEntry), "nowhere:follow-ups")
+	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "nowhere:follow-ups")
 	s.fileFollowUp(addr, path)
 	if got := followUpTickets(t, store); got != nil {
 		t.Errorf("filed %d tickets with no follow-ups project", len(got))
@@ -165,7 +165,7 @@ func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
 }
 
 func TestFileFollowUp_HumanOnlyFilesNothing(t *testing.T) {
-	s, store, addr, path := landedInvestigation(t, investigateReport(proposalHumanOnly), "proj:follow-ups")
+	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalHumanOnly), "proj:follow-ups")
 	s.fileFollowUp(addr, path)
 	if _, err := os.Stat(filepath.Join(store, "proj", "follow-ups")); !os.IsNotExist(err) {
 		t.Errorf("follow-ups epic exists after a human-only report: %v", err)

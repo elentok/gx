@@ -58,9 +58,9 @@ func (s *Server) ClaimTicket(address, agent string) (bool, error) {
 	return s.claimAndLaunch(rootOf(addr), addr, ref.ticket, ref.repo, ralphloop.AgentKind(agent), epics)
 }
 
-// ParkAs parks a ticket as the given kind the way the server's own parks do,
+// PauseAs pauses a ticket as the given kind the way the server's own pauses do,
 // including starting recovery.
-func (s *Server) ParkAs(address string, kind events.Kind, reason string) error {
+func (s *Server) PauseAs(address string, kind events.Kind, reason string) error {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return err
@@ -69,26 +69,26 @@ func (s *Server) ParkAs(address string, kind events.Kind, reason string) error {
 	if err != nil || !ok {
 		return errors.Join(err, errors.New("no ticket "+address))
 	}
-	return s.parkTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, Run{})
+	return s.pauseTicket(ref.projectDir, addr, ref.ticket.Path, kind, reason, Run{})
 }
 
 // SetCostOf swaps how an iteration's cost is read.
 func (s *Server) SetCostOf(f func(IterationInfo) (float64, bool)) { s.costOf = f }
 
-// SetMergeInto swaps the merge core a root land calls.
+// SetMergeInto swaps the merge core a root merge calls.
 func (s *Server) SetMergeInto(f func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error)) {
 	s.mergeInto = f
 }
 
-// SetLandedProbe swaps the poll-time ancestry check.
-func (s *Server) SetLandedProbe(f func(repo, ancestor, descendant string) (bool, error)) {
-	s.landedProbe = f
+// SetMergedProbe swaps the poll-time ancestry check.
+func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool, error)) {
+	s.mergedProbe = f
 }
 
-// UnparkAsWeb is the unpark the web mux serves: it needs a state token.
-func (s *Server) UnparkAsWeb(req RepairRequest) (RepairResult, error) {
+// ResumeAsWeb is the resume the web mux serves: it needs a state token.
+func (s *Server) ResumeAsWeb(req RepairRequest) (RepairResult, error) {
 	req.RequireState = true
-	return s.repairUnpark(req)
+	return s.repairResume(req)
 }
 
 // Rescan rescans the store now, as a ping or the watch would.
@@ -116,12 +116,12 @@ func (s *Server) PutRunAt(root string, r Run, at time.Time) {
 	s.registry.put(trackedRun{Run: r, Root: root, StartedAt: at})
 }
 
-// ParkTicket parks a ticket the way a failed iteration does: the write, the
+// PauseTicket pauses a ticket the way a failed iteration does: the write, the
 // event, then the chat message (or its hold while recovery runs).
-func (s *Server) ParkTicket(project, epic, id string, kind events.Kind, reason string) error {
+func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason string) error {
 	dir := filepath.Join(s.cfg.TicketStore, project)
 	path := filepath.Join(dir, epic, "issues", id+"-first.md")
-	return s.parkTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, Run{})
+	return s.pauseTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, Run{})
 }
 
 // PutRunFrom is PutRun with the base the iteration branched from.
@@ -136,12 +136,12 @@ func (s *Server) GateReleased(address string) bool { return s.registry.gateRelea
 func (s *Server) DropRun(address string) { s.registry.delete(address) }
 
 // SettleReleasedRun stands in for the finish of a run whose gate was released:
-// the park release-gate left, if any, then the run is dropped.
+// the pause release-gate left, if any, then the run is dropped.
 func (s *Server) SettleReleasedRun(address string) {
 	addr, _ := tickets.ParseAddress(address, tickets.AddressContext{})
 	dir := filepath.Join(s.cfg.TicketStore, addr.Project)
 	if run, ok := s.registry.runOf(address); ok {
-		s.parkReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
+		s.pauseReleasedGate(dir, addr, filepath.Join(dir, addr.Epic, "issues", addr.ID+"-first.md"), run)
 	}
 	s.registry.delete(address)
 }
@@ -167,7 +167,7 @@ func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(proje
 // RecoveredCount is recoveredCount for tests.
 func RecoveredCount(projectDir, epic string) int { return recoveredCount(projectDir, epic) }
 
-// HoldTrunkLock takes the project's trunk lock the way a land does, until
+// HoldTrunkLock takes the project's trunk lock the way a merge does, until
 // release runs.
 func (s *Server) HoldTrunkLock(project, trunk string) (release func(), err error) {
 	_, repo, err := s.projectOf(project)
@@ -192,7 +192,7 @@ func (s *Server) CompleteRootIfDone(address string) error {
 	return nil
 }
 
-// LockedTrunks lists the trunks any land has locked so far, in any repo.
+// LockedTrunks lists the trunks any merge has locked so far, in any repo.
 func (s *Server) LockedTrunks() []string {
 	s.trunkLocks.mu.Lock()
 	defer s.trunkLocks.mu.Unlock()

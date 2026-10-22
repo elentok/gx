@@ -108,7 +108,7 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 		time.Sleep(20 * time.Millisecond)
 		label, ok = fake.started("conflict-")
 	}
-	// Let the land settle before teardown.
+	// Let the merge settle before teardown.
 	for time.Now().Before(deadline) {
 		if tk, err := schema.ParseTicket(ticketPath); err == nil && tk.Status != schema.StatusClaimed {
 			break

@@ -22,25 +22,25 @@ func assertGxQuestion(t *testing.T, ticketPath string, kind events.Kind, summary
 		t.Fatalf("log = %+v, want one event", evs)
 	}
 	got := evs[0]
-	// The text is the fixed summary, then the park reason when it adds detail.
+	// The text is the fixed summary, then the pause reason when it adds detail.
 	if got.Type != tickets.EventParkQuestion || got.By != "gx" || got.ParkKind != string(kind) || got.Summary != summary || !strings.HasPrefix(got.Text, summary) {
 		t.Errorf("event = %+v, want a by-gx %s question %q", got, kind, summary)
 	}
 }
 
-func TestPark_ZeroCommitLogsGxQuestion(t *testing.T) {
+func TestPause_ZeroCommitLogsGxQuestion(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	runToZeroCommitPark(t, h, "done")
+	runToZeroCommitPause(t, h, "done")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	waitStatus(t, path, schema.StatusNeedsAnswer)
 	assertGxQuestion(t, path, events.ZeroCommit,
 		"The agent finished with no commits. Adopt it as done, or reopen the ticket?")
 }
 
-func TestPark_AmbiguousBaseLogsGxQuestion(t *testing.T) {
+func TestPause_AmbiguousBaseLogsGxQuestion(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")

@@ -163,7 +163,7 @@ func TestConfigReloadChat_ProjectSinkKeepsItsBatch(t *testing.T) {
 	s.chat.Park("proj", override, "epic", "/t/02.md", "02", "needs-answer", "zero-commit", "after-reload", ralphloop.EpicCounts{})
 	s.chat.Close()
 	if got := projectHook.sent(); len(got) != 1 || !strings.Contains(got[0], "before-reload") || !strings.Contains(got[0], "after-reload") {
-		t.Errorf("project sent %v, want one batch with both parks", got)
+		t.Errorf("project sent %v, want one batch with both pauses", got)
 	}
 }
 

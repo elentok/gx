@@ -113,8 +113,8 @@ func (s *Server) setMode(paused bool) (QueueResult, error) {
 func (s *Server) queuePause() (QueueResult, error)  { return s.setMode(true) }
 func (s *Server) queueResume() (QueueResult, error) { return s.setMode(false) }
 
-// queueDrain is the old name of Finish and pause, kept for one release.
-func (s *Server) queueDrain() (QueueResult, error) { return s.queuePause() }
+// queueFlush is the old name of Finish and pause, kept for one release.
+func (s *Server) queueFlush() (QueueResult, error) { return s.queuePause() }
 
 // modeWrite adapts a mode change to a POST handler.
 func (s *Server) modeWrite(do func() (QueueResult, error)) http.HandlerFunc {

@@ -74,7 +74,7 @@ func TestWeb_EpicDetailIsServed(t *testing.T) {
 	}
 }
 
-func TestWeb_AnswerAndUnparkNeedAStateToken(t *testing.T) {
+func TestWeb_AnswerAndResumeNeedAStateToken(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	for _, path := range []string{"/v1/tickets/answer", "/v1/tickets/resume", "/v1/tickets/unpark"} {

@@ -21,9 +21,9 @@ import (
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-// A failed launch parks the ticket needs-repair with one chat message, and the
+// A failed launch pauses the ticket stuck with one chat message, and the
 // next ticks do not claim it again.
-func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
+func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -42,7 +42,7 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	started := chat.waitStarted(t) // so the park message never shares a post with it
+	started := chat.waitStarted(t) // so the pause message never shares a post with it
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -81,8 +81,8 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 }
 
 // A server that restarts mid-iteration reattaches to the live agent instead of
-// prompting a fresh one, and the iteration lands exactly once.
-func TestLaunchPort_RestartReattachesAndLandsOnce(t *testing.T) {
+// prompting a fresh one, and the iteration merges exactly once.
+func TestLaunchPort_RestartReattachesAndMergesOnce(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -119,7 +119,7 @@ func TestLaunchPort_RestartReattachesAndLandsOnce(t *testing.T) {
 		return string(out)
 	}
 	if got := git("show", "epic-a:agent.txt"); got != "work" {
-		t.Errorf("feature branch agent.txt = %q, want the iteration's commit landed", got)
+		t.Errorf("feature branch agent.txt = %q, want the iteration's commit merged", got)
 	}
 	if n := strings.Count(git("log", "--format=%s", "epic-a"), "agent work"); n != 1 {
 		t.Errorf("feature branch has %d agent commits, want exactly 1", n)

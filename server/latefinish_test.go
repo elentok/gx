@@ -32,25 +32,25 @@ func (r *stopCounter) Stop(s agentrunner.Session) error {
 	return r.turnRunner.Stop(s)
 }
 
-// zeroCommitParked is 01 parked zero-commit, its agent still alive.
-type zeroCommitParked struct {
+// zeroCommitPaused is 01 paused zero-commit, its agent still alive.
+type zeroCommitPaused struct {
 	h          *servertest.Harness
 	store      string
 	wtPath     string
 	ticketPath string
-	park       ralphloop.Event
+	pause      ralphloop.Event
 	// agentGone makes the runner's Find miss the agent.
 	agentGone func()
 	// stops counts runner Stops from now on.
 	stops func() int32
 }
 
-func parkZeroCommit(t *testing.T, headless bool) zeroCommitParked {
+func pauseZeroCommit(t *testing.T, headless bool) zeroCommitPaused {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	p := zeroCommitParked{store: store, ticketPath: filepath.Join(store, "proj/epic-a/issues/01-first.md")}
+	p := zeroCommitPaused{store: store, ticketPath: filepath.Join(store, "proj/epic-a/issues/01-first.md")}
 	if headless {
 		fake := &stopCounter{turnRunner: newTurnRunner(func(string, string) {})}
 		p.h = servertest.StartWithStore(t, store, func(c *server.Config) {
@@ -69,7 +69,7 @@ func parkZeroCommit(t *testing.T, headless bool) zeroCommitParked {
 		p.stops = func() int32 { return fake.stops.Load() - base }
 	} else {
 		p.h = servertest.StartWithStore(t, store)
-		runToZeroCommitPark(t, p.h, "done")
+		runToZeroCommitPause(t, p.h, "done")
 		p.agentGone = func() {
 			p.h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 				return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
@@ -82,10 +82,10 @@ func parkZeroCommit(t *testing.T, headless bool) zeroCommitParked {
 		})
 		p.stops = func() int32 { return closes.Load() }
 	}
-	// The park writes the ticket's status before its run-log event.
+	// The pause writes the ticket's status before its run-log event.
 	waitFor(t, func() bool {
 		var ok bool
-		p.park, ok = ralphloop.LatestParkEvent(filepath.Join(store, "proj"), "epic-a", "01")
+		p.pause, ok = ralphloop.LatestParkEvent(filepath.Join(store, "proj"), "epic-a", "01")
 		return ok
 	})
 	r, err := git.FindRepo(repo)
@@ -103,7 +103,7 @@ func parkZeroCommit(t *testing.T, headless bool) zeroCommitParked {
 }
 
 // report writes the agent's late report onto the ticket and pings a rescan.
-func (p zeroCommitParked) report(t *testing.T, mutate func(*schema.Ticket)) {
+func (p zeroCommitPaused) report(t *testing.T, mutate func(*schema.Ticket)) {
 	t.Helper()
 	if err := schema.UpdateTicket(p.ticketPath, mutate); err != nil {
 		t.Fatal(err)
@@ -113,17 +113,17 @@ func (p zeroCommitParked) report(t *testing.T, mutate func(*schema.Ticket)) {
 	}
 }
 
-func (p zeroCommitParked) finishedLate(commitless bool) func(*schema.Ticket) {
+func (p zeroCommitPaused) finishedLate(commitless bool) func(*schema.Ticket) {
 	return func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
-		tk.IterationFinishedAt = p.park.Time.Add(time.Second)
+		tk.IterationFinishedAt = p.pause.Time.Add(time.Second)
 		tk.Commitless = commitless
 	}
 }
 
 // adopted waits for 01 to be done and returns its late-finish-adopted reason
 // as the history shows it.
-func (p zeroCommitParked) adopted(t *testing.T) string {
+func (p zeroCommitPaused) adopted(t *testing.T) string {
 	t.Helper()
 	waitStatus(t, p.ticketPath, schema.StatusDone)
 	var reason string
@@ -143,8 +143,8 @@ func (p zeroCommitParked) adopted(t *testing.T) string {
 	return reason
 }
 
-// staysParked gives a scan time to act, then checks it did not.
-func (p zeroCommitParked) staysParked(t *testing.T) {
+// staysPaused gives a scan time to act, then checks it did not.
+func (p zeroCommitPaused) staysPaused(t *testing.T) {
 	t.Helper()
 	time.Sleep(300 * time.Millisecond)
 	tk, err := schema.ParseTicket(p.ticketPath)
@@ -165,46 +165,46 @@ func (p zeroCommitParked) staysParked(t *testing.T) {
 	}
 }
 
-func parkedAt(p zeroCommitParked) string { return p.park.Time.UTC().Format(time.RFC3339) }
+func pausedAt(p zeroCommitPaused) string { return p.pause.Time.UTC().Format(time.RFC3339) }
 
-func TestLateFinish_LandsLateCommit(t *testing.T) {
+func TestLateFinish_MergesLateCommit(t *testing.T) {
 	runnerShapes(t, func(t *testing.T, headless bool) {
-		p := parkZeroCommit(t, headless)
+		p := pauseZeroCommit(t, headless)
 		commitAgentWork(t, p.wtPath)
 		p.report(t, p.finishedLate(false))
 		reason := p.adopted(t)
 		sha := ralphloop.LatestLandedSHA(filepath.Join(p.store, "proj"), "epic-a", "01")
-		if sha == "" || !strings.Contains(reason, "landed "+sha) || !strings.Contains(reason, "parked "+parkedAt(p)) {
-			t.Errorf("reason = %q, want parked %s and landed %q", reason, parkedAt(p), sha)
+		if sha == "" || !strings.Contains(reason, "merged "+sha) || !strings.Contains(reason, "paused "+pausedAt(p)) {
+			t.Errorf("reason = %q, want paused %s and merged %q", reason, pausedAt(p), sha)
 		}
 		if p.stops() == 0 {
-			t.Error("live agent not stopped after landing")
+			t.Error("live agent not stopped after merging")
 		}
 	})
 }
 
 func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
-	p := parkZeroCommit(t, true)
+	p := pauseZeroCommit(t, true)
 	evs, err := tickets.ReadLog(p.ticketPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	q := tickets.OpenQuestion(evs)
 	if q == nil {
-		t.Fatal("zero-commit park left no open question")
+		t.Fatal("zero-commit pause left no open question")
 	}
 	p.report(t, p.finishedLate(true))
 	p.adopted(t)
 	evs, _ = tickets.ReadLog(p.ticketPath)
 	last := evs[len(evs)-1]
 	if last.Type != tickets.EventParkClosed || last.Question != q.Seq || last.Reason != "adopted" {
-		t.Errorf("last event = %+v, want park.closed{question: %d, reason: adopted}", last, q.Seq)
+		t.Errorf("last event = %+v, want pause.closed{question: %d, reason: adopted}", last, q.Seq)
 	}
 }
 
 func TestLateFinish_ClosesCommitless(t *testing.T) {
 	runnerShapes(t, func(t *testing.T, headless bool) {
-		p := parkZeroCommit(t, headless)
+		p := pauseZeroCommit(t, headless)
 		p.report(t, p.finishedLate(true))
 		if reason := p.adopted(t); !strings.Contains(reason, "closed commitless") {
 			t.Errorf("reason = %q, want closed commitless", reason)
@@ -226,12 +226,12 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 		commitless bool
 		want       string
 	}{
-		{"land", true, false, "landed "},
+		{"land", true, false, "merged "},
 		{"commitless", false, true, "closed commitless"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
-				p := parkZeroCommit(t, headless)
+				p := pauseZeroCommit(t, headless)
 				p.agentGone()
 				if tc.commit {
 					commitAgentWork(t, p.wtPath)
@@ -248,13 +248,13 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 	}
 }
 
-// unpark and relaunch adopt a late finish before acting, launch nothing, and
+// resume and relaunch adopt a late finish before acting, launch nothing, and
 // cancel only the investigation that has not started.
-func TestLateFinish_UnparkAndRelaunchAdoptFirst(t *testing.T) {
+func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 	for _, verb := range []string{"unpark", "relaunch"} {
 		t.Run(verb, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
-				p := parkZeroCommit(t, headless)
+				p := pauseZeroCommit(t, headless)
 				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "02", "unstarted", servertest.TicketOpts{Type: "investigate", Parent: "01"})
 				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
 				commitAgentWork(t, p.wtPath)
@@ -266,7 +266,7 @@ func TestLateFinish_UnparkAndRelaunchAdoptFirst(t *testing.T) {
 				if verb == "unpark" {
 					res, err := p.h.Client.Repair(ctx, "unpark", server.RepairRequest{Address: "proj:epic-a/01"})
 					if err != nil || res.Refused || !strings.Contains(string(res.Data), `"adopted"`) {
-						t.Fatalf("unpark = %+v (data %s), %v; want adopted", res, res.Data, err)
+						t.Fatalf("resume = %+v (data %s), %v; want adopted", res, res.Data, err)
 					}
 				} else if res, err := p.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
 					t.Fatalf("relaunch = %+v, %v", res, err)
@@ -274,8 +274,8 @@ func TestLateFinish_UnparkAndRelaunchAdoptFirst(t *testing.T) {
 				if tk, err := schema.ParseTicket(p.ticketPath); err != nil || tk.Status != schema.StatusDone {
 					t.Fatalf("after %s: status = %v, %v; want done", verb, tk.Status, err)
 				}
-				if reason := p.adopted(t); !strings.Contains(reason, "landed ") {
-					t.Errorf("reason = %q, want landed", reason)
+				if reason := p.adopted(t); !strings.Contains(reason, "merged ") {
+					t.Errorf("reason = %q, want merged", reason)
 				}
 				unstarted := filepath.Join(p.store, "proj/epic-a/issues/02-unstarted.md")
 				if tk, err := schema.ParseTicket(unstarted); err != nil || tk.Status != schema.StatusCancelled {
@@ -297,43 +297,43 @@ func TestLateFinish_UnparkAndRelaunchAdoptFirst(t *testing.T) {
 	}
 }
 
-func TestLateFinish_FailedConditionStaysParked(t *testing.T) {
+func TestLateFinish_FailedConditionStaysPaused(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		commit bool
-		mutate func(p zeroCommitParked) func(*schema.Ticket)
+		mutate func(p zeroCommitPaused) func(*schema.Ticket)
 	}{
-		{"status changed", true, func(p zeroCommitParked) func(*schema.Ticket) {
+		{"status changed", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.Status = schema.StatusOpen }
 		}},
-		{"reclaimed", true, func(p zeroCommitParked) func(*schema.Ticket) {
+		{"reclaimed", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.Status = schema.StatusClaimed }
 		}},
-		{"kind changed", true, func(p zeroCommitParked) func(*schema.Ticket) {
+		{"kind changed", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.PauseReason = schema.PauseBlockedPane }
 		}},
-		{"self-reported park", false, func(p zeroCommitParked) func(*schema.Ticket) {
+		{"self-reported park", false, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(true)(tk); tk.PauseReason = schema.PauseSelfReported }
 		}},
-		{"finished before park", true, func(p zeroCommitParked) func(*schema.Ticket) {
+		{"finished before park", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) {
 				p.finishedLate(false)(tk)
-				tk.IterationFinishedAt = p.park.Time.Add(-time.Second)
+				tk.IterationFinishedAt = p.pause.Time.Add(-time.Second)
 			}
 		}},
-		{"no finished report", false, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { tk.IterationFinishedAt = p.park.Time.Add(time.Second); tk.Commitless = true }
+		{"no finished report", false, func(p zeroCommitPaused) func(*schema.Ticket) {
+			return func(tk *schema.Ticket) { tk.IterationFinishedAt = p.pause.Time.Add(time.Second); tk.Commitless = true }
 		}},
-		{"late commit without finished", true, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { tk.IterationFinishedAt = p.park.Time.Add(time.Second) }
+		{"late commit without finished", true, func(p zeroCommitPaused) func(*schema.Ticket) {
+			return func(tk *schema.Ticket) { tk.IterationFinishedAt = p.pause.Time.Add(time.Second) }
 		}},
-		{"zero commits without commitless", false, func(p zeroCommitParked) func(*schema.Ticket) {
+		{"zero commits without commitless", false, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return p.finishedLate(false)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
-				p := parkZeroCommit(t, headless)
+				p := pauseZeroCommit(t, headless)
 				// Every condition is checked before the agent is looked up; with
 				// it gone a wrong adoption skips the settle wait and shows at once.
 				p.agentGone()
@@ -341,7 +341,7 @@ func TestLateFinish_FailedConditionStaysParked(t *testing.T) {
 					commitAgentWork(t, p.wtPath)
 				}
 				p.report(t, tc.mutate(p))
-				p.staysParked(t)
+				p.staysPaused(t)
 			})
 		})
 	}

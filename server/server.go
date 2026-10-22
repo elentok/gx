@@ -80,7 +80,7 @@ type Settings struct {
 	Recovery recovery.Catalog
 	// RecoverySettings is the loaded config recovery block, defaults applied.
 	// An empty FollowUps means DefaultFollowUps; a zero NotifyHold sends a
-	// park's chat message without waiting for recovery.
+	// pause's chat message without waiting for recovery.
 	RecoverySettings config.RecoveryConfig
 
 	// StoreCommitDebounce and StorePushRemote configure the store commit loop,
@@ -204,7 +204,7 @@ type Config struct {
 	HerdrRetryInterval time.Duration // zero means the default
 
 	// Sleep paces the ralphloop waits (finish debounce, poll backoffs); nil
-	// means time.Sleep. Tests shrink it so each land skips the real seconds.
+	// means time.Sleep. Tests shrink it so each merge skips the real seconds.
 	Sleep func(time.Duration)
 
 	// Runner is the configured agent runner; nil means herdr. Herdr health
@@ -228,9 +228,9 @@ type Config struct {
 
 	SSEHeartbeat time.Duration // idle gap before /v1/events writes a comment line; zero means DefaultSSEHeartbeat
 
-	// LandStopTimeout bounds how long a stop waits for a land in flight; zero
-	// means DefaultLandStopTimeout.
-	LandStopTimeout time.Duration
+	// MergeStopTimeout bounds how long a stop waits for a merge in flight; zero
+	// means DefaultMergeStopTimeout.
+	MergeStopTimeout time.Duration
 
 	// LogLevel is the minimum level written to the server log; the zero value
 	// is slog.LevelInfo.
@@ -336,8 +336,8 @@ type Server struct {
 	costOf       func(IterationInfo) (float64, bool) // swapped in tests
 	events       *broker
 	herdr        herdrWatch
-	parkFold     parkFold
-	parkHold     recoveryHold
+	pauseFold    pauseFold
+	pauseHold    recoveryHold
 	defectScan   sync.Mutex
 	lateFinishes inFlight
 	deadlocks    deadlocks
@@ -349,12 +349,12 @@ type Server struct {
 	registry       *runRegistry
 	savedRuns      []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused        refusals
-	lands          landGuard
+	merges         mergeGuard
 	adoptMu        sync.Mutex // a late-finish adoption holds it from its finish to the cancel of unstarted investigations; the runner claims under it
 	trunkLocks     trunkLocks
 	mergeTargets   mergeTargetCache
 	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
-	landedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
+	mergedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts       verdictLog
 	nudges         nudgeLimiter
 	unavailable    unavailableNotes
@@ -495,7 +495,7 @@ func New(cfg Config) (*Server, error) {
 		ledger:      ledger,
 		costOf:      iterationCost,
 		mergeInto:   git.MergeBranchInto,
-		landedProbe: git.IsAncestor,
+		mergedProbe: git.IsAncestor,
 		events:      events,
 		kick:        make(chan struct{}, 1),
 
@@ -553,11 +553,11 @@ var routeTable = []struct {
 	{"POST /v1/queue/replace", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.queueReplace)(w, r) }},
 	{"POST /v1/queue/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queuePause)(w, r) }},
 	{"POST /v1/queue/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueResume)(w, r) }},
-	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueDrain)(w, r) }},
-	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.landInQueue)(w, r) }},
+	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueFlush)(w, r) }},
+	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},
 	{"POST /v1/tickets/start-over", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairReset)(w, r) }},
-	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairUnpark)(w, r) }},
-	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairUnpark)(w, r) }},
+	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
+	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},
 	{"POST /v1/tickets/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
 	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
@@ -626,7 +626,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)
 		case string(schema.StatusPaused), string(schema.StatusNeedsAnswer), string(schema.StatusNeedsRepair):
-			snap.Tickets[i].Recovery = recoveryState(s.parkHold.state(t.Address), t.Address, snap.Tickets)
+			snap.Tickets[i].Recovery = recoveryState(s.pauseHold.state(t.Address), t.Address, snap.Tickets)
 		}
 	}
 	s.fillEpicMergeTargets(snap.Tickets)
@@ -718,8 +718,8 @@ func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr, HerdrUnavailable: s.herdr.isUnavailable()})
 }
 
-// DefaultLandStopTimeout is how long a stop waits for a land in flight.
-const DefaultLandStopTimeout = 30 * time.Second
+// DefaultMergeStopTimeout is how long a stop waits for a merge in flight.
+const DefaultMergeStopTimeout = 30 * time.Second
 
 // Serve blocks until ctx is cancelled, then shuts down and releases the lock.
 func (s *Server) Serve(ctx context.Context) error {
@@ -749,9 +749,9 @@ func (s *Server) Serve(ctx context.Context) error {
 		lns = append(lns, s.web)
 		go func() { errc <- s.webHTTP.Serve(s.web) }()
 	}
-	s.recoverLands()
+	s.recoverMerges()
 	s.reclaimRuns()
-	s.logDrainingRunners()
+	s.logFlushingRunners()
 	s.pruneAgentLogs(time.Now())
 	s.scanParentDefects()
 	stopCommits := func() {}
@@ -788,7 +788,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		}
 		_ = shutdown()
 	}
-	// Stop claiming, let a land in flight finish, then flush the store commit
+	// Stop claiming, let a merge in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
 	stopFresh()
 	s.sessionWatches.close()
@@ -802,12 +802,12 @@ func (s *Server) Serve(ctx context.Context) error {
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()
 	s.stopHardGrace()
-	timeout := s.cfg.LandStopTimeout
+	timeout := s.cfg.MergeStopTimeout
 	if timeout <= 0 {
-		timeout = DefaultLandStopTimeout
+		timeout = DefaultMergeStopTimeout
 	}
-	if !s.lands.closeAndWait(timeout) {
-		s.log.Warn("stopping with a land still in flight", "timeout", timeout)
+	if !s.merges.closeAndWait(timeout) {
+		s.log.Warn("stopping with a merge still in flight", "timeout", timeout)
 	}
 	stopCommits()
 	s.chat.Close()

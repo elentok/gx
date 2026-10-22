@@ -13,7 +13,7 @@ import (
 func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	d, err := h.Client.Detail(context.Background(), answerAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	}
 }
 
-func TestDetail_GxQuestionOffersUnparkOnly(t *testing.T) {
+func TestDetail_GxQuestionOffersResumeOnly(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
@@ -63,7 +63,7 @@ func TestDetail_GxQuestionOffersUnparkOnly(t *testing.T) {
 func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	parkWithQuestion(t, ticketPath, optionsBlock)
+	pauseWithQuestion(t, ticketPath, optionsBlock)
 	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventParkAnswer, Question: 1, Source: "web", Choice: "b"}); err != nil {
 		t.Fatal(err)
 	}
@@ -98,23 +98,23 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	}
 }
 
-func TestDetail_NeedsRepairHasNoAnswerAction(t *testing.T) {
+func TestDetail_StuckHasNoAnswerAction(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	parkWithQuestion(t, ticketPath, optionsBlock)
+	pauseWithQuestion(t, ticketPath, optionsBlock)
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusNeedsRepair }); err != nil {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)
 	if err != nil || slices.Contains(d.Actions, server.ActionAnswer) {
-		t.Errorf("needs-repair actions = %v, %v", d.Actions, err)
+		t.Errorf("stuck actions = %v, %v", d.Actions, err)
 	}
 }
 
 func TestDetail_BadBlockReadsAsText(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	parkWithQuestion(t, ticketPath, "type: nonsense\n")
+	pauseWithQuestion(t, ticketPath, "type: nonsense\n")
 	d, err := h.Client.Detail(context.Background(), answerAddr)
 	if err != nil || d.Latest == nil || d.Latest.Kind != tickets.QuestionText || len(d.Latest.Options) != 0 {
 		t.Errorf("latest = %+v, %v; want a text question", d.Latest, err)

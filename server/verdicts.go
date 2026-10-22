@@ -55,7 +55,7 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 	d := ralphloop.TicketVerdict(e, ralphloop.WholeEpicScope(), t, claimed, false)
 	switch d.Decision {
 	case ralphloop.DecisionStalled:
-		return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // needs-answer, needs-repair or draft
+		return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Status} // asking, stuck or draft
 	case ralphloop.DecisionUnclaimed:
 		if path, missing := s.unavailablePath(addr.Project); missing {
 			return Explanation{Address: addr.String(), Verdict: VerdictProjectUnavailable, Reason: path + " does not exist"}

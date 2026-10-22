@@ -281,7 +281,7 @@ func (c *Client) QueueMove(ctx context.Context, address string, position int) (s
 
 // TicketPause pauses a ticket with a required one-line reason.
 func (c *Client) TicketPause(ctx context.Context, address, reason string) (server.QueueResult, error) {
-	return c.queueWriteTo(ctx, "/v1/tickets/pause", server.QueueRequest{Address: address, ParkReason: reason})
+	return c.queueWriteTo(ctx, "/v1/tickets/pause", server.QueueRequest{Address: address, PauseReason: reason})
 }
 
 // TicketUnmute clears a ticket's mutes and reopens it if it was parked needs-repair.

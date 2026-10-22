@@ -10,34 +10,34 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// EventLandRolledBack streams when startup recovery found a land that never
+// EventMergeRolledBack streams when startup recovery found a merge that never
 // reached the feature branch and undid what it left half done.
-const EventLandRolledBack = "land-rolled-back"
+const EventMergeRolledBack = "land-rolled-back"
 
-// recoverLands runs before anything is scheduled. A land lock whose owner is
-// dead and that has no conflict marker means a land was in flight when a
-// process died: clear the lock, then let verify say whether the ticket landed.
-func (s *Server) recoverLands() {
+// recoverMerges runs before anything is scheduled. A merge lock whose owner is
+// dead and that has no conflict marker means a merge was in flight when a
+// process died: clear the lock, then let verify say whether the ticket merged.
+func (s *Server) recoverMerges() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
-		s.log.Warn("recover lands", "err", err)
+		s.log.Warn("recover merges", "err", err)
 		return
 	}
 	for _, dir := range dirs {
 		epics, err := tickets.Load(dir)
 		if err != nil {
-			s.log.Warn("recover lands", "project", dir, "err", err)
+			s.log.Warn("recover merges", "project", dir, "err", err)
 			continue
 		}
 		for _, e := range epics {
-			if err := s.recoverEpicLand(dir, e.Path); err != nil {
-				s.log.Warn("recover land", "epic", e.Path, "err", err)
+			if err := s.recoverEpicMerge(dir, e.Path); err != nil {
+				s.log.Warn("recover merge", "epic", e.Path, "err", err)
 			}
 		}
 	}
 }
 
-func (s *Server) recoverEpicLand(projectDir, epicPath string) error {
+func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	lockDir, err := ralphloop.LandLockDir(epicPath)
 	if err != nil {
 		return err
@@ -47,9 +47,9 @@ func (s *Server) recoverEpicLand(projectDir, epicPath string) error {
 		return err
 	}
 	if err := ralphloop.ReleaseLandLock(lockDir); err != nil {
-		return fmt.Errorf("clearing orphan land lock: %w", err)
+		return fmt.Errorf("clearing orphan merge lock: %w", err)
 	}
-	s.log.Info("cleared orphan land lock", "epic", epicPath, "owner", owner.Describe())
+	s.log.Info("cleared orphan merge lock", "epic", epicPath, "owner", owner.Describe())
 	if owner.Ticket == "" {
 		return nil
 	}
@@ -76,29 +76,29 @@ func (s *Server) recoverEpicLand(projectDir, epicPath string) error {
 	addr := tickets.Address{Project: project, Epic: epic, ID: t.Identifier}.String()
 
 	v := res.Tickets[0]
-	s.log.Info("verified interrupted land", "ticket", addr, "landing", v.Landing, "evidence", v.Evidence)
+	s.log.Info("verified interrupted merge", "ticket", addr, "merging", v.Landing, "evidence", v.Evidence)
 	switch v.Landing {
 	case ralphloop.LandingLanded:
 		ev := ralphloop.Event{Outcome: string(ralphloop.Landed), SHA: v.SHA}
 		if err := ralphloop.RecordManualLand(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
-			return fmt.Errorf("finishing land of %s: %w", addr, err)
+			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}
 		s.events.publish(EventTicketDone, addr)
 	case ralphloop.LandingRecoverable:
 		if err := abortHalfPick(run.FeatureWorktree); err != nil {
-			return fmt.Errorf("rolling back land of %s: %w", addr, err)
+			return fmt.Errorf("rolling back merge of %s: %w", addr, err)
 		}
-		s.events.publish(EventLandRolledBack, addr)
+		s.events.publish(EventMergeRolledBack, addr)
 	default:
-		reason := fmt.Sprintf("land interrupted by a crash (lock owner %s) and verify cannot tell whether it landed: %s", owner.Describe(), v.Landing)
-		if err := s.parkTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, Run{}); err != nil {
-			return fmt.Errorf("parking %s: %w", addr, err)
+		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Landing)
+		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, Run{}); err != nil {
+			return fmt.Errorf("pausing %s: %w", addr, err)
 		}
 	}
 	return nil
 }
 
-// abortHalfPick drops a cherry-pick the crashed land left in progress.
+// abortHalfPick drops a cherry-pick the crashed merge left in progress.
 func abortHalfPick(featureWorktree string) error {
 	d := ralphloop.DefaultDeps()
 	inProgress, err := d.CherryPickInProgress(featureWorktree)

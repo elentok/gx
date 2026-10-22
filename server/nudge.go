@@ -108,9 +108,9 @@ const (
 )
 
 // watchNudgedPane tracks a pane a nudge set working after its run ended (a
-// parked ticket's pane, as recovery's R7 nudges): until it settles it counts
+// paused ticket's pane, as recovery's R7 nudges): until it settles it counts
 // as a run, so the budget meters it and the hard limit stops it. It is never
-// finished or landed; the parked ticket stays with whoever handles the park.
+// finished or merged; the paused ticket stays with whoever handles the pause.
 func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 	t := trackedRun{
 		Run:  Run{Address: ref.addr.String(), Runner: it.runner.Name(), Session: it.session},
@@ -129,7 +129,7 @@ func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 			}
 		}
 		if stopping, first := s.registry.claimBudgetStop(t.Address); stopping && first {
-			if perr := s.parkBudgetKilled(t); perr != nil {
+			if perr := s.pauseBudgetKilled(t); perr != nil {
 				s.log.Error("budget kill", "ticket", t.Address, "err", perr)
 			}
 		}

@@ -113,9 +113,9 @@ func (f *schedFixture) git(t *testing.T, args ...string) string {
 	return string(out)
 }
 
-// assertLanded checks each ticket is done, its commit is on the feature branch
+// assertMerged checks each ticket is done, its commit is on the feature branch
 // and no iteration branch is left behind.
-func (f *schedFixture) assertLanded(t *testing.T, ids ...string) {
+func (f *schedFixture) assertMerged(t *testing.T, ids ...string) {
 	t.Helper()
 	for _, id := range ids {
 		if body := readFile(t, f.ticketFile(t, id)); !strings.Contains(body, "status: done") {
@@ -152,7 +152,7 @@ func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing
 	if len(order) != 3 || order[0] != "01" {
 		t.Errorf("turns = %v, want 01 first then each child exactly once", order)
 	}
-	f.assertLanded(t, "01", "01a", "01b")
+	f.assertMerged(t, "01", "01a", "01b")
 }
 
 func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
@@ -180,11 +180,11 @@ func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	if len(order) != 4 || order[0] != "01" || order[1] != "02" {
 		t.Errorf("turns = %v, want 01, then the review 02, then its findings", order)
 	}
-	f.assertLanded(t, "01", "02", "02a", "02b")
+	f.assertMerged(t, "01", "02", "02a", "02b")
 }
 
-// The per-root cap is pinned to 1 here, so this pins the sequential order and the single landing per ticket.
-func TestSchedulingPort_ABlocksBAndCAndTheyLandInOrder(t *testing.T) {
+// The per-root cap is pinned to 1 here, so this pins the sequential order and the single merging per ticket.
+func TestSchedulingPort_ABlocksBAndCAndTheyMergeInOrder(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},
 		"02": {BlockedBy: []string{"01"}},
@@ -198,13 +198,13 @@ func TestSchedulingPort_ABlocksBAndCAndTheyLandInOrder(t *testing.T) {
 	if order := f.turns(); len(order) != 3 || order[0] != "01" {
 		t.Errorf("turns = %v, want 01 before 02 and 03", order)
 	}
-	f.assertLanded(t, "01", "02", "03")
+	f.assertMerged(t, "01", "02", "03")
 	if n := strings.Count(f.git(t, "log", "--format=%s", schedEpic), "work "); n != 3 {
 		t.Errorf("feature branch has %d work commits, want exactly 3", n)
 	}
 }
 
-func TestSchedulingPort_ParkThenResumeReusesBranchAndLandsBothCommitsOnce(t *testing.T) {
+func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *testing.T) {
 	var mu sync.Mutex
 	turn := 0
 	var ticketPath string
@@ -240,10 +240,10 @@ func TestSchedulingPort_ParkThenResumeReusesBranchAndLandsBothCommitsOnce(t *tes
 		t.FailNow()
 	}
 	if left := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); left == "" {
-		t.Error("iteration branch gone after park, want it kept for the resume")
+		t.Error("iteration branch gone after pause, want it kept for the resume")
 	}
 	if got := strings.TrimSpace(f.git(t, "log", "--format=%s", schedEpic)); strings.Contains(got, "work pre") {
-		t.Errorf("a parked iteration landed: %s", got)
+		t.Errorf("a paused iteration merged: %s", got)
 	}
 
 	// A person answers and the ticket is picked back up.
@@ -261,6 +261,6 @@ func TestSchedulingPort_ParkThenResumeReusesBranchAndLandsBothCommitsOnce(t *tes
 		t.Errorf("feature branch has %d work commits, want pre and post exactly once", n)
 	}
 	if left := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); left != "" {
-		t.Errorf("iteration branch left after landing:\n%s", left)
+		t.Errorf("iteration branch left after merging:\n%s", left)
 	}
 }

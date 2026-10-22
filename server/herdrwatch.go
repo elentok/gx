@@ -58,7 +58,7 @@ func (s *Server) checkHerdr() {
 		return
 	}
 	s.chat.Notice(ralphloop.ServerNotice{Kind: typ, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
-	s.flushParkFold()
+	s.flushPauseFold()
 }
 
 // keepHerdrChecked retries herdr until ctx ends, so a herdr that starts late

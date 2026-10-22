@@ -14,9 +14,9 @@ import (
 
 const answerAddr = "proj:epic-a/01"
 
-// parkWithQuestion turns the waiting run's ticket into a self-reported park
+// pauseWithQuestion turns the waiting run's ticket into a self-reported pause
 // with one open question, and returns the state token a client would hold.
-func parkWithQuestion(t *testing.T, ticketPath, block string) string {
+func pauseWithQuestion(t *testing.T, ticketPath, block string) string {
 	t.Helper()
 	err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
 		tk.Status = schema.StatusNeedsAnswer
@@ -58,7 +58,7 @@ const optionsBlock = "type: options\noptions:\n  - {id: a, label: A}\n  - {id: b
 func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{
 		Address: answerAddr, State: state, Choice: "b", Note: "line1\r\nline2", Source: "cli",
 	})
@@ -71,7 +71,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 		t.Errorf("prompts = %q, want [%q]", prompts, want)
 	}
 	if n := answerCount(t, ticketPath); n != 1 {
-		t.Errorf("park.answer lines = %d, want 1", n)
+		t.Errorf("pause.answer lines = %d, want 1", n)
 	}
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil || tk.Status != schema.StatusClaimed {
@@ -82,7 +82,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 func TestAnswer_NotAnswerable(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	for name, park := range map[string]func(*schema.Ticket){
+	for name, pause := range map[string]func(*schema.Ticket){
 		"zero-commit park": func(tk *schema.Ticket) {
 			tk.Status, tk.ParkKind = schema.StatusNeedsAnswer, schema.ParkKindZeroCommit
 		},
@@ -90,7 +90,7 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 			tk.Status, tk.ParkKind = schema.StatusNeedsRepair, schema.ParkKindSelfReported
 		},
 	} {
-		if err := schema.UpdateTicket(ticketPath, park); err != nil {
+		if err := schema.UpdateTicket(ticketPath, pause); err != nil {
 			t.Fatal(err)
 		}
 		res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, Choice: "a"})
@@ -99,7 +99,7 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 		}
 	}
 	if n := answerCount(t, ticketPath); n != 0 {
-		t.Errorf("refusals logged %d park.answer lines, want 0", n)
+		t.Errorf("refusals logged %d pause.answer lines, want 0", n)
 	}
 	if got := fake.Prompts("epic-a-iter-01"); len(got) != 0 {
 		t.Errorf("refusals prompted the agent: %q", got)
@@ -109,24 +109,24 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	h.Server.RecordSpend("spent", 6)
 	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Reason != server.ReasonBudgetLimit {
 		t.Fatalf("answer = %+v, %v; want %s", res, err, server.ReasonBudgetLimit)
 	}
 	if n := answerCount(t, ticketPath); n != 0 {
-		t.Errorf("park.answer lines = %d, want 0", n)
+		t.Errorf("pause.answer lines = %d, want 0", n)
 	}
 	if got := fake.Prompts("epic-a-iter-01"); len(got) != 0 {
 		t.Errorf("budget refusal prompted the agent: %q", got)
 	}
 }
 
-// A finish that arrived after a zero-commit park is adopted by the answer
-// verb, as it is by unpark: the reply is not delivered.
+// A finish that arrived after a zero-commit pause is adopted by the answer
+// verb, as it is by resume: the reply is not delivered.
 func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
-	p := parkZeroCommit(t, false)
+	p := pauseZeroCommit(t, false)
 	commitAgentWork(t, p.wtPath)
 	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
 		t.Fatal(err)
@@ -136,14 +136,14 @@ func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
 		t.Fatalf("answer = %+v, %v; want adopted", res, err)
 	}
 	if n := answerCount(t, p.ticketPath); n != 0 {
-		t.Errorf("park.answer lines = %d, want 0", n)
+		t.Errorf("pause.answer lines = %d, want 0", n)
 	}
 }
 
 func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	if err != nil || res.Outcome != server.OutcomeDelivered {
 		t.Fatalf("answer = %+v, %v; want delivered", res, err)
@@ -161,7 +161,7 @@ func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake 
 		t.Fatalf("answer = %+v, %v; want queued", res, err)
 	}
 	if n := answerCount(t, ticketPath); n != 1 {
-		t.Errorf("park.answer lines = %d, want 1", n)
+		t.Errorf("pause.answer lines = %d, want 1", n)
 	}
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil || tk.Status != schema.StatusOpen {
@@ -183,7 +183,7 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 	// The hard limit is spent: a queued answer skips the budget refusal.
 	h, ticketPath, fake := startWaitingRestartFake(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	h.Server.RecordSpend("spent", 6)
 	sess, ok, err := fake.Find("epic-a-iter-01")
 	if err != nil || !ok {
@@ -199,7 +199,7 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	fake.DieAfterPrompt("epic-a-iter-01", agentrunner.SessionDied("claude exited (code 1)"))
 	res, err := h.Client.TicketAnswer(context.Background(), server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
 	requireQueued(t, h, ticketPath, fake, res, err)
@@ -218,10 +218,10 @@ func TestAnswer_Refusals(t *testing.T) {
 		}
 		return res
 	}
-	if res := ask(server.QueueRequest{Choice: "a"}); res.Reason != server.ReasonNotParked {
-		t.Errorf("claimed ticket: %+v, want %s", res, server.ReasonNotParked)
+	if res := ask(server.QueueRequest{Choice: "a"}); res.Reason != server.ReasonNotPaused {
+		t.Errorf("claimed ticket: %+v, want %s", res, server.ReasonNotPaused)
 	}
-	state := parkWithQuestion(t, ticketPath, optionsBlock)
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
 	cases := []struct {
 		name   string
 		req    server.QueueRequest
@@ -245,7 +245,7 @@ func TestAnswer_Refusals(t *testing.T) {
 		t.Errorf("blocked agent: %+v, want %s", res, server.ReasonAgentNotReady)
 	}
 	if n := answerCount(t, ticketPath); n != 0 {
-		t.Errorf("refusals logged %d park.answer lines, want 0", n)
+		t.Errorf("refusals logged %d pause.answer lines, want 0", n)
 	}
 	if got := fake.Prompts("epic-a-iter-01"); len(got) != 0 {
 		t.Errorf("refusals prompted the agent: %q", got)

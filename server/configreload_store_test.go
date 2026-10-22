@@ -23,7 +23,7 @@ func TestConfigReload_StoreCommitDebounceApplies(t *testing.T) {
 		c.StoreCommitDebounce = time.Hour
 	})
 	// The loop starts after the server serves; its start-up flush commits the
-	// seed, so the loop is running once that commit lands.
+	// seed, so the loop is running once that commit merges.
 	deadline := time.Now().Add(5 * time.Second)
 	for storeLog(t, store) == "" && time.Now().Before(deadline) {
 		time.Sleep(20 * time.Millisecond)

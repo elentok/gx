@@ -59,12 +59,12 @@ func startNotifyRecoveryWith(t *testing.T, hold time.Duration, entry recovery.En
 	}
 }
 
-// parkMessages are the sends that are about the park, not the server starting.
-func parkMessages(sent []string) []string {
-	return parkMessagesOf(sent, events.IterationError)
+// pauseMessages are the sends that are about the pause, not the server starting.
+func pauseMessages(sent []string) []string {
+	return pauseMessagesOf(sent, events.IterationError)
 }
 
-func parkMessagesOf(sent []string, kind events.Kind) []string {
+func pauseMessagesOf(sent []string, kind events.Kind) []string {
 	var out []string
 	for _, b := range sent {
 		if strings.Contains(b, string(kind)) {
@@ -74,18 +74,18 @@ func parkMessagesOf(sent []string, kind events.Kind) []string {
 	return out
 }
 
-// waitParkMessages polls until a park message of kind is sent, then waits long
+// waitPauseMessages polls until a pause message of kind is sent, then waits long
 // enough for a wrong second one to show.
-func waitParkMessages(t *testing.T, sent func() []string, kind events.Kind) []string {
+func waitPauseMessages(t *testing.T, sent func() []string, kind events.Kind) []string {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(parkMessagesOf(sent(), kind)) == 0; time.Sleep(50 * time.Millisecond) {
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(pauseMessagesOf(sent(), kind)) == 0; time.Sleep(50 * time.Millisecond) {
 	}
 	time.Sleep(1500 * time.Millisecond)
-	return parkMessagesOf(sent(), kind)
+	return pauseMessagesOf(sent(), kind)
 }
 
-// unpark moves ticket 01 on the way a remedy's relaunch would.
-func unpark(t *testing.T, h *servertest.Harness) {
+// resume moves ticket 01 on the way a remedy's relaunch would.
+func resume(t *testing.T, h *servertest.Harness) {
 	t.Helper()
 	path := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
 	if err := schema.UpdateTicket(path, func(tk *schema.Ticket) { tk.Status = schema.StatusClaimed }); err != nil {
@@ -93,7 +93,7 @@ func unpark(t *testing.T, h *servertest.Harness) {
 	}
 }
 
-// waitRecoveryState polls the snapshot until the parked ticket shows want.
+// waitRecoveryState polls the snapshot until the paused ticket shows want.
 func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
 	t.Helper()
 	var got server.TicketInfo
@@ -111,7 +111,7 @@ func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
 			return
 		}
 	}
-	t.Fatalf("ticket = %s, recovery %q; want needs-repair, recovery %q", got.Status, got.Recovery, want)
+	t.Fatalf("ticket = %s, recovery %q; want stuck, recovery %q", got.Status, got.Recovery, want)
 }
 
 func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
@@ -121,7 +121,7 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 			<-release
 			return errors.New("remedy refused")
 		})
-		if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 			t.Fatal(err)
 		}
 		waitRecoveryState(t, h, server.RecoveryPending)
@@ -137,7 +137,7 @@ func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
 		// Registered after the server, so it runs before the server's
 		// cleanup waits for this remedy to end.
 		t.Cleanup(func() { close(release) })
-		if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 			t.Fatal(err)
 		}
 		waitRecoveryState(t, h, "")
@@ -168,12 +168,12 @@ func TestRecoveryState_FromInvestigations(t *testing.T) {
 	}
 }
 
-// The investigation's own launch fails here (no herdr), which parks it: that
-// is recovery escalating. Its later landing leaves the park's own state.
+// The investigation's own launch fails here (no herdr), which pauses it: that
+// is recovery escalating. Its later merging leaves the pause's own state.
 func TestRecoveryNotify_SnapshotFollowsTheInvestigation(t *testing.T) {
 	unmatched := recovery.Entry{ID: "TEST", Type: events.Paused, Kind: events.Spinning, Executor: recovery.ExecutorRule, Enabled: true}
 	h, _ := startNotifyRecoveryWith(t, time.Minute, unmatched)
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	waitRecoveryState(t, h, server.RecoveryEscalated)
@@ -184,45 +184,45 @@ func TestRecoveryNotify_SnapshotFollowsTheInvestigation(t *testing.T) {
 	waitRecoveryState(t, h, "")
 }
 
-func TestRecoveryNotify_RecoveredParkSendsNothingAndIsCounted(t *testing.T) {
+func TestRecoveryNotify_RecoveredPauseSendsNothingAndIsCounted(t *testing.T) {
 	done := make(chan struct{})
 	var h *servertest.Harness
 	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error {
-		unpark(t, h)
+		resume(t, h)
 		close(done)
 		return nil
 	})
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	<-done
 	time.Sleep(1500 * time.Millisecond) // a wrongly sent message would show by now
-	if got := parkMessages(sent()); len(got) != 0 {
-		t.Fatalf("a recovered park sent %v", got)
+	if got := pauseMessages(sent()); len(got) != 0 {
+		t.Fatalf("a recovered pause sent %v", got)
 	}
 	if n := server.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 1 {
 		t.Errorf("recovered count = %d, want 1", n)
 	}
 }
 
-// A park racing a land finds the ticket done: the park is refused and logged,
+// A pause racing a merge finds the ticket done: the pause is refused and logged,
 // and no chat message or recovery follows. The caller sees no error, since a
-// done ticket has nothing left to park.
-func TestRecoveryNotify_ParkOfDoneTicketIsRefusedAndLogged(t *testing.T) {
+// done ticket has nothing left to pause.
+func TestRecoveryNotify_PauseOfDoneTicketIsRefusedAndLogged(t *testing.T) {
 	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error {
-		t.Error("recovery ran for a refused park")
+		t.Error("recovery ran for a refused pause")
 		return nil
 	})
 	path := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
 	if err := schema.UpdateTicket(path, func(tk *schema.Ticket) { tk.Status = schema.StatusDone }); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
-		t.Fatalf("ParkTicket = %v, want nil", err)
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+		t.Fatalf("PauseTicket = %v, want nil", err)
 	}
 	time.Sleep(1500 * time.Millisecond) // a wrongly sent message would show by now
-	if got := parkMessages(sent()); len(got) != 0 {
-		t.Errorf("a refused park sent %v", got)
+	if got := pauseMessages(sent()); len(got) != 0 {
+		t.Errorf("a refused pause sent %v", got)
 	}
 	raw, _ := os.ReadFile(path)
 	if tk, err := schema.ParseTicketFromRaw(string(raw), path); err != nil || tk.Status != schema.StatusDone {
@@ -238,35 +238,35 @@ func TestRecoveryNotify_FailedRemedySendsOneMessageNamingTheEntry(t *testing.T) 
 	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error {
 		return errors.New("remedy refused")
 	})
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	got := waitParkMessages(t, sent, events.IterationError)
+	got := waitPauseMessages(t, sent, events.IterationError)
 	if len(got) != 1 || !strings.Contains(got[0], "TEST") || !strings.Contains(got[0], "boom") {
-		t.Fatalf("sends = %v, want one park message naming entry TEST and the original reason", got)
+		t.Fatalf("sends = %v, want one pause message naming entry TEST and the original reason", got)
 	}
 }
 
-func TestRecoveryNotify_OkRemedyThatLeavesTheTicketParkedSendsTheMessage(t *testing.T) {
+func TestRecoveryNotify_OkRemedyThatLeavesTheTicketPausedSendsTheMessage(t *testing.T) {
 	h, sent := startNotifyRecovery(t, time.Minute, func(recovery.Failure, recovery.Verbs) error { return nil })
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
-	got := waitParkMessages(t, sent, events.IterationError)
-	if len(got) != 1 || !strings.Contains(got[0], "TEST left it parked") || !strings.Contains(got[0], "boom") {
-		t.Fatalf("sends = %v, want one park message saying TEST left it parked", got)
+	got := waitPauseMessages(t, sent, events.IterationError)
+	if len(got) != 1 || !strings.Contains(got[0], "TEST left it paused") || !strings.Contains(got[0], "boom") {
+		t.Fatalf("sends = %v, want one pause message saying TEST left it paused", got)
 	}
 }
 
-func TestRecoveryNotify_RecognizedParkStillNotifiesAndIsNotCounted(t *testing.T) {
+func TestRecoveryNotify_RecognizedPauseStillNotifiesAndIsNotCounted(t *testing.T) {
 	entries := recovery.Default().Entries
 	r1 := entries[slices.IndexFunc(entries, func(e recovery.Entry) bool { return e.ID == "R1" })]
 	h, sent := startNotifyRecoveryWith(t, time.Minute, r1)
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
 		t.Fatal(err)
 	}
-	if got := waitParkMessages(t, sent, events.Spinning); len(got) != 1 {
-		t.Fatalf("sends = %v, want the spinning park message", got)
+	if got := waitPauseMessages(t, sent, events.Spinning); len(got) != 1 {
+		t.Fatalf("sends = %v, want the spinning pause message", got)
 	}
 	if n := server.RecoveredCount(filepath.Join(h.TicketStore, "proj"), "epic-a"); n != 0 {
 		t.Errorf("recovered count = %d, want 0", n)
@@ -321,7 +321,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 			if tc.setup != nil {
 				tc.setup(t, h)
 			}
-			if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+			if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 				t.Fatal(err)
 			}
 			for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(escalationMessages(sent())) == 0; time.Sleep(50 * time.Millisecond) {
@@ -338,7 +338,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigation(t *testing.T) {
 	entry := recovery.Entry{ID: "AGENT", Type: events.Paused, Kind: events.IterationError, Executor: recovery.ExecutorAgent, Enabled: true}
 	h, _ := startNotifyRecoveryWith(t, time.Minute, entry)
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
@@ -358,7 +358,7 @@ func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigatio
 	}
 }
 
-func TestRecoveryNotify_SlowRecoverySendsTheOriginalParkAfterTheHold(t *testing.T) {
+func TestRecoveryNotify_SlowRecoverySendsTheOriginalPauseAfterTheHold(t *testing.T) {
 	release := make(chan struct{})
 	h, sent := startNotifyRecovery(t, 200*time.Millisecond, func(recovery.Failure, recovery.Verbs) error {
 		<-release
@@ -367,14 +367,14 @@ func TestRecoveryNotify_SlowRecoverySendsTheOriginalParkAfterTheHold(t *testing.
 	// Registered after the server, so it runs before the server's cleanup
 	// waits for this remedy to end.
 	t.Cleanup(func() { close(release) })
-	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
 	}
 	var got []string
 	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(got) == 0; time.Sleep(50 * time.Millisecond) {
-		got = parkMessages(sent())
+		got = pauseMessages(sent())
 	}
 	if len(got) != 1 || !strings.Contains(got[0], "boom") {
-		t.Fatalf("sends = %v, want the original park once the hold expired", got)
+		t.Fatalf("sends = %v, want the original pause once the hold expired", got)
 	}
 }

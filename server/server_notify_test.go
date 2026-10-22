@@ -223,12 +223,12 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 	}
 }
 
-func TestNotifyPark_ShowsRealStatusKindAndReason(t *testing.T) {
+func TestNotifyPause_ShowsRealStatusKindAndReason(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	addr := tickets.Address{Project: "p", Epic: "epic", ID: "01"}
 
-	s.notifyPark(addr, "", events.BudgetKilled, "daily budget hard limit reached")
-	s.notifyPark(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "", events.AmbiguousBase, "choose a base")
+	s.notifyPause(addr, "", events.BudgetKilled, "daily budget hard limit reached")
+	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "02"}, "", events.AmbiguousBase, "choose a base")
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -242,7 +242,7 @@ func TestNotifyPark_ShowsRealStatusKindAndReason(t *testing.T) {
 	}
 }
 
-func TestNotifyPark_SelfReportedShowsQuestionSummary(t *testing.T) {
+func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	path := filepath.Join(t.TempDir(), "01-x.md")
 	if err := os.WriteFile(path, []byte("---\nid: \"01\"\n---\n"), 0o644); err != nil {
@@ -255,7 +255,7 @@ func TestNotifyPark_SelfReportedShowsQuestionSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.notifyPark(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported needs-answer via iteration_status")
+	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported needs-answer via iteration_status")
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
@@ -267,19 +267,19 @@ func TestNotifyPark_SelfReportedShowsQuestionSummary(t *testing.T) {
 	}
 }
 
-func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
+func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 	s, wait := chatServer(t, 0, 0)
 	s.herdr.unavailable = true
-	park := func(project, id string, kind events.Kind) {
-		s.notifyPark(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
+	pause := func(project, id string, kind events.Kind) {
+		s.notifyPause(tickets.Address{Project: project, Epic: "epic", ID: id}, "", kind, "why-"+project)
 	}
 
-	park("p1", "01", events.AgentNameTaken)
-	park("p2", "02", events.HandleMismatch)
-	park("p3", "03", events.AgentPaneBusy)
-	park("p4", "04", events.ZeroCommit) // not herdr-caused: at once
+	pause("p1", "01", events.AgentNameTaken)
+	pause("p2", "02", events.HandleMismatch)
+	pause("p3", "03", events.AgentPaneBusy)
+	pause("p4", "04", events.ZeroCommit) // not herdr-caused: at once
 	s.herdr.unavailable = false
-	s.flushParkFold()
+	s.flushPauseFold()
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n") // the batcher may merge both into one send
@@ -287,7 +287,7 @@ func TestParkFold_HerdrOutageParksBecomeOneDigest(t *testing.T) {
 		t.Fatalf("digests = %d, want 1: %s", n, all)
 	}
 	for _, p := range []string{"p1", "p2", "p3", "p4"} {
-		// Digest lines carry "[p]"; a live park sits under a bold "*p*" header.
+		// Digest lines carry "[p]"; a live pause sits under a bold "*p*" header.
 		if strings.Count(all, "["+p+"]")+strings.Count(all, "*"+p+"*") != 1 {
 			t.Errorf("%s not sent exactly once: %s", p, all)
 		}
@@ -355,12 +355,12 @@ func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
 		}
 		return path
 	}
-	landed := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement})
+	merged := write("epic", "01-landed-ticket.md", schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypeImplement})
 	write("epic", "02-next.md", schema.Ticket{ID: "02", Status: schema.StatusOpen, Type: schema.TypeImplement})
 	oneOff := write("cron", oneOffFile, schema.Ticket{ID: "01", Status: schema.StatusDone, Type: schema.TypePrompt})
 
 	s.notifyDone(tickets.Address{Project: "p", Epic: "cron", ID: "01"}, oneOff)
-	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, landed)
+	s.notifyDone(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, merged)
 	s.chat.Close()
 	got := wait(1)
 	if len(got) != 1 {

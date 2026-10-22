@@ -17,7 +17,7 @@ import (
 // Refusal reasons of the answer verb.
 const (
 	ReasonStale         = "stale"
-	ReasonNotParked     = "not-parked"
+	ReasonNotPaused     = "not-parked"
 	ReasonNotAnswerable = "not-answerable"
 	ReasonBadChoice     = "bad-choice"
 	ReasonEmptyAnswer   = "empty-answer"
@@ -42,9 +42,9 @@ func (e answerRefused) Error() string { return e.res.Message }
 
 // answerState is the token a client sends back: it covers the latest
 // question's seq and the ticket's status, so an answer to a question that was
-// replaced, closed or re-parked is stale.
+// replaced, closed or re-paused is stale.
 // storedStatus is t's status in the old stored spelling: a paused ticket is
-// needs-answer or needs-repair by class. The web API and park events keep
+// asking or stuck by class. The web API and pause events keep
 // those labels until the events are renamed.
 func storedStatus(t schema.Ticket) schema.Status {
 	if t.Status == schema.StatusPaused {
@@ -111,7 +111,7 @@ func validateAnswer(q tickets.Question, req QueueRequest) (answer, note string, 
 
 // ticketAnswer delivers a person's reply to the live agent that asked, then
 // claims the ticket again and settles the run when the agent finishes. The
-// state token, the prompt and the park.answer line are one step under the
+// state token, the prompt and the pause.answer line are one step under the
 // ticket lock, so a refusal logs nothing and a stale reply never reaches the
 // agent.
 func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
@@ -133,11 +133,11 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 			open := tickets.OpenQuestion(evs)
 			switch {
 			case t.PausedClass() == "":
-				return refuse(refusal(ReasonNotParked, address+" is not parked"))
+				return refuse(refusal(ReasonNotPaused, address+" is not paused"))
 			case t.PausedClass() == schema.PauseClassRepair || t.PauseReason != schema.PauseSelfReported:
-				return refuse(refusal(ReasonNotAnswerable, address+" was not parked by a question; use unpark"))
+				return refuse(refusal(ReasonNotAnswerable, address+" was not paused by a question; use resume"))
 			case open == nil:
-				return refuse(refusal(ReasonNotParked, address+" has no open question"))
+				return refuse(refusal(ReasonNotPaused, address+" has no open question"))
 			}
 			state := answerState(*open, storedStatus(t))
 			if req.State != "" && req.State != state {

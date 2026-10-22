@@ -27,29 +27,29 @@ func startTicketWrites(t *testing.T) (*servertest.Harness, string) {
 	return h, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 }
 
-func TestPark_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
+func TestPause_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
 	h, path := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "  ")
 	if err != nil || !res.Refused || res.Reason != server.ReasonReasonRequired {
-		t.Fatalf("park = %+v, %v; want %s refusal", res, err, server.ReasonReasonRequired)
+		t.Fatalf("pause = %+v, %v; want %s refusal", res, err, server.ReasonReasonRequired)
 	}
 	data, _ := os.ReadFile(path)
 	if strings.Contains(string(data), "status: paused") {
-		t.Errorf("refused park changed the ticket:\n%s", data)
+		t.Errorf("refused pause changed the ticket:\n%s", data)
 	}
 }
 
-func TestPark_WritesStatusSectionAndOneEvent(t *testing.T) {
+func TestPause_WritesStatusSectionAndOneEvent(t *testing.T) {
 	h, path := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "needs a human look")
 	if err != nil || res.Refused {
-		t.Fatalf("park = %+v, %v", res, err)
+		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	data, _ := os.ReadFile(path)
 	for _, want := range []string{"status: paused", "pause_reason: manual", "## Needs Repair", "needs a human look"} {
@@ -62,18 +62,18 @@ func TestPark_WritesStatusSectionAndOneEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(hist.Events) != 1 || hist.Events[0].Type != "paused" || hist.Events[0].Kind != "manual" {
-		t.Errorf("events = %+v, want one needs-repair/manual-park", hist.Events)
+		t.Errorf("events = %+v, want one stuck/manual-pause", hist.Events)
 	}
 }
 
-func TestPark_RefusesUnknownTicket(t *testing.T) {
+func TestPause_RefusesUnknownTicket(t *testing.T) {
 	h, _ := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	res, err := h.Client.TicketPause(ctx, "proj:epic-a/99", "why")
 	if err != nil || !res.Refused || res.Reason != server.ReasonUnknownTicket {
-		t.Fatalf("park = %+v, %v", res, err)
+		t.Fatalf("pause = %+v, %v", res, err)
 	}
 }
 
@@ -128,7 +128,7 @@ func writeMuted(t *testing.T, path, status, body string) {
 	}
 }
 
-func TestUnmute_ReopensANeedsRepairTicketAndDemotesItsSection(t *testing.T) {
+func TestUnmute_ReopensAStuckTicketAndDemotesItsSection(t *testing.T) {
 	h, path := startTicketWrites(t)
 	writeMuted(t, path, "needs-repair", "## Needs Repair\n\nnotification storm tripped a mute\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -152,7 +152,7 @@ func TestUnmute_ReopensANeedsRepairTicketAndDemotesItsSection(t *testing.T) {
 	}
 }
 
-func TestUnmute_LeavesANonParkedTicketsStatusAlone(t *testing.T) {
+func TestUnmute_LeavesANonPausedTicketsStatusAlone(t *testing.T) {
 	h, path := startTicketWrites(t)
 	writeMuted(t, path, "open", "Body text.\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -193,14 +193,14 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 	}
 }
 
-func TestRelaunch_StartsAFreshIterationOfAParkedTicket(t *testing.T) {
+func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 	h, path := startTicketWrites(t)
 	start, prompt, _ := registerLaunch(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
-		t.Fatalf("park = %+v, %v", res, err)
+		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false)
 	if err != nil || res.Refused {

@@ -191,7 +191,7 @@ func TestSessionBanner_StopDropsPending(t *testing.T) {
 	}
 }
 
-// openTUI opens a drained event stream as client, returning its close.
+// openTUI opens a flushed event stream as client, returning its close.
 func openTUI(ctx context.Context, t *testing.T, h *servertest.Harness, client string) context.CancelFunc {
 	t.Helper()
 	tuiCtx, drop := context.WithCancel(ctx)

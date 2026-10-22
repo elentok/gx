@@ -52,7 +52,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 		reportIteration(t, f.ticketFile(t, "01"), report)
 	})
 	gitOut(t, f.repo, "branch", schedEpic)
-	// Landing the epic is not this ticket's concern.
+	// Merging the epic is not this ticket's concern.
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
 	return f, func() []mergeTurn {
 		mu.Lock()
@@ -119,7 +119,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 	f.assertFeatureKept(t, "finish")
 }
 
-func TestMergeTicket_ParkKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T) {
+func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T) {
 	f, turns := newMergeFixture(t, func(n int) string {
 		if n == 1 {
 			return "needs-answer"

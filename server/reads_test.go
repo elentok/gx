@@ -165,7 +165,7 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 	}
 }
 
-func TestSnapshot_CarriesTheLandingMetrics(t *testing.T) {
+func TestSnapshot_CarriesTheMergingMetrics(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -184,7 +184,7 @@ func TestSnapshot_CarriesTheLandingMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(snap.Tickets) != 1 || snap.Tickets[0].ActualContextWindow != 66395 || snap.Tickets[0].ElapsedTime != 316 || snap.Tickets[0].Compactions != 2 {
-		t.Errorf("tickets = %+v, want the landing metrics", snap.Tickets)
+		t.Errorf("tickets = %+v, want the merging metrics", snap.Tickets)
 	}
 }
 

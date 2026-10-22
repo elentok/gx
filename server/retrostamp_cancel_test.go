@@ -12,8 +12,8 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// A retro parked needs-repair and then cancelled still stamps its epic skipped.
-func TestCancel_ParkedRetroStampsItsEpicSkipped(t *testing.T) {
+// A retro paused stuck and then cancelled still stamps its epic skipped.
+func TestCancel_PausedRetroStampsItsEpicSkipped(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "work", "")
 	epicTicket := filepath.Join(store, "proj", "epic-a", "ticket.md")

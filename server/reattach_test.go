@@ -32,7 +32,7 @@ type headlessFake struct {
 	cleaned   []string
 	stopped   []string
 	retention time.Duration
-	parked    map[string]bool
+	paused    map[string]bool
 }
 
 func (h *headlessFake) Stop(s agentrunner.Session) error {
@@ -56,16 +56,16 @@ func (h *headlessFake) Cleanup(label string) error {
 	return nil
 }
 
-func (h *headlessFake) Prune(maxAge time.Duration, _ time.Time, parked func(string) bool) ([]string, error) {
+func (h *headlessFake) Prune(maxAge time.Duration, _ time.Time, paused func(string) bool) ([]string, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.retention = maxAge
 	// Called once per project; only the proj call sees these labels.
-	if h.parked == nil {
-		h.parked = map[string]bool{}
+	if h.paused == nil {
+		h.paused = map[string]bool{}
 	}
 	for _, l := range []string{"epic-a-iter-01", "epic-a-iter-02"} {
-		h.parked[l] = h.parked[l] || parked(l)
+		h.paused[l] = h.paused[l] || paused(l)
 	}
 	return nil, nil
 }
@@ -116,7 +116,7 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 	return fake, ticketPath
 }
 
-func TestReattach_DiedParksNeedsRepairAndKeepsTheDir(t *testing.T) {
+func TestReattach_DiedPausesStuckAndKeepsTheDir(t *testing.T) {
 	fake, ticketPath := startHeadlessRestart(t, nativerunner.VerdictDied, 0)
 	deadline := time.Now().Add(20 * time.Second)
 	for {
@@ -132,7 +132,7 @@ func TestReattach_DiedParksNeedsRepairAndKeepsTheDir(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("status = %q, want needs-repair", tk.Status)
+			t.Fatalf("status = %q, want stuck", tk.Status)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -143,7 +143,7 @@ func TestReattach_DiedParksNeedsRepairAndKeepsTheDir(t *testing.T) {
 	}
 }
 
-func TestReattach_FinishedLandsAndCleansUp(t *testing.T) {
+func TestReattach_FinishedMergesAndCleansUp(t *testing.T) {
 	fake, ticketPath := startHeadlessRestart(t, nativerunner.VerdictFinished, 0)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -158,7 +158,7 @@ func TestReattach_FinishedLandsAndCleansUp(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	if ctx.Err() != nil {
-		t.Fatal("ticket never landed")
+		t.Fatal("ticket never merged")
 	}
 	for ; ctx.Err() == nil; time.Sleep(50 * time.Millisecond) {
 		fake.mu.Lock()
@@ -174,7 +174,7 @@ func TestReattach_FinishedLandsAndCleansUp(t *testing.T) {
 	t.Error("the agent was never cleaned up")
 }
 
-func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsParked(t *testing.T) {
+func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsPaused(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -194,14 +194,14 @@ func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsParked(t *testing.T) {
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		fake.mu.Lock()
-		parked, retention := fake.parked, fake.retention
+		paused, retention := fake.paused, fake.retention
 		fake.mu.Unlock()
-		if parked != nil {
+		if paused != nil {
 			if retention != 36*time.Hour {
 				t.Errorf("retention = %v, want 36h", retention)
 			}
-			if !parked["epic-a-iter-01"] || parked["epic-a-iter-02"] {
-				t.Errorf("parked = %v, want only epic-a-iter-01", parked)
+			if !paused["epic-a-iter-01"] || paused["epic-a-iter-02"] {
+				t.Errorf("paused = %v, want only epic-a-iter-01", paused)
 			}
 			return
 		}

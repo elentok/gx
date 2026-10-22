@@ -46,9 +46,9 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 	}
 }
 
-// parkedIteration leaves ticket 01 parked as kind with an iteration branch,
+// pausedIteration leaves ticket 01 paused as kind with an iteration branch,
 // committed to when commit is set, and returns the ticket's path.
-func parkedIteration(t *testing.T, kind string, commit bool) (*servertest.Harness, string) {
+func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harness, string) {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	store, repo := t.TempDir(), testutil.TempRepo(t)
@@ -60,25 +60,25 @@ func parkedIteration(t *testing.T, kind string, commit bool) (*servertest.Harnes
 	if !commit {
 		runGitIn(t, wt, "reset", "-q", "--hard", "HEAD~1")
 	}
-	park := "status: needs-answer\npark_kind: " + kind
-	testutil.WriteFile(t, filepath.Dir(ticketPath), filepath.Base(ticketPath), strings.Replace(readFile(t, ticketPath), "status: claimed", park, 1))
+	pause := "status: needs-answer\npark_kind: " + kind
+	testutil.WriteFile(t, filepath.Dir(ticketPath), filepath.Base(ticketPath), strings.Replace(readFile(t, ticketPath), "status: claimed", pause, 1))
 	return h, ticketPath
 }
 
-func TestRepair_LandAcceptsAZeroCommitParkWithCommits(t *testing.T) {
-	h, ticketPath := parkedIteration(t, string(events.ZeroCommit), true)
+func TestRepair_MergeAcceptsAZeroCommitPauseWithCommits(t *testing.T) {
+	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 
-	// A caller outside the repo still lands: the repo comes from the project.
+	// A caller outside the repo still merges: the repo comes from the project.
 	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
-		t.Fatalf("land = %+v, %v; want landed", res, err)
+		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
 	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusDone {
 		t.Errorf("status=%q err=%v, want done", tk.Status, err)
 	}
 }
 
-func TestRepair_LandRefusesOtherParks(t *testing.T) {
+func TestRepair_MergeRefusesOtherPauses(t *testing.T) {
 	cases := []struct {
 		name   string
 		kind   string
@@ -90,16 +90,16 @@ func TestRepair_LandRefusesOtherParks(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			h, _ := parkedIteration(t, c.kind, c.commit)
+			h, _ := pausedIteration(t, c.kind, c.commit)
 			res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
 			if err != nil || !res.Refused || res.Reason != c.reason {
-				t.Errorf("land = %+v, %v; want refusal %s", res, err, c.reason)
+				t.Errorf("merge = %+v, %v; want refusal %s", res, err, c.reason)
 			}
 		})
 	}
 }
 
-func TestRepair_LandWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
+func TestRepair_MergeWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	if err := ralphloop.Claim(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")); err != nil {
@@ -110,7 +110,7 @@ func TestRepair_LandWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 
 	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonWrongRepo {
-		t.Errorf("land = %+v, %v; want %s", res, err, repair.ReasonWrongRepo)
+		t.Errorf("merge = %+v, %v; want %s", res, err, repair.ReasonWrongRepo)
 	}
 }
 
@@ -121,6 +121,6 @@ func TestRepair_RalphLoopGuardIsServerSide(t *testing.T) {
 
 	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonRalphLoopCwd {
-		t.Errorf("land = %+v, %v; want %s", res, err, repair.ReasonRalphLoopCwd)
+		t.Errorf("merge = %+v, %v; want %s", res, err, repair.ReasonRalphLoopCwd)
 	}
 }

@@ -10,40 +10,40 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// parkTicket is the one way the server parks a ticket: the write, the
+// pauseTicket is the one way the server pauses a ticket: the write, the
 // EventTicketPaused event and the chat message all come from the same kind and
-// reason, so the three cannot disagree. A park that finds the ticket done (it
-// lost a race with a land) is not an error to the caller: nothing is left to park.
-// run is the parked run, zero when none launched.
-func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run Run) error {
-	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.parkEvent()); errors.Is(err, ralphloop.ErrParkDone) {
-		s.log.Warn("park refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
+// reason, so the three cannot disagree. A pause that finds the ticket done (it
+// lost a race with a merge) is not an error to the caller: nothing is left to pause.
+// run is the paused run, zero when none launched.
+func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run Run) error {
+	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.pauseEvent()); errors.Is(err, ralphloop.ErrParkDone) {
+		s.log.Warn("pause refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
 		return nil
 	} else if err != nil {
 		return err
 	}
 	s.events.publish(EventTicketPaused, addr.String())
-	if !s.holdParkForRecovery(addr, ticketPath, kind, reason) {
-		s.notifyPark(addr, ticketPath, kind, reason)
+	if !s.holdPauseForRecovery(addr, ticketPath, kind, reason) {
+		s.notifyPause(addr, ticketPath, kind, reason)
 	}
 	return nil
 }
 
-// notifyPark sends the one chat message for a park that is already written.
-// A park herdr's outage can cause is held for the digest instead.
-func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
+// notifyPause sends the one chat message for a pause that is already written.
+// A pause herdr's outage can cause is held for the digest instead.
+func (s *Server) notifyPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
 	status := ralphloop.PauseStatus(kind)
 	if kind.CauseHerdr() && s.herdr.isUnavailable() {
-		s.holdPark(addr, status, kind, reason)
+		s.holdPause(addr, status, kind, reason)
 		return
 	}
-	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, parkChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
+	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 
-// parkChatDetail is the chat line for a park. A self-reported park shows the
+// pauseChatDetail is the chat line for a pause. A self-reported pause shows the
 // agent's own question summary, which says more than the generic reason. It
 // falls back to the generic line when the ticket has no open question.
-func parkChatDetail(ticketPath string, kind events.Kind, reason string) string {
+func pauseChatDetail(ticketPath string, kind events.Kind, reason string) string {
 	if kind == events.SelfReported && ticketPath != "" {
 		if evs, err := tickets.ReadLog(ticketPath); err == nil {
 			if q := tickets.OpenQuestion(evs); q != nil && q.Summary != "" {
@@ -55,14 +55,14 @@ func parkChatDetail(ticketPath string, kind events.Kind, reason string) string {
 }
 
 // finishSink carries the finish path's chat-worthy events the outcome cannot
-// show: a land conflict's resolution starting, and its child parking.
+// show: a merge conflict's resolution starting, and its child pausing.
 func (s *Server) finishSink(addr tickets.Address, ticketPath string) ralphloop.EventSink {
 	return s.chat.FinishSink(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, func() ralphloop.EpicCounts {
 		return s.epicCounts(addr.Project, addr.Epic)
 	})
 }
 
-// epicCounts tallies the epic from disk, fresh: a park has just rewritten a
+// epicCounts tallies the epic from disk, fresh: a pause has just rewritten a
 // ticket, so the scanned view may not have it yet. Zero when the epic cannot be read.
 func (s *Server) epicCounts(project, epic string) ralphloop.EpicCounts {
 	e, ok := s.freshEpic(project, epic)

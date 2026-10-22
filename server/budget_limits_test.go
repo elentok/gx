@@ -36,7 +36,7 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
-		t.Fatalf("park = %+v, %v", res, err)
+		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	h.Server.RecordSpend("spent", 6)
 
@@ -51,10 +51,10 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	}
 }
 
-// A nudge into a parked ticket's still-open pane (recovery's R7 does this)
+// A nudge into a paused ticket's still-open pane (recovery's R7 does this)
 // sets an agent working outside any run; it must be metered and the hard
 // limit must stop it like any other live agent.
-func TestBudget_NudgedParkedPaneIsMeteredAndKilled(t *testing.T) {
+func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
@@ -63,7 +63,7 @@ func TestBudget_NudgedParkedPaneIsMeteredAndKilled(t *testing.T) {
 		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
 	})
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "compaction timed out"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "compaction timed out"); err != nil {
 		t.Fatal(err)
 	}
 	var gone, closed atomic.Bool
@@ -186,7 +186,7 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 	}
 }
 
-func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
+func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -262,7 +262,7 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 	}
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "status: paused") || !strings.Contains(string(data), "budget-killed") {
-		t.Fatalf("ticket not parked budget-killed:\n%s", data)
+		t.Fatalf("ticket not paused budget-killed:\n%s", data)
 	}
 	if len(sent) == 0 || !strings.Contains(sent[0], "ctrl+c") {
 		t.Errorf("send-keys = %v, want ctrl+c", sent)
@@ -272,28 +272,28 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 	}
 }
 
-// An agent that keeps spending after the ctrl+c is closed and parked
-// budget-killed, and its run's own finish must not overwrite that park.
+// An agent that keeps spending after the ctrl+c is closed and paused
+// budget-killed, and its run's own finish must not overwrite that pause.
 func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 	var mu sync.Mutex
 	cost := 0.0
-	testBudgetKillParksBudgetKilled(t, func() float64 { mu.Lock(); defer mu.Unlock(); cost += 3; return cost }, servertest.TicketOpts{})
+	testBudgetKillPausesBudgetKilled(t, func() float64 { mu.Lock(); defer mu.Unlock(); cost += 3; return cost }, servertest.TicketOpts{})
 }
 
-// An agent that goes quiet on the ctrl+c is parked budget-killed too, not
-// left to its own finish (which would park it zero-commit, a kind recovery
+// An agent that goes quiet on the ctrl+c is paused budget-killed too, not
+// left to its own finish (which would pause it zero-commit, a kind recovery
 // relaunches past the hard limit).
-func TestBudget_HardLimitParksAQuietRunBudgetKilledToo(t *testing.T) {
-	testBudgetKillParksBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{})
+func TestBudget_HardLimitPausesAQuietRunBudgetKilledToo(t *testing.T) {
+	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{})
 }
 
-func testBudgetKillParksBudgetKilled(t *testing.T, cost func() float64, ticket servertest.TicketOpts) {
+func testBudgetKillPausesBudgetKilled(t *testing.T, cost func() float64, ticket servertest.TicketOpts) {
 	t.Helper()
 	runBudgetKill(t, cost, ticket, nil)
 }
 
 // A hard-limit kill closes the run's open question with budget-killed, before
-// the park status.
+// the pause status.
 func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, func(path string) {
 		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "gx", Summary: "q?"}); err != nil {
@@ -305,7 +305,7 @@ func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(evs) != 2 || evs[1].Type != tickets.EventParkClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" {
-		t.Errorf("log = %+v, want the question then park.closed{question 1, budget-killed}", evs)
+		t.Errorf("log = %+v, want the question then pause.closed{question 1, budget-killed}", evs)
 	}
 }
 
@@ -317,7 +317,7 @@ func TestBudget_HardLimitKillWithoutQuestionWritesNoLog(t *testing.T) {
 }
 
 // runBudgetKill runs one ticket past the hard limit, seeding its log first
-// when seed is set, and returns the ticket's path once it is parked.
+// when seed is set, and returns the ticket's path once it is paused.
 func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOpts, seed func(path string)) string {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
@@ -344,7 +344,7 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 		time.Sleep(20 * time.Millisecond)
 	}
 	// Poll until the run has settled, and judge the ticket only then: the
-	// run's own finish is what used to overwrite the budget park.
+	// run's own finish is what used to overwrite the budget pause.
 	for len(h.Server.Runs()) != 0 && ctx.Err() == nil {
 		h.Server.PollBudget()
 		time.Sleep(20 * time.Millisecond)

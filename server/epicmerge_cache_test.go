@@ -37,7 +37,7 @@ func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 		t.Errorf("repeat: target %q, %d new git calls, want a and none", got, calls-first)
 	}
 
-	// A trunk move lands the blocker, so the target is fresh trunk again.
+	// A trunk move merges the blocker, so the target is fresh trunk again.
 	runGit(t, repo, "branch", "-f", "develop", "a")
 	if got := s.epicMergeTarget(key); got != "develop" {
 		t.Errorf("after trunk move: target %q, want develop", got)

@@ -27,7 +27,7 @@ type RepairRequest struct {
 	Cwd     string `json:"cwd,omitempty"`
 	Branch  string `json:"branch,omitempty"`
 
-	// land
+	// merge
 	From          string `json:"from,omitempty"`
 	To            string `json:"to,omitempty"`
 	IgnoreLiveTab bool   `json:"ignore_live_tab,omitempty"`
@@ -39,18 +39,18 @@ type RepairRequest struct {
 	Force        bool   `json:"force,omitempty"`
 	DeleteBranch bool   `json:"delete_branch,omitempty"`
 
-	// unpark
+	// resume
 	Base  string `json:"base,omitempty"`
 	State string `json:"state,omitempty"`
-	// RequireState is set by the web mux, never by a client: the unpark then
-	// needs a State token that still matches the park round.
+	// RequireState is set by the web mux, never by a client: the resume then
+	// needs a State token that still matches the pause round.
 	RequireState bool `json:"-"`
 }
 
-// ReasonBadBase refuses an unpark whose base is not one of the competing blockers.
+// ReasonBadBase refuses an resume whose base is not one of the competing blockers.
 const ReasonBadBase = "bad-base"
 
-// zeroCommitPrompt is what a live agent receives when a person unparks its
+// zeroCommitPrompt is what a live agent receives when a person resumes its
 // zero-commit finish.
 const zeroCommitPrompt = "A person reviewed your finish with no commits and wants you to continue. " +
 	"Finish the work, or report `--iteration-status finished --commitless true`."
@@ -72,7 +72,7 @@ type RepairResult struct {
 const ViaDirect = "direct"
 
 // RunRepairDirect runs a repair verb without a server, for the CLI's
-// server-down fallback. The verbs take the land lock themselves, so a live
+// server-down fallback. The verbs take the merge lock themselves, so a live
 // server and a direct run still exclude each other.
 func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult, error) {
 	s := &Server{cfg: Config{TicketStore: ticketStore}}
@@ -80,11 +80,11 @@ func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult,
 	var do func(RepairRequest) (RepairResult, error)
 	switch verb {
 	case "merge":
-		do = s.repairLand
+		do = s.repairMerge
 	case "start-over":
 		do = s.repairReset
 	case "resume", "unpark":
-		do = s.repairUnpark
+		do = s.repairResume
 	case "verify":
 		do = s.repairVerify
 	default:
@@ -144,9 +144,9 @@ func (s *Server) epicTarget(req RepairRequest, needID, preferProject bool) (epic
 	return "", "", "", &repair.RefusalError{Reason: ReasonUnknownTicket, Message: "no project " + project + " in the ticket store"}
 }
 
-func (s *Server) repairLand(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	if repair.IsGuardedBranch(req.Branch) {
-		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to land from a ralph-loop/* working directory (%s); run from outside the iteration worktree", req.Branch)}), nil
+		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonRalphLoopCwd, Message: fmt.Sprintf("refusing to merge from a ralph-loop/* working directory (%s); run from outside the iteration worktree", req.Branch)}), nil
 	}
 	epicPath, id, cwd, err := s.epicTarget(req, true, true)
 	if err != nil {
@@ -162,20 +162,20 @@ func (s *Server) repairLand(req RepairRequest) (RepairResult, error) {
 	return repairOK(res)
 }
 
-// landInQueue is the server's land. A ticket of a queued root may be the
-// one a landing parked, so once it lands the root completes as if its
-// iteration had settled. A direct land has no queue.
-func (s *Server) landInQueue(req RepairRequest) (RepairResult, error) {
+// mergeInQueue is the server's merge. A ticket of a queued root may be the
+// one a merging paused, so once it merges the root completes as if its
+// iteration had settled. A direct merge has no queue.
+func (s *Server) mergeInQueue(req RepairRequest) (RepairResult, error) {
 	addr, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
 	if err != nil || !s.rootQueued(rootOf(addr)) {
-		return s.repairLand(req)
+		return s.repairMerge(req)
 	}
-	res, err := s.repairLand(req)
+	res, err := s.repairMerge(req)
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if _, t, ok := s.freshTicket(addr); ok && s.lands.begin() {
-		defer s.lands.end()
+	if _, t, ok := s.freshTicket(addr); ok && s.merges.begin() {
+		defer s.merges.end()
 		s.completeRootIfDone(rootOf(addr), ralphloop.OneIteration{Epic: addr.Epic, Ticket: t})
 	}
 	return res, nil
@@ -233,7 +233,7 @@ func (s *Server) resetDeps(address string) ralphloop.Deps {
 	return s.depsWith(runner)
 }
 
-func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	epicPath, id, _, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
@@ -242,7 +242,7 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 	addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}
 	_, t, ferr := repair.FindEpicTicket(epicPath, id)
 	if ferr != nil {
-		// Not a ticket of this epic: the plain unpark reports why.
+		// Not a ticket of this epic: the plain resume reports why.
 		res, err := repair.Unpark(epicPath, id, time.Now(), "")
 		if err != nil {
 			return repairRefusal(err), nil
@@ -250,11 +250,11 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 		return repairOK(res)
 	}
 	tk, perr := schema.ParseTicket(t.Path)
-	parked := perr == nil && tk.PausedClass() == schema.PauseClassAnswer
-	zeroCommit := parked && tk.PauseReason == schema.PauseZeroCommit
+	paused := perr == nil && tk.PausedClass() == schema.PauseClassAnswer
+	zeroCommit := paused && tk.PauseReason == schema.PauseZeroCommit
 	// Every refusal runs before the first state change.
-	if parked && req.RequireState {
-		res, refused, err := unparkStale(t.Path, tk, req.State)
+	if paused && req.RequireState {
+		res, refused, err := resumeStale(t.Path, tk, req.State)
 		if err != nil {
 			return RepairResult{}, err
 		}
@@ -275,7 +275,7 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 		}
 		return repairOK(res)
 	}
-	if res, refused, err := s.unparkSelfReported(epicPath, id); refused || err != nil {
+	if res, refused, err := s.resumeSelfReported(epicPath, id); refused || err != nil {
 		return res, err
 	}
 	if zeroCommit {
@@ -288,14 +288,14 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 		}
 	}
 	var res repair.UnparkResult
-	if parked && req.RequireState && tk.PauseReason != schema.PauseSelfReported {
+	if paused && req.RequireState && tk.PauseReason != schema.PauseSelfReported {
 		var refused *RepairResult
-		res, refused, err = unparkAnswered(t.Path, id, req)
+		res, refused, err = resumeAnswered(t.Path, id, req)
 		if refused != nil {
 			return *refused, nil
 		}
 		if err != nil {
-			return RepairResult{}, fmt.Errorf("unpark of %s: %w", addr, err)
+			return RepairResult{}, fmt.Errorf("resume of %s: %w", addr, err)
 		}
 	} else {
 		res, err = repair.Unpark(epicPath, id, time.Now(), req.Base)
@@ -309,9 +309,9 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 	return repairOK(res)
 }
 
-// unparkStale refuses an unpark whose token no longer names the ticket's open
-// question and status; a park without an open question has no round to name.
-func unparkStale(ticketPath string, t schema.Ticket, state string) (RepairResult, bool, error) {
+// resumeStale refuses an resume whose token no longer names the ticket's open
+// question and status; a pause without an open question has no round to name.
+func resumeStale(ticketPath string, t schema.Ticket, state string) (RepairResult, bool, error) {
 	evs, err := tickets.ReadLog(ticketPath)
 	if err != nil {
 		return RepairResult{}, false, fmt.Errorf("read log of %s: %w", ticketPath, err)
@@ -319,23 +319,23 @@ func unparkStale(ticketPath string, t schema.Ticket, state string) (RepairResult
 	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.PausedClass().LegacyStatus()) == state {
 		return RepairResult{}, false, nil
 	}
-	return staleUnparkRefusal(), true, nil
+	return staleResumeRefusal(), true, nil
 }
 
-func staleUnparkRefusal() RepairResult {
-	return repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "the park changed; review the current one"})
+func staleResumeRefusal() RepairResult {
+	return repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "the pause changed; review the current one"})
 }
 
-// unparkRefused carries a refusal out of the lock-held append callback.
-type unparkRefused struct{ res RepairResult }
+// resumeRefused carries a refusal out of the lock-held append callback.
+type resumeRefused struct{ res RepairResult }
 
-func (e unparkRefused) Error() string { return "unpark refused" }
+func (e resumeRefused) Error() string { return "resume refused" }
 
-// unparkAnswered logs the person's unpark as the answer to the open question
+// resumeAnswered logs the person's resume as the answer to the open question
 // and reopens the ticket under one ticket lock. The state token is checked
 // again under the lock, and a refusal or a failed reopen appends nothing, so a
-// failure never leaves an answered question on a parked ticket.
-func unparkAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResult, *RepairResult, error) {
+// failure never leaves an answered question on a paused ticket.
+func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResult, *RepairResult, error) {
 	_, err := tickets.AppendLogFrom(ticketPath, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
 		t, err := schema.ParseTicket(ticketPath)
 		if err != nil {
@@ -343,16 +343,16 @@ func unparkAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResu
 		}
 		open := tickets.OpenQuestion(evs)
 		if t.PausedClass() != schema.PauseClassAnswer || open == nil || answerState(*open, t.PausedClass().LegacyStatus()) != req.State {
-			return tickets.LogEvent{}, unparkRefused{staleUnparkRefusal()}
+			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
 		if err := ralphloop.UnparkTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
-			return tickets.LogEvent{}, unparkRefused{repairRefusal(err)}
+			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
 		return tickets.LogEvent{
 			Type: tickets.EventParkAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: req.Base,
 		}, nil
 	})
-	var refused unparkRefused
+	var refused resumeRefused
 	if errors.As(err, &refused) {
 		return repair.UnparkResult{}, &refused.res, nil
 	}
@@ -362,7 +362,7 @@ func unparkAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResu
 	return repair.UnparkResult{Ticket: id, Status: "open"}, nil, nil
 }
 
-// ambiguousBlockers lists the blockers a ticket parked on an ambiguous base
+// ambiguousBlockers lists the blockers a ticket paused on an ambiguous base
 // has to choose between, recomputed from the epics; none when it is not ambiguous.
 func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
 	dir, err := s.projectDir(addr.Project)
@@ -385,7 +385,7 @@ func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
 			if _, err := tickets.DeriveLeafBase(addr.Project, epics, addr.Epic, t); errors.As(err, &amb) {
 				return amb.Blockers
 			}
-			if _, err := tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t, s.landingOnLanded(addr.Project)); errors.As(err, &amb) {
+			if _, err := tickets.DeriveRootBase(addr.Project, epics, addr.Epic, t, s.mergingOnMerged(addr.Project)); errors.As(err, &amb) {
 				return amb.Blockers
 			}
 		}
@@ -401,11 +401,11 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 	}
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
 	runner := s.runnerFor(addr.Project)
-	if park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID); ok {
-		if park.Label != "" {
-			label = park.Label
+	if pause, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID); ok {
+		if pause.Label != "" {
+			label = pause.Label
 		}
-		if r := s.runnerForRun(Run{Address: addr.String(), Runner: park.Runner}); park.Runner != "" && r != nil {
+		if r := s.runnerForRun(Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
 			runner = r
 		}
 	}
@@ -427,12 +427,12 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 	return true, nil
 }
 
-// unparkSelfReported applies the rule for a self-reported park: a live waiting
-// agent keeps its question, so unpark refuses and names the answer verb; a gone
+// resumeSelfReported applies the rule for a self-reported pause: a live waiting
+// agent keeps its question, so resume refuses and names the answer verb; a gone
 // agent's question is closed before the status moves on. Other tickets and kinds
 // pass through untouched. A direct run has no runner to ask and reads every
 // agent as gone, since no server is running to wait on an answer.
-func (s *Server) unparkSelfReported(epicPath, id string) (RepairResult, bool, error) {
+func (s *Server) resumeSelfReported(epicPath, id string) (RepairResult, bool, error) {
 	_, t, err := repair.FindEpicTicket(epicPath, id)
 	if err != nil {
 		return RepairResult{}, false, nil
@@ -497,7 +497,7 @@ func repairWriteAs(web bool, do func(RepairRequest) (RepairResult, error)) http.
 		}
 		req.RequireState = web
 		if web && req.State == "" {
-			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current park"}))
+			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current pause"}))
 			return
 		}
 		res, err := do(req)

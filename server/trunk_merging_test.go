@@ -33,7 +33,7 @@ func (f *schedFixture) runEpic(t *testing.T, wait string) {
 	servertest.WaitForEvent(ctx, t, f.queueEpic(ctx, t, "01"), wait, "")
 }
 
-func TestTrunk_TopLevelWorkStartsFromAndLandsOnTrunk(t *testing.T) {
+func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 	f := trunkFixture(t, servertest.TicketOpts{}, func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
 	main := f.rev(t, "main")
 	develop := f.rev(t, "develop")
@@ -69,7 +69,7 @@ func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 	}
 }
 
-func TestTrunk_EditedBetweenClaimAndLandingLandsOnTheNewTrunk(t *testing.T) {
+func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
 	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "next", "develop")
@@ -90,7 +90,7 @@ func TestTrunk_EditedBetweenClaimAndLandingLandsOnTheNewTrunk(t *testing.T) {
 func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
 	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
-		// Past the cap, the non-ff parks the root rather than forking a merge ticket.
+		// Past the cap, the non-ff pauses the root rather than forking a merge ticket.
 		for _, mid := range []string{"02", "03"} {
 			servertest.WriteTicketWith(t, f.store, "proj", schedEpic, mid, "t", servertest.TicketOpts{Type: "merge", Status: "done"})
 		}

@@ -5,12 +5,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// stampHandLanded notices epics landed outside the server (gx merge or a plain
+// stampHandMerged notices epics merged outside the server (gx merge or a plain
 // git merge). Only a complete, unmerged epic with a queued root or a
 // non-terminal ticket waiting on it is checked: the scope keeps idle cost flat
 // as unmerged epics pile up under auto-ff-merge off. It reads the index, not
 // the disk, so an out-of-scope epic costs no I/O at all.
-func (s *Server) stampHandLanded() {
+func (s *Server) stampHandMerged() {
 	queued := map[rootRef]bool{}
 	for _, item := range s.queued.list() {
 		if addr, err := parseQueuedAddress(item.Address); err == nil {
@@ -41,17 +41,17 @@ func (s *Server) stampHandLanded() {
 					continue
 				}
 			}
-			s.stampIfLanded(root, epics, e)
+			s.stampIfMerged(root, epics, e)
 		}
 	}
 }
 
-// stampIfLanded stamps merged_at on e once its branch is an ancestor of its
-// target, and dequeues its root if one is still queued (a root park). It
-// re-reads the stamp under the trunk's lock, so a server land racing it sends
+// stampIfMerged stamps merged_at on e once its branch is an ancestor of its
+// target, and dequeues its root if one is still queued (a root pause). It
+// re-reads the stamp under the trunk's lock, so a server merge racing it sends
 // the only notice. A held lock skips this tick: a poll never queues behind a
-// land, and the next tick checks again.
-func (s *Server) stampIfLanded(root rootRef, epics []tickets.Epic, e tickets.Epic) {
+// merge, and the next tick checks again.
+func (s *Server) stampIfMerged(root rootRef, epics []tickets.Epic, e tickets.Epic) {
 	dir, repo, err := s.projectOf(root.Project)
 	if err != nil {
 		return
@@ -64,20 +64,20 @@ func (s *Server) stampIfLanded(root rootRef, epics []tickets.Epic, e tickets.Epi
 	if !ok {
 		return
 	}
-	removed := s.stampLanded(root, e, repo, target)
+	removed := s.stampMerged(root, e, repo, target)
 	unlock()
 	if removed {
 		s.notifyEpicOutcome(root.Project, dir, ralphloop.OneIteration{Epic: e.Name, Ticket: t}, e, true)
 	}
 }
 
-// stampLanded is stampIfLanded under the trunk lock. It reports whether it
+// stampMerged is stampIfMerged under the trunk lock. It reports whether it
 // dequeued the root, the one case that sends a notice.
-func (s *Server) stampLanded(root rootRef, e tickets.Epic, repo, target string) (removed bool) {
+func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) (removed bool) {
 	if !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
 		return false
 	}
-	if landed, err := s.landedProbe(repo, "refs/heads/"+e.Name, target); err != nil || !landed {
+	if merged, err := s.mergedProbe(repo, "refs/heads/"+e.Name, target); err != nil || !merged {
 		return false
 	}
 	s.stampEpic(root, e.Path, "merged_at")

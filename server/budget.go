@@ -471,7 +471,7 @@ func (s *Server) budgetIteration(address string) (IterationInfo, bool) {
 }
 
 // pollBudget adds every live iteration's cost delta to the ledger: claimed
-// tickets, and parked ones whose pane a nudge set working (a watched run). All
+// tickets, and paused ones whose pane a nudge set working (a watched run). All
 // ticket kinds count.
 func (s *Server) pollBudget(now time.Time) {
 	for _, t := range s.idx.snapshot().Tickets {
@@ -506,9 +506,9 @@ func (s *Server) budgetSoftReached(now time.Time) bool { return s.budgetLatches(
 func (s *Server) budgetHardReached(now time.Time) bool { return s.budgetLatches(now).Hard }
 
 // killForBudget stops every live pane: ctrl+c, a grace period, then it closes
-// and parks every pane budget-killed. Each run is marked first, so a run that
-// settles on its own during the grace parks budget-killed too (see settleRun)
-// instead of finishing, landing or parking for another reason. It returns how
+// and pauses every pane budget-killed. Each run is marked first, so a run that
+// settles on its own during the grace pauses budget-killed too (see settleRun)
+// instead of finishing, merging or pausing for another reason. It returns how
 // many runs it stopped.
 func (s *Server) killForBudget(now time.Time) int {
 	return s.killRuns(now, s.killableRuns())
@@ -553,18 +553,18 @@ func (s *Server) killRuns(now time.Time, runs []trackedRun) int {
 	time.Sleep(time.Until(deadline))
 	for _, t := range runs {
 		if _, first := s.registry.claimBudgetStop(t.Address); !first {
-			continue // its run already settled and parked it
+			continue // its run already settled and paused it
 		}
-		if err := s.parkBudgetKilled(t); err != nil {
+		if err := s.pauseBudgetKilled(t); err != nil {
 			s.log.Error("budget kill", "ticket", t.Address, "err", err)
 		}
 	}
 	return len(runs)
 }
 
-// parkBudgetKilled stops the session through its runner, then parks the ticket
-// needs-repair.
-func (s *Server) parkBudgetKilled(t trackedRun) error {
+// pauseBudgetKilled stops the session through its runner, then pauses the ticket
+// stuck.
+func (s *Server) pauseBudgetKilled(t trackedRun) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
 	if err != nil {
 		return err
@@ -580,8 +580,8 @@ func (s *Server) parkBudgetKilled(t trackedRun) error {
 	if err := ralphloop.CloseOpenQuestion(t.TicketPath, ralphloop.CloseBudgetKilled); err != nil {
 		closeErr = errors.Join(closeErr, err)
 	}
-	parkErr := s.parkTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached", t.Run)
-	return errors.Join(closeErr, parkErr)
+	pauseErr := s.pauseTicket(dir, addr, t.TicketPath, events.BudgetKilled, "daily budget hard limit reached", t.Run)
+	return errors.Join(closeErr, pauseErr)
 }
 
 func (s *Server) keepBudgetPolled(ctx context.Context) {

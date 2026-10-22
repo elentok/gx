@@ -58,7 +58,7 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 	retention := 36 * time.Hour
 	expired := time.Now().Add(-retention - time.Hour)
 	old := agentDir(t, root, "old", expired)
-	parked := agentDir(t, root, "epic-a-iter-01", expired)
+	paused := agentDir(t, root, "epic-a-iter-01", expired)
 	fresh := agentDir(t, root, "fresh", time.Now())
 
 	configured := newRenamedFake("herdr", nativerunner.VerdictLive)
@@ -86,7 +86,7 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	for _, kept := range []string{parked, fresh} {
+	for _, kept := range []string{paused, fresh} {
 		if _, err := os.Stat(filepath.Join(kept, nativerunner.OutFile)); err != nil {
 			t.Errorf("%s was pruned: %v", filepath.Base(kept), err)
 		}

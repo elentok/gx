@@ -275,7 +275,7 @@ func (b *Banners) Sent() []osnotify.Notification {
 }
 
 // SessionBannerDelay is a harness's session banner delay: long enough for a
-// test to land a second trigger inside the window, shorter than the real one.
+// test to merge a second trigger inside the window, shorter than the real one.
 const SessionBannerDelay = 300 * time.Millisecond
 
 // Sounds is a sound.Player that records every sound played.
@@ -318,7 +318,7 @@ func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, ty
 
 // SetProjectRepo points the project at the repo its agents run in. Call it
 // after WriteTicket, before Start. It opts the project in to auto-ff-merge so a
-// finished epic lands; SetProjectRepoNoAutoMerge leaves the default (off).
+// finished epic merges; SetProjectRepoNoAutoMerge leaves the default (off).
 func SetProjectRepo(t *testing.T, store, project, repo string) {
 	t.Helper()
 	writeProjectRepo(t, store, project, repo, `,"auto-ff-merge":true`)
@@ -437,7 +437,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
-	// Every land pauses on ralphloop's 3s finish debounce; the fake agents
+	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
 	// Fake agents idle without a report and never leave idle after a nudge, so

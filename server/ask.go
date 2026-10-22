@@ -17,9 +17,9 @@ const (
 
 const askAuthorAgent = "agent"
 
-// ticketAsk records an agent's question: it appends one park.question to the
+// ticketAsk records an agent's question: it appends one pause.question to the
 // ticket's log and sets iteration_status asking. The body is validated
-// strictly first, and any refusal writes nothing. It returns at once; parking
+// strictly first, and any refusal writes nothing. It returns at once; pausing
 // the ticket is a later step.
 func (s *Server) ticketAsk(req QueueRequest) (QueueResult, error) {
 	q, err := tickets.ParseQuestionStrict(req.Text)

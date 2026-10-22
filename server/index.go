@@ -37,11 +37,11 @@ type TicketInfo struct {
 	// ClaimedAt is when the server launched the claimed ticket's iteration;
 	// filled in by the snapshot handler, zero while the ticket is not running.
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
-	// Recovery is RecoveryPending or RecoveryEscalated for a parked ticket that
+	// Recovery is RecoveryPending or RecoveryEscalated for a paused ticket that
 	// recovery is working on or gave up on; filled in by the snapshot handler.
 	Recovery string `json:"recovery,omitempty"`
-	// The landing-time metrics the Queue header and the preview sum up; zero
-	// until the ticket lands.
+	// The merging-time metrics the Queue header and the preview sum up; zero
+	// until the ticket merges.
 	ActualContextWindow   int     `json:"actual_context_window,omitempty"`
 	ExpectedContextWindow int     `json:"expected_context_window,omitempty"`
 	ElapsedTime           int     `json:"elapsed_time,omitempty"`
@@ -62,7 +62,7 @@ type TicketInfo struct {
 	EpicIsMap bool `json:"epic_is_map,omitempty"`
 	// EpicStatus is the epic's ticket.md status, riding along likewise.
 	EpicStatus string `json:"epic_status,omitempty"`
-	// EpicMergeTarget is the branch an epic merge lands on; filled in by the
+	// EpicMergeTarget is the branch an epic merge merges on; filled in by the
 	// snapshot handler, empty when the project has no repo or trunk.
 	EpicMergeTarget string `json:"epic_merge_target,omitempty"`
 

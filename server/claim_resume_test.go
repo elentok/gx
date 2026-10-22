@@ -31,8 +31,8 @@ func (n namedFake) Name() string { return n.name }
 const resumeLabel = "epic-a-iter-01"
 
 // claimOpen puts ticket 01 in the queue as a ticket that has run before
-// (session sess-old) and was parked, then waits for its next claim to launch.
-// answered says whether the park ended with a person's answer or a plain unpark.
+// (session sess-old) and was paused, then waits for its next claim to launch.
+// answered says whether the pause ended with a person's answer or a plain resume.
 func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *runnerfake.Runner) []ralphloop.Event {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

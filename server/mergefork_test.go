@@ -19,7 +19,7 @@ import (
 )
 
 // atMergeCap adds two done merge tickets to an epic's tickets: its run has
-// used both, so its next non-ff parks the root instead of forking.
+// used both, so its next non-ff pauses the root instead of forking.
 func atMergeCap(opts map[string]servertest.TicketOpts) map[string]servertest.TicketOpts {
 	opts["02"] = servertest.TicketOpts{Type: "merge", Status: "done"}
 	opts["03"] = servertest.TicketOpts{Type: "merge", Status: "done"}
@@ -108,7 +108,7 @@ func (f *schedFixture) rootQueued(t *testing.T) bool {
 	return slices.ContainsFunc(q, func(e server.QueueItem) bool { return e.Address == "proj:"+schedEpic+"/01" })
 }
 
-func TestMergeFork_NonFFForksAMergeTicketWhoseFinishLandsTheEpic(t *testing.T) {
+func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) {
 	f := newForkFixture(t, func(f *forkFixture, _ int) {
 		if !f.rootQueued(t) {
 			t.Error("root dequeued while its merge ticket runs")
@@ -117,7 +117,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishLandsTheEpic(t *testing.T) {
 			t.Errorf("epic stamped while its merge ticket runs:\n%s", md)
 		}
 		if n := f.others.Load(); n != 0 {
-			t.Errorf("whole-epic dependent launched %d times before the land", n)
+			t.Errorf("whole-epic dependent launched %d times before the merge", n)
 		}
 	})
 	servertest.WriteTicketWith(t, f.store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{schedEpic}})
@@ -146,27 +146,27 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishLandsTheEpic(t *testing.T) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}
 	if f.rootQueued(t) {
-		t.Error("root still queued after the land")
+		t.Error("root still queued after the merge")
 	}
 	waitUntil(t, "the dependent to launch", func() bool { return f.others.Load() > 0 })
 }
 
-func TestMergeFork_TrunkMovingAgainForksASecondThenParksAtTheCap(t *testing.T) {
+func TestMergeFork_TrunkMovingAgainForksASecondThenPausesAtTheCap(t *testing.T) {
 	f := newForkFixture(t, nil)
-	// Trunk moves between each merge ticket's finish and its land: moving it
+	// Trunk moves between each merge ticket's finish and its merge: moving it
 	// inside the agent's turn would fail the finish check instead.
-	var lands atomic.Int32
+	var merges atomic.Int32
 	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
-		if n := lands.Add(1); n > 1 {
+		if n := merges.Add(1); n > 1 {
 			moveMain(t, f.repo, fmt.Sprint("land-", n))
 		}
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})
 
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	if want := "needs rebase: " + schedEpic + " onto main; rebase it, then merge again"; ev.Kind != "" || ev.Message != want {
-		t.Errorf("park = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
+		t.Errorf("pause = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
 	}
 	if got := f.merges.Load(); got != 2 {
 		t.Errorf("merge turns = %d, want 2", got)
@@ -184,13 +184,13 @@ func TestMergeFork_TrunkMovingAgainForksASecondThenParksAtTheCap(t *testing.T) {
 	f.assertStamps(t, false)
 }
 
-func TestMergeFork_DirtyTrunkAfterAMergeTicketParksWithoutAnother(t *testing.T) {
+func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T) {
 	f := newForkFixture(t, func(f *forkFixture, _ int) {
-		// An untracked file in main's checkout that the land would overwrite.
+		// An untracked file in main's checkout that the merge would overwrite.
 		testutil.WriteFile(t, f.repo, "01.txt", "local")
 	})
 
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q (%s)", ev.Kind, events.DirtyTrunk, ev.Message)

@@ -51,18 +51,18 @@ type QueueItem struct {
 // a refusal (the queue is then untouched).
 type QueueResult struct {
 	Queue []QueueItem `json:"queue,omitempty"`
-	// Mode is set by pause, resume and drain: running or paused.
+	// Mode is set by pause, resume and flush: running or paused.
 	Mode QueueMode `json:"mode,omitempty"`
 	// ExtraUsage is the warning an enqueue carries while the account
 	// auto-purchases extra usage.
 	ExtraUsage bool `json:"extra_usage,omitempty"`
-	// Merged, MergeTicket and Parked are an epic merge's outcome: a direct
-	// land, the address of the merge ticket it forked, or a park of the root
-	// with ParkKind (empty for a needs-rebase park) and Message.
+	// Merged, MergeTicket and Paused are an epic merge's outcome: a direct
+	// merge, the address of the merge ticket it forked, or a pause of the root
+	// with PauseKind (empty for a needs-rebase pause) and Message.
 	Merged      bool   `json:"merged,omitempty"`
 	MergeTicket string `json:"merge_ticket,omitempty"`
-	Parked      bool   `json:"parked,omitempty"`
-	ParkKind    string `json:"park_kind,omitempty"`
+	Paused      bool   `json:"parked,omitempty"`
+	PauseKind   string `json:"park_kind,omitempty"`
 	// Outcome is an answer's result: delivered or adopted. A stale refusal
 	// carries the current Question and its State token.
 	Outcome  string            `json:"outcome,omitempty"`
@@ -86,11 +86,11 @@ type QueueRequest struct {
 	// Project and Items are what a replace swaps in.
 	Project string      `json:"project,omitempty"`
 	Items   []QueueItem `json:"items,omitempty"`
-	// ParkReason is the one-line reason a park writes into the ticket.
-	ParkReason string `json:"park_reason,omitempty"`
+	// PauseReason is the one-line reason a pause writes into the ticket.
+	PauseReason string `json:"park_reason,omitempty"`
 	// Stop lets a cancel stop the live pane of a claimed ticket instead of refusing.
 	Stop bool `json:"stop,omitempty"`
-	// Front makes an add land at the head of the queue instead of the tail.
+	// Front makes an add merge at the head of the queue instead of the tail.
 	Front bool `json:"front,omitempty"`
 	// Text is what a nudge types into the live pane.
 	Text string `json:"text,omitempty"`
@@ -108,7 +108,7 @@ type QueueRequest struct {
 	Source string `json:"source,omitempty"`
 
 	// actor is set only by the server's own recovery calls, never decoded from a
-	// client: a park made by recovery must not trigger recovery again.
+	// client: a pause made by recovery must not trigger recovery again.
 	actor string
 }
 

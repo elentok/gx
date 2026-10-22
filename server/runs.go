@@ -35,14 +35,14 @@ type Run struct {
 	Runner  string              `json:"runner"`
 	Session agentrunner.Session `json:"session"`
 	// Model and Effort are what the agent launched under; a conflict on its
-	// land inherits them. Empty when the launch named none.
+	// merge inherits them. Empty when the launch named none.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
 }
 
-// parkEvent is the run's agent context on its park event: the park drops the
+// pauseEvent is the run's agent context on its pause event: the pause drops the
 // runs.json entry, so late-finish adoption finds the runner from here.
-func (r Run) parkEvent() ralphloop.Event {
+func (r Run) pauseEvent() ralphloop.Event {
 	return ralphloop.Event{Agent: ralphloop.AgentKind(r.Agent), Runner: r.Runner, Label: r.Session.Label, AgentSession: r.Session.SessionID, Model: r.Model, Effort: r.Effort}
 }
 
@@ -108,7 +108,7 @@ type runRegistry struct {
 	// In memory only: a reclaimed run starts with its gate closed again.
 	released map[string]gateRelease
 	// budgetStops are the runs the budget hard limit is stopping, true once
-	// one path has parked it budget-killed. In memory only.
+	// one path has paused it budget-killed. In memory only.
 	budgetStops map[string]bool
 }
 
@@ -301,25 +301,25 @@ func (r *runRegistry) tracked(address string) (trackedRun, bool) {
 
 // gateRelease is what recovery left on a run whose gate it forced open.
 type gateRelease struct {
-	// park is the reason the run's finish parks with instead of landing; ""
+	// pause is the reason the run's finish pauses with instead of merging; ""
 	// lets the finish run.
-	park string
+	pause string
 }
 
-func (r *runRegistry) releaseGate(address, park string) {
+func (r *runRegistry) releaseGate(address, pause string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.released == nil {
 		r.released = map[string]gateRelease{}
 	}
-	r.released[address] = gateRelease{park: park}
+	r.released[address] = gateRelease{pause: pause}
 }
 
-// gatePark is the park reason release-gate left for the run at address.
-func (r *runRegistry) gatePark(address string) string {
+// gatePause is the pause reason release-gate left for the run at address.
+func (r *runRegistry) gatePause(address string) string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.released[address].park
+	return r.released[address].pause
 }
 
 // gateReleased is the Deps.GateReleased hook of the run at address.
@@ -346,17 +346,17 @@ func (r *runRegistry) markBudgetStop(address string) {
 }
 
 // claimBudgetStop reports whether the run at address is being budget-stopped,
-// and whether this caller is the first to claim it, so the run is parked
+// and whether this caller is the first to claim it, so the run is paused
 // budget-killed exactly once: by the kill or by the run's own settle.
 func (r *runRegistry) claimBudgetStop(address string) (stopping, first bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	parked, ok := r.budgetStops[address]
+	paused, ok := r.budgetStops[address]
 	if !ok {
 		return false, false
 	}
 	r.budgetStops[address] = true
-	return true, !parked
+	return true, !paused
 }
 
 // deleteWatched drops the watched pane t, unless a run has since replaced it
@@ -427,7 +427,7 @@ func (s *Server) Runs() []Run {
 // reclaimRuns takes over every persisted iteration that is still alive: its
 // agent is known to its runner and its worktree exists. It asks nothing, so a
 // restart is invisible to running work. A dead agent that left nothing behind
-// is reopened; any other handle that no longer matches is parked and left out
+// is reopened; any other handle that no longer matches is paused and left out
 // of the registry.
 func (s *Server) reclaimRuns() {
 	for _, t := range s.savedRuns {
@@ -436,14 +436,14 @@ func (s *Server) reclaimRuns() {
 			continue
 		}
 		s.log.Info("not reclaiming iteration", "ticket", t.Address, "reason", err)
-		s.parkUnreclaimed(t, err)
+		s.pauseUnreclaimed(t, err)
 	}
 	s.savedRuns = nil
 }
 
-// logDrainingRunners logs one line per runner other than the configured one
-// that still hosts live runs; those runs drain on it while new launches don't.
-func (s *Server) logDrainingRunners() {
+// logFlushingRunners logs one line per runner other than the configured one
+// that still hosts live runs; those runs flush on it while new launches don't.
+func (s *Server) logFlushingRunners() {
 	counts := map[string]int{}
 	for _, t := range s.registry.list() {
 		name := t.Runner
@@ -462,9 +462,9 @@ func (s *Server) logDrainingRunners() {
 // errHandleMismatch marks a persisted handle whose pane, agent or worktree is gone.
 var errHandleMismatch = errors.New("handle mismatch")
 
-// parkUnreclaimed parks the ticket of a handle that cannot be reclaimed, so a
+// pauseUnreclaimed pauses the ticket of a handle that cannot be reclaimed, so a
 // person sees it instead of it staying claimed forever.
-func (s *Server) parkUnreclaimed(t trackedRun, cause error) {
+func (s *Server) pauseUnreclaimed(t trackedRun, cause error) {
 	kind := events.IterationError
 	if errors.Is(cause, errHandleMismatch) {
 		kind = events.HandleMismatch
@@ -473,18 +473,18 @@ func (s *Server) parkUnreclaimed(t trackedRun, cause error) {
 	if err == nil {
 		var dir string
 		if dir, _, err = s.projectOf(addr.Project); err == nil {
-			err = s.parkTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error(), t.Run)
+			err = s.pauseTicket(dir, addr, t.TicketPath, kind, "cannot reclaim iteration after restart: "+cause.Error(), t.Run)
 		}
 	}
 	if err != nil {
-		s.log.Warn("park unreclaimed iteration", "ticket", t.Address, "err", err)
+		s.log.Warn("pause unreclaimed iteration", "ticket", t.Address, "err", err)
 	}
 }
 
 // reclaimHeadless takes over a headless iteration: a live agent keeps running
-// on the adopted session, a finished one lands as if it had just finished, and
+// on the adopted session, a finished one merges as if it had just finished, and
 // one that died with the server down is reopened when it left nothing behind,
-// else parks needs-repair with its dir kept. A live agent that was waiting for
+// else pauses stuck with its dir kept. A live agent that was waiting for
 // an answer stays waiting and unsettled.
 func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error {
 	addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{})
@@ -511,7 +511,7 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 		if err != nil {
 			return err
 		}
-		return s.parkTicket(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied, t.Run)
+		return s.pauseTicket(dir, addr, t.TicketPath, events.IterationError, nativerunner.ReasonAgentDied, t.Run)
 	}
 	one, wt, mode, err := s.resume(t)
 	if err != nil {
@@ -534,8 +534,8 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 		return nil
 	}
 	if !t.WaitingSince.IsZero() {
-		// Idle on purpose, waiting for an answer: finishing it now would land
-		// or park it for going quiet. The budget hard limit still reaches it
+		// Idle on purpose, waiting for an answer: finishing it now would merge
+		// or pause it for going quiet. The budget hard limit still reaches it
 		// through the registry.
 		return nil
 	}

@@ -44,7 +44,7 @@ var nonSlugRe = regexp.MustCompile(`[^a-z0-9]+`)
 // OneOffRequest is the body of a submit. Only Prompt is required.
 type OneOffRequest struct {
 	Prompt string `json:"prompt"`
-	// Project wins over Cwd; with neither matching, the ticket lands in scratch.
+	// Project wins over Cwd; with neither matching, the ticket merges in scratch.
 	Project string `json:"project,omitempty"`
 	// Cwd is the caller's directory, resolved to the registered project owning it.
 	Cwd   string `json:"cwd,omitempty"`
@@ -58,7 +58,7 @@ type OneOffRequest struct {
 	ExpectedContextWindow int      `json:"expected_context_window,omitempty"`
 	// Front queues it at the head instead of the tail.
 	Front bool `json:"front,omitempty"`
-	// Notify sends the ticket's Result to chat on success; parks always notify.
+	// Notify sends the ticket's Result to chat on success; pauses always notify.
 	Notify bool `json:"notify,omitempty"`
 	// File is a server-side path to a markdown payload (frontmatter + body).
 	// Its frontmatter fills every field left unset here; the body is the prompt
@@ -346,7 +346,7 @@ type duplicate struct {
 }
 
 // liveDuplicate finds a ticket of the project carrying key that is not done or
-// cancelled; parked copies count as live. Reads the files, not the index, so a
+// cancelled; paused copies count as live. Reads the files, not the index, so a
 // just-written ticket is seen.
 func (s *Server) liveDuplicate(projectDir, key string) (*duplicate, error) {
 	if key == "" {
@@ -384,8 +384,8 @@ func (d *duplicate) refusal(project, projectDir string) (OneOffResult, error) {
 	return res, nil
 }
 
-// notifyResult sends a landed ticket's ## Result to chat when its submit asked
-// for it. A ticket without the flag stays silent; parks never reach here.
+// notifyResult sends a merged ticket's ## Result to chat when its submit asked
+// for it. A ticket without the flag stays silent; pauses never reach here.
 func (s *Server) notifyResult(addr tickets.Address, ticketPath string) {
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil || !tk.Notify {

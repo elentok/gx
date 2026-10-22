@@ -18,7 +18,7 @@ type iterationMode struct {
 	// feature runs in the epic's feature worktree with no iteration branch, and
 	// ends like a commitless ticket on a kept directory: only the agent stops.
 	feature bool
-	// target is where a feature-mode epic lands, resolved at finish so the check
+	// target is where a feature-mode epic merges, resolved at finish so the check
 	// sees the trunk current then.
 	target func() (string, error)
 	// scratchDir is set only for scratch-project tickets.
@@ -31,7 +31,7 @@ type iterationMode struct {
 func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterationMode {
 	typ := schema.TicketType(t.Type)
 	if typ == schema.TypeMerge {
-		return iterationMode{feature: true, target: func() (string, error) { return s.landTarget(addr) }}
+		return iterationMode{feature: true, target: func() (string, error) { return s.mergeTarget(addr) }}
 	}
 	m := iterationMode{commitless: addr.Project == ScratchProject || addr.Epic == OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.commitless && (addr.Project == ScratchProject || s.projectHasNoVCS(addr.Project)) {

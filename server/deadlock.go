@@ -38,9 +38,9 @@ func (d *deadlocks) leave(root rootRef) {
 	delete(d.roots, root)
 }
 
-// isParked is tickets.Epic.IsParked, the rule shared with ralph-loop and the
+// isPaused is tickets.Epic.IsPaused, the rule shared with ralph-loop and the
 // Queue tab, except that map epics hold no work, so none of their tickets are.
-func isParked(e tickets.Epic, t tickets.Ticket) bool {
+func isPaused(e tickets.Epic, t tickets.Ticket) bool {
 	return !e.IsMap && e.IsParked(t)
 }
 
@@ -52,8 +52,8 @@ const (
 	epicDone epicState = iota
 	// epicRunnable: a ticket is open or claimed, so the run can proceed.
 	epicRunnable
-	// epicParked: nothing runnable, and a person can clear what remains.
-	epicParked
+	// epicPaused: nothing runnable, and a person can clear what remains.
+	epicPaused
 	// epicCycle: nothing runnable and nothing a person can clear, only blocked
 	// tickets.
 	epicCycle
@@ -61,15 +61,15 @@ const (
 
 // epicStateOf is the server's one rule for an epic's state; the deadlock check and
 // the epic summary both derive from it. A status it does not recognize counts as
-// parked, never as a cycle: a person has to look at it.
+// paused, never as a cycle: a person has to look at it.
 func epicStateOf(e tickets.Epic) epicState {
 	if e.IsMap {
 		return epicDone
 	}
 	state := epicDone
 	for _, t := range e.Tickets {
-		if isParked(e, t) {
-			state = max(state, epicParked)
+		if isPaused(e, t) {
+			state = max(state, epicPaused)
 			continue
 		}
 		switch e.RenderedStatus(t) {
@@ -81,18 +81,18 @@ func epicStateOf(e tickets.Epic) epicState {
 				state = epicCycle
 			}
 		default:
-			state = epicParked
+			state = epicPaused
 		}
 	}
 	return state
 }
 
 // deadlockKind says how e is deadlocked: nothing schedulable and nothing
-// running while work remains. Parked tickets make it all-parked, since a person
+// running while work remains. Paused tickets make it all-paused, since a person
 // can clear them; none makes it a blocked cycle.
 func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 	switch epicStateOf(e) {
-	case epicParked:
+	case epicPaused:
 		return events.AllPaused, true
 	case epicCycle:
 		return events.BlockedCycle, true
@@ -100,21 +100,21 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 	return "", false
 }
 
-// deadlockReason names what holds e: the parked tickets for all-parked, and for
+// deadlockReason names what holds e: the paused tickets for all-paused, and for
 // a blocked cycle each waiting ticket with what it waits on.
 func deadlockReason(root rootRef, e tickets.Epic, kind events.Kind) string {
 	if kind == events.AllPaused {
-		return parkedReason(root, e)
+		return pausedReason(root, e)
 	}
 	return cycleReason(root, e)
 }
 
 func ticketAddr(root rootRef, t tickets.Ticket) string { return root.String() + "/" + t.Identifier }
 
-func parkedReason(root rootRef, e tickets.Epic) string {
+func pausedReason(root rootRef, e tickets.Epic) string {
 	var parts []string
 	for _, t := range e.Tickets {
-		if isParked(e, t) {
+		if isPaused(e, t) {
 			parts = append(parts, ticketAddr(root, t))
 		}
 	}

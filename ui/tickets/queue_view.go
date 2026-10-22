@@ -268,11 +268,11 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 func (m QueueModel) queueTicketReasonLine(r queueRow) (line string, ok bool) {
 	epic, t := r.epic, r.ticket
 	status := ticketStatus(epic, t)
-	i := slices.IndexFunc(m.summaries[epic.Name].Parked, func(p server.SummaryTicket) bool { return p.Address == t.Path })
-	if i < 0 || m.summaries[epic.Name].Parked[i].Reason == "" {
+	i := slices.IndexFunc(m.summaries[epic.Name].Paused, func(p server.SummaryTicket) bool { return p.Address == t.Path })
+	if i < 0 || m.summaries[epic.Name].Paused[i].Reason == "" {
 		return "", false
 	}
-	reason := ellipsize(m.summaries[epic.Name].Parked[i].Reason, parkReasonMaxRunes, m.icons().Ellipsis)
+	reason := ellipsize(m.summaries[epic.Name].Paused[i].Reason, parkReasonMaxRunes, m.icons().Ellipsis)
 
 	triangleWidth := triangleColumnWidth(m.icons()) + 1
 	icon, _ := statusIconAndStyle(m.icons(), status)

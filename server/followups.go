@@ -48,7 +48,7 @@ func proposalClass(result string) string {
 	return found
 }
 
-// fileFollowUp files a draft research ticket in the follow-ups epic for a landed
+// fileFollowUp files a draft research ticket in the follow-ups epic for a merged
 // investigate ticket whose report proposes a catalog entry or an orchestrator fix.
 func (s *Server) fileFollowUp(addr tickets.Address, ticketPath string) {
 	tk, err := schema.ParseTicket(ticketPath)
@@ -89,7 +89,7 @@ var errNoFollowUpProject = errors.New("no follow-ups project")
 
 // failureLine matches the line writeInvestigateTicket puts in an investigate
 // ticket: the type and kind of the failure it was forked for.
-var failureLine = regexp.MustCompile(`parked with (\S+) \(([^)]*)\)`)
+var failureLine = regexp.MustCompile(`paused with (\S+) \(([^)]*)\)`)
 
 // dedupeKey is the (type, kind, proposal class) that makes two follow-ups the
 // same proposal. A report with no failure line still dedupes on its class.

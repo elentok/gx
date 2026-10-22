@@ -16,7 +16,7 @@ import (
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-func TestStop_WaitsForALandInFlightAndFlushesTheStoreCommit(t *testing.T) {
+func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -29,13 +29,13 @@ func TestStop_WaitsForALandInFlightAndFlushesTheStoreCommit(t *testing.T) {
 		testutil.CommitAll(t, *cwd, "agent work")
 		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
-	// The land closes the iteration's tab; hold it there.
-	landing, release := make(chan struct{}), make(chan struct{})
+	// The merge closes the iteration's tab; hold it there.
+	merging, release := make(chan struct{}), make(chan struct{})
 	var releaseOnce sync.Once
-	releaseLand := func() { releaseOnce.Do(func() { close(release) }) }
-	t.Cleanup(releaseLand) // a failure before the release must not hold herdrfake forever
+	releaseMerge := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseMerge) // a failure before the release must not hold herdrfake forever
 	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		close(landing)
+		close(merging)
 		<-release
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
@@ -46,38 +46,38 @@ func TestStop_WaitsForALandInFlightAndFlushesTheStoreCommit(t *testing.T) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	select {
-	case <-landing:
+	case <-merging:
 	case <-ctx.Done():
-		t.Fatal("land never started")
+		t.Fatal("merge never started")
 	}
 
 	stopped := make(chan error, 1)
 	go func() { stopped <- h.Stop() }()
 	select {
 	case err := <-stopped:
-		t.Fatalf("stop returned during a land: %v", err)
+		t.Fatalf("stop returned during a merge: %v", err)
 	case <-time.After(300 * time.Millisecond):
 	}
-	releaseLand()
+	releaseMerge()
 	select {
 	case err := <-stopped:
 		if err != nil {
 			t.Fatalf("stop: %v", err)
 		}
 	case <-ctx.Done():
-		t.Fatal("stop never returned after the land finished")
+		t.Fatal("stop never returned after the merge finished")
 	}
 
 	data, err := os.ReadFile(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
 	if err != nil || !strings.Contains(string(data), "status: done") {
-		t.Errorf("ticket not landed: %v\n%s", err, data)
+		t.Errorf("ticket not merged: %v\n%s", err, data)
 	}
 	if got := storeLog(t, store); !strings.Contains(got, "sync: ") {
 		t.Errorf("store log = %q, want the stop to flush a commit", got)
 	}
 }
 
-func TestStop_LeavesALiveAgentRunningAndUnlanded(t *testing.T) {
+func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -89,7 +89,7 @@ func TestStop_LeavesALiveAgentRunningAndUnlanded(t *testing.T) {
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
 	// The agent keeps working: its second wait (the finish wait) blocks until
-	// the test ends. A cleanup, not a defer, so the release lands before the
+	// the test ends. A cleanup, not a defer, so the release merges before the
 	// harness waits for the run to settle.
 	block := make(chan struct{})
 	t.Cleanup(func() { close(block) })

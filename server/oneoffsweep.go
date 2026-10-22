@@ -11,7 +11,7 @@ import (
 // sweepOneOffs moves every done or cancelled ticket of a one-offs epic into
 // one-offs-archived, whatever wrote its status. It runs after each rescan, so a
 // crash between a move's two writes is finished by the first rescan of the next
-// server. A ticket whose run is still tracked stays: the run's post-landing
+// server. A ticket whose run is still tracked stays: the run's post-merging
 // steps (retro stamp, result, follow-up) still read it at its old address.
 func (s *Server) sweepOneOffs() {
 	if s.cfg.TicketStore == "" {
@@ -76,7 +76,7 @@ func (s *Server) dequeueIdleOneOffs(dir string) {
 }
 
 // oneOffsLive reports whether a one-off is still pending, or its run is tracked.
-// Failed, parked and needs-* tickets are not terminal, so they count.
+// Failed, paused and needs-* tickets are not terminal, so they count.
 func (s *Server) oneOffsLive(dir string, root rootRef) bool {
 	live, _, err := tickets.LoadOneOffs(dir)
 	if err != nil {

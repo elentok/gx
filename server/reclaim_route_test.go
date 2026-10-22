@@ -83,7 +83,7 @@ func waitStatus(t *testing.T, ticketPath string, want schema.Status) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// A legacy needs-answer / needs-repair want means paused in that class.
+		// A legacy asking / stuck want means paused in that class.
 		if class := legacyClass(want); class != "" {
 			if tk.Status == schema.StatusPaused && tk.PausedClass() == class {
 				return
@@ -130,7 +130,7 @@ func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) 
 	waitStatus(t, ticketPath, schema.StatusDone)
 }
 
-func TestReclaim_NonMismatchErrorParksNeedsRepairWithItsReason(t *testing.T) {
+func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -154,7 +154,7 @@ func TestReclaim_NonMismatchErrorParksNeedsRepairWithItsReason(t *testing.T) {
 	}
 }
 
-func TestReclaim_UnavailableRunnerParksNeedsRepairNamingIt(t *testing.T) {
+func TestReclaim_UnavailableRunnerPausesStuckNamingIt(t *testing.T) {
 	_, ticketPath := restartUnder(t, "pty", newRenamedFake("headless", nativerunner.VerdictLive), nil)
 	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
 	body, _ := os.ReadFile(ticketPath)

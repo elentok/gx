@@ -147,7 +147,7 @@ func TestAgentAnswer_DeliveredAllowLogsShownAndIgnoresNote(t *testing.T) {
 	}
 	evs := e.permissionEvents(t)
 	if len(evs) != 1 {
-		t.Fatalf("events = %+v; want one park.permission", evs)
+		t.Fatalf("events = %+v; want one pause.permission", evs)
 	}
 	ev := evs[0]
 	if ev.Decision != "allow" || ev.Source != "web" || ev.Note != "" {

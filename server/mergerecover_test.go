@@ -16,9 +16,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// orphanLandLock leaves the lock a land that died mid-flight would: a dead
+// orphanMergeLock leaves the lock a merge that died mid-flight would: a dead
 // owner, no marker.
-func orphanLandLock(t *testing.T, store string) string {
+func orphanMergeLock(t *testing.T, store string) string {
 	t.Helper()
 	dir, err := ralphloop.LandLockDir(filepath.Join(store, "proj", "epic-a"))
 	if err != nil {
@@ -54,7 +54,7 @@ func restartAndSettle(t *testing.T, h *servertest.Harness, want string) {
 	t.Fatalf("never saw %s\n%s", want, log)
 }
 
-func startCrashedLand(t *testing.T) (h *servertest.Harness, store, repo, lockDir string) {
+func startCrashedMerge(t *testing.T) (h *servertest.Harness, store, repo, lockDir string) {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	store, repo = t.TempDir(), testutil.TempRepo(t)
@@ -65,15 +65,15 @@ func startCrashedLand(t *testing.T) (h *servertest.Harness, store, repo, lockDir
 	if err := h.Stop(); err != nil {
 		t.Fatal(err)
 	}
-	lockDir = orphanLandLock(t, store)
+	lockDir = orphanMergeLock(t, store)
 	return h, store, repo, lockDir
 }
 
-func TestLandRecovery_OrphanLockForALandedTicketFinishesIt(t *testing.T) {
-	h, store, repo, lockDir := startCrashedLand(t)
+func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
+	h, store, repo, lockDir := startCrashedMerge(t)
 	wt, ticketPath := leaveIteration(t, h, store, repo)
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
-	// The land got as far as the cherry-pick before the process died. -x keeps the
+	// The merge got as far as the cherry-pick before the process died. -x keeps the
 	// picked commit from hashing identically to its source within one second.
 	feature := filepath.Join(filepath.Dir(wt), "epic-a")
 	if out, err := exec.Command("git", "-C", feature, "cherry-pick", "-x", ralphloop.IterationBranch("epic-a", "01")).CombinedOutput(); err != nil {
@@ -86,12 +86,12 @@ func TestLandRecovery_OrphanLockForALandedTicketFinishesIt(t *testing.T) {
 		t.Errorf("status=%q err=%v, want done", tk.Status, err)
 	}
 	if _, err := os.Stat(filepath.Join(lockDir, "land.lock")); !os.IsNotExist(err) {
-		t.Errorf("land lock still there: %v", err)
+		t.Errorf("merge lock still there: %v", err)
 	}
 }
 
-func TestLandRecovery_OrphanLockForAnUnlandedTicketRollsBackTheHalfPick(t *testing.T) {
-	h, store, repo, lockDir := startCrashedLand(t)
+func TestMergeRecovery_OrphanLockForAnUnmergedTicketRollsBackTheHalfPick(t *testing.T) {
+	h, store, repo, lockDir := startCrashedMerge(t)
 	wt, ticketPath := leaveIteration(t, h, store, repo)
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
 	// A conflicting cherry-pick the crash left in progress.
@@ -100,7 +100,7 @@ func TestLandRecovery_OrphanLockForAnUnlandedTicketRollsBackTheHalfPick(t *testi
 	testutil.CommitAll(t, feature, "conflict")
 	_ = exec.Command("git", "-C", feature, "cherry-pick", ralphloop.IterationBranch("epic-a", "01")).Run()
 
-	restartAndSettle(t, h, server.EventLandRolledBack)
+	restartAndSettle(t, h, server.EventMergeRolledBack)
 
 	if err := exec.Command("git", "-C", feature, "rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD").Run(); err == nil {
 		t.Error("cherry-pick still in progress")
@@ -109,12 +109,12 @@ func TestLandRecovery_OrphanLockForAnUnlandedTicketRollsBackTheHalfPick(t *testi
 		t.Errorf("status=%q err=%v, want claimed", tk.Status, err)
 	}
 	if _, err := os.Stat(filepath.Join(lockDir, "land.lock")); !os.IsNotExist(err) {
-		t.Errorf("land lock still there: %v", err)
+		t.Errorf("merge lock still there: %v", err)
 	}
 }
 
-func TestLandRecovery_OrphanLockWithNoEvidenceParksAmbiguousLand(t *testing.T) {
-	h, store, _, lockDir := startCrashedLand(t)
+func TestMergeRecovery_OrphanLockWithNoEvidencePausesAmbiguousMerge(t *testing.T) {
+	h, store, _, lockDir := startCrashedMerge(t)
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	if err := ralphloop.Claim(ticketPath); err != nil {
 		t.Fatal(err)
@@ -128,6 +128,6 @@ func TestLandRecovery_OrphanLockWithNoEvidenceParksAmbiguousLand(t *testing.T) {
 	}
 	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseAmbiguousMerge)
 	if _, err := os.Stat(filepath.Join(lockDir, "land.lock")); !os.IsNotExist(err) {
-		t.Errorf("land lock still there: %v", err)
+		t.Errorf("merge lock still there: %v", err)
 	}
 }

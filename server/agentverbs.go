@@ -20,8 +20,8 @@ const (
 	// ReasonRequestIDRequired is the web's refusal of an answer that names no request.
 	ReasonRequestIDRequired = "request-id-required"
 	ReasonAgentGone         = "agent-gone"
-	// ReasonAgentWaiting is the refusal of a plain unpark on a live waiting
-	// self-reported park. It is public (ADR 0028) and named in the tracker text.
+	// ReasonAgentWaiting is the refusal of a plain resume on a live waiting
+	// self-reported pause. It is public (ADR 0028) and named in the tracker text.
 	ReasonAgentWaiting = "agent-waiting"
 	// ReasonNotDelivered: a deny closed the dialog but its reason never reached the agent.
 	ReasonNotDelivered = "reason-not-delivered"
@@ -69,7 +69,7 @@ func (s *Server) agentInterrupt(req QueueRequest) (QueueResult, error) {
 // agentAnswer allows or denies the permission request a live agent waits on.
 // With a request ID the open request must be that one and approvable; without
 // one (the TUI and CLI) whatever is open is answered. A decision that reached
-// the agent is logged as park.permission; a refusal logs nothing.
+// the agent is logged as pause.permission; a refusal logs nothing.
 func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 	decision := agentrunner.Decision(req.Decision)
 	if decision != agentrunner.DecisionAllow && decision != agentrunner.DecisionDeny {

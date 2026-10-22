@@ -27,12 +27,12 @@ func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop 
 	return f, f.rev(t, "develop"), chatCount
 }
 
-func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T) {
+func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.T) {
 	f, develop, chatCount := trunkDeletedMidRun(t, true)
 	f.runEpic(t, server.EventRootPaused)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
-		t.Errorf("ticket did not land on its root's branch:\n%s", body)
+		t.Errorf("ticket did not merge on its root's branch:\n%s", body)
 	}
 	if got := f.git(t, "show", schedEpic+":01.txt"); got != "01" {
 		t.Errorf("%s:01.txt = %q, want the ticket's work", schedEpic, got)
@@ -41,14 +41,14 @@ func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T)
 		t.Errorf("main moved to %s", got)
 	}
 	if waitForChat(chatCount, "the trunk branch is missing: project") == 0 {
-		t.Errorf("no root park with reason trunk-missing reached chat")
+		t.Errorf("no root pause with reason trunk-missing reached chat")
 	}
 	if slices.Contains(f.h.Server.LockedTrunks(), "") {
-		t.Errorf("a land locked on an empty target")
+		t.Errorf("a merge locked on an empty target")
 	}
 }
 
-func TestTrunkMissingAtLanding_AutoMergeOffIsNotParked(t *testing.T) {
+func TestTrunkMissingAtMerging_AutoMergeOffIsNotPaused(t *testing.T) {
 	f, _, _ := trunkDeletedMidRun(t, false)
 	f.runEpic(t, server.EventRootCompleted)
 
@@ -56,6 +56,6 @@ func TestTrunkMissingAtLanding_AutoMergeOffIsNotParked(t *testing.T) {
 		t.Errorf("ticket not done:\n%s", body)
 	}
 	if slices.Contains(f.h.Server.LockedTrunks(), "") {
-		t.Errorf("a land locked on an empty target")
+		t.Errorf("a merge locked on an empty target")
 	}
 }

@@ -24,7 +24,7 @@ func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 			return notify.Error("merge " + epic + ": " + err.Error())()
 		case res.Refused:
 			return notify.Error("merge refused: " + res.Message)()
-		case res.Parked:
+		case res.Paused:
 			return notify.Error("merge parked: " + res.Message)()
 		case res.MergeTicket != "":
 			return notify.Success("merge ticket " + res.MergeTicket + " forked")()

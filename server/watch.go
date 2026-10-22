@@ -89,7 +89,7 @@ func (s *Server) keepFresh(ctx context.Context) {
 // run-log.jsonl and other non-ticket files fire constantly and change nothing.
 func storeEventKind(ev fsnotify.Event) (relevant, newDir bool) {
 	// ".md" also matches fsutil.WriteFileAtomic's "<name>.md.tmp-*": kqueue can
-	// report the rename that lands a ticket under the temp name only.
+	// report the rename that merges a ticket under the temp name only.
 	if strings.Contains(filepath.Base(ev.Name), ".md") {
 		return true, false
 	}

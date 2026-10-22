@@ -15,7 +15,7 @@ const (
 	ActionResume  = "resume"
 )
 
-// Outcomes of a park round.
+// Outcomes of a pause round.
 const (
 	RoundOpen     = "open"
 	RoundAnswered = "answered"
@@ -29,7 +29,7 @@ type DetailOption struct {
 	Consequence string `json:"consequence,omitempty"`
 }
 
-// DetailRound is one park round. The earlier rounds fill only Seq, By, Summary
+// DetailRound is one pause round. The earlier rounds fill only Seq, By, Summary
 // and Outcome; the latest fills the rest.
 type DetailRound struct {
 	Seq     int    `json:"seq"`
@@ -46,9 +46,9 @@ type DetailRound struct {
 	Yes         string         `json:"yes,omitempty"`
 	No          string         `json:"no,omitempty"`
 
-	// Answer is the park.answer that ended the round.
+	// Answer is the pause.answer that ended the round.
 	Answer *DetailAnswer `json:"answer,omitempty"`
-	// ClosedReason is the park.closed reason of a round no answer ended.
+	// ClosedReason is the pause.closed reason of a round no answer ended.
 	ClosedReason string `json:"closed_reason,omitempty"`
 }
 

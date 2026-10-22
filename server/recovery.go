@@ -44,9 +44,9 @@ type recoveryPlan struct {
 	why string
 }
 
-// holdsPark reports whether a rule remedy will run unattended, so the park's
+// holdsPause reports whether a rule remedy will run unattended, so the pause's
 // chat message can wait for its outcome.
-func (p recoveryPlan) holdsPark() bool { return p.action == actionRunRule }
+func (p recoveryPlan) holdsPause() bool { return p.action == actionRunRule }
 
 // decide sets the plan's action, or reports false when the failure gets no
 // recovery at all. diagnose marks an epic-level plan, which always needs
@@ -127,7 +127,7 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 
 // recoverAsync starts recovery for a failure that is already written. It runs
 // off the caller's goroutine: a remedy calls the same verbs the caller may be
-// inside of (claim, land), which would otherwise wait on themselves.
+// inside of (claim, merge), which would otherwise wait on themselves.
 func (s *Server) recoverAsync(f recovery.Failure) {
 	if plan, ok := s.planRecovery(f); ok {
 		s.goSettle(func() { s.recoverFrom(plan, f) })
@@ -136,7 +136,7 @@ func (s *Server) recoverAsync(f recovery.Failure) {
 
 // recoverFrom runs the planned recovery through the server's own verbs.
 // Failures to record are logged, never fatal: recovery is best effort on top
-// of a park that stands.
+// of a pause that stands.
 func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 	if plan.matched {
 		ev := ralphloop.Event{Type: string(events.RecoveryMatched), Ticket: plan.ref.addr.ID, Kind: string(f.Kind), Reason: plan.entry.ID, Signature: plan.entry.Signature()}
@@ -155,7 +155,7 @@ func (s *Server) recoverFrom(plan recoveryPlan, f recovery.Failure) {
 }
 
 // runRule runs the entry's remedy unattended. A failed remedy, or an ok one
-// that leaves a held park parked, escalates; an ok one drops the held park
+// that leaves a held pause paused, escalates; an ok one drops the held pause
 // message.
 func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
 	ref, entry := plan.ref, plan.entry
@@ -168,10 +168,10 @@ func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
 	switch {
 	case outcome != "ok":
 		s.escalate(plan, f, entry.ID, outcome)
-	case !s.parkHold.take(f.Address):
-	case s.stillParked(f.Address):
-		// R5 and R7 end ok once their nudge is typed, which unparks nothing.
-		s.escalate(plan, f, entry.ID+" left it parked", "")
+	case !s.pauseHold.take(f.Address):
+	case s.stillPaused(f.Address):
+		// R5 and R7 end ok once their nudge is typed, which resumes nothing.
+		s.escalate(plan, f, entry.ID+" left it paused", "")
 	default:
 		// A --wait on the ticket reads the hold, so it must hear the hold end.
 		s.events.publish(EventTicketChanged, f.Address)
@@ -180,13 +180,13 @@ func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
 
 // escalate gives the failure to a person: it records recovery-escalated and
 // sends its one message, naming the matched entry and the ticket that reports
-// the failure. For a park the message replaces any park message still held.
+// the failure. For a pause the message replaces any pause message still held.
 func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome string) {
 	ref := plan.ref
 	s.recordRecovery(ref, events.RecoveryEscalated, f, reason, outcome)
 	if f.Type == events.Paused {
-		s.parkHold.take(f.Address)
-		s.parkHold.escalate(f.Address)
+		s.pauseHold.take(f.Address)
+		s.pauseHold.escalate(f.Address)
 		// A --wait on the ticket reads the hold, so it must hear the escalation.
 		s.events.publish(EventTicketChanged, f.Address)
 	}
@@ -204,37 +204,37 @@ func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome
 	s.chat.Escalated(ref.addr.Project, s.chatOverride(ref.addr.Project), ref.addr.Epic, ref.ticket.Path, ref.addr.ID, detail)
 }
 
-// holdParkForRecovery starts whatever recovery the park gets and, when a rule
-// remedy will run unattended, keeps back the park's chat message for it. It
+// holdPauseForRecovery starts whatever recovery the pause gets and, when a rule
+// remedy will run unattended, keeps back the pause's chat message for it. It
 // reports false when nothing is held: the caller then notifies at once.
-func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
+func (s *Server) holdPauseForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
 	f := recovery.Failure{Address: addr.String(), Type: events.Paused, Kind: kind, Reason: reason}
-	s.parkHold.forget(f.Address)
+	s.pauseHold.forget(f.Address)
 	plan, ok := s.planRecovery(f)
 	if !ok {
 		return false
 	}
-	if !plan.holdsPark() {
-		s.parkHold.start(f.Address)
+	if !plan.holdsPause() {
+		s.pauseHold.start(f.Address)
 		s.goSettle(func() {
 			s.recoverFrom(plan, f)
 			// An opened investigation keeps it pending from here: see recoveryState.
-			if s.parkHold.started(f.Address) {
+			if s.pauseHold.started(f.Address) {
 				s.events.publish(EventTicketChanged, f.Address)
 			}
 		})
 		return false
 	}
-	s.parkHold.hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
+	s.pauseHold.hold(f.Address, s.settings.Load().RecoverySettings.NotifyHold, func() {
 		s.events.publish(EventTicketChanged, f.Address)
-		s.notifyPark(addr, ticketPath, kind, reason)
+		s.notifyPause(addr, ticketPath, kind, reason)
 	})
 	s.goSettle(func() { s.recoverFrom(plan, f) })
 	return true
 }
 
-// stillParked re-reads the ticket: a remedy's verbs may have moved it on.
-func (s *Server) stillParked(address string) bool {
+// stillPaused re-reads the ticket: a remedy's verbs may have moved it on.
+func (s *Server) stillPaused(address string) bool {
 	ref, ok, err := s.findTicket(address)
 	if err != nil || !ok {
 		return false
@@ -374,7 +374,7 @@ const (
 )
 
 // ticketEvents is the ticket's run-log events, oldest first. An epic-level ref
-// also gets every ticket's landing, reset and manual land: progress anywhere in
+// also gets every ticket's merging, reset and manual merge: progress anywhere in
 // the epic clears its earlier recovery.
 func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Event {
 	log, _, err := ralphloop.ReadEvents(ref.projectDir, ref.addr.Epic)
@@ -391,10 +391,10 @@ func (s *Server) ticketEvents(ref ticketRef, f recovery.Failure) []ralphloop.Eve
 }
 
 // guardRailStop says why automatic recovery must not run for f, or "" when it
-// may. A failure after a remedy for the same kind that no landing, reset or
-// manual land has since cleared is a failed recovery; otherwise the per-kind
+// may. A failure after a remedy for the same kind that no merging, reset or
+// manual merge has since cleared is a failed recovery; otherwise the per-kind
 // and per-ticket caps apply. An investigation or a parent backfill remedies
-// nothing the next park could be a re-failure of, so only the caps see them.
+// nothing the next pause could be a re-failure of, so only the caps see them.
 // A person's relaunch starts the budget over.
 func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 	var applied int
@@ -431,7 +431,7 @@ func clearsRecovery(t events.Type) bool {
 }
 
 // failureSequence is the ticket's events as the matcher sees them, ending in
-// the failure itself (already appended by the park). A logged failure with no
+// the failure itself (already appended by the pause). A logged failure with no
 // kind, like the loop's gate hold, takes the failure's. A logged failure also
 // carries its session's last assistant text, which R2 and R3 read.
 func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
@@ -476,7 +476,7 @@ func (s *Server) appendRecoveryEvent(ref ticketRef, f recovery.Failure, ev ralph
 }
 
 // recoveryVerbs lets a remedy call the server's own verbs. Each call goes
-// through the same ticket write as a person's, so refusals, the land lock and
+// through the same ticket write as a person's, so refusals, the merge lock and
 // events are identical; only the actor differs.
 type recoveryVerbs struct{ s *Server }
 
@@ -484,7 +484,7 @@ type recoveryVerbs struct{ s *Server }
 // a call makes, already stamped actor recovery.
 var recoveryVerbHandlers = map[string]func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error){
 	recovery.VerbPark: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
-		req.ParkReason = c.Text
+		req.PauseReason = c.Text
 		return s.ticketPause(req)
 	},
 	recovery.VerbRelaunch: func(s *Server, req QueueRequest, _ recovery.Call) (QueueResult, error) {
@@ -572,8 +572,8 @@ func (s *Server) agentState(addr tickets.Address) (state agentrunner.State, idle
 
 // recoveryReleaseGate releases a held gate on an idle agent. Zero commits and
 // a clean worktree with commits ahead both let the finish run as it would:
-// parked zero-commit, or landed. A dirty worktree with commits ahead must not
-// land unfinished work, so its finish parks background-task-gate instead.
+// paused zero-commit, or merged. A dirty worktree with commits ahead must not
+// merge unfinished work, so its finish pauses background-task-gate instead.
 func (s *Server) recoveryReleaseGate(req QueueRequest, _ recovery.Call) (QueueResult, error) {
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		run, ok := s.registry.tracked(ref.addr.String())
@@ -592,22 +592,22 @@ func (s *Server) recoveryReleaseGate(req QueueRequest, _ recovery.Call) (QueueRe
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("commits ahead in %s: %w", worktree, err)
 		}
-		park := ""
+		pause := ""
 		if ahead > 0 {
 			dirty, err := git.UncommittedChanges(worktree)
 			if err != nil {
 				return QueueResult{}, fmt.Errorf("status of %s: %w", worktree, err)
 			}
 			if len(dirty) > 0 {
-				park = gateParkReason(dirty)
+				pause = gatePauseReason(dirty)
 			}
 		}
-		s.registry.releaseGate(ref.addr.String(), park)
+		s.registry.releaseGate(ref.addr.String(), pause)
 		return QueueResult{}, nil
 	})
 }
 
-func gateParkReason(dirty []git.Change) string {
+func gatePauseReason(dirty []git.Change) string {
 	paths := make([]string, len(dirty))
 	for i, c := range dirty {
 		paths[i] = c.Path
@@ -615,27 +615,27 @@ func gateParkReason(dirty []git.Change) string {
 	return "background-task gate released on an idle agent, but the worktree has uncommitted changes: " + strings.Join(paths, ", ")
 }
 
-// parkReleasedGate writes the park release-gate left for a run in place of its
+// pauseReleasedGate writes the pause release-gate left for a run in place of its
 // finish, leaving worktree and pane for a person. False when there is none.
-func (s *Server) parkReleasedGate(scratchDir string, addr tickets.Address, ticketPath string, run Run) bool {
-	reason := s.registry.gatePark(addr.String())
+func (s *Server) pauseReleasedGate(scratchDir string, addr tickets.Address, ticketPath string, run Run) bool {
+	reason := s.registry.gatePause(addr.String())
 	if reason == "" {
 		return false
 	}
-	if err := s.parkTicket(scratchDir, addr, ticketPath, events.BackgroundTaskGate, reason, run); err != nil {
-		s.log.Error("park released gate", "ticket", addr.String(), "err", err)
+	if err := s.pauseTicket(scratchDir, addr, ticketPath, events.BackgroundTaskGate, reason, run); err != nil {
+		s.log.Error("pause released gate", "ticket", addr.String(), "err", err)
 	}
 	return true
 }
 
 // finishWaitTimeout bounds Finish: a released gate's finish only re-checks
-// idle and lands, so a run still live well past that is stuck elsewhere.
+// idle and merges, so a run still live well past that is stuck elsewhere.
 const finishWaitTimeout = 10 * time.Minute
 
 // finishPoll paces Finish's registry reads; a var so tests can shorten it.
 var finishPoll = time.Second
 
-// recoveryFinish holds no ticket lock while it waits: the land it waits for
+// recoveryFinish holds no ticket lock while it waits: the merge it waits for
 // needs it.
 func (s *Server) recoveryFinish(req QueueRequest, _ recovery.Call) (QueueResult, error) {
 	for deadline := time.Now().Add(finishWaitTimeout); s.registry.has(req.Address); time.Sleep(finishPoll) {
@@ -698,7 +698,7 @@ func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
 }
 
 // ticketCommitlessDone marks a ticket done with no commits of its own, for work
-// that landed inside another ticket's commits. Commitless takes it out of
+// that merged inside another ticket's commits. Commitless takes it out of
 // reconcile's hands for good, which is why only an approved proposal calls it.
 func (s *Server) ticketCommitlessDone(req QueueRequest) (QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {

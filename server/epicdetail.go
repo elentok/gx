@@ -24,16 +24,16 @@ type EpicDetailRow struct {
 	RenderedStatus string `json:"rendered_status"`
 	Type           string `json:"type,omitempty"`
 	Parent         string `json:"parent,omitempty"`
-	// Elapsed is in seconds and set once the ticket lands; a running row ticks
+	// Elapsed is in seconds and set once the ticket merges; a running row ticks
 	// on the client from ClaimedAt.
 	Elapsed   int       `json:"elapsed,omitempty"`
 	Cost      float64   `json:"cost,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
 	// Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
 	Blockers []string `json:"blockers,omitempty"`
-	// NeedsAnswer is set on a parked ticket with an open question; Question is its summary line.
-	NeedsAnswer bool   `json:"needs_answer,omitempty"`
-	Question    string `json:"question,omitempty"`
+	// Asking is set on a paused ticket with an open question; Question is its summary line.
+	Asking   bool   `json:"needs_answer,omitempty"`
+	Question string `json:"question,omitempty"`
 }
 
 // EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
@@ -49,7 +49,7 @@ type EpicDetail struct {
 	Total int `json:"total"`
 	// WallClock runs from the epic's started_at to completed_at, or to now while
 	// it runs; it is absent before the first claim. AgentTime and CostTotal add up
-	// landed tickets only and are always sent, so a zero total still shows.
+	// merged tickets only and are always sent, so a zero total still shows.
 	WallClock int             `json:"wall_clock,omitempty"`
 	AgentTime int             `json:"agent_time"`
 	CostTotal float64         `json:"cost_total"`
@@ -59,10 +59,10 @@ type EpicDetail struct {
 	// Queued is set when the epic holds a queue item. A Waiting epic that is not
 	// queued is not waiting for a slot.
 	Queued bool `json:"queued"`
-	// LandBlockKind and LandBlockReason describe why a Merge blocked epic's last
-	// land parked; the kind is empty for a needs-rebase park.
-	LandBlockKind   string `json:"land_block_kind,omitempty"`
-	LandBlockReason string `json:"land_block_reason,omitempty"`
+	// MergeBlockKind and MergeBlockReason describe why a Merge blocked epic's last
+	// merge paused; the kind is empty for a needs-rebase pause.
+	MergeBlockKind   string `json:"land_block_kind,omitempty"`
+	MergeBlockReason string `json:"land_block_reason,omitempty"`
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -111,7 +111,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 	} else {
 		d.State = epicStateFor(root, e, s.registry.startedAtOf)
 		if epicMergeBlocked(e) {
-			d.LandBlockKind, d.LandBlockReason = e.LandBlockKind, e.LandBlockReason
+			d.MergeBlockKind, d.MergeBlockReason = e.LandBlockKind, e.LandBlockReason
 		}
 	}
 	addr := func(id string) string {
@@ -133,7 +133,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 			row.ClaimedAt = at
 		}
 		if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusNeedsAnswer {
-			row.NeedsAnswer, row.Question = true, open.Summary
+			row.Asking, row.Question = true, open.Summary
 		}
 		if t.Status == string(schema.StatusDone) {
 			d.AgentTime += t.ElapsedTime

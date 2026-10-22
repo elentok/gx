@@ -72,7 +72,7 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 		{server.EventExplainVerdictChange, resnap},
 		{server.EventRootCompleted, resnap},
 		{server.EventRootPaused, resnap},
-		{server.EventLandRolledBack, resnap},
+		{server.EventMergeRolledBack, resnap},
 		{server.EventTicketNudged, resnap},
 		{server.EventQueueChanged, resnap | viewmodel.EffectRefetchQueue},
 		{server.EventSessionChanged, resnap},

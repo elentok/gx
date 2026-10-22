@@ -12,7 +12,7 @@ func NewStoreWatch(root string) (*StoreWatch, error) {
 	}
 	WatchTree(w, root)
 	go func() {
-		// Drain errors so the watcher never blocks; the poll covers any loss.
+		// Flush errors so the watcher never blocks; the poll covers any loss.
 		for range w.Errors {
 		}
 	}()

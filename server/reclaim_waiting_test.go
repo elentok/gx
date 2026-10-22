@@ -73,7 +73,7 @@ func startWaitingRestartFake(t *testing.T, hardLimit float64) (*servertest.Harne
 func TestReclaim_WaitingRunStaysWaitingAndUnsettled(t *testing.T) {
 	h, ticketPath := startWaitingRestart(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
-	// A settled run would land (the fake agent is idle with a commit) and leave the registry.
+	// A settled run would merge (the fake agent is idle with a commit) and leave the registry.
 	time.Sleep(500 * time.Millisecond)
 	if runs := h.Server.Runs(); len(runs) != 1 {
 		t.Errorf("Runs() = %+v, want the waiting run kept", runs)
@@ -83,7 +83,7 @@ func TestReclaim_WaitingRunStaysWaitingAndUnsettled(t *testing.T) {
 		t.Fatal(err)
 	}
 	if tk.Status != schema.StatusClaimed {
-		t.Errorf("status = %q, want claimed (not landed or parked)", tk.Status)
+		t.Errorf("status = %q, want claimed (not merged or paused)", tk.Status)
 	}
 	if data, _ := os.ReadFile(filepath.Join(h.StateDir, "runs.json")); !strings.Contains(string(data), `"waiting_since"`) {
 		t.Errorf("runs.json lost waiting_since:\n%s", data)
@@ -101,6 +101,6 @@ func TestReclaim_BudgetHardLimitStopsAWaitingRun(t *testing.T) {
 	})
 	body, _ := os.ReadFile(ticketPath)
 	if !strings.Contains(string(body), "status: paused") {
-		t.Errorf("ticket not parked (paused):\n%s", body)
+		t.Errorf("ticket not paused (paused):\n%s", body)
 	}
 }

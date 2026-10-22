@@ -78,7 +78,7 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 		t.Fatalf("queue rows = %+v, want one %q naming %q", snap.Pending, server.VerdictTrunkMissing, wantReason)
 	}
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: open") {
-		t.Fatalf("ticket claimed or parked while trunk missing:\n%s", body)
+		t.Fatalf("ticket claimed or paused while trunk missing:\n%s", body)
 	}
 	if n := chatCount("proj: trunk missing"); n != 1 {
 		t.Fatalf("trunk-missing chat notices = %d, want 1", n)

@@ -70,7 +70,7 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	}
 }
 
-func TestOneOff_NoProjectLandsInScratchAndHonoursNameAndAgent(t *testing.T) {
+func TestOneOff_NoProjectMergesInScratchAndHonoursNameAndAgent(t *testing.T) {
 	h, _ := startOneOffHarness(t)
 	ctx := context.Background()
 
@@ -139,7 +139,7 @@ func TestOneOff_FrontQueuesAtHead(t *testing.T) {
 	}
 }
 
-func TestOneOff_OptionsLandInFrontmatter(t *testing.T) {
+func TestOneOff_OptionsMergeInFrontmatter(t *testing.T) {
 	h, repo := startOneOffHarness(t)
 	res, err := h.Client.OneOff(context.Background(), server.OneOffRequest{
 		Prompt: "build it", Cwd: repo,

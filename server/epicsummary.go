@@ -31,7 +31,7 @@ const (
 )
 
 // SummaryTicket is one ticket in an EpicSummary: an active one carries
-// ClaimedAt, a Parked one carries Recovery and its unclipped Park reason.
+// ClaimedAt, a Paused one carries Recovery and its unclipped Pause reason.
 type SummaryTicket struct {
 	Address   string    `json:"address"`
 	Title     string    `json:"title"`
@@ -39,7 +39,7 @@ type SummaryTicket struct {
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
 	Recovery  string    `json:"recovery,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
-	// Summary is the open question's summary line, or the park reason without one.
+	// Summary is the open question's summary line, or the pause reason without one.
 	Summary string `json:"summary,omitempty"`
 	// Answerable is set when a person's reply can go to the open question.
 	Answerable bool `json:"answerable"`
@@ -59,8 +59,8 @@ type EpicSummary struct {
 	Total   int       `json:"total"`
 	// Active is the running tickets, listed only while the epic is Running.
 	Active []SummaryTicket `json:"active"`
-	Parked []SummaryTicket `json:"parked"`
-	// HasRepair is set when a parked ticket is broken (needs-repair or error), so
+	Paused []SummaryTicket `json:"parked"`
+	// HasRepair is set when a paused ticket is broken (stuck or error), so
 	// both clients show a fault in the alarm color instead of a question.
 	HasRepair bool `json:"has_repair"`
 	// Reason is why a Paused epic is paused: the reason of its first paused
@@ -83,7 +83,7 @@ type EpicSummary struct {
 func (s *Server) epicSummaries(all []TicketInfo) []EpicSummary {
 	out := []EpicSummary{}
 	seen := map[rootRef]bool{}
-	recoveryOf := func(addr string) string { return recoveryState(s.parkHold.state(addr), addr, all) }
+	recoveryOf := func(addr string) string { return recoveryState(s.pauseHold.state(addr), addr, all) }
 	for _, item := range s.queued.list() {
 		addr, err := parseQueuedAddress(item.Address)
 		if err != nil {
@@ -145,14 +145,14 @@ func answeredLatest(evs []tickets.LogEvent) bool {
 func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool), recoveryOf func(string) string, logOf func(tickets.Ticket) []tickets.LogEvent) EpicSummary {
 	sum := EpicSummary{
 		Address: root.String(), Name: e.Name, Project: root.Project, Done: e.DoneCount(), Total: e.TotalCount(),
-		Active: []SummaryTicket{}, Parked: []SummaryTicket{},
+		Active: []SummaryTicket{}, Paused: []SummaryTicket{},
 	}
 	for _, t := range e.Tickets {
 		status := e.RenderedStatus(t)
 		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
 		info := SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
 		switch {
-		case isParked(e, t):
+		case isPaused(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.ParkReason(e, t)
 			open := tickets.OpenQuestion(logOf(t))
 			info.Summary = info.Reason
@@ -160,13 +160,13 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 				info.Summary = open.Summary
 			}
 			info.Answerable = status == tickets.StatusNeedsAnswer && open != nil
-			sum.Parked = append(sum.Parked, info)
+			sum.Paused = append(sum.Paused, info)
 			sum.HasRepair = sum.HasRepair || status == tickets.StatusNeedsRepair || status == tickets.StatusError
 		case status == tickets.StatusOpen && answeredLatest(logOf(t)):
 			// An answered gone-agent ticket is open again until gx claims it, yet a
 			// person still wants to see it was answered.
 			info.Answered = true
-			sum.Parked = append(sum.Parked, info)
+			sum.Paused = append(sum.Paused, info)
 		case status == tickets.StatusClaimed:
 			if at, ok := claimedAt(addr); ok {
 				info.ClaimedAt = at
@@ -202,7 +202,7 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 	n := 0
 	for _, t := range e.Tickets {
-		if !isParked(e, t) || e.RenderedStatus(t) == tickets.StatusDraft {
+		if !isPaused(e, t) || e.RenderedStatus(t) == tickets.StatusDraft {
 			continue
 		}
 		if n == 0 {
@@ -219,15 +219,15 @@ func epicMergeBlocked(e tickets.Epic) bool {
 }
 
 // onlyMergeTicketsRemain reports whether every ticket is done or cancelled
-// except merge tickets that are open or claimed. A parked merge ticket does not
-// count, so the epic falls through to Parked.
+// except merge tickets that are open or claimed. A paused merge ticket does not
+// count, so the epic falls through to Paused.
 func onlyMergeTicketsRemain(e tickets.Epic) bool {
 	merging := false
 	for _, t := range e.Tickets {
 		switch e.RenderedStatus(t) {
 		case tickets.StatusDone, tickets.StatusCancelled:
 		case tickets.StatusOpen, tickets.StatusClaimed:
-			if t.Type != string(schema.TypeMerge) || isParked(e, t) {
+			if t.Type != string(schema.TypeMerge) || isPaused(e, t) {
 				return false
 			}
 			merging = true
@@ -239,7 +239,7 @@ func onlyMergeTicketsRemain(e tickets.Epic) bool {
 }
 
 // epicStateFor is the one place that decides an epic's state. Running needs a
-// claimed, non-parked ticket that has a server claim time.
+// claimed, non-paused ticket that has a server claim time.
 func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Time, bool)) EpicState {
 	switch epicStateOf(e) {
 	case epicDone:
@@ -258,7 +258,7 @@ func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Tim
 			return EpicStateMerging
 		}
 		for _, t := range e.Tickets {
-			if isParked(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
+			if isPaused(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
 				continue
 			}
 			addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()

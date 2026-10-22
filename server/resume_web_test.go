@@ -18,11 +18,11 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// parkEnvZeroCommit parks ticket 01 of the answer env as zero-commit and returns
+// pauseEnvZeroCommit pauses ticket 01 of the answer env as zero-commit and returns
 // the state token of its question.
-func parkEnvZeroCommit(t *testing.T, e answerEnv) string {
+func pauseEnvZeroCommit(t *testing.T, e answerEnv) string {
 	t.Helper()
-	if err := e.h.Server.ParkAs(answerAddr, events.ZeroCommit, "no commits"); err != nil {
+	if err := e.h.Server.PauseAs(answerAddr, events.ZeroCommit, "no commits"); err != nil {
 		t.Fatal(err)
 	}
 	return stateOf(t, e.ticket)
@@ -46,20 +46,20 @@ func stateOf(t *testing.T, ticketPath string) string {
 	return fmt.Sprintf("%d:%s", open.Seq, tk.PausedClass().LegacyStatus())
 }
 
-func webUnpark(t *testing.T, h *servertest.Harness, req server.RepairRequest) server.RepairResult {
+func webResume(t *testing.T, h *servertest.Harness, req server.RepairRequest) server.RepairResult {
 	t.Helper()
 	req.Address = answerAddr
-	res, err := h.Server.UnparkAsWeb(req)
+	res, err := h.Server.ResumeAsWeb(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return res
 }
 
-func unparkResult(t *testing.T, res server.RepairResult) repair.UnparkResult {
+func resumeResult(t *testing.T, res server.RepairResult) repair.UnparkResult {
 	t.Helper()
 	if res.Refused {
-		t.Fatalf("unpark refused: %+v", res)
+		t.Fatalf("resume refused: %+v", res)
 	}
 	var out repair.UnparkResult
 	if err := json.Unmarshal(res.Data, &out); err != nil {
@@ -83,18 +83,18 @@ func answerEvents(t *testing.T, ticketPath string) []tickets.LogEvent {
 	return out
 }
 
-func TestWebUnpark_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
+func TestWebResume_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 	e := startAnswerEnv(t, nil)
-	parkEnvZeroCommit(t, e)
+	pauseEnvZeroCommit(t, e)
 
 	for name, state := range map[string]string{"missing": "", "stale": "99:needs-answer"} {
-		res := webUnpark(t, e.h, server.RepairRequest{State: state})
+		res := webResume(t, e.h, server.RepairRequest{State: state})
 		if !res.Refused || res.Reason != server.ReasonStale {
-			t.Fatalf("%s: unpark = %+v; want refusal %s", name, res, server.ReasonStale)
+			t.Fatalf("%s: resume = %+v; want refusal %s", name, res, server.ReasonStale)
 		}
 	}
 	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
-		t.Errorf("ticket = %+v, %v; want still needs-answer", tk, err)
+		t.Errorf("ticket = %+v, %v; want still asking", tk, err)
 	}
 	if got := answerEvents(t, e.ticket); len(got) != 0 {
 		t.Errorf("refusal logged %+v", got)
@@ -104,14 +104,14 @@ func TestWebUnpark_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 	}
 }
 
-func TestWebUnpark_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T) {
+func TestWebResume_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T) {
 	e := startAnswerEnv(t, nil)
-	state := parkEnvZeroCommit(t, e)
+	state := pauseEnvZeroCommit(t, e)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
 		t.Fatal(err)
 	}
 
-	out := unparkResult(t, webUnpark(t, e.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
 	if out.Status != "open" || out.Message != repair.MessageReopened {
 		t.Errorf("result = %+v; want open, %q", out, repair.MessageReopened)
 	}
@@ -120,15 +120,15 @@ func TestWebUnpark_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T)
 	}
 	got := answerEvents(t, e.ticket)
 	if len(got) != 1 || got[0].Choice != "unpark" || got[0].Source != "web" || got[0].Base != "" {
-		t.Errorf("answers = %+v; want one web park.answer{choice: unpark}", got)
+		t.Errorf("answers = %+v; want one web pause.answer{choice: resume}", got)
 	}
 }
 
-func TestWebUnpark_ZeroCommitWithALiveAgentPromptsAndKeepsThePark(t *testing.T) {
+func TestWebResume_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T) {
 	e := startAnswerEnv(t, nil)
-	state := parkEnvZeroCommit(t, e)
+	state := pauseEnvZeroCommit(t, e)
 
-	out := unparkResult(t, webUnpark(t, e.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
 	if out.Status != repair.UnparkPrompted || out.Message != repair.MessagePrompted {
 		t.Errorf("result = %+v; want prompted", out)
 	}
@@ -138,20 +138,20 @@ func TestWebUnpark_ZeroCommitWithALiveAgentPromptsAndKeepsThePark(t *testing.T) 
 		t.Errorf("prompts = %q; want [%q]", got, want)
 	}
 	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
-		t.Errorf("ticket = %+v, %v; want still needs-answer", tk, err)
+		t.Errorf("ticket = %+v, %v; want still asking", tk, err)
 	}
 }
 
-func TestWebUnpark_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
-	p := parkZeroCommit(t, false)
+func TestWebResume_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
+	p := pauseZeroCommit(t, false)
 	state := stateOf(t, p.ticketPath)
 
-	// The agent reports a commitless finish after the park. No rescan ping, so
-	// the unpark is the one that adopts it.
+	// The agent reports a commitless finish after the pause. No rescan ping, so
+	// the resume is the one that adopts it.
 	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(true)); err != nil {
 		t.Fatal(err)
 	}
-	out := unparkResult(t, webUnpark(t, p.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, p.h, server.RepairRequest{State: state}))
 	if out.Status != repair.UnparkAdopted || out.Message != repair.MessageAdopted {
 		t.Errorf("result = %+v; want adopted as done", out)
 	}
@@ -160,7 +160,7 @@ func TestWebUnpark_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
 	}
 }
 
-func TestWebUnpark_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
+func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -175,23 +175,23 @@ func TestWebUnpark_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	state := stateOf(t, path)
 	req := server.RepairRequest{Address: "proj:epic-a/03", State: state, Base: "99"}
 
-	res, err := h.Server.UnparkAsWeb(req)
+	res, err := h.Server.ResumeAsWeb(req)
 	if err != nil || !res.Refused || res.Reason != server.ReasonBadBase {
-		t.Fatalf("unpark with a foreign base = %+v, %v; want refusal %s", res, err, server.ReasonBadBase)
+		t.Fatalf("resume with a foreign base = %+v, %v; want refusal %s", res, err, server.ReasonBadBase)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.PausedClass() != schema.PauseClassAnswer || tk.Base != "" {
 		t.Fatalf("ticket = %+v, %v; want untouched", tk, err)
 	}
 
 	req.Base = "02"
-	if res, err := h.Server.UnparkAsWeb(req); err != nil || res.Refused {
-		t.Fatalf("unpark with a competing base = %+v, %v", res, err)
+	if res, err := h.Server.ResumeAsWeb(req); err != nil || res.Refused {
+		t.Fatalf("resume with a competing base = %+v, %v", res, err)
 	}
 	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusOpen || tk.Base != "02" {
 		t.Errorf("ticket = %+v, %v; want open with base 02", tk, err)
 	}
 	if got := answerEvents(t, path); len(got) != 1 || got[0].Choice != "unpark" || got[0].Base != "02" {
-		t.Errorf("answers = %+v; want park.answer{choice: unpark, base: 02}", got)
+		t.Errorf("answers = %+v; want pause.answer{choice: resume, base: 02}", got)
 	}
 }
 
@@ -212,16 +212,16 @@ func TestDetail_AmbiguousBaseListsTheCompetingBlockers(t *testing.T) {
 	}
 }
 
-func TestUnpark_CLIWithoutATokenStillWorks(t *testing.T) {
+func TestResume_CLIWithoutATokenStillWorks(t *testing.T) {
 	e := startAnswerEnv(t, nil)
-	parkEnvZeroCommit(t, e)
+	pauseEnvZeroCommit(t, e)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
 		t.Fatal(err)
 	}
 
 	res, err := e.h.Client.Repair(context.Background(), "unpark", server.RepairRequest{Address: answerAddr})
 	if err != nil || res.Refused {
-		t.Fatalf("unpark = %+v, %v; want reopened", res, err)
+		t.Fatalf("resume = %+v, %v; want reopened", res, err)
 	}
 	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.Status != schema.StatusOpen {
 		t.Errorf("ticket = %+v, %v; want open", tk, err)
@@ -231,9 +231,9 @@ func TestUnpark_CLIWithoutATokenStillWorks(t *testing.T) {
 	}
 }
 
-func TestWebUnpark_AFailedReopenLeavesNoAnswerAndTheNextUnparkWorks(t *testing.T) {
+func TestWebResume_AFailedReopenLeavesNoAnswerAndTheNextResumeWorks(t *testing.T) {
 	e := startAnswerEnv(t, nil)
-	state := parkEnvZeroCommit(t, e)
+	state := pauseEnvZeroCommit(t, e)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
 		t.Fatal(err)
 	}
@@ -253,15 +253,15 @@ func TestWebUnpark_AFailedReopenLeavesNoAnswerAndTheNextUnparkWorks(t *testing.T
 	}
 	defer restore()
 
-	if res, err := e.h.Server.UnparkAsWeb(server.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
-		t.Fatalf("unpark = %+v; want a failure", res)
+	if res, err := e.h.Server.ResumeAsWeb(server.RepairRequest{Address: answerAddr, State: state}); err == nil && !res.Refused {
+		t.Fatalf("resume = %+v; want a failure", res)
 	}
 	restore()
 	if got := answerEvents(t, e.ticket); len(got) != 0 {
-		t.Errorf("failed unpark logged %+v", got)
+		t.Errorf("failed resume logged %+v", got)
 	}
 
-	out := unparkResult(t, webUnpark(t, e.h, server.RepairRequest{State: state}))
+	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
 	if out.Status != "open" {
 		t.Errorf("retry = %+v; want open", out)
 	}
@@ -270,9 +270,9 @@ func TestWebUnpark_AFailedReopenLeavesNoAnswerAndTheNextUnparkWorks(t *testing.T
 	}
 }
 
-func TestWebUnpark_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
+func TestWebResume_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
 	e := startAnswerEnv(t, nil)
-	state := parkEnvZeroCommit(t, e)
+	state := pauseEnvZeroCommit(t, e)
 
 	logPath := tickets.LogPath(e.ticket)
 	if err := os.Chmod(logPath, 0); err != nil {
@@ -280,11 +280,11 @@ func TestWebUnpark_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
 	}
 	defer os.Chmod(logPath, 0o644)
 
-	res, err := e.h.Server.UnparkAsWeb(server.RepairRequest{Address: answerAddr, State: state})
+	res, err := e.h.Server.ResumeAsWeb(server.RepairRequest{Address: answerAddr, State: state})
 	if err == nil {
-		t.Fatalf("unpark = %+v; want an error", res)
+		t.Fatalf("resume = %+v; want an error", res)
 	}
 	if res.Refused {
-		t.Errorf("unpark = %+v; a read error must not be a stale refusal", res)
+		t.Errorf("resume = %+v; a read error must not be a stale refusal", res)
 	}
 }

@@ -55,7 +55,7 @@ func TestUnread_FocusedTUIViewingSuppressesAndClears(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Drained, so the server never drops the stream for lagging.
+	// Flushed, so the server never drops the stream for lagging.
 	go func() {
 		for range tuiEvs {
 		}

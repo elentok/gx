@@ -13,7 +13,7 @@ import (
 
 func TestWeb_EpicMergeChecksTheShownState(t *testing.T) {
 	store := t.TempDir()
-	// A done commitless epic is awaiting merge and has no branch to land.
+	// A done commitless epic is awaiting merge and has no branch to merge.
 	servertest.WriteTicketWith(t, store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })

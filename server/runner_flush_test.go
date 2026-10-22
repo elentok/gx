@@ -24,7 +24,7 @@ func TestStart_LogsRunsStillOnANonConfiguredRunner(t *testing.T) {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("no drain line for runner a:\n%s", log)
+			t.Fatalf("no flush line for runner a:\n%s", log)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

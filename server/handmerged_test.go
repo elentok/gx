@@ -51,7 +51,7 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-func TestHandLanded_PlainGitMergeReleasesAnOnLandedDependent(t *testing.T) {
+func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "blocker")
 	writeCompleteEpic(t, store, "blocker")
@@ -87,13 +87,13 @@ func TestHandLanded_PlainGitMergeReleasesAnOnLandedDependent(t *testing.T) {
 	}
 }
 
-func TestHandLanded_ParkedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T) {
+func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, "a.txt")
 		testutil.WriteFile(t, f.repo, "a.txt", "local")
 	}, chat)
-	f.parkRoot(t)
+	f.pauseRoot(t)
 
 	if err := os.Remove(filepath.Join(f.repo, "a.txt")); err != nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ func TestHandLanded_ParkedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 	}
 }
 
-func TestHandLanded_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T) {
+func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	writeCompleteEpic(t, store, "idle")
 	writeCompleteEpic(t, store, "waited")
@@ -118,7 +118,7 @@ func TestHandLanded_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	var mu sync.Mutex
 	var probed []string
-	h.Server.SetLandedProbe(func(_, ancestor, _ string) (bool, error) {
+	h.Server.SetMergedProbe(func(_, ancestor, _ string) (bool, error) {
 		mu.Lock()
 		defer mu.Unlock()
 		probed = append(probed, ancestor)

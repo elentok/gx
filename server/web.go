@@ -102,8 +102,8 @@ func (s *Server) webHandler() http.Handler {
 // require a state token. There is deliberately no withdraw or undo route.
 var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/tickets/answer": func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketAnswer) },
-	"POST /v1/tickets/resume": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairUnpark) },
-	"POST /v1/tickets/unpark": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairUnpark) },
+	"POST /v1/tickets/resume": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
+	"POST /v1/tickets/unpark": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
 	"POST /v1/queue/add":      func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.queueAdd) },
 	"POST /v1/epics/merge":    func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicMerge) },
 	"POST /v1/agents/answer":  func(s *Server) http.HandlerFunc { return s.queueWrite(s.agentAnswerWeb) },

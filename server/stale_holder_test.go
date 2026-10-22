@@ -67,21 +67,21 @@ func TestLaunch_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
 	}
 }
 
-// assertParkedNameTaken checks the launch logged launch-failed, then parked
+// assertPausedNameTaken checks the launch logged launch-failed, then paused
 // agent_name_taken with a reason containing want, and that R6 matches it.
-func assertParkedNameTaken(t *testing.T, h *servertest.Harness, want ...string) {
+func assertPausedNameTaken(t *testing.T, h *servertest.Harness, want ...string) {
 	t.Helper()
 	logged := runLog(t, h)
 	failed := slices.IndexFunc(logged, func(ev ralphloop.Event) bool {
 		return ev.Type == string(events.LaunchFailed) && ev.Kind == string(events.AgentNameTaken)
 	})
-	park := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.Paused) })
-	if failed < 0 || park < failed || logged[park].Kind != string(events.AgentNameTaken) {
-		t.Fatalf("run log = %+v, want launch-failed then a needs-repair agent_name_taken park", logged)
+	pause := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.Paused) })
+	if failed < 0 || pause < failed || logged[pause].Kind != string(events.AgentNameTaken) {
+		t.Fatalf("run log = %+v, want launch-failed then a stuck agent_name_taken pause", logged)
 	}
 	for _, w := range want {
-		if !strings.Contains(logged[park].Reason, w) {
-			t.Errorf("park reason %q lacks %q", logged[park].Reason, w)
+		if !strings.Contains(logged[pause].Reason, w) {
+			t.Errorf("pause reason %q lacks %q", logged[pause].Reason, w)
 		}
 	}
 	c := recovery.Default()
@@ -89,7 +89,7 @@ func assertParkedNameTaken(t *testing.T, h *servertest.Harness, want ...string) 
 		c.Entries[i].Enabled = c.Entries[i].ID == "R6"
 	}
 	var seq []recovery.Event
-	for _, ev := range logged[:park+1] {
+	for _, ev := range logged[:pause+1] {
 		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason})
 	}
 	if e, ok := c.Match(seq); !ok || e.ID != "R6" {
@@ -97,10 +97,10 @@ func assertParkedNameTaken(t *testing.T, h *servertest.Harness, want ...string) 
 	}
 }
 
-func TestLaunch_WorkingHolderParksNameTakenAndKeepsThePane(t *testing.T) {
+func TestLaunch_WorkingHolderPausesNameTakenAndKeepsThePane(t *testing.T) {
 	spy, holder := spyWithHolder(t, agentrunner.StateWorking)
 	h := launchOne(t, spy, server.EventIterationLaunchFailed)
-	assertParkedNameTaken(t, h, holder.ID, "working")
+	assertPausedNameTaken(t, h, holder.ID, "working")
 	if closed := ofType(runLog(t, h), events.StalePaneClosed); len(closed) != 0 {
 		t.Errorf("stale-pane-closed = %+v, want none", closed)
 	}
@@ -109,11 +109,11 @@ func TestLaunch_WorkingHolderParksNameTakenAndKeepsThePane(t *testing.T) {
 	}
 }
 
-func TestLaunch_SecondNameTakenAfterClosingParks(t *testing.T) {
+func TestLaunch_SecondNameTakenAfterClosingPauses(t *testing.T) {
 	spy, _ := spyWithHolder(t, agentrunner.StateIdle)
 	spy.SetStartErr(holderLabel, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, holderLabel))
 	h := launchOne(t, spy, server.EventIterationLaunchFailed)
-	assertParkedNameTaken(t, h)
+	assertPausedNameTaken(t, h)
 	if closed := ofType(runLog(t, h), events.StalePaneClosed); len(closed) != 1 {
 		t.Errorf("stale-pane-closed = %+v, want exactly one: the retry happens once", closed)
 	}

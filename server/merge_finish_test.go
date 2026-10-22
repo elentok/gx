@@ -48,7 +48,7 @@ func advanceTrunk(t *testing.T, f *schedFixture, name, content string) {
 	testutil.CommitAll(t, f.repo, "trunk "+name)
 }
 
-func assertParked(t *testing.T, f *schedFixture, tk schema.Ticket, status schema.Status, kind events.Kind, reason string) {
+func assertFixturePaused(t *testing.T, f *schedFixture, tk schema.Ticket, status schema.Status, kind events.Kind, reason string) {
 	t.Helper()
 	assertPaused(t, tk, legacyClass(status), schema.ParsePauseReason(string(kind)))
 	if t.Failed() {
@@ -70,15 +70,15 @@ func TestMergeFinish_FixerCommitOnTheEpicStillFinishesDone(t *testing.T) {
 	}
 }
 
-func TestMergeFinish_TargetNotAnAncestorParksNeedsRepair(t *testing.T) {
+func TestMergeFinish_TargetNotAnAncestorPausesStuck(t *testing.T) {
 	f, tk := runMergeTicket(t, func(f *schedFixture, _ string) string {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
 		return "finished"
 	})
-	assertParked(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "is not an ancestor of "+schedEpic)
+	assertFixturePaused(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "is not an ancestor of "+schedEpic)
 }
 
-func TestMergeFinish_RebaseInProgressParksNeedsRepair(t *testing.T) {
+func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
 	f, tk := runMergeTicket(t, func(f *schedFixture, cwd string) string {
 		testutil.WriteFile(t, cwd, "x.txt", "epic")
 		testutil.CommitAll(t, cwd, "epic x")
@@ -89,32 +89,32 @@ func TestMergeFinish_RebaseInProgressParksNeedsRepair(t *testing.T) {
 		}
 		return "finished"
 	})
-	assertParked(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "rebase still in progress")
+	assertFixturePaused(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "rebase still in progress")
 }
 
-func TestMergeFinish_SelfReportedNeedsAnswerParksNeedsAnswer(t *testing.T) {
+func TestMergeFinish_SelfReportedAskingPausesAsking(t *testing.T) {
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "needs-answer" })
-	assertParked(t, f, tk, schema.StatusNeedsAnswer, events.SelfReported, "")
+	assertFixturePaused(t, f, tk, schema.StatusNeedsAnswer, events.SelfReported, "")
 }
 
-func TestMergeFinish_AgentStoppingWithoutAReportParksNeedsRepair(t *testing.T) {
+func TestMergeFinish_AgentStoppingWithoutAReportPausesStuck(t *testing.T) {
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "" })
-	assertParked(t, f, tk, schema.StatusNeedsRepair, events.MergeUnreported, "without reporting")
+	assertFixturePaused(t, f, tk, schema.StatusNeedsRepair, events.MergeUnreported, "without reporting")
 }
 
-// reportMergeFinishedLate is the parked merge agent reporting finished after
-// its park, and the store rescan that follows.
+// reportMergeFinishedLate is the paused merge agent reporting finished after
+// its pause, and the store rescan that follows.
 func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 	t.Helper()
-	var park ralphloop.Event
+	var pause ralphloop.Event
 	waitFor(t, func() bool {
 		var ok bool
-		park, ok = ralphloop.LatestParkEvent(filepath.Join(f.store, "proj"), schedEpic, "01")
+		pause, ok = ralphloop.LatestParkEvent(filepath.Join(f.store, "proj"), schedEpic, "01")
 		return ok
 	})
 	if err := schema.UpdateTicket(f.ticketFile(t, "01"), func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
-		tk.IterationFinishedAt = park.Time.Add(time.Second)
+		tk.IterationFinishedAt = pause.Time.Add(time.Second)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestLateFinish_MergeUnreportedClosesDoneOnceChecksPass(t *testing.T) {
 	f.assertFeatureKept(t, "late finish")
 }
 
-func TestLateFinish_MergeUnreportedStaysParkedWhileChecksFail(t *testing.T) {
+func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
 	f, _ := runMergeTicket(t, func(f *schedFixture, _ string) string {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
 		return ""
@@ -170,6 +170,6 @@ func TestLateFinish_MergeUnreportedStaysParkedWhileChecksFail(t *testing.T) {
 	}
 }
 
-func TestMergeFinish_BudgetKillParksBudgetKilled(t *testing.T) {
-	testBudgetKillParksBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{Type: "merge"})
+func TestMergeFinish_BudgetKillPausesBudgetKilled(t *testing.T) {
+	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{Type: "merge"})
 }

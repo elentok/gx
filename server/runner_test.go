@@ -234,7 +234,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	}
 
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	// The server rescans once right after start; let that finish so the edit lands after it.
+	// The server rescans once right after start; let that finish so the edit merges after it.
 	time.Sleep(300 * time.Millisecond)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -279,7 +279,7 @@ func readFile(t *testing.T, path string) string {
 	return string(data)
 }
 
-func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
+func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -334,7 +334,7 @@ func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 	}
 }
 
-func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *testing.T) {
+func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -375,11 +375,11 @@ func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *tes
 	}
 }
 
-// A claim that parks on an ambiguous base launches nothing, so claimNext must
+// A claim that pauses on an ambiguous base launches nothing, so claimNext must
 // not count it against the concurrency limit. The frontier never offers such a
 // ticket (it shares the blocking rule with base derivation), so the claim is
 // driven directly.
-func TestRunner_AmbiguousBaseParksWithoutLaunching(t *testing.T) {
+func TestRunner_AmbiguousBasePausesWithoutLaunching(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -393,7 +393,7 @@ func TestRunner_AmbiguousBaseParksWithoutLaunching(t *testing.T) {
 		t.Fatal(err)
 	}
 	if launched {
-		t.Error("claim reported launched, want parked with no slot used")
+		t.Error("claim reported launched, want paused with no slot used")
 	}
 	if runs := h.Server.Runs(); len(runs) != 0 {
 		t.Errorf("runs = %+v, want none", runs)
@@ -414,7 +414,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	})
 	_, _, cwd := registerLaunch(h)
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
-		// Root A lands on main first, so root B needs work of its own to commit.
+		// Root A merges on main first, so root B needs work of its own to commit.
 		testutil.WriteFile(t, *cwd, filepath.Base(*cwd)+".txt", "work")
 		testutil.CommitAll(t, *cwd, "agent work")
 		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
@@ -763,7 +763,7 @@ func registerLiveAgent(h *servertest.Harness) {
 	})
 }
 
-func TestRunner_RestartParksAHandleWhoseWorktreeIsGone(t *testing.T) {
+func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -841,7 +841,7 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 		log, _ := os.ReadFile(server.LogPath(h.StateDir))
 		t.Fatalf("events = %v, want %v\nserver log:\n%s", seen, want, log)
 	}
-	// The land writes under the project, where the manual land and the
+	// The merge writes under the project, where the manual merge and the
 	// tickets live, never under a phantom <store>/<epic>.
 	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {
@@ -851,11 +851,11 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 		t.Errorf("no cherry-picked event in the project's run log: %v", logged)
 	}
 	if _, err := os.Stat(filepath.Join(store, "epic-a")); !os.IsNotExist(err) {
-		t.Errorf("land wrote under the store root: stat %s: %v", filepath.Join(store, "epic-a"), err)
+		t.Errorf("merge wrote under the store root: stat %s: %v", filepath.Join(store, "epic-a"), err)
 	}
 }
 
-func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *testing.T) {
+func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -863,10 +863,10 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
-	registerLaunch(h) // the agent finishes without committing, so the ticket parks
+	registerLaunch(h) // the agent finishes without committing, so the ticket pauses
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	started := chat.waitStarted(t) // so the park message never shares a post with it
+	started := chat.waitStarted(t) // so the pause message never shares a post with it
 
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {

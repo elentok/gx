@@ -14,19 +14,19 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// adoptablePark reports whether a late finish can adopt a pause with this
+// adoptablePause reports whether a late finish can adopt a pause with this
 // reason: a zero-commit one, or a merge agent's unreported stop. A reason
 // implies its class, so the reason alone decides.
-func adoptablePark(status schema.Status, reason schema.PauseReason) bool {
+func adoptablePause(status schema.Status, reason schema.PauseReason) bool {
 	return status == schema.StatusPaused && (reason == schema.PauseZeroCommit || reason == schema.PauseMergeUnreported)
 }
 
-// lateFinish is an adoptable park whose agent reported finished after it.
+// lateFinish is an adoptable pause whose agent reported finished after it.
 type lateFinish struct {
 	dir        string
 	addr       tickets.Address
 	path       string
-	park       ralphloop.Event
+	pause      ralphloop.Event
 	finishedAt time.Time
 	commitless bool
 }
@@ -65,7 +65,7 @@ func (f *inFlight) running(key string) <-chan struct{} {
 	return f.m[key]
 }
 
-// adoptFirst is unpark's and relaunch's late-finish check: it adopts a match
+// adoptFirst is resume's and relaunch's late-finish check: it adopts a match
 // itself, or waits out the adoption a rescan already started, and reports
 // whether the ticket ended adopted.
 func (s *Server) adoptFirst(dir string, addr tickets.Address, path string) bool {
@@ -96,7 +96,7 @@ func (s *Server) scanLateFinishes() {
 		epics, _ := s.idx.epicsOf(dir)
 		for _, e := range epics {
 			for _, t := range e.Tickets {
-				if !adoptablePark(schema.Status(t.Status), t.PauseReason) {
+				if !adoptablePause(schema.Status(t.Status), t.PauseReason) {
 					continue
 				}
 				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(e.Path), ID: t.Identifier}
@@ -113,42 +113,42 @@ func (s *Server) scanLateFinishes() {
 	}
 }
 
-// lateFinishOf reports whether the ticket is untouched since its latest park,
-// an adoptable one, and its agent reported finished after that park. Only
-// status and park kind are compared: a person who unparked, reset or re-parked
+// lateFinishOf reports whether the ticket is untouched since its latest pause,
+// an adoptable one, and its agent reported finished after that pause. Only
+// status and pause kind are compared: a person who resumed, reset or re-paused
 // it changed one of them.
 func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bool) {
 	t, err := schema.ParseTicket(path)
-	if err != nil || !adoptablePark(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
+	if err != nil || !adoptablePause(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
 		return lateFinish{}, false
 	}
-	park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
-	if !ok || park.Type != string(events.Paused) || park.Kind != string(t.PauseReason) || !t.IterationFinishedAt.After(park.Time) {
+	pause, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
+	if !ok || pause.Type != string(events.Paused) || pause.Kind != string(t.PauseReason) || !t.IterationFinishedAt.After(pause.Time) {
 		return lateFinish{}, false
 	}
-	return lateFinish{dir: dir, addr: addr, path: path, park: park, finishedAt: t.IterationFinishedAt, commitless: t.IsCommitless()}, true
+	return lateFinish{dir: dir, addr: addr, path: path, pause: pause, finishedAt: t.IterationFinishedAt, commitless: t.IsCommitless()}, true
 }
 
-// adoptLateFinish lands a late finish with commits, or closes a commitless one
-// with none, through the iteration's own finish path. The park dropped the
-// runs.json entry, so the runner and label come from the park event. A late
-// commit with no commitless report, or none at all, stays parked. A merge
-// ticket closes once its finish checks pass, and stays parked until then, so
+// adoptLateFinish merges a late finish with commits, or closes a commitless one
+// with none, through the iteration's own finish path. The pause dropped the
+// runs.json entry, so the runner and label come from the pause event. A late
+// commit with no commitless report, or none at all, stays paused. A merge
+// ticket closes once its finish checks pass, and stays paused until then, so
 // a later rescan retries after a person fixes the epic.
 func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	addr := lf.addr
 	label, branch, worktree := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
-	if lf.park.Label != "" {
-		label = lf.park.Label
+	if lf.pause.Label != "" {
+		label = lf.pause.Label
 	}
 	run := Run{
-		Address: addr.String(), Agent: string(lf.park.Agent), Runner: lf.park.Runner,
-		Session: agentrunner.Session{Label: label, SessionID: lf.park.AgentSession},
-		Model:   lf.park.Model, Effort: lf.park.Effort,
+		Address: addr.String(), Agent: string(lf.pause.Agent), Runner: lf.pause.Runner,
+		Session: agentrunner.Session{Label: label, SessionID: lf.pause.AgentSession},
+		Model:   lf.pause.Model, Effort: lf.pause.Effort,
 	}
 	runner := s.runnerForRun(run)
 	if runner == nil {
-		s.log.Warn("late finish: runner unavailable", "ticket", addr, "runner", lf.park.Runner)
+		s.log.Warn("late finish: runner unavailable", "ticket", addr, "runner", lf.pause.Runner)
 		return false
 	}
 	_, repo, err := s.projectOf(addr.Project)
@@ -162,8 +162,8 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		s.log.Warn("late finish", "ticket", addr, "err", err)
 		return false
 	}
-	// Only a merge ticket runs in the feature worktree, and only it parks merge-unreported.
-	if mode.feature != (lf.park.Kind == string(events.MergeUnreported)) {
+	// Only a merge ticket runs in the feature worktree, and only it pauses merge-unreported.
+	if mode.feature != (lf.pause.Kind == string(events.MergeUnreported)) {
 		return false
 	}
 	deps := s.depsWith(runner)
@@ -181,11 +181,11 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		}
 		pane = sess.ID
 	}
-	// A person may have unparked or re-parked it while the agent settled.
+	// A person may have resumed or re-paused it while the agent settled.
 	if _, ok := lateFinishOf(lf.dir, addr, lf.path); !ok {
 		return false
 	}
-	// A failing check here would re-park iteration-error, which is never adopted.
+	// A failing check here would re-pause iteration-error, which is never adopted.
 	if mode.feature {
 		target, err := mode.target()
 		if err != nil {
@@ -196,10 +196,10 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 			return false
 		}
 	}
-	if !s.lands.begin() {
+	if !s.merges.begin() {
 		return false
 	}
-	defer s.lands.end()
+	defer s.merges.end()
 	// The finish makes the ticket's investigations claimable; the claim waits
 	// until the unstarted ones are cancelled.
 	s.adoptMu.Lock()
@@ -218,14 +218,14 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	}
 	out, err := mode.finish(deps, one, wt, pane)
 	if err != nil {
-		if perr := s.parkTicket(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
-			s.log.Warn("late finish: park failed finish", "ticket", addr, "err", perr)
+		if perr := s.pauseTicket(lf.dir, addr, lf.path, events.IterationError, err.Error(), run); perr != nil {
+			s.log.Warn("late finish: pause failed finish", "ticket", addr, "err", perr)
 		}
 		s.events.publish(EventIterationFailed, addr.String())
 		return false
 	}
 	if !out.Landed {
-		s.log.Warn("late finish re-parked", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
+		s.log.Warn("late finish re-paused", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
 		s.events.publish(EventIterationPaused, addr.String())
 		return false
 	}
@@ -234,12 +234,12 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		outcome = "closed merge"
 	} else if ahead > 0 {
 		sha = ralphloop.LatestLandedSHA(lf.dir, addr.Epic, addr.ID)
-		outcome = "landed " + sha
+		outcome = "merged " + sha
 	}
 	s.logEvent(addr, ralphloop.Event{
 		Type: string(events.LateFinishAdopted), SHA: sha,
-		Reason: fmt.Sprintf("parked %s, finished %s; %s",
-			lf.park.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),
+		Reason: fmt.Sprintf("paused %s, finished %s; %s",
+			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),
 	})
 	s.events.publish(EventTicketDone, addr.String())
 	s.stampRetro(addr, lf.path, false)

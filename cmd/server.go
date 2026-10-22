@@ -510,9 +510,9 @@ func processAlive(pid int) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-// stopTimeout outlasts server.DefaultLandStopTimeout so a stop that waits for a
+// stopTimeout outlasts server.DefaultMergeStopTimeout so a stop that waits for a
 // land is not reported as a failure.
-const stopTimeout = server.DefaultLandStopTimeout + 15*time.Second
+const stopTimeout = server.DefaultMergeStopTimeout + 15*time.Second
 
 func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
 	if ctx == nil {

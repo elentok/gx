@@ -157,7 +157,7 @@ func (f graceFixture) countBanners(title string) int {
 	return n
 }
 
-func (f graceFixture) parkKind(t *testing.T) string {
+func (f graceFixture) pauseKind(t *testing.T) string {
 	t.Helper()
 	tk, err := schema.ParseTicket(filepath.Join(f.store, "proj", "epic-a", "issues", "01-first.md"))
 	if err != nil {
@@ -193,8 +193,8 @@ func (f graceFixture) expectCancelled(t *testing.T) {
 	if st := f.h.Server.BudgetStatusAt(time.Now()); st.BudgetPaused || !f.h.Server.HardStopAt().IsZero() {
 		t.Errorf("status = %+v, want unpaused with no stop time", st)
 	}
-	if kind := f.parkKind(t); kind != "" {
-		t.Errorf("park kind = %q, want the agent still running", kind)
+	if kind := f.pauseKind(t); kind != "" {
+		t.Errorf("pause kind = %q, want the agent still running", kind)
 	}
 }
 
@@ -203,8 +203,8 @@ func (f graceFixture) expectCancelled(t *testing.T) {
 func TestHardLimitGrace_ExpiryStopsAgents(t *testing.T) {
 	f := startGraceServer(t, 600*time.Millisecond)
 	f.lowerBelowSpend(t)
-	if kind := f.parkKind(t); kind != "" {
-		t.Fatalf("park kind = %q right after the reload, want no kill yet", kind)
+	if kind := f.pauseKind(t); kind != "" {
+		t.Fatalf("pause kind = %q right after the reload, want no kill yet", kind)
 	}
 	f.expectHeld(t)
 
@@ -219,8 +219,8 @@ func TestHardLimitGrace_ExpiryStopsAgents(t *testing.T) {
 	if !f.hasBanner(done) {
 		t.Errorf("banners = %+v, want the done banner", f.h.Banners.Sent())
 	}
-	if kind := f.parkKind(t); kind != string(events.BudgetKilled) {
-		t.Errorf("park kind = %q, want budget-killed", kind)
+	if kind := f.pauseKind(t); kind != string(events.BudgetKilled) {
+		t.Errorf("pause kind = %q, want budget-killed", kind)
 	}
 	if !f.h.Server.BudgetStatusAt(time.Now()).HardLatched {
 		t.Error("hard limit not latched after the grace period")
@@ -309,8 +309,8 @@ func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
 	if n := f.countBanners(done); n != 1 {
 		t.Errorf("done banners = %d, want 1", n)
 	}
-	if kind := f.parkKind(t); kind != string(events.BudgetKilled) {
-		t.Errorf("park kind = %q, want budget-killed", kind)
+	if kind := f.pauseKind(t); kind != string(events.BudgetKilled) {
+		t.Errorf("pause kind = %q, want budget-killed", kind)
 	}
 	mu.Lock()
 	defer mu.Unlock()

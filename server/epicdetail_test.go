@@ -130,10 +130,10 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 	if r := rowOf(t, d, "proj:work/05"); !slices.Equal(r.Blockers, []string{"04"}) {
 		t.Errorf("own-epic blockers = %v, want [04]", r.Blockers)
 	}
-	if r := rowOf(t, d, "proj:work/06"); !r.NeedsAnswer || r.Question != question {
+	if r := rowOf(t, d, "proj:work/06"); !r.Asking || r.Question != question {
 		t.Errorf("row 06 = %+v, want needs_answer with the question", r)
 	}
-	if r := rowOf(t, d, "proj:work/04"); r.NeedsAnswer || r.Question != "" {
+	if r := rowOf(t, d, "proj:work/04"); r.Asking || r.Question != "" {
 		t.Errorf("row 04 = %+v, want no answer flag", r)
 	}
 	if strings.Contains(strings.ToLower(body), "token") || strings.Contains(body, "context_window") {
@@ -171,12 +171,12 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 	})
 	code, d, body := getEpicDetail(t, h, base, "proj:blocked")
 	if code != http.StatusOK || d.State != server.EpicStatePaused ||
-		d.LandBlockKind != "self-reported" || d.LandBlockReason != "conflict in main.go" {
+		d.MergeBlockKind != "self-reported" || d.MergeBlockReason != "conflict in main.go" {
 		t.Errorf("blocked = %d, %+v (%s)", code, d, body)
 	}
 	_, d, body = getEpicDetail(t, h, base, "proj:unmerged")
-	if d.LandBlockKind != "" || d.LandBlockReason != "" {
-		t.Errorf("an unblocked epic carries a land block: %s", body)
+	if d.MergeBlockKind != "" || d.MergeBlockReason != "" {
+		t.Errorf("an unblocked epic carries a merge block: %s", body)
 	}
 }
 
@@ -225,7 +225,7 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 	if r := rowOf(t, d, "proj:atlas/01"); r.Title != "A" || r.RenderedStatus != "done" || r.Type != "" || r.Elapsed != 0 || r.Cost != 0 {
 		t.Errorf("row 01 = %+v, want title and status only", r)
 	}
-	if r := rowOf(t, d, "proj:atlas/02"); r.Blockers != nil || r.NeedsAnswer {
+	if r := rowOf(t, d, "proj:atlas/02"); r.Blockers != nil || r.Asking {
 		t.Errorf("row 02 = %+v, want no blockers and no answer flag", r)
 	}
 }

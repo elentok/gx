@@ -27,7 +27,7 @@ import (
 )
 
 // startRecovery starts a server whose catalog has one test-only low-authority
-// rule that relaunches a ticket parked on an iteration error, and reports each remedy result.
+// rule that relaunches a ticket paused on an iteration error, and reports each remedy result.
 func startRecovery(t *testing.T, optOut bool) (*servertest.Harness, <-chan recovery.Result) {
 	t.Helper()
 	return startRecoveryWith(t, optOut, recovery.AuthorityLow)
@@ -62,11 +62,11 @@ func startRecoveryWith(t *testing.T, optOut bool, authority recovery.Authority) 
 	return h, results
 }
 
-func TestRecovery_MatchingParkRunsItsRemedyThroughAServerVerb(t *testing.T) {
+func TestRecovery_MatchingPauseRunsItsRemedyThroughAServerVerb(t *testing.T) {
 	h, results := startRecovery(t, false)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	select {
 	case res := <-results:
@@ -78,11 +78,11 @@ func TestRecovery_MatchingParkRunsItsRemedyThroughAServerVerb(t *testing.T) {
 	}
 }
 
-func TestRecovery_RecoveredParkLeavesMatchedAndAppliedWithKind(t *testing.T) {
+func TestRecovery_RecoveredPauseLeavesMatchedAndAppliedWithKind(t *testing.T) {
 	h, results := startRecovery(t, false)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	select {
 	case <-results:
@@ -118,7 +118,7 @@ func TestRecovery_RecoveredParkLeavesMatchedAndAppliedWithKind(t *testing.T) {
 	}
 }
 
-func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
+func TestRecovery_SpinningPauseIsRecordedByR1WithoutANudge(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -127,7 +127,7 @@ func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
 	})
 	registerLaunch(h)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -143,15 +143,15 @@ func TestRecovery_SpinningParkIsRecordedByR1WithoutANudge(t *testing.T) {
 	for _, ev := range log {
 		switch events.Type(ev.Type) {
 		case events.RecoveryApplied, events.RecoveryEscalated, events.RecoveryProposed, events.Reclaimed:
-			t.Errorf("unexpected %s after a spinning park", ev.Type)
+			t.Errorf("unexpected %s after a spinning pause", ev.Type)
 		}
 	}
 }
 
-// parkStalledLaunch parks ticket 01 the way a launch whose prompt stalled ends,
+// pauseStalledLaunch pauses ticket 01 the way a launch whose prompt stalled ends,
 // with the pane answering prompts with promptErr, and returns R5's applied
 // event plus what was typed and which tabs were closed.
-func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, typed, closed []string) {
+func pauseStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, typed, closed []string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -188,7 +188,7 @@ func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, 
 	if err := ralphloop.AppendEvent(dir, "epic-a", stalled); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.Server.ParkAs("proj:epic-a/01", events.AgentPromptStalled, "agent_prompt_stalled"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.AgentPromptStalled, "agent_prompt_stalled"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -207,7 +207,7 @@ func parkStalledLaunch(t *testing.T, promptErr error) (applied ralphloop.Event, 
 }
 
 func TestRecovery_StalledPromptIsRetypedInFullByR5(t *testing.T) {
-	applied, typed, closed := parkStalledLaunch(t, nil)
+	applied, typed, closed := pauseStalledLaunch(t, nil)
 	if applied.Reason != "R5" || applied.Kind != string(events.AgentPromptStalled) || applied.Outcome != "ok" {
 		t.Errorf("applied = %+v, want R5 ok", applied)
 	}
@@ -221,7 +221,7 @@ func TestRecovery_StalledPromptIsRetypedInFullByR5(t *testing.T) {
 
 func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
 	// Not a stall: herdrrunner nudge-retries a stalled prompt.
-	applied, typed, closed := parkStalledLaunch(t, errors.New("pane is gone"))
+	applied, typed, closed := pauseStalledLaunch(t, errors.New("pane is gone"))
 	if applied.Reason != "R5" || applied.Outcome == "ok" {
 		t.Errorf("applied = %+v, want a failed R5", applied)
 	}
@@ -233,10 +233,10 @@ func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
 	}
 }
 
-// parkTimedOutCompaction parks ticket 01 the way an iteration ends after its
+// pauseTimedOutCompaction pauses ticket 01 the way an iteration ends after its
 // smart-zone compaction wait timed out, with the pane answering the extended
 // wait with waitErr, and returns R7's applied event plus what was typed.
-func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Event, waits int, typed []string) {
+func pauseTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Event, waits int, typed []string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -283,7 +283,7 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 			t.Fatal(err)
 		}
 	}
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "compact recovery exhausted"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "compact recovery exhausted"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -302,7 +302,7 @@ func parkTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Even
 }
 
 func TestRecovery_TimedOutCompactionIsReWaitedOnceThenFinishedUpByR7(t *testing.T) {
-	applied, waits, typed := parkTimedOutCompaction(t, nil)
+	applied, waits, typed := pauseTimedOutCompaction(t, nil)
 	if applied.Reason != "R7" || applied.Kind != string(events.IterationError) || applied.Outcome != "ok" {
 		t.Errorf("applied = %+v, want R7 ok", applied)
 	}
@@ -314,8 +314,8 @@ func TestRecovery_TimedOutCompactionIsReWaitedOnceThenFinishedUpByR7(t *testing.
 	}
 }
 
-func TestRecovery_SecondCompactionTimeoutLeavesTheParkToAPerson(t *testing.T) {
-	applied, waits, typed := parkTimedOutCompaction(t, errors.New("timed out waiting for agent status"))
+func TestRecovery_SecondCompactionTimeoutLeavesThePauseToAPerson(t *testing.T) {
+	applied, waits, typed := pauseTimedOutCompaction(t, errors.New("timed out waiting for agent status"))
 	if applied.Reason != "R7" || applied.Outcome == "ok" {
 		t.Errorf("applied = %+v, want a failed R7", applied)
 	}
@@ -324,10 +324,10 @@ func TestRecovery_SecondCompactionTimeoutLeavesTheParkToAPerson(t *testing.T) {
 	}
 }
 
-// parkAfterSeeding appends seed events to ticket 01's run log (as a previous
-// server run would have left them), parks it, and returns the escalation, or
-// nil once the park's own recovery is applied instead.
-func parkAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, <-chan recovery.Result) {
+// pauseAfterSeeding appends seed events to ticket 01's run log (as a previous
+// server run would have left them), pauses it, and returns the escalation, or
+// nil once the pause's own recovery is applied instead.
+func pauseAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, <-chan recovery.Result) {
 	t.Helper()
 	h, results := startRecovery(t, false)
 	dir := filepath.Join(h.TicketStore, "proj")
@@ -337,8 +337,8 @@ func parkAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event, 
 			t.Fatal(err)
 		}
 	}
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
@@ -363,8 +363,8 @@ func applied(kind events.Kind) ralphloop.Event {
 }
 
 func TestRecovery_SecondFailureOfTheSameKindEscalatesInsteadOfRecovering(t *testing.T) {
-	// A landing between the two clears the failed-recovery rule, leaving the cap.
-	esc, results := parkAfterSeeding(t, applied(events.IterationError), ralphloop.Event{Type: string(events.CherryPicked)})
+	// A merging between the two clears the failed-recovery rule, leaving the cap.
+	esc, results := pauseAfterSeeding(t, applied(events.IterationError), ralphloop.Event{Type: string(events.CherryPicked)})
 	if esc == nil || esc.Kind != string(events.IterationError) {
 		t.Fatalf("escalation = %+v, want recovery-escalated for iteration-error", esc)
 	}
@@ -376,16 +376,16 @@ func TestRecovery_SecondFailureOfTheSameKindEscalatesInsteadOfRecovering(t *test
 }
 
 func TestRecovery_PerTicketCapEscalatesDifferentKinds(t *testing.T) {
-	landed := ralphloop.Event{Type: string(events.CherryPicked)}
-	esc, _ := parkAfterSeeding(t,
-		applied(events.ZeroCommit), landed, applied(events.Spinning), landed, applied(events.RetryExhausted), landed)
+	merged := ralphloop.Event{Type: string(events.CherryPicked)}
+	esc, _ := pauseAfterSeeding(t,
+		applied(events.ZeroCommit), merged, applied(events.Spinning), merged, applied(events.RetryExhausted), merged)
 	if esc == nil {
 		t.Fatal("fourth recovery was not escalated")
 	}
 }
 
 func TestRecovery_ReFailRightAfterARecoveryOfTheSameKindIsAFailedRecovery(t *testing.T) {
-	esc, _ := parkAfterSeeding(t, applied(events.IterationError))
+	esc, _ := pauseAfterSeeding(t, applied(events.IterationError))
 	if esc == nil {
 		t.Fatal("re-fail after a recovery was not escalated")
 	}
@@ -395,7 +395,7 @@ func TestRecovery_ReFailRightAfterARecoveryOfTheSameKindIsAFailedRecovery(t *tes
 }
 
 // A recovery of another kind, an investigation fork or a parent backfill is
-// not a remedy for the park, so the park recovers as if it never happened.
+// not a remedy for the pause, so the pause recovers as if it never happened.
 func TestRecovery_UnrelatedPriorRecoveryDoesNotTripTheGuardRail(t *testing.T) {
 	investigated := applied(events.IterationError)
 	investigated.Reason = "investigate"
@@ -407,7 +407,7 @@ func TestRecovery_UnrelatedPriorRecoveryDoesNotTripTheGuardRail(t *testing.T) {
 		"investigate": investigated,
 	} {
 		t.Run(name, func(t *testing.T) {
-			esc, results := parkAfterSeeding(t, seed)
+			esc, results := pauseAfterSeeding(t, seed)
 			if esc != nil && strings.Contains(esc.Reason, "failed") {
 				t.Fatalf("escalated as a failed recovery: %+v", esc)
 			}
@@ -429,8 +429,8 @@ func TestRecovery_UnrelatedPriorRecoveryDoesNotTripTheGuardRail(t *testing.T) {
 func TestRecovery_TicketOptOutNeverTriggers(t *testing.T) {
 	h, results := startRecovery(t, true)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	select {
 	case res := <-results:
@@ -439,13 +439,13 @@ func TestRecovery_TicketOptOutNeverTriggers(t *testing.T) {
 	}
 }
 
-// proposeByParking parks ticket 01 under a high-authority rule and waits for
+// proposeByPausing pauses ticket 01 under a high-authority rule and waits for
 // its proposal.
-func proposeByParking(t *testing.T) (h *servertest.Harness, results <-chan recovery.Result, ticketPath string) {
+func proposeByPausing(t *testing.T) (h *servertest.Harness, results <-chan recovery.Result, ticketPath string) {
 	t.Helper()
 	h, results = startRecoveryWith(t, false, recovery.AuthorityHigh)
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
 	deadline := time.Now().Add(5 * time.Second)
@@ -466,7 +466,7 @@ func proposeByParking(t *testing.T) (h *servertest.Harness, results <-chan recov
 }
 
 func TestRecovery_HighAuthorityMatchProposesWithoutActing(t *testing.T) {
-	_, results, path := proposeByParking(t)
+	_, results, path := proposeByPausing(t)
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "## Proposed Remedy") || !strings.Contains(string(data), "relaunch proj:epic-a/01") {
 		t.Errorf("ticket lacks the Proposed Remedy section:\n%s", data)
@@ -482,7 +482,7 @@ func TestRecovery_HighAuthorityMatchProposesWithoutActing(t *testing.T) {
 }
 
 func TestRecovery_ApproveRunsTheLatestProposal(t *testing.T) {
-	h, results, _ := proposeByParking(t)
+	h, results, _ := proposeByPausing(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// Approve only runs what the proposal recorded.
@@ -513,7 +513,7 @@ func proposedRemedy(t *testing.T, path string) string {
 }
 
 func TestRecovery_ApproveRetiresTheProposalSection(t *testing.T) {
-	h, _, path := proposeByParking(t)
+	h, _, path := proposeByPausing(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
@@ -525,7 +525,7 @@ func TestRecovery_ApproveRetiresTheProposalSection(t *testing.T) {
 }
 
 func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
-	h, _, path := proposeByParking(t)
+	h, _, path := proposeByPausing(t)
 	data, _ := os.ReadFile(path)
 	if err := os.WriteFile(path, append(data, []byte("\nhand edit\n")...), 0o644); err != nil {
 		t.Fatal(err)
@@ -540,8 +540,8 @@ func TestRecovery_ApproveAfterHandEditRefusesProposalStale(t *testing.T) {
 	}
 }
 
-// startUnmatched starts a server whose catalog matches nothing, so every park
-// needs judgment, and queues ticket 02 behind the one that will be parked.
+// startUnmatched starts a server whose catalog matches nothing, so every pause
+// needs judgment, and queues ticket 02 behind the one that will be paused.
 func startUnmatched(t *testing.T) *servertest.Harness {
 	t.Helper()
 	store := t.TempDir()
@@ -562,7 +562,7 @@ func epicTickets(t *testing.T, h *servertest.Harness) tickets.Epic {
 	return epics[0]
 }
 
-func TestRecovery_UnmatchedParkForksAQueuedInvestigateChildAndNeverRecurses(t *testing.T) {
+func TestRecovery_UnmatchedPauseForksAQueuedInvestigateChildAndNeverRecurses(t *testing.T) {
 	h := startUnmatched(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -570,8 +570,8 @@ func TestRecovery_UnmatchedParkForksAQueuedInvestigateChildAndNeverRecurses(t *t
 		t.Fatal(err)
 	}
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
-		t.Fatalf("park: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
+		t.Fatalf("pause: %v", err)
 	}
 	waitFor(t, func() bool { return len(queueAddresses(t, h)) > 0 && queueAddresses(t, h)[0] == "proj:epic-a/01a" })
 
@@ -592,8 +592,8 @@ func TestRecovery_UnmatchedParkForksAQueuedInvestigateChildAndNeverRecurses(t *t
 		t.Errorf("parent renders %v, want waiting-for-children", got)
 	}
 
-	if err := h.Server.ParkAs("proj:epic-a/01a", events.IterationError, "stuck"); err != nil {
-		t.Fatalf("park child: %v", err)
+	if err := h.Server.PauseAs("proj:epic-a/01a", events.IterationError, "stuck"); err != nil {
+		t.Fatalf("pause child: %v", err)
 	}
 	time.Sleep(500 * time.Millisecond)
 	for _, tk := range epicTickets(t, h).Tickets {
@@ -603,9 +603,9 @@ func TestRecovery_UnmatchedParkForksAQueuedInvestigateChildAndNeverRecurses(t *t
 	}
 }
 
-// R2 launches disabled, so a zero-commit park falls through to an investigate
+// R2 launches disabled, so a zero-commit pause falls through to an investigate
 // fork with no R2 event: nothing is applied or proposed on R2's behalf.
-func TestRecovery_ZeroCommitParkWithR2DisabledInvestigatesWithoutR2Events(t *testing.T) {
+func TestRecovery_ZeroCommitPauseWithR2DisabledInvestigatesWithoutR2Events(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -614,7 +614,7 @@ func TestRecovery_ZeroCommitParkWithR2DisabledInvestigatesWithoutR2Events(t *tes
 	})
 	registerLaunch(h)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -635,7 +635,7 @@ func TestRecovery_ZeroCommitParkWithR2DisabledInvestigatesWithoutR2Events(t *tes
 
 // R3 is an agent entry: an enabled match hands the failure to an investigate
 // fork named for R3 and records the recovery as applied. The agent, not the
-// server, then proves presence and lands the recoverable branch.
+// server, then proves presence and merges the recoverable branch.
 func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -648,7 +648,7 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	})
 	registerLaunch(h)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousMerge, "done but commits missing from epic-a"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.AmbiguousMerge, "done but commits missing from epic-a"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -687,10 +687,10 @@ func startR3(t *testing.T) *servertest.Harness {
 	return h
 }
 
-// runToZeroCommitPark queues 01 under an agent whose every turn ends with
-// last as its final assistant text and no commit, so the loop parks it
+// runToZeroCommitPause queues 01 under an agent whose every turn ends with
+// last as its final assistant text and no commit, so the loop pauses it
 // zero-commit the way a real iteration does.
-func runToZeroCommitPark(t *testing.T, h *servertest.Harness, last string) {
+func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -743,16 +743,16 @@ func runToZeroCommitPark(t *testing.T, h *servertest.Harness, last string) {
 	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:epic-a/01")
 }
 
-// R2 and R3 read the transcript the park's session left: the matcher sees the
+// R2 and R3 read the transcript the pause's session left: the matcher sees the
 // agent's last words with no test injecting them.
-func TestRecovery_ZeroCommitParkMatchesOnItsTranscriptText(t *testing.T) {
+func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 	for _, tc := range []struct{ name, last, entry string }{
 		{"R2", `Bash({"command": "go test ./..."})`, "R2"},
 		{"R3", "The feature is already implemented on the feature branch.", "R3"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := startR3(t)
-			runToZeroCommitPark(t, h, tc.last)
+			runToZeroCommitPause(t, h, tc.last)
 			waitFor(t, func() bool {
 				for _, tk := range epicTickets(t, h).Tickets {
 					if tk.Identifier == "01a" && tk.Type == "investigate" {
@@ -768,7 +768,7 @@ func TestRecovery_ZeroCommitParkMatchesOnItsTranscriptText(t *testing.T) {
 
 func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
 	h := startR3(t)
-	runToZeroCommitPark(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
+	runToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
@@ -797,7 +797,7 @@ func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testin
 func TestRecovery_R3LostCommitsEscalateWithoutAnInvestigation(t *testing.T) {
 	h := startR3(t)
 	reason := "done but commits missing from epic-a and iteration branch ralph-loop/epic-a-item-01 no longer exists to recover them"
-	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousMerge, reason); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.AmbiguousMerge, reason); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
@@ -836,7 +836,7 @@ func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
 	})
 	registerLaunch(h)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.BlockedPane, "epic-a-01 is blocked on a prompt gx did not send; answer it in the pane"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.BlockedPane, "epic-a-01 is blocked on a prompt gx did not send; answer it in the pane"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -859,10 +859,10 @@ func TestRecovery_EnabledR4MatchForksAnInvestigateTicketNamingR4(t *testing.T) {
 	})
 }
 
-// parkLaunchCollision starts a server with the default catalog fully enabled,
+// pauseLaunchCollision starts a server with the default catalog fully enabled,
 // seeds ticket 01's earlier events and its launch-failed event of kind as the
-// loop would, and parks it with the same kind.
-func parkLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type) *servertest.Harness {
+// loop would, and pauses it with the same kind.
+func pauseLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type) *servertest.Harness {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -884,14 +884,14 @@ func parkLaunchCollision(t *testing.T, kind events.Kind, earlier ...events.Type)
 		}
 	})
 	registerLaunch(h)
-	if err := h.Server.ParkAs("proj:epic-a/01", kind, "launch failed: "+string(kind)); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", kind, "launch failed: "+string(kind)); err != nil {
 		t.Fatal(err)
 	}
 	return h
 }
 
 func TestRecovery_R6BusyPaneIsRelaunchedByARule(t *testing.T) {
-	h := parkLaunchCollision(t, events.AgentPaneBusy)
+	h := pauseLaunchCollision(t, events.AgentPaneBusy)
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
@@ -906,7 +906,7 @@ func TestRecovery_R6BusyPaneIsRelaunchedByARule(t *testing.T) {
 // A taken name needs herdr's candidate block read, so R6 hands it to an
 // investigate fork rather than acting.
 func TestRecovery_R6TakenNameForksAnInvestigateTicketNamingR6(t *testing.T) {
-	h := parkLaunchCollision(t, events.AgentNameTaken)
+	h := pauseLaunchCollision(t, events.AgentNameTaken)
 	waitFor(t, func() bool {
 		for _, tk := range epicTickets(t, h).Tickets {
 			if tk.Identifier == "01a" && tk.Type == "investigate" {
@@ -930,7 +930,7 @@ func TestRecovery_R6TakenNameForksAnInvestigateTicketNamingR6(t *testing.T) {
 // A taken name while the ticket's own iteration is still live is a clobbered
 // claim, so R11 (not R6) forks the investigation that restores it.
 func TestRecovery_R11ClobberedClaimForksAnInvestigateTicketNamingR11(t *testing.T) {
-	h := parkLaunchCollision(t, events.AgentNameTaken, events.IterationStarted)
+	h := pauseLaunchCollision(t, events.AgentNameTaken, events.IterationStarted)
 	waitFor(t, func() bool {
 		for _, tk := range epicTickets(t, h).Tickets {
 			if tk.Identifier == "01a" && tk.Type == "investigate" {
@@ -951,7 +951,7 @@ func TestRecovery_R11ClobberedClaimForksAnInvestigateTicketNamingR11(t *testing.
 	})
 }
 
-// A reclaim that parks zero-commit at once after an earlier prompt stall is a
+// A reclaim that pauses zero-commit at once after an earlier prompt stall is a
 // stalled pane read as finished, so R12 forks the investigation that closes it
 // and relaunches.
 func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.T) {
@@ -973,7 +973,7 @@ func TestRecovery_R12StalledReclaimForksAnInvestigateTicketNamingR12(t *testing.
 		}
 	})
 	registerLaunch(h)
-	if err := h.Server.ParkAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits landed"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -1065,7 +1065,7 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	ticketPath := filepath.Join(dir, "epic-a", "issues", "01-first.md")
 	data, _ := os.ReadFile(ticketPath)
 	got.ticket, got.worktree = string(data), worktree
-	// The park reason lives in the log's question, not in the markdown.
+	// The pause reason lives in the log's question, not in the markdown.
 	if evs, err := tickets.ReadLog(ticketPath); err == nil {
 		for _, ev := range evs {
 			got.question += ev.Text + "\n"
@@ -1089,7 +1089,7 @@ func dirtyAfter(t *testing.T, prepare func(string)) func(string) {
 }
 
 // R10 releases the gate on an idle agent whether or not the worktree has
-// commits: the finish then lands them or parks zero-commit on its own.
+// commits: the finish then merges them or pauses zero-commit on its own.
 func TestRecovery_R10ReleasesAnIdleAgentsGateAndLetsTheFinishRun(t *testing.T) {
 	for _, runner := range []string{"herdr", "headless"} {
 		for _, tc := range []struct {
@@ -1106,14 +1106,14 @@ func TestRecovery_R10ReleasesAnIdleAgentsGateAndLetsTheFinishRun(t *testing.T) {
 					t.Errorf("applied = %+v, escalated = %v; want R10 ok", got.applied, got.escalated)
 				}
 				if strings.Contains(got.ticket, "background-task-gate") {
-					t.Errorf("R10 parked a finish it should have let run:\n%s", got.ticket)
+					t.Errorf("R10 paused a finish it should have let run:\n%s", got.ticket)
 				}
 			})
 		}
 	}
 }
 
-func TestRecovery_R10ParksADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
+func TestRecovery_R10PausesADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
 	for _, runner := range []string{"herdr", "headless"} {
 		t.Run(runner, func(t *testing.T) {
 			got := raiseGateHeld(t, runner, agentrunner.StateIdle, dirtyAfter(t, commitInWorktree(t)))
@@ -1121,13 +1121,13 @@ func TestRecovery_R10ParksADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
 				t.Errorf("applied = %+v, want R10 ok", got.applied)
 			}
 			if !strings.Contains(got.ticket, "status: paused") || !strings.Contains(got.ticket, "pause_reason: background-task-gate") || !strings.Contains(got.question, "stray.txt") {
-				t.Errorf("ticket not parked background-task-gate naming the dirty file:\n%s", got.ticket)
+				t.Errorf("ticket not paused background-task-gate naming the dirty file:\n%s", got.ticket)
 			}
 			if _, err := os.Stat(filepath.Join(got.worktree, "stray.txt")); err != nil {
 				t.Errorf("worktree not left: %v", err)
 			}
 			if n := len(ofType(got.log, events.RecoveryApplied)); n != 1 {
-				t.Errorf("recoveries = %d, want R10's one: its own park must not re-match", n)
+				t.Errorf("recoveries = %d, want R10's one: its own pause must not re-match", n)
 			}
 		})
 	}
@@ -1255,10 +1255,10 @@ func TestRecovery_ParentDefectScanSkipsDrafts(t *testing.T) {
 	}
 }
 
-// A person's own park and a pane blocked on a dialog no rule allows are a
+// A person's own pause and a pane blocked on a dialog no rule allows are a
 // person's to handle: neither forks an investigation.
-func TestRecovery_ManualAndUnmatchedBlockedPaneParksForkNothing(t *testing.T) {
-	park := map[string]func(*servertest.Harness) error{
+func TestRecovery_ManualAndUnmatchedBlockedPanePausesForkNothing(t *testing.T) {
+	pause := map[string]func(*servertest.Harness) error{
 		"manual park": func(h *servertest.Harness) error {
 			res, err := h.Client.TicketPause(context.Background(), "proj:epic-a/01", "broken")
 			if err == nil && res.Refused {
@@ -1267,14 +1267,14 @@ func TestRecovery_ManualAndUnmatchedBlockedPaneParksForkNothing(t *testing.T) {
 			return err
 		},
 		"unmatched blocked pane": func(h *servertest.Harness) error {
-			return h.Server.ParkAs("proj:epic-a/01", events.BlockedPane, "blocked on a prompt gx did not send")
+			return h.Server.PauseAs("proj:epic-a/01", events.BlockedPane, "blocked on a prompt gx did not send")
 		},
 	}
-	for name, do := range park {
+	for name, do := range pause {
 		t.Run(name, func(t *testing.T) {
 			h := startUnmatched(t)
 			if err := do(h); err != nil {
-				t.Fatalf("park: %v", err)
+				t.Fatalf("pause: %v", err)
 			}
 			time.Sleep(300 * time.Millisecond)
 			assertNoInvestigation(t, h)
@@ -1327,7 +1327,7 @@ func TestRecovery_SetParentRefusesAParentChangedSinceTheScan(t *testing.T) {
 }
 
 // A defect the remedy failed to fix stays on disk and the failure is escalated
-// once, as no park reports it, yet later rescans neither raise it again nor
+// once, as no pause reports it, yet later rescans neither raise it again nor
 // send it to the guard rails.
 func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
 	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{

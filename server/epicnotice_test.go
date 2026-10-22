@@ -52,7 +52,7 @@ func waitForChat(count func(string) int, s string) int {
 	return count(s)
 }
 
-func TestEpicNotice_LandSendsEpicMerged(t *testing.T) {
+func TestEpicNotice_MergeSendsEpicMerged(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
@@ -83,7 +83,7 @@ func TestEpicNotice_AutoFFMergeOffSendsNotMerged(t *testing.T) {
 	}
 }
 
-func TestEpicNotice_NeedsRebaseParkSendsNotMerged(t *testing.T) {
+func TestEpicNotice_NeedsRebasePauseSendsNotMerged(t *testing.T) {
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)

@@ -52,7 +52,7 @@ type Explanation struct {
 }
 
 const (
-	lockKindLand = "land"
+	lockKindMerge = "land"
 )
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -126,7 +126,7 @@ func (s *Server) locks(w http.ResponseWriter, _ *http.Request) {
 				continue
 			}
 			list = append(list, LockInfo{
-				Kind: lockKindLand, Epic: project + ":" + filepath.Base(epicDir),
+				Kind: lockKindMerge, Epic: project + ":" + filepath.Base(epicDir),
 				Pid: owner.PID, Since: owner.Time, Ticket: owner.Ticket, Alive: owner.Alive(),
 			})
 		}

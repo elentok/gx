@@ -117,7 +117,7 @@ func (s *Server) resolvedWrite(req QueueRequest, do func(ticketRef) (QueueResult
 // ticketPause pauses a ticket with a person's one-line reason. It refuses a
 // running, done, already paused or map-epic ticket.
 func (s *Server) ticketPause(req QueueRequest) (QueueResult, error) {
-	reason := strings.TrimSpace(req.ParkReason)
+	reason := strings.TrimSpace(req.PauseReason)
 	if reason == "" {
 		return refusal(ReasonReasonRequired, "a one-line reason is required"), nil
 	}
@@ -133,14 +133,14 @@ func (s *Server) ticketPause(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonMapEpic, ref.addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
 		run, _ := s.registry.tracked(ref.addr.String())
-		if err := s.parkTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {
-			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
+		if err := s.pauseTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {
+			return QueueResult{}, fmt.Errorf("pause %s: %w", ref.addr, err)
 		}
 		return QueueResult{}, nil
 	})
 }
 
-// ticketUnmute clears a ticket's mutes and reopens it if the mute parked it.
+// ticketUnmute clears a ticket's mutes and reopens it if the mute paused it.
 func (s *Server) ticketUnmute(req QueueRequest) (QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
 		if len(ref.ticket.Mutes) == 0 {

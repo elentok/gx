@@ -25,7 +25,7 @@ type codexNamed struct{ *turnRunner }
 func (codexNamed) Name() string { return "headless" }
 
 // An ask from a herdr-hosted Claude or a Codex run cannot be answered live:
-// the ticket parks, the session closes and the run leaves the registry.
+// the ticket pauses, the session closes and the run leaves the registry.
 func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 	cases := []struct {
 		name, agent string
@@ -61,7 +61,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 	}
 }
 
-// A native Claude agent that asks and goes idle stays alive: the ticket parks
+// A native Claude agent that asks and goes idle stays alive: the ticket pauses
 // self-reported, but the worktree, session and run remain, flagged waiting.
 func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)

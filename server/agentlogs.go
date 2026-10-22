@@ -16,7 +16,7 @@ const pruneInterval = 24 * time.Hour
 
 // logPruner is a runner that keeps agent logs on disk (nativerunner.Headless).
 type logPruner interface {
-	Prune(maxAge time.Duration, now time.Time, parked func(label string) bool) ([]string, error)
+	Prune(maxAge time.Duration, now time.Time, paused func(label string) bool) ([]string, error)
 }
 
 // reattacher adopts the agent a previous server launched.
@@ -47,7 +47,7 @@ func (s *Server) keepPruned(ctx context.Context) {
 
 // pruneAgentLogs removes expired logs of every project's agent directories,
 // whatever runner is configured: the headless runner walks the agents root and
-// prunes each directory by the runner its meta.json names. A parked ticket's
+// prunes each directory by the runner its meta.json names. A paused ticket's
 // logs stay: a person may still need them.
 func (s *Server) pruneAgentLogs(now time.Time) {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
@@ -61,8 +61,8 @@ func (s *Server) pruneAgentLogs(now time.Time) {
 		if !ok {
 			continue
 		}
-		parked := parkedLabels(dir)
-		pruned, err := p.Prune(s.logRetention(), now, func(label string) bool { return parked[label] })
+		paused := pausedLabels(dir)
+		pruned, err := p.Prune(s.logRetention(), now, func(label string) bool { return paused[label] })
 		if err != nil {
 			s.log.Warn("prune agent logs", "project", project, "err", err)
 		}
@@ -72,10 +72,10 @@ func (s *Server) pruneAgentLogs(now time.Time) {
 	}
 }
 
-// parkedLabels is the iteration labels of the project's needs-repair and
-// needs-answer tickets. An unreadable store keeps everything: nothing parked
+// pausedLabels is the iteration labels of the project's stuck and
+// asking tickets. An unreadable store keeps everything: nothing paused
 // may lose its logs on a guess.
-func parkedLabels(projectDir string) map[string]bool {
+func pausedLabels(projectDir string) map[string]bool {
 	epics, err := tickets.Load(projectDir)
 	if err != nil {
 		return nil

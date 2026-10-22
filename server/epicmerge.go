@@ -16,9 +16,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// epicMerge is the manual merge trigger for an epic address: it lands the
+// epicMerge is the manual merge trigger for an epic address: it merges the
 // epic's branch when it already fast-forwards, and forks a manual merge ticket
-// otherwise. A manual ticket resets the merge-ticket cap and lands the epic
+// otherwise. A manual ticket resets the merge-ticket cap and merges the epic
 // whatever auto-ff-merge says.
 func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	project, epic, ok := tickets.ParseEpicAddress(req.Address)
@@ -64,38 +64,38 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	if err != nil {
 		return QueueResult{}, err
 	}
-	return s.actOnLand(root, one, dir, e, d), nil
+	return s.actOnMerge(root, one, dir, e, d), nil
 }
 
 // epicMergeLocked is epicMerge's work under the trunk lock; the caller acts on
 // the decision after unlock.
-func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string) (landDecision, error) {
+func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string) (mergeDecision, error) {
 	if r := epicMergeRefusal(root, e, repo); r != nil {
-		return landDecision{result: *r}, nil
+		return mergeDecision{result: *r}, nil
 	}
-	// No branch (a commitless epic): nothing to land, so landEpic only stamps it.
+	// No branch (a commitless epic): nothing to merge, so mergeEpic only stamps it.
 	if !git.RefExists(repo, "refs/heads/"+root.Epic) {
-		return s.landEpic(root, one, repo, epics, e, target, true), nil
+		return s.mergeEpic(root, one, repo, epics, e, target, true), nil
 	}
 	if err := s.ensureFeatureWorktree(root.Project, root.Epic, repo); err != nil {
-		return landDecision{}, err
+		return mergeDecision{}, err
 	}
-	// Queued first, so a park of the land below or of the merge ticket's shows.
+	// Queued first, so a pause of the merge below or of the merge ticket's shows.
 	if err := s.ensureRootQueued(root, one.Ticket); err != nil {
-		return landDecision{}, err
+		return mergeDecision{}, err
 	}
 	if ff, err := git.IsAncestor(repo, target, "refs/heads/"+root.Epic); err != nil {
-		return landDecision{}, err
+		return mergeDecision{}, err
 	} else if ff {
-		return s.landEpic(root, one, repo, epics, e, target, true), nil
+		return s.mergeEpic(root, one, repo, epics, e, target, true), nil
 	}
 	id := s.forkMergeTicket(root, e, target, true)
 	if id == "" {
-		return landDecision{}, errors.New("fork manual merge ticket for " + root.String())
+		return mergeDecision{}, errors.New("fork manual merge ticket for " + root.String())
 	}
-	// landEpic clears the block for the land paths; a fork that failed keeps it.
-	s.clearLandBlock(root, e.Path)
-	return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}, nil
+	// mergeEpic clears the block for the merge paths; a fork that failed keeps it.
+	s.clearMergeBlock(root, e.Path)
+	return mergeDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}, nil
 }
 
 // lowestTicket is the epic's Root ticket: the lowest-numbered one, whatever
@@ -107,7 +107,7 @@ func lowestTicket(e tickets.Epic) tickets.Ticket {
 }
 
 // fillEpicMergeTargets sets each ticket's EpicMergeTarget to the branch
-// epicMerge would land its epic on. rootRefs runs git, so once per epic.
+// epicMerge would merge its epic on. rootRefs runs git, so once per epic.
 func (s *Server) fillEpicMergeTargets(list []TicketInfo) {
 	targets := map[tickets.Address]string{}
 	for i, info := range list {
@@ -198,7 +198,7 @@ func epicMergeRefusal(root rootRef, e tickets.Epic, repo string) *QueueResult {
 		r = refusal(ReasonMergePending, root.String()+" already has a merge ticket pending")
 	case !ralphloop.AllDone(e):
 		r = refusal(ReasonNotComplete, root.String()+" has tickets that are not done")
-	// A commitless epic never makes a branch: landEpic stamps it merged.
+	// A commitless epic never makes a branch: mergeEpic stamps it merged.
 	case !allCommitless(e) && !git.RefExists(repo, "refs/heads/"+root.Epic):
 		r = refusal(ReasonBranchMissing, "no branch "+root.Epic+" in "+repo)
 	default:

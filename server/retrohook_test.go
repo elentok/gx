@@ -45,7 +45,7 @@ func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 	}, opts...)
 }
 
-func TestRetroHook_SubmitsAfterTheEpicLands(t *testing.T) {
+func TestRetroHook_SubmitsAfterTheEpicMerges(t *testing.T) {
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
@@ -119,7 +119,7 @@ func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 }
 
 // retrosAfter waits for the one retro the hook submits after a root event: the
-// submit follows the park/fail event, so the glob is polled.
+// submit follows the pause/fail event, so the glob is polled.
 func (f *schedFixture) retrosAfter(t *testing.T) []string {
 	t.Helper()
 	var retros []string
@@ -138,7 +138,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 	return retros
 }
 
-func TestRetroHook_SubmitsWhenTheLandNeedsARebase(t *testing.T) {
+func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
@@ -170,14 +170,14 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 	}
 }
 
-// A land error parks the root, and that park is the epic's final outcome.
-func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
+// A merge error pauses the root, and that pause is the epic's final outcome.
+func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
 		commitWork(t, p, id)
-		// An untracked file the fast-forward would overwrite fails the land.
+		// An untracked file the fast-forward would overwrite fails the merge.
 		testutil.WriteFile(t, f.repo, "01.txt", "untracked")
 	}, withEvolve(config.EvolveContributor))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

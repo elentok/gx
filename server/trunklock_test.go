@@ -16,7 +16,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func TestTrunkLock_TwoEpicsFinishingTogetherLandOneAndParkTheOtherAsNonFF(t *testing.T) {
+func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *testing.T) {
 	const other = "other"
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
 		epic, _, _ := strings.Cut(strings.TrimPrefix(p.Address, "proj:"), "/")
@@ -32,7 +32,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherLandOneAndParkTheOtherAsNonFF(t *tes
 			overlapped.Add(1)
 		}
 		defer inFlight.Add(-1)
-		// Long enough for the other epic to finish and try its land meanwhile.
+		// Long enough for the other epic to finish and try its merge meanwhile.
 		time.Sleep(time.Second)
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})
@@ -43,8 +43,8 @@ func TestTrunkLock_TwoEpicsFinishingTogetherLandOneAndParkTheOtherAsNonFF(t *tes
 	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+other+"/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	var completed, parked []server.Event
-	for len(completed)+len(parked) < 2 {
+	var completed, paused []server.Event
+	for len(completed)+len(paused) < 2 {
 		select {
 		case ev := <-evs:
 			switch ev.Type {
@@ -53,25 +53,25 @@ func TestTrunkLock_TwoEpicsFinishingTogetherLandOneAndParkTheOtherAsNonFF(t *tes
 			case server.EventRootCompleted:
 				completed = append(completed, ev)
 			case server.EventRootPaused:
-				parked = append(parked, ev)
+				paused = append(paused, ev)
 			}
 		case <-ctx.Done():
-			t.Fatalf("roots did not settle: completed %+v, parked %+v", completed, parked)
+			t.Fatalf("roots did not settle: completed %+v, paused %+v", completed, paused)
 		}
 	}
 
 	if overlapped.Load() > 0 {
-		t.Error("two lands into main ran at once")
+		t.Error("two merges into main ran at once")
 	}
-	if len(completed) != 1 || len(parked) != 1 {
-		t.Fatalf("completed %+v, parked %+v, want one each", completed, parked)
+	if len(completed) != 1 || len(paused) != 1 {
+		t.Fatalf("completed %+v, paused %+v, want one each", completed, paused)
 	}
-	if p := parked[0]; p.Kind != "" || !strings.HasPrefix(p.Message, "needs rebase: ") {
-		t.Errorf("park = kind %q, reason %q, want a needs-rebase park", p.Kind, p.Message)
+	if p := paused[0]; p.Kind != "" || !strings.HasPrefix(p.Message, "needs rebase: ") {
+		t.Errorf("pause = kind %q, reason %q, want a needs-rebase pause", p.Kind, p.Message)
 	}
-	landed := strings.TrimPrefix(completed[0].Address, "proj:")
-	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", landed) {
-		t.Errorf("main at %s, want %s's tip", got, landed)
+	merged := strings.TrimPrefix(completed[0].Address, "proj:")
+	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", merged) {
+		t.Errorf("main at %s, want %s's tip", got, merged)
 	}
 }
 
@@ -108,7 +108,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 	f.assertStamps(t, true)
 }
 
-func TestTrunkLock_TrunkMovedBeforeTheFFParksNeedsRebaseNotLandFailed(t *testing.T) {
+func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testing.T) {
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 	})
@@ -119,10 +119,10 @@ func TestTrunkLock_TrunkMovedBeforeTheFFParksNeedsRebaseNotLandFailed(t *testing
 		return git.MergeOutcome{}, errors.New("cannot lock ref 'refs/heads/main'")
 	})
 
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	if ev.Kind != "" || ev.Message != "needs rebase: "+schedEpic+" onto main; rebase it, then merge again" {
-		t.Errorf("park = kind %q, reason %q, want a needs-rebase park", ev.Kind, ev.Message)
+		t.Errorf("pause = kind %q, reason %q, want a needs-rebase pause", ev.Kind, ev.Message)
 	}
 	f.assertRootQueued(t)
 	f.assertStamps(t, false)

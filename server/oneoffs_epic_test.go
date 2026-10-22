@@ -163,7 +163,7 @@ func TestTicketAgent(t *testing.T) {
 
 // The one-offs epic is a standing inbox: with every ticket done it is not
 // stamped, merged or retro'd.
-func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverLands(t *testing.T) {
+func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
 	h := startOneOffsHarness(t, store)

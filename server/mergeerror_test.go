@@ -15,9 +15,9 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// parkRoot runs the epic to its root park, failing on an iteration-failed on
-// the way, and returns the park event.
-func (f *schedFixture) parkRoot(t *testing.T) server.Event {
+// pauseRoot runs the epic to its root pause, failing on an iteration-failed on
+// the way, and returns the pause event.
+func (f *schedFixture) pauseRoot(t *testing.T) server.Event {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -30,7 +30,7 @@ func (f *schedFixture) parkRoot(t *testing.T) server.Event {
 			}
 			switch ev.Type {
 			case server.EventIterationFailed:
-				t.Fatalf("iteration-failed on a land error: %+v", ev)
+				t.Fatalf("iteration-failed on a merge error: %+v", ev)
 			case server.EventRootPaused:
 				return ev
 			}
@@ -40,7 +40,7 @@ func (f *schedFixture) parkRoot(t *testing.T) server.Event {
 	}
 }
 
-// assertRootQueued checks the parked root was not dequeued.
+// assertRootQueued checks the paused root was not dequeued.
 func (f *schedFixture) assertRootQueued(t *testing.T) {
 	t.Helper()
 	q, err := f.h.Client.Queue(context.Background())
@@ -64,19 +64,19 @@ func commitFiles(t *testing.T, p servertest.Prompt, names ...string) {
 	testutil.CommitAll(t, p.Cwd, "work")
 }
 
-func TestLandError_DirtyTrunkParksTheRootWithACappedFileList(t *testing.T) {
+func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 	chat, count := chatRecorder(t)
 	files := []string{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"}
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, files...)
-		// Untracked files in main's checkout that the land would overwrite.
+		// Untracked files in main's checkout that the merge would overwrite.
 		for _, n := range files {
 			testutil.WriteFile(t, f.repo, n, "local "+n)
 		}
 	}, chat)
 	main := f.git(t, "rev-parse", "main")
 
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.DirtyTrunk)
@@ -92,29 +92,29 @@ func TestLandError_DirtyTrunkParksTheRootWithACappedFileList(t *testing.T) {
 	f.assertRootQueued(t)
 	f.assertStamps(t, false)
 	if got := waitForChat(count, "clash with a.txt"); got != 1 {
-		t.Errorf("park sent %d times, want once", got)
+		t.Errorf("pause sent %d times, want once", got)
 	}
 	if got := count(epicNotMergedText) + count(epicMergedText); got != 0 {
 		t.Errorf("epic notice sent %d times, want none", got)
 	}
 }
 
-func TestLandError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
+func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, "clash.txt")
 		testutil.WriteFile(t, f.repo, "clash.txt", "local")
 		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
 	})
 
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	want := fmt.Sprintf("uncommitted changes on main (%s) clash with clash.txt; commit or discard them, then merge again", f.repo)
 	if ev.Kind != string(events.DirtyTrunk) || ev.Message != want {
-		t.Errorf("park = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
+		t.Errorf("pause = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
 	}
 }
 
-// dirtyTrunkFixture parks the epic on a dirty trunk; clean undoes the dirt.
+// dirtyTrunkFixture pauses the epic on a dirty trunk; clean undoes the dirt.
 func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 	t.Helper()
 	turns := 0
@@ -130,13 +130,13 @@ func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 	}
 }
 
-func TestLandError_ParkStoresKindAndReasonUntilALaterLandClearsThem(t *testing.T) {
+func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testing.T) {
 	f, clean := dirtyTrunkFixture(t)
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	md := f.epicMD(t)
 	if !strings.Contains(md, "land_block_kind: "+string(events.DirtyTrunk)) || !strings.Contains(md, "land_block_reason:") {
-		t.Errorf("park not stored on the epic:\n%s", md)
+		t.Errorf("pause not stored on the epic:\n%s", md)
 	}
 	if !strings.Contains(md, "clash with") || ev.Message == "" {
 		t.Errorf("reason not stored:\n%s", md)
@@ -148,13 +148,13 @@ func TestLandError_ParkStoresKindAndReasonUntilALaterLandClearsThem(t *testing.T
 		t.Fatalf("merge = %+v, %v", res, err)
 	}
 	if md := f.epicMD(t); strings.Contains(md, "land_block") {
-		t.Errorf("land left the block on the epic:\n%s", md)
+		t.Errorf("merge left the block on the epic:\n%s", md)
 	}
 }
 
-func TestLandError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
+func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	f, _ := dirtyTrunkFixture(t)
-	f.parkRoot(t)
+	f.pauseRoot(t)
 
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -162,7 +162,7 @@ func TestLandError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	if _, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil {
 		t.Fatal(err)
 	}
-	// Reopen the ticket, so its second finish runs the land step again.
+	// Reopen the ticket, so its second finish runs the merge step again.
 	path := f.ticketFile(t, "01")
 	reopened := strings.Replace(readFile(t, path), "status: done", "status: open", 1)
 	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), reopened)
@@ -174,7 +174,7 @@ func TestLandError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	}
 }
 
-func TestLandError_NonOverlappingLocalChangeDoesNotBlockTheLand(t *testing.T) {
+func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
@@ -186,7 +186,7 @@ func TestLandError_NonOverlappingLocalChangeDoesNotBlockTheLand(t *testing.T) {
 	}
 }
 
-func TestLandError_OtherGitFailureParksLandFailed(t *testing.T) {
+func TestMergeError_OtherGitFailurePausesMergeFailed(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		// A stale index lock fails the merge without any local change.
@@ -195,12 +195,12 @@ func TestLandError_OtherGitFailureParksLandFailed(t *testing.T) {
 		}
 	})
 
-	ev := f.parkRoot(t)
+	ev := f.pauseRoot(t)
 
 	if ev.Kind != string(events.MergeError) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.MergeError)
 	}
-	if !strings.HasPrefix(ev.Message, "land failed: ") || !strings.Contains(ev.Message, "index.lock") ||
+	if !strings.HasPrefix(ev.Message, "merge failed: ") || !strings.Contains(ev.Message, "index.lock") ||
 		!strings.HasSuffix(ev.Message, "; fix it, then merge again") {
 		t.Errorf("reason = %q", ev.Message)
 	}

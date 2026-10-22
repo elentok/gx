@@ -63,7 +63,7 @@ func investigateRef(repo string, addr tickets.Address, t tickets.Ticket, epics [
 }
 
 // investigate forks a commitless investigate ticket off the failed ticket and
-// queues it at the front. The parent stays parked; it waits on the child through
+// queues it at the front. The parent stays paused; it waits on the child through
 // the ordinary parent edge. It returns the child's address.
 func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (string, error) {
 	path, id, err := writeInvestigateTicket(ref, f, entry)
@@ -88,7 +88,7 @@ func (s *Server) investigate(ref ticketRef, f recovery.Failure, entry string) (s
 // writeInvestigateTicket forks the investigation off the failed ticket, or, for
 // an epic-level ref, adds it as a top-level ticket of the epic.
 func writeInvestigateTicket(ref ticketRef, f recovery.Failure, entry string) (path, id string, err error) {
-	subject, what, done := ref.addr.ID, "Ticket "+ref.addr.ID+" parked with", "the parked ticket recovered"
+	subject, what, done := ref.addr.ID, "Ticket "+ref.addr.ID+" paused with", "the paused ticket recovered"
 	var parent *schema.TicketID
 	if ref.addr.ID == "" {
 		subject, what, done = "epic "+ref.addr.Epic, "Epic "+ref.addr.Epic+" is", "the epic moving again"

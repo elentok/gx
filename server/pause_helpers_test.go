@@ -6,7 +6,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// legacyClass is the pause class of an old needs-answer / needs-repair label,
+// legacyClass is the pause class of an old asking / stuck label,
 // or "" for any other status.
 func legacyClass(s schema.Status) schema.PauseClass {
 	return schema.Ticket{Status: s}.PausedClass()

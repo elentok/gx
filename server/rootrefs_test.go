@@ -53,29 +53,29 @@ func TestRootRefs(t *testing.T) {
 		}
 	}
 	for name, tc := range map[string]struct {
-		epics              []tickets.Epic
-		landBlocker        bool
-		wantBase, wantLand string
+		epics               []tickets.Epic
+		mergeBlocker        bool
+		wantBase, wantMerge string
 	}{
 		"no base starts from and lands on trunk": {
-			epics: []tickets.Epic{{Name: "b", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open"}}}}, wantBase: "develop", wantLand: "develop",
+			epics: []tickets.Epic{{Name: "b", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open"}}}}, wantBase: "develop", wantMerge: "develop",
 		},
 		"commitless ref is trunk": {
-			epics: []tickets.Epic{{Name: "b", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open", Commitless: true}}}}, wantBase: "develop", wantLand: "develop",
+			epics: []tickets.Epic{{Name: "b", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "open", Commitless: true}}}}, wantBase: "develop", wantMerge: "develop",
 		},
-		"explicit base moves only the start":             {epics: stacked("release-1.2"), wantBase: "release-1.2", wantLand: "develop"},
-		"stacked root targets its unlanded blocker":      {epics: stacked(""), wantBase: "a", wantLand: "a"},
-		"stacked root targets trunk once blocker landed": {epics: stacked(""), landBlocker: true, wantBase: "develop", wantLand: "develop"},
+		"explicit base moves only the start":             {epics: stacked("release-1.2"), wantBase: "release-1.2", wantMerge: "develop"},
+		"stacked root targets its unlanded blocker":      {epics: stacked(""), wantBase: "a", wantMerge: "a"},
+		"stacked root targets trunk once blocker landed": {epics: stacked(""), mergeBlocker: true, wantBase: "develop", wantMerge: "develop"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, repo := rootRefsFixture(t)
-			if tc.landBlocker {
+			if tc.mergeBlocker {
 				runGit(t, repo, "branch", "-f", "develop", "a")
 			}
 			e := tc.epics[len(tc.epics)-1]
 			base, target, err := s.rootRefs("proj", tc.epics, e.Name, e.Tickets[0], repo)
-			if err != nil || base != tc.wantBase || target != tc.wantLand {
-				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantLand)
+			if err != nil || base != tc.wantBase || target != tc.wantMerge {
+				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantMerge)
 			}
 		})
 	}
@@ -87,9 +87,9 @@ func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
 	blocker := tickets.Epic{Name: "a", MergedAt: time.Now(), Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	other := tickets.Epic{Name: "c", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
 	for name, tc := range map[string]struct {
-		dependent          tickets.Ticket
-		epics              []tickets.Epic
-		wantBase, wantLand string
+		dependent           tickets.Ticket
+		epics               []tickets.Epic
+		wantBase, wantMerge string
 	}{
 		"derived from a merged blocker":   {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a/01"}}, []tickets.Epic{blocker}, "develop", "develop"},
 		"explicit base on merged blocker": {tickets.Ticket{Number: 1, Identifier: "01", Status: "open", Base: "a/01"}, []tickets.Epic{blocker}, "develop", "develop"},
@@ -98,8 +98,8 @@ func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dependent := tickets.Epic{Name: "b", Tickets: []tickets.Ticket{tc.dependent}}
 			base, target, err := s.rootRefs("proj", append(tc.epics, dependent), "b", tc.dependent, repo)
-			if err != nil || base != tc.wantBase || target != tc.wantLand {
-				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantLand)
+			if err != nil || base != tc.wantBase || target != tc.wantMerge {
+				t.Errorf("got (%q, %q, %v), want (%q, %q)", base, target, err, tc.wantBase, tc.wantMerge)
 			}
 		})
 	}
@@ -134,8 +134,8 @@ func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
 	}
 	// b holds only a's work: landed on the root's target a, not on trunk.
 	runGit(t, repo, "branch", "b", "a")
-	if !s.nothingToLand("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
-		t.Errorf("nothingToLand = false, want b already on its target a")
+	if !s.nothingToMerge("proj", epics, ralphloop.OneIteration{Epic: "b", Ticket: finished}, repo) {
+		t.Errorf("nothingToMerge = false, want b already on its target a")
 	}
 }
 

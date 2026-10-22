@@ -71,10 +71,10 @@ func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
 func TestEpicStatusLine_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
-	repair := server.EpicSummary{State: server.EpicStatePaused, HasRepair: true, Parked: []server.SummaryTicket{
+	repair := server.EpicSummary{State: server.EpicStatePaused, HasRepair: true, Paused: []server.SummaryTicket{
 		{Status: "needs-answer"}, {Status: "needs-repair"},
 	}}
-	answer := server.EpicSummary{State: server.EpicStatePaused, Parked: []server.SummaryTicket{{Status: "needs-answer"}}}
+	answer := server.EpicSummary{State: server.EpicStatePaused, Paused: []server.SummaryTicket{{Status: "needs-answer"}}}
 	for _, tt := range []struct {
 		name string
 		sum  server.EpicSummary
@@ -100,7 +100,7 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 	for _, epic := range epics {
 		sum := server.EpicSummary{
 			Address: epic.Name, Name: epic.Name, State: server.EpicStateWaiting, Total: len(epic.Tickets),
-			Active: []server.SummaryTicket{}, Parked: []server.SummaryTicket{},
+			Active: []server.SummaryTicket{}, Paused: []server.SummaryTicket{},
 		}
 		for _, t := range epic.Tickets {
 			info := server.SummaryTicket{Address: t.Path, Title: t.Title}
@@ -115,7 +115,7 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 				}
 			case gxtickets.StatusNeedsAnswer, gxtickets.StatusNeedsRepair:
 				info.Status, info.Reason = status.Word(), gxtickets.ParkReason(epic, t)
-				sum.Parked = append(sum.Parked, info)
+				sum.Paused = append(sum.Paused, info)
 			}
 		}
 		if sum.Total > 0 && sum.Done == sum.Total {
@@ -156,7 +156,7 @@ func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
 	m := summaryQueue(t,
 		server.EpicSummary{
 			Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Done: 0, Total: 1,
-			Parked: []server.SummaryTicket{{
+			Paused: []server.SummaryTicket{{
 				Address: "gx:alpha/01", Title: "First", Status: "needs-answer", Reason: "Which approach, A or B?",
 			}},
 		},

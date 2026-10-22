@@ -99,7 +99,7 @@ func TestRelaunch_IdleLeftoverIsLeftToTheLaunch(t *testing.T) {
 	}
 }
 
-// A relaunch ends the ticket's open question with park.closed{relaunch}; with no
+// A relaunch ends the ticket's open question with pause.closed{relaunch}; with no
 // open question it writes nothing.
 func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 	h, _, _, path := startWithLeftover(t, agentrunner.StateIdle)
@@ -117,7 +117,7 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(evs) != 2 || evs[1].Type != tickets.EventParkClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" {
-		t.Errorf("log = %+v, want the question then park.closed{question 1, relaunch}", evs)
+		t.Errorf("log = %+v, want the question then pause.closed{question 1, relaunch}", evs)
 	}
 }
 

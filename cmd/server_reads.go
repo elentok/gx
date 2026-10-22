@@ -499,8 +499,8 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
-	if res.Parked {
-		kind := res.ParkKind
+	if res.Paused {
+		kind := res.PauseKind
 		if kind == "" {
 			kind = "needs-rebase"
 		}

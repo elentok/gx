@@ -66,12 +66,12 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	expectRun(t, h)
 }
 
-func TestDrain_IsFinishAndPause(t *testing.T) {
+func TestFlush_IsFinishAndPause(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
 	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Refused || res.Mode != server.QueueModePaused {
-		t.Fatalf("drain: %+v, %v", res, err)
+		t.Fatalf("flush: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
