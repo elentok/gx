@@ -58,7 +58,7 @@ export function UnparkForm({
     <Box
       position="sticky"
       bottom="0"
-      bg="bg"
+      bg="surface"
       borderTopWidth="1px"
       py="3"
       display="flex"
