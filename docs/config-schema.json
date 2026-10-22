@@ -79,13 +79,13 @@
         },
         "retry-storm-launches": {
           "type": "integer",
-          "description": "Consecutive failed launches of one ticket before it is parked needs-repair as retry-exhausted. Default: 3.",
+          "description": "Consecutive failed launches of one ticket before it is paused as retry-exhausted. Default: 3.",
           "minimum": 1,
           "default": 3
         },
         "spin-cycles": {
           "type": "integer",
-          "description": "Park/re-claim cycles of one ticket within spin-window before it is quarantined needs-repair as spinning. Default: 3.",
+          "description": "Pause/re-claim cycles of one ticket within spin-window before it is quarantined as spinning. Default: 3.",
           "minimum": 1,
           "default": 3
         },
@@ -319,7 +319,7 @@
     },
     "recovery": {
       "type": "object",
-      "description": "Recovery catalog: automatic investigation of parked tickets.",
+      "description": "Recovery catalog: automatic investigation of paused tickets.",
       "additionalProperties": false,
       "properties": {
         "enabled": {
@@ -341,7 +341,7 @@
         "notify-hold": {
           "type": "string",
           "default": "10m",
-          "description": "Go duration string for how long a park's chat message waits for recovery before it is sent anyway. Unparsable or non-positive values keep the default. Default: \"10m\"."
+          "description": "Go duration string for how long a pause's chat message waits for recovery before it is sent anyway. Unparsable or non-positive values keep the default. Default: \"10m\"."
         }
       }
     },

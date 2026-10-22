@@ -52,7 +52,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherLandOneAndParkTheOtherAsNonFF(t *tes
 				t.Fatalf("iteration-failed: %+v", ev)
 			case server.EventRootCompleted:
 				completed = append(completed, ev)
-			case server.EventRootParked:
+			case server.EventRootPaused:
 				parked = append(parked, ev)
 			}
 		case <-ctx.Done():

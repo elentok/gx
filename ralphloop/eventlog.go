@@ -30,7 +30,7 @@ const (
 	notifyKindIterationResumed  = "iteration-resumed"
 	notifyKindEpicComplete      = "epic-complete"
 	notifyKindDrainComplete     = "drain-complete"
-	notifyKindEpicParked        = "epic-parked"
+	notifyKindEpicPaused        = "epic-paused"
 	notifyKindTicketNeedsHuman  = "ticket-needs-human"
 	notifyKindEpicFailed        = "epic-failed"
 	notifyKindConflictStarted   = "conflict-resolution-started"

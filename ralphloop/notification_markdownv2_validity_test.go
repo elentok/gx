@@ -13,8 +13,8 @@ import (
 // adversarial input a live Telegram sendMessage call would reject if any
 // call site forgot to escape it: a punctuation-heavy title (parens, a
 // hyphen, a period, a literal asterisk), a fractional cost, and an
-// EpicCounts with more than parkedIdentifierCap ParkedIdentifiers (the "+N
-// more" overflow case — see TestMarkdownV2Validity_OverflowParkedIdentifiers
+// EpicCounts with more than pausedIdentifierCap PausedIdentifiers (the "+N
+// more" overflow case — see TestMarkdownV2Validity_OverflowPausedIdentifiers
 // for a dedicated tripwire). Each case is checked against
 // isValidTelegramMarkdownV2's own independently-written special-character
 // list, not production's, so a bug in the shared list can't hide from it.
@@ -28,7 +28,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 
 	overflowCounts := EpicCounts{
 		Done:              2,
-		ParkedIdentifiers: []string{"01", "02", "03", "04", "05", "06"},
+		PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"},
 		Total:             10,
 	}
 	ticket := tickets.Ticket{Identifier: adversarialTicket, Title: adversarialTitle}
@@ -42,7 +42,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		"iterationFinishedText":             telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
 		"ticketNeedsHumanText/needs-answer": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-answer", "zero-commit", "No commits landed (yet).", overflowCounts),
 		"ticketNeedsHumanText/needs-repair": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-repair", "blocked-pane", "Operator intervention required.", overflowCounts),
-		"epicParkedText":                    telegramStyle.epicParkedText(adversarialEpic, []string{"04", "07"}),
+		"epicPausedText":                    telegramStyle.epicPausedText(adversarialEpic, []string{"04", "07"}),
 		"epicCompleteText":                  telegramStyle.epicCompleteText(adversarialEpic, overflowCounts, 5, 492, fractionalCost),
 		"epicFailedText":                    telegramStyle.epicFailedText(adversarialEpic, overflowCounts, "boom (exit 1)."),
 		"mutedText":                         telegramStyle.mutedText(adversarialEpic, adversarialTicket),
@@ -62,16 +62,16 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 	}
 }
 
-// TestMarkdownV2Validity_OverflowParkedIdentifiers is the named tripwire for
-// the >5-parked-identifiers regression (ticket 01b): a future change to
+// TestMarkdownV2Validity_OverflowPausedIdentifiers is the named tripwire for
+// the >5-paused-identifiers regression (ticket 01b): a future change to
 // RenderCountsLine or to who escapes what should fail this test even though
-// nothing else in this file is "about" parked overflow specifically.
-func TestMarkdownV2Validity_OverflowParkedIdentifiers(t *testing.T) {
+// nothing else in this file is "about" paused overflow specifically.
+func TestMarkdownV2Validity_OverflowPausedIdentifiers(t *testing.T) {
 	t.Parallel()
 
 	counts := EpicCounts{
 		Done:              2,
-		ParkedIdentifiers: []string{"01", "02", "03", "04", "05", "06", "07"},
+		PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06", "07"},
 		Total:             10,
 	}
 

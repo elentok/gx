@@ -590,7 +590,7 @@ func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
 	for i, t := range stalled {
 		identifiers[i] = t.Identifier
 	}
-	s.send(s.style.epicParkedText(epicName, identifiers), notifyKindEpicParked, epicSource(epicName), "")
+	s.send(s.style.epicPausedText(epicName, identifiers), notifyKindEpicPaused, epicSource(epicName), "")
 }
 
 func (s *chatEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {

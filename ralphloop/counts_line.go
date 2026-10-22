@@ -7,25 +7,25 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// parkedIdentifierCap bounds how many parked identifiers a counts line lists
+// pausedIdentifierCap bounds how many paused identifiers a counts line lists
 // inline before falling back to an overflow marker — enough to be useful
-// without a park-heavy epic turning one chat message into a wall of ids.
-const parkedIdentifierCap = 5
+// without a pause-heavy epic turning one chat message into a wall of ids.
+const pausedIdentifierCap = 5
 
 // EpicCounts tallies an epic's tickets by rendered status, the input to
 // RenderCountsLine. Done and Total are the two fields that describe the
 // whole epic regardless of bucket; the rest name what's keeping the
-// remainder from being done. ParkedIdentifiers drives the inline "parked:
-// 07, 12" clause — its length is the parked count, so there is exactly one
-// source of truth for how many are parked.
+// remainder from being done. PausedIdentifiers drives the inline "paused:
+// 07, 12" clause — its length is the paused count, so there is exactly one
+// source of truth for how many are paused.
 type EpicCounts struct {
 	Done              int
 	InProgress        int
-	ParkedIdentifiers []string
+	PausedIdentifiers []string
 	Blocked           int
 	Ready             int
 	Total             int
-	// Recovered is how many parks recovery fixed without a person; only the
+	// Recovered is how many pauses recovery fixed without a person; only the
 	// server fills it, for the epic-complete summary.
 	Recovered int
 }
@@ -47,7 +47,7 @@ func (s RunScope) Counts(epic tickets.Epic) EpicCounts {
 		case tickets.StatusClaimed:
 			counts.InProgress++
 		case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair:
-			counts.ParkedIdentifiers = append(counts.ParkedIdentifiers, ticket.Identifier)
+			counts.PausedIdentifiers = append(counts.PausedIdentifiers, ticket.Identifier)
 		case tickets.StatusBlocked, tickets.StatusWaitingForChildren:
 			counts.Blocked++
 		case tickets.StatusOpen:
@@ -58,7 +58,7 @@ func (s RunScope) Counts(epic tickets.Epic) EpicCounts {
 }
 
 // RenderCountsLine renders c in the fixed bucket order done, in progress,
-// parked, blocked, ready, total. Every bucket but done/total is suppressed
+// paused, blocked, ready, total. Every bucket but done/total is suppressed
 // at zero, so a line only names what's materially true rather than
 // repeating "0 blocked" on every message. This is a pure function of c —
 // the formatting decisions live here, not in any sink — which is what makes
@@ -68,8 +68,8 @@ func RenderCountsLine(c EpicCounts) string {
 	if c.InProgress > 0 {
 		clauses = append(clauses, fmt.Sprintf("%d in progress", c.InProgress))
 	}
-	if len(c.ParkedIdentifiers) > 0 {
-		clauses = append(clauses, fmt.Sprintf("%d parked: %s", len(c.ParkedIdentifiers), joinParkedIdentifiers(c.ParkedIdentifiers)))
+	if len(c.PausedIdentifiers) > 0 {
+		clauses = append(clauses, fmt.Sprintf("%d paused: %s", len(c.PausedIdentifiers), joinPausedIdentifiers(c.PausedIdentifiers)))
 	}
 	if c.Blocked > 0 {
 		clauses = append(clauses, fmt.Sprintf("%d blocked", c.Blocked))
@@ -112,15 +112,15 @@ func loadEpicTotalCost(scratchDir, epicName string) float64 {
 	return total
 }
 
-// joinParkedIdentifiers lists identifiers inline, capped at
-// parkedIdentifierCap: beyond that, the rest collapse into a single "+N
+// joinPausedIdentifiers lists identifiers inline, capped at
+// pausedIdentifierCap: beyond that, the rest collapse into a single "+N
 // more" marker instead of growing the line without bound.
-func joinParkedIdentifiers(identifiers []string) string {
-	if len(identifiers) <= parkedIdentifierCap {
+func joinPausedIdentifiers(identifiers []string) string {
+	if len(identifiers) <= pausedIdentifierCap {
 		return strings.Join(identifiers, ", ")
 	}
-	shown := strings.Join(identifiers[:parkedIdentifierCap], ", ")
-	return fmt.Sprintf("%s, +%d more", shown, len(identifiers)-parkedIdentifierCap)
+	shown := strings.Join(identifiers[:pausedIdentifierCap], ", ")
+	return fmt.Sprintf("%s, +%d more", shown, len(identifiers)-pausedIdentifierCap)
 }
 
 // CountsOf tallies a whole epic the way the chat messages show it.

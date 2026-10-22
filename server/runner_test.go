@@ -310,7 +310,7 @@ func TestRunner_LandsTheIterationAndClosesTheRoot(t *testing.T) {
 	for ev := range evs {
 		switch ev.Type {
 		case server.EventTicketClaimed, server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted,
-			server.EventIterationFailed, server.EventIterationParked:
+			server.EventIterationFailed, server.EventIterationPaused:
 			seen = append(seen, ev.Type)
 		}
 		if ev.Type == server.EventRootCompleted || ev.Type == server.EventIterationFailed {
@@ -442,7 +442,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 		switch ev.Type {
 		case server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted:
 			seen = append(seen, ev.Type+" "+ev.Address)
-		case server.EventIterationFailed, server.EventIterationParked:
+		case server.EventIterationFailed, server.EventIterationPaused:
 			t.Fatalf("unexpected %s for %s", ev.Type, ev.Address)
 		}
 		if ev.Type == server.EventRootCompleted {
@@ -782,7 +782,7 @@ func TestRunner_RestartParksAHandleWhoseWorktreeIsGone(t *testing.T) {
 		t.Fatal(err)
 	}
 	for ev := range evs {
-		if ev.Type == server.EventTicketParked {
+		if ev.Type == server.EventTicketPaused {
 			break
 		}
 	}
@@ -829,7 +829,7 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	for ev := range evs {
 		switch ev.Type {
 		case server.EventReclaimed, server.EventIterationStarted, server.EventTicketDone, server.EventRootCompleted,
-			server.EventIterationFailed, server.EventIterationParked:
+			server.EventIterationFailed, server.EventIterationPaused:
 			seen = append(seen, ev.Type)
 		}
 		if ev.Type == server.EventRootCompleted || ev.Type == server.EventIterationFailed {
@@ -885,7 +885,7 @@ func TestRunner_AParkSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *t
 	}
 	for _, evs := range streams {
 		for ev := range evs {
-			if ev.Type == server.EventIterationParked {
+			if ev.Type == server.EventIterationPaused {
 				break
 			}
 		}

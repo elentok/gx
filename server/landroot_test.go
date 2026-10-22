@@ -83,7 +83,7 @@ func TestLandRoot_NeedsRebaseParksTheRootWithoutRebasing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
 
 	main := strings.TrimSpace(f.git(t, "rev-parse", "main"))
 	if got := strings.TrimSpace(f.git(t, "log", "-1", "--format=%s", "main")); got != "main moves on" {
@@ -184,7 +184,7 @@ func TestLandRoot_StampsOnlyCompletedAtWhenTheLandParks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
 
 	f.assertStamps(t, false)
 }

@@ -28,7 +28,7 @@ func runMergeTicket(t *testing.T, turn func(f *schedFixture, cwd string) string)
 		case <-ctx.Done():
 			t.Fatal("merge ticket never settled")
 		case ev := <-evs:
-			if ev.Type != server.EventTicketDone && ev.Type != server.EventIterationParked {
+			if ev.Type != server.EventTicketDone && ev.Type != server.EventIterationPaused {
 				continue
 			}
 			tk, err := schema.ParseTicket(f.ticketFile(t, "01"))

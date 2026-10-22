@@ -61,17 +61,17 @@ func TestReduce_EffectPerEventType(t *testing.T) {
 	}{
 		{server.EventTicketClaimed, resnap},
 		{server.EventIterationStarted, resnap},
-		{server.EventIterationParked, resnap},
+		{server.EventIterationPaused, resnap},
 		{server.EventIterationFailed, resnap},
 		{server.EventIterationLaunchFailed, resnap},
 		{server.EventTicketDone, resnap},
 		{server.EventTicketCancelled, resnap},
-		{server.EventTicketParked, resnap},
+		{server.EventTicketPaused, resnap},
 		{server.EventTicketChanged, resnap},
 		{server.EventReclaimed, resnap},
 		{server.EventExplainVerdictChange, resnap},
 		{server.EventRootCompleted, resnap},
-		{server.EventRootParked, resnap},
+		{server.EventRootPaused, resnap},
 		{server.EventLandRolledBack, resnap},
 		{server.EventTicketNudged, resnap},
 		{server.EventQueueChanged, resnap | viewmodel.EffectRefetchQueue},
@@ -149,9 +149,9 @@ func TestToastFor(t *testing.T) {
 		ev   server.Event
 		want viewmodel.Toast
 	}{
-		{"iteration parked", server.Event{Type: server.EventIterationParked, Address: "gx:e/01"},
+		{"iteration parked", server.Event{Type: server.EventIterationPaused, Address: "gx:e/01"},
 			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 parked"}},
-		{"ticket parked", server.Event{Type: server.EventTicketParked, Address: "gx:e/01"},
+		{"ticket parked", server.Event{Type: server.EventTicketPaused, Address: "gx:e/01"},
 			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 parked"}},
 		{"reload success", server.Event{Type: server.EventConfigReloaded, Level: server.EventLevelSuccess, Message: "ok"},
 			viewmodel.Toast{Level: server.EventLevelSuccess, Text: "ok"}},

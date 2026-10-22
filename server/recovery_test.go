@@ -740,7 +740,7 @@ func runToZeroCommitPark(t *testing.T, h *servertest.Harness, last string) {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	// The loop's own finish debounce outlasts waitFor.
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationParked, "proj:epic-a/01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:epic-a/01")
 }
 
 // R2 and R3 read the transcript the park's session left: the matcher sees the

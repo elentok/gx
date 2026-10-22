@@ -31,8 +31,8 @@ func TestRunScope_Counts_BucketsEveryStatus(t *testing.T) {
 	if counts.InProgress != 1 {
 		t.Errorf("InProgress = %d, want 1", counts.InProgress)
 	}
-	if len(counts.ParkedIdentifiers) != 2 {
-		t.Errorf("ParkedIdentifiers = %v, want 2 entries", counts.ParkedIdentifiers)
+	if len(counts.PausedIdentifiers) != 2 {
+		t.Errorf("PausedIdentifiers = %v, want 2 entries", counts.PausedIdentifiers)
 	}
 	if counts.Blocked != 2 {
 		t.Errorf("Blocked = %d, want 2 (05 blocked-by 02, 07 waiting-for-children)", counts.Blocked)

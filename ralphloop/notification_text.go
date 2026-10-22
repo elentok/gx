@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // formatDuration renders totalSeconds as "5m32s"/"1h5m32s"/"42s", the
@@ -137,52 +138,53 @@ func (s mrkdwnStyle) iterationFinishedText(ticket tickets.Ticket, epicName strin
 	return s.chatStyle.Message("✅", ticket.Title, counts, "", s.identityLine(epicName, ticket.Identifier))
 }
 
-// ticketNeedsHumanText renders the "a machine parked this ticket for a
-// person" notification, for either status — the one chat-visible message
-// for every park (see chatEventSink's park-cardinality handling).
-// needs-answer means no commit landed and the agent never declared the
+// ticketNeedsHumanText renders the "a machine paused this ticket for a
+// person" notification, for either class — the one chat-visible message
+// for every pause (see chatEventSink's pause-cardinality handling).
+// The answer class means no commit landed and the agent never declared the
 // zero-commit finish intentional via `gx tickets set --iteration-status
-// finished --commitless true`; needs-repair means a fault (operator
+// finished --commitless true`; the repair class means a fault (operator
 // intervention, an iteration error, a dead-on-arrival reconciliation)
-// parked it instead.
+// paused it instead. status is the ticket's stored status word, old or new;
+// the class decides the headline.
 //
-//	🆘 *needs answer*      (needs-answer)
-//	🛑 *needs repair*      (needs-repair)
+//	🆘 *needs answer*      (answer class)
+//	🛑 *needs repair*      (repair class)
 //
 //	{reason}
 //	{counts line}
 //	[gx] {epic}/{ticket}
 func (s mrkdwnStyle) ticketNeedsHumanText(identifier, epicName, status string, kind events.Kind, reason string, counts EpicCounts) chatmarkup.Text {
 	emoji, headline := "\U0001f198", "needs answer"
-	if status != "needs-answer" {
+	if (schema.Ticket{Status: schema.Status(status)}).PausedClass() != schema.PauseClassAnswer {
 		emoji, headline = "\U0001f6d1", "needs repair"
 	}
 	detail := fmt.Sprintf("%s\n%s", reason, RenderCountsLine(counts))
 	return s.chatStyle.Message(emoji, headline, "", detail, s.identityLine(epicName, identifier))
 }
 
-// conflictResolutionStartedText renders the "an agent took over a land
+// conflictResolutionStartedText renders the "an agent took over a merge
 // conflict" notification:
 //
-//	🔀 *resolving land conflict*
+//	🔀 *resolving merge conflict*
 //
 //	An agent is resolving the cherry-pick conflict
 //	[gx] {epic}/{ticket}
 func (s mrkdwnStyle) conflictResolutionStartedText(epicName, ticketIdentifier string) chatmarkup.Text {
-	return s.chatStyle.Message("🔀", "resolving land conflict", "", "An agent is resolving the cherry-pick conflict", s.identityLine(epicName, ticketIdentifier))
+	return s.chatStyle.Message("🔀", "resolving merge conflict", "", "An agent is resolving the cherry-pick conflict", s.identityLine(epicName, ticketIdentifier))
 }
 
-// epicParkedText renders the "epic parked" notification — the run is still
+// epicPausedText renders the "epic paused" notification — the run is still
 // alive (unlike epicCompleteText) with every pane recoverable, waiting on a
 // person to clear one of the named tickets:
 //
-//	🅿️ *epic parked*
+//	🅿️ *epic paused*
 //
 //	Nothing runnable left; waiting on {stalled}
 //	[gx] {epic}
-func (s mrkdwnStyle) epicParkedText(epicName string, stalled []string) chatmarkup.Text {
+func (s mrkdwnStyle) epicPausedText(epicName string, stalled []string) chatmarkup.Text {
 	detail := "Nothing runnable left; waiting on " + strings.Join(stalled, ", ")
-	return s.chatStyle.Message("\U0001f17f️", "epic parked", "", detail, s.identityLine(epicName, ""))
+	return s.chatStyle.Message("\U0001f17f️", "epic paused", "", detail, s.identityLine(epicName, ""))
 }
 
 // epicCompleteText renders the "epic complete" notification. counts is the

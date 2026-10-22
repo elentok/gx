@@ -229,7 +229,7 @@ func TestSchedulingPort_ParkThenResumeReusesBranchAndLandsBothCommitsOnce(t *tes
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventIterationParked, "proj:epic/01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:epic/01")
 
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {

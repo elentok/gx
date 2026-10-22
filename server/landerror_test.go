@@ -26,16 +26,16 @@ func (f *schedFixture) parkRoot(t *testing.T) server.Event {
 		select {
 		case ev, open := <-evs:
 			if !open {
-				t.Fatal("event stream ended before root-parked")
+				t.Fatal("event stream ended before root-paused")
 			}
 			switch ev.Type {
 			case server.EventIterationFailed:
 				t.Fatalf("iteration-failed on a land error: %+v", ev)
-			case server.EventRootParked:
+			case server.EventRootPaused:
 				return ev
 			}
 		case <-ctx.Done():
-			t.Fatalf("no root-parked: %v", ctx.Err())
+			t.Fatalf("no root-paused: %v", ctx.Err())
 		}
 	}
 }

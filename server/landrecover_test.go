@@ -120,7 +120,7 @@ func TestLandRecovery_OrphanLockWithNoEvidenceParksAmbiguousLand(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	restartAndSettle(t, h, server.EventTicketParked)
+	restartAndSettle(t, h, server.EventTicketPaused)
 
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {

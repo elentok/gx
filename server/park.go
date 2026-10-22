@@ -11,7 +11,7 @@ import (
 )
 
 // parkTicket is the one way the server parks a ticket: the write, the
-// EventTicketParked event and the chat message all come from the same kind and
+// EventTicketPaused event and the chat message all come from the same kind and
 // reason, so the three cannot disagree. A park that finds the ticket done (it
 // lost a race with a land) is not an error to the caller: nothing is left to park.
 // run is the parked run, zero when none launched.
@@ -22,7 +22,7 @@ func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath 
 	} else if err != nil {
 		return err
 	}
-	s.events.publish(EventTicketParked, addr.String())
+	s.events.publish(EventTicketPaused, addr.String())
 	if !s.holdParkForRecovery(addr, ticketPath, kind, reason) {
 		s.notifyPark(addr, ticketPath, kind, reason)
 	}

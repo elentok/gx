@@ -102,7 +102,7 @@ func TestLandDecide_RepeatNeedsRebaseParkIsQuiet(t *testing.T) {
 	if err := f.h.Server.CompleteRootIfDone("proj:" + schedEpic + "/01"); err != nil {
 		t.Fatal(err)
 	}
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
 	time.Sleep(10 * testFlushInterval)
 
 	if parks != 1 {

@@ -90,7 +90,7 @@ func TestEpicNotice_NeedsRebaseParkSendsNotMerged(t *testing.T) {
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")
 	}, chat)
-	f.runEpic(t, server.EventRootParked)
+	f.runEpic(t, server.EventRootPaused)
 
 	if got := waitForChat(count, epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)

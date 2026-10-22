@@ -22,8 +22,8 @@ import (
 // Flag names in the evolve inputs table. They are part of the JSON contract the
 // gx-evolve skill reads.
 const (
-	flagPark          = "park"
-	flagNeedsRepair   = "needs-repair"
+	flagPausedAnswer  = countPausedAnswer
+	flagPausedRepair  = countPausedRepair
 	flagRecovery      = "recovery"
 	flagDeadlock      = "deadlock"
 	flagConflict      = "conflict-hit"
@@ -40,7 +40,7 @@ const (
 	severityRest     = 0
 	severityOverrun  = 1
 	severityConflict = 2
-	severityParked   = 3
+	severityPaused   = 3
 )
 
 // InputsRow is one ticket of the flag table.
@@ -210,8 +210,9 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 			flags = append(flags, f)
 		}
 	}
-	add(has(countPausedAnswer) || tk.LegacyStatus() == string(schema.StatusNeedsAnswer), flagPark)
-	add(has(countPausedRepair) || tk.LegacyStatus() == string(schema.StatusNeedsRepair), flagNeedsRepair)
+	class := schema.Ticket{Status: schema.Status(tk.Status), PauseReason: tk.PauseReason}.PausedClass()
+	add(has(countPausedAnswer) || class == schema.PauseClassAnswer, flagPausedAnswer)
+	add(has(countPausedRepair) || class == schema.PauseClassRepair, flagPausedRepair)
 	add(has("recovery-"), flagRecovery)
 	add(has(string(events.Deadlocked)), flagDeadlock)
 	add(has(string(events.ConflictHit)), flagConflict)
@@ -225,14 +226,14 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 	return flags
 }
 
-// inputsSeverity ranks a flag set: parked or broken beats conflict beats
+// inputsSeverity ranks a flag set: paused or broken beats conflict beats
 // overrun beats the rest.
 func inputsSeverity(flags []string) int {
 	sev := severityRest
 	for _, f := range flags {
 		switch f {
-		case flagPark, flagNeedsRepair, flagRecovery, flagDeadlock:
-			return severityParked
+		case flagPausedAnswer, flagPausedRepair, flagRecovery, flagDeadlock:
+			return severityPaused
 		case flagConflict:
 			sev = max(sev, severityConflict)
 		case flagOverrun:

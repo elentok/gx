@@ -150,7 +150,7 @@ func TestRetroHook_SubmitsWhenTheLandNeedsARebase(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
@@ -183,7 +183,7 @@ func TestRetroHook_SubmitsWhenTheLandErrors(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
-	servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
 
 	if got := f.retrosAfter(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)

@@ -182,7 +182,7 @@ func TestEpicMerge_DirtyTrunkParksTheRootAndLeavesItQueued(t *testing.T) {
 	if !strings.Contains(res.Message, "01.txt") {
 		t.Errorf("message = %q, want the blocking file", res.Message)
 	}
-	ev := servertest.WaitForEvent(ctx, t, evs, server.EventRootParked, "proj:"+schedEpic)
+	ev := servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "proj:"+schedEpic)
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q (%s)", ev.Kind, events.DirtyTrunk, ev.Message)
 	}

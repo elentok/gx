@@ -170,8 +170,8 @@ func TestTelegramStyleEpicStartedText(t *testing.T) {
 
 func TestTelegramStyleEpicParkedText(t *testing.T) {
 	t.Parallel()
-	got := telegramStyle.epicParkedText("ui-tree-migration", []string{"04", "07"}).String()
-	want := "\U0001f17f️ *epic parked*\n\nNothing runnable left; waiting on 04, 07\n\\[gx\\] ui\\-tree\\-migration"
+	got := telegramStyle.epicPausedText("ui-tree-migration", []string{"04", "07"}).String()
+	want := "\U0001f17f️ *epic paused*\n\nNothing runnable left; waiting on 04, 07\n\\[gx\\] ui\\-tree\\-migration"
 	if got != want {
 		t.Errorf("text = %q, want %q", got, want)
 	}
@@ -186,10 +186,10 @@ func TestTelegramStyleEpicCompleteText(t *testing.T) {
 	}
 }
 
-func TestTelegramStyle_OverflowParkedIdentifiersEscapesPlus(t *testing.T) {
+func TestTelegramStyle_OverflowPausedIdentifiersEscapesPlus(t *testing.T) {
 	t.Parallel()
-	counts := EpicCounts{Done: 2, ParkedIdentifiers: []string{"01", "02", "03", "04", "05", "06"}, Total: 8}
-	const countsLine = "2 done · 6 parked: 01, 02, 03, 04, 05, \\+1 more · 8 total"
+	counts := EpicCounts{Done: 2, PausedIdentifiers: []string{"01", "02", "03", "04", "05", "06"}, Total: 8}
+	const countsLine = "2 done · 6 paused: 01, 02, 03, 04, 05, \\+1 more · 8 total"
 
 	t.Run("epicStartedText", func(t *testing.T) {
 		t.Parallel()

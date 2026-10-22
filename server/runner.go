@@ -30,19 +30,19 @@ const (
 	EventIterationLaunchFailed = "iteration-launch-failed"
 	// EventTicketDone streams once the ticket's commits are landed and the file says done.
 	EventTicketDone = "ticket-done"
-	// EventIterationParked streams when a finished iteration ended without landing
+	// EventIterationPaused streams when a finished iteration ended without landing
 	// (needs-answer or zero commits).
-	EventIterationParked = "iteration-parked"
-	// EventTicketParked streams once a person's park is written to the ticket file.
-	EventTicketParked = "ticket-parked"
+	EventIterationPaused = "iteration-paused"
+	// EventTicketPaused streams once a person's pause is written to the ticket file.
+	EventTicketPaused = "ticket-paused"
 	// EventTicketCancelled streams once per ticket a cancel wrote.
 	EventTicketCancelled = "ticket-cancelled"
 	// EventIterationFailed streams when finishing or landing errored; the ticket stays claimed.
 	EventIterationFailed = "iteration-failed"
 	// EventRootCompleted streams once every ticket of a queued root is done.
 	EventRootCompleted = "root-completed"
-	// EventRootParked streams when a finished root cannot fast-forward onto its target.
-	EventRootParked = "root-parked"
+	// EventRootPaused streams when a finished root cannot fast-forward onto its target.
+	EventRootPaused = "root-paused"
 
 	implementSkill   = "gx-implement"
 	codeReviewSkill  = "gx-code-review"
@@ -777,7 +777,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			keepRun = true
 			s.registry.markWaiting(ticketAddr, time.Now())
 		}
-		s.events.publish(EventIterationParked, ticketAddr)
+		s.events.publish(EventIterationPaused, ticketAddr)
 		if !s.holdParkForRecovery(addr, one.Ticket.Path, out.Kind, out.Reason) {
 			s.notifyPark(addr, one.Ticket.Path, out.Kind, out.Reason)
 		}

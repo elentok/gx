@@ -101,7 +101,7 @@ func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
 		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "next")
 	})
 
-	f.runEpic(t, server.EventRootParked)
+	f.runEpic(t, server.EventRootPaused)
 
 	if got := strings.TrimSpace(f.git(t, "log", "-1", "--format=%s", "next")); got != "next moves on" {
 		t.Errorf("next head = %q, want it untouched", got)

@@ -14,18 +14,30 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// waitExitCodes maps the statuses a --wait stops on to their exit code.
-var waitExitCodes = map[string]int{
-	string(schema.StatusDone):        0,
-	string(schema.StatusNeedsAnswer): 3,
-	string(schema.StatusNeedsRepair): 4,
-	string(schema.StatusCancelled):   5,
+// waitPauseExitCodes maps the pause class a --wait stops on to its exit code.
+var waitPauseExitCodes = map[schema.PauseClass]int{
+	schema.PauseClassAnswer: 3,
+	schema.PauseClassRepair: 4,
+}
+
+// waitExitCode is the exit code of a ticket a --wait stops on, and false when
+// the ticket has not ended. A paused ticket maps by its class, whichever
+// spelling the status travels in.
+func waitExitCode(t server.TicketInfo) (int, bool) {
+	switch schema.Status(t.Status) {
+	case schema.StatusDone:
+		return 0, true
+	case schema.StatusCancelled:
+		return 5, true
+	}
+	code, ok := waitPauseExitCodes[schema.Ticket{Status: schema.Status(t.Status)}.PausedClass()]
+	return code, ok
 }
 
 const (
 	// exitWaitTimeout is the exit code when --timeout expires before the ticket ends.
 	exitWaitTimeout = 6
-	// exitWaitEscalated is the exit code when recovery of a park gave up on it.
+	// exitWaitEscalated is the exit code when recovery of a pause gave up on it.
 	exitWaitEscalated = 9
 )
 
@@ -37,7 +49,7 @@ type eventSource interface {
 	Events(ctx context.Context, since uint64) (<-chan server.Event, error)
 }
 
-// waitForTicket blocks until address is done, parked or cancelled; a park
+// waitForTicket blocks until address is done, paused or cancelled; a pause
 // whose recovery is still pending (held remedy or open investigation) is not
 // an end yet. A dropped
 // stream or a dead server is not an end: it re-snapshots after a pause, so a
@@ -101,13 +113,13 @@ func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address s
 			continue
 		}
 		present = true
-		if _, stop := waitExitCodes[t.Status]; stop && t.Recovery != server.RecoveryPending {
+		if _, stop := waitExitCode(t); stop && t.Recovery != server.RecoveryPending {
 			return t, true, nil
 		}
 	}
 	if !present && moved != nil {
 		if t, ok := moved(address); ok {
-			if _, stop := waitExitCodes[t.Status]; stop {
+			if _, stop := waitExitCode(t); stop {
 				return t, true, nil
 			}
 		}
@@ -127,7 +139,7 @@ func waitOnce(ctx context.Context, src eventSource, moved movedLookup, address s
 }
 
 // runOneOffWait waits for address, prints its ## Result, and maps its status to
-// the exit code. A parked ticket has no result worth printing. A positive
+// the exit code. A paused ticket has no result worth printing. A positive
 // timeout only stops this waiter: the server is never told, so the ticket runs on.
 func runOneOffWait(ctx context.Context, src eventSource, moved movedLookup, w, errW io.Writer, address string, timeout time.Duration) error {
 	if timeout > 0 {
@@ -143,7 +155,7 @@ func runOneOffWait(ctx context.Context, src eventSource, moved movedLookup, w, e
 	if err != nil {
 		return err
 	}
-	code := waitExitCodes[t.Status]
+	code, _ := waitExitCode(t)
 	if t.Recovery == server.RecoveryEscalated {
 		fmt.Fprintf(errW, "%s: %s, recovery escalated\n", address, t.Status)
 		return &ExitError{Code: exitWaitEscalated}

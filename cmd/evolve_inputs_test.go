@@ -81,7 +81,7 @@ func TestEvolveInputs_FlagsAndSeverityOrder(t *testing.T) {
 	want := map[string][]string{
 		"01": {"context-overrun"},
 		"02": {"relaunch", "nudge"},
-		"03": {"needs-repair", "slow"},
+		"03": {"paused-repair", "slow"},
 		"04": {"conflict-hit"},
 		"05": {"has-fix-tickets"},
 		"06": {},

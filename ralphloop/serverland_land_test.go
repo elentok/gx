@@ -80,7 +80,7 @@ func TestLandBuilt_FinishSinkSendsConflictStartAndChildParkOnly(t *testing.T) {
 		t.Fatalf("got %d sends, want one batch", len(got))
 	}
 	text := got[0].Text
-	if !strings.Contains(text, "resolving land conflict") {
+	if !strings.Contains(text, "resolving merge conflict") {
 		t.Errorf("missing the conflict-started message:\n%s", text)
 	}
 	if n := strings.Count(text, "needs repair"); n != 1 || !strings.Contains(text, "epic/01a") {

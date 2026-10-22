@@ -226,7 +226,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	}
 	if !out.Landed {
 		s.log.Warn("late finish re-parked", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
-		s.events.publish(EventIterationParked, addr.String())
+		s.events.publish(EventIterationPaused, addr.String())
 		return false
 	}
 	sha, outcome := "", "closed commitless"

@@ -528,7 +528,7 @@ func TestServerStream_ParkToastsOnLiveEventsOnly(t *testing.T) {
 	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
 	h.probeUp() // the snapshot holds a parked ticket: state, not news
 
-	park := server.Event{Seq: 11, Type: server.EventIterationParked, Address: "gx:alpha/01"}
+	park := server.Event{Seq: 11, Type: server.EventIterationPaused, Address: "gx:alpha/01"}
 	events := h.m.stream.streamEvents
 	next, cmd := h.m.Update(streamEventMsg{ev: park, events: events})
 	if got := toastTexts(cmd); len(got) != 1 || got[0].Kind != notify.KindWarning {

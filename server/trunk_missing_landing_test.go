@@ -29,7 +29,7 @@ func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop 
 
 func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T) {
 	f, develop, chatCount := trunkDeletedMidRun(t, true)
-	f.runEpic(t, server.EventRootParked)
+	f.runEpic(t, server.EventRootPaused)
 
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, "status: done") {
 		t.Errorf("ticket did not land on its root's branch:\n%s", body)

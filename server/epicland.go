@@ -210,7 +210,7 @@ func (s *Server) actOnLand(root rootRef, one ralphloop.OneIteration, dir string,
 func (s *Server) parkRoot(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d landDecision) {
 	project := root.Project
 	reason, kind := d.result.Message, d.result.ParkKind
-	s.events.publishEvent(Event{Type: EventRootParked, Address: root.String(), Kind: kind, Level: EventLevelWarning, Message: reason})
+	s.events.publishEvent(Event{Type: EventRootPaused, Address: root.String(), Kind: kind, Level: EventLevelWarning, Message: reason})
 	s.log.Warn("root parked", "root", root, "kind", kind, "reason", reason)
 	if !d.sendNotice() {
 		return

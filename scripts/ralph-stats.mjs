@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Aggregates .scratch/<epic>/run-log.jsonl files into two metrics:
-//   1. unattended completion rate per ticket (no needs-repair/needs-answer/
+//   1. unattended completion rate per ticket (no paused or
 //      conflict-hit before the ticket's last event)
 //   2. failure/retry taxonomy: counts of intervention-signaling event types
 //
@@ -65,8 +65,7 @@ function inRange(iso) {
 }
 
 const INTERVENTION_TYPES = new Set([
-  "needs-repair",
-  "needs-answer",
+  "paused",
   "conflict-hit",
   "paused-smart-zone",
   "smart-zone-recovery-failed",
