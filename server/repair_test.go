@@ -33,8 +33,8 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 		{"merge continue and abort", "merge", server.RepairRequest{Address: addr, Continue: true, Abort: true}, repair.ReasonError},
 		{"merge an open ticket", "merge", server.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
 		{"start-over without a reason", "start-over", server.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
-		{"unpark an open ticket", "unpark", server.RepairRequest{Address: addr}, repair.ReasonNotParked},
-		{"resume an open ticket", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotParked},
+		{"unpark an open ticket", "unpark", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
+		{"resume an open ticket", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
 		{"bad address", "unpark", server.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
 		{"unknown project", "start-over", server.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
 	}

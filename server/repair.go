@@ -152,7 +152,7 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	res, _, err := repair.Land(repair.LandInput{
+	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
 		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Cwd: cwd,
 	}, ralphloop.DefaultDeps())
@@ -243,7 +243,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	_, t, ferr := repair.FindEpicTicket(epicPath, id)
 	if ferr != nil {
 		// Not a ticket of this epic: the plain resume reports why.
-		res, err := repair.Unpark(epicPath, id, time.Now(), "")
+		res, err := repair.Resume(epicPath, id, time.Now(), "")
 		if err != nil {
 			return repairRefusal(err), nil
 		}
@@ -269,7 +269,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		}
 	}
 	if s.adoptFirst(dir, addr, t.Path) {
-		res := repair.UnparkResult{Ticket: id, Status: repair.UnparkAdopted}
+		res := repair.ResumeResult{Ticket: id, Status: repair.ResumeAdopted}
 		if zeroCommit {
 			res.Message = repair.MessageAdopted
 		}
@@ -284,10 +284,10 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			return repairRefusal(err), nil
 		}
 		if prompted {
-			return repairOK(repair.UnparkResult{Ticket: id, Status: repair.UnparkPrompted, Message: repair.MessagePrompted})
+			return repairOK(repair.ResumeResult{Ticket: id, Status: repair.ResumePrompted, Message: repair.MessagePrompted})
 		}
 	}
-	var res repair.UnparkResult
+	var res repair.ResumeResult
 	if paused && req.RequireState && tk.PauseReason != schema.PauseSelfReported {
 		var refused *RepairResult
 		res, refused, err = resumeAnswered(t.Path, id, req)
@@ -298,7 +298,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			return RepairResult{}, fmt.Errorf("resume of %s: %w", addr, err)
 		}
 	} else {
-		res, err = repair.Unpark(epicPath, id, time.Now(), req.Base)
+		res, err = repair.Resume(epicPath, id, time.Now(), req.Base)
 		if err != nil {
 			return repairRefusal(err), nil
 		}
@@ -335,7 +335,7 @@ func (e resumeRefused) Error() string { return "resume refused" }
 // and reopens the ticket under one ticket lock. The state token is checked
 // again under the lock, and a refusal or a failed reopen appends nothing, so a
 // failure never leaves an answered question on a paused ticket.
-func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResult, *RepairResult, error) {
+func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.ResumeResult, *RepairResult, error) {
 	_, err := tickets.AppendLogFrom(ticketPath, func(evs []tickets.LogEvent) (tickets.LogEvent, error) {
 		t, err := schema.ParseTicket(ticketPath)
 		if err != nil {
@@ -354,12 +354,12 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResu
 	})
 	var refused resumeRefused
 	if errors.As(err, &refused) {
-		return repair.UnparkResult{}, &refused.res, nil
+		return repair.ResumeResult{}, &refused.res, nil
 	}
 	if err != nil {
-		return repair.UnparkResult{}, nil, err
+		return repair.ResumeResult{}, nil, err
 	}
-	return repair.UnparkResult{Ticket: id, Status: "open"}, nil, nil
+	return repair.ResumeResult{Ticket: id, Status: "open"}, nil, nil
 }
 
 // ambiguousBlockers lists the blockers a ticket paused on an ambiguous base

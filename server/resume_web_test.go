@@ -56,12 +56,12 @@ func webResume(t *testing.T, h *servertest.Harness, req server.RepairRequest) se
 	return res
 }
 
-func resumeResult(t *testing.T, res server.RepairResult) repair.UnparkResult {
+func resumeResult(t *testing.T, res server.RepairResult) repair.ResumeResult {
 	t.Helper()
 	if res.Refused {
 		t.Fatalf("resume refused: %+v", res)
 	}
-	var out repair.UnparkResult
+	var out repair.ResumeResult
 	if err := json.Unmarshal(res.Data, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestWebResume_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T)
 	state := pauseEnvZeroCommit(t, e)
 
 	out := resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
-	if out.Status != repair.UnparkPrompted || out.Message != repair.MessagePrompted {
+	if out.Status != repair.ResumePrompted || out.Message != repair.MessagePrompted {
 		t.Errorf("result = %+v; want prompted", out)
 	}
 	want := "A person reviewed your finish with no commits and wants you to continue. " +
@@ -152,7 +152,7 @@ func TestWebResume_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := resumeResult(t, webResume(t, p.h, server.RepairRequest{State: state}))
-	if out.Status != repair.UnparkAdopted || out.Message != repair.MessageAdopted {
+	if out.Status != repair.ResumeAdopted || out.Message != repair.MessageAdopted {
 		t.Errorf("result = %+v; want adopted as done", out)
 	}
 	if tk, err := schema.ParseTicket(p.ticketPath); err != nil || tk.Status != schema.StatusDone {

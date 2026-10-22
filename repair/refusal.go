@@ -13,11 +13,11 @@ import (
 // Stable machine-readable refusal codes shared by the repair verbs
 // (merge, verify, start-over, resume). Callers branch on these, never on message text.
 const (
-	ReasonLandLocked             = "land_locked"
+	ReasonMergeLocked            = "land_locked"
 	ReasonIterationBranchMissing = "iteration_branch_missing"
 	ReasonLiveAgentOnTab         = "live_agent_on_tab"
 	ReasonForkChildren           = "fork_children"
-	ReasonNotParked              = "not_parked"
+	ReasonNotPaused              = "not_paused"
 	ReasonStatusRefused          = "status_refused"
 	ReasonCommitless             = "commitless"
 	ReasonRalphLoopCwd           = "ralph_loop_cwd"
