@@ -13,14 +13,14 @@ import { AnswerResult } from "./AnswerResult";
 import { useTicketDetail, type FetchDetail } from "./detail";
 import { PermissionCard } from "./PermissionCard";
 import { TicketReading } from "./TicketReading";
-import { UnparkForm } from "./UnparkForm";
+import { ResumeForm } from "./ResumeForm";
 
 export function TicketPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
-  const [unparked, setUnparked] = useState("");
+  const [resumed, setResumed] = useState("");
   // A ticket address is <project>:<epic>/<id>.
   const epicAddress = address.slice(0, address.lastIndexOf("/"));
 
@@ -45,15 +45,15 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
               }}
               onStale={refetch}
             />
-            {unparked && (
+            {resumed && (
               <Text role="status" aria-label="Resume result" mt="4">
-                Resumed ·{unparked}
+                Resumed ·{resumed}
               </Text>
             )}
-            <UnparkForm
+            <ResumeForm
               detail={detail}
               onDone={(words) => {
-                setUnparked(words);
+                setResumed(words);
                 refetch();
               }}
               onStale={refetch}

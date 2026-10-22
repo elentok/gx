@@ -1,8 +1,8 @@
 {
   "address": "gx:demo/12",
   "title": "Pick a storage backend",
-  "status": "parked",
-  "park_kind": "question",
+  "status": "paused",
+  "pause_reason": "self-reported",
   "answered": false,
   "rounds": [
     { "seq": 1, "by": "agent", "summary": "Which database?", "outcome": "answered" },

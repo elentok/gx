@@ -1,22 +1,32 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { ActionUnpark, type TicketDetail } from "../generated/server";
+import { ActionResume, type TicketDetail } from "../generated/server";
 import { ReasonStale } from "./answer";
-import { postUnpark, unparkWords, type PostUnpark } from "./unpark";
+import { postResume, resumeWords, type PostResume } from "./resume";
 
-// The unpark area. The server decides whether it shows (the detail's actions); an
-// ambiguous-base park lists the competing blockers and needs one chosen.
-export function UnparkForm({
+const REASON_MANUAL = "manual";
+const REASON_AMBIGUOUS_BASE = "ambiguous-base";
+
+/** The action's name by pause reason: Resume lifts only a pause the person chose. */
+export function resumeLabel(reason: string | undefined): string {
+  if (reason === REASON_AMBIGUOUS_BASE) return "Choose base";
+  if (reason === REASON_MANUAL) return "Resume";
+  return "Retry";
+}
+
+// The resume area. The server decides whether it shows (the detail's actions); an
+// ambiguous-base pause lists the competing blockers and needs one chosen.
+export function ResumeForm({
   detail,
-  post = postUnpark,
+  post = postResume,
   onDone,
   onStale,
 }: {
   detail: TicketDetail;
-  post?: PostUnpark;
-  /** Called with the words describing what the unpark did. */
+  post?: PostResume;
+  /** Called with the words describing what the resume did. */
   onDone?: (words: string) => void;
-  /** The park changed under the person: refetch so the current one shows. */
+  /** The pause changed under the person: refetch so the current one shows. */
   onStale?: () => void;
 }) {
   const bases = detail.bases ?? [];
@@ -25,15 +35,16 @@ export function UnparkForm({
   const [error, setError] = useState("");
   const [seenState, setSeenState] = useState(detail.state);
 
-  // A new park clears the pick: it may list different blockers.
+  // A new pause clears the pick: it may list different blockers.
   if (seenState !== detail.state) {
     setSeenState(detail.state);
     setBase("");
   }
 
-  if (!detail.actions.includes(ActionUnpark)) return null;
+  if (!detail.actions.includes(ActionResume)) return null;
 
   const ready = bases.length === 0 || base !== "";
+  const label = resumeLabel(detail.pause_reason);
 
   const send = async () => {
     if (!ready || pending) return;
@@ -45,10 +56,10 @@ export function UnparkForm({
         setError(res.message);
         if (res.reason === ReasonStale) onStale?.();
       } else {
-        onDone?.(unparkWords(res.data));
+        onDone?.(resumeWords(res.data));
       }
     } catch {
-      setError("Could not resume. Try again.");
+      setError(`Could not ${label.toLowerCase()}. Try again.`);
     } finally {
       setPending(false);
     }
@@ -64,7 +75,7 @@ export function UnparkForm({
       display="flex"
       flexDirection="column"
       gap="2"
-      aria-label="Resume"
+      aria-label={label}
       role="form"
     >
       {bases.length > 0 && (
@@ -87,7 +98,7 @@ export function UnparkForm({
       )}
       {error && <Text role="alert">{error}</Text>}
       <Button disabled={!ready || pending} onClick={send}>
-        Resume
+        {label}
       </Button>
     </Box>
   );

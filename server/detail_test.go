@@ -18,7 +18,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Status != string(schema.StatusNeedsAnswer) || d.ParkKind != string(schema.ParkKindSelfReported) || d.Title == "" {
+	if d.Status != string(schema.StatusNeedsAnswer) || d.PauseReason != string(schema.PauseSelfReported) || d.Title == "" {
 		t.Errorf("header = %+v", d)
 	}
 	if d.State != state {
@@ -38,7 +38,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err = h.Client.Detail(context.Background(), answerAddr)
-	if want := []string{server.ActionAnswer, server.ActionUnpark}; err != nil || !slices.Equal(d.Actions, want) {
+	if want := []string{server.ActionAnswer, server.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("gone agent actions = %v, %v; want %v", d.Actions, err, want)
 	}
 }
@@ -55,7 +55,7 @@ func TestDetail_GxQuestionOffersUnparkOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)
-	if want := []string{server.ActionUnpark}; err != nil || !slices.Equal(d.Actions, want) {
+	if want := []string{server.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("actions = %v, %v; want %v", d.Actions, err, want)
 	}
 }

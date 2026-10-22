@@ -62,11 +62,11 @@ export const ReasonNotAnIncrease = "not-an-increase";
 
 export const ActionAnswer = "answer";
 export const ActionApprove = "approve";
-export const ActionUnpark = "unpark";
+export const ActionResume = "resume";
 /**
  * Actions the detail route offers. The server decides them; the UI renders them.
  */
-export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionUnpark;
+export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume;
 export const RoundOpen = "open";
 export const RoundAnswered = "answered";
 export const RoundClosed = "closed";
@@ -145,7 +145,10 @@ export interface TicketDetail {
   address: string;
   title: string;
   status: string;
-  park_kind?: string;
+  /**
+   * PauseReason picks the action the page labels: Answer, Choose base, Retry or Resume.
+   */
+  pause_reason?: string;
   /**
    * Answered is derived, never stored: the ticket is open again and its
    * latest question has an answer.
@@ -162,12 +165,12 @@ export interface TicketDetail {
   permission?: PermissionCard;
   chat: ChatMessage[];
   /**
-   * State is the token an answer or unpark sends back; empty without a round.
+   * State is the token an answer or resume sends back; empty without a round.
    */
   state?: string;
   /**
-   * Bases are the competing blockers an ambiguous-base park chooses between;
-   * the unpark sends the chosen one back as its base.
+   * Bases are the competing blockers an ambiguous-base pause chooses between;
+   * the resume sends the chosen one back as its base.
    */
   bases?: string[];
   actions: string[];

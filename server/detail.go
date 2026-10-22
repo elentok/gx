@@ -12,7 +12,7 @@ import (
 const (
 	ActionAnswer  = "answer"
 	ActionApprove = "approve"
-	ActionUnpark  = "unpark"
+	ActionResume  = "resume"
 )
 
 // Outcomes of a park round.
@@ -81,10 +81,11 @@ type ChatMessage struct {
 
 // TicketDetail is the /v1/tickets/detail payload.
 type TicketDetail struct {
-	Address  string `json:"address"`
-	Title    string `json:"title"`
-	Status   string `json:"status"`
-	ParkKind string `json:"park_kind,omitempty"`
+	Address string `json:"address"`
+	Title   string `json:"title"`
+	Status  string `json:"status"`
+	// PauseReason picks the action the page labels: Answer, Choose base, Retry or Resume.
+	PauseReason string `json:"pause_reason,omitempty"`
 	// Answered is derived, never stored: the ticket is open again and its
 	// latest question has an answer.
 	Answered bool `json:"answered"`
@@ -94,10 +95,10 @@ type TicketDetail struct {
 	// Permission is empty until a headless or pty agent reports a pending prompt.
 	Permission *PermissionCard `json:"permission,omitempty"`
 	Chat       []ChatMessage   `json:"chat"`
-	// State is the token an answer or unpark sends back; empty without a round.
+	// State is the token an answer or resume sends back; empty without a round.
 	State string `json:"state,omitempty"`
-	// Bases are the competing blockers an ambiguous-base park chooses between;
-	// the unpark sends the chosen one back as its base.
+	// Bases are the competing blockers an ambiguous-base pause chooses between;
+	// the resume sends the chosen one back as its base.
 	Bases   []string `json:"bases,omitempty"`
 	Actions []string `json:"actions"`
 }
@@ -130,7 +131,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		return TicketDetail{}, err
 	}
 	d := TicketDetail{
-		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(storedStatus(t)), ParkKind: t.PauseReason.LegacyKind(),
+		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(storedStatus(t)), PauseReason: string(t.PauseReason),
 		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
 	}
 	if t.Status == schema.StatusClaimed {
@@ -204,7 +205,7 @@ func detailActions(t schema.Ticket, latest *tickets.ParkRound, agentGone bool, c
 		actions = append(actions, ActionAnswer)
 	}
 	if !selfReported || agentGone {
-		actions = append(actions, ActionUnpark)
+		actions = append(actions, ActionResume)
 	}
 	return actions
 }
