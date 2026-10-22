@@ -366,7 +366,7 @@ func TestR3MatchesAnUnrecoverableDoneTicketOrAZeroCommitClaimingPresence(t *test
 		{"zero-commit with no text", zero(""), false},
 		{"claim on another kind", []Event{{Type: events.Paused, Kind: events.SelfReported, Text: "already implemented"}}, false},
 		{"claim on another type", []Event{{Type: events.IterationFinished, Kind: events.ZeroCommit, Text: "already implemented"}}, false},
-		{"unrelated needs-repair kind", []Event{{Type: events.Paused, Kind: events.BudgetKilled}}, false},
+		{"unrelated repair kind", []Event{{Type: events.Paused, Kind: events.BudgetKilled}}, false},
 		{"claim only on an earlier event", []Event{{Type: events.IterationFinished, Text: "already implemented"}, {Type: events.Paused, Kind: events.ZeroCommit, Text: "Done."}}, false},
 	}
 	for _, tt := range tests {

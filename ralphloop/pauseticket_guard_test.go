@@ -11,7 +11,7 @@ import (
 )
 
 // pauseStatuses are the statuses only the pause path may write.
-var pauseStatuses = map[string]bool{"StatusNeedsAnswer": true, "StatusNeedsRepair": true}
+var pauseStatuses = map[string]bool{"StatusPaused": true, "StatusLegacyAnswer": true, "StatusLegacyRepair": true}
 
 // pauseWriters are the claim.go helpers that write a pause status; only pause.go
 // may call them.
@@ -43,6 +43,11 @@ func TestPausePath_NoStatusWriteBypasses(t *testing.T) {
 		f, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
 			return err
+		}
+		// The one-off ticket migration rewrites legacy statuses to paused; it is
+		// not a runtime pause, so it owes no event or notification.
+		if filepath.ToSlash(filepath.Clean(path)) == "../tickets/migrate_pause.go" {
+			return nil
 		}
 		inRalphloop := filepath.Clean(filepath.Dir(path)) == filepath.Join("..", "ralphloop")
 		base := filepath.Base(path)
@@ -90,5 +95,5 @@ func isSetStatusToPause(c *ast.CallExpr) bool {
 		return false
 	}
 	lit, ok := c.Args[1].(*ast.BasicLit)
-	return ok && (lit.Value == `"needs-answer"` || lit.Value == `"needs-repair"`)
+	return ok && (lit.Value == `"paused"`)
 }

@@ -92,7 +92,7 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnRepairReason(t *testing.T) {
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
 	assertRawPaused(t, contents, schema.PauseClassRepair, schema.PauseIterationError)
 	if !strings.Contains(contents, "herdr pane vanished") {
-		t.Errorf("ticket after ordinary failure =\n%s\nwant needs-repair carrying the failure's own reason", contents)
+		t.Errorf("ticket after ordinary failure =\n%s\nwant paused (repair) carrying the failure's own reason", contents)
 	}
 	if strings.Contains(contents, errCompactRecoveryExhausted.Error()) ||
 		strings.Contains(contents, errCompactNeverConfirmed.Error()) {

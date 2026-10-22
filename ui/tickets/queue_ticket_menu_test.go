@@ -116,7 +116,7 @@ func TestQueueTicketMenu_UnmuteByAddress(t *testing.T) {
 func TestQueueTicketMenu_ServerTicketMutesEnableUnmute(t *testing.T) {
 	m := newMaintenanceQueue(t, fakeServerAPI{})
 	m, _ = m.applyServerState(&viewmodel.State{
-		Tickets: []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair", Mutes: muted}},
+		Tickets: []server.TicketInfo{withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted)},
 		Queue:   []string{"gx:alpha/01"},
 	})
 	m = selectFirstQueueTicketRow(t, m)

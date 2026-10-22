@@ -82,7 +82,7 @@ func TestWeb_AnswerAndResumeNeedAStateToken(t *testing.T) {
 		if code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
 			t.Errorf("%s without token = %d %s, want a stale refusal", path, code, body)
 		}
-		code, body = webPostJSON(t, base+path, `{"address":"nope/none/01","state":"1:needs-answer"}`, cookie, "", jsonPost(base))
+		code, body = webPostJSON(t, base+path, `{"address":"nope/none/01","state":"1:paused"}`, cookie, "", jsonPost(base))
 		if code != http.StatusOK || reasonOf(t, body) == server.ReasonStale {
 			t.Errorf("%s with token = %d %s, want the handler to run", path, code, body)
 		}
@@ -93,7 +93,7 @@ func TestWeb_NoWithdrawRoute(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	for _, path := range []string{"/v1/tickets/withdraw", "/v1/tickets/undo"} {
-		if code, _ := webPostJSON(t, base+path, `{"state":"1:needs-answer"}`, cookie, "", jsonPost(base)); code != http.StatusNotFound {
+		if code, _ := webPostJSON(t, base+path, `{"state":"1:paused"}`, cookie, "", jsonPost(base)); code != http.StatusNotFound {
 			t.Errorf("POST %s = %d, want 404", path, code)
 		}
 	}
@@ -102,7 +102,7 @@ func TestWeb_NoWithdrawRoute(t *testing.T) {
 func TestWeb_AnswerWriteChecks(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
-	body := `{"address":"nope/none/01","state":"1:needs-answer"}`
+	body := `{"address":"nope/none/01","state":"1:paused"}`
 
 	if code, _ := webPostJSON(t, base+"/v1/tickets/answer", body, cookie, "", map[string]string{"Origin": "http://evil.example", "Content-Type": "application/json"}); code != http.StatusForbidden {
 		t.Errorf("foreign Origin = %d, want 403", code)

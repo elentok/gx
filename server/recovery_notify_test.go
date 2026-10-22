@@ -157,9 +157,9 @@ func TestRecoveryState_FromInvestigations(t *testing.T) {
 		"none":              {"", []server.TicketInfo{other}, ""},
 		"open":              {"", []server.TicketInfo{inv("open")}, server.RecoveryPending},
 		"claimed":           {"", []server.TicketInfo{inv("claimed")}, server.RecoveryPending},
-		"parked":            {"", []server.TicketInfo{inv("needs-repair")}, server.RecoveryEscalated},
+		"paused":            {"", []server.TicketInfo{inv("needs-repair")}, server.RecoveryEscalated},
 		"landed":            {"", []server.TicketInfo{inv("done")}, ""},
-		"open beats parked": {"", []server.TicketInfo{inv("needs-answer"), inv("claimed")}, server.RecoveryPending},
+		"open beats paused": {"", []server.TicketInfo{inv("needs-answer"), inv("claimed")}, server.RecoveryPending},
 		"hold wins":         {server.RecoveryEscalated, []server.TicketInfo{inv("claimed")}, server.RecoveryEscalated},
 	} {
 		if got := server.RecoveryState(tc.held, "p:e/01", tc.all); got != tc.want {
@@ -262,7 +262,7 @@ func TestRecoveryNotify_RecognizedPauseStillNotifiesAndIsNotCounted(t *testing.T
 	entries := recovery.Default().Entries
 	r1 := entries[slices.IndexFunc(entries, func(e recovery.Entry) bool { return e.ID == "R1" })]
 	h, sent := startNotifyRecoveryWith(t, time.Minute, r1)
-	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
+	if err := h.Server.PauseTicket("proj", "epic-a", "01", events.Spinning, "paused and re-claimed 3 times within 5m0s"); err != nil {
 		t.Fatal(err)
 	}
 	if got := waitPauseMessages(t, sent, events.Spinning); len(got) != 1 {

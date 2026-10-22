@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestResolveRunScope_ValidSubsetOwnsMembership(t *testing.T) {
@@ -155,7 +156,7 @@ func TestRunScope_AllDone_AskingSubsetIsNotDone(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
-		{Number: 2, Identifier: "02", Status: "needs-answer"},
+		{Number: 2, Identifier: "02", Status: "paused", PauseReason: schema.PauseSelfReported},
 	}}
 	scope, err := ResolveRunScope(epic, []string{"01", "02"})
 	if err != nil {

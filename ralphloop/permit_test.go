@@ -34,7 +34,7 @@ func (p *fakePermit) Release() {
 func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	pauseTimer, polls := clearOnPause(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
@@ -45,7 +45,7 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 		t.Fatalf("Run() error = %v, want nil (no Permit set, unrestricted behavior)", err)
 	}
 	if *polls == 0 {
-		t.Errorf("run never paused (no pause poll), want it to pause on the needs-answer ticket")
+		t.Errorf("run never paused (no pause poll), want it to pause on the paused (answer) ticket")
 	}
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want the cleared ticket claimed and run once", *prompts)
@@ -60,7 +60,7 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 func TestRun_Permit_AcquiredOnClaimReleasedOnPause(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	pauseTimer, polls := clearOnPause(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")

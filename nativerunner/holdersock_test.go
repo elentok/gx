@@ -216,7 +216,7 @@ func TestHolderSocket_DenyReason_VimGiveUpFailsTheDenyWithoutTyping(t *testing.T
 const idleThenExit = `st idle; read -r l; exit 3`
 
 func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
-	// Hold the holder before its drain, while holder.sock still answers.
+	// Hold the holder before its wind-down, while holder.sock still answers.
 	release := make(chan struct{})
 	nativerunner.SetHolderAfterExit(t, func() { <-release })
 	c := startDenyHolder(t, idleThenExit)

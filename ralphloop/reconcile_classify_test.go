@@ -239,9 +239,9 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedRepair(t *testing.T) {
 		}
 	}
 	if attentionEvent == nil {
-		t.Fatalf("events = %v, want a needs-repair event for ticket 3", events)
+		t.Fatalf("events = %v, want a paused event for ticket 3", events)
 	}
 	if attentionEvent.Reason == "" {
-		t.Errorf("needs-repair event has no reason")
+		t.Errorf("paused event has no reason")
 	}
 }

@@ -41,21 +41,21 @@ func TestClearablePausedTicket(t *testing.T) {
 		setupDeps func(*testing.T, *Deps)
 		want      bool
 	}{
-		{"blocked-pane live unblocked clearable", "needs-answer", "blocked-pane", live, true},
-		{"blocked-pane live still blocked not clearable", "needs-answer", "blocked-pane", blocked, false},
-		{"blocked-pane dead pane not clearable", "needs-answer", "blocked-pane", dead, false},
-		{"self-reported live unblocked clearable", "needs-answer", "self-reported", live, true},
-		{"self-reported dead pane not clearable", "needs-answer", "self-reported", dead, false},
-		{"zero-commit live with new commits clearable", "needs-answer", "zero-commit", live, true},
-		{"zero-commit live with no new commits not clearable", "needs-answer", "zero-commit", func(t *testing.T, d *Deps) { live(t, d); noCommits(t, d) }, false},
-		{"zero-commit dead pane not clearable", "needs-answer", "zero-commit", dead, false},
-		{"zero-commit CommitsAhead failure degrades to not clearable", "needs-answer", "zero-commit", func(t *testing.T, d *Deps) { live(t, d); commitsErr(t, d) }, false},
-		{"missing park_kind defaults to zero-commit, live with commits clearable", "needs-answer", "", live, true},
-		{"missing park_kind defaults to zero-commit, live with no commits not clearable", "needs-answer", "", func(t *testing.T, d *Deps) { live(t, d); noCommits(t, d) }, false},
-		{"needs-repair ignores park_kind, live is enough", "needs-repair", "", live, true},
-		{"needs-repair ignores park_kind, dead pane not clearable", "needs-repair", "", dead, false},
-		{"draft ignores park_kind, live is enough", "draft", "", live, true},
-		{"draft ignores park_kind, dead pane not clearable", "draft", "", dead, false},
+		{"blocked-pane live unblocked clearable", "paused", "blocked-pane", live, true},
+		{"blocked-pane live still blocked not clearable", "paused", "blocked-pane", blocked, false},
+		{"blocked-pane dead pane not clearable", "paused", "blocked-pane", dead, false},
+		{"self-reported live unblocked clearable", "paused", "self-reported", live, true},
+		{"self-reported dead pane not clearable", "paused", "self-reported", dead, false},
+		{"zero-commit live with new commits clearable", "paused", "zero-commit", live, true},
+		{"zero-commit live with no new commits not clearable", "paused", "zero-commit", func(t *testing.T, d *Deps) { live(t, d); noCommits(t, d) }, false},
+		{"zero-commit dead pane not clearable", "paused", "zero-commit", dead, false},
+		{"zero-commit CommitsAhead failure degrades to not clearable", "paused", "zero-commit", func(t *testing.T, d *Deps) { live(t, d); commitsErr(t, d) }, false},
+		{"legacy answer status without a reason defaults to zero-commit, live with commits clearable", string(schema.StatusLegacyAnswer), "", live, true},
+		{"legacy answer status without a reason defaults to zero-commit, live with no commits not clearable", string(schema.StatusLegacyAnswer), "", func(t *testing.T, d *Deps) { live(t, d); noCommits(t, d) }, false},
+		{"repair reason ignores the answer rules, live is enough", "paused", "iteration-error", live, true},
+		{"repair reason ignores the answer rules, dead pane not clearable", "paused", "iteration-error", dead, false},
+		{"draft ignores pause_reason, live is enough", "draft", "", live, true},
+		{"draft ignores pause_reason, dead pane not clearable", "draft", "", dead, false},
 	}
 
 	for _, tt := range tests {
@@ -63,7 +63,7 @@ func TestClearablePausedTicket(t *testing.T) {
 			t.Parallel()
 			pauseKindLine := ""
 			if tt.pauseKind != "" {
-				pauseKindLine = "park_kind: " + tt.pauseKind + "\n"
+				pauseKindLine = "pause_reason: " + tt.pauseKind + "\n"
 			}
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
 				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: implement\n" + pauseKindLine + "---\n# A\n",

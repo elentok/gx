@@ -78,7 +78,7 @@ func TestRunTicketsFilterRunLog_CombinesTicketAndEventFilters(t *testing.T) {
 	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
 	writeRunLog(t, epicDir, []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"iteration-started","ticket":"01"}`,
-		`{"time":"2026-01-01T00:01:00Z","type":"needs-answer","ticket":"01"}`,
+		`{"time":"2026-01-01T00:01:00Z","type":"paused","ticket":"01"}`,
 		`{"time":"2026-01-01T00:02:00Z","type":"paused","ticket":"02"}`,
 	})
 
@@ -87,7 +87,6 @@ func TestRunTicketsFilterRunLog_CombinesTicketAndEventFilters(t *testing.T) {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
-	// Ticket 01's line is in the old spelling: the read shim makes it match.
 	out := buf.String()
 	if strings.Count(out, `"type": "paused"`) != 1 || !strings.Contains(out, `"ticket": "01"`) {
 		t.Errorf("output = %s, want exactly one paused event for ticket 01", out)

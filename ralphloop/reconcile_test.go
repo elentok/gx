@@ -242,7 +242,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 func TestReconcile_RepairWithLiveTab_ReturnsReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -256,7 +256,7 @@ func TestReconcile_RepairWithLiveTab_ReturnsReattached(t *testing.T) {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 	if len(reattached) != 1 || reattached[0].Number != 1 {
-		t.Fatalf("reattached = %v, want needs-repair ticket 01", reattached)
+		t.Fatalf("reattached = %v, want paused (repair) ticket 01", reattached)
 	}
 }
 
@@ -304,7 +304,7 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 func TestReconcile_RepairOutsideScope_NotReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# A\n",
 	})
 	epics, err := tickets.Load(scratchDir)
 	if err != nil {
@@ -320,7 +320,7 @@ func TestReconcile_RepairOutsideScope_NotReattached(t *testing.T) {
 		t.Fatalf("reconcile() error = %v", err)
 	}
 	if len(reattached) != 0 {
-		t.Fatalf("reattached = %v, want none (needs-repair ticket 01 is outside the scope)", reattached)
+		t.Fatalf("reattached = %v, want none (paused (repair) ticket 01 is outside the scope)", reattached)
 	}
 }
 
@@ -331,7 +331,7 @@ func TestReconcile_RepairOutsideScope_NotReattached(t *testing.T) {
 func TestRun_RepairWithoutLiveTab_SchedulesOtherTicketsThenPauses(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# Attention\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()
@@ -357,7 +357,7 @@ func TestRun_RepairWithoutLiveTab_SchedulesOtherTicketsThenPauses(t *testing.T) 
 func TestRun_RestartedRepairRecoversThenResumesScheduling(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# Attention\n",
+		"01-attention.md": "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# Attention\n",
 		"02-open.md":      "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Open\n",
 	})
 	d, prompts, _ := fakeDeps()

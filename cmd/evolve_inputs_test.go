@@ -27,7 +27,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 	// 01 (from the base fixture) has no metrics and is the slow-baseline-free one.
 	write("01-a.md", "id: \"01\"\nstatus: done\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 90000\nelapsed_time: 100\nactual_cost: 1.5\nsession_ids: [s1]\n")
 	write("02-b.md", "id: \"02\"\nstatus: done\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 30000\nelapsed_time: 100\nactual_cost: 1\nsession_ids: [s2]\n")
-	write("03-c.md", "id: \"03\"\nstatus: needs-repair\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 30000\nelapsed_time: 900\nactual_cost: 2\nsession_ids: [s3]\n")
+	write("03-c.md", "id: \"03\"\nstatus: paused\npause_reason: merge-error\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 30000\nelapsed_time: 900\nactual_cost: 2\nsession_ids: [s3]\n")
 	write("04-d.md", "id: \"04\"\nstatus: done\ntype: implement\nactual_context_window: 1\nelapsed_time: 100\nactual_cost: 1\n")
 	write("05-review.md", "id: \"05\"\nstatus: done\ntype: code-review\nactual_context_window: 1\nelapsed_time: 100\nactual_cost: 1\n")
 	write("06-fix.md", "id: \"06\"\nstatus: done\ntype: implement\nparent: \"05\"\nactual_context_window: 1\nelapsed_time: 100\nactual_cost: 1\n")

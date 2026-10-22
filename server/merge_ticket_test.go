@@ -122,7 +122,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T) {
 	f, turns := newMergeFixture(t, func(n int) string {
 		if n == 1 {
-			return "needs-answer"
+			return "asking"
 		}
 		return "finished"
 	})
@@ -130,7 +130,7 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/01")
-	f.assertFeatureKept(t, "park")
+	f.assertFeatureKept(t, "pause")
 
 	if err := ralphloop.ResumeTicket(f.ticketFile(t, "01"), time.Now()); err != nil {
 		t.Fatal(err)

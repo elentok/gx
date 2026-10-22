@@ -254,7 +254,7 @@ func TestApplySnapshot_CarriesEpicSummaries(t *testing.T) {
 	})
 
 	if len(st.Epics) != 1 || st.Epics[0].State != server.EpicStatePaused || st.Epics[0].Total != 3 {
-		t.Errorf("Epics = %+v, want the snapshot's parked summary", st.Epics)
+		t.Errorf("Epics = %+v, want the snapshot's paused summary", st.Epics)
 	}
 }
 

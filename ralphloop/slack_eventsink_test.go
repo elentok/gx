@@ -12,6 +12,7 @@ import (
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // slackRequest captures one decoded call to the fake Slack webhook.
@@ -104,7 +105,7 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{Completed: 1, Total: 3})
-	sink.TicketNeedsHuman("02", "epic", "needs-answer", "zero-commit", "no commits merged")
+	sink.TicketNeedsHuman("02", "epic", string(schema.StatusLegacyAnswer), "zero-commit", "no commits merged")
 	sink.IterationPaused("03", "iter-03", PauseRateLimit, "rate limit hit")
 	sink.EpicPaused("epic", []StalledTicket{{Identifier: "03"}})
 	sink.EpicComplete("epic", 1, 300)

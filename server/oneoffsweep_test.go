@@ -37,7 +37,7 @@ func startSweep(t *testing.T, store string) *servertest.Harness {
 func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
-	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "needs-repair", "04": "open"} {
+	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "paused", "04": "open"} {
 		servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, id, "t"+id, servertest.TicketOpts{Type: "prompt", Status: status})
 	}
 	servertest.WriteTicketWith(t, store, "proj", "feature", "01", "after", servertest.TicketOpts{BlockedBy: []string{"one-offs/01"}})
@@ -174,7 +174,7 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 }
 
 func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
-	for _, status := range []string{"needs-repair", "needs-answer", "parked", "failed"} {
+	for _, status := range []string{"paused", "failed"} {
 		t.Run(status, func(t *testing.T) {
 			store := t.TempDir()
 			servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: status})

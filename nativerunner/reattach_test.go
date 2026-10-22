@@ -243,7 +243,7 @@ func TestHeadless_CleanupOfAMissingFIFOIsANoop(t *testing.T) {
 	}
 }
 
-func TestHeadless_PruneKeepsRecentParkedAndLiveAgents(t *testing.T) {
+func TestHeadless_PruneKeepsRecentPausedAndLiveAgents(t *testing.T) {
 	root := t.TempDir()
 	now := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
 	old := now.Add(-nativerunner.DefaultLogRetention - time.Hour)
@@ -255,7 +255,7 @@ func TestHeadless_PruneKeepsRecentParkedAndLiveAgents(t *testing.T) {
 			}
 		}
 	}
-	for label, at := range map[string]time.Time{"old": old, "parked": old, "recent": recent, "live": old} {
+	for label, at := range map[string]time.Time{"old": old, "paused": old, "recent": recent, "live": old} {
 		dir := prepareAgent(t, root, label, "", lines(evAssistant))
 		if label != "live" {
 			// The fake process table only runs agentPID.
@@ -272,15 +272,15 @@ func TestHeadless_PruneKeepsRecentParkedAndLiveAgents(t *testing.T) {
 	}
 
 	r := &nativerunner.Headless{Root: root, Procs: agentProcs()}
-	parked := func(label string) bool { return label == "parked" }
-	pruned, err := r.Prune(nativerunner.DefaultLogRetention, now, parked)
+	paused := func(label string) bool { return label == "paused" }
+	pruned, err := r.Prune(nativerunner.DefaultLogRetention, now, paused)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(pruned, []string{"old"}) {
 		t.Errorf("pruned = %q, want [old]", pruned)
 	}
-	for _, kept := range []string{"parked", "recent", "live", "not-an-agent"} {
+	for _, kept := range []string{"paused", "recent", "live", "not-an-agent"} {
 		if _, err := os.Stat(filepath.Join(root, kept)); err != nil {
 			t.Errorf("%s was pruned: %v", kept, err)
 		}
@@ -291,7 +291,7 @@ func TestHeadless_PruneKeepsRecentParkedAndLiveAgents(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "old", nativerunner.MetaFile)); err != nil {
 		t.Errorf("old's meta was removed, watch can't name its transcript: %v", err)
 	}
-	if again, err := r.Prune(nativerunner.DefaultLogRetention, now, parked); err != nil || len(again) != 0 {
+	if again, err := r.Prune(nativerunner.DefaultLogRetention, now, paused); err != nil || len(again) != 0 {
 		t.Errorf("second prune = %q, %v; want nothing (already pruned)", again, err)
 	}
 }

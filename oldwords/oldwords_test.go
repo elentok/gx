@@ -76,6 +76,34 @@ var allowed = map[string]string{
 	"webui/src/epic/EpicPage.tsx":         "reads the needs_answer wire field",
 	"webui/src/epic/rows.ts":              "maps the legacy needs-answer and needs-repair statuses",
 	"webui/src/view.ts":                   "reads the legacy needs-repair status and the parked wire field",
+	// Tests of the read shim, the hidden aliases and the kept wire names.
+	"cmd/server_parity_test.go":            "lists the hidden drain, park and unpark routes",
+	"cmd/tickets_alias_test.go":            "tests the hidden park and unpark aliases",
+	"cmd/tickets_migrate_test.go":          "migrate input uses the legacy statuses",
+	"cmd/tickets_migrate_pause_test.go":    "migrate input uses the legacy statuses, park_kind and headings",
+	"cmd/tickets_migrate_park_test.go":     "migrates the legacy Needs Answer section",
+	"config/agents_test.go":                "tests the resume-on-start alias",
+	"events/legacy_test.go":                "tests the legacy event reader",
+	"ralphloop/notification_text_test.go":  "chat headlines \"needs answer\" and \"needs repair\"",
+	"ralphloop/claim_test.go":              "tests demoting the legacy Needs Repair section",
+	"ralphloop/resumeticket_test.go":       "tests demoting the legacy Needs Answer and Needs Repair sections",
+	"tickets/loader_test.go":               "loads legacy statuses, park_kind and headings",
+	"tickets/log_test.go":                  "reads legacy park.* log events",
+	"tickets/schema/parse_test.go":         "reads the legacy iteration_status needs-answer",
+	"tickets/schema/pause_test.go":         "tests the legacy heading and kind shim",
+	"tickets/schema/pause_write_test.go":   "asserts the old words are never written",
+	"webui/src/canned-snapshot.json":       "fixture of the kept parked wire field and legacy rendered statuses",
+	"webui/src/canned-snapshot.test.ts":    "reads the kept parked wire field",
+	"webui/src/queue/QueueScreen.test.tsx": "builds the kept parked wire field",
+	"webui/src/routes.test.tsx":            "uses the kept legacy rendered statuses and needs_answer field",
+	"server/epicsummary_test.go":           "summary reads only the legacy Needs headings",
+	"server/ticketwrites_test.go":          "unmute demotes only the legacy Needs Repair heading",
+	"server/recovery_notify_test.go":       "snapshot status is the legacy wire word",
+	"server/reads_test.go":                 "persisted lock kind \"land\"",
+	"server/web_test.go":                   "tests the hidden unpark route",
+	"server/web_allowlist_test.go":         "tests the hidden unpark route",
+	"server/resume_web_test.go":            "asserts the persisted unpark answer choice",
+	"server/server_notify_test.go":         "asserts the \"needs answer\" and \"needs repair\" headlines",
 	// Documentation of the retirement and of the past.
 	"docs/":                          "old specs, ADRs and plans",
 	"CHANGELOG.md":                   "changelog",
@@ -129,24 +157,17 @@ func matchAny(res []*regexp.Regexp, line string) string {
 
 func TestNoOldWords(t *testing.T) {
 	for _, rel := range trackedFiles(t) {
-		if !scanned(rel) || isAllowed(rel) || rel == "oldwords/oldwords_test.go" || rel == "oldwords/leftovers_test.go" {
+		if !scanned(rel) || isAllowed(rel) || rel == "oldwords/oldwords_test.go" {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join("..", rel))
 		if err != nil {
 			continue
 		}
-		found := false
 		for i, line := range strings.Split(string(raw), "\n") {
 			if m := findOldWord(rel, line); m != "" {
-				found = true
-				if !leftovers[rel] {
-					t.Errorf("%s:%d: old word %q", rel, i+1, m)
-				}
+				t.Errorf("%s:%d: old word %q", rel, i+1, m)
 			}
-		}
-		if leftovers[rel] && !found {
-			t.Errorf("%s is clean: remove it from leftovers", rel)
 		}
 	}
 }

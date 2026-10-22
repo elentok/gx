@@ -58,12 +58,12 @@ func TestRun_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 	// The default fakeDeps CommitsAhead returns 1: commits are present, which
 	// is exactly the case that must not be merged once paused (answer) has been
 	// reported.
-	reportIterationStatus(t, d, path, "epic-iter-01", "needs-answer")
+	reportIterationStatus(t, d, path, "epic-iter-01", string(schema.IterationStatusAsking))
 
 	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 
 	if cherryPickCalled {
-		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted needs-answer report")
+		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted asking report")
 	}
 	wantRemoved := []string{"ralph-loop/epic-item-01"}
 	if len(*removed) != 1 || (*removed)[0] != wantRemoved[0] {
@@ -79,10 +79,10 @@ func TestRun_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 	}
 	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 	if strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket must not be marked done after an adopted needs-answer report:\n%s", raw)
+		t.Errorf("ticket must not be marked done after an adopted asking report:\n%s", raw)
 	}
 	if strings.Contains(string(raw), "commitless: true") {
-		t.Errorf("needs-answer adoption must not set commitless:\n%s", raw)
+		t.Errorf("asking adoption must not set commitless:\n%s", raw)
 	}
 }
 

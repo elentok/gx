@@ -24,7 +24,7 @@ func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	req := server.RepairRequest{Address: "proj:epic-a/01"}
 
 	var out bytes.Buffer
-	err := runServerRepair(context.Background(), cl, &out, true, "unpark", req, direct)
+	err := runServerRepair(context.Background(), cl, &out, true, "resume", req, direct)
 	var res server.RepairResult
 	if jerr := json.Unmarshal(out.Bytes(), &res); jerr != nil {
 		t.Fatalf("json: %v (%s)", jerr, out.String())

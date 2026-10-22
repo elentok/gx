@@ -34,7 +34,7 @@ func retryTurnSelfReport(t *testing.T, d Deps, path string, mutate func(*schema.
 // ticket 04's first case: when the corrective retry's own turn ends
 // ahead == 0 and self-reports paused (answer), the ticket must pause with the
 // self-reported kind and the agent's actual question, not
-// ParkKindZeroCommit/"no commits merged" — even though the pre-retry turn
+// PauseKindZeroCommit/"no commits merged" — even though the pre-retry turn
 // matched the unexecuted-tool-call detector and carried no report of its own.
 func TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testing.T) {
 	t.Parallel()
@@ -177,7 +177,7 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 			commitless = &events[i]
 		}
 		if ev.Type == string(eventsc.Paused) {
-			t.Errorf("events = %+v, want no needs-answer event for the retry's declared-commitless self-report", events)
+			t.Errorf("events = %+v, want no paused event for the retry's declared-commitless self-report", events)
 		}
 	}
 	if commitless == nil {
@@ -192,6 +192,6 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 		t.Errorf("ticket not marked done for the retry's commitless-and-finished self-report:\n%s", raw)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
-		t.Errorf("ticket must not be paused needs-answer for a declared-commitless retry finish:\n%s", raw)
+		t.Errorf("ticket must not be paused (answer) for a declared-commitless retry finish:\n%s", raw)
 	}
 }

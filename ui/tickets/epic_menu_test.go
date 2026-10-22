@@ -114,7 +114,7 @@ func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 		{Address: "gx:alpha/02", Title: "Draft", Status: "draft"},
 		{Address: "gx:alpha/03", Title: "Open", Status: "open"},
 		{Address: "gx:alpha/04", Title: "Claimed", Status: "claimed"},
-		{Address: "gx:alpha/05", Title: "Paused", Status: "needs-repair"},
+		pausedRepairInfo("gx:alpha/05", "Paused"),
 		{Address: "gx:alpha/06", Title: "Queued", Status: "open"},
 		{Address: "gx:alpha/07", Title: "Blocked", Status: "open", BlockedBy: []string{"gx:alpha/02"}},
 	}})

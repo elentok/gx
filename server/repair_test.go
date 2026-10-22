@@ -33,9 +33,9 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 		{"merge continue and abort", "merge", server.RepairRequest{Address: addr, Continue: true, Abort: true}, repair.ReasonError},
 		{"merge an open ticket", "merge", server.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
 		{"start-over without a reason", "start-over", server.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
-		{"unpark an open ticket", "unpark", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
+		{"resume an open ticket via alias", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
 		{"resume an open ticket", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotPaused},
-		{"bad address", "unpark", server.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
+		{"bad address", "resume", server.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
 		{"unknown project", "start-over", server.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
 	}
 	for _, c := range cases {
@@ -60,7 +60,7 @@ func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harnes
 	if !commit {
 		runGitIn(t, wt, "reset", "-q", "--hard", "HEAD~1")
 	}
-	pause := "status: needs-answer\npark_kind: " + kind
+	pause := "status: paused\npause_reason: " + kind
 	testutil.WriteFile(t, filepath.Dir(ticketPath), filepath.Base(ticketPath), strings.Replace(readFile(t, ticketPath), "status: claimed", pause, 1))
 	return h, ticketPath
 }

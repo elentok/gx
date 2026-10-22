@@ -112,7 +112,7 @@ func TestAddWorktreeOnBranch(t *testing.T) {
 	repoDir := tempBareRepoLight(t)
 	repo, _ := git.FindRepo(repoDir)
 
-	// Simulate a park: a branch created by an earlier AddWorktree survives
+	// Simulate a pause: a branch created by an earlier AddWorktree survives
 	// after its worktree is removed.
 	firstPath := filepath.Join(repoDir, "feature")
 	if err := git.AddWorktree(*repo, "feature", firstPath, "main"); err != nil {

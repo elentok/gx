@@ -226,7 +226,7 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 		commitless bool
 		want       string
 	}{
-		{"land", true, false, "merged "},
+		{"merge", true, false, "merged "},
 		{"commitless", false, true, "closed commitless"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -251,7 +251,7 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 // resume and relaunch adopt a late finish before acting, launch nothing, and
 // cancel only the investigation that has not started.
 func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
-	for _, verb := range []string{"unpark", "relaunch"} {
+	for _, verb := range []string{"resume", "relaunch"} {
 		t.Run(verb, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
 				p := pauseZeroCommit(t, headless)
@@ -263,8 +263,8 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 					t.Fatal(err)
 				}
 				ctx := context.Background()
-				if verb == "unpark" {
-					res, err := p.h.Client.Repair(ctx, "unpark", server.RepairRequest{Address: "proj:epic-a/01"})
+				if verb == "resume" {
+					res, err := p.h.Client.Repair(ctx, "resume", server.RepairRequest{Address: "proj:epic-a/01"})
 					if err != nil || res.Refused || !strings.Contains(string(res.Data), `"adopted"`) {
 						t.Fatalf("resume = %+v (data %s), %v; want adopted", res, res.Data, err)
 					}
@@ -312,10 +312,10 @@ func TestLateFinish_FailedConditionStaysPaused(t *testing.T) {
 		{"kind changed", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.PauseReason = schema.PauseBlockedPane }
 		}},
-		{"self-reported park", false, func(p zeroCommitPaused) func(*schema.Ticket) {
+		{"self-reported pause", false, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(true)(tk); tk.PauseReason = schema.PauseSelfReported }
 		}},
-		{"finished before park", true, func(p zeroCommitPaused) func(*schema.Ticket) {
+		{"finished before pause", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) {
 				p.finishedLate(false)(tk)
 				tk.IterationFinishedAt = p.pause.Time.Add(-time.Second)

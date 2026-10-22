@@ -55,11 +55,11 @@ func TestTail_Steps(t *testing.T) {
 		t.Fatalf("completed line step = %q, %v", lines, done)
 	}
 
-	// Written just before the agent exited: the last drain still reads it.
+	// Written just before the agent exited: the last poll still reads it.
 	appendFile(t, path, textLine+"\n")
 	ended = true
 	if lines, done := step(t, tl); !slices.Equal(lines, []string{"[text] hi"}) || !done {
-		t.Fatalf("last drain = %q, %v", lines, done)
+		t.Fatalf("last poll =%q, %v", lines, done)
 	}
 	if lines, done := step(t, tl); len(lines) != 0 || !done {
 		t.Fatalf("after end = %q, %v", lines, done)

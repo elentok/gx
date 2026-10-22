@@ -56,7 +56,7 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_PausesInsteadOfPrompting(t *tes
 	}
 	last := events[len(events)-1]
 	if last.Type != string(eventsc.Paused) {
-		t.Fatalf("last event type = %q, want needs-answer", last.Type)
+		t.Fatalf("last event type = %q, want paused", last.Type)
 	}
 	if !strings.Contains(last.Reason, "trust_directory") {
 		t.Errorf("pause reason = %q, want it to name the matched_rule.id trust_directory", last.Reason)
@@ -101,7 +101,7 @@ func TestRecoverCodexRateLimit_NonBlockedAfterReset_ReturnsWithoutSendingAnythin
 			if readErr != nil {
 				t.Fatalf("ReadFile: %v", readErr)
 			}
-			if strings.Contains(string(raw), "needs-answer") {
+			if rawIsPaused(t, string(raw), "") {
 				t.Errorf("ticket was paused on the unaffected non-blocked branch:\n%s", raw)
 			}
 		})

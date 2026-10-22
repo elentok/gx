@@ -217,7 +217,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 			commitWork(t, p, "pre")
 			// The agent reports a question for a person.
 			body := readFile(t, ticketPath)
-			body = strings.Replace(body, "status: claimed\n", "status: claimed\niteration_status: needs-answer\n", 1)
+			body = strings.Replace(body, "status: claimed\n", "status: claimed\niteration_status: asking\n", 1)
 			if err := os.WriteFile(ticketPath, []byte(body), 0o644); err != nil {
 				t.Error(err)
 			}

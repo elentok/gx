@@ -59,7 +59,7 @@ func TestRun_UnexecutedToolCallDetected_RetryMergesCommits(t *testing.T) {
 		t.Errorf("ticket not marked done after the retry merged commits:\n%s", raw)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
-		t.Errorf("ticket must not be paused needs-answer once the retry merged commits:\n%s", raw)
+		t.Errorf("ticket must not be paused for an answer once the retry merged commits:\n%s", raw)
 	}
 }
 

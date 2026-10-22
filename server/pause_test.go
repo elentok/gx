@@ -70,7 +70,7 @@ func TestFlush_IsFinishAndPause(t *testing.T) {
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
-	if res, err := h.Client.QueueDrain(ctx); err != nil || res.Refused || res.Mode != server.QueueModePaused {
+	if res, err := h.Client.QueuePause(ctx); err != nil || res.Refused || res.Mode != server.QueueModePaused {
 		t.Fatalf("flush: %+v, %v", res, err)
 	}
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -99,7 +99,7 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 		{"initial", nil, server.QueueModeRunning},
 		{"pause", h.Client.QueuePause, server.QueueModePaused},
 		{"resume", h.Client.QueueResume, server.QueueModeRunning},
-		{"drain", h.Client.QueueDrain, server.QueueModePaused},
+		{"pause again", h.Client.QueuePause, server.QueueModePaused},
 	}
 	for _, st := range steps {
 		if st.do != nil {

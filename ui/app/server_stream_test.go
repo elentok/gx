@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/server"
+	gxtickets "github.com/elentok/gx/tickets"
 	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/notify"
@@ -523,9 +524,14 @@ func toastTexts(cmd tea.Cmd) []notify.NotifyMsg {
 	return nil
 }
 
+// pausedRepairTickets is one ticket paused for a repair.
+func pausedRepairTickets() []server.TicketInfo {
+	return []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "paused", RenderedStatus: gxtickets.StatusPausedRepair.Word()}}
+}
+
 func TestServerStream_PauseToastsOnLiveEventsOnly(t *testing.T) {
 	h, f := newStreamHarness(t)
-	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
+	f.tickets = pausedRepairTickets()
 	h.probeUp() // the snapshot holds a paused ticket: state, not news
 
 	pause := server.Event{Seq: 11, Type: server.EventIterationPaused, Address: "gx:alpha/01"}
@@ -544,7 +550,7 @@ func TestServerStream_PauseToastsOnLiveEventsOnly(t *testing.T) {
 
 func TestServerStream_SnapshotNeverToastsButFailureDoes(t *testing.T) {
 	h, f := newStreamHarness(t)
-	f.tickets = []server.TicketInfo{{Address: "gx:alpha/01", Title: "First", Status: "needs-repair"}}
+	f.tickets = pausedRepairTickets()
 	next, cmd := h.m.Update(streamSnapshotMsg{snap: server.Snapshot{Seq: 3, Tickets: withRenderedStatus(f.tickets)}})
 	h.m = next.(Model)
 	for _, got := range toastTexts(cmd) {

@@ -14,6 +14,18 @@ func summaryTicket(n, status string, blockedBy ...string) tickets.Ticket {
 	return tickets.Ticket{Number: int(n[1] - '0'), Identifier: n, Title: "title " + n, Status: status, BlockedBy: blockedBy}
 }
 
+func pausedTicket(n string, reason schema.PauseReason) tickets.Ticket {
+	t := summaryTicket(n, string(schema.StatusPaused))
+	t.PauseReason = reason
+	return t
+}
+
+// repairPausedTicket is paused with a repair-class reason.
+func repairPausedTicket(n string) tickets.Ticket { return pausedTicket(n, schema.PauseMergeConflict) }
+
+// answerPausedTicket is paused with an answer-class reason.
+func answerPausedTicket(n string) tickets.Ticket { return pausedTicket(n, schema.PauseZeroCommit) }
+
 func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
 	claimTime := time.Unix(100, 0)
@@ -75,14 +87,14 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 		{
 			name: "running: claimed with a server claim time",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-				summaryTicket("01", "done"), summaryTicket("02", "claimed"), summaryTicket("03", "needs-repair"),
+				summaryTicket("01", "done"), summaryTicket("02", "claimed"), repairPausedTicket("03"),
 			}},
 			wantState: EpicStateRunning, wantDone: 1, wantActive: []string{"proj:epic/02"}, wantPaused: []string{"proj:epic/03"}, wantRepair: true,
 		},
 		{
 			name: "claimed without a claim time is runnable, so waiting",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-				summaryTicket("01", "claimed"), summaryTicket("03", "needs-answer"),
+				summaryTicket("01", "claimed"), answerPausedTicket("03"),
 			}},
 			wantState: EpicStateWaiting, wantPaused: []string{"proj:epic/03"},
 		},
@@ -96,7 +108,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 		{
 			name: "paused: nothing runnable, shows the first paused ticket's reason and the rest as more; a draft is not paused",
 			epic: tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{
-				summaryTicket("01", "draft"), summaryTicket("03", "needs-repair"), summaryTicket("04", "nonsense"),
+				summaryTicket("01", "draft"), repairPausedTicket("03"), summaryTicket("04", "nonsense"),
 			}},
 			wantState: EpicStatePaused, wantPaused: []string{"proj:epic/01", "proj:epic/03", "proj:epic/04"}, wantRepair: true,
 			wantReason: "the really long reason", wantMore: 1,
@@ -121,7 +133,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := range tc.epic.Tickets {
-				if tc.epic.Tickets[i].Status == "needs-repair" {
+				if tc.epic.Tickets[i].Status == string(schema.StatusPaused) {
 					tc.epic.Tickets[i].Body = pausedBody
 				}
 			}
@@ -159,7 +171,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 
 func TestSummarizeEpic_PausedDetails(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
-	repair := summaryTicket("03", "needs-repair")
+	repair := repairPausedTicket("03")
 	repair.Body = "## Needs Repair\n\n**the `really` long reason**\n\nmore\n"
 	broken := summaryTicket("04", "nonsense")
 	broken.ReadErr = "cannot read it"
@@ -176,7 +188,7 @@ func TestSummarizeEpic_PausedDetails(t *testing.T) {
 		t.Fatalf("paused = %+v", got.Paused)
 	}
 	p := got.Paused[0]
-	if p.Title != "title 03" || p.Status != "needs-repair" || p.Recovery != RecoveryEscalated || p.Reason != "the really long reason" {
+	if p.Title != "title 03" || p.Status != tickets.StatusPausedRepair.Word() || p.Recovery != RecoveryEscalated || p.Reason != "the really long reason" {
 		t.Errorf("paused[0] = %+v", p)
 	}
 	if got.Paused[1].Reason != "cannot read it" {
@@ -188,9 +200,9 @@ func noLog(tickets.Ticket) []tickets.LogEvent { return nil }
 
 func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
-	asked := summaryTicket("01", "needs-answer")
+	asked := answerPausedTicket("01")
 	asked.Body = "## Needs Answer\n\nfallback line\n"
-	repair := summaryTicket("02", "needs-repair")
+	repair := repairPausedTicket("02")
 	repair.Body = "## Needs Repair\n\nthe repair reason\n"
 	answered := summaryTicket("03", "open")
 	question := func(seq int, summary string) tickets.LogEvent {
@@ -231,11 +243,11 @@ func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T)
 	}
 
 	broken := tickets.Epic{Name: OneOffsEpic, Tickets: []tickets.Ticket{
-		summaryTicket("01", "done"), summaryTicket("02", "needs-repair"), summaryTicket("03", "needs-answer"),
+		summaryTicket("01", "done"), repairPausedTicket("02"), answerPausedTicket("03"),
 	}}
 	got = summarizeEpic(root, broken, none, noRecovery, noLog)
 	if got.State != EpicStatePaused || len(got.Paused) != 2 {
-		t.Errorf("one-offs with needs-* = state %q paused %+v", got.State, got.Paused)
+		t.Errorf("one-offs with paused tickets = state %q paused %+v", got.State, got.Paused)
 	}
 }
 
@@ -248,8 +260,9 @@ func mergeSummaryTicket(n, status string) tickets.Ticket {
 func TestSummarizeEpic_MergingState(t *testing.T) {
 	noRecovery := func(string) string { return "" }
 	claimedAll := func(string) (time.Time, bool) { return time.Unix(100, 0), true }
-	pausedBody := "# t\n\n## Needs Repair\n\n**why**\n"
-	pausedMerge := mergeSummaryTicket("02", "needs-repair")
+	pausedBody := "# t\n\n## Paused\n\n**why**\n"
+	pausedMerge := mergeSummaryTicket("02", "paused")
+	pausedMerge.PauseReason = schema.PauseMergeConflict
 	pausedMerge.Body = pausedBody
 
 	cases := []struct {
@@ -262,7 +275,7 @@ func TestSummarizeEpic_MergingState(t *testing.T) {
 		{"open merge ticket", "epic", []tickets.Ticket{summaryTicket("01", "done"), mergeSummaryTicket("02", "open")}, EpicStateMerging, nil},
 		{"claimed merge ticket stays active", "epic", []tickets.Ticket{summaryTicket("01", "done"), mergeSummaryTicket("02", "claimed")}, EpicStateMerging, []string{"proj:epic/02"}},
 		{"cancelled work does not block merging", "epic", []tickets.Ticket{summaryTicket("01", "cancelled"), mergeSummaryTicket("02", "open")}, EpicStateMerging, nil},
-		{"parked merge ticket keeps parked", "epic", []tickets.Ticket{summaryTicket("01", "done"), pausedMerge}, EpicStatePaused, nil},
+		{"paused merge ticket keeps paused", "epic", []tickets.Ticket{summaryTicket("01", "done"), pausedMerge}, EpicStatePaused, nil},
 		{"unfinished work beside a merge ticket is not merging", "epic", []tickets.Ticket{summaryTicket("01", "open"), mergeSummaryTicket("02", "open")}, EpicStateWaiting, nil},
 		{"one-offs epic is never merging", OneOffsEpic, []tickets.Ticket{summaryTicket("01", "done"), mergeSummaryTicket("02", "open")}, EpicStateWaiting, nil},
 	}
@@ -294,7 +307,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 	none := func(string) (time.Time, bool) { return time.Time{}, false }
 	noRecovery := func(string) string { return "" }
 	for _, statuses := range [][]string{
-		{"open"}, {"done", "open"}, {"needs-answer"}, {"draft", "open"}, {"nonsense"}, {"claimed"}, {"cancelled", "done"},
+		{"open"}, {"done", "open"}, {"paused"}, {"draft", "open"}, {"nonsense"}, {"claimed"}, {"cancelled", "done"},
 	} {
 		var ts []tickets.Ticket
 		for i, st := range statuses {
@@ -315,7 +328,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 
 func TestDeadlockReason_PausedAndCycle(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
-	paused := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{summaryTicket("01", "needs-answer"), summaryTicket("02", "draft")}}
+	paused := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{answerPausedTicket("01"), summaryTicket("02", "draft")}}
 	if got, want := deadlockReason(root, paused, events.AllPaused), "every remaining ticket is paused: proj:epic/01, proj:epic/02"; got != want {
 		t.Errorf("paused reason = %q, want %q", got, want)
 	}

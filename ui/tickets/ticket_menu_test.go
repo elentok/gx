@@ -79,11 +79,16 @@ func orchestrationLabels() []string {
 	return []string{resumeLabel, "Unmute & Reopen", "Pause", "Cancel", "Relaunch"}
 }
 
+func withMutes(info server.TicketInfo, mutes []schema.MuteRecord) server.TicketInfo {
+	info.Mutes = mutes
+	return info
+}
+
 func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
+		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = pressMenuKey(t, selectTicketRow(t, updated.(Model)))
@@ -117,7 +122,7 @@ func TestTicketMenu_UnmuteByAddress(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "needs-repair", Mutes: muted},
+		withMutes(pausedRepairInfo("gx:alpha/01", "First"), muted),
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
@@ -143,7 +148,7 @@ func TestTicketMenu_ServerTicketMutesDecideUnmute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := newServerModel(t).WithServer(fakeServerAPI{})
 			m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-				{Address: "gx:alpha/01", Title: "First", Status: "needs-repair", Mutes: tt.mutes},
+				withMutes(pausedRepairInfo("gx:alpha/01", "First"), tt.mutes),
 			}})
 			updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 			_, ready := requestTicketMenu(t, selectTicketRow(t, updated.(Model)))

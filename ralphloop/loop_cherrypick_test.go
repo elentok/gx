@@ -419,7 +419,7 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Pause
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if rawIsPaused(t, string(parentRaw), schema.PauseClassRepair) {
-		t.Errorf("parent iteration ticket = %q, want it left alone (not needs-repair) — the failure belongs to the conflict-resolution child", parentRaw)
+		t.Errorf("parent iteration ticket = %q, want it left alone (not paused for repair) — the failure belongs to the conflict-resolution child", parentRaw)
 	}
 
 	// The parent is paused on its conflict-resolution child, not merged: its
@@ -743,7 +743,7 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 		t.Errorf("ticket not marked done despite the agent finishing after the transient blip:\n%s", raw)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
-		t.Errorf("ticket wrongly marked needs-answer from a transient idle blip:\n%s", raw)
+		t.Errorf("ticket wrongly paused for an answer from a transient idle blip:\n%s", raw)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)
@@ -783,7 +783,7 @@ func TestRun_CommitMergesDuringAskingRecheck_MarksDoneNotAsking(t *testing.T) {
 		t.Errorf("ticket not marked done after commit merged on recheck:\n%s", raw)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
-		t.Errorf("ticket wrongly marked needs-answer despite commit merging on recheck:\n%s", raw)
+		t.Errorf("ticket wrongly paused for an answer despite commit merging on recheck:\n%s", raw)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)

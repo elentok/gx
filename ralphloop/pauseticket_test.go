@@ -54,7 +54,7 @@ func TestRun_CatchAll_PausesThroughOnePath(t *testing.T) {
 		}
 	}
 	if len(repairs) != 1 {
-		t.Fatalf("needs-repair events = %d, want 1 (%v)", len(repairs), evs)
+		t.Fatalf("paused events = %d, want 1 (%v)", len(repairs), evs)
 	}
 	ev := repairs[0]
 	if ev.Kind != string(events.IterationError) || ev.Address != canonicalAddr(scratchDir, "my-epic", "01") || !strings.Contains(ev.Reason, "simulated git hiccup") {
@@ -151,7 +151,7 @@ func TestPause_AskingKinds(t *testing.T) {
 			assertPaused(t, got, schema.PauseClassAnswer, schema.ParsePauseReason(string(kind)))
 			evs, _, _ := ReadEvents(scratchDir, "my-epic")
 			if len(evs) != 1 || evs[0].Type != "paused" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
-				t.Errorf("events = %+v, want one needs-answer event kind %s", evs, kind)
+				t.Errorf("events = %+v, want one paused event kind %s", evs, kind)
 			}
 			if calls := sink.snapshot(); len(calls) != 1 || calls[0] != "TicketNeedsHuman" {
 				t.Errorf("sink calls = %v, want one TicketNeedsHuman", calls)
@@ -244,7 +244,7 @@ func openQuestionSummary(t *testing.T, path string) string {
 }
 
 // Seam 1: Pause derives the event type from the kind, and a paused (answer) pause
-// never writes a Needs Answer/Handoff section into the markdown: the question
+// never writes a Handoff section into the markdown: the question
 // lives in the log.
 func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T) {
 	t.Parallel()
@@ -276,7 +276,7 @@ func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T
 			}
 			got := mustParse(t, path)
 			assertPaused(t, got, legacyClass(c.status), schema.ParsePauseReason(string(c.kind)))
-			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Needs Answer") || strings.Contains(string(data), "## Handoff") {
+			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Handoff") {
 				t.Errorf("pause wrote a conversation section into the .md:\n%s", data)
 			}
 			qevs, err := tickets.ReadLog(path)

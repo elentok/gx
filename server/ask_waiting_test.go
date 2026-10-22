@@ -40,7 +40,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
 			ticketPath := store + "/proj/epic-a/issues/01-first.md"
-			turn := newTurnRunner(func(_, _ string) { reportIteration(t, ticketPath, "needs-answer") })
+			turn := newTurnRunner(func(_, _ string) { reportIteration(t, ticketPath, "asking") })
 			fake := c.wrap(turn)
 			h := servertest.StartWithStore(t, store, func(cfg *server.Config) {
 				cfg.Runner = fake
@@ -71,7 +71,7 @@ func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
 	var worktree string
 	fake := newTurnRunner(func(_, cwd string) {
 		worktree = cwd
-		reportIteration(t, ticketPath, "needs-answer")
+		reportIteration(t, ticketPath, "asking")
 	})
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }

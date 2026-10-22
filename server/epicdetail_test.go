@@ -131,7 +131,7 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 		t.Errorf("own-epic blockers = %v, want [04]", r.Blockers)
 	}
 	if r := rowOf(t, d, "proj:work/06"); !r.Asking || r.Question != question {
-		t.Errorf("row 06 = %+v, want needs_answer with the question", r)
+		t.Errorf("row 06 = %+v, want Asking with the question", r)
 	}
 	if r := rowOf(t, d, "proj:work/04"); r.Asking || r.Question != "" {
 		t.Errorf("row 04 = %+v, want no answer flag", r)

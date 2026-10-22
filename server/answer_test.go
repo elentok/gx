@@ -83,10 +83,10 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	for name, pause := range map[string]func(*schema.Ticket){
-		"zero-commit park": func(tk *schema.Ticket) {
+		"zero-commit pause": func(tk *schema.Ticket) {
 			tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindZeroCommit
 		},
-		"needs-repair": func(tk *schema.Ticket) {
+		"repair pause": func(tk *schema.Ticket) {
 			tk.Status, tk.PauseKind = schema.StatusLegacyRepair, schema.PauseKindSelfReported
 		},
 	} {
@@ -227,7 +227,7 @@ func TestAnswer_Refusals(t *testing.T) {
 		req    server.QueueRequest
 		reason string
 	}{
-		{"stale", server.QueueRequest{State: "99:needs-answer", Choice: "a"}, server.ReasonStale},
+		{"stale", server.QueueRequest{State: "99:paused", Choice: "a"}, server.ReasonStale},
 		{"bad choice", server.QueueRequest{State: state, Choice: "zzz"}, server.ReasonBadChoice},
 		{"empty", server.QueueRequest{State: state}, server.ReasonEmptyAnswer},
 		{"too long", server.QueueRequest{State: state, Choice: "a", Note: strings.Repeat("x", 4001)}, server.ReasonTooLong},
@@ -237,7 +237,7 @@ func TestAnswer_Refusals(t *testing.T) {
 			t.Errorf("%s: %+v, want %s", c.name, res, c.reason)
 		}
 	}
-	if res := ask(server.QueueRequest{State: "99:needs-answer", Choice: "a"}); res.Question == nil || res.State != state {
+	if res := ask(server.QueueRequest{State: "99:paused", Choice: "a"}); res.Question == nil || res.State != state {
 		t.Errorf("stale carries question %v state %q, want the current one (%q)", res.Question, res.State, state)
 	}
 	fake.SetState("epic-a-iter-01", agentrunner.StateBlocked, "permission")

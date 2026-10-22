@@ -1,6 +1,7 @@
 package ralphloop
 
 import "github.com/elentok/gx/tickets"
+import "github.com/elentok/gx/tickets/schema"
 import "testing"
 
 // TestRunScope_Counts_BucketsEveryStatus pins the mapping from
@@ -12,8 +13,8 @@ func TestRunScope_Counts_BucketsEveryStatus(t *testing.T) {
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
 		{Number: 2, Identifier: "02", Status: "claimed"},
-		{Number: 3, Identifier: "03", Status: "needs-answer"},
-		{Number: 4, Identifier: "04", Status: "needs-repair"},
+		{Number: 3, Identifier: "03", Status: "paused", PauseReason: schema.PauseSelfReported},
+		{Number: 4, Identifier: "04", Status: "paused", PauseReason: schema.PauseIterationError},
 		{Number: 5, Identifier: "05", Status: "open", BlockedBy: []string{"2"}},
 		{Number: 6, Identifier: "06", Status: "open"},
 		// A done parent still waiting on an open fork child: counts as

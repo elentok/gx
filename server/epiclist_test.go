@@ -29,7 +29,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	claimed := map[string]string{"01-a.md": issueMD("01", "claimed", "", "A")}
-	paused := map[string]string{"01-a.md": issueMD("01", "needs-answer", "park_kind: self-reported\n", "A")}
+	paused := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A")}
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
 	mapMD := "---\nstatus: open\nkind: map\n---\n"
 	h, base := startEpicDetail(t, func(store string) {
@@ -37,7 +37,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		writeEpicFiles(t, store, "draft", "---\nstatus: draft\n---\n", open)
 		writeEpicFiles(t, store, "queued", loop, open)
 		writeEpicFiles(t, store, "awaiting", loop, done)
-		writeEpicFiles(t, store, "parked", loop, paused)
+		writeEpicFiles(t, store, "paused", loop, paused)
 		writeEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict\n---\n", done)
 		writeEpicFiles(t, store, "merging", loop, map[string]string{
 			"01-a.md": issueMD("01", "done", "", "A"),
@@ -68,7 +68,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		"proj:draft":            {server.EpicListDraft, server.EpicKindLoop},
 		"proj:queued":           {server.EpicListQueued, server.EpicKindLoop},
 		"proj:awaiting":         {server.EpicListAwaitingMerge, server.EpicKindLoop},
-		"proj:parked":           {server.EpicListPaused, server.EpicKindLoop},
+		"proj:paused":           {server.EpicListPaused, server.EpicKindLoop},
 		"proj:blocked":          {server.EpicListMergeBlocked, server.EpicKindLoop},
 		"proj:merging":          {server.EpicListMerging, server.EpicKindLoop},
 		"proj:unqueued-claimed": {server.EpicListNoOpenTickets, server.EpicKindLoop},

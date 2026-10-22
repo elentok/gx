@@ -336,7 +336,7 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 	var merges atomic.Int32
 	f.h.Server.SetMergeInto(func(repo git.Repo, wts []git.Worktree, branch, target string) (git.MergeOutcome, error) {
 		if merges.Add(1) == 1 {
-			moveMain(t, f.repo, "manual-land")
+			moveMain(t, f.repo, "manual-merge")
 		}
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})

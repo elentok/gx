@@ -72,9 +72,9 @@ func TestEpicStatusLine_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
 	repair := server.EpicSummary{State: server.EpicStatePaused, HasRepair: true, Paused: []server.SummaryTicket{
-		{Status: "needs-answer"}, {Status: "needs-repair"},
+		{Status: "paused"}, {Status: "paused"},
 	}}
-	answer := server.EpicSummary{State: server.EpicStatePaused, Paused: []server.SummaryTicket{{Status: "needs-answer"}}}
+	answer := server.EpicSummary{State: server.EpicStatePaused, Paused: []server.SummaryTicket{{Status: "paused"}}}
 	for _, tt := range []struct {
 		name string
 		sum  server.EpicSummary
@@ -157,10 +157,10 @@ func TestQueueServerMode_ShowsPauseReasonFromSummary(t *testing.T) {
 		server.EpicSummary{
 			Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Done: 0, Total: 1,
 			Paused: []server.SummaryTicket{{
-				Address: "gx:alpha/01", Title: "First", Status: "needs-answer", Reason: "Which approach, A or B?",
+				Address: "gx:alpha/01", Title: "First", Status: "paused", Reason: "Which approach, A or B?",
 			}},
 		},
-		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
+		pausedAnswerInfo("gx:alpha/01", "First"),
 	)
 
 	body := ansi.Strip(m.View().Content)

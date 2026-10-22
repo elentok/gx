@@ -682,10 +682,10 @@ func TestRun_LogsAskingEvent_OnZeroCommitIteration(t *testing.T) {
 		}
 	}
 	if asking == nil {
-		t.Fatalf("events = %+v, want a needs-answer event for ticket 1", events)
+		t.Fatalf("events = %+v, want a paused (answer) event for ticket 1", events)
 	}
 	if asking.AgentSession == "" {
-		t.Errorf("needs-answer event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", asking)
+		t.Errorf("paused (answer) event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", asking)
 	}
 }
 
@@ -705,8 +705,8 @@ func TestRun_EventSink_TicketAsking_OnZeroCommitIteration(t *testing.T) {
 	if len(sink.ticketNeedsHumanCalls) != 1 {
 		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.ticketNeedsHumanCalls)
 	}
-	if got := sink.ticketNeedsHumanCalls[0]; got[0] != "01" || got[1] != "epic" || got[2] != "needs-answer" {
-		t.Errorf("TicketNeedsHuman call = %v, want [01 epic needs-answer ...]", got)
+	if got := sink.ticketNeedsHumanCalls[0]; got[0] != "01" || got[1] != "epic" || got[2] != string(schema.StatusLegacyAnswer) {
+		t.Errorf("TicketNeedsHuman call = %v, want [01 epic %s ...]", got, schema.StatusLegacyAnswer)
 	}
 }
 
@@ -752,7 +752,7 @@ func TestRun_HonorsCommitlessFlag_SkipsAsking(t *testing.T) {
 			commitless = &events[i]
 		}
 		if ev.Type == string(eventsc.Paused) {
-			t.Errorf("events = %+v, want no needs-answer event for a declared-commitless iteration", events)
+			t.Errorf("events = %+v, want no paused event for a declared-commitless iteration", events)
 		}
 	}
 	if commitless == nil {
@@ -838,7 +838,7 @@ func TestAllDone_RepairIsNotComplete(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
-		{Number: 2, Status: "needs-repair"},
+		{Number: 2, Status: "paused", PauseReason: schema.PauseIterationError},
 	}}
 	if allDone(epic) {
 		t.Errorf("allDone() = true, want false while ticket 2 paused for repair")
@@ -1061,7 +1061,7 @@ func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
 func TestRun_RepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# First\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()
@@ -1074,7 +1074,7 @@ func TestRun_RepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 		TicketIDs:  []string{"02"},
 	}, d, noopEventSink{})
 	if err != nil {
-		t.Fatalf("Run() error = %v, want the unselected needs-repair ticket 01 to not block scheduling ticket 02", err)
+		t.Fatalf("Run() error = %v, want the unselected paused (repair) ticket 01 to not block scheduling ticket 02", err)
 	}
 
 	wantPrompt := "/implement " + ticketAddr(scratchDir, "my-epic", "02")
@@ -1098,7 +1098,7 @@ func TestRun_RepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 func TestRun_RepairInsideSubset_RunsTheRestThenPauses(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# First\n",
+		"01-first.md":  "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# First\n",
 		"02-second.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# Second\n",
 	})
 	d, prompts, _ := fakeDeps()

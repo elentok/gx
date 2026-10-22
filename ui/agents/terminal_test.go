@@ -101,9 +101,9 @@ func TestTerminal_HeaderShowsTimeSinceTheLastStatusChange(t *testing.T) {
 
 func TestTerminal_ActionableReasonWinsOverStatusDetail(t *testing.T) {
 	s := terminalSession(server.SessionStatus{State: server.SessionBlocked, Kind: "permission", Message: "Bash"})
-	s.Actionable = server.SessionActionable{Reason: "needs answer", Action: []string{"yes"}}
+	s.Actionable = server.SessionActionable{Reason: "needs approval", Action: []string{"yes"}}
 	got := ansi.Strip(infoRow(s))
-	if got != "needs answer  <leader> a: yes" {
+	if got != "needs approval  <leader> a: yes" {
 		t.Fatalf("info row = %q", got)
 	}
 }

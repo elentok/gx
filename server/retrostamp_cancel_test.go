@@ -25,7 +25,7 @@ func TestCancel_PausedRetroStampsItsEpicSkipped(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(oneOff, "issues"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	fm := "---\nid: \"01\"\nstatus: needs-repair\ntype: evolve\nunique: evolve:proj/epic-a\n---\n\n# retro\n"
+	fm := "---\nid: \"01\"\nstatus: paused\npause_reason: merge-conflict\ntype: evolve\nunique: evolve:proj/epic-a\n---\n\n# retro\n"
 	if err := os.WriteFile(filepath.Join(oneOff, "issues", "01-retro.md"), []byte(fm), 0o644); err != nil {
 		t.Fatal(err)
 	}

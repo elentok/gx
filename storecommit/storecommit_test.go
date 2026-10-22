@@ -106,12 +106,12 @@ func TestPush_PushesAfterCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, dir, "a.md", "x")
-	if err := Immediate(filepath.Join(dir, "a.md"), "park"); err != nil {
+	if err := Immediate(filepath.Join(dir, "a.md"), "pause"); err != nil {
 		t.Fatal(err)
 	}
 	l.Stop()
 	out, err := git(remote, "log", "--format=%s", "HEAD")
-	if err != nil || strings.TrimSpace(out) != "park" {
+	if err != nil || strings.TrimSpace(out) != "pause" {
 		t.Fatalf("remote log = %q, err %v", out, err)
 	}
 }
@@ -151,7 +151,7 @@ func TestPush_FailureIsReportedAndDoesNotBlockCommits(t *testing.T) {
 	}
 	defer l.Stop()
 	write(t, dir, "a.md", "x")
-	if err := Immediate(filepath.Join(dir, "a.md"), "park"); err != nil {
+	if err := Immediate(filepath.Join(dir, "a.md"), "pause"); err != nil {
 		t.Fatal(err)
 	}
 	if got := logLines(t, dir); len(got) != 1 {

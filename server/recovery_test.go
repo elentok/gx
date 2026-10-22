@@ -127,7 +127,7 @@ func TestRecovery_SpinningPauseIsRecordedByR1WithoutANudge(t *testing.T) {
 	})
 	registerLaunch(h)
 
-	if err := h.Server.PauseAs("proj:epic-a/01", events.Spinning, "parked and re-claimed 3 times within 5m0s"); err != nil {
+	if err := h.Server.PauseAs("proj:epic-a/01", events.Spinning, "paused and re-claimed 3 times within 5m0s"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -1259,7 +1259,7 @@ func TestRecovery_ParentDefectScanSkipsDrafts(t *testing.T) {
 // person's to handle: neither forks an investigation.
 func TestRecovery_ManualAndUnmatchedBlockedPanePausesForkNothing(t *testing.T) {
 	pause := map[string]func(*servertest.Harness) error{
-		"manual park": func(h *servertest.Harness) error {
+		"manual pause": func(h *servertest.Harness) error {
 			res, err := h.Client.TicketPause(context.Background(), "proj:epic-a/01", "broken")
 			if err == nil && res.Refused {
 				err = errors.New(res.Reason)

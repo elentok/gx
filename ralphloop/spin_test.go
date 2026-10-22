@@ -67,7 +67,7 @@ func TestRun_SpinCyclesInsideWindow_PauseSpinningAndNeverReclaim(t *testing.T) {
 	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseSpinning)
 	spins := spinningEvents(t, scratchDir)
 	if len(spins) != 1 || spins[0].Type != string(events.Paused) {
-		t.Errorf("spinning events = %+v, want exactly one needs-repair", spins)
+		t.Errorf("spinning events = %+v, want exactly one paused", spins)
 	}
 }
 

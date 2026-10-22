@@ -136,9 +136,9 @@ func TestFaultWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 }
 
 func TestParseTicket_HandAuthoredFileWithoutPausedSection_StillLoads(t *testing.T) {
-	path := writeTemp(t, "05-ticket.md", "---\nid: \"05\"\nstatus: needs-repair\ntype: implement\n---\nNo section here, just a note in prose.\n")
+	path := writeTemp(t, "05-ticket.md", "---\nid: \"05\"\nstatus: paused\npause_reason: merge-conflict\ntype: implement\n---\nNo section here, just a note in prose.\n")
 
 	if _, err := ParseTicket(path); err != nil {
-		t.Errorf("ParseTicket: %v, want a hand-authored needs-repair ticket without the section to still load (validation is write-conditional, not at rest)", err)
+		t.Errorf("ParseTicket: %v, want a hand-authored repair-paused ticket without the section to still load (validation is write-conditional, not at rest)", err)
 	}
 }

@@ -102,13 +102,13 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedRepairNotSilently(t *testin
 		t.Fatalf("ReadEvents: %v", err)
 	}
 	if len(evs) != 1 || evs[0].Type != string(eventsc.Paused) || evs[0].Kind != string(eventsc.AmbiguousMerge) || evs[0].Address != canonicalAddr(scratchDir, "epic", "03") {
-		t.Errorf("events = %+v, want one needs-repair event of kind ambiguous-merge for 03", evs)
+		t.Errorf("events = %+v, want one paused (repair) event of kind ambiguous-merge for 03", evs)
 	}
 }
 
 // TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable is the
 // commitless counterpart to TestReconcile_DoneTicketWithNoProvenance_
-// FlaggedNeedsRepairNotSilently above: a done ticket with commitless: true
+// FlaggedRepairNotSilently above: a done ticket with commitless: true
 // has no merged commit by design, so classifyDoneTicket's verification must
 // be skipped for it entirely rather than flagging it paused (repair) for
 // having no provenance.
@@ -135,7 +135,7 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassRepair) {
-		t.Errorf("commitless done ticket was flagged needs-repair, want its no-commit verification skipped entirely:\n%s", raw)
+		t.Errorf("commitless done ticket was flagged paused (repair), want its no-commit verification skipped entirely:\n%s", raw)
 	}
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("commitless done ticket's status changed unexpectedly:\n%s", raw)
@@ -176,7 +176,7 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 			t.Fatalf("ReadFile %s: %v", name, err)
 		}
 		if rawIsPaused(t, string(raw), schema.PauseClassRepair) {
-			t.Errorf("%s flagged needs-repair, want its no-commit verification skipped by type:\n%s", name, raw)
+			t.Errorf("%s flagged paused (repair), want its no-commit verification skipped by type:\n%s", name, raw)
 		}
 		if !strings.Contains(string(raw), "status: done") {
 			t.Errorf("%s status changed unexpectedly:\n%s", name, raw)
@@ -253,7 +253,7 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassRepair) {
-		t.Errorf("out-of-scope done ticket 01 was verified and flagged needs-repair, want it left untouched:\n%s", raw)
+		t.Errorf("out-of-scope done ticket 01 was verified and flagged paused (repair), want it left untouched:\n%s", raw)
 	}
 }
 

@@ -236,7 +236,7 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 // orchestration statuses are refused without touching the file.
 func TestExecute_TicketsSet_OrchestrationStatusesRefused(t *testing.T) {
 	t.Parallel()
-	for _, status := range []string{"claimed", "done", "needs-answer", "needs-repair", "cancelled"} {
+	for _, status := range []string{"claimed", "done", "paused", "cancelled"} {
 		t.Run(status, func(t *testing.T) {
 			t.Parallel()
 			path := filepath.Join(t.TempDir(), "04b-ticket.md")
@@ -285,9 +285,9 @@ func TestExecute_TicketsSet_MapEpicClaimsAndCloses(t *testing.T) {
 		t.Errorf("ticket = %q, want claimed_at and done_at stamped", raw)
 	}
 
-	err := execute([]string{"tickets", "set", path, "--status=needs-repair"}, d)
+	err := execute([]string{"tickets", "set", path, "--status=paused"}, d)
 	if err == nil || !strings.Contains(err.Error(), "orchestration status") {
-		t.Errorf("needs-repair in a map epic: error = %v, want refusal", err)
+		t.Errorf("paused in a map epic: error = %v, want refusal", err)
 	}
 }
 
@@ -340,18 +340,18 @@ func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_NeedsRepairToOpenAccepted(t *testing.T) {
+func TestExecute_TicketsSet_RepairPausedToOpenAccepted(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: needs-repair\ntype: implement\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: paused\npause_reason: merge-error\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
-		t.Fatalf("execute tickets set: %v, want needs-repair -> open to be accepted", err)
+		t.Fatalf("execute tickets set: %v, want a repair pause -> open to be accepted", err)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -563,7 +563,7 @@ func TestExecute_TicketsSet_RefusesWithoutOpenQuestionNamingVerb(t *testing.T) {
 		name, frontmatter, flag, verb string
 	}{
 		{"iteration-status", "status: claimed", "--iteration-status=asking", "ask"},
-		{"status-open", "status: needs-answer", "--status=open", "answer"},
+		{"status-open", "status: paused\npause_reason: self-reported", "--status=open", "answer"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -702,9 +702,9 @@ func TestExecute_TicketsSet_AgentBranch_AlreadyOpenToOpenRefused(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_AgentBranch_NeedsAnswerAndNeedsRepairRefused(t *testing.T) {
+func TestExecute_TicketsSet_AgentBranch_PausedRefused(t *testing.T) {
 	t.Parallel()
-	for _, status := range []string{"needs-answer", "needs-repair"} {
+	for _, status := range []string{"paused"} {
 		t.Run(status, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()

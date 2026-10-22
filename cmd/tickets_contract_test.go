@@ -42,12 +42,12 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 		{
 			name: "needs-info status",
 			raw:  "---\nid: \"04\"\nstatus: needs-info\ntype: implement\n---\nBody.\n",
-			want: "needs-answer",
+			want: "gx tickets migrate",
 		},
 		{
 			name: "needs-attention status",
 			raw:  "---\nid: \"04\"\nstatus: needs-attention\ntype: implement\n---\nBody.\n",
-			want: "needs-repair",
+			want: "gx tickets migrate",
 		},
 		{
 			name: "missing status",
@@ -77,7 +77,7 @@ func TestExecute_TicketsValidate_RejectsPreContractionShape(t *testing.T) {
 func TestExecute_TicketsValidate_AcceptsPostMigrationShape(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "04a-ticket.md")
-	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: needs-answer\ntype: implement\nparent: \"04\"\n---\nBody.\n")
+	writeTicketFile(t, path, "---\nid: \"04a\"\nstatus: paused\npause_reason: self-reported\ntype: implement\nparent: \"04\"\n---\nBody.\n")
 	writeLogFile(t, path, logQuestionLine)
 
 	var stdout, stderr bytes.Buffer

@@ -334,11 +334,11 @@ func TestRun_CodexLaunchFailureAfterClaimRepair(t *testing.T) {
 	}
 	assertRawPaused(t, string(contents), schema.PauseClassRepair, "")
 	if !strings.Contains(string(contents), "starting "+iterLabel("my-epic", "01")+": Herdr rejected Codex integration") {
-		t.Errorf("ticket after launch failure =\n%s\nwant durable needs-repair status and launch reason", contents)
+		t.Errorf("ticket after launch failure =\n%s\nwant durable paused (repair) status and launch reason", contents)
 	}
 
 	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||
-		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == "needs-answer" }) {
+		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == string(schema.StatusLegacyAnswer) }) {
 		t.Errorf("events = %+v, must not report successful/generic completion", sink.Events())
 	}
 }

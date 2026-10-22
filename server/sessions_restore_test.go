@@ -115,7 +115,7 @@ func TestRestart_DeadHolderWithoutAutoResumeIsCrashed(t *testing.T) {
 		harness string
 		opts    []func(*server.Config)
 	}{
-		"resume-on-start off":   {harness: string(agentfake.HarnessKind)},
+		"restore-on-start off":  {harness: string(agentfake.HarnessKind)},
 		"harness cannot resume": {harness: string(agentfake.NoResumeHarnessKind), opts: []func(*server.Config){resumeOnStart}},
 	} {
 		t.Run(name, func(t *testing.T) {

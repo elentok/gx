@@ -623,11 +623,11 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	sink.mu.Lock()
 	paused, status, reason := sink.paused, sink.status, sink.reason
 	sink.mu.Unlock()
-	if !paused || status != "needs-repair" {
-		t.Fatalf("TicketNeedsHuman = (paused:%v status:%q), want (true, %q)", paused, status, "needs-repair")
+	if !paused || legacyClass(schema.Status(status)) != schema.PauseClassRepair {
+		t.Fatalf("TicketNeedsHuman = (paused:%v status:%q), want (true, a repair pause)", paused, status)
 	}
 	if !strings.Contains(reason, "recovery failed") || !strings.Contains(reason, evidence) {
-		t.Errorf("needs-repair reason = %q, want it to name the failed recovery and its evidence", reason)
+		t.Errorf("repair reason = %q, want it to name the failed recovery and its evidence", reason)
 	}
 
 	rawTicket, err := os.ReadFile(ticketPath)
@@ -674,7 +674,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		t.Error("iteration must not appear finished/cherry-picked: no commit ever merged")
 	}
 	if sawAsking {
-		t.Error("must not fall back to generic needs-answer: that would lose the exhaustion reason")
+		t.Error("must not fall back to a generic answer pause: that would lose the exhaustion reason")
 	}
 
 	path := iterationWorktreePath(wtDir, epicName, "01")

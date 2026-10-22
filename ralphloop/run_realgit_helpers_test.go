@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -338,7 +339,7 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 	}
 
 	if hasEvent(sink, LiveEventIterationFinished, func(LiveEvent) bool { return true }) ||
-		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == "needs-answer" }) {
+		hasEvent(sink, LiveEventTicketNeedsHuman, func(ev LiveEvent) bool { return ev.Status == string(schema.StatusLegacyAnswer) }) {
 		t.Errorf("launch failure events = %+v, must not report successful/generic completion", sink.Events())
 	}
 }

@@ -108,9 +108,9 @@ func TestScreen_ScrollbackTailIsLastN(t *testing.T) {
 	}
 }
 
-// Run under -race: the drain goroutine must not touch the emulator after
+// Run under -race: the reader goroutine must not touch the emulator after
 // Close returns.
-func TestScreen_CloseWhileDrainingIsRaceFree(t *testing.T) {
+func TestScreen_CloseWhileReadingIsRaceFree(t *testing.T) {
 	s := screen.NewScreen(10, 2)
 	// Cursor-position and device-attribute queries make the emulator reply.
 	_, _ = s.Write([]byte("\x1b[6n\x1b[c"))

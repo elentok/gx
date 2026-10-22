@@ -86,14 +86,14 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseClosed, Question: q.Seq, Reason: "unparked"}); err != nil {
+	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseClosed, Question: q.Seq, Reason: "resumed"}); err != nil {
 		t.Fatal(err)
 	}
 	d, err = h.Client.Detail(context.Background(), answerAddr)
 	if err != nil || len(d.Rounds) != 1 || d.Rounds[0].Outcome != server.RoundAnswered || d.Rounds[0].Options != nil {
 		t.Fatalf("earlier rounds = %+v, %v", d.Rounds, err)
 	}
-	if d.Latest.Outcome != server.RoundClosed || d.Latest.ClosedReason != "unparked" || slices.Contains(d.Actions, server.ActionAnswer) {
+	if d.Latest.Outcome != server.RoundClosed || d.Latest.ClosedReason != "resumed" || slices.Contains(d.Actions, server.ActionAnswer) {
 		t.Errorf("closed round = %+v, actions = %v", d.Latest, d.Actions)
 	}
 }

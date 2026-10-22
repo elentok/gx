@@ -6,6 +6,7 @@ import (
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // TestMarkdownV2Validity_AllNotificationTexts drives every chatmarkup-backed
@@ -35,20 +36,20 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 	stats := IterationStats{ElapsedSeconds: 332, PeakContextTokens: 39000, Cost: fractionalCost, Completed: 2, Total: 5}
 
 	cases := map[string]chatmarkup.Text{
-		"epicStartedText":                   telegramStyle.epicStartedText(adversarialEpic, overflowCounts),
-		"iterationStartedText":              telegramStyle.iterationStartedText(ticket, adversarialEpic),
-		"iterationPausedText":               telegramStyle.iterationPausedText("iter-04", "rate limit (hit).", adversarialEpic, adversarialTicket),
-		"iterationResumedText":              telegramStyle.iterationResumedText("iter-04", adversarialEpic, adversarialTicket),
-		"iterationFinishedText":             telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
-		"ticketNeedsHumanText/needs-answer": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-answer", "zero-commit", "No commits merged (yet).", overflowCounts),
-		"ticketNeedsHumanText/needs-repair": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-repair", "blocked-pane", "Operator intervention required.", overflowCounts),
-		"epicPausedText":                    telegramStyle.epicPausedText(adversarialEpic, []string{"04", "07"}),
-		"epicCompleteText":                  telegramStyle.epicCompleteText(adversarialEpic, overflowCounts, 5, 492, fractionalCost),
-		"epicFailedText":                    telegramStyle.epicFailedText(adversarialEpic, overflowCounts, "boom (exit 1)."),
-		"mutedText":                         telegramStyle.mutedText(adversarialEpic, adversarialTicket),
-		"globallyMutedText":                 telegramStyle.globallyMutedText("telegram"),
-		"testMessageText":                   telegramStyle.testMessageText(),
-		"identityLine/punctuation-bearing":  telegramStyle.iterationStartedText(tickets.Ticket{Identifier: "04 (retry)", Title: "x"}, "ui-tree.migration (v2)"),
+		"epicStartedText":                  telegramStyle.epicStartedText(adversarialEpic, overflowCounts),
+		"iterationStartedText":             telegramStyle.iterationStartedText(ticket, adversarialEpic),
+		"iterationPausedText":              telegramStyle.iterationPausedText("iter-04", "rate limit (hit).", adversarialEpic, adversarialTicket),
+		"iterationResumedText":             telegramStyle.iterationResumedText("iter-04", adversarialEpic, adversarialTicket),
+		"iterationFinishedText":            telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
+		"ticketNeedsHumanText/answer":      telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, string(schema.StatusLegacyAnswer), "zero-commit", "No commits merged (yet).", overflowCounts),
+		"ticketNeedsHumanText/repair":      telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, string(schema.StatusLegacyRepair), "blocked-pane", "Operator intervention required.", overflowCounts),
+		"epicPausedText":                   telegramStyle.epicPausedText(adversarialEpic, []string{"04", "07"}),
+		"epicCompleteText":                 telegramStyle.epicCompleteText(adversarialEpic, overflowCounts, 5, 492, fractionalCost),
+		"epicFailedText":                   telegramStyle.epicFailedText(adversarialEpic, overflowCounts, "boom (exit 1)."),
+		"mutedText":                        telegramStyle.mutedText(adversarialEpic, adversarialTicket),
+		"globallyMutedText":                telegramStyle.globallyMutedText("telegram"),
+		"testMessageText":                  telegramStyle.testMessageText(),
+		"identityLine/punctuation-bearing": telegramStyle.iterationStartedText(tickets.Ticket{Identifier: "04 (retry)", Title: "x"}, "ui-tree.migration (v2)"),
 	}
 
 	for name, text := range cases {

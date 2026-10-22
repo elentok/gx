@@ -93,7 +93,7 @@ func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
 }
 
 func TestMergeFinish_SelfReportedAskingPausesAsking(t *testing.T) {
-	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "needs-answer" })
+	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "asking" })
 	assertFixturePaused(t, f, tk, schema.StatusLegacyAnswer, events.SelfReported, "")
 }
 

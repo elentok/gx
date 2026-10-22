@@ -87,7 +87,7 @@ func TestWebResume_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
-	for name, state := range map[string]string{"missing": "", "stale": "99:needs-answer"} {
+	for name, state := range map[string]string{"missing": "", "stale": "99:paused"} {
 		res := webResume(t, e.h, server.RepairRequest{State: state})
 		if !res.Refused || res.Reason != server.ReasonStale {
 			t.Fatalf("%s: resume = %+v; want refusal %s", name, res, server.ReasonStale)
@@ -219,7 +219,7 @@ func TestResume_CLIWithoutATokenStillWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res, err := e.h.Client.Repair(context.Background(), "unpark", server.RepairRequest{Address: answerAddr})
+	res, err := e.h.Client.Repair(context.Background(), "resume", server.RepairRequest{Address: answerAddr})
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v; want reopened", res, err)
 	}

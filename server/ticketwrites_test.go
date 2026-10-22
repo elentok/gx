@@ -130,7 +130,7 @@ func writeMuted(t *testing.T, path, status, body string) {
 
 func TestUnmute_ReopensAStuckTicketAndDemotesItsSection(t *testing.T) {
 	h, path := startTicketWrites(t)
-	writeMuted(t, path, "needs-repair", "## Needs Repair\n\nnotification storm tripped a mute\n")
+	writeMuted(t, path, "paused\npause_reason: merge-conflict", "## Needs Repair\n\nnotification storm tripped a mute\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

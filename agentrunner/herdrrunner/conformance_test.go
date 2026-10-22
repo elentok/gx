@@ -334,7 +334,7 @@ func TestRateLimit_CodexContextExhausted(t *testing.T) {
 	if !errors.Is(err, agentrunner.ErrContextExhausted) || limited {
 		t.Fatalf("RateLimit = %v, %v; want ErrContextExhausted, not limited", limited, err)
 	}
-	// ralph-loop puts the evidence in the park reason.
+	// ralph-loop puts the evidence in the pause reason.
 	if !strings.Contains(err.Error(), "ran out of room") {
 		t.Fatalf("RateLimit err = %q, want the pane evidence", err)
 	}

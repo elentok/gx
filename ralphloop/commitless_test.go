@@ -103,7 +103,7 @@ func TestFinishCommitless_StrandedCommitsPauseAndKeepWorktree(t *testing.T) {
 		t.Fatal(err)
 	}
 	if out.Status != schema.StatusLegacyAnswer || out.Kind != events.StrandedCommits {
-		t.Errorf("outcome = %+v, want needs-answer/%s", out, events.StrandedCommits)
+		t.Errorf("outcome = %+v, want paused answer/%s", out, events.StrandedCommits)
 	}
 	if _, err := os.Stat(wt.Path); err != nil {
 		t.Errorf("worktree gone: %v", err)

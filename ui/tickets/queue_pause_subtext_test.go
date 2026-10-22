@@ -35,9 +35,9 @@ func writePausedFrontmatterTicket(t *testing.T, root, epic, filename, id, pauseR
 	if parent != "" {
 		fmt.Fprintf(&b, "parent: %q\n", parent)
 	}
-	heading := "## Needs Answer"
+	heading := tickets.LegacyAnswerHeading
 	if pauseReason == string(schema.PauseSpinning) {
-		heading = "## Needs Repair"
+		heading = tickets.LegacyRepairHeading
 	}
 	fmt.Fprintf(&b, "---\n\n%s\n\n%s\n", heading, reason)
 	if err := os.WriteFile(path, []byte(b.String()), 0644); err != nil {
@@ -47,12 +47,12 @@ func writePausedFrontmatterTicket(t *testing.T, root, epic, filename, id, pauseR
 
 // TestQueueModel_DraftRowUnaffectedByPauseRendering is acceptance criterion 7:
 // a draft-status ticket's row must stay visually unchanged by this ticket's
-// work, even when it happens to carry a leftover "## Needs Answer" heading.
+// work, even when it happens to carry a leftover "## Paused" heading.
 func TestQueueModel_DraftRowUnaffectedByPauseRendering(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeTicket(t, root, "alpha", "01-first.md",
-		"Status: draft\n\n## Needs Answer\n\nLeftover text that must not surface.\n")
+		"Status: draft\n\n## Paused\n\nLeftover text that must not surface.\n")
 	checked := map[string]bool{ticketPath(root, "alpha", "01-first.md"): true}
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 

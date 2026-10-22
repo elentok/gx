@@ -58,7 +58,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 
 func TestPausedOutcome_NoKindNoReason_FallsBackHonestly(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
+		"01-a.md": "---\nid: \"01\"\nstatus: paused\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "epic", "01-a.md")
 	tk, err := schema.ParseTicket(path)

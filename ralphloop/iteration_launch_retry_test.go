@@ -57,14 +57,19 @@ func assertTicketStatus(t *testing.T, scratchDir, status string) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	// status is the legacy label of the pause class the ticket must be in.
-	if class := legacyClass(schema.Status(status)); class != "" {
-		assertRawPaused(t, string(raw), class, "")
-		return
-	}
 	if tk := parseRawTicket(t, string(raw)); string(tk.Status) != status {
 		t.Errorf("ticket status = %q, want %q", tk.Status, status)
 	}
+}
+
+// assertTicketPaused checks the launch epic's ticket is paused in class.
+func assertTicketPaused(t *testing.T, scratchDir string, class schema.PauseClass) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(scratchDir, launchEpic, "issues", "01-first.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	assertRawPaused(t, string(raw), class, "")
 }
 
 func launchFailedEvents(t *testing.T, scratchDir string) []Event {
@@ -148,7 +153,7 @@ func TestRunIteration_PromptNotDeliveredTwice_PausesPromptStalled(t *testing.T) 
 
 	scratchDir := runLaunchEpic(t, d, true)
 
-	assertTicketStatus(t, scratchDir, "needs-repair")
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
 	if _, found, _ := r.Find(launchLabel); found {
 		t.Error("an undelivered session is still live, want both stopped")
 	}
@@ -176,7 +181,7 @@ func TestRunIteration_PromptNotReady_PausesBlockedPane(t *testing.T) {
 
 	scratchDir := runLaunchEpic(t, d, true)
 
-	assertTicketStatus(t, scratchDir, "needs-answer")
+	assertTicketPaused(t, scratchDir, schema.PauseClassAnswer)
 	if _, found, _ := r.Find(launchLabel); !found {
 		t.Error("blocked session was stopped, want it live for a person to answer")
 	}
@@ -196,7 +201,7 @@ func TestRunIteration_MissingCapability_PausesWithDoctorHint(t *testing.T) {
 
 	scratchDir := runLaunchEpic(t, d, true)
 
-	assertTicketStatus(t, scratchDir, "needs-repair")
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
 	failed := launchFailedEvents(t, scratchDir)
 	if len(failed) != 1 {
 		t.Fatalf("launch-failed events = %+v, want one", failed)
@@ -216,7 +221,7 @@ func TestRunIteration_MissingCapabilityOnStart_PausesWithDoctorHint(t *testing.T
 
 	scratchDir := runLaunchEpic(t, d, true)
 
-	assertTicketStatus(t, scratchDir, "needs-repair")
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
 	failed := launchFailedEvents(t, scratchDir)
 	if len(failed) != 1 {
 		t.Fatalf("launch-failed events = %+v, want one", failed)
@@ -249,7 +254,7 @@ func TestRunIteration_SessionDiedInWait_PausesRepairWithReason(t *testing.T) {
 
 	scratchDir := runLaunchEpic(t, d, true)
 
-	assertTicketStatus(t, scratchDir, "needs-repair")
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
 	evs, _, err := ReadEvents(scratchDir, launchEpic)
 	if err != nil {
 		t.Fatalf("ReadEvents() error = %v", err)
@@ -262,7 +267,7 @@ func TestRunIteration_SessionDiedInWait_PausesRepairWithReason(t *testing.T) {
 	}
 	if len(paused) != 1 || paused[0].Kind != string(events.IterationError) ||
 		!strings.Contains(paused[0].Reason, "claude exited (code 1)") {
-		t.Errorf("needs-repair events = %+v, want one iteration_error carrying the died reason", paused)
+		t.Errorf("paused events = %+v, want one iteration_error carrying the died reason", paused)
 	}
 }
 
@@ -274,9 +279,9 @@ func TestRunIteration_OtherPromptError_PausesWithoutRetry(t *testing.T) {
 
 	scratchDir := runLaunchEpic(t, d, true)
 
-	assertTicketStatus(t, scratchDir, "needs-repair")
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
 	if _, found, _ := r.Find(launchLabel); !found {
-		t.Error("session was stopped, want it left for needs-repair inspection")
+		t.Error("session was stopped, want it left for repair inspection")
 	}
 	failed := launchFailedEvents(t, scratchDir)
 	if len(failed) != 1 || failed[0].Kind != string(events.IterationError) {

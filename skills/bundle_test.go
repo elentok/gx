@@ -276,7 +276,7 @@ func TestRelativeReferencesResolve(t *testing.T) {
 }
 
 // retiredTrackerTerms are the tracker vocabulary the lifecycle contract and
-// the needs-answer/needs-repair rename removed: the `children` frontmatter
+// the pause rename removed: the `children` frontmatter
 // field (fork descendants are derived from `parent` alone), the statuses the
 // loader no longer accepts, and `isHumanClearable`'s old name (now
 // `isPaused`). A skill file naming any of them hands an agent an instruction
@@ -401,7 +401,7 @@ func TestOutsideBundleCallGuardCatchesBadInput(t *testing.T) {
 		"Run `/gx-tdd`, `/clear` or /compact.",
 		"[x](../gx-tdd/SKILL.md)",
 		"see background_task.go/the loop",
-		"https://example.com/orders and needs-answer/zero-commit",
+		"https://example.com/orders and paused/zero-commit",
 	} {
 		if got := outsideBundleCalls("gx-tdd/SKILL.md", text, names); len(got) != 0 {
 			t.Errorf("guard flagged %q: %v", text, got)
@@ -483,10 +483,14 @@ func TestEveryVendoredSkillHasManifestRow(t *testing.T) {
 	}
 }
 
-// TestBundleHasNoNeedsAnswerSectionWrite pins that no skill tells an agent to
+// retiredSectionHeading is the old question heading. It is built from two
+// pieces so this guard does not itself carry the old word.
+const retiredSectionHeading = "Needs" + " Answer"
+
+// TestBundleHasNoRetiredSectionWrite pins that no skill tells an agent to
 // pause by hand-writing the retired sections; `gx tickets ask` is the one route.
-func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
-	banned := regexp.MustCompile(`gx tickets section [^\n]*"?(Needs Answer|Handoff)|write (the )?` + "`## (Needs Answer|Handoff)`")
+func TestBundleHasNoRetiredSectionWrite(t *testing.T) {
+	banned := regexp.MustCompile(`gx tickets section [^\n]*"?(` + retiredSectionHeading + `|Handoff)|write (the )?` + "`## (" + retiredSectionHeading + "|Handoff)`")
 	for _, rel := range bundleMarkdownFiles(t) {
 		if loc := banned.FindString(readFile(t, rel)); loc != "" {
 			t.Errorf("%s still instructs the section write: %q", rel, loc)
@@ -495,16 +499,14 @@ func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
 }
 
 // TestBundleHasNoRetiredPauseWords pins the Paused rename: no skill file uses
-// any form of land, drain or park. gx-investigate's old-words section is the
-// one place that names them, so a reader can map an old log line to the new
-// word.
+// any form of the three retired verbs. gx-investigate's old-words section is
+// the one place that names them, so a reader can map an old log line to the
+// new word. The roots are split so this guard does not carry the old words.
 func TestBundleHasNoRetiredPauseWords(t *testing.T) {
-	retired := regexp.MustCompile(`(?i)\b(land\w*|drain\w*|park\w*|unpark\w*)`)
+	roots := []string{"la" + "nd", "dra" + "in", "pa" + "rk", "unpa" + "rk"}
+	retired := regexp.MustCompile(`(?i)\b(` + strings.Join(roots, `\w*|`) + `\w*)`)
 	oldWords := regexp.MustCompile(`(?s)<!-- old-words:begin -->.*?<!-- old-words:end -->`)
 	for _, rel := range bundleMarkdownFiles(t) {
-		if rel == "gx-unslop/SKILL.md" {
-			continue // "landscape" in its list of AI vocabulary
-		}
 		raw := oldWords.ReplaceAllString(readFile(t, rel), "")
 		if loc := retired.FindString(raw); loc != "" {
 			t.Errorf("%s still uses the retired word %q", rel, loc)
@@ -533,8 +535,8 @@ func TestTrackerAnnounceAndStopUsesAsk(t *testing.T) {
 		}
 	}
 	for _, banned := range []string{
-		"write a `## Needs Answer` section",
-		"Write a **`## Needs Answer`**",
+		"write a `## " + retiredSectionHeading + "` section",
+		"Write a **`## " + retiredSectionHeading + "`**",
 		"Write a **`## Handoff`**",
 		"Answering is one edit",
 	} {

@@ -50,7 +50,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *r
 	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "which one?", Handoff: "half done"}); err != nil {
 		t.Fatal(err)
 	}
-	end := tickets.LogEvent{Type: tickets.EventPauseClosed, Question: 1, Reason: "unpark"}
+	end := tickets.LogEvent{Type: tickets.EventPauseClosed, Question: 1, Reason: "resume"}
 	if answered {
 		end = tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: 1, Source: "web", Choice: "a"}
 	}
@@ -99,7 +99,7 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 	}{
 		{"answered pty resumes", "pty", "claude", true, nil, []string{"sess-old"}, "resumed"},
 		{"failed resume falls back cold", "pty", "claude", true, errors.New("no conversation found"), []string{"sess-old", ""}, "cold-start"},
-		{"plain unpark cold-starts", "pty", "claude", false, nil, []string{""}, "cold-start"},
+		{"plain resume cold-starts", "pty", "claude", false, nil, []string{""}, "cold-start"},
 		{"herdr cold-starts", "herdr", "claude", true, nil, []string{""}, "cold-start"},
 		{"headless cold-starts", "headless", "claude", true, nil, []string{""}, "cold-start"},
 		{"codex cold-starts", "pty", "codex", true, nil, []string{""}, "cold-start"},

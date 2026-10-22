@@ -11,6 +11,13 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets/schema"
+)
+
+// The snapshot carries a paused ticket under its class's wire status.
+const (
+	wireAnswer = string(schema.StatusLegacyAnswer)
+	wireRepair = string(schema.StatusLegacyRepair)
 )
 
 // fakeSource serves one ticket whose status advances one step per snapshot.
@@ -102,7 +109,7 @@ func TestOneOffWait_DonePrintsResultAndExitsZero(t *testing.T) {
 }
 
 func TestOneOffWait_ExitCodesByStatus(t *testing.T) {
-	for status, want := range map[string]int{"needs-answer": 3, "needs-repair": 4, "cancelled": 5} {
+	for status, want := range map[string]int{wireAnswer: 3, wireRepair: 4, "cancelled": 5} {
 		if _, code := runWait(t, &fakeSource{statuses: []string{"open", status}}); code != want {
 			t.Errorf("%s: code = %d; want %d", status, code, want)
 		}
@@ -115,9 +122,9 @@ func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
 		statuses, recoveries []string
 		want                 int
 	}{
-		"recovered":    {[]string{"claimed", "needs-repair", "needs-repair", "claimed", "cancelled"}, []string{"", pending, pending}, 5},
-		"escalated":    {[]string{"claimed", "needs-repair", "needs-repair"}, []string{"", pending, escalated}, exitWaitEscalated},
-		"hold expired": {[]string{"claimed", "needs-answer", "needs-answer"}, []string{"", pending, ""}, 3},
+		"recovered":    {[]string{"claimed", wireRepair, wireRepair, "claimed", "cancelled"}, []string{"", pending, pending}, 5},
+		"escalated":    {[]string{"claimed", wireRepair, wireRepair}, []string{"", pending, escalated}, exitWaitEscalated},
+		"hold expired": {[]string{"claimed", wireAnswer, wireAnswer}, []string{"", pending, ""}, 3},
 	} {
 		if _, code := runWait(t, &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries}); code != tc.want {
 			t.Errorf("%s: code = %d; want %d", name, code, tc.want)
@@ -131,8 +138,8 @@ func TestOneOffWait_WakesOnItsInvestigation(t *testing.T) {
 		statuses, recoveries []string
 		want                 int
 	}{
-		"escalated": {[]string{"needs-repair", "needs-repair"}, []string{pending, escalated}, exitWaitEscalated},
-		"merged":    {[]string{"needs-repair", "needs-repair", "done"}, []string{pending, pending}, 0},
+		"escalated": {[]string{wireRepair, wireRepair}, []string{pending, escalated}, exitWaitEscalated},
+		"merged":    {[]string{wireRepair, wireRepair, "done"}, []string{pending, pending}, 0},
 	} {
 		f := &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries, investigation: true}
 		if _, code := runWait(t, f); code != tc.want {
@@ -152,7 +159,7 @@ func TestOneOffWait_SurvivesServerRestart(t *testing.T) {
 	old := waitRetry
 	t.Cleanup(func() { waitRetry = old })
 	waitRetry = time.Millisecond
-	f := &fakeSource{statuses: []string{"claimed", "needs-repair"}, failFirst: 3}
+	f := &fakeSource{statuses: []string{"claimed", wireRepair}, failFirst: 3}
 	if _, code := runWait(t, f); code != 4 {
 		t.Errorf("code = %d; want 4 after the outage", code)
 	}

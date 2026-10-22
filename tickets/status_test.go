@@ -1,6 +1,16 @@
 package tickets
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/elentok/gx/tickets/schema"
+)
+
+// The retired status spellings still load; these tests pin how they render.
+const (
+	legacyAnswerStatus = string(schema.StatusLegacyAnswer)
+	legacyRepairStatus = string(schema.StatusLegacyRepair)
+)
 
 func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 	cases := []struct {
@@ -12,8 +22,8 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		{"ready-for-agent", StatusError},
 		{"ready-for-human", StatusError},
 		{"claimed", StatusClaimed},
-		{"needs-answer", StatusPausedAnswer},
-		{"needs-repair", StatusPausedRepair},
+		{legacyAnswerStatus, StatusPausedAnswer},
+		{legacyRepairStatus, StatusPausedRepair},
 		{"needs-triage", StatusError},
 		{"done", StatusDone},
 		{"draft", StatusDraft},
@@ -100,7 +110,7 @@ func TestEpic_RenderedStatus_ResolvedBlockerDropsOverlay(t *testing.T) {
 
 func TestEpic_RenderedStatus_PausedAnswerNotOverlaidByBlocked(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "needs-answer", BlockedBy: []string{"2"}},
+		{Number: 1, Status: legacyAnswerStatus, BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -111,7 +121,7 @@ func TestEpic_RenderedStatus_PausedAnswerNotOverlaidByBlocked(t *testing.T) {
 
 func TestEpic_RenderedStatus_PausedRepairNotOverlaidByBlocked(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
-		{Number: 1, Status: "needs-repair", BlockedBy: []string{"2"}},
+		{Number: 1, Status: legacyRepairStatus, BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
@@ -591,7 +601,7 @@ func TestEpic_RenderedStatus_ForkChildBlockedOnParentsOwnDone(t *testing.T) {
 // silently seed a child iteration.
 func TestEpic_RenderedStatus_ForkChildHeldByPausedParent(t *testing.T) {
 	parent := "01"
-	for _, pausedStatus := range []string{"needs-answer", "needs-repair"} {
+	for _, pausedStatus := range []string{legacyAnswerStatus, legacyRepairStatus} {
 		epic := Epic{Tickets: []Ticket{
 			{Number: 1, Identifier: "01", Status: pausedStatus},
 			{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
@@ -671,14 +681,14 @@ func TestEpic_CancelledBlockerResolvesAndEpicCompletes(t *testing.T) {
 
 func TestEpic_IsPaused(t *testing.T) {
 	cases := map[string]bool{
-		"paused":       true,
-		"needs-answer": true,
-		"needs-repair": true,
-		"draft":        true,
-		"bogus-value":  true, // renders as error
-		"open":         false,
-		"claimed":      false,
-		"done":         false,
+		"paused":           true,
+		legacyAnswerStatus: true,
+		legacyRepairStatus: true,
+		"draft":            true,
+		"bogus-value":      true, // renders as error
+		"open":             false,
+		"claimed":          false,
+		"done":             false,
 	}
 	for status, want := range cases {
 		epic := Epic{Tickets: []Ticket{{Number: 1, Status: status}}}

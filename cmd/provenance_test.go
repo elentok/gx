@@ -55,7 +55,7 @@ func TestTicketsSetJSON_IterationStatusFromAgent(t *testing.T) {
 func TestServerRepairJSON_ReportsServerVia(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out bytes.Buffer
-	if err := runServerRepair(context.Background(), cl, &out, true, "unpark", server.RepairRequest{Address: "p:e/01"},
+	if err := runServerRepair(context.Background(), cl, &out, true, "resume", server.RepairRequest{Address: "p:e/01"},
 		func(string, server.RepairRequest) (server.RepairResult, error) { return server.RepairResult{}, nil }); err != nil {
 		t.Fatalf("runServerRepair: %v", err)
 	}

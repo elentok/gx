@@ -255,14 +255,14 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported needs-answer via iteration_status")
+	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, path, events.SelfReported, "agent reported asking via iteration_status")
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n")
 	if !strings.Contains(all, summary) {
 		t.Errorf("chat lacks the question summary: %s", all)
 	}
-	if strings.Contains(all, "agent reported needs-answer") {
+	if strings.Contains(all, "agent reported asking") {
 		t.Errorf("generic reason leaked: %s", all)
 	}
 }

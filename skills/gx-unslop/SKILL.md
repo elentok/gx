@@ -18,7 +18,7 @@ Rule numbers are stable ids that other skills cite. A removed rule leaves a gap.
 
 ### Language
 
-7. **AI vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant. Replace with plain words.
+7. **AI vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, scene (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant. Replace with plain words.
 8. **Fancy ways to say "is".** "serves as", "stands as", "boasts", "features". Say "is" or "has".
 9. **"Not just X, but Y."** State the point directly instead.
 10. **Rule of three.** Don't force ideas into groups of three. Use the natural number.

@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // dupServer refuses every one-off as a live duplicate of gx:p/1, which its
@@ -101,7 +102,7 @@ func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
 }
 
 func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
-	cl := dupServer(t, "needs-answer")
+	cl := dupServer(t, string(schema.StatusLegacyAnswer))
 	var out, errOut bytes.Buffer
 	err := runServerOneOff(context.Background(), cl, &out, &errOut, false, true, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
@@ -137,7 +138,7 @@ func TestServerOneOff_JSONDuplicateWithoutWaitExitsSeven(t *testing.T) {
 }
 
 func TestServerOneOff_JSONDuplicateWaitFollowsExistingTicket(t *testing.T) {
-	cl := dupServer(t, "needs-answer")
+	cl := dupServer(t, string(schema.StatusLegacyAnswer))
 	var out, errOut bytes.Buffer
 	err := runServerOneOff(context.Background(), cl, &out, &errOut, true, true, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError

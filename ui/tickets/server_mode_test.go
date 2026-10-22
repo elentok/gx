@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentlog"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/notify"
@@ -146,6 +147,16 @@ func withRenderedStatus(snap server.Snapshot) server.Snapshot {
 
 func applySnapshot(st viewmodel.State, snap server.Snapshot) viewmodel.State {
 	return st.ApplySnapshot(withRenderedStatus(snap))
+}
+
+// pausedAnswerInfo and pausedRepairInfo are server tickets paused for each
+// class: status paused, rendered as the class's word.
+func pausedAnswerInfo(address, title string) server.TicketInfo {
+	return server.TicketInfo{Address: address, Title: title, Status: "paused", RenderedStatus: gxtickets.StatusPausedAnswer.Word()}
+}
+
+func pausedRepairInfo(address, title string) server.TicketInfo {
+	return server.TicketInfo{Address: address, Title: title, Status: "paused", RenderedStatus: gxtickets.StatusPausedRepair.Word()}
 }
 
 func newServerModel(t *testing.T) Model {
@@ -357,7 +368,9 @@ func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
 	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/02", Title: "Second", Status: "needs-repair"},
+		// The wire carries no pause reason, so only the retired repair status
+		// tells the client this pause is a repair.
+		{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: gxtickets.StatusPausedRepair.Word()},
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = selectTicketRow(t, updated.(Model))
@@ -438,7 +451,7 @@ func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
 	m := newServerModel(t).WithServer(api)
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "needs-answer"},
+		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
 	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	return pressMenuKey(t, selectTicketRow(t, updated.(Model)))
@@ -456,7 +469,7 @@ func pressMenuKey(t *testing.T, m Model) Model {
 }
 
 func TestServerMode_MenuKeyOpensOnEveryStatus(t *testing.T) {
-	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "needs-repair"} {
+	for _, status := range []string{"open", "claimed", "done", "blocked", "draft", "paused"} {
 		m := newServerModel(t).WithServer(fakeServerAPI{})
 		m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 			{Address: "gx:alpha/01", Title: "First", Status: status},

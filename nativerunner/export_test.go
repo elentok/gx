@@ -42,7 +42,7 @@ var (
 )
 
 // SetHolderAfterExit runs fn in a holder started by the test once its child
-// has exited, before the holder drains and closes holder.sock.
+// has exited, before the holder winds down and closes holder.sock.
 func SetHolderAfterExit(t *testing.T, fn func()) {
 	old := holderAfterExit
 	holderAfterExit = fn

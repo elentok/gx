@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -117,7 +118,7 @@ func TestWaitIterationFinished_NudgesIdleAgentWithNoReportOnce(t *testing.T) {
 
 func TestWaitIterationFinished_NoNudgeWhileQuestionOpenOrFinished(t *testing.T) {
 	t.Parallel()
-	for _, status := range []string{"needs-answer", "finished"} {
+	for _, status := range []string{string(schema.IterationStatusAsking), "finished"} {
 		t.Run(status, func(t *testing.T) {
 			t.Parallel()
 			d, r, one, sleeps := stallNudgeFixture(t, status, 2*time.Minute)

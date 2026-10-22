@@ -10,7 +10,7 @@ describe("Chip", () => {
   });
 
   it("defaults to muted", () => {
-    const { getByText } = renderThemed(<Chip>Draining</Chip>);
-    expect(getByText("Draining").getAttribute("data-tone")).toBe("muted");
+    const { getByText } = renderThemed(<Chip>Stopping</Chip>);
+    expect(getByText("Stopping").getAttribute("data-tone")).toBe("muted");
   });
 });

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets"
 )
 
 func TestReads_HistoryLocksAndProjects(t *testing.T) {
@@ -66,7 +67,7 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "03", "dangling", "99")
 	issues := filepath.Join(store, "proj", "epic-a", "issues")
-	for name, status := range map[string]string{"04-draft.md": "draft", "05-asking.md": "needs-answer"} {
+	for name, status := range map[string]string{"04-draft.md": "draft", "05-asking.md": "paused\npause_reason: zero-commit"} {
 		body := "---\nid: \"" + name[:2] + "\"\nstatus: " + status + "\ntype: implement\n---\n\n# x\n"
 		if err := os.WriteFile(filepath.Join(issues, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -79,7 +80,7 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 		"02": {"blocked", "01"},
 		"03": {"error", ""},
 		"04": {"stalled", "draft"},
-		"05": {"stalled", "needs-answer"},
+		"05": {"stalled", tickets.StatusPausedAnswer.Word()},
 	}
 	for id, w := range want {
 		ex, err := h.Client.Explain(context.Background(), "proj:epic-a/"+id)
@@ -220,7 +221,7 @@ func TestSnapshot_CarriesMutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	with := strings.Replace(string(raw), "status: open", "status: needs-repair\nmutes:\n  - event_type: notification-storm\n    tripped_at: 2026-10-11T09:30:00Z", 1)
+	with := strings.Replace(string(raw), "status: open", "status: paused\npause_reason: merge-conflict\nmutes:\n  - event_type: notification-storm\n    tripped_at: 2026-10-11T09:30:00Z", 1)
 	if err := os.WriteFile(path, []byte(with), 0o644); err != nil {
 		t.Fatal(err)
 	}

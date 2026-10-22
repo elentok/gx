@@ -15,7 +15,7 @@ func TestStartOver_PausedTicketReturnsToFreshOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, `---
 id: "05"
-status: needs-answer
+status: paused
 blocked_by: ["03"]
 type: implement
 expected_context_window: 25000
@@ -25,15 +25,15 @@ actual_cost: 1.5
 compactions: 2
 session_ids: [abc, def]
 commitless: true
-iteration_status: needs-answer
-park_kind: self-reported
+iteration_status: asking
+pause_reason: self-reported
 ---
 
 # 05 — Thing
 
 Human prose.
 
-## Needs Answer
+`+LegacyAnswerHeading+`
 
 Which db?
 
@@ -67,10 +67,10 @@ Earlier note.
 	}
 
 	body := schema.ParseBody(string(raw))
-	if strings.Contains(body, "\n## Needs Answer") {
-		t.Errorf("Needs Answer section not retired:\n%s", body)
+	if strings.Contains(body, "\n"+LegacyAnswerHeading) {
+		t.Errorf("legacy answer section not retired:\n%s", body)
 	}
-	for _, s := range []string{"# 05 — Thing", "Human prose.", "Earlier note.", "retired from `## Needs Answer`", "Which db?"} {
+	for _, s := range []string{"# 05 — Thing", "Human prose.", "Earlier note.", "retired from `" + LegacyAnswerHeading + "`", "Which db?"} {
 		if !strings.Contains(body, s) {
 			t.Errorf("body lost %q:\n%s", s, body)
 		}
@@ -79,7 +79,7 @@ Earlier note.
 
 func TestStartOver_RetiresOldRepairSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-repair\ntype: implement\n---\n\n## Needs Repair\n\nBroke.\n")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: merge-conflict\ntype: implement\n---\n\n"+LegacyRepairHeading+"\n\nBroke.\n")
 
 	if err := StartOver(path, time.Now(), ""); err != nil {
 		t.Fatalf("StartOver: %v", err)
@@ -87,7 +87,7 @@ func TestStartOver_RetiresOldRepairSection(t *testing.T) {
 
 	raw, _ := os.ReadFile(path)
 	body := schema.ParseBody(string(raw))
-	if strings.Contains(body, "\n## Needs Repair") || !strings.Contains(body, "Broke.") {
+	if strings.Contains(body, "\n"+LegacyRepairHeading) || !strings.Contains(body, "Broke.") {
 		t.Fatalf("unexpected body:\n%s", body)
 	}
 }
@@ -108,7 +108,7 @@ func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 
 func TestStartOver_ClosesOpenQuestion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
-	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-answer\ntype: implement\n---\n\n# 05 — Thing\n")
+	writeFile(t, path, "---\nid: \"05\"\nstatus: paused\npause_reason: self-reported\ntype: implement\n---\n\n# 05 — Thing\n")
 	q, err := AppendLog(path, LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
 	if err != nil {
 		t.Fatal(err)

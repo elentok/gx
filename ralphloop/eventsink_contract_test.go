@@ -111,7 +111,7 @@ func TestChatMembershipVerdicts_FailsOnUnmappedMethod(t *testing.T) {
 // (reading scratchDir to render its message) to plausibly grow a write; this
 // snapshots every ticket file's content and mtime around a call and fails if
 // either changed — the shape any future non-notification state transition in
-// this codebase would take (see StampEpicCompleted/MarkNeedsRepair, the
+// this codebase would take (see StampEpicCompleted/the pause write, the
 // existing examples of ticket state persisted to disk).
 func TestEpicComplete_ChatSinkIsNotificationOnly(t *testing.T) {
 	t.Parallel()

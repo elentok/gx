@@ -179,7 +179,7 @@ func TestPty_DenyReasonFallbackOnOlderHolder(t *testing.T) {
 }
 
 // A deny that never reaches idle leaves the session died, so the loop's next
-// Wait parks the ticket needs-repair.
+// Wait pauses the ticket for a repair.
 func TestPty_DenyReasonIdleTimeoutIsSessionDied(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -403,7 +403,7 @@ func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
 	}
 }
 
-// The holder's status reports the exit while it drains, before exit-code is
+// The holder's status reports the exit while it winds down, before exit-code is
 // on disk.
 func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
 	p := &nativerunner.Pty{Root: t.TempDir()}
@@ -486,7 +486,7 @@ func TestPty_CleanupRemovesStaleHolderSock(t *testing.T) {
 	}
 }
 
-// An upgrade must never park a live pty run: a holder that predates the
+// An upgrade must never pause a live pty run: a holder that predates the
 // version field and every optional op is still adopted.
 func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
 	p, dir := preparePtyAgent(t, ptyAgentProcs())

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -24,7 +25,7 @@ func queueWithTicket(t *testing.T, m QueueModel, reason schema.PauseReason, mute
 func writeTicketFile(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "01-first.md")
-	body := "---\nid: \"01\"\ntitle: First\nstatus: paused\npause_reason: blocked-pane\n---\n\n# A\n\n## Needs Answer\n\nWhich approach?\n"
+	body := "---\nid: \"01\"\ntitle: First\nstatus: paused\npause_reason: blocked-pane\n---\n\n# A\n\n" + tickets.LegacyAnswerHeading + "\n\nWhich approach?\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}

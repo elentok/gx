@@ -70,7 +70,7 @@ func ticketPath(scratchDir, epicName, file string) string {
 func TestRun_StalledTicket_PausesInsteadOfExiting(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
 	// The pause has no timeout: only the scripted clearing hand ends it.
@@ -84,7 +84,7 @@ func TestRun_StalledTicket_PausesInsteadOfExiting(t *testing.T) {
 	}
 
 	if *polls == 0 {
-		t.Errorf("run never paused (no pause poll), want it to pause on the needs-answer ticket")
+		t.Errorf("run never paused (no pause poll), want it to pause on the paused ticket")
 	}
 	if len(sink.pausedStalled) != 1 || len(sink.pausedStalled[0]) != 1 || sink.pausedStalled[0][0].Identifier != "01" {
 		t.Errorf("EpicPaused calls = %v, want one naming ticket 01", sink.pausedStalled)
@@ -95,7 +95,7 @@ func TestRun_StalledTicket_PausesInsteadOfExiting(t *testing.T) {
 }
 
 // TestRun_DraftOnlyEpic_Pauses covers the other human-clearable status:
-// draft. Unlike paused (answer)/paused (repair), IsParked matches it off
+// draft. Unlike paused (answer)/paused (repair), IsPaused matches it off
 // the raw frontmatter Status: rather than RenderedStatus, so this proves a
 // draft ticket pauses rather than deadlocking.
 func TestRun_DraftOnlyEpic_Pauses(t *testing.T) {
@@ -295,7 +295,7 @@ func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 func TestRun_StaysPaused_NeverReportsEpicComplete(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
 	})
 	d, _, _ := fakeDeps()
 	polled := make(chan struct{})
@@ -318,13 +318,13 @@ func TestRun_StaysPaused_NeverReportsEpicComplete(t *testing.T) {
 	select {
 	case <-polled:
 	case err := <-done:
-		t.Fatalf("Run() returned %v before pausing, want it to pause on the needs-answer ticket", err)
+		t.Fatalf("Run() returned %v before pausing, want it to pause on the paused ticket", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("run never paused")
 	}
 	select {
 	case err := <-done:
-		t.Fatalf("Run() returned %v while its only ticket was still needs-answer, want it to stay paused", err)
+		t.Fatalf("Run() returned %v while its only ticket was still paused, want it to stay paused", err)
 	case <-time.After(100 * time.Millisecond):
 	}
 
@@ -342,7 +342,7 @@ func TestRun_StaysPaused_NeverReportsEpicComplete(t *testing.T) {
 	}
 }
 
-// TestRun_EpicPaused_ZeroCommitParkReportsNotReattachable covers the third
+// TestRun_EpicPaused_ZeroCommitPauseReportsNotReattachable covers the third
 // of the ticket's three call sites: EpicPaused's Reattachable flag (surfaced
 // in Telegram notifications) must not claim a zero-commit pause is
 // reattachable when gx will never auto-reattach it. Before this predicate
@@ -373,7 +373,7 @@ func TestRun_EpicPaused_ZeroCommitPauseReportsNotReattachable(t *testing.T) {
 	}
 }
 
-// TestGate_WakePaused_ShortensParkWait proves the cosmetic-wake mechanism
+// TestGate_WakePaused_ShortensPauseWait proves the cosmetic-wake mechanism
 // loop.go's pause branch relies on: WakePaused cuts a pause wait short instead
 // of it running out a long pause-poll-interval wait.
 func TestGate_WakePaused_ShortensPauseWait(t *testing.T) {
@@ -425,7 +425,7 @@ func deadlockedKinds(t *testing.T, scratchDir, epicName string) []string {
 func TestRun_Pause_EmitsDeadlockedOncePerEntry(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
 	})
 	d, _, _ := fakeDeps()
 	path := ticketPath(scratchDir, "my-epic", "01-stuck.md")

@@ -140,7 +140,7 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "needs-answer") {
+	if rawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket was paused despite recoverable context exhaustion:\n%s", raw)
 	}
 }
@@ -272,8 +272,8 @@ func TestWaitForFinish_CodexContextBreachRecovers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "needs-repair") {
-		t.Errorf("ticket status = %s, a recovered breach must not become needs-repair", raw)
+	if rawIsPaused(t, string(raw), "") {
+		t.Errorf("ticket status = %s, a recovered breach must not become paused", raw)
 	}
 	if gate.isPaused() {
 		t.Error("gate.isPaused() = true, want smart-zone recovery to never pause the Gate")
@@ -1294,8 +1294,8 @@ func TestWaitForFinish_BlockedPaneDwellsThenPauses(t *testing.T) {
 				t.Fatalf("ParseTicketFromRaw: %v", err)
 			}
 			assertPaused(t, ticket, schema.PauseClassAnswer, schema.PauseBlockedPane)
-			if body := schema.ParseBody(string(raw)); strings.Contains(body, "## Needs Answer") {
-				t.Errorf("body carries a Needs Answer section:\n%s", body)
+			if body := schema.ParseBody(string(raw)); strings.Contains(body, schema.PausedHeading) {
+				t.Errorf("body carries a Paused section:\n%s", body)
 			}
 			if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "iter-01") {
 				t.Errorf("open question summary %q does not name the iteration label iter-01", got)
@@ -1307,7 +1307,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenPauses(t *testing.T) {
 			}
 			last := events[len(events)-1]
 			if last.Type != string(eventsc.Paused) || !strings.Contains(last.Reason, "iter-01") {
-				t.Errorf("pause event = %+v, want type needs-answer with reason naming iter-01", last)
+				t.Errorf("pause event = %+v, want type paused with reason naming iter-01", last)
 			}
 			// Seam B: exactly one pause event, kind matching the frontmatter pause_kind.
 			var pauses int
@@ -1317,7 +1317,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenPauses(t *testing.T) {
 				}
 			}
 			if pauses != 1 || last.Kind != ticket.PauseReason.LegacyKind() || last.Kind != "blocked-pane" || last.Pane != "pane-1" {
-				t.Errorf("pauses = %d, last = %+v, want one blocked-pane event matching park_kind with pane context", pauses, last)
+				t.Errorf("pauses = %d, last = %+v, want one blocked-pane event matching the pause kind with pane context", pauses, last)
 			}
 		})
 	}
@@ -1348,7 +1348,7 @@ func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPause(t *testi
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "needs-answer") {
+	if rawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket was paused despite the pane clearing before the dwell recheck:\n%s", raw)
 	}
 }
@@ -1435,7 +1435,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "needs-answer") {
+	if rawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket was paused off a pane blocked by gx's own smart-zone recovery:\n%s", raw)
 	}
 }
@@ -1550,8 +1550,8 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	if readErr != nil {
 		t.Fatalf("ReadFile: %v", readErr)
 	}
-	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
-		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
+	if !strings.Contains(string(raw), "claimed") || rawIsPaused(t, string(raw), "") {
+		t.Errorf("ticket status = %s, want claimed without a pause", raw)
 	}
 }
 
@@ -1583,8 +1583,8 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeRepairWhenPaneIdlesAfterReset(t *t
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "claimed") || strings.Contains(string(raw), "needs-repair") {
-		t.Errorf("ticket status = %s, want claimed without needs-repair", raw)
+	if !strings.Contains(string(raw), "claimed") || rawIsPaused(t, string(raw), "") {
+		t.Errorf("ticket status = %s, want claimed without a pause", raw)
 	}
 }
 

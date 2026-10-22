@@ -772,7 +772,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 		t.Error("missing smart-zone-recovery-failed event for a pane blocked at /compact submission")
 	}
 	if sawRepair {
-		t.Error("needs-repair event emitted, want none: a single gated give-up must not abort the run")
+		t.Error("paused (repair) event emitted, want none: a single gated give-up must not abort the run")
 	}
 	if sawResumed {
 		t.Error("resumed event emitted, want none: nothing recovered")

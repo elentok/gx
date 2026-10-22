@@ -157,10 +157,10 @@ func TestConfigReloadChat_ProjectSinkKeepsItsBatch(t *testing.T) {
 	s, path := reloadChatServer(t, oldHook.URL, time.Hour)
 	override := &ralphloop.ServerChatConfig{SlackWebhookURL: projectHook.URL}
 
-	s.chat.Pause("proj", override, "epic", "/t/01.md", "01", "needs-answer", "zero-commit", "before-reload", ralphloop.EpicCounts{})
+	s.chat.Pause("proj", override, "epic", "/t/01.md", "01", "paused", "zero-commit", "before-reload", ralphloop.EpicCounts{})
 	writeChatConfig(t, s, path, newHook.URL, 3)
 	s.reloadConfig(reloadTriggerCommand)
-	s.chat.Pause("proj", override, "epic", "/t/02.md", "02", "needs-answer", "zero-commit", "after-reload", ralphloop.EpicCounts{})
+	s.chat.Pause("proj", override, "epic", "/t/02.md", "02", "paused", "zero-commit", "after-reload", ralphloop.EpicCounts{})
 	s.chat.Close()
 	if got := projectHook.sent(); len(got) != 1 || !strings.Contains(got[0], "before-reload") || !strings.Contains(got[0], "after-reload") {
 		t.Errorf("project sent %v, want one batch with both pauses", got)

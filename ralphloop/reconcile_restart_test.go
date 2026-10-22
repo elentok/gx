@@ -140,7 +140,7 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 func TestRun_RestartWithRepairTicketAndLiveResolver_ReattachesWithoutReforking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md":                    "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
+		"01-a.md":                    "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# A\n",
 		"01a-conflict-resolution.md": "---\nid: \"01a\"\nstatus: claimed\ntype: conflict-resolution\nparent: \"01\"\n---\n# Conflict resolution for 01\n",
 	})
 	d, _, _ := fakeDeps()
