@@ -1,4 +1,4 @@
-import { act, screen } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 import canned from "../canned-snapshot.json";
@@ -47,6 +47,36 @@ describe("QueueScreen", () => {
     expect(screen.getByText("Merging")).toBeTruthy();
     expect(screen.getByText("Merge agent").closest("[data-tone]")?.querySelector("[role=img]")).not.toBeNull();
     expect(container.querySelectorAll("[data-live]")).toHaveLength(1);
+  });
+
+  it("shows Merge on a Merge blocked card only, posts it, and re-reads after", async () => {
+    const base = snap.epics[0];
+    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "merge-blocked", active: [], parked: [] };
+    const awaiting = { ...base, address: "gx:awaiting", name: "awaiting-epic", state: "awaiting-merge", active: [], parked: [] };
+    const epics = [blocked, awaiting] as unknown as Snapshot["epics"];
+    const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ merge_ticket: "gx:blocked/09" })));
+    vi.stubGlobal("fetch", post);
+    const onChanged = vi.fn();
+    renderThemed(<QueueScreen state={state({ snapshot: { ...snap, epics } })} onChanged={onChanged} />);
+    const buttons = screen.getAllByRole("button", { name: "Merge" });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]!);
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(post.mock.calls[0]![0]).toBe("/v1/epics/merge");
+    expect(JSON.parse(post.mock.calls[0]![1].body as string)).toEqual({ address: "gx:blocked", state: "merge-blocked" });
+    vi.unstubAllGlobals();
+  });
+
+  it("shows a Merge refusal inline on the card and does not re-read", async () => {
+    const base = snap.epics[0];
+    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "merge-blocked", active: [], parked: [] };
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })));
+    const onChanged = vi.fn();
+    renderThemed(<QueueScreen state={state({ snapshot: { ...snap, epics: [blocked] as unknown as Snapshot["epics"] } })} onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("the epic changed");
+    expect(onChanged).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("shows the server build in the header, and nothing when the server sends none", () => {

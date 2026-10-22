@@ -9,13 +9,18 @@ export type QueueAddResult = { refused?: false } | { refused: true; reason: stri
 export type PostQueueAdd = (body: QueueAddBody) => Promise<QueueAddResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
-export const postQueueAdd: PostQueueAdd = async (body) => {
-  const res = await fetch("/v1/queue/add", {
+async function postEpicWrite(path: string, body: QueueAddBody): Promise<QueueAddResult> {
+  const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const result = await res.json().catch(() => null);
   if (res.ok && result) return result;
-  throw new Error(`queue add: HTTP ${res.status}`);
-};
+  throw new Error(`HTTP ${res.status}`);
+}
+
+export const postQueueAdd: PostQueueAdd = (body) => postEpicWrite("/v1/queue/add", body);
+
+/** The merge route takes the same address and state token as a queue add. */
+export const postEpicMerge: PostQueueAdd = (body) => postEpicWrite("/v1/epics/merge", body);

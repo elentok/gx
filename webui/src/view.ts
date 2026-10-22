@@ -19,6 +19,8 @@ export interface EpicView {
   address: string;
   name: string;
   project: string;
+  /** The server's state token, which a write sends back so the server can refuse a stale view. */
+  state: EpicState;
   tone: Tone;
   badge: string;
   live: boolean;
@@ -106,6 +108,7 @@ export function epicView(epic: EpicSummary, mode?: QueueMode, queue: string[] = 
     address: epic.address,
     name: epic.name,
     project: epic.project,
+    state: epic.state,
     tone: STATES[epic.state].tone,
     badge: epicBadge(epic.state, mode),
     live: epic.state === "running" || epic.state === "merging",

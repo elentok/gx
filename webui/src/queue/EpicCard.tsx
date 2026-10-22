@@ -1,12 +1,13 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import type { EpicView } from "../view";
+import { MergeButton } from "../epics/MergeButton";
 import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Card } from "../ui/card/Card";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 
-export function EpicCard({ epic }: { epic: EpicView }) {
+export function EpicCard({ epic, onMerged }: { epic: EpicView; onMerged: () => void }) {
   return (
     <Card tone={epic.tone} live={epic.live}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb="1">
@@ -51,6 +52,11 @@ export function EpicCard({ epic }: { epic: EpicView }) {
         <Text data-reason fontSize="sm" color="tone.deadlocked.fg" lineClamp="2">
           {epic.reason}
         </Text>
+      )}
+      {epic.state === "merge-blocked" && (
+        <Box mt="2" display="flex" alignItems="center" gap="2">
+          <MergeButton address={epic.address} state={epic.state} onMerged={onMerged} />
+        </Box>
       )}
     </Card>
   );

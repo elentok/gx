@@ -8,7 +8,7 @@ import { snapshotView } from "../view";
 import { EpicCard } from "./EpicCard";
 import { RecentlyFinishedRow } from "./RecentlyFinishedRow";
 
-export function QueueScreen({ state }: { state: ConnectionState }) {
+export function QueueScreen({ state, onChanged = () => {} }: { state: ConnectionState; onChanged?: () => void }) {
   const { snapshot, connected, loadedOnce } = state;
   // state.tick is not read: a new render per tick is what refreshes the relative times.
   const view = snapshot ? snapshotView(snapshot, new Date()) : null;
@@ -22,7 +22,7 @@ export function QueueScreen({ state }: { state: ConnectionState }) {
         {view && (
           <Box display="flex" flexDirection="column" gap="3">
             {view.epics.map((e) => (
-              <EpicCard key={e.address} epic={e} />
+              <EpicCard key={e.address} epic={e} onMerged={onChanged} />
             ))}
           </Box>
         )}

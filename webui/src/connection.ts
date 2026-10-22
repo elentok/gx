@@ -222,6 +222,10 @@ export function createConnection(deps: ConnectionDeps = {}) {
       eventListeners.add(l);
       return () => eventListeners.delete(l);
     },
+    /** Re-reads the snapshot now, for a write whose event has not arrived yet. */
+    refresh() {
+      void refresh(gen);
+    },
     start() {
       document.addEventListener("visibilitychange", onVisibility);
       window.addEventListener("online", onOnline);

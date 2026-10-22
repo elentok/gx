@@ -491,3 +491,52 @@ test("the epic page Queue posts, then refetches; a refusal shows inline", async 
   expect((await screen.findByRole("alert")).textContent).toBe("already in the queue");
   vi.unstubAllGlobals();
 });
+
+test("the epic page shows Merge only for Awaiting merge and Merge blocked", async () => {
+  for (const state of ["awaiting-merge", "merge-blocked"] as const) {
+    renderAt("/e/gx:e", okFor, undefined, epicFetch({ state }));
+    expect(await screen.findByRole("button", { name: "Merge" })).toBeTruthy();
+    cleanup();
+  }
+  for (const state of ["running", "merging", "finished", "waiting", undefined] as const) {
+    renderAt("/e/gx:e", okFor, undefined, epicFetch({ state }));
+    await screen.findByRole("heading", { name: "e" });
+    expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
+    cleanup();
+  }
+});
+
+test("the epic page Merge posts the shown state, is disabled while pending, then refetches", async () => {
+  let answer!: (r: Response) => void;
+  const post = vi.fn(async (_url: string, _init: RequestInit) => new Promise<Response>((r) => (answer = r)));
+  vi.stubGlobal("fetch", post);
+  let fetched = 0;
+  renderAt("/e/gx:e", okFor, undefined, async () => {
+    fetched++;
+    return { kind: "ok", detail: epicOf({ state: fetched === 1 ? "awaiting-merge" : "merging" }) };
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Merge" }));
+  const pending = await screen.findByRole("button", { name: "Merging…" });
+  expect((pending as HTMLButtonElement).disabled).toBe(true);
+  expect(post.mock.calls[0]![0]).toBe("/v1/epics/merge");
+  expect(JSON.parse(post.mock.calls[0]![1].body as string)).toEqual({ address: "gx:e", state: "awaiting-merge" });
+  await act(async () => answer(new Response(JSON.stringify({ merge_ticket: "gx:e/09" }))));
+  await waitFor(() => expect(screen.queryByRole("button", { name: /Merg/ })).toBeNull());
+  expect(fetched).toBe(2);
+  vi.unstubAllGlobals();
+});
+
+test("the epic page Merge shows a refusal and an HTTP error inline", async () => {
+  const post = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })),
+  );
+  vi.stubGlobal("fetch", post);
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merge-blocked" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Merge" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("the epic changed");
+  post.mockImplementation(async () => new Response("boom", { status: 500 }));
+  fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Merge failed: HTTP 500"));
+  vi.unstubAllGlobals();
+});

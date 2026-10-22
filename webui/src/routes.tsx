@@ -9,7 +9,8 @@ import type { FetchDetail } from "./ticket/detail";
 import { TicketPage } from "./ticket/TicketPage";
 
 function QueueRoute() {
-  return <QueueScreen state={useConnectionState(useConnectionContext())} />;
+  const conn = useConnectionContext();
+  return <QueueScreen state={useConnectionState(conn)} onChanged={conn.refresh} />;
 }
 
 function TicketRoute({ fetchDetail }: { fetchDetail?: FetchDetail }) {
