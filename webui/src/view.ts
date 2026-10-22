@@ -74,8 +74,11 @@ export const REPAIR_HINT = "Fix it in the TUI";
 
 function pausedLine(t: SummaryTicket, queue: string[]): TicketLineView {
   const base = { address: t.address, id: shortId(t.address), title: t.title };
+  // The server sends the label for every pause reason; the raw reason text is
+  // only the fallback for a ticket the server could not label.
+  const label = t.reason_label || t.reason;
   if (t.status === "needs-repair") {
-    return { ...base, tone: "paused", detail: t.reason, hint: REPAIR_HINT };
+    return { ...base, tone: "paused", detail: label, hint: REPAIR_HINT };
   }
   if (t.answered) {
     // The agent is gone; the ticket is in the queue for a slot.
@@ -85,7 +88,7 @@ function pausedLine(t: SummaryTicket, queue: string[]): TicketLineView {
   if (t.answerable) {
     return { ...base, tone: "paused", detail: t.summary ?? t.reason, href: `#/t/${t.address}` };
   }
-  return { ...base, tone: "paused", detail: t.reason };
+  return { ...base, tone: "paused", detail: label };
 }
 
 function activeLine(t: SummaryTicket): TicketLineView {

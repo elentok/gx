@@ -25,6 +25,8 @@ test("shows nothing unless the detail lists resume", () => {
 test.each([
   ["manual", "Resume"],
   ["ambiguous-base", "Choose base"],
+  ["merge-conflict", "Resolve conflict"],
+  ["stranded-commits", "Merge commits"],
   ["zero-commit", "Retry"],
   ["iteration-error", "Retry"],
   ["self-reported", "Retry"],

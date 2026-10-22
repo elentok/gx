@@ -7,18 +7,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// pauseReasonLabels are the plain-words reasons shown beside "Paused". A
-// reason missing here falls back to its own spelling in words.
-var pauseReasonLabels = map[schema.PauseReason]string{
-	schema.PauseSelfReported:    "Waiting for your answer",
-	schema.PauseAmbiguousBase:   "Ambiguous base",
-	schema.PauseMergeConflict:   "Merge conflict",
-	schema.PauseStrandedCommits: "Stranded commits",
-	schema.PauseManual:          "Paused by you",
-}
-
+// pauseReasonLabel is the plain-words reason shown beside "Paused". A reason
+// the schema has no label for (a stale value) falls back to its own spelling.
 func pauseReasonLabel(reason schema.PauseReason) string {
-	if label, ok := pauseReasonLabels[reason]; ok {
+	if label := reason.Label(); label != "" {
 		return label
 	}
 	words := strings.ReplaceAll(strings.ReplaceAll(string(reason), "-", " "), "_", " ")

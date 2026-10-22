@@ -5,13 +5,21 @@ import { ReasonStale } from "./answer";
 import { postResume, resumeWords, type PostResume } from "./resume";
 
 const REASON_MANUAL = "manual";
-const REASON_AMBIGUOUS_BASE = "ambiguous-base";
 
 /** The action's name by pause reason: Resume lifts only a pause the person chose. */
 export function resumeLabel(reason: string | undefined): string {
-  if (reason === REASON_AMBIGUOUS_BASE) return "Choose base";
-  if (reason === REASON_MANUAL) return "Resume";
-  return "Retry";
+  switch (reason) {
+    case "ambiguous-base":
+      return "Choose base";
+    case "merge-conflict":
+      return "Resolve conflict";
+    case "stranded-commits":
+      return "Merge commits";
+    case REASON_MANUAL:
+      return "Resume";
+    default:
+      return "Retry";
+  }
 }
 
 // The resume area. The server decides whether it shows (the detail's actions); an

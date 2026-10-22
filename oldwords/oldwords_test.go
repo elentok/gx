@@ -92,6 +92,7 @@ var allowed = map[string]string{
 	"webui/src/canned-snapshot.json":       "fixture of the kept parked wire field and legacy rendered statuses",
 	"webui/src/canned-snapshot.test.ts":    "reads the kept parked wire field",
 	"webui/src/queue/QueueScreen.test.tsx": "builds the kept parked wire field",
+	"webui/src/view.test.ts":               "builds the kept parked wire field",
 	"webui/src/routes.test.tsx":            "uses the kept legacy rendered statuses and needs_answer field",
 	"server/epicsummary_test.go":           "summary reads only the legacy Needs headings",
 	"server/ticketwrites_test.go":          "unmute demotes only the legacy Needs Repair heading",

@@ -375,6 +375,10 @@ export interface SummaryTicket {
   recovery?: string;
   reason?: string;
   /**
+   * ReasonLabel is the plain-words label of the ticket's pause reason.
+   */
+  reason_label?: string;
+  /**
    * Summary is the open question's summary line, or the pause reason without one.
    */
   summary?: string;

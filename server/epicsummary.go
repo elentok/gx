@@ -39,6 +39,8 @@ type SummaryTicket struct {
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
 	Recovery  string    `json:"recovery,omitempty"`
 	Reason    string    `json:"reason,omitempty"`
+	// ReasonLabel is the plain-words label of the ticket's pause reason.
+	ReasonLabel string `json:"reason_label,omitempty"`
 	// Summary is the open question's summary line, or the pause reason without one.
 	Summary string `json:"summary,omitempty"`
 	// Answerable is set when a person's reply can go to the open question.
@@ -154,6 +156,7 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		switch {
 		case isPaused(e, t):
 			info.Recovery, info.Reason = recoveryOf(addr), tickets.PauseDetail(e, t)
+			info.ReasonLabel = t.PauseReason.Label()
 			open := tickets.OpenQuestion(logOf(t))
 			info.Summary = info.Reason
 			if open != nil {

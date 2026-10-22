@@ -76,6 +76,44 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseManual:             PauseClassRepair,
 }
 
+// pauseLabels is the one table of plain-words labels the TUI and the web show
+// for each reason, grouped as the spec groups them.
+var pauseLabels = map[PauseReason]string{
+	// Waiting for a person.
+	PauseSelfReported:  "Waiting for your answer",
+	PauseAmbiguousBase: "Ambiguous base",
+	// Agent stopped or stuck.
+	PauseZeroCommit:         "Agent stopped without a result",
+	PauseMergeUnreported:    "Merge agent stopped without a result",
+	PauseBlockedPane:        "Agent stuck",
+	PauseSpinning:           "Agent looping",
+	PauseRetryExhausted:     "Retries used up",
+	PauseHandleMismatch:     "Session mismatch",
+	PauseDuplicateLive:      "Already running",
+	PauseAgentNameTaken:     "Could not start the agent",
+	PauseAgentPaneBusy:      "Could not start the agent",
+	PauseAgentPromptStalled: "Could not start the agent",
+	// Background task.
+	PauseBackgroundTaskGate: "Background task still running",
+	// Merging.
+	PauseMergeConflict:   "Merge conflict",
+	PauseAmbiguousMerge:  "Unclear what to merge",
+	PauseDirtyTrunk:      "Trunk has local changes",
+	PauseTrunkMissing:    "Trunk not found",
+	PauseStrandedCommits: "Stranded commits",
+	PauseMergeError:      "Merge failed",
+	// Ticket graph.
+	PauseBlockedCycle: "Dependency loop",
+	PauseParentDefect: "Parent ticket missing or wrong",
+	// Limits and other.
+	PauseBudgetKilled:   "Daily budget reached",
+	PauseIterationError: "Run failed",
+	PauseManual:         "Paused by you",
+}
+
+// Label is r's plain-words label, or "" for an empty or unknown reason.
+func (r PauseReason) Label() string { return pauseLabels[r] }
+
 // Valid reports whether r is a known reason or the empty "absent" value.
 func (r PauseReason) Valid() bool {
 	if r == "" {

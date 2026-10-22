@@ -66,6 +66,20 @@ describe("snapshotView", () => {
     expect(row.href).toBeUndefined();
   });
 
+  it("shows the server's reason label instead of the raw reason text", () => {
+    const epic = byName("run");
+    const labelled = {
+      ...snap.epics.find((e) => e.name === "run")!,
+      parked: epic.tickets.slice(1).map((t) => ({
+        ...snap.epics.find((e) => e.name === "run")!.parked[0]!,
+        address: t.address,
+        reason: "raw text",
+        reason_label: "Merge conflict",
+      })),
+    };
+    expect(epicView(labelled).tickets.at(-1)).toMatchObject({ detail: "Merge conflict" });
+  });
+
   it("shows an answered row as amber with its queue position", () => {
     expect(byName("wait").tickets[1]).toMatchObject({ tone: "waiting", state: "Answered · #2 in queue" });
     expect(byName("wait").tickets[1].href).toBeUndefined();
