@@ -353,7 +353,7 @@ func agentReported(ticketPath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("reading ticket for stall check: %w", err)
 	}
-	return t.IterationStatus == schema.IterationStatusFinished || t.IterationStatus == schema.IterationStatusNeedsAnswer, nil
+	return t.IterationStatus == schema.IterationStatusFinished || t.IterationStatus == schema.IterationStatusAsking, nil
 }
 
 // landBuilt lands a built iteration that was waiting on the land queue.

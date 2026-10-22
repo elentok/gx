@@ -111,7 +111,7 @@ func TestStatus_Valid(t *testing.T) {
 }
 
 func TestIterationStatus_Valid(t *testing.T) {
-	for _, s := range []IterationStatus{"", IterationStatusWorking, IterationStatusNeedsAnswer, IterationStatusFinished} {
+	for _, s := range []IterationStatus{"", IterationStatusWorking, IterationStatusAsking, IterationStatusFinished} {
 		if !s.Valid() {
 			t.Errorf("IterationStatus(%q).Valid() = false, want true", s)
 		}

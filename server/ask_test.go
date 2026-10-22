@@ -55,8 +55,15 @@ func TestAsk_AppendsQuestionAndSetsIterationStatus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if tk.IterationStatus != schema.IterationStatusNeedsAnswer {
+			if tk.IterationStatus != schema.IterationStatusAsking {
 				t.Errorf("iteration_status = %q", tk.IterationStatus)
+			}
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(raw), "iteration_status: asking") {
+				t.Errorf("ticket file = %q, want iteration_status: asking written", raw)
 			}
 		})
 	}

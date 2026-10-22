@@ -18,7 +18,7 @@ const (
 const askAuthorAgent = "agent"
 
 // ticketAsk records an agent's question: it appends one park.question to the
-// ticket's log and sets iteration_status needs-answer. The body is validated
+// ticket's log and sets iteration_status asking. The body is validated
 // strictly first, and any refusal writes nothing. It returns at once; parking
 // the ticket is a later step.
 func (s *Server) ticketAsk(req QueueRequest) (QueueResult, error) {
@@ -51,7 +51,7 @@ func (s *Server) ticketAsk(req QueueRequest) (QueueResult, error) {
 			return QueueResult{}, fmt.Errorf("ask %s: %w", ref.addr, err)
 		}
 		err = schema.UpdateTicket(ref.ticket.Path, func(t *schema.Ticket) {
-			t.IterationStatus = schema.IterationStatusNeedsAnswer
+			t.IterationStatus = schema.IterationStatusAsking
 		})
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("ask %s: setting iteration_status: %w", ref.addr, err)

@@ -356,11 +356,11 @@ invisible by construction. `gx tickets ask` records the question in the ticket's
 web UI, the TUI and the CLI all read it.
 
 `ask` validates the body, appends one `park.question` to the ticket log, sets
-`iteration_status: needs-answer` and returns at once. It writes nothing and refuses with a reason
+`iteration_status: asking` and returns at once. It writes nothing and refuses with a reason
 when the body is invalid, the handoff is empty, the ticket is unknown, or an earlier question is
-still open. It works for every ticket type. Do not write `--iteration-status needs-answer` yourself
+still open. It works for every ticket type. Do not write `--iteration-status asking` yourself
 and do not put the question in a body section. `gx tickets set --status open` and
-`--iteration-status needs-answer` refuse when no matching open question exists, and name the verb to
+`--iteration-status asking` refuse when no matching open question exists, and name the verb to
 use.
 
 When the server is down, `ask` refuses with `server-not-running`. Retry `ask` after a minute and do not end your turn.

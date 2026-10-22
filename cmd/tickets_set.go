@@ -43,7 +43,7 @@ Settable fields:
     or it's still treated as an unresolved iteration.
 
 Agent-only settable fields:
-  iteration_status (enum, --iteration-status): working, needs-answer, finished. The
+  iteration_status (enum, --iteration-status): working, asking, finished. The
     agent's own self-report for the current claim, distinct from status. This report
     can only start a landing, never conclude one — gx's own commit count and
     cherry-pick decide whether the ticket actually lands. Never pair finished with
@@ -123,7 +123,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&ticketType, "type", "", "set the type field")
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
-	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, needs-answer, finished)")
+	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, asking, finished)")
 
 	// Declared only so a write attempt is refused with a clear message rather
 	// than cobra's generic unknown-flag error.
@@ -498,19 +498,19 @@ func lockEpicForParentWrite(path, parentID string) (unlock func(), err error) {
 func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
 	v, _ := c.Flags().GetString("iteration-status")
 	if !schema.IterationStatus(v).Valid() {
-		return fmt.Errorf("%s: --iteration-status %s is invalid; want working, needs-answer, or finished", path, v)
+		return fmt.Errorf("%s: --iteration-status %s is invalid; want working, asking, or finished", path, v)
 	}
 	return nil
 }
 
 // checkOpenQuestionGuard keeps `status: needs-answer` meaning "the latest
 // question is open": moving a parked ticket to open, or reporting
-// --iteration-status needs-answer, both need a question in the log, and
+// --iteration-status asking, both need a question in the log, and
 // the refusal names the verb that writes one (ask) or ends one (answer).
 func checkOpenQuestionGuard(c *cobra.Command, path string) error {
 	var verb string
 	if v, _ := c.Flags().GetString("iteration-status"); c.Flags().Changed("iteration-status") &&
-		schema.IterationStatus(v) == schema.IterationStatusNeedsAnswer {
+		schema.IterationStatus(v) == schema.IterationStatusAsking {
 		verb = "ask"
 	}
 	if v, _ := c.Flags().GetString("status"); c.Flags().Changed("status") && schema.Status(v) == schema.StatusOpen {

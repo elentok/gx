@@ -16,7 +16,7 @@ func newTicketsAskCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "ask <project:epic/NN>",
-		Short: "record a question on a ticket and flag it needs-answer",
+		Short: "record a question on a ticket and pause it as asking",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			text, err := readBodyArg(d, body)

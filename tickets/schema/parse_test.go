@@ -283,8 +283,27 @@ func TestParseTicket_RoundTrip_Mutes(t *testing.T) {
 	}
 }
 
+func TestParseTicket_LegacyNeedsAnswerIterationStatusReadsAsAsking(t *testing.T) {
+	path := writeTemp(t, "04b-legacy-iteration-status.md", "---\nid: \"04b\"\nstatus: claimed\ntype: implement\niteration_status: needs-answer\n---\nbody\n")
+
+	got, err := ParseTicket(path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if got.IterationStatus != IterationStatusAsking {
+		t.Fatalf("IterationStatus = %q, want %q", got.IterationStatus, IterationStatusAsking)
+	}
+	marshaled, err := MarshalTicket(got, "body\n")
+	if err != nil {
+		t.Fatalf("MarshalTicket: %v", err)
+	}
+	if strings.Contains(string(marshaled), "needs-answer") {
+		t.Errorf("marshaled ticket = %q, want the old value never written", string(marshaled))
+	}
+}
+
 func TestParseTicket_IterationStatusRoundTrip(t *testing.T) {
-	for _, status := range []IterationStatus{IterationStatusWorking, IterationStatusNeedsAnswer, IterationStatusFinished} {
+	for _, status := range []IterationStatus{IterationStatusWorking, IterationStatusAsking, IterationStatusFinished} {
 		t.Run(string(status), func(t *testing.T) {
 			content := "---\nid: \"04b\"\nstatus: claimed\ntype: implement\niteration_status: " + string(status) + "\n---\nbody\n"
 			path := writeTemp(t, "04b-iteration-status.md", content)

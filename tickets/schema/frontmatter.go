@@ -89,7 +89,7 @@ func (w ticketYAML) toTicket() Ticket {
 		Unique:                w.Unique,
 		Agent:                 w.Agent,
 		SessionIDs:            copyStrings(w.SessionIDs),
-		IterationStatus:       IterationStatus(w.IterationStatus),
+		IterationStatus:       normalizeIterationStatus(IterationStatus(w.IterationStatus)),
 		IterationFinishedAt:   w.IterationFinishedAt,
 		ClaimedAt:             w.ClaimedAt,
 		DoneAt:                w.DoneAt,

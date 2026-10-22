@@ -168,16 +168,28 @@ func (c Category) Valid() bool {
 type IterationStatus string
 
 const (
-	IterationStatusWorking     IterationStatus = "working"
-	IterationStatusNeedsAnswer IterationStatus = "needs-answer"
-	IterationStatusFinished    IterationStatus = "finished"
+	IterationStatusWorking  IterationStatus = "working"
+	IterationStatusAsking   IterationStatus = "asking"
+	IterationStatusFinished IterationStatus = "finished"
+
+	// iterationStatusLegacyNeedsAnswer is the pre-rename spelling of asking.
+	// Reads fold it into asking; writes never emit it.
+	iterationStatusLegacyNeedsAnswer IterationStatus = "needs-answer"
 )
 
 var validIterationStatuses = map[IterationStatus]bool{
-	"":                         true,
-	IterationStatusWorking:     true,
-	IterationStatusNeedsAnswer: true,
-	IterationStatusFinished:    true,
+	"":                      true,
+	IterationStatusWorking:  true,
+	IterationStatusAsking:   true,
+	IterationStatusFinished: true,
+}
+
+// normalizeIterationStatus folds the legacy needs-answer spelling into asking.
+func normalizeIterationStatus(s IterationStatus) IterationStatus {
+	if s == iterationStatusLegacyNeedsAnswer {
+		return IterationStatusAsking
+	}
+	return s
 }
 
 // Valid reports whether s is one of the three named values or the empty

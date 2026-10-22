@@ -562,7 +562,7 @@ func TestExecute_TicketsSet_RefusesWithoutOpenQuestionNamingVerb(t *testing.T) {
 	cases := []struct {
 		name, frontmatter, flag, verb string
 	}{
-		{"iteration-status", "status: claimed", "--iteration-status=needs-answer", "ask"},
+		{"iteration-status", "status: claimed", "--iteration-status=asking", "ask"},
 		{"status-open", "status: needs-answer", "--status=open", "answer"},
 	}
 	for _, c := range cases {
@@ -580,7 +580,7 @@ func TestExecute_TicketsSet_RefusesWithoutOpenQuestionNamingVerb(t *testing.T) {
 	}
 }
 
-func TestExecute_TicketsSet_IterationStatusNeedsAnswerAcceptedWithOpenQuestion(t *testing.T) {
+func TestExecute_TicketsSet_IterationStatusAskingAcceptedWithOpenQuestion(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
@@ -593,17 +593,17 @@ func TestExecute_TicketsSet_IterationStatusNeedsAnswerAcceptedWithOpenQuestion(t
 	var stdout bytes.Buffer
 	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
 
-	err := execute([]string{"tickets", "set", path, "--iteration-status=needs-answer"}, d)
+	err := execute([]string{"tickets", "set", path, "--iteration-status=asking"}, d)
 	if err != nil {
-		t.Fatalf("execute tickets set: %v, want needs-answer accepted with an open question", err)
+		t.Fatalf("execute tickets set: %v, want asking accepted with an open question", err)
 	}
 
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("reading ticket back: %v", err)
 	}
-	if !strings.Contains(string(raw), "iteration_status: needs-answer") {
-		t.Errorf("ticket file = %q, want iteration_status: needs-answer written", string(raw))
+	if !strings.Contains(string(raw), "iteration_status: asking") {
+		t.Errorf("ticket file = %q, want iteration_status: asking written", string(raw))
 	}
 }
 

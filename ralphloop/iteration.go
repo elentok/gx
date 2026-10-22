@@ -24,7 +24,7 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // create its worktree, launch and prompt the agent, wait for it to finish,
 // adopt any iteration_status report the agent left, cherry-pick its commits
 // onto the feature branch, mark the ticket done, and remove the iteration
-// worktree. An `iteration_status: needs-answer` report is adopted before any
+// worktree. An `iteration_status: asking` report is adopted before any
 // of that: see adoptNeedsAnswerReport. Otherwise, if the agent finishes
 // without landing any commits, the ticket is marked needs-answer instead and
 // the worktree/tab are left in place for inspection — unless the agent
@@ -564,7 +564,7 @@ func adoptCommitlessFinish(p iterationParams, path, pane, sessionID string) (ado
 	return true, nil
 }
 
-// adoptNeedsAnswerReport honours an agent's `iteration_status: needs-answer`
+// adoptNeedsAnswerReport honours an agent's `iteration_status: asking`
 // report before finishIteration counts commits, lands them, cleans up, or
 // announces the iteration finished (ADR 0019's adoption-precedes-landing
 // invariant): without this ordering, an agent that commits what is green and
@@ -580,7 +580,7 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, sessionID string) (ad
 	if err != nil {
 		return false, fmt.Errorf("reading ticket %s for iteration-status adoption: %w", p.Ticket.Path, err)
 	}
-	if current.IterationStatus != schema.IterationStatusNeedsAnswer {
+	if current.IterationStatus != schema.IterationStatusAsking {
 		return false, nil
 	}
 

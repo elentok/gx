@@ -52,7 +52,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *te
 		return 0, nil
 	}
 	retryTurnSelfReport(t, d, path, func(tk *schema.Ticket) {
-		tk.IterationStatus = schema.IterationStatusNeedsAnswer
+		tk.IterationStatus = schema.IterationStatusAsking
 	})
 
 	sink := &recordingSink{}
@@ -110,7 +110,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 		return nil
 	}
 	retryTurnSelfReport(t, d, path, func(tk *schema.Ticket) {
-		tk.IterationStatus = schema.IterationStatusNeedsAnswer
+		tk.IterationStatus = schema.IterationStatusAsking
 	})
 
 	sink := &recordingSink{}
