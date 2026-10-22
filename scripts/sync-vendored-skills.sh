@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Reports which vendored skills have upstream changes. See docs/specs/vendored-skills.md.
+# Reports which vendored skills have upstream changes and, with --merge, merges them into the gx
+# copies. See docs/specs/vendored-skills.md.
 #
 # Usage: sync-vendored-skills.sh --check|--merge [--accept-license SKILL]... [--manifest FILE]
 #        [--skills-dir DIR]
 #
 # --check lists skills with upstream changes. --merge 3-way merges `merge` skills into the gx copies
-# under --skills-dir (default ../skills) and reports; `port` skills only get the upstream diff. The
+# under --skills-dir (default: ../skills relative to this script's own directory, not the current
+# directory) and reports; `port` skills only get the upstream diff. The
 # pin does not move. A changed upstream LICENSE blocks its skill until a reviewer re-runs with
 # --accept-license SKILL, which copies the new LICENSE. README.md is never touched.
 #
@@ -44,7 +46,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$mode" ]; then
-	echo "usage: $0 --check|--merge [--manifest FILE] [--skills-dir DIR]" >&2
+	echo "usage: $0 --check|--merge [--accept-license SKILL]... [--manifest FILE] [--skills-dir DIR]" >&2
 	exit 2
 fi
 
@@ -89,21 +91,27 @@ merge_skill() {
 		[ $b = 1 ] && git -C "$dir" show "$pin:$path/$f" >"$tmp/base"
 		[ $t = 1 ] && git -C "$dir" show "$latest:$path/$f" >"$tmp/theirs"
 
+		# The code is base, ours, theirs presence (1 = file exists). Codes 000, 010 and 100 need no
+		# action: gone everywhere, added only in gx, or deleted on both sides.
 		case "$b$o$t" in
+		# 111: in all three, so 3-way merge unless upstream did not change it.
 		111)
 			if cmp -s "$tmp/base" "$tmp/theirs"; then continue; fi
 			rc=0
 			git merge-file "$ours_dir/$f" "$tmp/base" "$tmp/theirs" || rc=$?
 			if [ "$rc" -eq 0 ]; then clean+=("$f"); else conflicted+=("$f"); fi
 			;;
+		# 001: added upstream, so copy it in.
 		001)
 			mkdir -p "$(dirname "$ours_dir/$f")"
 			cp "$tmp/theirs" "$ours_dir/$f"
 			clean+=("$f")
 			;;
+		# 011: added by both gx and upstream, a conflict unless the contents match.
 		011)
 			cmp -s "$ours_dir/$f" "$tmp/theirs" || conflicted+=("$f")
 			;;
+		# 110: deleted upstream, so delete it here too unless gx changed it (then a conflict).
 		110)
 			if cmp -s "$ours_dir/$f" "$tmp/base"; then
 				rm "$ours_dir/$f"
@@ -112,6 +120,7 @@ merge_skill() {
 				conflicted+=("$f")
 			fi
 			;;
+		# 101: deleted in gx, a conflict if upstream changed the file since the pin.
 		101)
 			cmp -s "$tmp/base" "$tmp/theirs" || conflicted+=("$f")
 			;;
