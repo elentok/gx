@@ -169,7 +169,7 @@ going.
 
 Before every commit, and before `--iteration-status finished`: run `gofmt -l` on the changed `.go`
 files only (e.g. `gofmt -l $(git diff --name-only HEAD -- '*.go')`; add `--cached`/new files as
-needed). The output must be empty — fix with `gofmt -w` on those files. Then run `/verify`. Never
+needed). The output must be empty — fix with `gofmt -w` on those files. Then follow [gx-verify](../gx-verify/SKILL.md) in `working-changes` mode. Never
 run `gofmt -l .`: files on main that are already unformatted are out of scope. No goimports.
 
 Claiming already writes `status: claimed` for you — never write it yourself.
