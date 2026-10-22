@@ -595,7 +595,7 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, sessionID string) (ad
 func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, sessionID, cwd string) (string, error) {
 	return park(p.Sink, parkRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
-		Type: events.NeedsAnswer, Kind: kind, Reason: reason,
+		Type: events.Paused, Kind: kind, Reason: reason,
 		Event: p.agentEvent(pane, sessionID, cwd),
 	})
 }
@@ -1098,7 +1098,7 @@ func parkConflictResolutionChildNeedsRepair(p iterationParams, childPath, childI
 	}
 	park(p.Sink, parkRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: childID, Path: childPath,
-		Type: events.NeedsRepair, Kind: events.IterationError, Reason: reason, Repair: state,
+		Type: events.Paused, Kind: events.IterationError, Reason: reason, Repair: state,
 	})
 	return fmt.Errorf("%w: %s: %s", errConflictResolutionUnresolved, childID, reason)
 }

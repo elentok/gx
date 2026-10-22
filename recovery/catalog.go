@@ -174,7 +174,7 @@ func r10BackgroundGateHeld() Entry {
 // writes should make it unreachable, and there is no S0 event data behind it.
 func r11ClaimClobbered() Entry {
 	return Entry{
-		ID: "R11", Type: events.NeedsRepair, Kind: events.AgentNameTaken,
+		ID: "R11", Type: events.Paused, Kind: events.AgentNameTaken,
 		Predicate: func(seq []Event) bool {
 			failed := false
 			for _, e := range slices.Backward(seq[:len(seq)-1]) {
@@ -185,8 +185,8 @@ func r11ClaimClobbered() Entry {
 					if failed {
 						return true
 					}
-				case events.IterationFinished, events.NeedsRepair, events.NeedsAnswer, events.Commitless,
-					events.CherryPicked, events.ManualLand, events.TicketReset:
+				case events.IterationFinished, events.Paused, events.Commitless,
+					events.CherryPicked, events.ManualMerge, events.TicketStartedOver:
 					if failed {
 						return false
 					}
@@ -213,13 +213,13 @@ const reclaimStallWindow = 2 * time.Second
 // match it yet.
 func r12StalledReclaim() Entry {
 	return Entry{
-		ID: "R12", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		ID: "R12", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool {
 			park := seq[len(seq)-1]
 			reclaimed := false
 			for _, e := range slices.Backward(seq[:len(seq)-1]) {
 				switch {
-				case e.Type == events.CherryPicked || e.Type == events.ManualLand || e.Type == events.TicketReset:
+				case e.Type == events.CherryPicked || e.Type == events.ManualMerge || e.Type == events.TicketStartedOver:
 					return false
 				case reclaimed:
 					if e.Kind == events.AgentPromptStalled {
@@ -230,7 +230,7 @@ func r12StalledReclaim() Entry {
 						return false
 					}
 					reclaimed = true
-				case e.Type == events.IterationStarted || e.Type == events.NeedsAnswer || e.Type == events.NeedsRepair || e.Type == events.Commitless:
+				case e.Type == events.IterationStarted || e.Type == events.Paused || e.Type == events.Commitless:
 					return false
 				}
 			}
@@ -268,7 +268,7 @@ func r8RateLimitPause() Entry {
 // no S0 launch-failed event data behind it yet.
 func r6PaneBusy() Entry {
 	return Entry{
-		ID: "R6", Type: events.NeedsRepair, Kind: events.AgentPaneBusy,
+		ID: "R6", Type: events.Paused, Kind: events.AgentPaneBusy,
 		Predicate: afterLaunchFailed(events.AgentPaneBusy),
 		Executor:  ExecutorRule, Authority: AuthorityLow, Verbs: []string{VerbRelaunch},
 		Remedy: func(f Failure, v Verbs) error {
@@ -279,7 +279,7 @@ func r6PaneBusy() Entry {
 
 func r6NameTaken() Entry {
 	return Entry{
-		ID: "R6", Type: events.NeedsRepair, Kind: events.AgentNameTaken,
+		ID: "R6", Type: events.Paused, Kind: events.AgentNameTaken,
 		Predicate: afterLaunchFailed(events.AgentNameTaken),
 		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{VerbClosePane, VerbRelaunch},
 	}
@@ -303,7 +303,7 @@ func afterLaunchFailed(kind events.Kind) func(seq []Event) bool {
 // the pane held, so nothing yet justifies the allow-list.
 func r4BlockedPaneDialog() Entry {
 	return Entry{
-		ID: "R4", Type: events.NeedsAnswer, Kind: events.BlockedPane,
+		ID: "R4", Type: events.Paused, Kind: events.BlockedPane,
 		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"answer"},
 	}
 }
@@ -325,14 +325,14 @@ var (
 // branch. Launches disabled: there is no S0 event data showing it occurs yet.
 func r3Unrecoverable() Entry {
 	return Entry{
-		ID: "R3", Type: events.NeedsRepair, Kind: events.AmbiguousLand,
+		ID: "R3", Type: events.Paused, Kind: events.AmbiguousMerge,
 		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "land"},
 	}
 }
 
 func r3ClaimedPresent() Entry {
 	return Entry{
-		ID: "R3", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		ID: "R3", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool { return claimsWorkPresentRE.MatchString(seq[len(seq)-1].Text) },
 		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "land"},
 	}
@@ -343,7 +343,7 @@ func r3ClaimedPresent() Entry {
 // their range is out of scope, and recovery must never invent one.
 func r3LostCommits() Entry {
 	return Entry{
-		ID: "R3", Type: events.NeedsRepair, Kind: events.AmbiguousLand,
+		ID: "R3", Type: events.Paused, Kind: events.AmbiguousMerge,
 		Predicate: func(seq []Event) bool { return lostCommitsRE.MatchString(seq[len(seq)-1].Reason) },
 		Executor:  ExecutorPerson, Authority: AuthorityHigh,
 	}
@@ -354,7 +354,7 @@ func r3LostCommits() Entry {
 // silently drops the ticket from the epic: high authority, so it is proposed.
 func r3LandedElsewhere() Entry {
 	return Entry{
-		ID: "R3", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		ID: "R3", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool {
 			text := seq[len(seq)-1].Text
 			return claimsWorkPresentRE.MatchString(text) && landedElsewhereRE.MatchString(text)
@@ -373,7 +373,7 @@ func r3LandedElsewhere() Entry {
 // there is no S0 event data showing it occurs yet.
 func r2UnexecutedToolCall() Entry {
 	return Entry{
-		ID: "R2", Type: events.NeedsAnswer, Kind: events.ZeroCommit,
+		ID: "R2", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool {
 			return transcript.LooksLikeUnexecutedToolCall(seq[len(seq)-1].Text)
 		},
@@ -389,7 +389,7 @@ func r2UnexecutedToolCall() Entry {
 // launch-failed it matches.
 func r5PromptNeverDelivered() Entry {
 	return Entry{
-		ID: "R5", Type: events.NeedsRepair, Kind: events.AgentPromptStalled,
+		ID: "R5", Type: events.Paused, Kind: events.AgentPromptStalled,
 		Predicate: func(seq []Event) bool {
 			return slices.ContainsFunc(seq[:len(seq)-1], func(e Event) bool {
 				return e.Type == events.LaunchFailed && e.Kind == events.AgentPromptStalled
@@ -429,7 +429,7 @@ const FinishUpPrompt = "Your conversation was compacted after you exceeded the c
 // matches, and it is one of the two failures that dominate the S0 data.
 func r7CompactionTimedOut() Entry {
 	return Entry{
-		ID: "R7", Type: events.NeedsRepair, Kind: events.IterationError,
+		ID: "R7", Type: events.Paused, Kind: events.IterationError,
 		Predicate: func(seq []Event) bool {
 			for _, e := range slices.Backward(seq[:len(seq)-1]) {
 				switch e.Type {
@@ -460,7 +460,7 @@ func r7CompactionTimedOut() Entry {
 // still hears of the park. Launches enabled: S0 emits the event it matches.
 func r1Spin() Entry {
 	return Entry{
-		ID: "R1", Type: events.NeedsRepair, Kind: events.Spinning,
+		ID: "R1", Type: events.Paused, Kind: events.Spinning,
 		Executor: ExecutorRecognize, Authority: AuthorityLow, Enabled: true,
 	}
 }

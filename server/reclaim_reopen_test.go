@@ -143,7 +143,7 @@ func TestReclaim_DeadClaimWithWorkParks(t *testing.T) {
 				if _, err := os.Stat(wtPath); err != nil {
 					t.Errorf("worktree gone: %v", err)
 				}
-				assertParkRecordsRun(t, store, events.NeedsRepair, runnerOf(headless), deadSession)
+				assertParkRecordsRun(t, store, events.Paused, runnerOf(headless), deadSession)
 			})
 		})
 	}

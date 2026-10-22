@@ -235,7 +235,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	wantEventOrder := []string{string(eventsc.PausedSmartZone), string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked)}
 	var gotEventOrder []string
 	for _, event := range events {
-		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
+		if event.Type == string(eventsc.Paused) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		if slices.Contains(wantEventOrder, event.Type) {
@@ -471,7 +471,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	var gotEventOrder []string
 	for _, event := range events {
 		switch event.Type {
-		case string(eventsc.NeedsAnswer), string(eventsc.NeedsRepair), string(eventsc.SmartZoneRecoveryFailed):
+		case string(eventsc.Paused), string(eventsc.SmartZoneRecoveryFailed):
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		case string(eventsc.PausedSmartZone):
 			pausedReason = event.Reason
@@ -661,8 +661,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 			sawFinished = true
 		case string(eventsc.CherryPicked):
 			sawCherryPicked = true
-		case string(eventsc.NeedsAnswer):
-			sawNeedsAnswer = true
+		case string(eventsc.Paused):
+			sawNeedsAnswer = sawNeedsAnswer || eventsc.Kind(event.Kind).AwaitsAnswer()
 		case string(eventsc.Resumed):
 			t.Error("unexpected resumed event: recovery never succeeded")
 		}

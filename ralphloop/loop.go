@@ -836,7 +836,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				return fmt.Errorf("epic %q is deadlocked: no runnable tickets left, none done, and none a human could clear; check for a dependency cycle or a bad status", opts.EpicName)
 			}
 			if !parked {
-				logDeadlocked(scratchDir, opts.EpicName, events.AllParked, "every remaining ticket is parked")
+				logDeadlocked(scratchDir, opts.EpicName, events.AllPaused, "every remaining ticket is parked")
 				stalledForSink := make([]StalledTicket, len(stalled))
 				for i, t := range stalled {
 					stalledForSink[i] = StalledTicket{
@@ -919,7 +919,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				EpicName:   opts.EpicName,
 				Ticket:     r.ticket.Identifier,
 				Path:       r.ticket.Path,
-				Type:       events.NeedsRepair,
+				Type:       events.Paused,
 				Kind:       kind,
 				Reason:     reason,
 				Repair: schema.NeedsRepairState{

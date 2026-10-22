@@ -41,7 +41,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 		{Type: "conflict-hit", Ticket: "04", AgentSession: "land-1"},
 		{Type: "conflict-resolved", Ticket: "04", AgentSession: "res-1"},
 		{Type: "recovery-applied", Ticket: "07", Kind: "zero-commit"},
-		{Type: "deadlocked", Kind: "all-parked"},
+		{Type: "deadlocked", Kind: "all-paused"},
 	} {
 		if err := ralphloop.AppendEvent(scratch, "epic", ev); err != nil {
 			t.Fatal(err)

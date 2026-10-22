@@ -195,7 +195,7 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 // parkedOutcome is the outcome of a finish that left t parked. Kind is never
 // blank and Reason never empty, so a person is always told something true.
 func parkedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
-	kind := events.Kind(t.PauseReason.LegacyKind())
+	kind := events.Kind(t.PauseReason)
 	if kind == "" {
 		kind = events.IterationError
 	}
@@ -390,7 +390,7 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 			" is intact. Land it again with `gx server tickets land`."
 		_, err := park(p.Sink, parkRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
-			Type: events.NeedsRepair, Kind: events.LandConflict, Reason: reason,
+			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,
 			Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
 			Event:  p.agentEvent(built.job.pane, built.job.sessionID, built.job.path),
 		})

@@ -97,7 +97,7 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 	}
 
 	res := ResetResult{Ticket: in.ID, Status: string(schema.StatusOpen), AtticRef: attic.Ref, Warning: ResetLiveRunWarning}
-	ev := ralphloop.Event{Type: string(events.TicketReset), Ticket: t.Identifier, Outcome: "reset", Reason: in.Reason}
+	ev := ralphloop.Event{Type: string(events.TicketStartedOver), Ticket: t.Identifier, Outcome: "reset", Reason: in.Reason}
 	if attic.Ref != nil {
 		ev.AtticRef = *attic.Ref
 		ev.SHA = attic.Tip

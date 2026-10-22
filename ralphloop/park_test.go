@@ -49,7 +49,7 @@ func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
 	}
 	var repairs []Event
 	for _, ev := range evs {
-		if ev.Type == string(events.NeedsRepair) {
+		if ev.Type == string(events.Paused) {
 			repairs = append(repairs, ev)
 		}
 	}
@@ -72,7 +72,7 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 
 	park(sink, parkRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-		Type: events.NeedsRepair, Kind: events.IterationError, Reason: "boom",
+		Type: events.Paused, Kind: events.IterationError, Reason: "boom",
 		Repair: schema.NeedsRepairState{Label: "l", Branch: "b", Worktree: "w"},
 	})
 
@@ -105,7 +105,7 @@ func TestPark_RefusesDoneTicket(t *testing.T) {
 
 			_, err := park(sink, parkRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-				Type: kind.ParkType(), Kind: kind, Reason: "late", Repair: schema.NeedsRepairState{Label: "l"},
+				Type: events.Paused, Kind: kind, Reason: "late", Repair: schema.NeedsRepairState{Label: "l"},
 			})
 
 			if !errors.Is(err, ErrParkDone) {
@@ -142,7 +142,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 
 			if _, err := park(sink, parkRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-				Type: events.NeedsAnswer, Kind: kind, Reason: "why", Event: Event{Pane: "p1"},
+				Type: events.Paused, Kind: kind, Reason: "why", Event: Event{Pane: "p1"},
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -150,7 +150,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 			got := mustParse(t, path)
 			assertPaused(t, got, schema.PauseClassAnswer, schema.ParsePauseReason(string(kind)))
 			evs, _, _ := ReadEvents(scratchDir, "my-epic")
-			if len(evs) != 1 || evs[0].Type != "needs-answer" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
+			if len(evs) != 1 || evs[0].Type != "paused" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
 				t.Errorf("events = %+v, want one needs-answer event kind %s", evs, kind)
 			}
 			if calls := sink.snapshot(); len(calls) != 1 || calls[0] != "TicketNeedsHuman" {
@@ -171,7 +171,7 @@ func TestPark_LogsGxQuestionPerKind(t *testing.T) {
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
 			if _, err := park(&recordingSink{}, parkRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-				Type: events.NeedsAnswer, Kind: kind, Reason: "why",
+				Type: events.Paused, Kind: kind, Reason: "why",
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -194,7 +194,7 @@ func TestPark_SelfReportedLogsNoQuestion(t *testing.T) {
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	if _, err := park(&recordingSink{}, parkRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-		Type: events.NeedsAnswer, Kind: events.SelfReported, Reason: "why",
+		Type: events.Paused, Kind: events.SelfReported, Reason: "why",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
 
 	park(&recordingSink{}, parkRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-		Type: events.NeedsRepair, Kind: events.BudgetKilled, Reason: "boom",
+		Type: events.Paused, Kind: events.BudgetKilled, Reason: "boom",
 	})
 	assertPaused(t, mustParse(t, path), schema.PauseClassRepair, schema.PauseBudgetKilled)
 
@@ -251,19 +251,18 @@ func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T)
 	cases := []struct {
 		kind     events.Kind
 		status   schema.Status
-		event    string
 		question bool // the log carries an open question afterwards
 	}{
-		{events.ManualPark, schema.StatusNeedsRepair, "needs-repair", false},
-		{events.AmbiguousBase, schema.StatusNeedsAnswer, "needs-answer", true},
-		{events.BlockedPane, schema.StatusNeedsAnswer, "needs-answer", true},
-		{events.StrandedCommits, schema.StatusNeedsAnswer, "needs-answer", true},
-		{events.BackgroundTaskGate, schema.StatusNeedsAnswer, "needs-answer", true},
-		{events.ZeroCommit, schema.StatusNeedsAnswer, "needs-answer", true},
-		{events.BudgetKilled, schema.StatusNeedsRepair, "needs-repair", false},
-		{events.HandleMismatch, schema.StatusNeedsRepair, "needs-repair", false},
-		{events.AmbiguousLand, schema.StatusNeedsRepair, "needs-repair", false},
-		{events.IterationError, schema.StatusNeedsRepair, "needs-repair", false},
+		{events.Manual, schema.StatusNeedsRepair, false},
+		{events.AmbiguousBase, schema.StatusNeedsAnswer, true},
+		{events.BlockedPane, schema.StatusNeedsAnswer, true},
+		{events.StrandedCommits, schema.StatusNeedsAnswer, true},
+		{events.BackgroundTaskGate, schema.StatusNeedsAnswer, true},
+		{events.ZeroCommit, schema.StatusNeedsAnswer, true},
+		{events.BudgetKilled, schema.StatusNeedsRepair, false},
+		{events.HandleMismatch, schema.StatusNeedsRepair, false},
+		{events.AmbiguousMerge, schema.StatusNeedsRepair, false},
+		{events.IterationError, schema.StatusNeedsRepair, false},
 	}
 	for _, c := range cases {
 		t.Run(string(c.kind), func(t *testing.T) {
@@ -288,8 +287,8 @@ func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T)
 				t.Errorf("open question = %+v, want present=%v", open, c.question)
 			}
 			evs, _, _ := ReadEvents(scratchDir, "my-epic")
-			if len(evs) != 1 || evs[0].Type != c.event || evs[0].Kind != string(c.kind) {
-				t.Errorf("events = %+v, want one %s event kind %s", evs, c.event, c.kind)
+			if len(evs) != 1 || evs[0].Type != "paused" || evs[0].Kind != string(c.kind) {
+				t.Errorf("events = %+v, want one paused event kind %s", evs, c.kind)
 			}
 		})
 	}

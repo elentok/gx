@@ -197,8 +197,8 @@ func TestLandError_OtherGitFailureParksLandFailed(t *testing.T) {
 
 	ev := f.parkRoot(t)
 
-	if ev.Kind != string(events.LandError) {
-		t.Errorf("kind = %q, want %q", ev.Kind, events.LandError)
+	if ev.Kind != string(events.MergeError) {
+		t.Errorf("kind = %q, want %q", ev.Kind, events.MergeError)
 	}
 	if !strings.HasPrefix(ev.Message, "land failed: ") || !strings.Contains(ev.Message, "index.lock") ||
 		!strings.HasSuffix(ev.Message, "; fix it, then merge again") {

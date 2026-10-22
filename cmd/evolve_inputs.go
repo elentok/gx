@@ -165,7 +165,7 @@ func digestTicketEvents(frontmatter []string, evs []ralphloop.Event) (sessions, 
 		if counts == nil {
 			counts = map[string]int{}
 		}
-		counts[ev.Type]++
+		counts[eventCountKey(ev)]++
 		switch ev.Type {
 		case string(events.IterationStarted):
 			sessions = add(sessions, ev.AgentSession)
@@ -174,6 +174,25 @@ func digestTicketEvents(frontmatter []string, evs []ralphloop.Event) (sessions, 
 		}
 	}
 	return sessions, conflict, counts
+}
+
+// Count keys for pause events, split by class so the flags can tell a question
+// from a fault.
+const (
+	countPausedAnswer = "paused-answer"
+	countPausedRepair = "paused-repair"
+)
+
+// eventCountKey is the per-type count key of ev: its type, except a pause,
+// which is counted under its class.
+func eventCountKey(ev ralphloop.Event) string {
+	if ev.Type != string(events.Paused) {
+		return ev.Type
+	}
+	if events.Kind(ev.Kind).AwaitsAnswer() {
+		return countPausedAnswer
+	}
+	return countPausedRepair
 }
 
 func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
@@ -191,8 +210,8 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 			flags = append(flags, f)
 		}
 	}
-	add(has(string(events.NeedsAnswer)) || tk.LegacyStatus() == string(schema.StatusNeedsAnswer), flagPark)
-	add(has(string(events.NeedsRepair)) || tk.LegacyStatus() == string(schema.StatusNeedsRepair), flagNeedsRepair)
+	add(has(countPausedAnswer) || tk.LegacyStatus() == string(schema.StatusNeedsAnswer), flagPark)
+	add(has(countPausedRepair) || tk.LegacyStatus() == string(schema.StatusNeedsRepair), flagNeedsRepair)
 	add(has("recovery-"), flagRecovery)
 	add(has(string(events.Deadlocked)), flagDeadlock)
 	add(has(string(events.ConflictHit)), flagConflict)

@@ -286,7 +286,7 @@ func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 	}
 	n := 0
 	for _, e := range events {
-		if e.Type == string(eventsc.LandDeferred) {
+		if e.Type == string(eventsc.MergeDeferred) {
 			n++
 		}
 	}

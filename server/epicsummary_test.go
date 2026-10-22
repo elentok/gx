@@ -293,7 +293,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 		if want := stuck && kind == events.BlockedCycle; (got.State == EpicStateDeadlocked) != want {
 			t.Errorf("%v: state %q, deadlockKind %q/%v", statuses, got.State, kind, stuck)
 		}
-		if want := stuck && kind == events.AllParked; (got.State == EpicStateParked) != want {
+		if want := stuck && kind == events.AllPaused; (got.State == EpicStateParked) != want {
 			t.Errorf("%v: state %q, deadlockKind %q/%v", statuses, got.State, kind, stuck)
 		}
 	}
@@ -302,7 +302,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 func TestDeadlockReason_ParkedAndCycle(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
 	parked := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{summaryTicket("01", "needs-answer"), summaryTicket("02", "draft")}}
-	if got, want := deadlockReason(root, parked, events.AllParked), "every remaining ticket is parked: proj:epic/01, proj:epic/02"; got != want {
+	if got, want := deadlockReason(root, parked, events.AllPaused), "every remaining ticket is parked: proj:epic/01, proj:epic/02"; got != want {
 		t.Errorf("parked reason = %q, want %q", got, want)
 	}
 	first := summaryTicket("01", "open", "02")

@@ -13,16 +13,15 @@ func TestFailure_Triggers(t *testing.T) {
 		kind events.Kind
 		want bool
 	}{
-		{"needs-repair iteration error", events.NeedsRepair, events.IterationError, true},
-		{"needs-repair manual park", events.NeedsRepair, events.ManualPark, false},
-		{"needs-repair budget-killed", events.NeedsRepair, events.BudgetKilled, false},
-		{"needs-repair self-reported", events.NeedsRepair, events.SelfReported, false},
-		{"needs-answer zero-commit", events.NeedsAnswer, events.ZeroCommit, true},
-		{"needs-answer blocked-pane", events.NeedsAnswer, events.BlockedPane, true},
-		{"needs-answer self-reported", events.NeedsAnswer, events.SelfReported, false},
-		{"needs-answer ambiguous-base", events.NeedsAnswer, events.AmbiguousBase, false},
+		{"repair iteration error", events.Paused, events.IterationError, true},
+		{"repair manual pause", events.Paused, events.Manual, false},
+		{"repair budget-killed", events.Paused, events.BudgetKilled, false},
+		{"answer zero-commit", events.Paused, events.ZeroCommit, true},
+		{"answer blocked-pane", events.Paused, events.BlockedPane, true},
+		{"answer self-reported", events.Paused, events.SelfReported, false},
+		{"answer ambiguous-base", events.Paused, events.AmbiguousBase, false},
 		{"commitless finish", events.Commitless, "", false},
-		{"deadlocked", events.Deadlocked, events.AllParked, true},
+		{"deadlocked", events.Deadlocked, events.AllPaused, true},
 		{"rate-limit pause is healthy waiting", events.PausedRateLimit, "", false},
 		{"notification-failed", events.NotificationFailed, "", false},
 		{"background gate held", events.BackgroundTaskGateHeld, events.BackgroundTaskGate, true},
@@ -36,17 +35,17 @@ func TestFailure_Triggers(t *testing.T) {
 }
 
 func TestFailure_NeedsMatch(t *testing.T) {
-	if !(Failure{Type: events.NeedsAnswer, Kind: events.BlockedPane}).NeedsMatch() {
+	if !(Failure{Type: events.Paused, Kind: events.BlockedPane}).NeedsMatch() {
 		t.Error("blocked-pane: NeedsMatch() = false, want true")
 	}
-	if (Failure{Type: events.NeedsAnswer, Kind: events.ZeroCommit}).NeedsMatch() {
+	if (Failure{Type: events.Paused, Kind: events.ZeroCommit}).NeedsMatch() {
 		t.Error("zero-commit: NeedsMatch() = true, want false")
 	}
 }
 
 func TestEntry_Runnable(t *testing.T) {
 	remedy := func(Failure, Verbs) error { return nil }
-	park := Failure{Type: events.NeedsRepair, Kind: events.IterationError}
+	park := Failure{Type: events.Paused, Kind: events.IterationError}
 	tests := []struct {
 		name  string
 		entry Entry

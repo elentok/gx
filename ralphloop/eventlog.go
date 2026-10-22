@@ -606,7 +606,7 @@ func ReadServerEvents(storeDir string) (events []Event, ok bool, err error) {
 	return readEventsFile(serverLogPath(storeDir))
 }
 
-func readEventsFile(path string) (events []Event, ok bool, err error) {
+func readEventsFile(path string) (evs []Event, ok bool, err error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -624,7 +624,9 @@ func readEventsFile(path string) (events []Event, ok bool, err error) {
 		if err := json.Unmarshal([]byte(line), &ev); err != nil {
 			continue
 		}
-		events = append(events, ev)
+		t, k := events.ReadLegacy(events.Type(ev.Type), events.Kind(ev.Kind))
+		ev.Type, ev.Kind = string(t), string(k)
+		evs = append(evs, ev)
 	}
-	return events, true, nil
+	return evs, true, nil
 }

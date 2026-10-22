@@ -176,7 +176,7 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 		if ev.Type == string(eventsc.Commitless) && ev.Ticket == "01" {
 			commitless = &events[i]
 		}
-		if ev.Type == string(eventsc.NeedsAnswer) {
+		if ev.Type == string(eventsc.Paused) {
 			t.Errorf("events = %+v, want no needs-answer event for the retry's declared-commitless self-report", events)
 		}
 	}

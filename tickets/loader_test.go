@@ -387,7 +387,7 @@ func TestLoad_LegacyPauseLoadsAsPausedAndMapEpicsStayUnshimmed(t *testing.T) {
 		render RenderedStatus
 	}{
 		{"paused", schema.PauseBlockedPane, "blocked-pane", StatusNeedsAnswer},
-		{"paused", schema.PauseMergeConflict, "land-conflict", StatusNeedsRepair},
+		{"paused", schema.PauseMergeConflict, "merge-conflict", StatusNeedsRepair},
 		{"paused", schema.PauseSpinning, "spinning", StatusNeedsRepair},
 	}
 	for i, w := range want {

@@ -292,7 +292,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	}
 	pausedIdx, resumedIdx, started03Idx, finished03Idx := -1, -1, -1, -1
 	for i, event := range events {
-		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
+		if event.Type == string(eventsc.Paused) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		switch {
@@ -720,7 +720,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	pausedRateLimit02, resumed02 := -1, -1
 	started03, finished03 := -1, -1
 	for i, event := range events {
-		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
+		if event.Type == string(eventsc.Paused) || event.Type == string(eventsc.SmartZoneRecoveryFailed) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		switch {

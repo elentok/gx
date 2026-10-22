@@ -47,7 +47,7 @@ func startRecoveryWith(t *testing.T, optOut bool, authority recovery.Authority) 
 	}
 	results := make(chan recovery.Result, 4)
 	cat := recovery.Catalog{Enabled: true, Entries: []recovery.Entry{{
-		ID: "TEST", Type: events.NeedsRepair, Kind: events.IterationError,
+		ID: "TEST", Type: events.Paused, Kind: events.IterationError,
 		Executor: recovery.ExecutorRule, Authority: authority, Enabled: true, Verbs: []string{recovery.VerbRelaunch},
 		Remedy: func(f recovery.Failure, v recovery.Verbs) error {
 			res, err := v.Do(recovery.Call{Verb: recovery.VerbRelaunch, Address: f.Address})
@@ -648,7 +648,7 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	})
 	registerLaunch(h)
 
-	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousLand, "done but commits missing from epic-a"); err != nil {
+	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousMerge, "done but commits missing from epic-a"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, func() bool {
@@ -663,7 +663,7 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		for _, ev := range log {
-			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AmbiguousLand) && ev.Outcome == "proj:epic-a/01a" {
+			if events.Type(ev.Type) == events.RecoveryApplied && ev.Kind == string(events.AmbiguousMerge) && ev.Outcome == "proj:epic-a/01a" {
 				return true
 			}
 		}
@@ -797,7 +797,7 @@ func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testin
 func TestRecovery_R3LostCommitsEscalateWithoutAnInvestigation(t *testing.T) {
 	h := startR3(t)
 	reason := "done but commits missing from epic-a and iteration branch ralph-loop/epic-a-item-01 no longer exists to recover them"
-	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousLand, reason); err != nil {
+	if err := h.Server.ParkAs("proj:epic-a/01", events.AmbiguousMerge, reason); err != nil {
 		t.Fatal(err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")

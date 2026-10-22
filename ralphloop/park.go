@@ -120,15 +120,24 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 // isParkType reports whether t is an event type a park writes for a person to
 // act on (as opposed to manual-land).
 func isParkType(t events.Type) bool {
-	return t == events.NeedsAnswer || t == events.NeedsRepair
+	return t == events.Paused
+}
+
+// PauseStatus is the needs-answer / needs-repair label that notifications still
+// show for a pause of this kind.
+func PauseStatus(k events.Kind) string {
+	if k.AwaitsAnswer() {
+		return string(schema.StatusNeedsAnswer)
+	}
+	return string(schema.StatusNeedsRepair)
 }
 
 // RecordManualLand writes done through the park path and appends the one
-// manual-land event. Only the ticket write's error is returned, matching park.
+// manual-merge event. Only the ticket write's error is returned, matching park.
 func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone bool, ev Event) error {
 	_, err := park(noopEventSink{}, parkRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: events.ManualLand, Reason: ev.Reason, AlreadyDone: alreadyDone, Event: ev,
+		Type: events.ManualMerge, Reason: ev.Reason, AlreadyDone: alreadyDone, Event: ev,
 	})
 	return err
 }
@@ -140,7 +149,7 @@ func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone boo
 func Park(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev Event) error {
 	_, err := park(noopEventSink{}, parkRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
-		Type: kind.ParkType(), Kind: kind, Reason: reason, Event: ev,
+		Type: events.Paused, Kind: kind, Reason: reason, Event: ev,
 	})
 	return err
 }
@@ -155,16 +164,16 @@ func Park(scratchDir, epicName, ticket, path string, kind events.Kind, reason st
 // an unwritten park.
 func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	reason = req.Reason
-	switch req.Type {
-	case events.NeedsRepair:
+	switch {
+	case req.Type == events.Paused && !req.Kind.AwaitsAnswer():
 		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair, req.ReparkDone)
-	case events.NeedsAnswer:
+	case req.Type == events.Paused:
 		if err := logGxQuestion(req.Path, req.Kind, reason); err != nil {
 			// A silent park is the bug this path exists to remove: park anyway.
 			reason = fmt.Sprintf("%s (also failed logging question: %v)", reason, err)
 		}
 		writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
-	case events.ManualLand:
+	case req.Type == events.ManualMerge:
 		if !req.AlreadyDone {
 			writeErr = MarkDone(req.Path)
 		}
@@ -185,9 +194,9 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	if err := logEvent(req.ScratchDir, req.EpicName, ev); err != nil {
 		reason = fmt.Sprintf("%s (also failed logging event: %v)", reason, err)
 	}
-	if req.Type == events.ManualLand {
-		return reason, writeErr // a land needs no human
+	if req.Type == events.ManualMerge {
+		return reason, writeErr // a merge needs no human
 	}
-	sink.TicketNeedsHuman(req.Ticket, req.EpicName, string(req.Type), req.Kind, reason)
+	sink.TicketNeedsHuman(req.Ticket, req.EpicName, PauseStatus(req.Kind), req.Kind, reason)
 	return reason, writeErr
 }

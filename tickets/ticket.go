@@ -93,8 +93,7 @@ type Ticket struct {
 	// paused.
 	PauseReason schema.PauseReason
 
-	// ParkKind is PauseReason in the old park-event spelling, which is what
-	// the events package still uses. Derived on load, never stored.
+	// ParkKind is PauseReason as an events.Kind. Derived on load, never stored.
 	ParkKind schema.ParkKind
 
 	// Mutes mirrors schema.Ticket.Mutes: notification event types that have

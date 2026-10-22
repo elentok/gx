@@ -123,7 +123,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 		return lateFinish{}, false
 	}
 	park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
-	if !ok || park.Type != string(t.PausedClass().LegacyStatus()) || park.Kind != t.PauseReason.LegacyKind() || !t.IterationFinishedAt.After(park.Time) {
+	if !ok || park.Type != string(events.Paused) || park.Kind != string(t.PauseReason) || !t.IterationFinishedAt.After(park.Time) {
 		return lateFinish{}, false
 	}
 	return lateFinish{dir: dir, addr: addr, path: path, park: park, finishedAt: t.IterationFinishedAt, commitless: t.IsCommitless()}, true

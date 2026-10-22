@@ -124,7 +124,7 @@ func parkOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (parke
 func (p launchAndPromptParams) parkBlockedPane(sessionID, reason string) {
 	park(p.sink(), parkRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.EpicName, Ticket: p.Ticket, Path: p.TicketPath,
-		Type: events.NeedsAnswer, Kind: events.BlockedPane, Reason: reason,
+		Type: events.Paused, Kind: events.BlockedPane, Reason: reason,
 		Event: Event{Agent: p.Agent, Pane: p.Pane, AgentSession: sessionID, Cwd: p.SessionCwd},
 	})
 }

@@ -431,7 +431,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	conflictResolvedSessionID := ""
 	lifecycleEventCount := 0
 	for i, event := range events {
-		if event.Type == string(eventsc.NeedsAnswer) || event.Type == string(eventsc.NeedsRepair) {
+		if event.Type == string(eventsc.Paused) {
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		}
 		if event.Type == string(eventsc.SmartZoneRecoveryFailed) {
@@ -757,7 +757,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	var gotEventOrder []string
 	for _, event := range events {
 		switch event.Type {
-		case string(eventsc.NeedsAnswer), string(eventsc.NeedsRepair), string(eventsc.SmartZoneRecoveryFailed):
+		case string(eventsc.Paused), string(eventsc.SmartZoneRecoveryFailed):
 			t.Errorf("unexpected recovery residue event: %+v", event)
 		case string(eventsc.PausedSmartZone), string(eventsc.Resumed), string(eventsc.IterationFinished), string(eventsc.CherryPicked):
 			gotEventOrder = append(gotEventOrder, event.Type)

@@ -93,7 +93,7 @@ func epicStateOf(e tickets.Epic) epicState {
 func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 	switch epicStateOf(e) {
 	case epicParked:
-		return events.AllParked, true
+		return events.AllPaused, true
 	case epicCycle:
 		return events.BlockedCycle, true
 	}
@@ -103,7 +103,7 @@ func deadlockKind(e tickets.Epic) (events.Kind, bool) {
 // deadlockReason names what holds e: the parked tickets for all-parked, and for
 // a blocked cycle each waiting ticket with what it waits on.
 func deadlockReason(root rootRef, e tickets.Epic, kind events.Kind) string {
-	if kind == events.AllParked {
+	if kind == events.AllPaused {
 		return parkedReason(root, e)
 	}
 	return cycleReason(root, e)

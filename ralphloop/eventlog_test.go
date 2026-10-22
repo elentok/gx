@@ -48,13 +48,13 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 	dir := epicScratchDir(t, "epic")
 
 	err := AppendEvent(dir, "epic", Event{
-		Type: string(eventsc.ManualLand), Ticket: "04", Outcome: "landed",
+		Type: string(eventsc.ManualMerge), Ticket: "04", Outcome: "landed",
 		TrailerValue: "epic/04", AtticRef: "refs/attic/04", Reason: "by hand",
 	})
 	if err != nil {
 		t.Fatalf("AppendEvent: %v", err)
 	}
-	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.TicketReset), Ticket: "05"}); err != nil {
+	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.TicketStartedOver), Ticket: "05"}); err != nil {
 		t.Fatalf("AppendEvent: %v", err)
 	}
 
@@ -70,10 +70,10 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 		t.Fatalf("ReadEvents = %v, %v, %v; want 2 events", events, ok, err)
 	}
 	got := events[0]
-	if got.Type != "manual-land" || got.Outcome != "landed" || got.TrailerValue != "epic/04" || got.AtticRef != "refs/attic/04" {
+	if got.Type != "manual-merge" || got.Outcome != "landed" || got.TrailerValue != "epic/04" || got.AtticRef != "refs/attic/04" {
 		t.Errorf("event 0 = %+v, want new fields round-tripped", got)
 	}
-	if events[1].Type != "ticket-reset" || strings.Contains(strings.Split(string(raw), "\n")[1], "outcome") {
+	if events[1].Type != "ticket-started-over" || strings.Contains(strings.Split(string(raw), "\n")[1], "outcome") {
 		t.Errorf("event 1 should omit empty new fields: %q", raw)
 	}
 }
@@ -84,7 +84,7 @@ func TestAppendEvent_OversizedReasonIsTruncatedBelowCap(t *testing.T) {
 
 	// Multi-byte and escaped characters exercise the encoded-size accounting.
 	reason := strings.Repeat("é\"\n", 5000)
-	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.ManualLand), Ticket: "04", Reason: reason}); err != nil {
+	if err := AppendEvent(dir, "epic", Event{Type: string(eventsc.ManualMerge), Ticket: "04", Reason: reason}); err != nil {
 		t.Fatalf("AppendEvent: %v", err)
 	}
 
@@ -105,7 +105,7 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 	t.Parallel()
 	dir := epicScratchDir(t, "epic")
 	before := time.Now()
-	if err := logEvent(dir, "epic", Event{Type: string(eventsc.NeedsAnswer), Ticket: "02"}); err != nil {
+	if err := logEvent(dir, "epic", Event{Type: string(eventsc.Paused), Ticket: "02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 	events, ok, err := ReadEvents(dir, "epic")
@@ -122,10 +122,10 @@ func TestLogEvent_FillsInTimeWhenZero(t *testing.T) {
 
 func TestLogEvent_EmptyScratchDirOrEpicName_NoOp(t *testing.T) {
 	t.Parallel()
-	if err := logEvent("", "epic", Event{Type: string(eventsc.NeedsAnswer)}); err != nil {
+	if err := logEvent("", "epic", Event{Type: string(eventsc.Paused)}); err != nil {
 		t.Errorf("logEvent(scratchDir=\"\") error = %v, want nil no-op", err)
 	}
-	if err := logEvent(t.TempDir(), "", Event{Type: string(eventsc.NeedsAnswer)}); err != nil {
+	if err := logEvent(t.TempDir(), "", Event{Type: string(eventsc.Paused)}); err != nil {
 		t.Errorf("logEvent(epicName=\"\") error = %v, want nil no-op", err)
 	}
 }
@@ -171,7 +171,7 @@ func TestLastIterationSession_ReturnsMostRecentMatchingTicket(t *testing.T) {
 	events := []Event{
 		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1a", Cwd: "/cwd-1a"},
 		{Type: string(eventsc.IterationFinished), Ticket: "01"},
-		{Type: string(eventsc.NeedsAnswer), Ticket: "01"},
+		{Type: string(eventsc.Paused), Ticket: "01"},
 		{Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: "sess-1b", Cwd: "/cwd-1b"},
 		{Type: string(eventsc.IterationStarted), Ticket: "02", Agent: AgentClaude, AgentSession: "sess-2", Cwd: "/cwd-2"},
 	}

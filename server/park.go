@@ -8,7 +8,6 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // parkTicket is the one way the server parks a ticket: the write, the
@@ -33,10 +32,7 @@ func (s *Server) parkTicket(scratchDir string, addr tickets.Address, ticketPath 
 // notifyPark sends the one chat message for a park that is already written.
 // A park herdr's outage can cause is held for the digest instead.
 func (s *Server) notifyPark(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
-	status := string(schema.StatusNeedsAnswer)
-	if kind.ParkType() == events.NeedsRepair {
-		status = string(schema.StatusNeedsRepair)
-	}
+	status := ralphloop.PauseStatus(kind)
 	if kind.CauseHerdr() && s.herdr.isUnavailable() {
 		s.holdPark(addr, status, kind, reason)
 		return

@@ -55,7 +55,7 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 		t.Fatalf("ReadEvents() = %+v, ok=%v, err=%v", events, ok, err)
 	}
 	last := events[len(events)-1]
-	if last.Type != string(eventsc.NeedsAnswer) {
+	if last.Type != string(eventsc.Paused) {
 		t.Fatalf("last event type = %q, want needs-answer", last.Type)
 	}
 	if !strings.Contains(last.Reason, "trust_directory") {

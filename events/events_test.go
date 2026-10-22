@@ -27,7 +27,7 @@ func TestValidate_KindOptionalOnOtherEvents(t *testing.T) {
 }
 
 func TestValidate_UnknownKindRejected(t *testing.T) {
-	if err := Validate(NeedsRepair, "made-up"); err == nil {
+	if err := Validate(Paused, "made-up"); err == nil {
 		t.Error("unknown kind accepted")
 	}
 }

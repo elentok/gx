@@ -379,7 +379,7 @@ func (s *Server) refsFailed(project, epic string, err error) (string, events.Kin
 }
 
 func landFailed(project, epic string, err error) (string, events.Kind) {
-	return fmt.Sprintf("land failed: %v; fix it, then merge again", err), events.LandError
+	return fmt.Sprintf("land failed: %v; fix it, then merge again", err), events.MergeError
 }
 
 // clashingFiles lists the uncommitted files in the target's checkout that the

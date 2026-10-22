@@ -234,7 +234,7 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	}
 	var attentionEvent *Event
 	for i := range events {
-		if events[i].Type == string(eventsc.NeedsRepair) && events[i].Ticket == "03" {
+		if events[i].Type == string(eventsc.Paused) && events[i].Ticket == "03" {
 			attentionEvent = &events[i]
 		}
 	}

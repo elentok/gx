@@ -17,7 +17,7 @@ func seedParks(t *testing.T, scratchDir, epic string, n int, age time.Duration) 
 	t.Helper()
 	for range n {
 		err := logEvent(scratchDir, epic, Event{
-			Time: time.Now().Add(-age), Type: string(events.NeedsAnswer), Ticket: "01",
+			Time: time.Now().Add(-age), Type: string(events.Paused), Ticket: "01",
 			Kind: string(events.SelfReported), Reason: "question",
 		})
 		if err != nil {
@@ -66,7 +66,7 @@ func TestRun_SpinCyclesInsideWindow_ParkSpinningAndNeverReclaim(t *testing.T) {
 	}
 	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseSpinning)
 	spins := spinningEvents(t, scratchDir)
-	if len(spins) != 1 || spins[0].Type != string(events.NeedsRepair) {
+	if len(spins) != 1 || spins[0].Type != string(events.Paused) {
 		t.Errorf("spinning events = %+v, want exactly one needs-repair", spins)
 	}
 }

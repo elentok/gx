@@ -61,7 +61,7 @@ func TestPark_WritesStatusSectionAndOneEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(hist.Events) != 1 || hist.Events[0].Type != "needs-repair" || hist.Events[0].Kind != "manual-park" {
+	if len(hist.Events) != 1 || hist.Events[0].Type != "paused" || hist.Events[0].Kind != "manual" {
 		t.Errorf("events = %+v, want one needs-repair/manual-park", hist.Events)
 	}
 }

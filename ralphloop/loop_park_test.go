@@ -434,8 +434,8 @@ func TestRun_Park_EmitsDeadlockedOncePerEntry(t *testing.T) {
 		assertParkInterval(t, dur)
 		polls++
 		if polls == 3 {
-			if got := deadlockedKinds(t, scratchDir, "my-epic"); !slices.Equal(got, []string{"all-parked"}) {
-				t.Errorf("deadlocked events after repeated polls = %v, want one all-parked", got)
+			if got := deadlockedKinds(t, scratchDir, "my-epic"); !slices.Equal(got, []string{"all-paused"}) {
+				t.Errorf("deadlocked events after repeated polls = %v, want one all-paused", got)
 			}
 			if err := SetStatus(path, "open"); err != nil {
 				t.Errorf("SetStatus: %v", err)

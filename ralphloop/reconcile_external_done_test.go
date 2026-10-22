@@ -101,7 +101,7 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	if err != nil {
 		t.Fatalf("ReadEvents: %v", err)
 	}
-	if len(evs) != 1 || evs[0].Type != string(eventsc.NeedsRepair) || evs[0].Kind != string(eventsc.AmbiguousLand) || evs[0].Address != canonicalAddr(scratchDir, "epic", "03") {
+	if len(evs) != 1 || evs[0].Type != string(eventsc.Paused) || evs[0].Kind != string(eventsc.AmbiguousMerge) || evs[0].Address != canonicalAddr(scratchDir, "epic", "03") {
 		t.Errorf("events = %+v, want one needs-repair event of kind ambiguous-land for 03", evs)
 	}
 }

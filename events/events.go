@@ -19,7 +19,7 @@ const (
 	IterationStarted           Type = "iteration-started"
 	IterationFinished          Type = "iteration-finished"
 	CherryPicked               Type = "cherry-picked"
-	LandDeferred               Type = "land-deferred"
+	MergeDeferred              Type = "merge-deferred"
 	ConflictHit                Type = "conflict-hit"
 	ConflictResolved           Type = "conflict-resolved"
 	PausedSmartZone            Type = "paused-smart-zone"
@@ -31,18 +31,19 @@ const (
 	BackgroundTaskGateExpired  Type = "background-task-gate-expired"
 	PausedRateLimit            Type = "paused-rate-limit"
 	Resumed                    Type = "resumed"
-	NeedsAnswer                Type = "needs-answer"
-	Commitless                 Type = "commitless"
-	NeedsRepair                Type = "needs-repair"
-	DepsInstalled              Type = "deps-installed"
-	SchedulerScan              Type = "scheduler-scan"
-	NotificationsConfigured    Type = "notifications-configured"
-	NotificationSent           Type = "notification-sent"
-	NotificationFailed         Type = "notification-failed"
-	NotificationDegraded       Type = "notification-degraded"
-	NotificationSuppressed     Type = "notification-suppressed"
-	ManualLand                 Type = "manual-land"
-	TicketReset                Type = "ticket-reset"
+	// Paused is a ticket paused for a person; the kind is the pause reason and
+	// its class says whether the person answers or repairs.
+	Paused                  Type = "paused"
+	Commitless              Type = "commitless"
+	DepsInstalled           Type = "deps-installed"
+	SchedulerScan           Type = "scheduler-scan"
+	NotificationsConfigured Type = "notifications-configured"
+	NotificationSent        Type = "notification-sent"
+	NotificationFailed      Type = "notification-failed"
+	NotificationDegraded    Type = "notification-degraded"
+	NotificationSuppressed  Type = "notification-suppressed"
+	ManualMerge             Type = "manual-merge"
+	TicketStartedOver       Type = "ticket-started-over"
 	// Nudged is text typed into a live iteration pane through the server.
 	Nudged Type = "nudged"
 	// StallNudged is the fixed text the server typed into an agent that sat idle
@@ -67,7 +68,7 @@ const (
 	// HumanRelaunch is a relaunch a person asked for; recovery's budget
 	// counts only what came after the latest one.
 	HumanRelaunch Type = "human-relaunch"
-	// LateFinishAdopted is a zero-commit park whose agent reported finished
+	// LateFinishAdopted is a zero-commit pause whose agent reported finished
 	// after it, which the server then landed or closed.
 	LateFinishAdopted Type = "late-finish-adopted"
 	HerdrUnavailable  Type = "herdr-unavailable"
@@ -109,21 +110,21 @@ const (
 	RetryExhausted     Kind = "retry-exhausted"
 	Spinning           Kind = "spinning"
 	BudgetKilled       Kind = "budget-killed"
-	AmbiguousLand      Kind = "ambiguous-land"
-	AllParked          Kind = "all-parked"
+	AmbiguousMerge     Kind = "ambiguous-merge"
+	AllPaused          Kind = "all-paused"
 	BlockedCycle       Kind = "blocked-cycle"
 	DuplicateLive      Kind = "duplicate-live"
 	// IterationError is the loop's catch-all: an iteration or land failed
 	// with an error no more specific kind names.
 	IterationError Kind = "iteration-error"
-	// ManualPark is a person parking a ticket through `gx server tickets park`.
-	ManualPark Kind = "manual-park"
+	// Manual is a person pausing a ticket through `gx server tickets pause`.
+	Manual Kind = "manual"
 	// AmbiguousBase is a claim that found two or more unlanded blockers and no
 	// base: to choose between them.
 	AmbiguousBase Kind = "ambiguous-base"
-	// LandConflict is a land whose cherry-pick conflicted and whose
+	// MergeConflict is a merge whose cherry-pick conflicted and whose
 	// conflict-resolution child could not resolve it.
-	LandConflict Kind = "land-conflict"
+	MergeConflict Kind = "merge-conflict"
 	// ParentDefect is a lettered ticket whose parent is missing or is not an
 	// ancestor its ID allows.
 	ParentDefect Kind = "parent-defect"
@@ -136,11 +137,11 @@ const (
 	StrandedCommits Kind = "stranded-commits"
 	// TrunkMissing is a landing whose project's trunk could not be resolved.
 	TrunkMissing Kind = "trunk-missing"
-	// DirtyTrunk is a root land git refused because trunk's checkout has
+	// DirtyTrunk is a root merge git refused because trunk's checkout has
 	// local changes.
 	DirtyTrunk Kind = "dirty-trunk"
-	// LandError is a root land that failed for any reason no other kind names.
-	LandError Kind = "land-error"
+	// MergeError is a root merge that failed for any reason no other kind names.
+	MergeError Kind = "merge-error"
 	// MergeUnreported is a merge agent that stopped without reporting finished
 	// or needs-answer. Unlike the other merge faults, a late finish adopts it.
 	MergeUnreported Kind = "merge-unreported"
@@ -158,10 +159,10 @@ var kindCauseHerdr = map[Kind]bool{
 var kinds = map[Kind]bool{
 	AgentNameTaken: true, AgentPaneBusy: true, AgentPromptStalled: true, ZeroCommit: true, BlockedPane: true,
 	SelfReported: true, HandleMismatch: true, RetryExhausted: true, Spinning: true,
-	BudgetKilled: true, AmbiguousLand: true, AllParked: true, BlockedCycle: true,
-	DuplicateLive: true, IterationError: true, ManualPark: true, AmbiguousBase: true,
-	LandConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
-	TrunkMissing: true, DirtyTrunk: true, LandError: true, MergeUnreported: true,
+	BudgetKilled: true, AmbiguousMerge: true, AllPaused: true, BlockedCycle: true,
+	DuplicateLive: true, IterationError: true, Manual: true, AmbiguousBase: true,
+	MergeConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
+	TrunkMissing: true, DirtyTrunk: true, MergeError: true, MergeUnreported: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes
@@ -178,27 +179,25 @@ func Kinds() []Kind {
 // Valid reports whether k is in the closed enum.
 func (k Kind) Valid() bool { return kinds[k] }
 
-// kindNeedsAnswer lists the kinds that park a ticket as a question for a
-// person; every other kind parks needs-repair.
-var kindNeedsAnswer = map[Kind]bool{
+// kindAwaitsAnswer lists the kinds that pause a ticket as a question for a
+// person; every other kind is a fault to repair. schema's class table is the
+// same decision, and a test there keeps the two equal (events cannot import
+// schema).
+var kindAwaitsAnswer = map[Kind]bool{
 	ZeroCommit: true, BlockedPane: true, SelfReported: true, AmbiguousBase: true, StrandedCommits: true,
 	BackgroundTaskGate: true,
 }
 
-// ParkType is the event type a park of this kind writes.
-func (k Kind) ParkType() Type {
-	if kindNeedsAnswer[k] {
-		return NeedsAnswer
-	}
-	return NeedsRepair
-}
+// AwaitsAnswer reports whether a pause of this kind is a question for a
+// person rather than a fault to repair.
+func (k Kind) AwaitsAnswer() bool { return kindAwaitsAnswer[k] }
 
 // CauseHerdr reports whether a herdr outage can cause this kind.
 func (k Kind) CauseHerdr() bool { return kindCauseHerdr[k] }
 
 // kindRequired lists the types that must carry a valid kind: the failure and
 // recovery events introduced with the contract. Older failure types
-// (needs-repair, needs-answer, commitless, ...) predate it; their call sites
+// (paused, commitless, ...) predate it; their call sites
 // don't pass a kind yet, so a kind on them is validated if present but not
 // demanded until they migrate.
 var kindRequired = map[Type]bool{

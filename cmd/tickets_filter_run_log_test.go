@@ -54,12 +54,12 @@ func TestRunTicketsFilterRunLog_FiltersByEvent(t *testing.T) {
 	epicDir := filepath.Join(repoDir, ".scratch", "widget-epic")
 	writeRunLog(t, epicDir, []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"iteration-started","ticket":"01"}`,
-		`{"time":"2026-01-01T00:01:00Z","type":"needs-answer","ticket":"01"}`,
+		`{"time":"2026-01-01T00:01:00Z","type":"paused","ticket":"01"}`,
 		`{"time":"2026-01-01T00:02:00Z","type":"scheduler-scan","ticket":""}`,
 	})
 
 	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "", []string{"needs-answer", "scheduler-scan"}, &buf); err != nil {
+	if err := runTicketsFilterRunLog(epicDir, "", []string{"paused", "scheduler-scan"}, &buf); err != nil {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
@@ -67,8 +67,8 @@ func TestRunTicketsFilterRunLog_FiltersByEvent(t *testing.T) {
 	if strings.Contains(out, "iteration-started") {
 		t.Errorf("output = %s, should not contain iteration-started", out)
 	}
-	if !strings.Contains(out, "needs-answer") || !strings.Contains(out, "scheduler-scan") {
-		t.Errorf("output = %s, want both needs-answer and scheduler-scan events", out)
+	if !strings.Contains(out, "paused") || !strings.Contains(out, "scheduler-scan") {
+		t.Errorf("output = %s, want both paused and scheduler-scan events", out)
 	}
 }
 
@@ -79,17 +79,18 @@ func TestRunTicketsFilterRunLog_CombinesTicketAndEventFilters(t *testing.T) {
 	writeRunLog(t, epicDir, []string{
 		`{"time":"2026-01-01T00:00:00Z","type":"iteration-started","ticket":"01"}`,
 		`{"time":"2026-01-01T00:01:00Z","type":"needs-answer","ticket":"01"}`,
-		`{"time":"2026-01-01T00:02:00Z","type":"needs-answer","ticket":"02"}`,
+		`{"time":"2026-01-01T00:02:00Z","type":"paused","ticket":"02"}`,
 	})
 
 	var buf bytes.Buffer
-	if err := runTicketsFilterRunLog(epicDir, "01", []string{"needs-answer"}, &buf); err != nil {
+	if err := runTicketsFilterRunLog(epicDir, "01", []string{"paused"}, &buf); err != nil {
 		t.Fatalf("runTicketsFilterRunLog: %v", err)
 	}
 
+	// Ticket 01's line is in the old spelling: the read shim makes it match.
 	out := buf.String()
-	if strings.Count(out, `"type": "needs-answer"`) != 1 || !strings.Contains(out, `"ticket": "01"`) {
-		t.Errorf("output = %s, want exactly one needs-answer event for ticket 01", out)
+	if strings.Count(out, `"type": "paused"`) != 1 || !strings.Contains(out, `"ticket": "01"`) {
+		t.Errorf("output = %s, want exactly one paused event for ticket 01", out)
 	}
 }
 

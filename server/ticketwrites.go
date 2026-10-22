@@ -124,7 +124,7 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		run, _ := s.registry.tracked(ref.addr.String())
-		if err := s.parkTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.ManualPark, reason, run.Run); err != nil {
+		if err := s.parkTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {
 			return QueueResult{}, fmt.Errorf("park %s: %w", ref.addr, err)
 		}
 		return QueueResult{}, nil

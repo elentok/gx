@@ -28,7 +28,7 @@ import (
 func startNotifyRecovery(t *testing.T, hold time.Duration, remedy recovery.Remedy) (*servertest.Harness, func() []string) {
 	t.Helper()
 	return startNotifyRecoveryWith(t, hold, recovery.Entry{
-		ID: "TEST", Type: events.NeedsRepair, Kind: events.IterationError,
+		ID: "TEST", Type: events.Paused, Kind: events.IterationError,
 		Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true, Remedy: remedy,
 	})
 }
@@ -171,7 +171,7 @@ func TestRecoveryState_FromInvestigations(t *testing.T) {
 // The investigation's own launch fails here (no herdr), which parks it: that
 // is recovery escalating. Its later landing leaves the park's own state.
 func TestRecoveryNotify_SnapshotFollowsTheInvestigation(t *testing.T) {
-	unmatched := recovery.Entry{ID: "TEST", Type: events.NeedsRepair, Kind: events.Spinning, Executor: recovery.ExecutorRule, Enabled: true}
+	unmatched := recovery.Entry{ID: "TEST", Type: events.Paused, Kind: events.Spinning, Executor: recovery.ExecutorRule, Enabled: true}
 	h, _ := startNotifyRecoveryWith(t, time.Minute, unmatched)
 	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)
@@ -287,7 +287,7 @@ func escalationMessages(sent []string) []string {
 func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport(t *testing.T) {
 	rule := func(remedy recovery.Remedy) recovery.Entry {
 		return recovery.Entry{
-			ID: "TEST", Type: events.NeedsRepair, Kind: events.IterationError,
+			ID: "TEST", Type: events.Paused, Kind: events.IterationError,
 			Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Enabled: true, Remedy: remedy,
 		}
 	}
@@ -336,7 +336,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 }
 
 func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigation(t *testing.T) {
-	entry := recovery.Entry{ID: "AGENT", Type: events.NeedsRepair, Kind: events.IterationError, Executor: recovery.ExecutorAgent, Enabled: true}
+	entry := recovery.Entry{ID: "AGENT", Type: events.Paused, Kind: events.IterationError, Executor: recovery.ExecutorAgent, Enabled: true}
 	h, _ := startNotifyRecoveryWith(t, time.Minute, entry)
 	if err := h.Server.ParkTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 		t.Fatal(err)

@@ -438,7 +438,7 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 	}
 	var parks []Event
 	for _, ev := range evs {
-		if ev.Type == string(events.NeedsRepair) {
+		if ev.Type == string(events.Paused) {
 			parks = append(parks, ev)
 		}
 	}

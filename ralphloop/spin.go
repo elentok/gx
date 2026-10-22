@@ -76,7 +76,7 @@ func firstNonSpinning(opts RunOptions, now time.Time, sink EventSink, scratchDir
 		}
 		_, err := park(sink, parkRequest{
 			ScratchDir: scratchDir, EpicName: opts.EpicName, Ticket: t.Identifier, Path: t.Path,
-			Type: events.NeedsRepair, Kind: events.Spinning,
+			Type: events.Paused, Kind: events.Spinning,
 			Reason: fmt.Sprintf("parked and re-claimed %d times within %s", policy.cycles, policy.window),
 			Repair: schema.NeedsRepairState{
 				Label:    iterLabel(opts.EpicName, t.Identifier),

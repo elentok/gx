@@ -159,7 +159,7 @@ func TestGuardRail_AHumanRelaunchResetsTheBudget(t *testing.T) {
 		return ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: kind, Reason: "relaunch"}
 	}
 	full := []ralphloop.Event{applied("a"), applied("b"), applied("c")}
-	f := recovery.Failure{Address: "proj:epic-a/01", Type: events.NeedsRepair, Kind: "d"}
+	f := recovery.Failure{Address: "proj:epic-a/01", Type: events.Paused, Kind: "d"}
 	if why := server.GuardRailStop(full, f); why == "" {
 		t.Fatal("three recoveries did not stop recovery")
 	}

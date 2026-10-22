@@ -674,7 +674,7 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 	}
 	var needsAnswer *Event
 	for i, ev := range events {
-		if ev.Type == string(eventsc.NeedsAnswer) && ev.Ticket == "01" {
+		if ev.Type == string(eventsc.Paused) && ev.Ticket == "01" {
 			needsAnswer = &events[i]
 		}
 		if ev.Type == string(eventsc.CherryPicked) {
@@ -751,7 +751,7 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 		if ev.Type == string(eventsc.Commitless) && ev.Ticket == "01" {
 			commitless = &events[i]
 		}
-		if ev.Type == string(eventsc.NeedsAnswer) {
+		if ev.Type == string(eventsc.Paused) {
 			t.Errorf("events = %+v, want no needs-answer event for a declared-commitless iteration", events)
 		}
 	}

@@ -522,7 +522,7 @@ func (s *chatEventSink) parkTicket(source, reason string) error {
 		EpicName:   s.epicName,
 		Ticket:     identifier,
 		Path:       source,
-		Type:       events.NeedsRepair,
+		Type:       events.Paused,
 		Kind:       events.IterationError,
 		Reason:     reason,
 	})

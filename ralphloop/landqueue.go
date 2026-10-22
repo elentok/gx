@@ -167,7 +167,7 @@ func logLandDeferred(p iterationParams) {
 			reason = "land lock held by " + owner.Describe()
 		}
 	}
-	p.logTicketEventReason(string(events.LandDeferred), "", "", "", reason)
+	p.logTicketEventReason(string(events.MergeDeferred), "", "", "", reason)
 }
 
 // claimEligibleLandJob picks the lowest-numbered job in landJobs (see
@@ -262,7 +262,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 			// Parked, not failed: callers then see it via isParked / the ticket.
 			if _, perr := park(p.Sink, parkRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
-				Type: events.NeedsRepair, Kind: events.AmbiguousLand, Reason: amb.Error(),
+				Type: events.Paused, Kind: events.AmbiguousMerge, Reason: amb.Error(),
 				Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},
 			}); perr != nil {
 				return outcome{ticket: job.ticket, err: perr}

@@ -184,7 +184,7 @@ func (s *Server) runRule(plan recoveryPlan, f recovery.Failure) {
 func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome string) {
 	ref := plan.ref
 	s.recordRecovery(ref, events.RecoveryEscalated, f, reason, outcome)
-	if f.Type == events.NeedsRepair || f.Type == events.NeedsAnswer {
+	if f.Type == events.Paused {
 		s.parkHold.take(f.Address)
 		s.parkHold.escalate(f.Address)
 		// A --wait on the ticket reads the hold, so it must hear the escalation.
@@ -208,7 +208,7 @@ func (s *Server) escalate(plan recoveryPlan, f recovery.Failure, reason, outcome
 // remedy will run unattended, keeps back the park's chat message for it. It
 // reports false when nothing is held: the caller then notifies at once.
 func (s *Server) holdParkForRecovery(addr tickets.Address, ticketPath string, kind events.Kind, reason string) bool {
-	f := recovery.Failure{Address: addr.String(), Type: kind.ParkType(), Kind: kind, Reason: reason}
+	f := recovery.Failure{Address: addr.String(), Type: events.Paused, Kind: kind, Reason: reason}
 	s.parkHold.forget(f.Address)
 	plan, ok := s.planRecovery(f)
 	if !ok {
@@ -427,7 +427,7 @@ func guardRailStop(log []ralphloop.Event, f recovery.Failure) string {
 }
 
 func clearsRecovery(t events.Type) bool {
-	return t == events.CherryPicked || t == events.TicketReset || t == events.ManualLand
+	return t == events.CherryPicked || t == events.TicketStartedOver || t == events.ManualMerge
 }
 
 // failureSequence is the ticket's events as the matcher sees them, ending in

@@ -202,7 +202,7 @@ func TestEpicMerge_LandErrorReturnsALandErrorPark(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertMergeParked(t, res, events.LandError)
+	assertMergeParked(t, res, events.MergeError)
 	if !strings.HasPrefix(res.Message, "land failed: ") {
 		t.Errorf("message = %q, want a land failure", res.Message)
 	}

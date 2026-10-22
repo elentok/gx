@@ -19,7 +19,7 @@ func TestFinish_ZeroCommitParkRecordsRun(t *testing.T) {
 		servertest.SetProjectRepo(t, store, "proj", repo)
 		h := servertest.StartWithStore(t, store)
 		runToZeroCommitPark(t, h, "done")
-		assertParkRecordsRun(t, store, events.NeedsAnswer, "herdr", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "s1"})
+		assertParkRecordsRun(t, store, events.Paused, "herdr", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "s1"})
 	})
 	t.Run("headless", func(t *testing.T) {
 		store, repo := t.TempDir(), testutil.TempRepo(t)
@@ -33,6 +33,6 @@ func TestFinish_ZeroCommitParkRecordsRun(t *testing.T) {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
 		waitStatus(t, h.TicketStore+"/proj/epic-a/issues/01-first.md", schema.StatusNeedsAnswer)
-		assertParkRecordsRun(t, store, events.NeedsAnswer, "fake", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "session-1"})
+		assertParkRecordsRun(t, store, events.Paused, "fake", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "session-1"})
 	})
 }

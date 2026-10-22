@@ -61,7 +61,7 @@ func TestDeadlock_AllParkedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 	h.Server.ClaimNext()
 	got := runLogOf(t, h, events.Deadlocked)
-	if len(got) != 1 || got[0].Kind != string(events.AllParked) {
+	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
 		t.Errorf("deadlocked events = %+v, want one all-parked", got)
 	}
 }
@@ -80,7 +80,7 @@ func TestDeadlock_ErrorTicketParksTheEpic(t *testing.T) {
 	h.Server.ClaimNext()
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
 	got := runLogOf(t, h, events.Deadlocked)
-	if len(got) != 1 || got[0].Kind != string(events.AllParked) {
+	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
 		t.Errorf("deadlocked events = %+v, want one all-parked", got)
 	}
 }
@@ -126,7 +126,7 @@ func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
 // investigation of the epic and queues it at the front.
 func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	h := startDeadlock(t, recovery.Catalog{Enabled: true})
-	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllParked, Reason: "every remaining ticket is parked"})
+	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is parked"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryApplied)) > 0 })
 
 	applied := runLogOf(t, h, events.RecoveryApplied)
@@ -147,7 +147,7 @@ func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	}
 
 	// A second deadlock of the same kind hits the per-kind cap.
-	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllParked, Reason: "again"})
+	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "again"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryEscalated)) > 0 })
 	time.Sleep(100 * time.Millisecond)
 	if got := runLogOf(t, h, events.RecoveryApplied); len(got) != 1 {

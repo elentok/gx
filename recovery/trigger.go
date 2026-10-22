@@ -25,20 +25,21 @@ type Failure struct {
 }
 
 // Triggers reports whether a failure of this shape may start recovery at all:
-// every needs-repair kind except budget-killed (a deliberate stop), needs-answer
-// zero-commit, needs-answer blocked-pane, a deadlock, a held background-task
-// gate (R10) and a ticket-graph defect a scan found (R14). Self-reported and
-// manual parks and commitless finishes are a person's or the ticket's own
+// every repair-class pause except budget-killed (a deliberate stop), an
+// answer-class zero-commit or blocked-pane pause, a deadlock, a held
+// background-task gate (R10) and a ticket-graph defect a scan found (R14).
+// Self-reported and manual pauses and commitless finishes are a person's or the ticket's own
 // decision, never recovered; a rate-limit pause (R8) is healthy waiting. A
 // blocked pane still needs a match (NeedsMatch).
 func (f Failure) Triggers() bool {
 	switch f.Type {
 	case events.BackgroundTaskGateHeld, events.TicketGraphDefect:
 		return true
-	case events.NeedsRepair:
-		return f.Kind != events.BudgetKilled && f.Kind != events.SelfReported && f.Kind != events.ManualPark
-	case events.NeedsAnswer:
-		return f.Kind == events.ZeroCommit || f.Kind == events.BlockedPane
+	case events.Paused:
+		if f.Kind.AwaitsAnswer() {
+			return f.Kind == events.ZeroCommit || f.Kind == events.BlockedPane
+		}
+		return f.Kind != events.BudgetKilled && f.Kind != events.Manual
 	case events.Deadlocked:
 		return true
 	}

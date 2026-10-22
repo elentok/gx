@@ -75,7 +75,7 @@ func assertParkedNameTaken(t *testing.T, h *servertest.Harness, want ...string) 
 	failed := slices.IndexFunc(logged, func(ev ralphloop.Event) bool {
 		return ev.Type == string(events.LaunchFailed) && ev.Kind == string(events.AgentNameTaken)
 	})
-	park := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.NeedsRepair) })
+	park := slices.IndexFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.Paused) })
 	if failed < 0 || park < failed || logged[park].Kind != string(events.AgentNameTaken) {
 		t.Fatalf("run log = %+v, want launch-failed then a needs-repair agent_name_taken park", logged)
 	}

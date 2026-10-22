@@ -762,7 +762,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 		switch e.Type {
 		case string(eventsc.SmartZoneRecoveryFailed):
 			sawFailed = true
-		case string(eventsc.NeedsRepair):
+		case string(eventsc.Paused):
 			sawNeedsRepair = true
 		case string(eventsc.Resumed):
 			sawResumed = true

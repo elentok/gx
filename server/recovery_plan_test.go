@@ -17,8 +17,8 @@ func TestRecoveryPlan_DecideMapsEachCaseToOneAction(t *testing.T) {
 	person := recovery.Entry{ID: "R9", Executor: recovery.ExecutorPerson}
 	recognize := recovery.Entry{ID: "R9", Executor: recovery.ExecutorRecognize}
 
-	park := recovery.Failure{Type: events.NeedsRepair, Kind: events.Spinning}
-	blocked := recovery.Failure{Type: events.NeedsAnswer, Kind: events.BlockedPane}
+	park := recovery.Failure{Type: events.Paused, Kind: events.Spinning}
+	blocked := recovery.Failure{Type: events.Paused, Kind: events.BlockedPane}
 	deadlock := recovery.Failure{Type: events.Deadlocked}
 	recovered := []ralphloop.Event{{Type: string(events.RecoveryApplied), Kind: string(events.Spinning), Reason: "R9"}}
 

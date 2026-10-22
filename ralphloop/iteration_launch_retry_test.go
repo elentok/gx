@@ -256,7 +256,7 @@ func TestRunIteration_SessionDiedInWait_ParksNeedsRepairWithReason(t *testing.T)
 	}
 	var parked []Event
 	for _, ev := range evs {
-		if ev.Type == string(events.NeedsRepair) {
+		if ev.Type == string(events.Paused) {
 			parked = append(parked, ev)
 		}
 	}

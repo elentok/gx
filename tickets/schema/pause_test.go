@@ -3,7 +3,22 @@ package schema
 import (
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/events"
 )
+
+func TestPauseClasses_MatchEventKinds(t *testing.T) {
+	for r, class := range pauseClasses {
+		k := events.Kind(r)
+		if !k.Valid() {
+			t.Errorf("reason %q is not an events kind", r)
+			continue
+		}
+		if k.AwaitsAnswer() != (class == PauseClassAnswer) {
+			t.Errorf("reason %q: events says AwaitsAnswer=%v, schema says class %q", r, k.AwaitsAnswer(), class)
+		}
+	}
+}
 
 func TestPauseReason_EveryReasonHasAClass(t *testing.T) {
 	for r, class := range pauseClasses {

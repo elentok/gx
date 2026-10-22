@@ -61,7 +61,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 		if fault != "" {
 			reason, err := park(p.Sink, parkRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
-				Type: events.NeedsRepair, Kind: kind, Reason: fault,
+				Type: events.Paused, Kind: kind, Reason: fault,
 				Event: p.agentEvent(pane, sessionID, w.Path),
 			})
 			if err != nil {
