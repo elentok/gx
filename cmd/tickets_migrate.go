@@ -88,9 +88,9 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		changes = append(changes, timed...)
 	}
 	if err == nil {
-		var parked []tickets.MigrationChange
-		parked, err = tickets.MigrateQuestionSections(scratchRoot, time.Now())
-		changes = append(changes, parked...)
+		var moved []tickets.MigrationChange
+		moved, err = tickets.MigrateQuestionSections(scratchRoot, time.Now())
+		changes = append(changes, moved...)
 	}
 	if err == nil {
 		var paused []tickets.MigrationChange

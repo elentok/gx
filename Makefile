@@ -33,7 +33,7 @@ install: web-build
 	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
 
 # -timeout=10m (per package; the server package alone sums to ~100s): legitimate tests (incl. real-git/production-style) finish in a few seconds each
-# locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. park/resume
+# locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. pause/resume
 # against a permit cap) more room to legitimately run long; 2m proved too tight there.
 # The real-herdr e2e tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
 # The PTY-runner packages also run under -race: they share a vt emulator with

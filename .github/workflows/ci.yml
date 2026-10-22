@@ -55,7 +55,7 @@ jobs:
         # make test runs the race packages, then every other package, then the
         # server package sharded across processes (scripts/test-shards.sh). Each
         # step keeps -timeout=10m per package/shard: CI runners' lower core counts
-        # give concurrency-sensitive tests (e.g. park/resume against a permit cap)
+        # give concurrency-sensitive tests (e.g. pause/resume against a permit cap)
         # more room to legitimately run long; 2m and 5m both timed out on tests
         # that pass reliably (and fast) locally.
         # A commit's detached auto maintenance can outlive a test and break

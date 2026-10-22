@@ -11,7 +11,7 @@ import (
 // blockedBySuffix's unbounded text today.
 const pauseReasonMaxRunes = 60
 
-// pausedRepairHeading is the literal heading markNeedsRepairWithReason
+// pausedRepairHeading is the literal heading markRepairWithReason
 // (ralphloop/claim.go) appends to a paused ticket's body.
 const pausedRepairHeading = tickets.LegacyRepairHeading
 

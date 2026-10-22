@@ -149,10 +149,10 @@ func TestToastFor(t *testing.T) {
 		ev   server.Event
 		want viewmodel.Toast
 	}{
-		{"iteration parked", server.Event{Type: server.EventIterationPaused, Address: "gx:e/01"},
-			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 parked"}},
-		{"ticket parked", server.Event{Type: server.EventTicketPaused, Address: "gx:e/01"},
-			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 parked"}},
+		{"iteration paused", server.Event{Type: server.EventIterationPaused, Address: "gx:e/01"},
+			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 paused"}},
+		{"ticket paused", server.Event{Type: server.EventTicketPaused, Address: "gx:e/01"},
+			viewmodel.Toast{Level: server.EventLevelWarning, Text: "gx:e/01 paused"}},
 		{"reload success", server.Event{Type: server.EventConfigReloaded, Level: server.EventLevelSuccess, Message: "ok"},
 			viewmodel.Toast{Level: server.EventLevelSuccess, Text: "ok"}},
 		{"reload warning", server.Event{Type: server.EventConfigReloaded, Level: server.EventLevelWarning, Message: "warn"},

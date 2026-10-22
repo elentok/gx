@@ -31,7 +31,7 @@ type IterationState string
 const (
 	IterationClaimed IterationState = "claimed"
 	IterationRunning IterationState = "running"
-	IterationParked  IterationState = "parked"
+	IterationPaused  IterationState = "paused"
 	IterationFailed  IterationState = "failed"
 )
 
@@ -147,7 +147,7 @@ func (s State) PendingRowFor(address string) (server.PendingRow, bool) {
 func ToastFor(ev server.Event) (Toast, bool) {
 	switch ev.Type {
 	case server.EventIterationPaused, server.EventTicketPaused:
-		return Toast{Level: server.EventLevelWarning, Text: ev.Address + " parked"}, true
+		return Toast{Level: server.EventLevelWarning, Text: ev.Address + " paused"}, true
 	case server.EventConfigReloaded:
 		return Toast{Level: ev.Level, Text: ev.Message}, true
 	}
@@ -233,7 +233,7 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 	case server.EventIterationStarted:
 		s = s.withIteration(ev.Address, IterationRunning)
 	case server.EventIterationPaused:
-		s = s.withIteration(ev.Address, IterationParked)
+		s = s.withIteration(ev.Address, IterationPaused)
 	case server.EventIterationFailed:
 		s = s.withIteration(ev.Address, IterationFailed)
 	case server.EventIterationLaunchFailed:

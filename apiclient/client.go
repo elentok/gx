@@ -202,7 +202,7 @@ func (c *Client) Explain(ctx context.Context, address string) (server.Explanatio
 	return e, err
 }
 
-// Detail returns one ticket's park detail, by its full address.
+// Detail returns one ticket's pause detail, by its full address.
 func (c *Client) Detail(ctx context.Context, address string) (server.TicketDetail, error) {
 	var d server.TicketDetail
 	err := c.get(ctx, "/v1/tickets/detail?address="+url.QueryEscape(address), &d)
@@ -284,7 +284,7 @@ func (c *Client) TicketPause(ctx context.Context, address, reason string) (serve
 	return c.queueWriteTo(ctx, "/v1/tickets/pause", server.QueueRequest{Address: address, PauseReason: reason})
 }
 
-// TicketUnmute clears a ticket's mutes and reopens it if it was parked needs-repair.
+// TicketUnmute clears a ticket's mutes and reopens it if it was paused for repair.
 func (c *Client) TicketUnmute(ctx context.Context, address string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/unmute", server.QueueRequest{Address: address})
 }
@@ -313,7 +313,7 @@ func (c *Client) EpicMerge(ctx context.Context, address string) (server.QueueRes
 }
 
 // TicketAsk records an agent's question (a "## Question" + "## Handoff" body)
-// on a ticket and flags it needs-answer.
+// on a ticket and pauses it asking.
 func (c *Client) TicketAsk(ctx context.Context, address, body string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/ask", server.QueueRequest{Address: address, Text: body})
 }

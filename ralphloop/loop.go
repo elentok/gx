@@ -908,7 +908,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// claimed, not done, so this is not a completed merge — no
 			// completed++/sink.IterationFinished. Drop it from launched so a
 			// later run's reconcile can pick the orphaned claim back up
-			// (see tickets.Epic.IsParked: "claimed" itself is never paused, so
+			// (see tickets.Epic.IsPaused: "claimed" itself is never paused, so
 			// nothing else would remove it here).
 			delete(launched, r.ticket.Identifier)
 			continue
@@ -1025,7 +1025,7 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 func AllDone(e tickets.Epic) bool { return allDone(e) }
 
 // allDone reports whether every ticket in e is done — the run's one exit
-// condition. A stalled ticket (see tickets.Epic.IsParked) is deliberately not an
+// condition. A stalled ticket (see tickets.Epic.IsPaused) is deliberately not an
 // exit condition: the run pauses on it instead, so the agent's question is
 // still answerable in its own pane.
 func allDone(e tickets.Epic) bool {

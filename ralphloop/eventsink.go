@@ -89,11 +89,8 @@ type EventSink interface {
 	// for a person, fired at gx's pausing write itself (the gate's write, the
 	// adoption path's write, and each fault-side write) so coverage is total
 	// rather than incidental. status is a plain string ("paused (answer)" /
-	// "paused (repair)", matching schema.StatusNeedsAnswer/StatusNeedsRepair's
-	// raw values) — ask-versus-fault is a rendering choice a consumer makes
-	// from status, not a plumbing fork into separate events the way
-	// TicketNeedsAnswer/TicketStillNeedsRepair/the pause-flavored
-	// IterationPaused used to be.
+	// "paused (repair)") — ask-versus-fault is a rendering choice a consumer
+	// makes from status, not a plumbing fork into separate events.
 	TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string)
 
 	// TicketClaimed reports that ticket was claimed off the frontier for a

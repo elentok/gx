@@ -266,7 +266,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 
 Run it by hand once after upgrading; gx does not run it at server start. It
 also moves each live "## Needs Answer" and "## Handoff" section into the
-ticket's log as a park.question (plus a park.answer when the ticket was
+ticket's log as a question event (plus an answer event when the ticket was
 answered by hand and is open again). Until it has run, an old ticket without a
 log shows no open question on the web. A second run changes nothing.`,
 		Args: cobra.ExactArgs(1),

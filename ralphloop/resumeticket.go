@@ -110,14 +110,14 @@ func clearablePausedTicket(d Deps, epicName, worktreeDir string, agentKind Agent
 	}
 }
 
-// clearableAsking is clearablePausedTicket's StatusNeedsAnswer branch,
+// clearableAsking is clearablePausedTicket's asking branch,
 // split out so a caller that has already looked up t's live-agent status
 // (hasLivePausedTicket, deciding whether to keep polling the same ticket) can
 // reuse that lookup instead of paying for a second pane lookup here.
 //
 // Clearability depends on which of ralph-loop's three paused (answer) producers
-// paused t (see schema.ParkKind's doc). A missing pause_kind (any ticket
-// paused before that field existed) defaults to ParkKindZeroCommit, the
+// paused t (see schema.PauseKind's doc). A missing pause_kind (any ticket
+// paused before that field existed) defaults to PauseKindZeroCommit, the
 // conservative choice: unlike a gate pause or a self-report, a zero-commit
 // finish never told anyone whether picking the pane back up is actually
 // safe. blocked-pane and self-reported pauses still own a pane an operator

@@ -94,11 +94,11 @@ func pauseWrite(path string, repauseDone bool, mutate func(*schema.Ticket, *stri
 }
 
 // markRepairWithReason writes status: paused (repair) into the ticket file,
-// stamps pauseKind (the same kind the pause event carries), and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
+// stamps pauseKind (the same kind the pause event carries), and appends a "## Needs Repair" section built by schema.FormatFaultBody
 // (summary/detail split from reason, plus state rendered best-effort), so the
 // full failure is readable by opening the ticket file even when the live
 // UI's status subtext truncates it. Fails without writing anything if reason
-// is empty — see FormatNeedsRepairBody's write-conditional validation.
+// is empty — see FormatFaultBody's write-conditional validation.
 func markRepairWithReason(path, reason string, pauseKind schema.PauseKind, state schema.FaultState, repauseDone bool) error {
 	section, err := schema.FormatFaultBody(reason, state)
 	if err != nil {

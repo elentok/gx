@@ -40,7 +40,23 @@ var allowed = map[string]string{
 	"tickets/schema/frontmatter.go": "read shim",
 	"events/legacy.go":              "read shim",
 	// Hidden aliases.
-	"config/config.go": "resume-on-start alias",
+	"config/config.go":    "resume-on-start alias",
+	"apiclient/client.go": "QueueDrain alias client for the hidden drain route",
+	"cmd/server_reads.go": "hidden drain and park command aliases",
+	"server/server.go":    "hidden /v1/queue/drain, /v1/tickets/park and unpark routes",
+	"server/web.go":       "hidden /v1/tickets/unpark route",
+	// Legacy section headings and statuses that old tickets still carry; the
+	// code demotes, migrates or recognises them.
+	"cmd/commands.go":             "migrate help names the legacy Needs Answer section",
+	"cmd/tickets_migrate.go":      "migrate doc names the legacy statuses",
+	"ralphloop/claim.go":          "demotes the legacy Needs Repair section",
+	"ralphloop/pauseticket.go":    "names the legacy Needs Repair section",
+	"ralphloop/resumeticket.go":   "demotes the legacy Needs Answer and Needs Repair sections",
+	"tickets/migrate_question.go": "moves the legacy Needs Answer section into the log",
+	"tickets/pausedetail.go":      "legacy Needs Answer and Needs Repair headings",
+	"tickets/startover.go":        "demotes the legacy Needs Answer and Needs Repair sections",
+	"ui/tickets/pause_labels.go":  "documents the legacy statuses it still labels",
+	"ui/tickets/preview.go":       "highlights the legacy Needs Repair heading",
 	// Documentation of the retirement and of the past.
 	"docs/":                          "old specs, ADRs and plans",
 	"CHANGELOG.md":                   "changelog",
