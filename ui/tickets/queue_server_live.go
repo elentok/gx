@@ -61,7 +61,8 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 // applyEpics swaps the rows in and re-derives what hangs off them. With
 // wholeEpic, every ticket of an epic holding a queue item is a candidate: the
 // server schedules the epic's whole frontier, so a ticket added after the epic
-// was queued must show too.
+// was queued must show too. The item is a ticket address or, from the web UI,
+// the epic's own address.
 func (m *QueueModel) applyEpics(epics []gxtickets.Epic, wholeEpic bool) {
 	m.loaded = true
 	m.epics = epics
@@ -70,7 +71,8 @@ func (m *QueueModel) applyEpics(epics []gxtickets.Epic, wholeEpic bool) {
 		m.candidates[path] = true
 	}
 	for _, epic := range epics {
-		if !wholeEpic || !slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.checked[t.Path] }) {
+		queued := m.checked[epic.Name] || slices.ContainsFunc(epic.Tickets, func(t gxtickets.Ticket) bool { return m.checked[t.Path] })
+		if !wholeEpic || !queued {
 			continue
 		}
 		for _, t := range epic.Tickets {

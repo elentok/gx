@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -137,6 +138,25 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 	body := strings.Join(m.queueHeaderBodyLines(), "\n")
 	if !strings.Contains(body, "herdr unavailable") {
 		t.Errorf("header body %q does not say herdr is unavailable", body)
+	}
+}
+
+// The web UI queues a whole epic as one epic-address item, which names no
+// ticket; every ticket of that epic must still show.
+func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, Tickets: []server.TicketInfo{
+		{Address: "gx:alpha/01", Title: "First", Status: "open"},
+		{Address: "gx:alpha/02", Title: "Second", Status: "open", BlockedBy: []string{"gx:alpha/01"}},
+	}}, []server.QueueItem{{Address: "gx:alpha"}})
+
+	var shown []string
+	for _, e := range m.buildQueueEntries() {
+		if e.Value.kind == nodeQueueTicket {
+			shown = append(shown, e.Value.ticket.ticket.Path)
+		}
+	}
+	if want := []string{"gx:alpha/01", "gx:alpha/02"}; !slices.Equal(shown, want) {
+		t.Errorf("ticket rows = %v, want %v", shown, want)
 	}
 }
 
