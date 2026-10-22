@@ -8,3 +8,5 @@ gx-implement   mattpocock/skills  skills/engineering/implement    LICENSE  386d4
 gx-grilling         mattpocock/skills  skills/productivity/grilling         LICENSE        5beb35b  merge
 gx-domain-modeling  mattpocock/skills  skills/engineering/domain-modeling   LICENSE        5beb35b  merge
 gx-unslop           cursor/plugins     pstack/skills/unslop                 pstack/LICENSE eb4db2b  merge
+gx-research         mattpocock/skills  skills/engineering/research          LICENSE        5beb35b  merge
+gx-prototype        mattpocock/skills  skills/engineering/prototype         LICENSE        5beb35b  merge

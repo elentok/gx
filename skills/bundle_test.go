@@ -55,6 +55,16 @@ var requiredFiles = []string{
 	"gx-unslop/SKILL.md",
 	"gx-unslop/LICENSE",
 	"gx-unslop/README.md",
+	"gx-research/SKILL.md",
+	"gx-research/LICENSE",
+	"gx-research/README.md",
+	"gx-research/agents/openai.yaml",
+	"gx-prototype/SKILL.md",
+	"gx-prototype/LOGIC.md",
+	"gx-prototype/UI.md",
+	"gx-prototype/LICENSE",
+	"gx-prototype/README.md",
+	"gx-prototype/agents/openai.yaml",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -178,6 +188,8 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-grilling":                  false,
 	"gx-domain-modeling":           false,
 	"gx-unslop":                    false,
+	"gx-research":                  false,
+	"gx-prototype":                 false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
