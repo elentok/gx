@@ -259,7 +259,7 @@ running it only if the user has explicitly asked for a second code-review ticket
 <ticket-template>
 
 ```markdown
-# <NN> — <Ticket title>
+# <Ticket title>
 
 ## What to build
 
