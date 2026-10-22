@@ -181,9 +181,6 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	ticket.Unique = parsed.Unique
 	ticket.Agent = parsed.Agent
 	ticket.PauseReason = parsed.PauseReason
-	if parsed.PauseReason != "" {
-		ticket.PauseKind = schema.PauseKind(parsed.PauseReason)
-	}
 	ticket.Mutes = parsed.Mutes
 	ticket.Base = parsed.Base
 	ticket.ResolvedBase = parsed.ResolvedBase

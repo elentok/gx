@@ -136,11 +136,11 @@ func clearableAsking(d Deps, worktreeDir, epicName string, t tickets.Ticket, sta
 	if !live || status.State == agentrunner.StateBlocked {
 		return false
 	}
-	kind := t.PauseKind
-	if kind == "" {
-		kind = schema.PauseKindZeroCommit
+	reason := t.PauseReason
+	if reason == "" {
+		reason = schema.PauseZeroCommit
 	}
-	if kind == schema.PauseKindZeroCommit {
+	if reason == schema.PauseZeroCommit {
 		return pausedTicketHasNewCommits(d, worktreeDir, epicName, t)
 	}
 	return true

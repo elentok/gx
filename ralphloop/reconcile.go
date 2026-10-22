@@ -122,17 +122,16 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// reattaching, reverting, or reporting on it here.
 			continue
 		}
-		status := strings.ToLower(strings.TrimSpace(t.LegacyStatus()))
-		if status == "needs-repair" {
+		if t.PausedClass() == schema.PauseClassRepair {
 			if live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 				reattach(t)
 				reattached = append(reattached, t)
 			} else {
-				sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", eventsc.Kind(t.PauseKind), "no live iteration found")
+				sink.TicketNeedsHuman(t.Identifier, epic.Name, string(schema.StatusLegacyRepair), eventsc.Kind(t.PauseReason), "no live iteration found")
 			}
 			continue
 		}
-		if status != "claimed" {
+		if strings.ToLower(strings.TrimSpace(t.Status)) != "claimed" {
 			continue
 		}
 		if t.Type == string(schema.TypeConflictResolution) {

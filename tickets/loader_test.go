@@ -383,17 +383,16 @@ func TestLoad_LegacyPauseLoadsAsPausedAndMapEpicsStayUnshimmed(t *testing.T) {
 	want := []struct {
 		status string
 		reason schema.PauseReason
-		kind   schema.PauseKind
 		render RenderedStatus
 	}{
-		{"paused", schema.PauseBlockedPane, "blocked-pane", StatusPausedAnswer},
-		{"paused", schema.PauseMergeConflict, "merge-conflict", StatusPausedRepair},
-		{"paused", schema.PauseSpinning, "spinning", StatusPausedRepair},
+		{"paused", schema.PauseBlockedPane, StatusPausedAnswer},
+		{"paused", schema.PauseMergeConflict, StatusPausedRepair},
+		{"paused", schema.PauseSpinning, StatusPausedRepair},
 	}
 	for i, w := range want {
 		got := byName["plain"].Tickets[i]
-		if got.Status != w.status || got.PauseReason != w.reason || got.PauseKind != w.kind || got.RawStatus() != w.render {
-			t.Errorf("plain[%d] = %q/%q/%q/%v, want %+v", i, got.Status, got.PauseReason, got.PauseKind, got.RawStatus(), w)
+		if got.Status != w.status || got.PauseReason != w.reason || got.RawStatus() != w.render {
+			t.Errorf("plain[%d] = %q/%q/%v, want %+v", i, got.Status, got.PauseReason, got.RawStatus(), w)
 		}
 	}
 	if got := byName["mapepic"].Tickets[0].Status; got != "needs-answer" {

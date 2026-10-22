@@ -40,9 +40,6 @@ type answerRefused struct{ res QueueResult }
 
 func (e answerRefused) Error() string { return e.res.Message }
 
-// answerState is the token a client sends back: it covers the latest
-// question's seq and the ticket's status, so an answer to a question that was
-// replaced, closed or re-paused is stale.
 // storedStatus is t's status in the old stored spelling: a paused ticket is
 // asking or stuck by class. The web API and pause events keep
 // those labels until the events are renamed.
@@ -53,8 +50,11 @@ func storedStatus(t schema.Ticket) schema.Status {
 	return t.Status
 }
 
-func answerState(q tickets.LogEvent, status schema.Status) string {
-	return fmt.Sprintf("%d:%s", q.Seq, status)
+// answerState is the token a client sends back: it covers the latest
+// question's seq and the ticket's pause class, so an answer to a question that
+// was replaced, closed or re-paused is stale.
+func answerState(q tickets.LogEvent, class schema.PauseClass) string {
+	return fmt.Sprintf("%d:%s", q.Seq, class)
 }
 
 // normalizeAnswer turns every line ending into \n so a CR cannot submit the
@@ -139,7 +139,7 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 			case open == nil:
 				return refuse(refusal(ReasonNotPaused, address+" has no open question"))
 			}
-			state := answerState(*open, storedStatus(t))
+			state := answerState(*open, t.PausedClass())
 			if req.State != "" && req.State != state {
 				res := refusal(ReasonStale, "the question changed; answer the current one")
 				res.Question, res.State = open, state

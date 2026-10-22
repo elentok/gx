@@ -41,7 +41,7 @@ const (
 	// ticket 04a) treats it as its own "paused for repair" state rather than a
 	// generic pause. A pane blocked on an operator prompt is a different pause
 	// entirely (paused (answer), no pause — see pauseOnBlockedPane).
-	PauseRepair PauseKind = "needs-repair"
+	PauseRepair PauseKind = "repair"
 )
 
 // StalledTicket names one human-clearable ticket a paused epic is waiting

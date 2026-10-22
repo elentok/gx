@@ -93,9 +93,6 @@ type Ticket struct {
 	// paused.
 	PauseReason schema.PauseReason
 
-	// PauseKind is PauseReason as an events.Kind. Derived on load, never stored.
-	PauseKind schema.PauseKind
-
 	// Mutes mirrors schema.Ticket.Mutes: notification event types that have
 	// tripped a throttle for this ticket, oldest first.
 	Mutes []schema.MuteRecord

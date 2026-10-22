@@ -42,8 +42,7 @@ func stateOf(t *testing.T, ticketPath string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The state token keeps the old status label for the web API.
-	return fmt.Sprintf("%d:%s", open.Seq, tk.PausedClass().LegacyStatus())
+	return fmt.Sprintf("%d:%s", open.Seq, tk.PausedClass())
 }
 
 func webResume(t *testing.T, h *servertest.Harness, req server.RepairRequest) server.RepairResult {

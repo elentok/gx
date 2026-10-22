@@ -316,7 +316,7 @@ func resumeStale(ticketPath string, t schema.Ticket, state string) (RepairResult
 	if err != nil {
 		return RepairResult{}, false, fmt.Errorf("read log of %s: %w", ticketPath, err)
 	}
-	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.PausedClass().LegacyStatus()) == state {
+	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.PausedClass()) == state {
 		return RepairResult{}, false, nil
 	}
 	return staleResumeRefusal(), true, nil
@@ -342,7 +342,7 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.ResumeResu
 			return tickets.LogEvent{}, err
 		}
 		open := tickets.OpenQuestion(evs)
-		if t.PausedClass() != schema.PauseClassAnswer || open == nil || answerState(*open, t.PausedClass().LegacyStatus()) != req.State {
+		if t.PausedClass() != schema.PauseClassAnswer || open == nil || answerState(*open, t.PausedClass()) != req.State {
 			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
 		if err := ralphloop.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {

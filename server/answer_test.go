@@ -31,11 +31,11 @@ func pauseWithQuestion(t *testing.T, ticketPath, block string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return answerToken(ev.Seq, schema.StatusLegacyAnswer)
+	return answerToken(ev.Seq, schema.PauseClassAnswer)
 }
 
-func answerToken(seq int, status schema.Status) string {
-	return strings.Join([]string{string(rune('0' + seq)), string(status)}, ":")
+func answerToken(seq int, class schema.PauseClass) string {
+	return strings.Join([]string{string(rune('0' + seq)), string(class)}, ":")
 }
 
 func answerCount(t *testing.T, ticketPath string) int {

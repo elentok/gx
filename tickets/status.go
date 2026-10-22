@@ -119,6 +119,14 @@ func (t Ticket) LegacyStatus() string {
 	return t.Status
 }
 
+// PausedClass is the pause class of t when it is paused, else "".
+func (t Ticket) PausedClass() schema.PauseClass {
+	if t.Status == string(schema.StatusPaused) {
+		return t.PauseReason.Class()
+	}
+	return ""
+}
+
 // RawStatus is t's status as its file says it, with no Blocked by: or
 // waiting-for-children overlay.
 func (t Ticket) RawStatus() RenderedStatus { return t.baseStatus() }
