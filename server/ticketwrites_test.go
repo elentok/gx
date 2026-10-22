@@ -2,13 +2,14 @@ package server_test
 
 import (
 	"context"
-	"github.com/elentok/gx/ralphloop"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/ralphloop"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
@@ -36,7 +37,7 @@ func TestPark_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
 		t.Fatalf("park = %+v, %v; want %s refusal", res, err, server.ReasonReasonRequired)
 	}
 	data, _ := os.ReadFile(path)
-	if strings.Contains(string(data), "needs-repair") {
+	if strings.Contains(string(data), "status: paused") {
 		t.Errorf("refused park changed the ticket:\n%s", data)
 	}
 }
@@ -51,7 +52,7 @@ func TestPark_WritesStatusSectionAndOneEvent(t *testing.T) {
 		t.Fatalf("park = %+v, %v", res, err)
 	}
 	data, _ := os.ReadFile(path)
-	for _, want := range []string{"status: needs-repair", "## Needs Repair", "needs a human look"} {
+	for _, want := range []string{"status: paused", "pause_reason: manual", "## Needs Repair", "needs a human look"} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("ticket lacks %q:\n%s", want, data)
 		}

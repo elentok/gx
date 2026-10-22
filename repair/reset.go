@@ -161,7 +161,7 @@ func checkResettable(in ResetInput, epic tickets.Epic, t tickets.Ticket) error {
 	// Raw status, not RenderedStatus: blockers render a claimed ticket
 	// "blocked" and dependents render a done one "waiting-for-children".
 	switch status := schema.Status(t.Status); status {
-	case schema.StatusClaimed, schema.StatusNeedsRepair, schema.StatusNeedsAnswer:
+	case schema.StatusClaimed, schema.StatusPaused:
 	case schema.StatusDone:
 		if !in.Force {
 			return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is done and already landed; pass --force to reset it anyway (the landing is not reverted)", in.ID)}

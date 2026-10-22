@@ -43,6 +43,16 @@ func (e answerRefused) Error() string { return e.res.Message }
 // answerState is the token a client sends back: it covers the latest
 // question's seq and the ticket's status, so an answer to a question that was
 // replaced, closed or re-parked is stale.
+// storedStatus is t's status in the old stored spelling: a paused ticket is
+// needs-answer or needs-repair by class. The web API and park events keep
+// those labels until the events are renamed.
+func storedStatus(t schema.Ticket) schema.Status {
+	if t.Status == schema.StatusPaused {
+		return t.PausedClass().LegacyStatus()
+	}
+	return t.Status
+}
+
 func answerState(q tickets.LogEvent, status schema.Status) string {
 	return fmt.Sprintf("%d:%s", q.Seq, status)
 }
@@ -122,14 +132,14 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 			}
 			open := tickets.OpenQuestion(evs)
 			switch {
-			case t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusNeedsRepair:
+			case t.PausedClass() == "":
 				return refuse(refusal(ReasonNotParked, address+" is not parked"))
-			case t.Status == schema.StatusNeedsRepair || t.ParkKind != schema.ParkKindSelfReported:
+			case t.PausedClass() == schema.PauseClassRepair || t.PauseReason != schema.PauseSelfReported:
 				return refuse(refusal(ReasonNotAnswerable, address+" was not parked by a question; use unpark"))
 			case open == nil:
 				return refuse(refusal(ReasonNotParked, address+" has no open question"))
 			}
-			state := answerState(*open, t.Status)
+			state := answerState(*open, storedStatus(t))
 			if req.State != "" && req.State != state {
 				res := refusal(ReasonStale, "the question changed; answer the current one")
 				res.Question, res.State = open, state

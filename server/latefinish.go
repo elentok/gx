@@ -14,11 +14,11 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// adoptablePark reports whether a late finish can adopt a park of this status
-// and kind: a zero-commit one, or a merge agent's unreported stop.
-func adoptablePark(status schema.Status, kind schema.ParkKind) bool {
-	return status == schema.StatusNeedsAnswer && kind == schema.ParkKindZeroCommit ||
-		status == schema.StatusNeedsRepair && kind == schema.ParkKindMergeUnreported
+// adoptablePark reports whether a late finish can adopt a pause with this
+// reason: a zero-commit one, or a merge agent's unreported stop. A reason
+// implies its class, so the reason alone decides.
+func adoptablePark(status schema.Status, reason schema.PauseReason) bool {
+	return status == schema.StatusPaused && (reason == schema.PauseZeroCommit || reason == schema.PauseMergeUnreported)
 }
 
 // lateFinish is an adoptable park whose agent reported finished after it.
@@ -96,7 +96,7 @@ func (s *Server) scanLateFinishes() {
 		epics, _ := s.idx.epicsOf(dir)
 		for _, e := range epics {
 			for _, t := range e.Tickets {
-				if !adoptablePark(schema.Status(t.Status), t.ParkKind) {
+				if !adoptablePark(schema.Status(t.Status), t.PauseReason) {
 					continue
 				}
 				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(e.Path), ID: t.Identifier}
@@ -119,11 +119,11 @@ func (s *Server) scanLateFinishes() {
 // it changed one of them.
 func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bool) {
 	t, err := schema.ParseTicket(path)
-	if err != nil || !adoptablePark(t.Status, t.ParkKind) || t.IterationStatus != schema.IterationStatusFinished {
+	if err != nil || !adoptablePark(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
 		return lateFinish{}, false
 	}
 	park, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
-	if !ok || park.Type != string(t.Status) || park.Kind != string(t.ParkKind) || !t.IterationFinishedAt.After(park.Time) {
+	if !ok || park.Type != string(t.PausedClass().LegacyStatus()) || park.Kind != t.PauseReason.LegacyKind() || !t.IterationFinishedAt.After(park.Time) {
 		return lateFinish{}, false
 	}
 	return lateFinish{dir: dir, addr: addr, path: path, park: park, finishedAt: t.IterationFinishedAt, commitless: t.IsCommitless()}, true

@@ -74,7 +74,7 @@ func TestBudget_KillStopsTheSessionThroughTheRunsRunner(t *testing.T) {
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		h.Server.PollBudget()
-		if tk, err := schema.ParseTicket(ticketPath); err == nil && tk.Status == schema.StatusNeedsRepair {
+		if tk, err := schema.ParseTicket(ticketPath); err == nil && tk.PausedClass() == schema.PauseClassRepair {
 			break
 		}
 		if time.Now().After(deadline) {

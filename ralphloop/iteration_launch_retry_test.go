@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func testIterationParams() iterationParams {
@@ -56,8 +57,13 @@ func assertTicketStatus(t *testing.T, scratchDir, status string) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: "+status) {
-		t.Errorf("ticket not %s:\n%s", status, raw)
+	// status is the legacy label of the pause class the ticket must be in.
+	if class := legacyClass(schema.Status(status)); class != "" {
+		assertRawPaused(t, string(raw), class, "")
+		return
+	}
+	if tk := parseRawTicket(t, string(raw)); string(tk.Status) != status {
+		t.Errorf("ticket status = %q, want %q", tk.Status, status)
 	}
 }
 

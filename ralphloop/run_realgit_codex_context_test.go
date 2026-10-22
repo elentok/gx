@@ -458,8 +458,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 	if !strings.Contains(string(rawTicket), "status: done") {
 		t.Errorf("completed ticket = %s, want done", rawTicket)
 	}
-	if strings.Contains(string(rawTicket), "status: needs-answer") || strings.Contains(string(rawTicket), "status: needs-repair") {
-		t.Errorf("completed ticket = %s, want neither needs-answer nor needs-repair", rawTicket)
+	if rawIsPaused(t, string(rawTicket), "") {
+		t.Errorf("completed ticket = %s, want not paused", rawTicket)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, epicName)
@@ -634,11 +634,10 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	if err != nil {
 		t.Fatalf("ReadFile ticket: %v", err)
 	}
-	if !strings.Contains(string(rawTicket), "status: needs-repair") {
-		t.Errorf("ticket = %s, want needs-repair", rawTicket)
-	}
-	if strings.Contains(string(rawTicket), "status: done") || strings.Contains(string(rawTicket), "status: needs-answer") {
-		t.Errorf("ticket = %s, want neither done nor needs-answer (would drop the exhaustion reason)", rawTicket)
+	// Repair class, not a generic answer-class zero-commit (would drop the exhaustion reason).
+	assertRawPaused(t, string(rawTicket), schema.PauseClassRepair, "")
+	if strings.Contains(string(rawTicket), "status: done") {
+		t.Errorf("ticket = %s, want not done", rawTicket)
 	}
 	if !strings.Contains(string(rawTicket), "## Needs Repair") || !strings.Contains(string(rawTicket), evidence) {
 		t.Errorf("ticket = %s, want a durable Needs Repair note naming the exhaustion evidence", rawTicket)

@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -131,7 +130,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		return TicketDetail{}, err
 	}
 	d := TicketDetail{
-		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(t.Status), ParkKind: string(t.ParkKind),
+		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(storedStatus(t)), ParkKind: t.PauseReason.LegacyKind(),
 		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
 	}
 	if t.Status == schema.StatusClaimed {
@@ -150,17 +149,17 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	latest := detailRound(last, true)
 	d.Latest = &latest
-	d.State = answerState(last.Question, t.Status)
+	d.State = answerState(last.Question, storedStatus(t))
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == RoundAnswered
 	d.Chat = roundChat(latest)
 	gone := false
-	if t.Status == schema.StatusNeedsAnswer || t.Status == schema.StatusNeedsRepair {
+	if t.PausedClass() != "" {
 		if gone, err = s.agentGone(d.Address); err != nil {
 			return TicketDetail{}, err
 		}
 	}
 	d.Actions = detailActions(t, &last, gone, d.Permission)
-	if t.Status == schema.StatusNeedsAnswer && string(t.ParkKind) == string(events.AmbiguousBase) {
+	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
 		d.Bases = s.ambiguousBlockers(ref.addr)
 	}
 	return d, nil
@@ -197,11 +196,11 @@ func detailActions(t schema.Ticket, latest *tickets.ParkRound, agentGone bool, c
 	if card != nil && card.RequestID != "" {
 		actions = append(actions, ActionApprove)
 	}
-	if t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusNeedsRepair {
+	if t.PausedClass() == "" {
 		return actions
 	}
-	selfReported := t.ParkKind == schema.ParkKindSelfReported
-	if selfReported && t.Status == schema.StatusNeedsAnswer && latest != nil && latest.End == nil {
+	selfReported := t.PauseReason == schema.PauseSelfReported
+	if selfReported && t.PausedClass() == schema.PauseClassAnswer && latest != nil && latest.End == nil {
 		actions = append(actions, ActionAnswer)
 	}
 	if !selfReported || agentGone {

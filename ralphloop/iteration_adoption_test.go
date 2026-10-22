@@ -77,17 +77,12 @@ func TestRun_NeedsAnswerReport_ParksWithoutCherryPickEvenWithCommits(t *testing.
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done after an adopted needs-answer report:\n%s", raw)
 	}
 	if strings.Contains(string(raw), "commitless: true") {
 		t.Errorf("needs-answer adoption must not set commitless:\n%s", raw)
-	}
-	if !strings.Contains(string(raw), "park_kind: self-reported") {
-		t.Errorf("ticket not stamped park_kind: self-reported after adopted needs-answer report:\n%s", raw)
 	}
 }
 
@@ -117,7 +112,5 @@ func TestRun_FinishedReport_ZeroCommits_DoesNotReachDone(t *testing.T) {
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("a finished report with zero commits must not reach done through the report alone:\n%s", raw)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer after a zero-commit finished report:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
 }

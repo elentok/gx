@@ -23,6 +23,7 @@ func Reset(path string, now time.Time, note string) error {
 		t.IterationStatus = ""
 		t.IterationFinishedAt = time.Time{}
 		t.ParkKind = ""
+		t.PauseReason = ""
 		t.SessionIDs = nil
 		t.ActualContextWindow = 0
 		t.ElapsedTime = 0

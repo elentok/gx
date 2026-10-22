@@ -216,8 +216,9 @@ func unparkMutation(now time.Time, base string) func(*schema.Ticket, *string) er
 func UnmuteTicket(path string, now time.Time) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Mutes = nil
-		if t.Status == schema.StatusNeedsRepair {
+		if t.PausedClass() == schema.PauseClassRepair {
 			t.Status = schema.StatusOpen
+			t.PauseReason = ""
 		}
 		*body = schema.DemoteSection(*body, "## Needs Repair", now)
 		*body = schema.AppendComment(*body, fmt.Sprintf("**%s** — unmuted", now.Format("2006-01-02")))

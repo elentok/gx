@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // serverLandFixture is a claimed ticket built and waiting to land through the
@@ -51,10 +52,9 @@ func TestLandBuilt_UnresolvedConflictParksParentAsLandConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	for _, want := range []string{"status: needs-repair", "park_kind: land-conflict", "01a"} {
-		if !strings.Contains(string(raw), want) {
-			t.Errorf("parent ticket missing %q:\n%s", want, raw)
-		}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseMergeConflict)
+	if !strings.Contains(string(raw), "01a") {
+		t.Errorf("parent ticket missing %q:\n%s", "01a", raw)
 	}
 }
 

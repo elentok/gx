@@ -191,8 +191,8 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 			flags = append(flags, f)
 		}
 	}
-	add(has(string(events.NeedsAnswer)) || tk.Status == string(schema.StatusNeedsAnswer), flagPark)
-	add(has(string(events.NeedsRepair)) || tk.Status == string(schema.StatusNeedsRepair), flagNeedsRepair)
+	add(has(string(events.NeedsAnswer)) || tk.LegacyStatus() == string(schema.StatusNeedsAnswer), flagPark)
+	add(has(string(events.NeedsRepair)) || tk.LegacyStatus() == string(schema.StatusNeedsRepair), flagNeedsRepair)
 	add(has("recovery-"), flagRecovery)
 	add(has(string(events.Deadlocked)), flagDeadlock)
 	add(has(string(events.ConflictHit)), flagConflict)

@@ -129,12 +129,11 @@ func TestConflictResolutionHandoff(t *testing.T) {
 					t.Fatalf("handoff: %v", err)
 				}
 
-				want := tc.wantChild
+				child := mustParse(t, childPath)
 				if tc.stillConflicted && path == "fresh" {
-					want = schema.StatusNeedsRepair
-				}
-				if got := mustParse(t, childPath).Status; got != want {
-					t.Errorf("child status = %q, want %q", got, want)
+					assertPaused(t, child, schema.PauseClassRepair, "")
+				} else if child.Status != tc.wantChild {
+					t.Errorf("child status = %q, want %q", child.Status, tc.wantChild)
 				}
 			})
 		}
@@ -181,7 +180,7 @@ func TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutParking(t *test
 	if got.Status != schema.StatusDone || !got.Commitless {
 		t.Errorf("ticket status = %q commitless = %v, want done and commitless", got.Status, got.Commitless)
 	}
-	if got.ParkKind != "" {
-		t.Errorf("park kind = %q, want none", got.ParkKind)
+	if got.PauseReason != "" {
+		t.Errorf("pause reason = %q, want none", got.PauseReason)
 	}
 }

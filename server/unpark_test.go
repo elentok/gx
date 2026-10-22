@@ -45,7 +45,7 @@ func TestUnpark_LiveWaitingAgentRefusesAndIsUntouched(t *testing.T) {
 	if closed, answers := unparkEvents(t, ticketPath); len(closed) != 0 || answers != 0 {
 		t.Errorf("refusal logged closed=%+v answers=%d", closed, answers)
 	}
-	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusNeedsAnswer {
+	if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
 		t.Errorf("ticket = %+v, %v; want still needs-answer", tk, err)
 	}
 }

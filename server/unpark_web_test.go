@@ -42,7 +42,8 @@ func stateOf(t *testing.T, ticketPath string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return fmt.Sprintf("%d:%s", open.Seq, tk.Status)
+	// The state token keeps the old status label for the web API.
+	return fmt.Sprintf("%d:%s", open.Seq, tk.PausedClass().LegacyStatus())
 }
 
 func webUnpark(t *testing.T, h *servertest.Harness, req server.RepairRequest) server.RepairResult {
@@ -92,7 +93,7 @@ func TestWebUnpark_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 			t.Fatalf("%s: unpark = %+v; want refusal %s", name, res, server.ReasonStale)
 		}
 	}
-	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.Status != schema.StatusNeedsAnswer {
+	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
 		t.Errorf("ticket = %+v, %v; want still needs-answer", tk, err)
 	}
 	if got := answerEvents(t, e.ticket); len(got) != 0 {
@@ -136,7 +137,7 @@ func TestWebUnpark_ZeroCommitWithALiveAgentPromptsAndKeepsThePark(t *testing.T) 
 	if got := e.fake.Prompts(answerLabel); len(got) != 1 || got[0] != want {
 		t.Errorf("prompts = %q; want [%q]", got, want)
 	}
-	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.Status != schema.StatusNeedsAnswer {
+	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
 		t.Errorf("ticket = %+v, %v; want still needs-answer", tk, err)
 	}
 }
@@ -178,7 +179,7 @@ func TestWebUnpark_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 	if err != nil || !res.Refused || res.Reason != server.ReasonBadBase {
 		t.Fatalf("unpark with a foreign base = %+v, %v; want refusal %s", res, err, server.ReasonBadBase)
 	}
-	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusNeedsAnswer || tk.Base != "" {
+	if tk, err := schema.ParseTicket(path); err != nil || tk.PausedClass() != schema.PauseClassAnswer || tk.Base != "" {
 		t.Fatalf("ticket = %+v, %v; want untouched", tk, err)
 	}
 

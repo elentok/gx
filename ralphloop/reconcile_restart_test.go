@@ -353,8 +353,9 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ReadFile: %v", err)
 			}
-			if !strings.Contains(string(raw), "status: needs-repair") || !strings.Contains(string(raw), tc.wantErr) {
-				t.Errorf("ticket after failed reattach:\n%s\nwant needs-repair with %q", raw, tc.wantErr)
+			assertRawPaused(t, string(raw), schema.PauseClassRepair, "")
+			if !strings.Contains(string(raw), tc.wantErr) {
+				t.Errorf("ticket after failed reattach:\n%s\nwant it to carry %q", raw, tc.wantErr)
 			}
 			if starts != 0 || len(*prompts) != 0 || len(*removed) != 0 {
 				t.Errorf("side effects: starts=%d prompts=%v removed=%v, want none", starts, *prompts, *removed)

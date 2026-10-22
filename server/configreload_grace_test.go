@@ -163,7 +163,7 @@ func (f graceFixture) parkKind(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(tk.ParkKind)
+	return tk.PauseReason.LegacyKind()
 }
 
 // expectHeld checks the grace period's effect: nothing killed, no new start.

@@ -134,7 +134,6 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ClaimedAt:             t.ClaimedAt,
 		DoneAt:                t.DoneAt,
 		CompletedAt:           t.CompletedAt,
-		ParkKind:              string(t.ParkKind),
 		PauseReason:           string(t.PauseReason),
 		Mutes:                 copyMutes(t.Mutes),
 		Base:                  t.Base,
@@ -248,9 +247,11 @@ func SplitFrontmatter(raw string) (yamlPart, body string, hasFM bool) {
 }
 
 // MarshalTicket writes t back out as a "---" delimited YAML frontmatter
-// block followed by body, unchanged, the same shape ParseTicket reads.
+// block followed by body, unchanged, the same shape ParseTicket reads. It
+// writes only the new pause form: an old needs-answer / needs-repair status is
+// written as paused with a reason, and park_kind is never written.
 func MarshalTicket(t Ticket, body string) ([]byte, error) {
-	yamlBytes, err := yaml.Marshal(ticketToYAML(t))
+	yamlBytes, err := yaml.Marshal(ticketToYAML(ShimLegacyPause(t)))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling ticket frontmatter: %w", err)
 	}

@@ -76,9 +76,7 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 		Repair: schema.NeedsRepairState{Label: "l", Branch: "b", Worktree: "w"},
 	})
 
-	if got := mustParse(t, path); got.Status != schema.StatusNeedsRepair {
-		t.Errorf("Status = %q, want needs-repair", got.Status)
-	}
+	assertPaused(t, mustParse(t, path), schema.PauseClassRepair, schema.PauseIterationError)
 	evs, _, _ := ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "iteration-error" || evs[0].Reason != "boom" {
 		t.Errorf("events = %+v, want one iteration-error event", evs)
@@ -150,9 +148,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 			}
 
 			got := mustParse(t, path)
-			if got.Status != schema.StatusNeedsAnswer || got.ParkKind != schema.ParkKind(kind) {
-				t.Errorf("ticket = (%q, %q), want needs-answer/%s", got.Status, got.ParkKind, kind)
-			}
+			assertPaused(t, got, schema.PauseClassAnswer, schema.ParsePauseReason(string(kind)))
 			evs, _, _ := ReadEvents(scratchDir, "my-epic")
 			if len(evs) != 1 || evs[0].Type != "needs-answer" || evs[0].Kind != string(kind) || evs[0].Pane != "p1" {
 				t.Errorf("events = %+v, want one needs-answer event kind %s", evs, kind)
@@ -220,15 +216,13 @@ func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.NeedsRepair, Kind: events.BudgetKilled, Reason: "boom",
 	})
-	if got := mustParse(t, path); got.ParkKind != schema.ParkKind(events.BudgetKilled) {
-		t.Fatalf("ParkKind = %q, want budget-killed", got.ParkKind)
-	}
+	assertPaused(t, mustParse(t, path), schema.PauseClassRepair, schema.PauseBudgetKilled)
 
 	if err := Claim(path); err != nil {
 		t.Fatal(err)
 	}
-	if got := mustParse(t, path); got.ParkKind != "" {
-		t.Errorf("ParkKind after claim = %q, want cleared", got.ParkKind)
+	if got := mustParse(t, path); got.PauseReason != "" || got.Status == schema.StatusPaused {
+		t.Errorf("after claim = (%q, %q), want pause reason cleared", got.Status, got.PauseReason)
 	}
 	evs, _, _ := ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "budget-killed" {
@@ -282,9 +276,7 @@ func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T)
 				t.Fatal(err)
 			}
 			got := mustParse(t, path)
-			if got.Status != c.status || got.ParkKind != schema.ParkKind(c.kind) {
-				t.Errorf("ticket = (%q, %q), want %s/%s", got.Status, got.ParkKind, c.status, c.kind)
-			}
+			assertPaused(t, got, legacyClass(c.status), schema.ParsePauseReason(string(c.kind)))
 			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Needs Answer") || strings.Contains(string(data), "## Handoff") {
 				t.Errorf("park wrote a conversation section into the .md:\n%s", data)
 			}

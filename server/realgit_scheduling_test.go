@@ -235,8 +235,9 @@ func TestSchedulingPort_ParkThenResumeReusesBranchAndLandsBothCommitsOnce(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsAnswer {
-		t.Fatalf("status after park = %q, want needs-answer", tk.Status)
+	assertPaused(t, tk, schema.PauseClassAnswer, "")
+	if t.Failed() {
+		t.FailNow()
 	}
 	if left := strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")); left == "" {
 		t.Error("iteration branch gone after park, want it kept for the resume")

@@ -109,6 +109,16 @@ func (t Ticket) ShowsCommitlessSuffix() bool {
 	return t.Commitless && !commitlessByDesignTypes[t.Type]
 }
 
+// LegacyStatus is t.Status with paused spelled as the needs-answer or
+// needs-repair its class used to be stored as. Wire formats that clients still
+// read as the old words use it.
+func (t Ticket) LegacyStatus() string {
+	if t.Status == string(schema.StatusPaused) {
+		return string(t.PauseReason.Class().LegacyStatus())
+	}
+	return t.Status
+}
+
 // RawStatus is t's status as its file says it, with no Blocked by: or
 // waiting-for-children overlay.
 func (t Ticket) RawStatus() RenderedStatus { return t.baseStatus() }
@@ -132,6 +142,11 @@ func (t Ticket) baseStatus() RenderedStatus {
 	case needsAnswerStatuses[status]:
 		return StatusNeedsAnswer
 	case needsRepairStatuses[status]:
+		return StatusNeedsRepair
+	case status == string(schema.StatusPaused):
+		if t.PauseReason.Class() == schema.PauseClassAnswer {
+			return StatusNeedsAnswer
+		}
 		return StatusNeedsRepair
 	case openStatuses[status]:
 		return StatusOpen

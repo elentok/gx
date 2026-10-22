@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestRun_CodexLaunchPreflight(t *testing.T) {
@@ -328,13 +329,11 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(%q): %v", ticketPath, err)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-answer"} {
-		if strings.Contains(string(contents), unwanted) {
-			t.Errorf("ticket after launch failure =\n%s\nmust not contain %q", contents, unwanted)
-		}
+	if strings.Contains(string(contents), "status: done") {
+		t.Errorf("ticket after launch failure =\n%s\nmust not be done", contents)
 	}
-	if !strings.Contains(string(contents), "status: needs-repair") ||
-		!strings.Contains(string(contents), "starting "+iterLabel("my-epic", "01")+": Herdr rejected Codex integration") {
+	assertRawPaused(t, string(contents), schema.PauseClassRepair, "")
+	if !strings.Contains(string(contents), "starting "+iterLabel("my-epic", "01")+": Herdr rejected Codex integration") {
 		t.Errorf("ticket after launch failure =\n%s\nwant durable needs-repair status and launch reason", contents)
 	}
 

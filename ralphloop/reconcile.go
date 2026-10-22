@@ -122,7 +122,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// reattaching, reverting, or reporting on it here.
 			continue
 		}
-		status := strings.ToLower(strings.TrimSpace(t.Status))
+		status := strings.ToLower(strings.TrimSpace(t.LegacyStatus()))
 		if status == "needs-repair" {
 			if live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 				reattach(t)

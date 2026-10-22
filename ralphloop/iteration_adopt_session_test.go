@@ -3,12 +3,12 @@ package ralphloop
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // adoptLiveSession leaves a live session of ticket 01's iteration, as a
@@ -116,7 +116,5 @@ func TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Parks(t *testing.T)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }

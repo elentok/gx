@@ -84,9 +84,7 @@ func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.ParkKind != "self-reported" {
-		t.Errorf("park_kind = %q, want self-reported", tk.ParkKind)
-	}
+	assertPaused(t, tk, schema.PauseClassAnswer, schema.PauseSelfReported)
 	waitFor(t, func() bool {
 		data, _ := os.ReadFile(filepath.Join(h.StateDir, "runs.json"))
 		return strings.Contains(string(data), `"waiting_since"`)

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -127,9 +126,7 @@ func TestLandRecovery_OrphanLockWithNoEvidenceParksAmbiguousLand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKind(events.AmbiguousLand) {
-		t.Errorf("status=%q park_kind=%q, want needs-repair/ambiguous-land", tk.Status, tk.ParkKind)
-	}
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseAmbiguousMerge)
 	if _, err := os.Stat(filepath.Join(lockDir, "land.lock")); !os.IsNotExist(err) {
 		t.Errorf("land lock still there: %v", err)
 	}

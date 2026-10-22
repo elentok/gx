@@ -65,7 +65,7 @@ func loadEpic(scratchDir, name string) Epic {
 		}
 
 		ticketPath := filepath.Join(issuesDir, issueEntry.Name())
-		epic.Tickets = append(epic.Tickets, loadTicketCached(ticketPath, number, identifier, title))
+		epic.Tickets = append(epic.Tickets, loadTicketCached(ticketPath, number, identifier, title, epic.IsMap))
 	}
 
 	epic.quarantineInvalidParents()
@@ -96,10 +96,10 @@ const ticketCacheRacy = 2 * time.Second
 // loadTicketCached returns the parsed ticket at path, skipping the read and
 // parse when its mtime and size match the last load. The file stays the truth:
 // any stat difference, or a file modified too close to the cache time, reloads.
-func loadTicketCached(path string, number int, identifier, title string) Ticket {
+func loadTicketCached(path string, number int, identifier, title string, isMap bool) Ticket {
 	info, statErr := os.Stat(path)
 	if statErr != nil {
-		return loadTicketFile(path, number, identifier, title)
+		return loadTicketFile(path, number, identifier, title, isMap)
 	}
 
 	ticketCacheMu.Lock()
@@ -110,7 +110,7 @@ func loadTicketCached(path string, number int, identifier, title string) Ticket 
 		return cloneTicket(entry.ticket)
 	}
 
-	ticket := loadTicketFile(path, number, identifier, title)
+	ticket := loadTicketFile(path, number, identifier, title, isMap)
 	ticketCacheMu.Lock()
 	ticketCache[path] = ticketCacheEntry{
 		modTime:  info.ModTime(),
@@ -132,7 +132,7 @@ func cloneTicket(t Ticket) Ticket {
 	return t
 }
 
-func loadTicketFile(ticketPath string, number int, identifier, title string) Ticket {
+func loadTicketFile(ticketPath string, number int, identifier, title string, isMap bool) Ticket {
 	ticket := Ticket{
 		Number:     number,
 		Identifier: identifier,
@@ -146,7 +146,11 @@ func loadTicketFile(ticketPath string, number int, identifier, title string) Tic
 		return ticket
 	}
 
-	parsed, err := schema.ParseTicketFromRaw(string(raw), ticketPath)
+	parse := schema.ParseTicketFromRaw
+	if isMap {
+		parse = schema.ParseTicketFromRawUnshimmed
+	}
+	parsed, err := parse(string(raw), ticketPath)
 	if err != nil {
 		ticket.ReadErr = err.Error()
 		return ticket
@@ -176,7 +180,10 @@ func loadTicketFile(ticketPath string, number int, identifier, title string) Tic
 	ticket.NoRecover = parsed.NoRecover
 	ticket.Unique = parsed.Unique
 	ticket.Agent = parsed.Agent
-	ticket.ParkKind = parsed.ParkKind
+	ticket.PauseReason = parsed.PauseReason
+	if parsed.PauseReason != "" {
+		ticket.ParkKind = schema.ParkKind(parsed.PauseReason.LegacyKind())
+	}
 	ticket.Mutes = parsed.Mutes
 	ticket.Base = parsed.Base
 	ticket.ResolvedBase = parsed.ResolvedBase

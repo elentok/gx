@@ -1,8 +1,6 @@
 package ralphloop
 
 import (
-	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/testutil/runnerfake"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,6 +8,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/testutil/runnerfake"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -171,11 +172,11 @@ func TestClaim_ClearsParkKind(t *testing.T) {
 		t.Fatalf("Claim: %v", err)
 	}
 	ticket := mustParse(t, path)
-	if ticket.ParkKind != "" {
-		t.Errorf("ParkKind = %q, want cleared", ticket.ParkKind)
+	if ticket.PauseReason != "" || ticket.Status == schema.StatusPaused {
+		t.Errorf("ticket = (%q, %q), want pause reason cleared", ticket.Status, ticket.PauseReason)
 	}
-	if strings.Contains(mustRead(t, path), "park_kind") {
-		t.Errorf("ticket file = %q, want park_kind omitted entirely", mustRead(t, path))
+	if raw := mustRead(t, path); strings.Contains(raw, "park_kind") || strings.Contains(raw, "pause_reason") {
+		t.Errorf("ticket file = %q, want park_kind and pause_reason omitted entirely", raw)
 	}
 }
 

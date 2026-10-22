@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // stuckCompactionDeps returns fakeDeps wired so every poll tick times out with
@@ -60,13 +62,9 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	}, d, noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
-	if !strings.Contains(contents, "status: needs-repair") {
-		t.Errorf("ticket after escalation =\n%s\nwant status: needs-repair", contents)
-	}
-	for _, unwanted := range []string{"status: done", "status: needs-answer"} {
-		if strings.Contains(contents, unwanted) {
-			t.Errorf("ticket after escalation =\n%s\nmust not contain %q", contents, unwanted)
-		}
+	assertRawPaused(t, contents, schema.PauseClassRepair, schema.PauseIterationError)
+	if strings.Contains(contents, "status: done") {
+		t.Errorf("ticket after escalation =\n%s\nmust not be done", contents)
 	}
 	if !strings.Contains(contents, errCompactRecoveryExhausted.Error()) ||
 		!strings.Contains(contents, errCompactNeverConfirmed.Error()) {
@@ -92,8 +90,8 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	}, d, noopEventSink{})
 
 	contents := readTicket(t, scratchDir, epicName, "01-first.md")
-	if !strings.Contains(contents, "status: needs-repair") ||
-		!strings.Contains(contents, "herdr pane vanished") {
+	assertRawPaused(t, contents, schema.PauseClassRepair, schema.PauseIterationError)
+	if !strings.Contains(contents, "herdr pane vanished") {
 		t.Errorf("ticket after ordinary failure =\n%s\nwant needs-repair carrying the failure's own reason", contents)
 	}
 	if strings.Contains(contents, errCompactRecoveryExhausted.Error()) ||

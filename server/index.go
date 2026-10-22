@@ -212,7 +212,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 	info := TicketInfo{
 		Address:   addr(t.DisplayNumber()),
 		Title:     t.Title,
-		Status:    t.Status,
+		Status:    t.LegacyStatus(),
 		Type:      t.Type,
 		BlockedBy: t.BlockedBy,
 		File:      t.Path,

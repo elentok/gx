@@ -42,7 +42,7 @@ func TestPark_CommitsStoreWithAddressAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("git log: %v: %s", err, out)
 	}
-	if got := strings.TrimSpace(string(out)); got != "myepic/01: needs-answer" {
-		t.Errorf("log = %q, want %q", got, "myepic/01: needs-answer")
+	if got := strings.TrimSpace(string(out)); got != "myepic/01: paused" {
+		t.Errorf("log = %q, want %q", got, "myepic/01: paused")
 	}
 }

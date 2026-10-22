@@ -83,7 +83,7 @@ func parkedLabels(projectDir string) map[string]bool {
 	out := map[string]bool{}
 	for _, e := range epics {
 		for _, t := range e.Tickets {
-			if st := schema.Status(t.Status); st == schema.StatusNeedsRepair || st == schema.StatusNeedsAnswer {
+			if st := schema.Status(t.Status); st == schema.StatusPaused {
 				label, _, _ := ralphloop.IterationIdentity(filepath.Base(e.Path), t.Identifier, "")
 				out[label] = true
 			}

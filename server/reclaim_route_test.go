@@ -83,7 +83,12 @@ func waitStatus(t *testing.T, ticketPath string, want schema.Status) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tk.Status == want {
+		// A legacy needs-answer / needs-repair want means paused in that class.
+		if class := legacyClass(want); class != "" {
+			if tk.Status == schema.StatusPaused && tk.PausedClass() == class {
+				return
+			}
+		} else if tk.Status == want {
 			return
 		}
 		if time.Now().After(deadline) {

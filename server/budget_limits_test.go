@@ -126,9 +126,7 @@ func TestBudget_NudgedParkedPaneIsMeteredAndKilled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(tk.ParkKind) != string(events.BudgetKilled) {
-		t.Errorf("park kind = %s, want budget-killed", tk.ParkKind)
-	}
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseBudgetKilled)
 }
 
 func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
@@ -263,7 +261,7 @@ func TestBudget_HardLimitStopsLivePaneAndParksBudgetKilled(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	data, _ := os.ReadFile(path)
-	if !strings.Contains(string(data), "status: needs-repair") || !strings.Contains(string(data), "budget-killed") {
+	if !strings.Contains(string(data), "status: paused") || !strings.Contains(string(data), "budget-killed") {
 		t.Fatalf("ticket not parked budget-killed:\n%s", data)
 	}
 	if len(sent) == 0 || !strings.Contains(sent[0], "ctrl+c") {
@@ -356,9 +354,10 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsRepair || string(tk.ParkKind) != string(events.BudgetKilled) {
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseBudgetKilled)
+	if t.Failed() {
 		data, _ := os.ReadFile(path)
-		t.Fatalf("ticket = %s/%s, want needs-repair/budget-killed:\n%s", tk.Status, tk.ParkKind, data)
+		t.Fatalf("ticket:\n%s", data)
 	}
 	if live, _ := fake.List("epic-a"); len(live) != 0 {
 		t.Errorf("sessions still live after budget kill: %v", live)

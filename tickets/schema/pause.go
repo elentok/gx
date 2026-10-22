@@ -120,6 +120,51 @@ func ParsePauseReason(s string) PauseReason {
 	return PauseReason(s)
 }
 
+// LegacyStatus is the stored status this class used before `paused`. Park
+// events and notification wording still use it as their label.
+func (c PauseClass) LegacyStatus() Status {
+	if c == PauseClassAnswer {
+		return StatusNeedsAnswer
+	}
+	return StatusNeedsRepair
+}
+
+// LegacyKind is r spelled as the park event kind (the old `park_kind`). The
+// spellings differ from the events kinds for four reasons until the event log
+// is renamed.
+func (r PauseReason) LegacyKind() string {
+	for old, nu := range legacyReasons {
+		if nu == r {
+			return old
+		}
+	}
+	return string(r)
+}
+
+// PausedReason returns the reason to store for a pause of class that was
+// raised with the (possibly legacy) kind spelling. A kind that is empty, unknown
+// or of the other class falls back to the class default.
+func PausedReason(kind string, class PauseClass) PauseReason {
+	if r := ParsePauseReason(kind); r.Class() == class {
+		return r
+	}
+	return class.DefaultReason()
+}
+
+// PausedClass is the class of t when it is paused (or still carries an old
+// needs-answer / needs-repair status), else "".
+func (t Ticket) PausedClass() PauseClass {
+	switch t.Status {
+	case StatusNeedsAnswer:
+		return PauseClassAnswer
+	case StatusNeedsRepair:
+		return PauseClassRepair
+	case StatusPaused:
+		return t.PauseReason.Class()
+	}
+	return ""
+}
+
 // Legacy body headings, accepted by the read shim only.
 var legacyPauseHeadings = []string{"## Needs Answer", "## Needs Repair"}
 

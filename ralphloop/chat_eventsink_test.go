@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/elentok/gx/events"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/events"
 
 	"github.com/elentok/gx/chatmarkup"
 	"github.com/elentok/gx/tickets"
@@ -414,8 +415,9 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 	if err != nil {
 		t.Fatalf("ParseTicket: %v", err)
 	}
-	if ticket.Status != schema.StatusNeedsRepair {
-		t.Fatalf("ticket.Status = %q, want %q", ticket.Status, schema.StatusNeedsRepair)
+	assertPaused(t, ticket, schema.PauseClassRepair, "")
+	if t.Failed() {
+		t.FailNow()
 	}
 	if len(ticket.Mutes) != 1 || ticket.Mutes[0].EventType != notifyKindIterationPaused {
 		t.Fatalf("ticket.Mutes = %+v, want one %s mute", ticket.Mutes, notifyKindIterationPaused)

@@ -47,8 +47,9 @@ func TestLandOne_TrailerOnly_ParksAmbiguousLand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKind(events.AmbiguousLand) {
-		t.Fatalf("ticket = %s/%s, want needs-repair/%s", tk.Status, tk.ParkKind, events.AmbiguousLand)
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseAmbiguousMerge)
+	if t.Failed() {
+		t.FailNow()
 	}
 	if reason := latestParkReason(scratchDir, "epic", "01"); !strings.Contains(reason, base) {
 		t.Errorf("park reason %q does not name base %s", reason, base)

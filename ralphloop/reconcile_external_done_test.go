@@ -2,11 +2,13 @@ package ralphloop
 
 import (
 	"fmt"
-	eventsc "github.com/elentok/gx/events"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	eventsc "github.com/elentok/gx/events"
+	"github.com/elentok/gx/tickets/schema"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -89,9 +91,7 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-repair") {
-		t.Errorf("ticket not flagged needs-repair for a human to check:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseAmbiguousMerge)
 	if !hasEvent(sink, LiveEventTicketUnrecoverable, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
 		t.Errorf("events = %+v, want an unrecoverable-mismatch event naming ticket 03", sink.Events())
 	}
@@ -134,7 +134,7 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "status: needs-repair") {
+	if rawIsPaused(t, string(raw), schema.PauseClassRepair) {
 		t.Errorf("commitless done ticket was flagged needs-repair, want its no-commit verification skipped entirely:\n%s", raw)
 	}
 	if !strings.Contains(string(raw), "status: done") {
@@ -175,7 +175,7 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 		if err != nil {
 			t.Fatalf("ReadFile %s: %v", name, err)
 		}
-		if strings.Contains(string(raw), "status: needs-repair") {
+		if rawIsPaused(t, string(raw), schema.PauseClassRepair) {
 			t.Errorf("%s flagged needs-repair, want its no-commit verification skipped by type:\n%s", name, raw)
 		}
 		if !strings.Contains(string(raw), "status: done") {
@@ -212,9 +212,7 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-repair") {
-		t.Errorf("prototype ticket not flagged needs-repair, want unchanged crash-recovery behavior:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, "")
 }
 
 // TestReconcile_OutOfScopeDoneTicket_NotVerified covers the bug reported
@@ -254,7 +252,7 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(raw), "status: needs-repair") {
+	if rawIsPaused(t, string(raw), schema.PauseClassRepair) {
 		t.Errorf("out-of-scope done ticket 01 was verified and flagged needs-repair, want it left untouched:\n%s", raw)
 	}
 }
@@ -327,8 +325,8 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-repair") {
-		t.Fatalf("ticket 02 not flagged needs-repair before backfill:\n%s", raw)
+	if !rawIsPaused(t, string(raw), schema.PauseClassRepair) {
+		t.Fatalf("ticket 02 not flagged paused (repair) before backfill:\n%s", raw)
 	}
 
 	// Recovery: a human/auditing agent confirms ticket 02's work is really on

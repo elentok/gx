@@ -67,7 +67,7 @@ func Land(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 	if err != nil {
 		return LandResult{}, "", err
 	}
-	if parsed.Status == schema.StatusNeedsAnswer {
+	if parsed.PausedClass() == schema.PauseClassAnswer {
 		if err := checkRecoverable(d, featurePath, epic, t.Identifier); err != nil {
 			return LandResult{}, "", err
 		}
@@ -293,8 +293,8 @@ func featureWorktree(d ralphloop.Deps, cwd, epic string) (string, error) {
 // lands only as a zero-commit park, a late commit that came with no finish.
 func checkLandable(id string, t schema.Ticket) error {
 	switch {
-	case t.Status == schema.StatusDone, t.Status == schema.StatusClaimed, t.Status == schema.StatusNeedsRepair:
-	case t.Status == schema.StatusNeedsAnswer && (t.ParkKind == "" || t.ParkKind == schema.ParkKindZeroCommit):
+	case t.Status == schema.StatusDone, t.Status == schema.StatusClaimed, t.PausedClass() == schema.PauseClassRepair:
+	case t.PausedClass() == schema.PauseClassAnswer && (t.PauseReason == "" || t.PauseReason == schema.PauseZeroCommit):
 	default:
 		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; land accepts only done, claimed, needs-repair or a zero-commit needs-answer", id, describeStatus(t))}
 	}
@@ -305,8 +305,11 @@ func checkLandable(id string, t schema.Ticket) error {
 }
 
 func describeStatus(t schema.Ticket) string {
-	if t.Status == schema.StatusNeedsAnswer && t.ParkKind != "" {
-		return fmt.Sprintf("%s (%s)", t.Status, t.ParkKind)
+	if class := t.PausedClass(); class != "" {
+		if class == schema.PauseClassAnswer && t.PauseReason != "" {
+			return fmt.Sprintf("%s (%s)", class.LegacyStatus(), t.PauseReason.LegacyKind())
+		}
+		return string(class.LegacyStatus())
 	}
 	return string(t.Status)
 }

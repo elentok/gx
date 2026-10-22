@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // classifyDoneTicketFixture is the shared setup for the four
@@ -219,9 +219,7 @@ func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-repair") {
-		t.Errorf("ticket not marked needs-repair:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, "")
 
 	if !hasEvent(sink, LiveEventTicketUnrecoverable, func(ev LiveEvent) bool { return ev.Identifier == "03" }) {
 		t.Errorf("events = %+v, want an unrecoverable-mismatch event for ticket 03", sink.Events())

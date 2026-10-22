@@ -794,9 +794,7 @@ func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingR
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-repair") {
-		t.Errorf("ticket file = %q, want Status: needs-repair after the install failure", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseIterationError)
 }
 
 func TestRun_ZeroOpenTickets_NoOpSummary(t *testing.T) {

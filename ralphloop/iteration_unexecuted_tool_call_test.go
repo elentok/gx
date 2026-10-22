@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // TestRun_UnexecutedToolCallDetected_RetryLandsCommits pins ticket 02's
@@ -57,7 +58,7 @@ func TestRun_UnexecutedToolCallDetected_RetryLandsCommits(t *testing.T) {
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done after the retry landed commits:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "status: needs-answer") {
+	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
 		t.Errorf("ticket must not be parked needs-answer once the retry landed commits:\n%s", raw)
 	}
 }
@@ -90,12 +91,7 @@ func TestRun_UnexecutedToolCallNotDetected_GoesStraightToNeedsAnswer(t *testing.
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer:\n%s", raw)
-	}
-	if !strings.Contains(string(raw), "park_kind: zero-commit") {
-		t.Errorf("ticket not stamped park_kind: zero-commit:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
 }
 
 // TestRun_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToNeedsAnswer
@@ -130,9 +126,7 @@ func TestRun_UnexecutedToolCallDetected_RetryStillZeroCommits_FallsToNeedsAnswer
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer after the retry still produced zero commits:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }
 
 // TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry pins
@@ -167,9 +161,7 @@ func TestRun_UnexecutedToolCallDetected_BlockedPane_SkipsCorrectiveRetry(t *test
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }
 
 // TestRun_UnexecutedToolCallRetry_PromptRefusedWhileBusy_KeepsWaiting pins
@@ -244,7 +236,5 @@ func TestRun_UnexecutedToolCallRetry_PromptRefusedWhileBlocked_Parks(t *testing.
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }

@@ -240,7 +240,7 @@ func (s *Server) stillParked(address string) bool {
 		return false
 	}
 	switch schema.Status(ref.ticket.Status) {
-	case schema.StatusNeedsRepair, schema.StatusNeedsAnswer:
+	case schema.StatusPaused:
 		return true
 	}
 	return false

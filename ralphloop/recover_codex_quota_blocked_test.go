@@ -48,12 +48,7 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 	if parseErr != nil {
 		t.Fatalf("ParseTicketFromRaw: %v", parseErr)
 	}
-	if ticket.Status != schema.StatusNeedsAnswer {
-		t.Errorf("Status = %q, want needs-answer", ticket.Status)
-	}
-	if ticket.ParkKind != schema.ParkKindBlockedPane {
-		t.Errorf("ParkKind = %q, want blocked-pane", ticket.ParkKind)
-	}
+	assertPaused(t, ticket, schema.PauseClassAnswer, schema.PauseBlockedPane)
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok || len(events) == 0 {

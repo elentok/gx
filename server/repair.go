@@ -250,8 +250,8 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 		return repairOK(res)
 	}
 	tk, perr := schema.ParseTicket(t.Path)
-	parked := perr == nil && tk.Status == schema.StatusNeedsAnswer
-	zeroCommit := parked && tk.ParkKind == schema.ParkKindZeroCommit
+	parked := perr == nil && tk.PausedClass() == schema.PauseClassAnswer
+	zeroCommit := parked && tk.PauseReason == schema.PauseZeroCommit
 	// Every refusal runs before the first state change.
 	if parked && req.RequireState {
 		res, refused, err := unparkStale(t.Path, tk, req.State)
@@ -288,7 +288,7 @@ func (s *Server) repairUnpark(req RepairRequest) (RepairResult, error) {
 		}
 	}
 	var res repair.UnparkResult
-	if parked && req.RequireState && tk.ParkKind != schema.ParkKindSelfReported {
+	if parked && req.RequireState && tk.PauseReason != schema.PauseSelfReported {
 		var refused *RepairResult
 		res, refused, err = unparkAnswered(t.Path, id, req)
 		if refused != nil {
@@ -316,7 +316,7 @@ func unparkStale(ticketPath string, t schema.Ticket, state string) (RepairResult
 	if err != nil {
 		return RepairResult{}, false, fmt.Errorf("read log of %s: %w", ticketPath, err)
 	}
-	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.Status) == state {
+	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.PausedClass().LegacyStatus()) == state {
 		return RepairResult{}, false, nil
 	}
 	return staleUnparkRefusal(), true, nil
@@ -342,7 +342,7 @@ func unparkAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResu
 			return tickets.LogEvent{}, err
 		}
 		open := tickets.OpenQuestion(evs)
-		if t.Status != schema.StatusNeedsAnswer || open == nil || answerState(*open, t.Status) != req.State {
+		if t.PausedClass() != schema.PauseClassAnswer || open == nil || answerState(*open, t.PausedClass().LegacyStatus()) != req.State {
 			return tickets.LogEvent{}, unparkRefused{staleUnparkRefusal()}
 		}
 		if err := ralphloop.UnparkTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
@@ -438,7 +438,7 @@ func (s *Server) unparkSelfReported(epicPath, id string) (RepairResult, bool, er
 		return RepairResult{}, false, nil
 	}
 	tk, err := schema.ParseTicket(t.Path)
-	if err != nil || tk.Status != schema.StatusNeedsAnswer || tk.ParkKind != schema.ParkKindSelfReported {
+	if err != nil || tk.PausedClass() != schema.PauseClassAnswer || tk.PauseReason != schema.PauseSelfReported {
 		return RepairResult{}, false, nil
 	}
 	dir := filepath.Dir(epicPath)

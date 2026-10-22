@@ -27,6 +27,17 @@ func ParseTicket(path string) (Ticket, error) {
 // than ignored, so the pre-contraction shape can't quietly round-trip through
 // a reader that simply doesn't look at it.
 func ParseTicketFromRaw(raw, path string) (Ticket, error) {
+	t, err := ParseTicketFromRawUnshimmed(raw, path)
+	if err != nil {
+		return Ticket{}, err
+	}
+	return ShimLegacyPause(t), nil
+}
+
+// ParseTicketFromRawUnshimmed is ParseTicketFromRaw without the legacy-pause
+// shim: an old needs-answer / needs-repair status stays as stored. The loader
+// uses it for map-epic tickets, which are never Paused.
+func ParseTicketFromRawUnshimmed(raw, path string) (Ticket, error) {
 	r, err := ParseTicketRaw(raw, path)
 	if err != nil {
 		return Ticket{}, err

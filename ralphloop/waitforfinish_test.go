@@ -1293,12 +1293,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ParseTicketFromRaw: %v", err)
 			}
-			if ticket.Status != schema.StatusNeedsAnswer {
-				t.Errorf("Status = %q, want needs-answer", ticket.Status)
-			}
-			if ticket.ParkKind != schema.ParkKindBlockedPane {
-				t.Errorf("ParkKind = %q, want blocked-pane", ticket.ParkKind)
-			}
+			assertPaused(t, ticket, schema.PauseClassAnswer, schema.PauseBlockedPane)
 			if body := schema.ParseBody(string(raw)); strings.Contains(body, "## Needs Answer") {
 				t.Errorf("body carries a Needs Answer section:\n%s", body)
 			}
@@ -1321,7 +1316,7 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 					parks++
 				}
 			}
-			if parks != 1 || last.Kind != string(ticket.ParkKind) || last.Kind != "blocked-pane" || last.Pane != "pane-1" {
+			if parks != 1 || last.Kind != ticket.PauseReason.LegacyKind() || last.Kind != "blocked-pane" || last.Pane != "pane-1" {
 				t.Errorf("parks = %d, last = %+v, want one blocked-pane event matching park_kind with pane context", parks, last)
 			}
 		})
@@ -1470,9 +1465,7 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "needs-answer") {
-		t.Errorf("ticket was not parked despite a blocked pane:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 	if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "iter-01") {
 		t.Errorf("open question summary %q does not name the iteration label", got)
 	}
@@ -1534,9 +1527,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "needs-answer") || strings.Contains(string(raw), "needs-repair") {
-		t.Errorf("ticket status = %s, want needs-answer without needs-repair", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 	if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "approval_prompt") {
 		t.Errorf("open question summary %q, want the park reason to name the runner's blocked reason", got)
 	}

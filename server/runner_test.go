@@ -369,9 +369,7 @@ func TestRunner_AFinishThatErrorsParksTheTicketNeedsRepairAndFreesTheRoot(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKind(events.IterationError) {
-		t.Errorf("ticket = (%q, %q), want needs-repair/iteration-error", tk.Status, tk.ParkKind)
-	}
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseIterationError)
 	if runs := h.Server.Runs(); len(runs) != 0 {
 		t.Errorf("runs = %+v, want the root freed", runs)
 	}
@@ -401,8 +399,8 @@ func TestRunner_AmbiguousBaseParksWithoutLaunching(t *testing.T) {
 		t.Errorf("runs = %+v, want none", runs)
 	}
 	body, err := os.ReadFile(filepath.Join(store, "proj", "epic-a", "issues", "03-third.md"))
-	if err != nil || !strings.Contains(string(body), "status: needs-answer") {
-		t.Errorf("ticket 03 (%v):\n%s\nwant status: needs-answer", err, body)
+	if err != nil || !strings.Contains(string(body), "status: paused") || !strings.Contains(string(body), "pause_reason: ambiguous-base") {
+		t.Errorf("ticket 03 (%v):\n%s\nwant status: paused, pause_reason: ambiguous-base", err, body)
 	}
 }
 
@@ -792,9 +790,7 @@ func TestRunner_RestartParksAHandleWhoseWorktreeIsGone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKind(events.HandleMismatch) {
-		t.Errorf("status=%q park_kind=%q, want needs-repair/handle-mismatch", tk.Status, tk.ParkKind)
-	}
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseHandleMismatch)
 	body, _ := os.ReadFile(ticketPath)
 	if !strings.Contains(string(body), "## Needs Repair") {
 		t.Errorf("ticket has no Needs Repair section:\n%s", body)

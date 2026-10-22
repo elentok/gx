@@ -257,7 +257,7 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	}()
 
 	// Wait for ticket 01 to gate-park (its pane stays blocked and live).
-	waitForFileContains(t, path01, "status: needs-answer")
+	waitForFileContains(t, path01, "status: paused")
 
 	// Answer the pane, but do NOT release ticket 02 yet.
 	mu.Lock()

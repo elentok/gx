@@ -327,7 +327,7 @@ func assertNoLaunchTrace(t *testing.T, repoDir, epicName, scratchDir, ticketFile
 	if !strings.Contains(string(raw), "status: open") {
 		t.Errorf("ticket after launch failure = %s, want status to remain open (never claimed)", raw)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-answer", "status: needs-repair"} {
+	for _, unwanted := range []string{"status: done", "status: paused"} {
 		if strings.Contains(string(raw), unwanted) {
 			t.Errorf("ticket after launch failure = %s, must not contain %q", raw, unwanted)
 		}

@@ -124,7 +124,7 @@ func TestReattach_DiedParksNeedsRepairAndKeepsTheDir(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tk.Status == schema.StatusNeedsRepair {
+		if tk.Status == schema.StatusPaused && tk.PausedClass() == schema.PauseClassRepair {
 			body, _ := os.ReadFile(ticketPath)
 			if !strings.Contains(string(body), nativerunner.ReasonAgentDied) {
 				t.Errorf("ticket lacks %q:\n%s", nativerunner.ReasonAgentDied, body)

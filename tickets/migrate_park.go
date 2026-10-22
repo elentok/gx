@@ -71,11 +71,12 @@ func migrateParkSection(path string, now time.Time) (bool, error) {
 	}
 	body := schema.ParseBody(string(raw))
 	text := schema.Section(body, needsAnswerName)
-	if text == "" || (t.Status != schema.StatusNeedsAnswer && t.Status != schema.StatusOpen) {
+	if text == "" || (t.PausedClass() != schema.PauseClassAnswer && t.Status != schema.StatusOpen) {
 		return false, nil
 	}
 
-	kind := t.ParkKind
+	// The read shim clears ParkKind; the old spelling comes from the reason.
+	kind := schema.ParkKind(t.PauseReason.LegacyKind())
 	if kind == "" {
 		kind = schema.ParkKindZeroCommit
 	}

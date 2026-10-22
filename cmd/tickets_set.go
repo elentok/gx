@@ -269,6 +269,7 @@ var orchestrationStatuses = map[schema.Status]bool{
 	schema.StatusDone:        true,
 	schema.StatusNeedsAnswer: true,
 	schema.StatusNeedsRepair: true,
+	schema.StatusPaused:      true,
 	schema.StatusCancelled:   true,
 }
 
@@ -517,7 +518,7 @@ func checkOpenQuestionGuard(c *cobra.Command, path string) error {
 		if err != nil {
 			return err
 		}
-		if current.Status == schema.StatusNeedsAnswer {
+		if current.PausedClass() == schema.PauseClassAnswer {
 			verb = "answer"
 		}
 	}

@@ -261,7 +261,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		}
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
-	if strings.EqualFold(strings.TrimSpace(p.Ticket.Status), "needs-repair") {
+	if strings.EqualFold(strings.TrimSpace(p.Ticket.LegacyStatus()), "needs-repair") {
 		if err := Claim(p.Ticket.Path); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}

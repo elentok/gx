@@ -1120,7 +1120,7 @@ func TestRecovery_R10ParksADirtyWorktreeWithCommitsAndKeepsIt(t *testing.T) {
 			if got.applied.Reason != "R10" || got.applied.Outcome != "ok" {
 				t.Errorf("applied = %+v, want R10 ok", got.applied)
 			}
-			if !strings.Contains(got.ticket, "status: needs-answer") || !strings.Contains(got.ticket, "park_kind: background-task-gate") || !strings.Contains(got.question, "stray.txt") {
+			if !strings.Contains(got.ticket, "status: paused") || !strings.Contains(got.ticket, "pause_reason: background-task-gate") || !strings.Contains(got.question, "stray.txt") {
 				t.Errorf("ticket not parked background-task-gate naming the dirty file:\n%s", got.ticket)
 			}
 			if _, err := os.Stat(filepath.Join(got.worktree, "stray.txt")); err != nil {

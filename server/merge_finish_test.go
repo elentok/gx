@@ -50,8 +50,9 @@ func advanceTrunk(t *testing.T, f *schedFixture, name, content string) {
 
 func assertParked(t *testing.T, f *schedFixture, tk schema.Ticket, status schema.Status, kind events.Kind, reason string) {
 	t.Helper()
-	if tk.Status != status || string(tk.ParkKind) != string(kind) {
-		t.Fatalf("ticket = %s/%s, want %s/%s:\n%s", tk.Status, tk.ParkKind, status, kind, readFile(t, f.ticketFile(t, "01")))
+	assertPaused(t, tk, legacyClass(status), schema.ParsePauseReason(string(kind)))
+	if t.Failed() {
+		t.Fatalf("ticket:\n%s", readFile(t, f.ticketFile(t, "01")))
 	}
 	if body := readFile(t, f.ticketFile(t, "01")); !strings.Contains(body, reason) {
 		t.Errorf("ticket lacks reason %q:\n%s", reason, body)
@@ -163,9 +164,7 @@ func TestLateFinish_MergeUnreportedStaysParkedWhileChecksFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tk.Status != schema.StatusNeedsRepair || tk.ParkKind != schema.ParkKindMergeUnreported {
-		t.Errorf("ticket = %s/%s, want needs-repair/merge-unreported", tk.Status, tk.ParkKind)
-	}
+	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseMergeUnreported)
 	if reason, ok := lateFinishReason(t, f); ok {
 		t.Errorf("history has late-finish-adopted: %s", reason)
 	}

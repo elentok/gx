@@ -3,12 +3,12 @@ package ralphloop
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // seedParks writes n park events for ticket 01 at the given age, as a prior
@@ -64,11 +64,7 @@ func TestRun_SpinCyclesInsideWindow_ParkSpinningAndNeverReclaim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"status: needs-repair", "park_kind: spinning"} {
-		if !strings.Contains(string(raw), want) {
-			t.Errorf("ticket missing %q:\n%s", want, raw)
-		}
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, schema.PauseSpinning)
 	spins := spinningEvents(t, scratchDir)
 	if len(spins) != 1 || spins[0].Type != string(events.NeedsRepair) {
 		t.Errorf("spinning events = %+v, want exactly one needs-repair", spins)

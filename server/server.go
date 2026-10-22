@@ -623,7 +623,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 		switch t.Status {
 		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)
-		case string(schema.StatusNeedsAnswer), string(schema.StatusNeedsRepair):
+		case string(schema.StatusPaused), string(schema.StatusNeedsAnswer), string(schema.StatusNeedsRepair):
 			snap.Tickets[i].Recovery = recoveryState(s.parkHold.state(t.Address), t.Address, snap.Tickets)
 		}
 	}

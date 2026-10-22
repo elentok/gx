@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // gatedRunner blocks only the "wait for the agent to finish" Wait (the one
@@ -354,9 +355,7 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutA
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-repair") {
-		t.Errorf("ticket file = %q, want Status: needs-repair after the stuck conflict resolution", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassRepair, "")
 }
 
 // findConflictResolutionChild scans scratchDir/epicName/issues for the one
@@ -412,15 +411,14 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	childRaw := findConflictResolutionChild(t, scratchDir, "epic")
-	if !strings.Contains(childRaw, "status: needs-repair") {
-		t.Errorf("conflict-resolution child ticket = %q, want status: needs-repair after a premature done signal with the sequencer still conflicted", childRaw)
-	}
+	// Premature done signal with the sequencer still conflicted.
+	assertRawPaused(t, childRaw, schema.PauseClassRepair, "")
 
 	parentRaw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if strings.Contains(string(parentRaw), "status: needs-repair") {
+	if rawIsPaused(t, string(parentRaw), schema.PauseClassRepair) {
 		t.Errorf("parent iteration ticket = %q, want it left alone (not needs-repair) — the failure belongs to the conflict-resolution child", parentRaw)
 	}
 
@@ -625,14 +623,9 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer after zero-commit iteration:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseZeroCommit)
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done after a zero-commit iteration:\n%s", raw)
-	}
-	if !strings.Contains(string(raw), "park_kind: zero-commit") {
-		t.Errorf("ticket not stamped park_kind: zero-commit after zero-commit iteration:\n%s", raw)
 	}
 
 	// A parked ticket already gets its own notification via
@@ -705,9 +698,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw01), "status: needs-answer") {
-		t.Errorf("ticket 01 not marked needs-answer:\n%s", raw01)
-	}
+	assertRawPaused(t, string(raw01), schema.PauseClassAnswer, "")
 
 	raw02, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-b.md"))
 	if err != nil {
@@ -751,7 +742,7 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done despite the agent finishing after the transient blip:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "status: needs-answer") {
+	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
 		t.Errorf("ticket wrongly marked needs-answer from a transient idle blip:\n%s", raw)
 	}
 	if len(*removed) != 1 {
@@ -791,7 +782,7 @@ func TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer(t *test
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done after commit landed on recheck:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "status: needs-answer") {
+	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
 		t.Errorf("ticket wrongly marked needs-answer despite commit landing on recheck:\n%s", raw)
 	}
 	if len(*removed) != 1 {

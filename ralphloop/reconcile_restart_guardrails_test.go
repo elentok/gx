@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands covers ticket 23's
@@ -90,8 +91,8 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 			raw, err := os.ReadFile(path)
 			if err != nil {
 				t.Errorf("ReadFile %s: %v", path, err)
-			} else if !strings.Contains(string(raw), "needs-answer") {
-				t.Errorf("ticket at first park poll = %s, want needs-answer", raw)
+			} else {
+				assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 			}
 			if err := SetStatus(path, "done"); err != nil {
 				t.Errorf("SetStatus %s: %v", path, err)

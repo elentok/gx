@@ -42,6 +42,7 @@ func ClaimWithBase(path, resolvedBase string) error {
 		t.IterationStatus = ""
 		t.IterationFinishedAt = time.Time{}
 		t.ParkKind = ""
+		t.PauseReason = ""
 		*body = schema.DemoteSection(*body, "## Needs Repair", time.Now())
 	})
 }
@@ -69,8 +70,9 @@ func MarkBuiltAwaitingLand(path string) error {
 // parked it.
 func markNeedsAnswer(path string, parkKind schema.ParkKind) error {
 	return parkWrite(path, false, func(t *schema.Ticket, _ *string) {
-		t.Status = schema.StatusNeedsAnswer
-		t.ParkKind = parkKind
+		t.Status = schema.StatusPaused
+		t.ParkKind = ""
+		t.PauseReason = schema.PausedReason(string(parkKind), schema.PauseClassAnswer)
 	})
 }
 
@@ -103,8 +105,9 @@ func markNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, st
 		return err
 	}
 	return parkWrite(path, reparkDone, func(t *schema.Ticket, body *string) {
-		t.Status = schema.StatusNeedsRepair
-		t.ParkKind = parkKind
+		t.Status = schema.StatusPaused
+		t.ParkKind = ""
+		t.PauseReason = schema.PausedReason(string(parkKind), schema.PauseClassRepair)
 		*body += section
 	})
 }
@@ -250,7 +253,7 @@ func rewriteTicketLocked(path string, repair bool, mutate func(*schema.Ticket, *
 // ticket write, and the debounced loop picks the change up anyway.
 func commitStatusChange(path string, t schema.Ticket) {
 	switch t.Status {
-	case schema.StatusDone, schema.StatusCancelled, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+	case schema.StatusDone, schema.StatusCancelled, schema.StatusPaused:
 	default:
 		return
 	}

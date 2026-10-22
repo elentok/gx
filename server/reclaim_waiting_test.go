@@ -100,7 +100,7 @@ func TestReclaim_BudgetHardLimitStopsAWaitingRun(t *testing.T) {
 		return strings.Contains(string(data), "budget-killed")
 	})
 	body, _ := os.ReadFile(ticketPath)
-	if !strings.Contains(string(body), "status: needs-repair") {
-		t.Errorf("ticket not parked needs-repair:\n%s", body)
+	if !strings.Contains(string(body), "status: paused") {
+		t.Errorf("ticket not parked (paused):\n%s", body)
 	}
 }

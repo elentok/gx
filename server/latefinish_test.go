@@ -310,10 +310,10 @@ func TestLateFinish_FailedConditionStaysParked(t *testing.T) {
 			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.Status = schema.StatusClaimed }
 		}},
 		{"kind changed", true, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.ParkKind = schema.ParkKindBlockedPane }
+			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.PauseReason = schema.PauseBlockedPane }
 		}},
 		{"self-reported park", false, func(p zeroCommitParked) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { p.finishedLate(true)(tk); tk.ParkKind = schema.ParkKindSelfReported }
+			return func(tk *schema.Ticket) { p.finishedLate(true)(tk); tk.PauseReason = schema.PauseSelfReported }
 		}},
 		{"finished before park", true, func(p zeroCommitParked) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) {

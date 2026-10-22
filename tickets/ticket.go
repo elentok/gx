@@ -89,9 +89,12 @@ type Ticket struct {
 	// Agent mirrors schema.Ticket.Agent.
 	Agent string
 
-	// ParkKind mirrors schema.Ticket.ParkKind: which of ralph-loop's
-	// needs-answer producers parked this ticket, empty for a ticket parked
-	// before that field existed (or never parked).
+	// PauseReason mirrors schema.Ticket.PauseReason: why a Paused ticket is
+	// paused.
+	PauseReason schema.PauseReason
+
+	// ParkKind is PauseReason in the old park-event spelling, which is what
+	// the events package still uses. Derived on load, never stored.
 	ParkKind schema.ParkKind
 
 	// Mutes mirrors schema.Ticket.Mutes: notification event types that have

@@ -364,6 +364,43 @@ func TestLoad_MergedAtRoundTrips(t *testing.T) {
 	}
 }
 
+func TestLoad_LegacyPauseLoadsAsPausedAndMapEpicsStayUnshimmed(t *testing.T) {
+	dir := t.TempDir()
+	issue := func(epic, name, front string) {
+		writeFile(t, filepath.Join(dir, epic, "issues", name), "---\nid: 01\n"+front+"type: implement\n---\n# T\n\n## Needs Answer\n\n**why** here\n")
+	}
+	issue("plain", "01-old.md", "status: needs-answer\npark_kind: blocked-pane\n")
+	issue("plain", "02-old-repair.md", "status: needs-repair\npark_kind: land-conflict\n")
+	issue("plain", "03-new.md", "status: paused\npause_reason: spinning\n")
+	writeFile(t, filepath.Join(dir, "mapepic", "ticket.md"), "---\nkind: map\nstatus: open\n---\n# Map\n")
+	issue("mapepic", "01-map.md", "status: needs-answer\n")
+
+	epics, err := Load(dir)
+	if err != nil || len(epics) != 2 {
+		t.Fatalf("Load = %v, %v", epics, err)
+	}
+	byName := map[string]Epic{epics[0].Name: epics[0], epics[1].Name: epics[1]}
+	want := []struct {
+		status string
+		reason schema.PauseReason
+		kind   schema.ParkKind
+		render RenderedStatus
+	}{
+		{"paused", schema.PauseBlockedPane, "blocked-pane", StatusNeedsAnswer},
+		{"paused", schema.PauseMergeConflict, "land-conflict", StatusNeedsRepair},
+		{"paused", schema.PauseSpinning, "spinning", StatusNeedsRepair},
+	}
+	for i, w := range want {
+		got := byName["plain"].Tickets[i]
+		if got.Status != w.status || got.PauseReason != w.reason || got.ParkKind != w.kind || got.RawStatus() != w.render {
+			t.Errorf("plain[%d] = %q/%q/%q/%v, want %+v", i, got.Status, got.PauseReason, got.ParkKind, got.RawStatus(), w)
+		}
+	}
+	if got := byName["mapepic"].Tickets[0].Status; got != "needs-answer" {
+		t.Errorf("map-epic ticket status = %q, want it never Paused", got)
+	}
+}
+
 func TestLoad_TicketMDKindMapMakesAMapEpic(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "map-epic", "ticket.md"),

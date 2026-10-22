@@ -116,8 +116,8 @@ func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseTicket: %v (loader must accept the written shape)", err)
 	}
-	if got.Status != StatusNeedsRepair {
-		t.Errorf("Status = %q, want needs-repair", got.Status)
+	if got.Status != StatusPaused || got.PausedClass() != PauseClassRepair {
+		t.Errorf("Status = %q reason %q, want paused with a repair reason", got.Status, got.PauseReason)
 	}
 
 	final, err := os.ReadFile(path)

@@ -67,15 +67,8 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *te
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer:\n%s", raw)
-	}
-	if !strings.Contains(string(raw), "park_kind: self-reported") {
-		t.Errorf("ticket parked with the wrong kind, want park_kind: self-reported:\n%s", raw)
-	}
-	if strings.Contains(string(raw), "park_kind: zero-commit") {
-		t.Errorf("ticket parked as zero-commit, want the retry's own self-report to take precedence:\n%s", raw)
-	}
+	// Self-reported, not zero-commit: the retry's own self-report takes precedence.
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 
 	if len(sink.ticketNeedsHumanCalls) != 1 {
 		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.ticketNeedsHumanCalls)
@@ -135,14 +128,9 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	if !strings.Contains(string(raw), "status: needs-answer") {
-		t.Errorf("ticket not marked needs-answer despite the retry landing commits alongside a self-report:\n%s", raw)
-	}
+	assertRawPaused(t, string(raw), schema.PauseClassAnswer, schema.PauseSelfReported)
 	if strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket must not be marked done while the retry's self-reported question is unanswered:\n%s", raw)
-	}
-	if !strings.Contains(string(raw), "park_kind: self-reported") {
-		t.Errorf("ticket parked with the wrong kind, want park_kind: self-reported:\n%s", raw)
 	}
 }
 
@@ -203,7 +191,7 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket not marked done for the retry's commitless-and-finished self-report:\n%s", raw)
 	}
-	if strings.Contains(string(raw), "status: needs-answer") {
+	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
 		t.Errorf("ticket must not be parked needs-answer for a declared-commitless retry finish:\n%s", raw)
 	}
 }

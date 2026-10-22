@@ -70,10 +70,10 @@ func TestLaunchPort_FailureAfterClaimParksNeedsRepair(t *testing.T) {
 		t.Fatalf("ticket files = %v", matches)
 	}
 	body := readFile(t, matches[0])
-	if !strings.Contains(body, "status: needs-repair") {
-		t.Errorf("ticket after launch failure:\n%s\nwant status: needs-repair", body)
+	if !strings.Contains(body, "status: paused") {
+		t.Errorf("ticket after launch failure:\n%s\nwant status: paused", body)
 	}
-	for _, unwanted := range []string{"status: done", "status: needs-answer", "status: claimed", "status: open"} {
+	for _, unwanted := range []string{"status: done", "status: claimed", "status: open"} {
 		if strings.Contains(body, unwanted) {
 			t.Errorf("ticket after launch failure must not contain %q:\n%s", unwanted, body)
 		}
