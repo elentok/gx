@@ -109,6 +109,16 @@ func IsAncestor(dir, ancestor, descendant string) (bool, error) {
 	return false, err
 }
 
+// DiffNames lists the paths whose content differs between the tips of refA and
+// refB (git diff --name-only refA refB).
+func DiffNames(dir, refA, refB string) ([]string, error) {
+	out, _, err := run(dir, []string{"diff", "--name-only", refA, refB})
+	if err != nil || out == "" {
+		return nil, err
+	}
+	return strings.Split(out, "\n"), nil
+}
+
 // CherryPickRange cherry-picks the commit range fromExclusive..toInclusive
 // (in order) onto dir's current branch via `git cherry-pick`. On a conflict,
 // the returned error is a *RunError and dir is left mid-cherry-pick with

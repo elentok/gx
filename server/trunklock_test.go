@@ -121,7 +121,7 @@ func TestTrunkLock_TrunkMovedBeforeTheFFParksNeedsRebaseNotLandFailed(t *testing
 
 	ev := f.parkRoot(t)
 
-	if ev.Kind != "" || ev.Message != "needs rebase: "+schedEpic+" onto main; run gx server epics merge proj:"+schedEpic {
+	if ev.Kind != "" || ev.Message != "needs rebase: "+schedEpic+" onto main; rebase it, then merge again" {
 		t.Errorf("park = kind %q, reason %q, want a needs-rebase park", ev.Kind, ev.Message)
 	}
 	f.assertRootQueued(t)

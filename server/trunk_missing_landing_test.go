@@ -40,7 +40,7 @@ func TestTrunkMissingAtLanding_TicketLandsOnItsRootAndTheRootParks(t *testing.T)
 	if got := f.rev(t, "main"); got != develop {
 		t.Errorf("main moved to %s", got)
 	}
-	if waitForChat(chatCount, "trunk-missing: project") == 0 {
+	if waitForChat(chatCount, "the trunk branch is missing: project") == 0 {
 		t.Errorf("no root park with reason trunk-missing reached chat")
 	}
 	if slices.Contains(f.h.Server.LockedTrunks(), "") {

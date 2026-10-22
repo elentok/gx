@@ -165,7 +165,7 @@ func TestMergeFork_TrunkMovingAgainForksASecondThenParksAtTheCap(t *testing.T) {
 
 	ev := f.parkRoot(t)
 
-	if want := "needs rebase: " + schedEpic + " onto main; run gx server epics merge proj:" + schedEpic; ev.Kind != "" || ev.Message != want {
+	if want := "needs rebase: " + schedEpic + " onto main; rebase it, then merge again"; ev.Kind != "" || ev.Message != want {
 		t.Errorf("park = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
 	}
 	if got := f.merges.Load(); got != 2 {

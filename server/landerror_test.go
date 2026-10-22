@@ -81,8 +81,8 @@ func TestLandError_DirtyTrunkParksTheRootWithACappedFileList(t *testing.T) {
 	if ev.Kind != string(events.DirtyTrunk) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.DirtyTrunk)
 	}
-	want := fmt.Sprintf("trunk dirty: main checked out at %s has local changes in a.txt, b.txt, c.txt, d.txt, e.txt +2 more; "+
-		"commit or discard them, then run gx server epics merge proj:%s", f.repo, schedEpic)
+	want := fmt.Sprintf("uncommitted changes on main (%s) clash with a.txt, b.txt, c.txt, d.txt, e.txt +2 more; "+
+		"commit or discard them, then merge again", f.repo)
 	if ev.Message != want {
 		t.Errorf("reason =\n%q\nwant\n%q", ev.Message, want)
 	}
@@ -91,11 +91,26 @@ func TestLandError_DirtyTrunkParksTheRootWithACappedFileList(t *testing.T) {
 	}
 	f.assertRootQueued(t)
 	f.assertStamps(t, false)
-	if got := waitForChat(count, "trunk dirty"); got != 1 {
+	if got := waitForChat(count, "clash with a.txt"); got != 1 {
 		t.Errorf("park sent %d times, want once", got)
 	}
 	if got := count(epicNotMergedText) + count(epicMergedText); got != 0 {
 		t.Errorf("epic notice sent %d times, want none", got)
+	}
+}
+
+func TestLandError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+		commitFiles(t, p, "clash.txt")
+		testutil.WriteFile(t, f.repo, "clash.txt", "local")
+		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
+	})
+
+	ev := f.parkRoot(t)
+
+	want := fmt.Sprintf("uncommitted changes on main (%s) clash with clash.txt; commit or discard them, then merge again", f.repo)
+	if ev.Kind != string(events.DirtyTrunk) || ev.Message != want {
+		t.Errorf("park = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
 	}
 }
 
@@ -123,7 +138,7 @@ func TestLandError_ParkStoresKindAndReasonUntilALaterLandClearsThem(t *testing.T
 	if !strings.Contains(md, "land_block_kind: "+string(events.DirtyTrunk)) || !strings.Contains(md, "land_block_reason:") {
 		t.Errorf("park not stored on the epic:\n%s", md)
 	}
-	if !strings.Contains(md, "trunk dirty") || ev.Message == "" {
+	if !strings.Contains(md, "clash with") || ev.Message == "" {
 		t.Errorf("reason not stored:\n%s", md)
 	}
 
@@ -186,7 +201,7 @@ func TestLandError_OtherGitFailureParksLandFailed(t *testing.T) {
 		t.Errorf("kind = %q, want %q", ev.Kind, events.LandError)
 	}
 	if !strings.HasPrefix(ev.Message, "land failed: ") || !strings.Contains(ev.Message, "index.lock") ||
-		!strings.HasSuffix(ev.Message, "; fix it, then run gx server epics merge proj:"+schedEpic) {
+		!strings.HasSuffix(ev.Message, "; fix it, then merge again") {
 		t.Errorf("reason = %q", ev.Message)
 	}
 	f.assertRootQueued(t)

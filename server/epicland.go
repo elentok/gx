@@ -339,7 +339,7 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 	if err != nil {
 		return landFailed(project, one.Epic, err)
 	}
-	needsRebase := fmt.Sprintf("needs rebase: %s onto %s; run gx server epics merge %s:%s", one.Epic, target, project, one.Epic)
+	needsRebase := fmt.Sprintf("needs rebase: %s onto %s; rebase it, then merge again", one.Epic, target)
 	out, err := s.mergeInto(info.Repo, worktrees, one.Epic, target)
 	if err != nil {
 		// Trunk moved outside the server between git's ff check and the ff:
@@ -350,9 +350,9 @@ func (s *Server) landRoot(project string, epics []tickets.Epic, one ralphloop.On
 		// No pre-check: git decides whether local changes block the land, and
 		// only a refused land looks at them.
 		if dir := git.CheckoutDirForBranch(info.Repo, worktrees, target); dir != "" {
-			if changes, cerr := git.UncommittedChanges(dir); cerr == nil && len(changes) > 0 {
-				return fmt.Sprintf("trunk dirty: %s checked out at %s has local changes in %s; commit or discard them, then run gx server epics merge %s:%s",
-					target, dir, changedFiles(changes), project, one.Epic), events.DirtyTrunk
+			if clashing := clashingFiles(info.Repo.Root, dir, target, one.Epic); len(clashing) > 0 {
+				return fmt.Sprintf("uncommitted changes on %s (%s) clash with %s; commit or discard them, then merge again",
+					target, dir, listFiles(clashing)), events.DirtyTrunk
 			}
 		}
 		return landFailed(project, one.Epic, err)
@@ -369,26 +369,47 @@ func (s *Server) refsFailed(project, epic string, err error) (string, events.Kin
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing lands; the project stops claiming until a person fixes trunk.
 		s.enterTrunkMissing(project, err.Error())
-		return fmt.Sprintf("%s: %v; fix it and run gx-merge %s", events.TrunkMissing, err, epic), events.TrunkMissing
+		return fmt.Sprintf("the trunk branch is missing: %v; fix the trunk, then merge again", err), events.TrunkMissing
 	}
 	return landFailed(project, epic, err)
 }
 
 func landFailed(project, epic string, err error) (string, events.Kind) {
-	return fmt.Sprintf("land failed: %v; fix it, then run gx server epics merge %s:%s", err, project, epic), events.LandError
+	return fmt.Sprintf("land failed: %v; fix it, then merge again", err), events.LandError
+}
+
+// clashingFiles lists the uncommitted files in the target's checkout that the
+// land would also change: files that differ between the target's tip and the
+// branch's. An unrelated local change doesn't block a land, so it isn't listed.
+func clashingFiles(repoRoot, dir, target, branch string) []string {
+	changes, err := git.UncommittedChanges(dir)
+	if err != nil || len(changes) == 0 {
+		return nil
+	}
+	landed, err := git.DiffNames(repoRoot, "refs/heads/"+target, "refs/heads/"+branch)
+	if err != nil {
+		return nil
+	}
+	touched := make(map[string]bool, len(landed))
+	for _, p := range landed {
+		touched[p] = true
+	}
+	var clashing []string
+	for _, c := range changes {
+		if touched[c.Path] {
+			clashing = append(clashing, c.Path)
+		}
+	}
+	return clashing
 }
 
 // maxReasonFiles caps the files a dirty-trunk reason lists.
 const maxReasonFiles = 5
 
-// changedFiles lists the changes' paths, the first maxReasonFiles then "+N more".
-func changedFiles(changes []git.Change) string {
-	paths := make([]string, 0, min(len(changes), maxReasonFiles))
-	for _, c := range changes[:min(len(changes), maxReasonFiles)] {
-		paths = append(paths, c.Path)
-	}
-	list := strings.Join(paths, ", ")
-	if extra := len(changes) - maxReasonFiles; extra > 0 {
+// listFiles lists the first maxReasonFiles paths, then "+N more".
+func listFiles(paths []string) string {
+	list := strings.Join(paths[:min(len(paths), maxReasonFiles)], ", ")
+	if extra := len(paths) - maxReasonFiles; extra > 0 {
 		list += fmt.Sprintf(" +%d more", extra)
 	}
 	return list
