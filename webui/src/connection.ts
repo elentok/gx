@@ -124,7 +124,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   }
 
   // One fetch in flight, at most one queued behind it. Fetches run one after another, so an
-  // older snapshot can never land after a newer one.
+  // older snapshot can never apply after a newer one.
   async function refresh(g: number) {
     if (refreshing) {
       refreshQueued = true;

@@ -15,7 +15,7 @@ test("broken storage reads as empty", () => {
   expect(readPageCache("epic")).toBeNull();
 });
 
-test("the epic list repaints from the cache before the fetch lands, then saves the fresh list", async () => {
+test("the epic list repaints from the cache before the fetch returns, then saves the fresh list", async () => {
   const old = { epics: [], follow_ups: [{ project: "old", open: 1 }] } as unknown as EpicList;
   const fresh = { epics: [], follow_ups: [{ project: "fresh", open: 2 }] } as unknown as EpicList;
   writePageCache("epics", old);

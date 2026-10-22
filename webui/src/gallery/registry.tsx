@@ -28,7 +28,7 @@ export interface GalleryEntry {
 }
 
 const ticket = canned.tickets[0];
-const longReason = "Waiting on a long chain of upstream tickets that all have to land first. ".repeat(4);
+const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
 const perTone = (render: (tone: Tone) => ReactNode): GalleryCase[] =>
   TONES.map((tone) => ({ label: tone, node: render(tone) }));
@@ -133,7 +133,6 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "Epics active", node: <TopBar active="epics" build="v1.2.3" connected /> },
       { label: "none active", node: <TopBar build="v1.2.3" connected /> },
       { label: "Paused", node: <TopBar active="queue" build="v1.2.3" mode="paused" connected /> },
-      { label: "Draining", node: <TopBar active="queue" build="v1.2.3" mode="draining" connected /> },
       { label: "Offline", node: <TopBar active="queue" build="v1.2.3" connected={false} /> },
       { label: "no build string", node: <TopBar active="queue" connected /> },
     ],

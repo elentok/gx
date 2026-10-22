@@ -25,7 +25,7 @@ describe("QueueScreen", () => {
     for (const label of ["Running", "Paused", "Awaiting merge"]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
-    expect(screen.queryByText(/parked|deadlocked/i)).toBeNull();
+    expect(screen.queryByText(/deadlocked/i)).toBeNull();
     expect(screen.getByText("Waiting for a slot")).toBeTruthy();
   });
 
@@ -88,15 +88,14 @@ describe("QueueScreen", () => {
     expect(screen.queryByTestId("server-build")).toBeNull();
   });
 
-  it("shows the Paused or Draining chip and the Live or Offline dot in the top bar", () => {
+  it("shows the Paused chip and the Live or Offline dot in the top bar", () => {
     const paused = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "paused" } })} />);
     expect(paused.getAllByText("Paused").length).toBeGreaterThan(0);
     expect(paused.getByRole("status", { name: "Live" })).toBeTruthy();
     expect(paused.getByRole("link", { name: "Queue" }).getAttribute("aria-current")).toBe("page");
     paused.unmount();
-    const draining = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "draining" }, connected: false })} />);
-    expect(draining.getByText("Draining")).toBeTruthy();
-    expect(draining.getByRole("status", { name: "Offline" })).toBeTruthy();
+    const offline = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, mode: "running" }, connected: false })} />);
+    expect(offline.getByRole("status", { name: "Offline" })).toBeTruthy();
   });
 
   it("shows the deadlock reason clamped to two lines", () => {

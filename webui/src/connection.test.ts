@@ -96,7 +96,7 @@ test("an event frame refetches the snapshot without reconnecting", async () => {
   conn.stop();
 });
 
-test("a stream drop reconnects after 1s (a good snapshot resets backoff), snapshot before events", async () => {
+test("a stream drop reconnects after 1s (a good snapshot clears backoff), snapshot before events", async () => {
   const { conn, log, streams } = setup();
   conn.start();
   await vi.advanceTimersByTimeAsync(0);
@@ -114,7 +114,7 @@ test("a stream drop reconnects after 1s (a good snapshot resets backoff), snapsh
   conn.stop();
 });
 
-test("failing snapshots back off 1s, 2s, 4s up to 15s and a good one resets", async () => {
+test("failing snapshots back off 1s, 2s, 4s up to 15s and a good one clears them", async () => {
   let failing = true;
   const { conn, log } = setup({ snapshotFails: () => failing });
   const snaps = () => log.filter((l) => l === "snapshot").length;

@@ -4,13 +4,13 @@ import type { StatusKind } from "../ui/status-icon/StatusIcon";
 import type { Tone } from "../ui/tone";
 import { epicBadge } from "../view";
 
-type Bucket = "done" | "running" | "needs-answer" | "waiting" | "children" | "attention";
+type Bucket = "done" | "running" | "asking" | "waiting" | "children" | "attention";
 
 const BUCKETS: Record<string, Bucket> = {
   done: "done",
   cancelled: "done",
   claimed: "running",
-  "needs-answer": "needs-answer",
+  "needs-answer": "asking",
   "waiting-for-children": "children",
   "needs-repair": "attention",
   error: "attention",
@@ -22,7 +22,7 @@ const bucketOf = (row: EpicDetailRow): Bucket => BUCKETS[row.rendered_status] ??
 const BUCKET_TONES: Record<Bucket, Tone> = {
   done: "done",
   running: "running",
-  "needs-answer": "paused",
+  asking: "paused",
   waiting: "waiting",
   children: "muted",
   attention: "deadlocked",
@@ -31,7 +31,7 @@ const BUCKET_TONES: Record<Bucket, Tone> = {
 const BUCKET_ICONS: Record<Bucket, StatusKind | undefined> = {
   done: "done",
   running: undefined,
-  "needs-answer": "needs-answer",
+  asking: "needs-answer",
   waiting: "waiting",
   children: "children",
   attention: "attention",

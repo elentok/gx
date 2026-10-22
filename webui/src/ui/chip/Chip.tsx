@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import type { Tone } from "../tone";
 
-// Pill for queue-level states such as Paused and Draining.
+// Pill for queue-level states such as Paused.
 export function Chip({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
   return (
     <Box

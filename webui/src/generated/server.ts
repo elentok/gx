@@ -71,7 +71,7 @@ export const RoundOpen = "open";
 export const RoundAnswered = "answered";
 export const RoundClosed = "closed";
 /**
- * Outcomes of a park round.
+ * Outcomes of a pause round.
  */
 export type Round = typeof RoundOpen | typeof RoundAnswered | typeof RoundClosed;
 /**
@@ -83,7 +83,7 @@ export interface DetailOption {
   consequence?: string;
 }
 /**
- * DetailRound is one park round. The earlier rounds fill only Seq, By, Summary
+ * DetailRound is one pause round. The earlier rounds fill only Seq, By, Summary
  * and Outcome; the latest fills the rest.
  */
 export interface DetailRound {
@@ -100,11 +100,11 @@ export interface DetailRound {
   yes?: string;
   no?: string;
   /**
-   * Answer is the park.answer that ended the round.
+   * Answer is the pause.answer that ended the round.
    */
   answer?: DetailAnswer;
   /**
-   * ClosedReason is the park.closed reason of a round no answer ended.
+   * ClosedReason is the pause.closed reason of a round no answer ended.
    */
   closed_reason?: string;
 }
@@ -196,7 +196,7 @@ export interface EpicDetailRow {
   type?: string;
   parent?: string;
   /**
-   * Elapsed is in seconds and set once the ticket lands; a running row ticks
+   * Elapsed is in seconds and set once the ticket merges; a running row ticks
    * on the client from ClaimedAt.
    */
   elapsed?: number /* int */;
@@ -207,7 +207,7 @@ export interface EpicDetailRow {
    */
   blockers?: string[];
   /**
-   * NeedsAnswer is set on a parked ticket with an open question; Question is its summary line.
+   * Asking is set on a paused ticket with an open question; Question is its summary line.
    */
   needs_answer?: boolean;
   question?: string;
@@ -232,7 +232,7 @@ export interface EpicDetail {
   /**
    * WallClock runs from the epic's started_at to completed_at, or to now while
    * it runs; it is absent before the first claim. AgentTime and CostTotal add up
-   * landed tickets only and are always sent, so a zero total still shows.
+   * merged tickets only and are always sent, so a zero total still shows.
    */
   wall_clock?: number /* int */;
   agent_time: number /* int */;
@@ -248,8 +248,8 @@ export interface EpicDetail {
    */
   queued: boolean;
   /**
-   * LandBlockKind and LandBlockReason describe why a Merge blocked epic's last
-   * land parked; the kind is empty for a needs-rebase park.
+   * MergeBlockKind and MergeBlockReason describe why a Merge blocked epic's last
+   * merge paused; the kind is empty for a needs-rebase pause.
    */
   land_block_kind?: string;
   land_block_reason?: string;
@@ -311,7 +311,7 @@ export interface EpicListRow {
    */
   last_activity_at?: string;
   /**
-   * LandBlockKind and LandBlockReason are set only on a Merge blocked row;
+   * MergeBlockKind and MergeBlockReason are set only on a Merge blocked row;
    * see EpicDetail.
    */
   land_block_kind?: string;
@@ -365,7 +365,7 @@ export const EpicReasonMergeBlocked = "Merge blocked";
 export type EpicReason = typeof EpicReasonDeadlock | typeof EpicReasonMergeBlocked;
 /**
  * SummaryTicket is one ticket in an EpicSummary: an active one carries
- * ClaimedAt, a Parked one carries Recovery and its unclipped Park reason.
+ * ClaimedAt, a Paused one carries Recovery and its unclipped Pause reason.
  */
 export interface SummaryTicket {
   address: string;
@@ -375,7 +375,7 @@ export interface SummaryTicket {
   recovery?: string;
   reason?: string;
   /**
-   * Summary is the open question's summary line, or the park reason without one.
+   * Summary is the open question's summary line, or the pause reason without one.
    */
   summary?: string;
   /**
@@ -407,7 +407,7 @@ export interface EpicSummary {
   active: SummaryTicket[];
   parked: SummaryTicket[];
   /**
-   * HasRepair is set when a parked ticket is broken (needs-repair or error), so
+   * HasRepair is set when a paused ticket is broken (stuck or error), so
    * both clients show a fault in the alarm color instead of a question.
    */
   has_repair: boolean;
@@ -475,13 +475,13 @@ export interface TicketInfo {
    */
   claimed_at?: string;
   /**
-   * Recovery is RecoveryPending or RecoveryEscalated for a parked ticket that
+   * Recovery is RecoveryPending or RecoveryEscalated for a paused ticket that
    * recovery is working on or gave up on; filled in by the snapshot handler.
    */
   recovery?: string;
   /**
-   * The landing-time metrics the Queue header and the preview sum up; zero
-   * until the ticket lands.
+   * The merging-time metrics the Queue header and the preview sum up; zero
+   * until the ticket merges.
    */
   actual_context_window?: number /* int */;
   expected_context_window?: number /* int */;
@@ -510,7 +510,7 @@ export interface TicketInfo {
    */
   epic_status?: string;
   /**
-   * EpicMergeTarget is the branch an epic merge lands on; filled in by the
+   * EpicMergeTarget is the branch an epic merge merges on; filled in by the
    * snapshot handler, empty when the project has no repo or trunk.
    */
   epic_merge_target?: string;
@@ -548,7 +548,7 @@ export interface Snapshot {
    */
   pending: PendingRow[];
   /**
-   * Mode is QueueModeRunning, QueueModePaused or QueueModeDraining; filled in by the handler.
+   * Mode is QueueModeRunning or QueueModePaused; filled in by the handler.
    * Empty from a server that predates it.
    */
   mode?: QueueMode;
@@ -581,8 +581,7 @@ export interface Snapshot {
  */
 export const QueueModeRunning = "running";
 export const QueueModePaused = "paused";
-export const QueueModeDraining = "draining";
-export type QueueMode = typeof QueueModeRunning | typeof QueueModePaused | typeof QueueModeDraining;
+export type QueueMode = typeof QueueModeRunning | typeof QueueModePaused;
 
 //////////
 // source: recentlyfinished.go

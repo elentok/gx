@@ -123,8 +123,8 @@
       "has_repair": false
     },
     {
-      "address": "gx:park",
-      "name": "park",
+      "address": "gx:pause",
+      "name": "pause",
       "project": "gx",
       "state": "paused",
       "done": 0,
@@ -132,12 +132,12 @@
       "active": [],
       "parked": [
         {
-          "address": "gx:park/01",
+          "address": "gx:pause/01",
           "title": "Paused only",
           "status": "needs-answer"
         },
         {
-          "address": "gx:park/02",
+          "address": "gx:pause/02",
           "title": "Also paused",
           "status": "needs-answer"
         }

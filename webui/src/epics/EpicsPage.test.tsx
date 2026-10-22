@@ -106,7 +106,7 @@ test("a blocked ready row names its blockers as links", async () => {
   expect(within(region).getByRole("link", { name: "b" }).getAttribute("href")).toBe("#/e/blog:b");
 });
 
-test("a Merge blocked row shows the land-block reason", async () => {
+test("a Merge blocked row shows the merge-block reason", async () => {
   await loaded(listOf([row("x", { state: "merge-blocked", land_block_reason: "conflict in a.go" })]));
   fireEvent.change(screen.getByRole("searchbox", { name: "Search epics" }), { target: { value: "x" } });
   expect(screen.getByText("conflict in a.go")).toBeTruthy();

@@ -22,7 +22,7 @@ interface Props {
 
 // Plain anchors, not router links, so the gallery can render it without a router.
 export function TopBar({ active, tone = "running", build, mode, connected }: Props) {
-  const queueChip = mode === "paused" ? "Paused" : mode === "draining" ? "Draining" : null;
+  const queueChip = mode === "paused" ? "Paused" : null;
   return (
     <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" mb="4">
       <Box display="flex" gap="5">

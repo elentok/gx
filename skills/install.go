@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-// SourceFile is one skill file to install: RelPath is where it lands,
+// SourceFile is one skill file to install: RelPath is where it is written,
 // relative to both the manifest's Files entries and every agent root;
 // AbsPath is where its content currently lives on disk.
 type SourceFile struct {

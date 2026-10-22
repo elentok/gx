@@ -59,10 +59,10 @@ const STATES: Record<EpicState, { order: number; tone: Tone; label: string }> = 
   finished: { order: 5, tone: "muted", label: "Finished" },
 };
 
-// Only Waiting changes with the queue mode: a paused or draining queue is why
+// Only Waiting changes with the queue mode: a paused queue is why
 // nothing starts. A running epic keeps its label.
 export function epicBadge(state: EpicState, mode?: QueueMode): string {
-  if (state === "waiting" && (mode === "paused" || mode === "draining")) {
+  if (state === "waiting" && mode === "paused") {
     return `Waiting: queue ${mode}`;
   }
   return STATES[state].label;
@@ -72,7 +72,7 @@ const shortId = (address: string) => address.slice(address.lastIndexOf("/") + 1)
 
 export const REPAIR_HINT = "Fix it in the TUI";
 
-function parkedLine(t: SummaryTicket, queue: string[]): TicketLineView {
+function pausedLine(t: SummaryTicket, queue: string[]): TicketLineView {
   const base = { address: t.address, id: shortId(t.address), title: t.title };
   if (t.status === "needs-repair") {
     return { ...base, tone: "paused", detail: t.reason, hint: REPAIR_HINT };
@@ -99,7 +99,7 @@ function activeLine(t: SummaryTicket): TicketLineView {
 function ticketLines(epic: EpicSummary, queue: string[]): TicketLineView[] {
   return [
     ...epic.active.map(activeLine),
-    ...epic.parked.map((t) => parkedLine(t, queue)),
+    ...epic.parked.map((t) => pausedLine(t, queue)),
   ];
 }
 

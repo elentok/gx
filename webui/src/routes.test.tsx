@@ -258,7 +258,7 @@ test("a waiting epic says Not queued until it holds a queue item", async () => {
   expect(await screen.findByText("Waiting for a slot · 0 of 1 done · $0.00 · 0s of agent time")).toBeTruthy();
 });
 
-test("a Merge blocked epic shows its label and land-block reason; a Merging epic its label", async () => {
+test("a Merge blocked epic shows its label and merge-block reason; a Merging epic its label", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", total: 1, done: 1, land_block_reason: "rebase clash in a.go" }));
   expect(await screen.findByText(/^Paused · 1 of 1 done/)).toBeTruthy();
   expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
@@ -397,7 +397,7 @@ test("a blocked row lists its blockers, cross-epic ones as epic/NN", async () =>
   expect(screen.getByText("blocked · after 04")).toBeTruthy();
 });
 
-test("a needs-answer row shows its question and an Answer link to the ticket page; other rows have no link", async () => {
+test("an asking row shows its question and an Answer link to the ticket page; other rows have no link", async () => {
   const rows = [
     rowOf("02", "needs-answer", { needs_answer: true, question: "Which database?" }),
     rowOf("03", "needs-repair"),

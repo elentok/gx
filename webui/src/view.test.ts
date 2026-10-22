@@ -10,11 +10,11 @@ const byName = (name: string, mode?: QueueMode) => view(mode).epics.find((e) => 
 
 describe("snapshotView", () => {
   it("orders epics by state and keeps server order within a state", () => {
-    expect(view().epics.map((e) => e.name)).toEqual(["dead", "park", "run", "run2", "wait", "await"]);
+    expect(view().epics.map((e) => e.name)).toEqual(["dead", "pause", "run", "run2", "wait", "await"]);
   });
 
   it("maps state to tone and badge", () => {
-    expect(byName("park")).toMatchObject({ tone: "paused", badge: "Paused", reason: "needs a person (+1 more)" });
+    expect(byName("pause")).toMatchObject({ tone: "paused", badge: "Paused", reason: "needs a person (+1 more)" });
     expect(byName("dead")).toMatchObject({ tone: "paused", badge: "Paused", reason: "Dependency deadlock" });
     expect(byName("run")).toMatchObject({ tone: "running", badge: "Running" });
     expect(byName("wait")).toMatchObject({ tone: "waiting", badge: "Waiting for a slot" });
@@ -23,7 +23,6 @@ describe("snapshotView", () => {
 
   it("labels Waiting by queue mode and leaves Running unchanged", () => {
     expect(byName("wait", "paused").badge).toBe("Waiting: queue paused");
-    expect(byName("wait", "draining").badge).toBe("Waiting: queue draining");
     expect(byName("wait", "running").badge).toBe("Waiting for a slot");
     expect(byName("run", "paused").badge).toBe("Running");
   });

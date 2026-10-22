@@ -31,7 +31,6 @@ test.each([
 ])("a %s pause shows the %s action", (pause_reason, label) => {
   renderThemed(<ResumeForm detail={resumable({ pause_reason })} post={vi.fn(ok)} />);
   expect(screen.getByRole("button", { name: label })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Unpark" })).toBeNull();
 });
 
 test("a plain resume posts the address and state token and reports the result words", async () => {
