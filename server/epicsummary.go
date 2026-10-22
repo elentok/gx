@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // EpicState is EpicSummary.State.
@@ -16,9 +17,12 @@ const (
 	EpicStateMergeBlocked EpicState = "merge-blocked"
 	EpicStateFinished     EpicState = "finished"
 	EpicStateRunning      EpicState = "running"
-	EpicStateWaiting      EpicState = "waiting"
-	EpicStateParked       EpicState = "parked"
-	EpicStateDeadlocked   EpicState = "deadlocked"
+	// EpicStateMerging is an epic whose only unfinished tickets are merge tickets
+	// that are open or claimed.
+	EpicStateMerging    EpicState = "merging"
+	EpicStateWaiting    EpicState = "waiting"
+	EpicStateParked     EpicState = "parked"
+	EpicStateDeadlocked EpicState = "deadlocked"
 )
 
 // SummaryTicket is one ticket in an EpicSummary: an active one carries
@@ -169,10 +173,30 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 	if sum.State == EpicStateMergeBlocked {
 		sum.Reason, sum.ParkKind = e.LandBlockReason, e.LandBlockKind
 	}
-	if sum.State != EpicStateRunning {
+	if sum.State != EpicStateRunning && sum.State != EpicStateMerging {
 		sum.Active = []SummaryTicket{}
 	}
 	return sum
+}
+
+// onlyMergeTicketsRemain reports whether every ticket is done or cancelled
+// except merge tickets that are open or claimed. A parked merge ticket does not
+// count, so the epic falls through to Parked.
+func onlyMergeTicketsRemain(e tickets.Epic) bool {
+	merging := false
+	for _, t := range e.Tickets {
+		switch e.RenderedStatus(t) {
+		case tickets.StatusDone, tickets.StatusCancelled:
+		case tickets.StatusOpen, tickets.StatusClaimed:
+			if t.Type != string(schema.TypeMerge) || isParked(e, t) {
+				return false
+			}
+			merging = true
+		default:
+			return false
+		}
+	}
+	return merging
 }
 
 // epicStateFor is the one place that decides an epic's state. Running needs a
@@ -191,6 +215,9 @@ func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Tim
 		}
 		return EpicStateFinished
 	case epicRunnable:
+		if root.Epic != OneOffsEpic && onlyMergeTicketsRemain(e) {
+			return EpicStateMerging
+		}
 		for _, t := range e.Tickets {
 			if isParked(e, t) || e.RenderedStatus(t) != tickets.StatusClaimed {
 				continue

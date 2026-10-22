@@ -1,11 +1,13 @@
 package server
 
 import (
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func summaryTicket(n, status string, blockedBy ...string) tickets.Ticket {
@@ -220,6 +222,55 @@ func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T)
 	got = summarizeEpic(root, broken, none, noRecovery, noLog)
 	if got.State != EpicStateParked || len(got.Parked) != 2 {
 		t.Errorf("one-offs with needs-* = state %q parked %+v", got.State, got.Parked)
+	}
+}
+
+func mergeSummaryTicket(n, status string) tickets.Ticket {
+	t := summaryTicket(n, status)
+	t.Type = string(schema.TypeMerge)
+	return t
+}
+
+func TestSummarizeEpic_MergingState(t *testing.T) {
+	noRecovery := func(string) string { return "" }
+	claimedAll := func(string) (time.Time, bool) { return time.Unix(100, 0), true }
+	parkedBody := "# t\n\n## Needs Repair\n\n**why**\n"
+	parkedMerge := mergeSummaryTicket("02", "needs-repair")
+	parkedMerge.Body = parkedBody
+
+	cases := []struct {
+		name       string
+		epic       string
+		tickets    []tickets.Ticket
+		wantState  EpicState
+		wantActive []string
+	}{
+		{"open merge ticket", "epic", []tickets.Ticket{summaryTicket("01", "done"), mergeSummaryTicket("02", "open")}, EpicStateMerging, nil},
+		{"claimed merge ticket stays active", "epic", []tickets.Ticket{summaryTicket("01", "done"), mergeSummaryTicket("02", "claimed")}, EpicStateMerging, []string{"proj:epic/02"}},
+		{"cancelled work does not block merging", "epic", []tickets.Ticket{summaryTicket("01", "cancelled"), mergeSummaryTicket("02", "open")}, EpicStateMerging, nil},
+		{"parked merge ticket keeps parked", "epic", []tickets.Ticket{summaryTicket("01", "done"), parkedMerge}, EpicStateParked, nil},
+		{"unfinished work beside a merge ticket is not merging", "epic", []tickets.Ticket{summaryTicket("01", "open"), mergeSummaryTicket("02", "open")}, EpicStateWaiting, nil},
+		{"one-offs epic is never merging", OneOffsEpic, []tickets.Ticket{summaryTicket("01", "done"), mergeSummaryTicket("02", "open")}, EpicStateWaiting, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := rootRef{Project: "proj", Epic: tc.epic}
+			claimed := func(string) (time.Time, bool) { return time.Time{}, false }
+			if tc.wantActive != nil {
+				claimed = claimedAll
+			}
+			got := summarizeEpic(root, tickets.Epic{Name: tc.epic, Tickets: tc.tickets}, claimed, noRecovery, noLog)
+			if got.State != tc.wantState {
+				t.Fatalf("state = %q, want %q", got.State, tc.wantState)
+			}
+			var active []string
+			for _, a := range got.Active {
+				active = append(active, a.Address)
+			}
+			if !slices.Equal(active, tc.wantActive) {
+				t.Errorf("active = %v, want %v", active, tc.wantActive)
+			}
+		})
 	}
 }
 

@@ -333,10 +333,15 @@ export const EpicStateAwaitingMerge = "awaiting-merge";
 export const EpicStateMergeBlocked = "merge-blocked";
 export const EpicStateFinished = "finished";
 export const EpicStateRunning = "running";
+/**
+ * EpicStateMerging is an epic whose only unfinished tickets are merge tickets
+ * that are open or claimed.
+ */
+export const EpicStateMerging = "merging";
 export const EpicStateWaiting = "waiting";
 export const EpicStateParked = "parked";
 export const EpicStateDeadlocked = "deadlocked";
-export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateMergeBlocked | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateMergeBlocked | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
 /**
  * SummaryTicket is one ticket in an EpicSummary: an active one carries
  * ClaimedAt, a Parked one carries Recovery and its unclipped Park reason.
