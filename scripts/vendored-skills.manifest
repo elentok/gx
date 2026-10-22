@@ -5,3 +5,6 @@
 gx-tdd         mattpocock/skills  skills/engineering/tdd          LICENSE  bd453a6  merge
 gx-to-tickets  mattpocock/skills  skills/engineering/to-tickets   LICENSE  19c50d5  port
 gx-implement   mattpocock/skills  skills/engineering/implement    LICENSE  386d4ff  port
+gx-grilling         mattpocock/skills  skills/productivity/grilling         LICENSE        5beb35b  merge
+gx-domain-modeling  mattpocock/skills  skills/engineering/domain-modeling   LICENSE        5beb35b  merge
+gx-unslop           cursor/plugins     pstack/skills/unslop                 pstack/LICENSE eb4db2b  merge

@@ -42,6 +42,19 @@ var requiredFiles = []string{
 	"gx-resolve-follow-ups/SKILL.md",
 	"gx-design/SKILL.md",
 	"gx-follow-up/SKILL.md",
+	"gx-grilling/SKILL.md",
+	"gx-grilling/LICENSE",
+	"gx-grilling/README.md",
+	"gx-grilling/agents/openai.yaml",
+	"gx-domain-modeling/SKILL.md",
+	"gx-domain-modeling/ADR-FORMAT.md",
+	"gx-domain-modeling/GLOSSARY-FORMAT.md",
+	"gx-domain-modeling/LICENSE",
+	"gx-domain-modeling/README.md",
+	"gx-domain-modeling/agents/openai.yaml",
+	"gx-unslop/SKILL.md",
+	"gx-unslop/LICENSE",
+	"gx-unslop/README.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -162,6 +175,9 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-resolve-follow-ups":        true,
 	"gx-design":                    true,
 	"gx-follow-up":                 false,
+	"gx-grilling":                  false,
+	"gx-domain-modeling":           false,
+	"gx-unslop":                    false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
@@ -186,10 +202,28 @@ func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
 // "[gx-local-tracker.md](../gx-local-tracker.md)" — not an http(s) link.
 var relativeLinkRe = regexp.MustCompile(`\]\(([^)]+\.md)\)`)
 
+// stripFencedBlocks drops fenced code blocks: links in them are examples for
+// the reader's own repo (vendored skills such as gx-domain-modeling carry
+// some), not references into the bundle.
+func stripFencedBlocks(s string) string {
+	var kept []string
+	inFence := false
+	for _, line := range strings.Split(s, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			inFence = !inFence
+			continue
+		}
+		if !inFence {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
+}
+
 func TestRelativeReferencesResolve(t *testing.T) {
 	bundleFiles := append([]string{}, requiredFiles...)
 	for _, rel := range bundleFiles {
-		raw := readFile(t, rel)
+		raw := stripFencedBlocks(readFile(t, rel))
 		dir := filepath.Dir(rel)
 		for _, m := range relativeLinkRe.FindAllStringSubmatch(raw, -1) {
 			target := m[1]
