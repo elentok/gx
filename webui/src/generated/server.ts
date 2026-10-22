@@ -269,8 +269,7 @@ export const EpicListRunning: EpicListState = "running";
 export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
 export const EpicListMergeBlocked: EpicListState = "merge-blocked";
 export const EpicListMerging: EpicListState = "merging";
-export const EpicListParked: EpicListState = "parked";
-export const EpicListDeadlocked: EpicListState = "deadlocked";
+export const EpicListPaused: EpicListState = "paused";
 export const EpicListDraft: EpicListState = "draft";
 /**
  * EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
@@ -341,10 +340,6 @@ export interface EpicList {
  * EpicState is EpicSummary.State.
  */
 export const EpicStateAwaitingMerge = "awaiting-merge";
-/**
- * EpicStateMergeBlocked is a done, unmerged epic whose last land parked.
- */
-export const EpicStateMergeBlocked = "merge-blocked";
 export const EpicStateFinished = "finished";
 export const EpicStateRunning = "running";
 /**
@@ -353,9 +348,18 @@ export const EpicStateRunning = "running";
  */
 export const EpicStateMerging = "merging";
 export const EpicStateWaiting = "waiting";
-export const EpicStateParked = "parked";
-export const EpicStateDeadlocked = "deadlocked";
-export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateMergeBlocked | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
+/**
+ * EpicStatePaused is an epic with nothing runnable: a paused ticket, a
+ * dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
+ */
+export const EpicStatePaused = "paused";
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateMerging | typeof EpicStateWaiting | typeof EpicStatePaused;
+export const EpicReasonDeadlock = "Dependency deadlock";
+export const EpicReasonMergeBlocked = "Merge blocked";
+/**
+ * The reasons a Paused epic gives for itself, when no ticket is paused.
+ */
+export type EpicReason = typeof EpicReasonDeadlock | typeof EpicReasonMergeBlocked;
 /**
  * SummaryTicket is one ticket in an EpicSummary: an active one carries
  * ClaimedAt, a Parked one carries Recovery and its unclipped Park reason.
@@ -405,14 +409,28 @@ export interface EpicSummary {
    */
   has_repair: boolean;
   /**
-   * Reason names what holds a Deadlocked epic, or the park reason of a
-   * MergeBlocked one.
+   * Reason is why a Paused epic is paused: the reason of its first paused
+   * ticket, else "Dependency deadlock" or "Merge blocked". It is empty for a
+   * Paused epic that holds only drafts.
    */
   reason?: string;
   /**
-   * ParkKind is the park kind of a MergeBlocked epic; empty for a needs-rebase park.
+   * More is the number of paused tickets beyond the first, whose reason Reason shows.
    */
-  park_kind?: string;
+  more?: number /* int */;
+  /**
+   * Detail is the cycle that deadlocks the epic, or why its merge is blocked.
+   */
+  detail?: string;
+  /**
+   * MergeBlocked is set on a Paused epic whose last merge failed, so clients
+   * keep offering the merge action.
+   */
+  merge_blocked?: boolean;
+  /**
+   * MergeBlockKind is the pause reason of a blocked merge; empty for a needs-rebase block.
+   */
+  merge_block_kind?: string;
 }
 
 //////////

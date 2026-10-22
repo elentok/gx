@@ -7,12 +7,12 @@ import (
 	"time"
 )
 
-// parkPollInterval is how often a parked run (nothing runnable, something
+// pausedPollInterval is how often a paused run (nothing runnable, something
 // human-clearable) re-reads the epic looking for a status a person has
 // cleared. Slower than resumePollInterval (see ratelimit.go) on purpose:
-// every pass writes a scheduler-scan line to the run log, and a park can
+// every pass writes a scheduler-scan line to the run log, and a pause can
 // last hours.
-const parkPollInterval = 30 * time.Second
+const pausedPollInterval = 30 * time.Second
 
 // QueuePauseLabel identifies the in-process pause controlled by the Queue UI.
 const QueuePauseLabel = "queue"
@@ -207,7 +207,7 @@ func (g *Gate) ForceResume(label string) bool {
 
 // ParkWake returns the channel a parked run's poll wait selects on, closed
 // by WakeParked to cut that wait short without touching the underlying
-// d.Sleep(parkPollInterval) call itself.
+// d.Sleep(pausedPollInterval) call itself.
 func (g *Gate) ParkWake() <-chan struct{} {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -215,7 +215,7 @@ func (g *Gate) ParkWake() <-chan struct{} {
 }
 
 // WakeParked interrupts a parked run's current poll wait — a cosmetic wake
-// that skips the remainder of the current parkPollInterval tick so a run
+// that skips the remainder of the current pausedPollInterval tick so a run
 // whose Run() goroutine is still alive rechecks the frontier immediately,
 // mirroring ForceResume's lock/close/replace shape so a second WakeParked
 // call doesn't panic on an already-closed channel.

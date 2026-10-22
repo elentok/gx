@@ -37,9 +37,7 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 		{server.EpicStateAwaitingMerge, icons.TicketDone, "Awaiting merge"},
 		{server.EpicStateRunning, "S", "Running"},
 		{server.EpicStateWaiting, icons.EpicQueued, "Waiting for a slot"},
-		{server.EpicStateParked, icons.Warning, "Parked"},
-		{server.EpicStateDeadlocked, icons.Warning, "Deadlocked"},
-		{server.EpicStateMergeBlocked, icons.Warning, "Merge blocked"},
+		{server.EpicStatePaused, icons.Warning, "Paused"},
 		{server.EpicStateMerging, "S", "Merging"},
 	}
 	for _, tt := range tests {
@@ -50,18 +48,19 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 	}
 }
 
-func TestEpicStatusLine_DeadlockedShowsReason(t *testing.T) {
+func TestEpicStatusLine_PausedShowsReasonAndMore(t *testing.T) {
 	t.Parallel()
-	_, text, _ := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.EpicStateDeadlocked, Reason: "01 waits on itself"}, "")
-	if text != "Deadlocked: 01 waits on itself" {
-		t.Errorf("text = %q, want the label followed by the reason", text)
+	sum := server.EpicSummary{State: server.EpicStatePaused, Reason: "Waiting for your answer", More: 2}
+	_, text, _ := epicStatusLine(ui.Icons(false), sum, "")
+	if text != "Paused: Waiting for your answer +2 more" {
+		t.Errorf("text = %q, want the label, the reason and the count of the others", text)
 	}
 }
 
 func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
 	t.Parallel()
-	_, text, style := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.EpicStateMergeBlocked, Reason: "trunk dirty"}, "")
-	if text != "Merge blocked: trunk dirty" {
+	_, text, style := epicStatusLine(ui.Icons(false), server.EpicSummary{State: server.EpicStatePaused, Reason: server.EpicReasonMergeBlocked, MergeBlocked: true}, "")
+	if text != "Paused: Merge blocked" {
 		t.Errorf("text = %q, want the label followed by the reason", text)
 	}
 	if style.Render("x") != epicStatusProblemStyle.Render("x") {
@@ -72,10 +71,10 @@ func TestEpicStatusLine_MergeBlockedShowsReason(t *testing.T) {
 func TestEpicStatusLine_Colors(t *testing.T) {
 	t.Parallel()
 	icons := ui.Icons(false)
-	repair := server.EpicSummary{State: server.EpicStateParked, HasRepair: true, Parked: []server.SummaryTicket{
+	repair := server.EpicSummary{State: server.EpicStatePaused, HasRepair: true, Parked: []server.SummaryTicket{
 		{Status: "needs-answer"}, {Status: "needs-repair"},
 	}}
-	answer := server.EpicSummary{State: server.EpicStateParked, Parked: []server.SummaryTicket{{Status: "needs-answer"}}}
+	answer := server.EpicSummary{State: server.EpicStatePaused, Parked: []server.SummaryTicket{{Status: "needs-answer"}}}
 	for _, tt := range []struct {
 		name string
 		sum  server.EpicSummary
@@ -84,7 +83,7 @@ func TestEpicStatusLine_Colors(t *testing.T) {
 		{"awaiting-merge", server.EpicSummary{State: server.EpicStateAwaitingMerge}, epicStatusDoneStyle.Render(icons.TicketDone)},
 		{"parked needs-repair", repair, epicStatusParkedRepairStyle.Render(icons.Warning)},
 		{"parked needs-answer", answer, epicStatusParkedAnswerStyle.Render(icons.Warning)},
-		{"deadlocked", server.EpicSummary{State: server.EpicStateDeadlocked}, epicStatusParkedRepairStyle.Render(icons.Warning)},
+		{"deadlocked", server.EpicSummary{State: server.EpicStatePaused, Reason: server.EpicReasonDeadlock}, epicStatusParkedRepairStyle.Render(icons.Warning)},
 	} {
 		icon, _, style := epicStatusLine(icons, tt.sum, "")
 		if got := style.Render(icon); got != tt.want {
@@ -156,7 +155,7 @@ func TestQueueServerMode_HeaderReadsSummary(t *testing.T) {
 func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
 	m := summaryQueue(t,
 		server.EpicSummary{
-			Address: "gx:alpha", Name: "alpha", State: server.EpicStateParked, Done: 0, Total: 1,
+			Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Done: 0, Total: 1,
 			Parked: []server.SummaryTicket{{
 				Address: "gx:alpha/01", Title: "First", Status: "needs-answer", Reason: "Which approach, A or B?",
 			}},
@@ -168,18 +167,18 @@ func TestQueueServerMode_ShowsParkReasonFromSummary(t *testing.T) {
 	if !strings.Contains(body, "Which approach, A or B?") {
 		t.Errorf("view lacks the Park reason line:\n%s", body)
 	}
-	if !strings.Contains(body, "Parked") {
-		t.Errorf("view lacks the parked state label:\n%s", body)
+	if !strings.Contains(body, "Paused") {
+		t.Errorf("view lacks the paused state label:\n%s", body)
 	}
 }
 
 func TestQueueServerMode_DeadlockedWord(t *testing.T) {
 	m := summaryQueue(t,
-		server.EpicSummary{Address: "gx:alpha", Name: "alpha", State: server.EpicStateDeadlocked, Total: 1, Reason: "01 waits on itself"},
+		server.EpicSummary{Address: "gx:alpha", Name: "alpha", State: server.EpicStatePaused, Total: 1, Reason: server.EpicReasonDeadlock, Detail: "01 waits on itself"},
 		server.TicketInfo{Address: "gx:alpha/01", Title: "First", Status: "open"},
 	)
 
-	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "Deadlocked: 01 waits on itself") {
-		t.Errorf("view lacks the deadlocked label and reason:\n%s", body)
+	if body := ansi.Strip(m.View().Content); !strings.Contains(body, "Paused: Dependency deadlock") {
+		t.Errorf("view lacks the paused label and deadlock reason:\n%s", body)
 	}
 }

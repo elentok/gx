@@ -48,12 +48,10 @@ var (
 
 // epicStateLabels must match LABELS in webui/src/view.ts.
 var epicStateLabels = map[server.EpicState]string{
-	server.EpicStateParked:        "Parked",
-	server.EpicStateDeadlocked:    "Deadlocked",
+	server.EpicStatePaused:        "Paused",
 	server.EpicStateRunning:       "Running",
 	server.EpicStateWaiting:       "Waiting for a slot",
 	server.EpicStateAwaitingMerge: "Awaiting merge",
-	server.EpicStateMergeBlocked:  "Merge blocked",
 	server.EpicStateMerging:       "Merging",
 	server.EpicStateFinished:      "Finished",
 }
@@ -67,24 +65,22 @@ func epicStatusLine(icons ui.IconSet, sum server.EpicSummary, spinnerGlyph strin
 		return icons.TicketDone, epicStateLabels[sum.State], epicStatusDoneStyle
 	case server.EpicStateRunning, server.EpicStateMerging:
 		return spinnerGlyph, epicStateLabels[sum.State], lipgloss.NewStyle()
-	case server.EpicStateMergeBlocked:
+	case server.EpicStatePaused:
 		text = epicStateLabels[sum.State]
 		if sum.Reason != "" {
 			text += ": " + sum.Reason
 		}
-		return icons.Warning, text, epicStatusProblemStyle
-	case server.EpicStateParked:
-		// Red once a parked ticket is broken, since a fault outranks a question.
-		if sum.HasRepair {
-			return icons.Warning, epicStateLabels[sum.State], epicStatusParkedRepairStyle
+		if sum.More > 0 {
+			text += fmt.Sprintf(" +%d more", sum.More)
 		}
-		return icons.Warning, epicStateLabels[sum.State], epicStatusParkedAnswerStyle
-	case server.EpicStateDeadlocked:
-		text = epicStateLabels[sum.State]
-		if sum.Reason != "" {
-			text += ": " + sum.Reason
+		switch {
+		case sum.MergeBlocked:
+			return icons.Warning, text, epicStatusProblemStyle
+		// Red once a paused ticket is broken, since a fault outranks a question.
+		case sum.HasRepair || sum.Reason == server.EpicReasonDeadlock:
+			return icons.Warning, text, epicStatusParkedRepairStyle
 		}
-		return icons.Warning, text, epicStatusParkedRepairStyle
+		return icons.Warning, text, epicStatusParkedAnswerStyle
 	default:
 		return icons.EpicQueued, epicStateLabels[server.EpicStateWaiting], lipgloss.NewStyle()
 	}

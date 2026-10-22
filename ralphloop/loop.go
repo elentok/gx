@@ -836,7 +836,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				return fmt.Errorf("epic %q is deadlocked: no runnable tickets left, none done, and none a human could clear; check for a dependency cycle or a bad status", opts.EpicName)
 			}
 			if !parked {
-				logDeadlocked(scratchDir, opts.EpicName, events.AllPaused, "every remaining ticket is parked")
+				logDeadlocked(scratchDir, opts.EpicName, events.AllPaused, "every remaining ticket is paused")
 				stalledForSink := make([]StalledTicket, len(stalled))
 				for i, t := range stalled {
 					stalledForSink[i] = StalledTicket{
@@ -853,7 +853,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			// cut the wait short cosmetically; ctx.Done() lets a caller stop
 			// the run outright.
 			select {
-			case <-d.ParkTimer(parkPollInterval):
+			case <-d.ParkTimer(pausedPollInterval):
 			case <-gate.ParkWake():
 			case <-ctx.Done():
 			}
@@ -884,7 +884,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			case r = <-results:
 			case r = <-landResults:
 				fromLand = true
-			case <-d.ParkTimer(parkPollInterval):
+			case <-d.ParkTimer(pausedPollInterval):
 				continue
 			}
 		} else {

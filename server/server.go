@@ -33,7 +33,7 @@ import (
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
-const APIVersion = 2
+const APIVersion = 3
 
 const (
 	lockFileName   = "server.lock"

@@ -13,16 +13,21 @@ type EpicState string
 
 const (
 	EpicStateAwaitingMerge EpicState = "awaiting-merge"
-	// EpicStateMergeBlocked is a done, unmerged epic whose last land parked.
-	EpicStateMergeBlocked EpicState = "merge-blocked"
-	EpicStateFinished     EpicState = "finished"
-	EpicStateRunning      EpicState = "running"
+	EpicStateFinished      EpicState = "finished"
+	EpicStateRunning       EpicState = "running"
 	// EpicStateMerging is an epic whose only unfinished tickets are merge tickets
 	// that are open or claimed.
-	EpicStateMerging    EpicState = "merging"
-	EpicStateWaiting    EpicState = "waiting"
-	EpicStateParked     EpicState = "parked"
-	EpicStateDeadlocked EpicState = "deadlocked"
+	EpicStateMerging EpicState = "merging"
+	EpicStateWaiting EpicState = "waiting"
+	// EpicStatePaused is an epic with nothing runnable: a paused ticket, a
+	// dependency deadlock, or a blocked merge. EpicSummary.Reason says which.
+	EpicStatePaused EpicState = "paused"
+)
+
+// The reasons a Paused epic gives for itself, when no ticket is paused.
+const (
+	EpicReasonDeadlock     = "Dependency deadlock"
+	EpicReasonMergeBlocked = "Merge blocked"
 )
 
 // SummaryTicket is one ticket in an EpicSummary: an active one carries
@@ -58,11 +63,19 @@ type EpicSummary struct {
 	// HasRepair is set when a parked ticket is broken (needs-repair or error), so
 	// both clients show a fault in the alarm color instead of a question.
 	HasRepair bool `json:"has_repair"`
-	// Reason names what holds a Deadlocked epic, or the park reason of a
-	// MergeBlocked one.
+	// Reason is why a Paused epic is paused: the reason of its first paused
+	// ticket, else "Dependency deadlock" or "Merge blocked". It is empty for a
+	// Paused epic that holds only drafts.
 	Reason string `json:"reason,omitempty"`
-	// ParkKind is the park kind of a MergeBlocked epic; empty for a needs-rebase park.
-	ParkKind string `json:"park_kind,omitempty"`
+	// More is the number of paused tickets beyond the first, whose reason Reason shows.
+	More int `json:"more,omitempty"`
+	// Detail is the cycle that deadlocks the epic, or why its merge is blocked.
+	Detail string `json:"detail,omitempty"`
+	// MergeBlocked is set on a Paused epic whose last merge failed, so clients
+	// keep offering the merge action.
+	MergeBlocked bool `json:"merge_blocked,omitempty"`
+	// MergeBlockKind is the pause reason of a blocked merge; empty for a needs-rebase block.
+	MergeBlockKind string `json:"merge_block_kind,omitempty"`
 }
 
 // epicSummaries summarizes every epic with a queue item, in queue order. A
@@ -167,16 +180,42 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		sum.Done, sum.Total = 0, 0
 	}
 	sum.State = epicStateFor(root, e, claimedAt)
-	if sum.State == EpicStateDeadlocked {
-		sum.Reason = cycleReason(root, e)
-	}
-	if sum.State == EpicStateMergeBlocked {
-		sum.Reason, sum.ParkKind = e.LandBlockReason, e.LandBlockKind
+	if sum.State == EpicStatePaused {
+		sum.Reason, sum.More = pausedEpicReason(e)
+		switch {
+		case root.Epic != OneOffsEpic && epicMergeBlocked(e):
+			sum.Reason, sum.Detail = EpicReasonMergeBlocked, e.LandBlockReason
+			sum.MergeBlocked, sum.MergeBlockKind = true, e.LandBlockKind
+		case epicStateOf(e) == epicCycle:
+			sum.Reason, sum.Detail = EpicReasonDeadlock, cycleReason(root, e)
+		}
 	}
 	if sum.State != EpicStateRunning && sum.State != EpicStateMerging {
 		sum.Active = []SummaryTicket{}
 	}
 	return sum
+}
+
+// pausedEpicReason is the reason of the first paused ticket in e's ticket
+// order and the count of the others. A draft is not paused, so a drafts-only
+// epic has neither.
+func pausedEpicReason(e tickets.Epic) (reason string, more int) {
+	n := 0
+	for _, t := range e.Tickets {
+		if !isParked(e, t) || e.RenderedStatus(t) == tickets.StatusDraft {
+			continue
+		}
+		if n == 0 {
+			reason = tickets.ParkReason(e, t)
+		}
+		n++
+	}
+	return reason, max(n-1, 0)
+}
+
+// epicMergeBlocked reports whether e is done and unmerged, with its last merge blocked.
+func epicMergeBlocked(e tickets.Epic) bool {
+	return epicStateOf(e) == epicDone && e.MergedAt.IsZero() && e.LandBlockReason != ""
 }
 
 // onlyMergeTicketsRemain reports whether every ticket is done or cancelled
@@ -208,8 +247,8 @@ func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Tim
 			return EpicStateWaiting
 		}
 		if e.MergedAt.IsZero() {
-			if e.LandBlockReason != "" {
-				return EpicStateMergeBlocked
+			if epicMergeBlocked(e) {
+				return EpicStatePaused
 			}
 			return EpicStateAwaitingMerge
 		}
@@ -228,9 +267,7 @@ func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Tim
 			}
 		}
 		return EpicStateWaiting
-	case epicParked:
-		return EpicStateParked
 	default:
-		return EpicStateDeadlocked
+		return EpicStatePaused
 	}
 }

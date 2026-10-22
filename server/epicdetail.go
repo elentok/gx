@@ -110,7 +110,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		d.Kind, d.Summary = EpicKindMap, schema.Section(e.Body, "Destination")
 	} else {
 		d.State = epicStateFor(root, e, s.registry.startedAtOf)
-		if d.State == EpicStateMergeBlocked {
+		if epicMergeBlocked(e) {
 			d.LandBlockKind, d.LandBlockReason = e.LandBlockKind, e.LandBlockReason
 		}
 	}

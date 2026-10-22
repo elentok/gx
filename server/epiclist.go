@@ -24,8 +24,7 @@ const (
 	EpicListAwaitingMerge   EpicListState = "awaiting-merge"
 	EpicListMergeBlocked    EpicListState = "merge-blocked"
 	EpicListMerging         EpicListState = "merging"
-	EpicListParked          EpicListState = "parked"
-	EpicListDeadlocked      EpicListState = "deadlocked"
+	EpicListPaused          EpicListState = "paused"
 	EpicListDraft           EpicListState = "draft"
 	// EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
 	// nothing to queue, yet not finished.
@@ -97,16 +96,15 @@ func epicListState(e tickets.Epic, queued bool, loopState EpicState) EpicListSta
 	switch loopState {
 	case EpicStateAwaitingMerge:
 		return EpicListAwaitingMerge
-	case EpicStateMergeBlocked:
-		return EpicListMergeBlocked
 	case EpicStateMerging:
 		return EpicListMerging
 	case EpicStateRunning:
 		return EpicListRunning
-	case EpicStateParked:
-		return EpicListParked
-	case EpicStateDeadlocked:
-		return EpicListDeadlocked
+	case EpicStatePaused:
+		if epicMergeBlocked(e) {
+			return EpicListMergeBlocked
+		}
+		return EpicListPaused
 	}
 	switch {
 	case queued:

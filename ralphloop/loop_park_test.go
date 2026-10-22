@@ -29,8 +29,8 @@ func readyTimer(time.Duration) <-chan time.Time {
 // this test did not intend to script.
 func assertParkInterval(t *testing.T, dur time.Duration) {
 	t.Helper()
-	if dur != parkPollInterval {
-		t.Errorf("ParkTimer duration = %v, want %v", dur, parkPollInterval)
+	if dur != pausedPollInterval {
+		t.Errorf("ParkTimer duration = %v, want %v", dur, pausedPollInterval)
 	}
 }
 

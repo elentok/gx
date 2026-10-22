@@ -118,7 +118,7 @@ func parkedReason(root rootRef, e tickets.Epic) string {
 			parts = append(parts, ticketAddr(root, t))
 		}
 	}
-	return "every remaining ticket is parked: " + strings.Join(parts, ", ")
+	return "every remaining ticket is paused: " + strings.Join(parts, ", ")
 }
 
 func cycleReason(root rootRef, e tickets.Epic) string {

@@ -68,7 +68,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		"proj:draft":            {server.EpicListDraft, server.EpicKindLoop},
 		"proj:queued":           {server.EpicListQueued, server.EpicKindLoop},
 		"proj:awaiting":         {server.EpicListAwaitingMerge, server.EpicKindLoop},
-		"proj:parked":           {server.EpicListParked, server.EpicKindLoop},
+		"proj:parked":           {server.EpicListPaused, server.EpicKindLoop},
 		"proj:blocked":          {server.EpicListMergeBlocked, server.EpicKindLoop},
 		"proj:merging":          {server.EpicListMerging, server.EpicKindLoop},
 		"proj:unqueued-claimed": {server.EpicListNoOpenTickets, server.EpicKindLoop},

@@ -106,7 +106,7 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d: %s", code, body)
 	}
-	if d.Address != "proj:work" || d.Kind != server.EpicKindLoop || d.State != server.EpicStateDeadlocked || d.Summary != "Does the thing." {
+	if d.Address != "proj:work" || d.Kind != server.EpicKindLoop || d.State != server.EpicStatePaused || d.Summary != "Does the thing." {
 		t.Errorf("header = %+v", d)
 	}
 	if d.Done != 3 || d.Total != 6 {
@@ -170,7 +170,7 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
 	})
 	code, d, body := getEpicDetail(t, h, base, "proj:blocked")
-	if code != http.StatusOK || d.State != server.EpicStateMergeBlocked ||
+	if code != http.StatusOK || d.State != server.EpicStatePaused ||
 		d.LandBlockKind != "self-reported" || d.LandBlockReason != "conflict in main.go" {
 		t.Errorf("blocked = %d, %+v (%s)", code, d, body)
 	}

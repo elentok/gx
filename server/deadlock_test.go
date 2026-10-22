@@ -126,7 +126,7 @@ func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
 // investigation of the epic and queues it at the front.
 func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
 	h := startDeadlock(t, recovery.Catalog{Enabled: true})
-	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is parked"})
+	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is paused"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryApplied)) > 0 })
 
 	applied := runLogOf(t, h, events.RecoveryApplied)
