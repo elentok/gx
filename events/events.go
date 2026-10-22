@@ -60,7 +60,7 @@ const (
 	LaunchFailed Type = "launch-failed"
 	Reclaimed    Type = "reclaimed"
 	// ClaimReopened is a claim a restarted server found dead and empty, so it
-	// cleared the iteration and reopened the ticket instead of parking it.
+	// cleared the iteration and reopened the ticket instead of pausing it.
 	ClaimReopened Type = "claim-reopened"
 	// StalePaneClosed is a launch that found its label held by a pane no run
 	// tracks and not mid-turn, so it closed that pane and retried.
@@ -130,7 +130,7 @@ const (
 	ParentDefect Kind = "parent-defect"
 	// BackgroundTaskGate is a finish held on a background task. The loop logs
 	// the hold kind-less; the failure recovery raises from it carries this, and
-	// so does R10's park of a dirty worktree with commits ahead.
+	// so does R10's pause of a dirty worktree with commits ahead.
 	BackgroundTaskGate Kind = "background-task-gate"
 	// StrandedCommits is a commitless ticket that committed on its detached
 	// worktree anyway; the worktree stays until a person lands or drops them.
@@ -143,7 +143,7 @@ const (
 	// MergeError is a root merge that failed for any reason no other kind names.
 	MergeError Kind = "merge-error"
 	// MergeUnreported is a merge agent that stopped without reporting finished
-	// or needs-answer. Unlike the other merge faults, a late finish adopts it.
+	// or asking. Unlike the other merge faults, a late finish adopts it.
 	MergeUnreported Kind = "merge-unreported"
 )
 

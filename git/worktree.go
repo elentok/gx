@@ -106,8 +106,8 @@ func AddDetachedWorktree(repo Repo, newPath, ref string) error {
 
 // AddWorktreeOnBranch creates a linked worktree at newPath attached to the
 // existing local branch branch (no -b, no new branch created) — the
-// resume-after-park counterpart to AddWorktree's always-fresh-branch
-// behavior, for reattaching to an iteration branch a prior park left intact.
+// resume-after-pause counterpart to AddWorktree's always-fresh-branch
+// behavior, for reattaching to an iteration branch a prior pause left intact.
 func AddWorktreeOnBranch(repo Repo, branch, newPath string) error {
 	if err := excludeWorktreeDir(repo); err != nil {
 		return err

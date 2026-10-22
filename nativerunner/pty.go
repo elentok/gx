@@ -74,7 +74,7 @@ type ptySession struct {
 	exited  chan struct{}
 	stopped bool
 	// died is set once a step left claude in a state gx can't trust; every
-	// later call fails with it, so the loop parks the ticket needs-repair.
+	// later call fails with it, so the loop pauses the ticket for repair.
 	died error
 }
 
@@ -559,7 +559,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 
 	grace := p.StopGrace
 	if grace <= 0 {
-		// Longer than the holder's own grace for claude, plus its drain.
+		// Longer than the holder's own grace for claude, plus its final flush.
 		grace = 2 * holderStopGrace
 	}
 	wait := grace

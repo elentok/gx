@@ -23,13 +23,13 @@ const (
 	// VerdictFinished: claude is gone but its last turn ran to a result,
 	// so the iteration counts as a normal finish.
 	VerdictFinished
-	// VerdictDied: claude is gone mid-turn. The caller parks the ticket
-	// needs-repair with ReasonAgentDied and keeps the directory. gx never
+	// VerdictDied: claude is gone mid-turn. The caller pauses the ticket
+	// for repair with ReasonAgentDied and keeps the directory. gx never
 	// resumes it on its own, so no work is repeated by surprise.
 	VerdictDied
 )
 
-// ReasonAgentDied is the needs-repair reason for VerdictDied.
+// ReasonAgentDied is the repair-pause reason for VerdictDied.
 const ReasonAgentDied = "agent-died-while-server-down"
 
 // DefaultLogRetention is how long Prune keeps an agent directory.

@@ -25,7 +25,7 @@ const (
 	StateDone    State = "done"
 	// StateBlocked means the agent waits on a prompt gx did not send. Adapters
 	// answer the dialogs they know themselves; callers only see blocked plus
-	// Status.BlockedReason and park.
+	// Status.BlockedReason and pause.
 	StateBlocked State = "blocked"
 )
 
@@ -89,7 +89,7 @@ type Pending struct {
 var NotApprovableTools = []string{"ExitPlanMode", "AskUserQuestion"}
 
 // LoopDisallowedTools are the interactive tools no loop (ticket) agent may
-// use. Agents ask through the ticket's Needs Answer section instead.
+// use. Agents ask through the ticket's Question section instead.
 const LoopDisallowedTools = "AskUserQuestion,EnterPlanMode,ExitPlanMode"
 
 // WithLoopDisallowedTools appends the claude ban on LoopDisallowedTools to
@@ -151,14 +151,14 @@ var (
 	// (Codex only). It's an error, not a Status field, because detecting it
 	// costs the same pane read RateLimit already makes, which Status, polled
 	// far more often, should not. The wrapping error's message carries the
-	// evidence the adapter found, for a park reason.
+	// evidence the adapter found, for a pause reason.
 	ErrContextExhausted = errors.New("agentrunner: context window exhausted")
 	// ErrMissingCapability: the agent lacks a protocol capability the runner
 	// relies on. Retrying cannot help; the agent needs upgrading.
 	ErrMissingCapability = errors.New("agentrunner: agent missing capability")
 	// ErrSessionDied: Status or Wait found the session gone without a Stop
 	// (the agent exited, or its host crashed). Build it with SessionDied so
-	// the message carries why; callers park needs-repair with that message.
+	// the message carries why; callers pause the ticket for repair with that message.
 	ErrSessionDied = errors.New("agentrunner: session died")
 	// ErrInvalidDecision: Answer got a decision the blocked prompt can't take,
 	// e.g. allow on a dialog that is not a permission prompt.

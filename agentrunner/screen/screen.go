@@ -61,7 +61,7 @@ type Cursor struct {
 type Screen struct {
 	mu      sync.Mutex
 	emu     *vt.Emulator
-	drained chan struct{}
+	replied chan struct{}
 	// cursorVisible and allDirty are set by emulator callbacks, which run
 	// inside calls that already hold mu.
 	cursorVisible bool
@@ -98,7 +98,7 @@ func NewScreenWithReplies(cols, rows int, replies io.Writer) *Screen {
 	}
 	emu := vt.NewEmulator(cols, rows)
 	emu.SetScrollbackSize(scrollbackLines + scrollbackSlack)
-	s := &Screen{emu: emu, drained: make(chan struct{}), cursorVisible: true, mouse: map[ansi.Mode]bool{}}
+	s := &Screen{emu: emu, replied: make(chan struct{}), cursorVisible: true, mouse: map[ansi.Mode]bool{}}
 	emu.SetCallbacks(vt.Callbacks{
 		CursorVisibility: func(visible bool) { s.cursorVisible = visible },
 		AltScreen:        func(bool) { s.allDirty = true },
@@ -106,9 +106,9 @@ func NewScreenWithReplies(cols, rows int, replies io.Writer) *Screen {
 		DisableMode:      func(m ansi.Mode) { s.setMouseMode(m, false) },
 	})
 	// The emulator writes replies and encoded input into a pipe, and an
-	// undrained pipe blocks the next Write that triggers one.
+	// unread pipe blocks the next Write that triggers one.
 	go func() {
-		defer close(s.drained)
+		defer close(s.replied)
 		_, _ = io.Copy(replies, emu)
 	}()
 	return s
@@ -498,16 +498,16 @@ func (s *Screen) Paste(text string) {
 	s.emu.Paste(text)
 }
 
-// Close stops the drain goroutine, waits for it to exit, then stops the
+// Close stops the reply-reading goroutine, waits for it to exit, then stops the
 // emulator.
 func (s *Screen) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// emu.Read checks the emulator's closed flag without a lock, so
-	// emu.Close must not run until the drain goroutine is gone. Closing the
+	// emu.Close must not run until the reply-reading goroutine is gone. Closing the
 	// reply pipe first ends its io.Copy. The unchecked assertion panics
 	// rather than hangs if the emulator ever stops handing back a closer.
 	_ = s.emu.InputPipe().(io.Closer).Close()
-	<-s.drained
+	<-s.replied
 	return s.emu.Close()
 }

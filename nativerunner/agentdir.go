@@ -112,8 +112,8 @@ func (h *Headless) Inspect(label string) (Meta, bool, error) {
 // Prune removes the logs of agent directories untouched for longer than
 // maxAge and returns their labels. meta.json stays, so watch can still name
 // the claude transcript. It keeps any directory whose agent still runs and
-// any label parked reports true for, so a parked ticket's logs stay.
-func (h *Headless) Prune(maxAge time.Duration, now time.Time, parked func(label string) bool) ([]string, error) {
+// any label paused reports true for, so a paused ticket's logs stay.
+func (h *Headless) Prune(maxAge time.Duration, now time.Time, paused func(label string) bool) ([]string, error) {
 	entries, err := os.ReadDir(h.Root)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -124,7 +124,7 @@ func (h *Headless) Prune(maxAge time.Duration, now time.Time, parked func(label 
 	var pruned []string
 	for _, e := range entries {
 		label := e.Name()
-		if !e.IsDir() || parked(label) {
+		if !e.IsDir() || paused(label) {
 			continue
 		}
 		dir := filepath.Join(h.Root, label)

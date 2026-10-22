@@ -94,7 +94,7 @@ func matchAny(res []*regexp.Regexp, line string) string {
 
 func TestNoOldWords(t *testing.T) {
 	for _, rel := range trackedFiles(t) {
-		if !scanned(rel) || isAllowed(rel) || rel == "oldwords/oldwords_test.go" {
+		if !scanned(rel) || isAllowed(rel) || rel == "oldwords/oldwords_test.go" || rel == "oldwords/leftovers_test.go" {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join("..", rel))

@@ -42,11 +42,11 @@ func (t *Tail) Step() (lines []string, ended bool, err error) {
 	if t.ended {
 		return nil, true, nil
 	}
-	lines, err = t.drain()
+	lines, err = t.readToEnd()
 	if err != nil || t.log.Ended == nil || !t.log.Ended() {
 		return lines, false, err
 	}
-	more, err := t.drain()
+	more, err := t.readToEnd()
 	if err != nil {
 		return nil, false, err
 	}
@@ -64,7 +64,7 @@ func (t *Tail) Flush() []string {
 
 func (t *Tail) Close() error { return t.f.Close() }
 
-func (t *Tail) drain() ([]string, error) {
+func (t *Tail) readToEnd() ([]string, error) {
 	var lines []string
 	for {
 		chunk, err := t.r.ReadString('\n')

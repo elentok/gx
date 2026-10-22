@@ -135,7 +135,7 @@ func runDoctor(args []string, d deps) error {
 }
 
 // runDoctorBlockedFormCheck is gx doctor's interactive regression check for
-// the orchestrator gate (ralphloop.parkOnBlockedPane): it asks the operator
+// the orchestrator gate (ralphloop's blocked-pane pause): it asks the operator
 // to drive target into a live blocked form by hand, then asserts herdr's own
 // pane monitor still recognizes it via the "live_blocked_form" rule the gate
 // depends on. See docs/runbooks/blocked-form-regression-check.md for the

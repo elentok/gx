@@ -242,9 +242,9 @@ func (f *frameHub) sent(c *attachClient) {
 	f.paceLocked(c)
 }
 
-// drain returns c's last frames, ignoring the pacing: the frame in its slot,
+// takeRemaining returns c's last frames, ignoring the pacing: the frame in its slot,
 // then any it is still owed.
-func (f *frameHub) drain(c *attachClient) []Frame {
+func (f *frameHub) takeRemaining(c *attachClient) []Frame {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.stopTimerLocked(c)
@@ -513,7 +513,7 @@ func (h *holderServer) attach(conn net.Conn, in *bufio.Reader) {
 			}
 		case <-h.finished:
 			// finish flushed the last output before closing finished.
-			for _, frame := range h.frames.drain(client) {
+			for _, frame := range h.frames.takeRemaining(client) {
 				if send(StreamFrame, frame) != nil {
 					return
 				}

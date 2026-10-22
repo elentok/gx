@@ -23,10 +23,10 @@ type ExecutionQueueConfig struct {
 	MaxAgents int `json:"max-agents"`
 	// MaxOneOffAgents caps live agents across one project's one-off tickets.
 	MaxOneOffAgents int `json:"max-one-off-agents"`
-	// RetryStormLaunches is how many consecutive failed launches park a ticket
+	// RetryStormLaunches is how many consecutive failed launches pause a ticket
 	// as retry-exhausted.
 	RetryStormLaunches int `json:"retry-storm-launches"`
-	// SpinCycles park/re-claim cycles inside SpinWindow quarantine a ticket.
+	// SpinCycles pause/re-claim cycles inside SpinWindow quarantine a ticket.
 	// SpinWindow is read from the "spin-window" key as a Go duration string
 	// (e.g. "5m"); an unparsable or non-positive value keeps the default.
 	SpinCycles int           `json:"spin-cycles"`

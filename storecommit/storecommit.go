@@ -1,5 +1,5 @@
 // Package storecommit commits the ticket store (a git repo) as tickets change:
-// debounced after the last change, immediately on done/cancelled/park.
+// debounced after the last change, immediately on done/cancelled/pause.
 // The in-process loop runs it, or the server when the orchestrator switch says
 // "server". The S2
 // read-only server never starts one.

@@ -41,11 +41,11 @@ const (
 	HolderRows = 50
 )
 
-// holderDrainTimeout bounds the wait for the last pty output after the child
+// holderFlushTimeout bounds the wait for the last pty output after the child
 // exits: a grandchild that inherited the tty can keep it open forever.
-const holderDrainTimeout = time.Second
+const holderFlushTimeout = time.Second
 
-// holderAfterExit runs once the child has exited, before the drain; tests
+// holderAfterExit runs once the child has exited, before the final read; tests
 // hold the holder there.
 var holderAfterExit = func() {}
 
@@ -171,9 +171,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	}
 	output := make(outputSignal, 1)
 	go srv.frames.run(output, srv.finished)
-	drained := make(chan struct{})
+	copied := make(chan struct{})
 	go func() {
-		defer close(drained)
+		defer close(copied)
 		_, _ = io.Copy(io.MultiWriter(rawLog, scr, output, srv.name, &programStatus{ptmx: ptmx, watcher: watcher}, &srv.changes), ptmx)
 	}()
 
@@ -184,14 +184,14 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	// The holder keeps its own tty fd open until now: on macOS the child's
 	// last output is dropped once every tty fd is closed, so it is read out
 	// of the pty before the holder lets go.
-	deadline := time.Now().Add(holderDrainTimeout)
+	deadline := time.Now().Add(holderFlushTimeout)
 	for unread(tty) && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	_ = tty.Close()
 	select {
-	case <-drained:
-	case <-time.After(holderDrainTimeout):
+	case <-copied:
+	case <-time.After(holderFlushTimeout):
 	}
 
 	if waitErr != nil {

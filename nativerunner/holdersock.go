@@ -102,7 +102,7 @@ const denyBusyMessage = "deny-reason in progress"
 var ErrHolderDenyBusy = errors.New(denyBusyMessage)
 
 // ClaudeExitedError is status's error once claude has exited. The holder
-// writes exit-code only after its drain, so this is how a caller tells a
+// writes exit-code only after its final flush, so this is how a caller tells a
 // normal exit from a holder failure until then.
 type ClaudeExitedError struct{ Code int }
 
@@ -189,7 +189,7 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		return holderResponse{Version: HolderProtocolVersion, Ops: h.ops, Pid: h.proc.Pid}, nil
 	case opStatus:
 		// The pid file's last status outlives claude, and the holder keeps
-		// answering while it drains, so an exit must not read as idle.
+		// answering while it flushes, so an exit must not read as idle.
 		select {
 		case <-h.exited:
 			// Error too, so an older client still fails the call.

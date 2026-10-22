@@ -290,7 +290,7 @@ func launchArgs(sessionID string, extra []string) []string {
 }
 
 // tail follows out.jsonl from offset and folds each complete line into the
-// session's status. Once claude has exited and the file is drained, the
+// session's status. Once claude has exited and the file is read to the end, the
 // session is done.
 func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 	defer close(ss.tailed)
@@ -310,7 +310,7 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 
 	var pending []byte
 	buf := make([]byte, 64*1024)
-	drain := func() {
+	readAll := func() {
 		for {
 			n, err := f.Read(buf)
 			pending = append(pending, buf[:n]...)
@@ -333,11 +333,11 @@ func (h *Headless) tail(ss *headlessSession, path string, offset int64) {
 	for {
 		select {
 		case <-ss.exited:
-			drain()
+			readAll()
 			h.update(ss, func(t *tracker) { t.exited = true })
 			return
 		case <-ticker.C:
-			drain()
+			readAll()
 		}
 	}
 }
