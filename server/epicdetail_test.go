@@ -181,6 +181,9 @@ func TestEpicDetail_Queueable(t *testing.T) {
 		if code != http.StatusOK || d.Queueable != want {
 			t.Errorf("%s = %d, queueable %v, want %v (%s)", epic, code, d.Queueable, want, body)
 		}
+		if wantQueued := epic == "queued"; d.Queued != wantQueued {
+			t.Errorf("%s queued = %v, want %v", epic, d.Queued, wantQueued)
+		}
 	}
 }
 

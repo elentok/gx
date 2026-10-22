@@ -239,6 +239,11 @@ export interface EpicDetail {
    * Queueable is set when the Queue action applies; see epicQueueable.
    */
   queueable: boolean;
+  /**
+   * Queued is set when the epic holds a queue item. A Waiting epic that is not
+   * queued is not waiting for a slot.
+   */
+  queued: boolean;
 }
 
 //////////

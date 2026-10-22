@@ -56,6 +56,9 @@ type EpicDetail struct {
 	Rows      []EpicDetailRow `json:"rows"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
 	Queueable bool `json:"queueable"`
+	// Queued is set when the epic holds a queue item. A Waiting epic that is not
+	// queued is not waiting for a slot.
+	Queued bool `json:"queued"`
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -93,10 +96,11 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) EpicDetail {
+	queued := s.rootQueued(root)
 	d := EpicDetail{
 		Address: root.String(), Kind: EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
-		Queueable: epicQueueable(e, s.rootQueued(root)),
+		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
 	if e.IsMap {
 		d.Kind, d.Summary = EpicKindMap, schema.Section(e.Body, "Destination")

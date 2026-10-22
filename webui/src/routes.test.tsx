@@ -151,6 +151,7 @@ const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   cost_total: 0,
   rows: [],
   queueable: false,
+  queued: false,
   ...over,
 });
 
@@ -247,6 +248,14 @@ test("a loop epic shows the stat sentence with no token counts", async () => {
 test("a loop epic with zero cost and agent time still shows both in the stat sentence", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "running", total: 6, done: 2, wall_clock: 4000, cost_total: 0, agent_time: 0, rows: loopRows }));
   expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $0.00 · 0s of agent time")).toBeTruthy();
+});
+
+test("a waiting epic says Not queued until it holds a queue item", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "waiting", total: 1, queueable: true }));
+  expect(await screen.findByText("Not queued · 0 of 1 done · $0.00 · 0s of agent time")).toBeTruthy();
+  cleanup();
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "waiting", total: 1, queued: true }));
+  expect(await screen.findByText("Waiting for a slot · 0 of 1 done · $0.00 · 0s of agent time")).toBeTruthy();
 });
 
 test("the done fold counts done tickets and adds cancelled only when above zero", async () => {
