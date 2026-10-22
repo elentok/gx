@@ -314,6 +314,112 @@ func TestBundleDropsRetiredTrackerTerms(t *testing.T) {
 	}
 }
 
+var (
+	slashCallRe     = regexp.MustCompile("(?:^|[\\s(`'\"])/([a-z][a-z0-9-]*)(?:[\\s)`'\".,;:]|$)")
+	skillToolCallRe = regexp.MustCompile(`Skill\(|skill:\s*"([^"]+)"`)
+	skillLinkRe     = regexp.MustCompile(`\]\(([^)]*SKILL\.md)\)`)
+)
+
+// notSkillCalls are slash tokens that are not skill invocations: harness
+// built-ins, ticket types, and URL paths or placeholders used in examples.
+var notSkillCalls = map[string]bool{
+	"clear": true, "new": true, "compact": true,
+	"grilling": true, "research": true, "prototype": true,
+	"name": true, "command": true, "the": true, "zero-commit": true,
+	"orders": true, "settings": true,
+}
+
+// outsideBundleCalls returns every call in text (a file at rel) to a skill
+// that is not in bundleSkills: a `/name` invocation, a Skill-tool call, or a
+// relative SKILL.md link leaving the bundle.
+func outsideBundleCalls(rel, text string, bundleSkills map[string]bool) []string {
+	var bad []string
+	text = stripFencedBlocks(text)
+	for _, m := range slashCallRe.FindAllStringSubmatch(text, -1) {
+		if !bundleSkills[m[1]] && !notSkillCalls[m[1]] {
+			bad = append(bad, "/"+m[1])
+		}
+	}
+	for _, m := range skillToolCallRe.FindAllStringSubmatch(text, -1) {
+		if !bundleSkills[m[1]] {
+			bad = append(bad, m[0])
+		}
+	}
+	for _, m := range skillLinkRe.FindAllStringSubmatch(text, -1) {
+		if strings.Contains(m[1], "://") {
+			continue
+		}
+		resolved := filepath.ToSlash(filepath.Join(filepath.Dir(rel), m[1]))
+		if strings.HasPrefix(resolved, "..") || !bundleSkills[strings.SplitN(resolved, "/", 2)[0]] {
+			bad = append(bad, m[1])
+		}
+	}
+	return bad
+}
+
+func bundleSkillNames(t *testing.T) map[string]bool {
+	t.Helper()
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("reading bundle dir: %v", err)
+	}
+	names := map[string]bool{}
+	for _, e := range entries {
+		if e.IsDir() {
+			names[e.Name()] = true
+		}
+	}
+	return names
+}
+
+func TestBundleCallsStayInsideBundle(t *testing.T) {
+	names := bundleSkillNames(t)
+	for _, rel := range bundleMarkdownFiles(t) {
+		for _, call := range outsideBundleCalls(rel, readFile(t, rel), names) {
+			t.Errorf("%s calls a skill outside the bundle: %s", rel, call)
+		}
+	}
+}
+
+func TestOutsideBundleCallGuardCatchesBadInput(t *testing.T) {
+	names := map[string]bool{"gx-tdd": true}
+	for _, text := range []string{
+		"Run `/wayfinder` first.",
+		"Use /wayfinder to plan.",
+		`Skill(skill: "wayfinder")`,
+		"See [x](../wayfinder/SKILL.md).",
+	} {
+		if len(outsideBundleCalls("gx-tdd/SKILL.md", text, names)) == 0 {
+			t.Errorf("guard missed %q", text)
+		}
+	}
+	for _, text := range []string{"Run `/gx-tdd`, `/clear` or /compact.", "[x](../gx-tdd/SKILL.md)"} {
+		if got := outsideBundleCalls("gx-tdd/SKILL.md", text, names); len(got) != 0 {
+			t.Errorf("guard flagged %q: %v", text, got)
+		}
+	}
+}
+
+var conflictMarkerRe = regexp.MustCompile(`(?m)^(<{7}( |$)|={7}$|>{7}( |$))`)
+
+func TestBundleHasNoConflictMarkers(t *testing.T) {
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if conflictMarkerRe.Match([]byte(readFile(t, path))) {
+			t.Errorf("%s has a git conflict marker", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking skills: %v", err)
+	}
+	if !conflictMarkerRe.MatchString("a\n<<<<<<< HEAD\nb") {
+		t.Error("conflict marker regex missed a marker")
+	}
+}
+
 // TestBundleHasNoNeedsAnswerSectionWrite pins that no skill tells an agent to
 // park by hand-writing the retired sections; `gx tickets ask` is the one route.
 func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
