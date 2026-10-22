@@ -163,6 +163,23 @@ func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+		writeEpicFiles(t, store, "blocked", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict in main.go\n---\n", done)
+		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
+	})
+	code, d, body := getEpicDetail(t, h, base, "proj:blocked")
+	if code != http.StatusOK || d.State != server.EpicStateMergeBlocked ||
+		d.LandBlockKind != "self-reported" || d.LandBlockReason != "conflict in main.go" {
+		t.Errorf("blocked = %d, %+v (%s)", code, d, body)
+	}
+	_, d, body = getEpicDetail(t, h, base, "proj:unmerged")
+	if d.LandBlockKind != "" || d.LandBlockReason != "" {
+		t.Errorf("an unblocked epic carries a land block: %s", body)
+	}
+}
+
 func TestEpicDetail_Queueable(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}

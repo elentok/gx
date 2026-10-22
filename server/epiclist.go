@@ -22,6 +22,8 @@ const (
 	EpicListQueued          EpicListState = "queued"
 	EpicListRunning         EpicListState = "running"
 	EpicListAwaitingMerge   EpicListState = "awaiting-merge"
+	EpicListMergeBlocked    EpicListState = "merge-blocked"
+	EpicListMerging         EpicListState = "merging"
 	EpicListParked          EpicListState = "parked"
 	EpicListDeadlocked      EpicListState = "deadlocked"
 	EpicListDraft           EpicListState = "draft"
@@ -91,6 +93,10 @@ func epicListState(e tickets.Epic, queued bool, loopState EpicState) EpicListSta
 	switch loopState {
 	case EpicStateAwaitingMerge:
 		return EpicListAwaitingMerge
+	case EpicStateMergeBlocked:
+		return EpicListMergeBlocked
+	case EpicStateMerging:
+		return EpicListMerging
 	case EpicStateRunning:
 		return EpicListRunning
 	case EpicStateParked:

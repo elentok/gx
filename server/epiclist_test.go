@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -37,6 +38,11 @@ func TestEpicList_SectionRules(t *testing.T) {
 		writeEpicFiles(t, store, "queued", loop, open)
 		writeEpicFiles(t, store, "awaiting", loop, done)
 		writeEpicFiles(t, store, "parked", loop, parked)
+		writeEpicFiles(t, store, "blocked", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_reason: conflict\n---\n", done)
+		writeEpicFiles(t, store, "merging", loop, map[string]string{
+			"01-a.md": issueMD("01", "done", "", "A"),
+			"02-m.md": strings.Replace(issueMD("02", "open", "", "M"), "type: implement", "type: merge", 1),
+		})
 		writeEpicFiles(t, store, "unqueued-claimed", loop, claimed)
 		writeEpicFiles(t, store, "merged", "---\nstatus: done\nmerged_at: 2026-01-02T11:00:00Z\n---\n", done)
 		writeEpicFiles(t, store, "noopen", loop, map[string]string{"01-a.md": issueMD("01", "cancelled", "", "A")})
@@ -63,6 +69,8 @@ func TestEpicList_SectionRules(t *testing.T) {
 		"proj:queued":           {server.EpicListQueued, server.EpicKindLoop},
 		"proj:awaiting":         {server.EpicListAwaitingMerge, server.EpicKindLoop},
 		"proj:parked":           {server.EpicListParked, server.EpicKindLoop},
+		"proj:blocked":          {server.EpicListMergeBlocked, server.EpicKindLoop},
+		"proj:merging":          {server.EpicListMerging, server.EpicKindLoop},
 		"proj:unqueued-claimed": {server.EpicListNoOpenTickets, server.EpicKindLoop},
 		"proj:merged":           {server.EpicListFinished, server.EpicKindLoop},
 		"proj:noopen":           {server.EpicListAwaitingMerge, server.EpicKindLoop},

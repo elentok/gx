@@ -59,6 +59,10 @@ type EpicDetail struct {
 	// Queued is set when the epic holds a queue item. A Waiting epic that is not
 	// queued is not waiting for a slot.
 	Queued bool `json:"queued"`
+	// LandBlockKind and LandBlockReason describe why a Merge blocked epic's last
+	// land parked; the kind is empty for a needs-rebase park.
+	LandBlockKind   string `json:"land_block_kind,omitempty"`
+	LandBlockReason string `json:"land_block_reason,omitempty"`
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -106,6 +110,9 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		d.Kind, d.Summary = EpicKindMap, schema.Section(e.Body, "Destination")
 	} else {
 		d.State = epicStateFor(root, e, s.registry.startedAtOf)
+		if d.State == EpicStateMergeBlocked {
+			d.LandBlockKind, d.LandBlockReason = e.LandBlockKind, e.LandBlockReason
+		}
 	}
 	addr := func(id string) string {
 		return tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()

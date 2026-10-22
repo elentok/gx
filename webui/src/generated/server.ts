@@ -244,6 +244,12 @@ export interface EpicDetail {
    * queued is not waiting for a slot.
    */
   queued: boolean;
+  /**
+   * LandBlockKind and LandBlockReason describe why a Merge blocked epic's last
+   * land parked; the kind is empty for a needs-rebase park.
+   */
+  land_block_kind?: string;
+  land_block_reason?: string;
 }
 
 //////////
@@ -261,6 +267,8 @@ export const EpicListFinished: EpicListState = "finished";
 export const EpicListQueued: EpicListState = "queued";
 export const EpicListRunning: EpicListState = "running";
 export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
+export const EpicListMergeBlocked: EpicListState = "merge-blocked";
+export const EpicListMerging: EpicListState = "merging";
 export const EpicListParked: EpicListState = "parked";
 export const EpicListDeadlocked: EpicListState = "deadlocked";
 export const EpicListDraft: EpicListState = "draft";
