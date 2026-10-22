@@ -1,11 +1,11 @@
 # Runbook: blocked-form regression check
 
-The orchestrator gate (`parkOnBlockedPane` in `ralphloop/waitforfinish.go`) parks an iteration
+The orchestrator's blocked-pane check (in `ralphloop/waitforfinish.go`) pauses the ticket
 whenever herdr reports a pane's `agent_status` as `blocked`. That recognition — which detection
 rule in herdr's pane monitor fires, and whether it fires at all — lives entirely outside this repo,
 in herdr's own agent-detection manifest. An upgrade to Claude Code or to herdr's manifest can change
 what a blocked prompt looks like on screen and silently stop herdr from recognizing it, which would
-return the epic to the exact invisible stall this gate exists to eliminate: an agent sits on an
+return the epic to the exact invisible stall this check exists to eliminate: an agent sits on an
 unanswered prompt forever, and nothing pages anyone.
 
 This check is how you catch that regression. It cannot be automated: nothing can drive Claude Code
@@ -20,8 +20,8 @@ herdr upgrade, and periodically otherwise.
 - After upgrading herdr, or after herdr's agent-detection manifest updates (herdr pulls detection
   rules from a remote manifest; `herdr agent explain` reports `manifest_source` /
   `manifest_version`, so a version bump there is also a signal to re-run this check).
-- Whenever the gate's behavior is in question — e.g. a ticket sat "blocked" for a long time without
-  parking, or parked when it shouldn't have.
+- Whenever the check's behavior is in question — e.g. a ticket sat "blocked" for a long time without
+  being Paused, or was Paused when it shouldn't have been.
 
 Run the enforcement check (below) at the same times — it's the same triggers, just a different
 regression.
@@ -51,7 +51,7 @@ regression.
 PASS: herdr matched live_blocked_form.
 ```
 
-`gx doctor --check-blocked-form` exits 0. Nothing further to do — the gate's detection is intact.
+`gx doctor --check-blocked-form` exits 0. Nothing further to do — the check's detection is intact.
 
 ## What a failure looks like, and what to do
 
@@ -60,8 +60,8 @@ FAIL: herdr matched rule "live_prompt_box" (state "idle"); want "live_blocked_fo
 ```
 
 `gx doctor --check-blocked-form` exits non-zero. This means herdr no longer recognizes the on-screen
-form as blocked — the exact failure mode that would make `parkOnBlockedPane` never fire, leaving a
-blocked agent running forever with no park, no `needs-answer`, and no notification.
+form as blocked — the exact failure mode that would make the blocked-pane check never fire, leaving a
+blocked agent running forever with no pause and no notification.
 
 If this happens:
 
@@ -75,7 +75,7 @@ If this happens:
    region, a UI redesign).
 3. This is a herdr-side (or Claude Code-side) regression, not a gx bug: file it against herdr's
    agent-detection manifest, or against Claude Code if the on-screen form itself changed shape.
-4. Until it's fixed upstream, treat the gate as **not trustworthy** for this failure mode — a
+4. Until it's fixed upstream, treat the check as **not trustworthy** for this failure mode — a
    blocked agent may sit unrecognized. Consider running epics with closer manual supervision (e.g.
    watching pane state directly) until a herdr/manifest fix lands and this check passes again.
 
@@ -93,27 +93,27 @@ The contract, confirmed against live panes (not fakes, not release notes):
 - `agent start` fails outright with `agent_not_ready` when the target pane is already blocked at
   startup.
 
-gx depends on all three. `parkOnBlockedPane` in `ralphloop/waitforfinish.go` relies on `agent
+gx depends on all three. The blocked-pane check in `ralphloop/waitforfinish.go` relies on `agent
 prompt` being refused so a blocked pane is never silently re-prompted. `launchAndPrompt` in
 `ralphloop/launch.go` classifies `agent_not_ready` (via `herdr.AgentNotReadyError`) instead of
-routing every launch-time block to an opaque needs-repair. Both rely on `agent send-keys` still
+routing every launch-time block to an opaque repair pause. Both rely on `agent send-keys` still
 reaching the pane, since that's the only write path gx ever uses against a blocked pane.
 
-**What gx answers automatically.** This is the whole answerable set — everything else parks:
+**What gx answers automatically.** This is the whole answerable set — everything else pauses the ticket:
 
 - Codex's `trust_directory` dialog, at `agent start`, with a single `agent send-keys <label>
   enter` (`recoverAgentNotReady` in `ralphloop/launch.go`). That's it.
 - Everywhere else — a quota-reset dialog, a permission prompt, any rule id gx doesn't recognize —
-  gx parks for a human and names the dialog by its `matched_rule.id` (read via `AgentExplain`).
+  gx pauses the ticket for a human and names the dialog by its `matched_rule.id` (read via `AgentExplain`).
   gx never guesses at an answer.
 
 **gx never bypasses the guard.** herdr also exposes `herdr pane run <pane_id> <text>`, which sends
 text straight to the pane runtime with no blocked-state check — a complete bypass of `agent
 prompt`'s guard, available today. gx deliberately has no wrapper for it. Do not add one: the guard
 is telling gx something true (a blocked pane is showing a dialog, not waiting for a prompt), and
-routing around it would reintroduce the exact operator-dialog clobbering the park gate exists to
+routing around it would reintroduce the exact operator-dialog clobbering the blocked-pane check exists to
 prevent. If you're reading this because `pane run` looks like a fix for a stuck path, it isn't —
-the fix is answering the dialog correctly or parking.
+the fix is answering the dialog correctly or pausing the ticket.
 
 **Two live-pane facts to re-check after any herdr or Claude Code/Codex upgrade.** These are the
 facts gx's fakes (`testutil/herdrfake`) encode, and the ones that silently invalidated this epic's

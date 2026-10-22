@@ -22,15 +22,15 @@ HTTP 403.
 
 IP addresses and `localhost` are unaffected.
 
-## Answering a parked ticket from a phone
+## Answering a paused ticket from a phone
 
-When an agent parks a ticket with a question, the question shows in the queue. Open the ticket page,
+When an agent pauses a ticket with a question, the question shows in the queue. Open the ticket page,
 read the question, and send your answer from the browser. The running agent picks it up.
 
 The same flow has command-line verbs:
 
-- `gx tickets ask <project:epic/NN>` records a question and flags the ticket `needs-answer`.
-- `gx tickets answer <project:epic/NN>` answers the question a parked ticket is waiting on.
+- `gx tickets ask <project:epic/NN>` records a question and pauses the ticket with the reason "Waiting for your answer".
+- `gx tickets answer <project:epic/NN>` answers the question a paused ticket is waiting on.
 - `gx tickets log <addr>` prints the ticket's raw log events, one JSON object per line.
 
 ## Upgrade note: run migrate

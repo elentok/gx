@@ -96,7 +96,7 @@ _Avoid_: actions menu, suggested-actions menu, session menu (retired names), Act
 term).
 
 **Target** — the focused item a Context menu acts on: a ticket row, an epic row, a session.
-Not the branch a ticket lands on (see **Base** / **Target**); where both could be meant, name the
+Not the branch a ticket merges into (see **Base** / **Target**); where both could be meant, name the
 branch itself (e.g. "Merge into main"). _Avoid_: context (taken by the context window and `ViewContext`),
 subject.
 
@@ -129,25 +129,23 @@ without pull). Rendered purple with `󰜮`.
 **RenderedStatus** — the tickets tab's collapse of a ticket's raw `Status:` value into a small,
 fixed set of user-facing states, each with its own icon:
 
-- **Draft** — raw `Status: draft`; work its author parked deliberately. Neither open (it never
+- **Draft** — raw `Status: draft`; work its author set aside deliberately. Never shown as Paused. Neither open (it never
   enters the frontier, so no agent claims it) nor done (it still counts as outstanding). This is the
   status `gx tickets add` stamps on a freshly allocated stub, until `set --status open` promotes it.
 - **Open** — raw `Status: open`: unclaimed, nothing blocks picking it up. `status` is required,
   so a ticket without one renders as **Error** rather than defaulting to open.
 - **Claimed** — raw `Status: claimed`.
 - **Blocked** — an overlay, not a raw status: applied whenever an open or claimed ticket has a
-  blocker that is still **blocking** (see Ticket Dependencies). Needs-answer, needs-repair, and
-  done tickets keep their own state regardless of `blocked_by`.
-- **Needs-answer** — raw `Status: needs-answer`; a person is being asked for something — an answer
-  or a decision — and nothing is broken. Written by gx when an agent asks through `gx tickets ask`
-  (the agent keeps waiting live), or when gx's own guess finds a ticket that stopped without
-  commits. Says nothing about
-  whether an iteration survives; that's **Reclaim**'s question. _Avoid_: Needs-info (retired
-  name, see ADR 0018).
-- **Needs-repair** — raw `Status: needs-repair`; gx hit a fault it can't resolve on its own and a
-  person must investigate. Never agent-authored. Also says nothing about whether an iteration
-  survives: of its several producers, only the operator-attention gate leaves one. _Avoid_:
-  Needs-attention (retired name, see ADR 0018), treating it as "a pane is alive" — see Reclaim.
+  blocker that is still **blocking** (see Ticket Dependencies). Paused and done tickets keep their
+  own state regardless of `blocked_by`.
+- **Paused** — raw `Status: paused`; the ticket stopped and waits for a person or for a fix. It
+  always carries a **Pause reason**, and the reason's **Pause class** says whether a person is asked
+  for an answer or something must be repaired. Written by gx when an agent asks through
+  `gx tickets ask` (the agent keeps waiting live), when gx hits a fault it can't resolve on its own,
+  or when a person pauses a ticket by hand. Agents never write it. Says nothing about whether an
+  iteration survives; that's **Reclaim**'s question. Replaces the statuses `needs-answer` and
+  `needs-repair`. _Avoid_: Needs-answer, Needs-repair, Needs-info, Needs-attention (retired names,
+  see ADR 0018), treating it as "a pane is alive" — see Reclaim.
 - **Done** — the ticket's own work is complete. Says nothing about its fork subtree.
 - **Waiting-for-children** — an overlay on Done, not a raw status: the ticket's own `Status:` is
   done, but its fork subtree isn't. Derived from the graph on every render, never written to a file.
@@ -161,34 +159,79 @@ siblings tie-breaking on display number so an original sorts before its replacem
 **not** group or reorder them: a ticket never jumps out of its place once it finishes, so the list
 reads as the epic's intended order of execution.
 
-**Parked** — a ticket's state (`needs-answer`, `needs-repair`, `error`, or `draft`; the server's `isParked`; tickets of a map epic are never parked) and, derived
-from it, an **epic state**: an epic with no runnable work left but at least one parked ticket keeps
-scheduling everything else, then parks indefinitely and notifies, releasing its slot in the
-epic-level concurrency cap, rather than exiting. Per ADR 0020, **stall** names the opposite thing —
-the invisible failure this design exists to eliminate — and must not be used for the deliberate,
-visible state described here. _Avoid_: Stalled, Human-clearable (retired names, see ADR 0020),
-Paused (that's the operator-driven whole-queue toggle), Settled (removed from the vocabulary
-entirely — see ADR 0017).
+**Paused** — one state for the queue, an epic and a ticket that stop and wait. Every Paused thing
+carries a **Pause reason** that says why. Three levels:
+- A **ticket** is Paused when its status is `paused`. Tickets of a map epic are never Paused. A
+  `draft` ticket shows as Draft and a broken ticket (`error`) shows as Error, never as Paused.
+- An **epic** is Paused when it has no runnable work left but at least one Paused ticket. It keeps
+  scheduling everything else, then waits and notifies, releasing its slot in the epic-level
+  concurrency cap, rather than exiting. It shows the reason of its first Paused ticket (by ID) and
+  "+N more". A merge-blocked epic shows "Paused: merge blocked" and a **Deadlocked** epic shows
+  "Paused: dependency deadlock". A person resumes the ticket, never the epic, and there is no manual
+  epic pause.
+- The **queue** is Paused when no new ticket starts. See **Finish and pause**.
 
-**Unpark** — clearing a parked ticket back to the frontier: a person writes `status: open`, or answers the
-question (see **Answered**), which resumes the waiting agent. A `zero-commit` park never
-auto-unparks on liveness alone — it requires a person to look at the ticket and flip its status by
-hand.
-Not `resume` — the pause `Gate` already owns that verb — and not `clear` — the Queue tab's
-clear-checked/-complete keymaps already own that verb, and mean deleting tickets from the queue.
+Per ADR 0020, **stall** names the opposite thing, the invisible failure this design exists to
+eliminate, and must not be used for the deliberate, visible state described here. _Avoid_: Parked
+(retired name, replaced by Paused), Stalled, Human-clearable (retired names, see ADR 0020), Settled
+(removed from the vocabulary entirely, see ADR 0017).
 
-**Park kind** (`park_kind` frontmatter field, `needs-answer` and `needs-repair` parks; value is the park event's kind) — which of two things
-caused a `needs-answer` park of the server: `self-reported` (the agent itself asked a real question
-via `gx tickets ask` — its pane stays live while it waits, and the slot is released after a grace
-period, see ADR 0032), or `zero-commit` (gx's own uncertain guess: no commits, no self-report,
-pane left alive for inspection). `blocked-pane` is not a park kind of the server. A ticket parked before this field existed carries no `park_kind` and is treated as
-`zero-commit` — the conservative default. A `needs-repair` park also stamps it (any events kind), but unpark keeps its
-liveness-only rule for it, ignoring the field. Cleared on claim; the event keeps the history. _Avoid_: "gate park", "announce-and-stop park"
-(retired informal names — collided with the already-established `Gate` type and its `.gates()`
-verb).
+**Pause reason** (`pause_reason` frontmatter field) — the enum that says why a ticket is Paused, for
+example `self-reported`, `zero-commit`, `ambiguous-base`, `manual` or `iteration-error`. gx writes it
+with `status: paused`. Cleared on claim; the event keeps the history. The UI shows a plain label for
+each reason ("Waiting for your answer", "Merge conflict", "Paused by you") and an action named after
+what the person does. Replaces `park_kind`. A ticket stored before this field existed carries no
+reason and is read as `zero-commit`, or `iteration-error` for a repair, until `gx tickets migrate`
+rewrites it. _Avoid_: Park kind, "gate park", "announce-and-stop park" (retired names).
 
-**Deadlocked** — an epic state (the server reports it per epic): an epic with no runnable work and nothing parked either (an `error` ticket counts as parked; map epics are never Deadlocked) — a
-genuine dependency error, reported as a failure rather than parked on. Its record names the blocked tickets and what they wait on.
+**Pause class** — `answer` or `repair`, derived from the **Pause reason**. It decides which verbs
+work on the ticket, `--wait` exit codes 3 (answer) and 4 (repair), notification wording and counts.
+Replaces the split between the statuses `needs-answer` and `needs-repair`. It is not stored.
+
+**Resume** — lift a pause, and nothing else. A person resumes a Paused ticket with `gx server tickets
+resume`: it goes back to the frontier, or, for a ticket waiting on an answer, the answer itself
+resumes the waiting agent (see **Answered**). `resume` dispatches by reason. A `zero-commit` ticket
+never resumes on liveness alone, since a person has to look at the ticket first. The UI shows the
+word "Resume" only for a pause a person chose (`manual`, and a queue pause a person lifts). Other
+reasons show an action named after what the person does ("Answer", "Retry", "Choose base"). Pauses
+that end by themselves, such as the rate-limit and smart-zone queue pauses, show no Resume. Replaces
+**Unpark**. _Avoid_: Unpark, `clear` (the Queue tab's clear-checked/-complete keymaps already own
+that verb, and mean deleting tickets from the queue), using "resume" for a session restore (see
+**Restore**) or for Claude's `--resume` flag.
+
+**Finish and pause** — the queue control that starts no new ticket, lets running tickets finish,
+then leaves the queue Paused until Resume. The Paused queue is saved, so it survives a server
+restart. The header says what is happening: "Paused. N tickets still running." or "Paused. No
+tickets running." Replaces the old pause and drain, which differed only in whether they survived a
+restart. `D` and `gx server queue drain` remain as hidden aliases for one release. The budget limits
+and a person's pause are queue pauses with their own reasons, lifted by Resume. The rate-limit and
+smart-zone pauses lift themselves and show no Resume. _Avoid_: Drain, Draining.
+
+**Start over** — throw away a ticket's work and run it again from its base, keeping a backup branch.
+`gx server tickets start-over`; the UI says "Start over". Replaces the ticket verb `reset`, not
+`git reset`.
+
+**Merge (ticket level)** — put a ticket's commits onto its **Target** branch. `gx server tickets
+merge` does what `land` did, and the UI shows the target ("Merge into the feature branch"). A
+**Merge ticket** is a ticket whose job is to merge. Epic-level merge states keep their names.
+_Avoid_: land, landing.
+
+**Deadlocked** — an epic state (the server reports it per epic), shown as "Paused: dependency
+deadlock": an epic with no runnable work and no Paused ticket either (an `error` ticket counts as
+Paused here; map epics are never Deadlocked). It is a genuine dependency error, reported as a
+failure and not waited on. Its record names the blocked tickets and what they wait on.
+
+**Retired terms** — old words and their replacements, for reading old specs, ADRs, logs and retros.
+They survive only in one read shim and a few hidden aliases, until `gx:follow-ups/70` removes them.
+- Parked, Park, Unpark → **Paused**, pause, **Resume**.
+- Park kind (`park_kind`), Park reason → **Pause reason**.
+- Needs-answer, Needs-repair → **Paused** with a reason of class `answer` or `repair`. The
+  `iteration_status` value `needs-answer` is now `asking`.
+- Park round → **Pause round**.
+- Pause and drain (queue) → **Finish and pause**.
+- Land, landing (ticket) → **Merge (ticket level)**.
+- Reset (ticket) → **Start over**.
+- Relaunch, `resume-on-start` (session) → **Restore**.
 
 **Recently finished** — the last few completed loop epics (by `completed_at`), listed apart from and
 dimmer than the live epics so a finished epic does not just vanish from the Queue. Map epics never
@@ -207,7 +250,7 @@ Claude-only; Codex iterations have no equivalent signal.
 **`status` / `iteration_status`** — a ticket's status splits across two fields with different
 owners. **`status`** is gx-owned and is the sole scheduling authority (the six `RenderedStatus`
 values above). **`iteration_status`** is agent-owned and reports on the current claim alone
-(`working` / `needs-answer` / `finished`, or absent — gx clears it on every claim and reclaim, so
+(`working` / `asking` / `finished`, or absent — gx clears it on every claim and reclaim, so
 a report is never readable outside the claim that produced it). Not to be confused with **herdr's
 `agent_status`** (`idle`/`done`/`blocked`, on the pane payload, `herdr/agent.go`) — the two names
 collided during design specifically because both describe "what is the agent up to," which is why
@@ -216,43 +259,44 @@ describes (the current iteration's state) rather than who wrote it, and can't be
 herdr's field in the one file that holds both. See ADR 0019.
 
 **Adopt** — the verb for gx accepting an `iteration_status` report and acting on it: seeing
-`needs-answer` and writing `status: needs-answer`, or seeing `finished` and entering the landing
-path (only writing `status: done` if landing succeeds). Not "promote", which already names two
-unrelated things in this repo (`draft` → `open`, and an epic entering `MaxConcurrentEpics`'s
-auto-promotion queue). An agent's report can start a landing; it can never conclude one — the
-commit count and the cherry-pick are what conclude it. See ADR 0019. A **late finish** is a
-`finished` report that arrives after gx already parked the ticket because its agent stopped without
-reporting (`zero-commit`, or a merge ticket's `merge-unreported`); gx adopts it while the ticket is
-still parked and either has commits (it lands), reported commitless (it closes `done` with nothing
-to land), or is a merge ticket whose merge checks pass (it closes `done`), the same as an on-time
-one.
+`asking` and writing `status: paused` with reason `self-reported`, or seeing `finished` and
+entering the merge path (only writing `status: done` if the merge succeeds). Not "promote", which
+already names two unrelated things in this repo (`draft` → `open`, and an epic entering
+`MaxConcurrentEpics`'s auto-promotion queue). An agent's report can start a merge; it can never
+conclude one — the commit count and the cherry-pick are what conclude it. See ADR 0019. A **late
+finish** is a `finished` report that arrives after gx already paused the ticket because its agent
+stopped without reporting (`zero-commit`, or a merge ticket's `merge-unreported`); gx adopts it
+while the ticket is still Paused and either has commits (it merges), reported commitless (it closes
+`done` with nothing to merge), or is a merge ticket whose merge checks pass (it closes `done`), the
+same as an on-time one.
 
-**Park reason** — for a `needs-answer` ticket, the summary line of its open question. For a
-`needs-repair` ticket, the first non-empty line after its `## Needs Repair` heading. Markdown markers
-are stripped and the line is ellipsised for display. What the Queue row
-shows as subtext for a parked ticket, read fresh from disk on every render rather than cached, so
-the row can't go stale between a park and a restart.
+**Pause reason text** — the explanation shown beside a **Pause reason**. For a ticket waiting on an
+answer, the summary line of its open question. For any other Paused ticket, the first non-empty line
+after its `## Paused` heading. Markdown markers are stripped and the line is ellipsised for display.
+It is what the Queue row shows as subtext for a Paused ticket, read fresh from disk on every render
+rather than cached, so the row can't go stale between a pause and a restart. Never written to
+frontmatter.
 
 **Question block** — the optional fenced `gx-question` YAML block in a question's text. It gives the
 question's type (`yes-no`, `options` or `text`), its options, and which option is recommended. A
 question without one is a free-text question. A question in a **Grilling round** carries one too.
-Not the `Park reason`, which is the question's summary line.
+Not the **Pause reason text**, which is the question's summary line.
 
 **Grilling round** — the numbered `❓ **Qn**` questions an agent asks a person in one turn. The person
-answers them together, in one prompt. Each question may carry a **Question block**. Not a **Park
-round**, which is one question a paused ticket asks.
+answers them together, in one prompt. Each question may carry a **Question block**. Not a **Pause
+round**, which is one question a Paused ticket asks.
 
-**Answered** — a ticket that is `open` again after a person answered its `needs-answer` park and that
+**Answered** — a ticket that is `open` again after a person answered its pause (reason `self-reported`) and that
 gx has not yet claimed. It is derived, never written: the ticket's latest question has an answer. It
 ends when gx claims the ticket. Not a status value.
 
 **Ticket log** — a ticket's append-only conversation record, kept beside its markdown file. It holds
-the park rounds and the person's permission decisions. Not the run log, which records what happened
+the pause rounds and the person's permission decisions. Not the run log, which records what happened
 to a ticket.
 
-**Park round** — one question a parked ticket asks and what ends it: a person's answer, or gx closing
-it because the ticket left `needs-answer` another way. The ticket's open question is the latest
-question with neither. Not an iteration, and not a `park` event in the run log.
+**Pause round** — one question a Paused ticket asks and what ends it: a person's answer, or gx
+closing it because the ticket left the `self-reported` pause another way. The ticket's open question
+is the latest question with neither. Not an iteration, and not a `pause` event in the run log.
 
 **Action card** — the part of a ticket's page that asks a person to act: the open question and its
 answer form, a pending permission prompt, the text that says why the ticket stopped, the action that
@@ -279,7 +323,7 @@ tab, pane and workspace triple as what ralph-loop holds on to. _Avoid_: "pane", 
 
 **Stale holder** — a leftover agent that holds a ticket's label when gx launches for that ticket:
 no live run tracks it, and it is idle or done. gx closes it and launches fresh; it never adopts it.
-A leftover agent that is still working is not a stale holder: the ticket parks and a person or the
+A leftover agent that is still working is not a stale holder: the ticket is Paused and a person or the
 investigate agent decides. _Avoid_: zombie, orphan pane.
 
 **Interactive session** — a session a person starts and types into from the Agents tab, rather than
@@ -289,9 +333,9 @@ one the loop launches for an iteration. `gx server` keeps it alive while no TUI 
 **Restore (interactive session)** — relaunch an Exited interactive session on its latest
 conversation, in the same dir, keeping the same session (name, Unread, Actionable). A person does it
 by hand, or gx does it once on server start for sessions that were live before
-(`agents.restore-sessions-on-start`; the old `resume-on-start` key is a hidden alias). Not the
-queue's resume, which belongs to the pause **Gate**. _Avoid_: resume, restart (sounds like a fresh
-conversation).
+(`agents.restore-sessions-on-start`; the old `resume-on-start` key is a hidden alias). Not
+**Resume**, which only lifts a pause, and not Claude's `--resume` flag, which a claim uses to reuse
+an agent's last session. _Avoid_: relaunch, resume, restart (sounds like a fresh conversation).
 
 **Session ticket** — the map epic or map ticket an interactive session was started from. Set once,
 when the session is created, and shown with the session. It never changes the ticket's status: the
@@ -378,8 +422,8 @@ are its clients; they reach it over its API (ADR 0028). _Avoid_: daemon, orchest
 **Author write** — a change a person may make to a ticket: its body, or its status to `draft` or
 `open`. It names the ticket by address and edits the ticket's file in the store.
 
-**Orchestration write** — a change only the server may make: park, unpark, unmute, cancel,
-relaunch, land and the other server verbs. A client asks for one by address and never writes the
+**Orchestration write** — a change only the server may make: pause, resume, unmute, cancel,
+restore, merge, start over and the other server verbs. A client asks for one by address and never writes the
 file itself. With no server running, it can't happen.
 
 **Server lock** — the one flock in the state dir that makes the server a singleton. A second
@@ -405,7 +449,7 @@ then pings the server. Used for content (`gx tickets show|add|section|set`). The
 carries `"via": "direct"`. Works with the server down.
 
 **Server write** — a write only the server performs, because it changes scheduling (enqueue,
-dequeue, pause, drain, unpark, override). The server writes the file first, so markdown stays the
+dequeue, finish and pause, resume, override). The server writes the file first, so markdown stays the
 truth. The JSON result carries `"via": "server"` and an `actor` (who asked). Refused with
 `server-not-running` when the server is down (ADR 0030). _Avoid_: daemon write.
 
@@ -423,16 +467,16 @@ Tickets tab still reads markdown.
 herdr tab and start the agent. _Avoid_: spawn (retired), start (ambiguous with `gx server start`).
 
 **Reclaim** — the server, after a restart, taking back an iteration whose pane is still live and
-owned (found by its recorded handle). A handle that no longer matches parks the ticket
-`needs-repair`. Replaces **Reattach** and Re-adopt; there is no prompt. A surviving herdr pane alone
+owned (found by its recorded handle). A handle that no longer matches pauses the ticket
+with reason `handle-mismatch`. Replaces **Reattach** and Re-adopt; there is no prompt. A surviving herdr pane alone
 is not a reclaim — the handle must match. _Avoid_: Reattach / Reattach signal, Live (queue sense),
 re-adopt, "has a pane".
 
 **Base** / **Target** — a ticket's **base** is the branch its work starts from; its **target** is
-the branch it lands on. Only `base:` is declared (a branch or a ticket address); the target is
+the branch it merges into. Only `base:` is declared (a branch or a ticket address); the target is
 derived (a child's is its parent's branch, a top-level ticket's is trunk) and is none for a
-commitless ticket. An epic has one base and one target, taken from its **Root ticket**: it lands
-on trunk, or on its blocker's branch until that branch reaches trunk. The resolved base is
+commitless ticket. An epic has one base and one target, taken from its **Root ticket**: it merges
+into trunk, or on its blocker's branch until that branch reaches trunk. The resolved base is
 recorded at claim as read-only `resolved_base`. `gx merge` takes `target`, not `base`.
 Not the Context menu's **Target** (the focused item); where both could be meant, name the
 branch itself (e.g. "merges into main").
@@ -441,20 +485,20 @@ branch itself (e.g. "merges into main").
 **Target** come from it and from the epic's own `base:` and `blocked_by`; another ticket's `base:`
 moves only where that ticket starts. _Avoid_: first ticket.
 
-**Trunk** — the branch a project's top-level tickets land on: `main`, `develop`, a release branch.
+**Trunk** — the branch a project's top-level tickets merge into: `main`, `develop`, a release branch.
 Set per project; detected from the repo when unset. A top-level ticket's **Target** is trunk.
 _Avoid_: target branch, main branch, master.
 
-**Dirty trunk** — a **Trunk** checked out in a worktree whose local changes make git refuse a land.
-Changes the land doesn't touch don't count. gx never discards them: the epic is **Merge blocked**
+**Dirty trunk** — a **Trunk** checked out in a worktree whose local changes make git refuse a merge.
+Changes the merge doesn't touch don't count. gx never discards them: the epic is **Merge blocked**
 until a person commits or discards them and merges again.
 _Avoid_: unclean trunk, trunk conflict (a conflict is between branches, not with a checkout).
 
 **Missing trunk** — a project whose **Trunk** names no local branch, whether set or detected. gx
 never falls back to another branch: the server claims nothing for the project until the branch
-exists, then carries on by itself. A ticket whose landing finds trunk missing is **Parked**.
-_Avoid_: held, paused or blocked project (**Paused** is the whole-queue toggle; blocked is a
-ticket's `blocked_by` edges).
+exists, then carries on by itself. A ticket whose merge finds trunk missing is **Paused** with reason `trunk-missing`.
+_Avoid_: held, paused or blocked project (a project is never Paused; blocked is a ticket's
+`blocked_by` edges).
 
 **Fix ticket** — a ticket a code-review ticket opens to repair what the review found. Its `parent`
 is the code-review ticket, so it sits in that ticket's fork subtree.
@@ -477,12 +521,12 @@ server and resets at the start of each budget day.
 
 **Budget ledger** — the persisted per-day record of live cost deltas that the soft and hard budget
 limits are checked against. It replaces the Attach baselines. One-offs and investigate tickets
-count. A hard kill parks the ticket with kind `budget-killed`.
+count. A hard kill pauses the ticket with reason `budget-killed`.
 
 ## Ticket Forking
 
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
-than its budget or mixes concerns that should land separately. _Avoid_: Split.
+than its budget or mixes concerns that should merge separately. _Avoid_: Split.
 
 **Parent** — the ticket a forked ticket came from, or the code-review ticket that opened a fix
 ticket. Frontmatter field `parent`, written on the descendant at creation. This is the only
@@ -501,7 +545,7 @@ into `04a`, `04b`; one level deeper, `04b1`). _Avoid_: Split suffix.
 
 **Blocker** — a ticket, or a whole epic, named in another ticket's `blocked_by` list. A ticket in
 another epic that needs commits is *widened*: it blocks as its whole epic, because its code can't be
-used before that epic lands. Only a commitless ticket in another epic blocks on its own.
+used before that epic merges. Only a commitless ticket in another epic blocks on its own.
 
 **Blocking** — a ticket blocker is *blocking* until its own work is `done` **and** every ticket in
 its fork subtree is likewise no longer blocking. This is the only question `blocked_by` resolution
@@ -657,25 +701,25 @@ and stops on a command error, a missing worktree or failed checks. `gx-cleanup`'
 calls into this same skill rather than duplicating the flow.
 
 **Merge ticket** (`type: merge`) — a system-generated ticket in a finished epic whose only job is to
-get the epic onto its target with `gx-merge`, when the server's fast-forward landing isn't possible.
+get the epic onto its target with `gx-merge`, when the server's fast-forward merge isn't possible.
 _Avoid_: land ticket, rebase ticket.
 
-**Complete epic** — an epic whose tickets are all done or cancelled. Its branch may not have landed
+**Complete epic** — an epic whose tickets are all done or cancelled. Its branch may not have merged
 yet; once it has, the epic is also a **Merged epic**. A map epic can be complete but never merged,
 since it has no branch.
 _Avoid_: closed epic, finished epic.
 
-**Merge blocked** — an epic state: a **Complete epic** whose land failed and waits for a person. It
-carries the reason (a **Dirty trunk**, a git error, a branch that still needs a rebase after the
+**Merge blocked** — an epic state: a **Complete epic** whose merge failed and waits for a person. It
+is shown as "Paused: merge blocked" with its existing merge action. It carries the reason (a **Dirty trunk**, a git error, a branch that still needs a rebase after the
 merge-ticket cap) and the fix. A person fixes the cause and merges again.
-_Avoid_: merge failed, root parked (the server's internal name for the same event).
+_Avoid_: merge failed, root paused (the server's internal name for the same event).
 
 **Merging** — an epic state: every ticket is done or cancelled except an open or claimed **Merge
-ticket**, so an agent is rebasing the branch before the server lands it.
-_Avoid_: landing (the land itself is instant), rebasing.
+ticket**, so an agent is rebasing the branch before the server merges it.
+_Avoid_: landing (the merge itself is instant), rebasing.
 
-**Merged epic** — an epic whose branch has landed on its target. Distinct from a complete epic,
-whose tickets are all done but whose branch may not have landed yet.
+**Merged epic** — an epic whose branch has merged into its target. Distinct from a complete epic,
+whose tickets are all done but whose branch may not have merged yet.
 _Avoid_: landed epic, closed epic.
 
 ## Launching External Programs
@@ -757,9 +801,8 @@ removed with the in-process loop, no replacement).
 
 ## Slots and Caps
 
-**Slot** — one live agent: a node that is claimed and has a running pane. `needs-answer`,
-`needs-repair`, parked and waiting-for-children nodes hold no slot, and landing is daemon work, so it
-takes none. A slot is a plain count, never weighted by model or context window.
+**Slot** — one live agent: a node that is claimed and has a running pane. Paused and waiting-for-children
+nodes hold no slot, and merging is daemon work, so it takes none. A slot is a plain count, never weighted by model or context window.
 
 **Cap** — a limit on slots in use. A node starts only when every applicable cap has room; there is
 no "which binds first" order. Three caps exist: the **global cap** (`execution-queue.max-agents`,
@@ -776,17 +819,17 @@ caps. `--front` sets queue position only. See ADR 0032.
 
 **One-off** — a commitless ticket in the project's `one-offs` epic, usually submitted from outside gx
 with `gx server one-off "<prompt>"` (or `--file <path>`). It is `type: prompt` unless `--type` says
-`evolve` or `diagnose`, and it lands no commits. The project is `--project`, else the one owning the
+`evolve` or `diagnose`, and it merges no commits. The project is `--project`, else the one owning the
 current directory, else `scratch`. One-offs share one **one-off cap** (`max-one-off-agents`) instead
 of the per-root cap, and still count against the global and project caps. A `done` or `cancelled`
-one-off moves to `one-offs-archived`; one that failed or is parked stays in `one-offs` until a
+one-off moves to `one-offs-archived`; one that failed or is Paused stays in `one-offs` until a
 person closes it. _Avoid_: standalone ticket, job. There is one verb and no spool: when the server
 is down the submit is refused, never queued for later. See ADR 0033.
 
 **Dedupe key** — the key (`--unique <key>`; with `--file`, by default the file's absolute,
 symlink-resolved path; `--no-unique` opts out; a plain prompt has none) that refuses a live
 duplicate. Another ticket of the same project with the same key that is not `done` or `cancelled`
-counts as live, parked copies included. The refusal is `duplicate-live`: it returns the existing
+counts as live, Paused copies included. The refusal is `duplicate-live`: it returns the existing
 ticket's address and writes a `submit-refused` event.
 
 **Result** — the `## Result` section a one-off's agent writes its answer into (with `gx tickets
@@ -798,7 +841,7 @@ existing ticket.
 
 ## Recovery
 
-When a ticket parks, the server tries to get it moving again without a person. Recovery repairs the
+When a ticket is Paused, the server tries to get it moving again without a person. Recovery repairs the
 orchestration, never the work: it may nudge a pane or call the server's own verbs, but it never
 writes code or commits. See ADR 0034.
 
@@ -808,12 +851,12 @@ printed by `gx recovery catalog`. Each entry names a `(type, kind)` signature, a
 whether it is enabled. `recovery.enabled` is the global kill switch.
 
 **Recovery rule** — a catalog entry the server applies itself, in Go (`executor: rule`). It calls the
-same verbs as a person, with the same refusals and land lock, stamped `actor: recovery`. _Avoid_:
+same verbs as a person, with the same refusals and merge lock, stamped `actor: recovery`. _Avoid_:
 bare "rule".
 
 **Investigate ticket** — a `type: investigate` child the server opens when a failure needs judgment
 (`executor: agent`) or matches no entry. It runs `gx-investigate` in unattended mode, is queued
-`--front`, and is commitless by type, so nothing it commits can land. Its report is its `## Result`.
+`--front`, and is commitless by type, so nothing it commits can merge. Its report is its `## Result`.
 It is never itself recovered; any other ticket opts out with `recover: false`.
 
 **Authority** — how far recovery may act on a matched entry. `low` and `medium` apply on their own.
@@ -856,9 +899,9 @@ uses the **global destination**, which also receives every server-level event. `
 narrows it to that project's destination.
 
 **Counts line** — the line of state tallies a chat message may carry, in place of a fraction:
-`8 done · 2 in progress · 1 parked: 07 · 10 total`. A **ticket counts line** tallies the ticket
-states within one epic (`done · in progress · parked · blocked · ready · total`); a **queue counts
-line** tallies the epic states across the Queue (`done · in progress · parked · failed · total`).
+`8 done · 2 in progress · 1 paused: 07 · 10 total`. A **ticket counts line** tallies the ticket
+states within one epic (`done · in progress · paused · blocked · ready · total`); a **queue counts
+line** tallies the epic states across the Queue (`done · in progress · paused · failed · total`).
 Zero clauses are suppressed except `done` and `total`, which always render. Counts are always
 **epic-truth** — recomputed from disk over the whole epic — never scoped to one run's own progress.
 

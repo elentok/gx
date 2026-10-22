@@ -32,7 +32,7 @@ Summary of the fix shape:
 - Queue: added `entriesCache` (`ui/tickets/queue_rows.go`, `queueEntriesCache` type +
   `buildQueueEntriesCached()`), memoizing `buildQueueEntries()` against its real inputs (epics,
   checked map, hideComplete, collapsed IDs). Verified safe mid-run because live per-row state
-  (running-epic elapsed time, spinner frame, parked/stalled) is read fresh at draw time by
+  (running-epic elapsed time, spinner frame, paused/stalled) is read fresh at draw time by
   `queueRenderOpts`'s `Label` callback (`ui/tickets/queue_view.go`), not baked into cached
   entries.
 
