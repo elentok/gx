@@ -32,7 +32,7 @@ func TestPark_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "  ")
+	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "  ")
 	if err != nil || !res.Refused || res.Reason != server.ReasonReasonRequired {
 		t.Fatalf("park = %+v, %v; want %s refusal", res, err, server.ReasonReasonRequired)
 	}
@@ -47,7 +47,7 @@ func TestPark_WritesStatusSectionAndOneEvent(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "needs a human look")
+	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "needs a human look")
 	if err != nil || res.Refused {
 		t.Fatalf("park = %+v, %v", res, err)
 	}
@@ -71,9 +71,50 @@ func TestPark_RefusesUnknownTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketPark(ctx, "proj:epic-a/99", "why")
+	res, err := h.Client.TicketPause(ctx, "proj:epic-a/99", "why")
 	if err != nil || !res.Refused || res.Reason != server.ReasonUnknownTicket {
 		t.Fatalf("park = %+v, %v", res, err)
+	}
+}
+
+func TestPause_RefusesARunningDoneAlreadyPausedOrMapEpicTicket(t *testing.T) {
+	h, path := startTicketWrites(t)
+	store := h.TicketStore
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "finished", servertest.TicketOpts{Status: "done"})
+	servertest.WriteTicket(t, store, "proj", "map-epic", "01", "mapped", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for _, c := range []struct{ name, address, reason string }{
+		{"running", "proj:epic-a/01", server.ReasonIterationRunning},
+		{"done", "proj:epic-a/02", server.ReasonTicketDone},
+		{"map epic", "proj:map-epic/01", server.ReasonMapEpic},
+	} {
+		res, err := h.Client.TicketPause(ctx, c.address, "why")
+		if err != nil || !res.Refused || res.Reason != c.reason {
+			t.Errorf("pause %s = %+v, %v; want %s refusal", c.name, res, err, c.reason)
+		}
+	}
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "status: paused") {
+		t.Errorf("refused pause changed the running ticket:\n%s", data)
+	}
+}
+
+func TestPause_RefusesAnAlreadyPausedTicket(t *testing.T) {
+	h, _ := startTicketWrites(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "first"); err != nil || res.Refused {
+		t.Fatalf("pause = %+v, %v", res, err)
+	}
+	res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "second")
+	if err != nil || !res.Refused || res.Reason != server.ReasonAlreadyPaused {
+		t.Fatalf("second pause = %+v, %v; want %s refusal", res, err, server.ReasonAlreadyPaused)
 	}
 }
 
@@ -158,7 +199,7 @@ func TestRelaunch_StartsAFreshIterationOfAParkedTicket(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("park = %+v, %v", res, err)
 	}
 	res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false)

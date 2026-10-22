@@ -33,7 +33,7 @@ import (
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
-const APIVersion = 1
+const APIVersion = 2
 
 const (
 	lockFileName   = "server.lock"
@@ -556,9 +556,11 @@ var routeTable = []struct {
 	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueDrain)(w, r) }},
 	{"POST /v1/tickets/land", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.landInQueue)(w, r) }},
 	{"POST /v1/tickets/reset", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairReset)(w, r) }},
+	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairUnpark)(w, r) }},
 	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairUnpark)(w, r) }},
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},
-	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPark)(w, r) }},
+	{"POST /v1/tickets/pause", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
+	{"POST /v1/tickets/park", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketPause)(w, r) }},
 	{"POST /v1/tickets/unmute", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketUnmute)(w, r) }},
 	{"POST /v1/tickets/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketCancel)(w, r) }},
 	{"POST /v1/tickets/nudge", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.ticketNudge)(w, r) }},

@@ -83,7 +83,7 @@ func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult,
 		do = s.repairLand
 	case "reset":
 		do = s.repairReset
-	case "unpark":
+	case "resume", "unpark":
 		do = s.repairUnpark
 	case "verify":
 		do = s.repairVerify

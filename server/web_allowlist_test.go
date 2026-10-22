@@ -77,7 +77,7 @@ func TestWeb_EpicDetailIsServed(t *testing.T) {
 func TestWeb_AnswerAndUnparkNeedAStateToken(t *testing.T) {
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
-	for _, path := range []string{"/v1/tickets/answer", "/v1/tickets/unpark"} {
+	for _, path := range []string{"/v1/tickets/answer", "/v1/tickets/resume", "/v1/tickets/unpark"} {
 		code, body := webPostJSON(t, base+path, `{"address":"nope/none/01"}`, cookie, "", jsonPost(base))
 		if code != http.StatusOK || reasonOf(t, body) != server.ReasonStale {
 			t.Errorf("%s without token = %d %s, want a stale refusal", path, code, body)

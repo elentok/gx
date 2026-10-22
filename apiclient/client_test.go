@@ -69,17 +69,20 @@ func TestNegotiate_BuildMismatchOnlyHints(t *testing.T) {
 }
 
 func TestNegotiate_APIVersionMismatchGoesReadOnly(t *testing.T) {
-	c := fakeServer(t, server.Handshake{APIVersion: server.APIVersion + 1, Build: "x"})
+	// The older version is the server a build before the pause terminology runs.
+	for _, version := range []int{server.APIVersion + 1, server.APIVersion - 1} {
+		c := fakeServer(t, server.Handshake{APIVersion: version, Build: "x"})
 
-	n, err := c.Negotiate(context.Background(), "x")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !n.ReadOnly || !strings.Contains(n.Hint, "gx server restart") {
-		t.Errorf("negotiation = %+v", n)
-	}
-	if err := c.CheckWrite(); !errors.Is(err, apiclient.ErrReadOnly) {
-		t.Errorf("CheckWrite = %v, want ErrReadOnly", err)
+		n, err := c.Negotiate(context.Background(), "x")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !n.ReadOnly || !strings.Contains(n.Hint, "gx server restart") {
+			t.Errorf("API v%d: negotiation = %+v", version, n)
+		}
+		if err := c.CheckWrite(); !errors.Is(err, apiclient.ErrReadOnly) {
+			t.Errorf("API v%d: CheckWrite = %v, want ErrReadOnly", version, err)
+		}
 	}
 }
 

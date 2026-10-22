@@ -20,7 +20,7 @@ import (
 func addServerRepairCmds(parent *cobra.Command) {
 	var req server.RepairRequest
 	var jsonOut bool
-	verb := func(name, use, short string, args cobra.PositionalArgs, flags func(*cobra.Command)) {
+	verb := func(name, use, short string, args cobra.PositionalArgs, flags func(*cobra.Command)) *cobra.Command {
 		c := &cobra.Command{
 			Use:   use,
 			Short: short,
@@ -46,6 +46,7 @@ func addServerRepairCmds(parent *cobra.Command) {
 			flags(c)
 		}
 		parent.AddCommand(c)
+		return c
 	}
 
 	verb("land", "land <project:epic/NN>", "land a stuck ticket's commits onto the feature branch and mark it done", cobra.ExactArgs(1), func(c *cobra.Command) {
@@ -60,7 +61,8 @@ func addServerRepairCmds(parent *cobra.Command) {
 		c.Flags().BoolVar(&req.Force, "force", false, "allow resetting a done ticket")
 		c.Flags().BoolVar(&req.DeleteBranch, "delete-branch", false, "delete the iteration branch instead of keeping it under ralph-loop/attic/")
 	})
-	verb("unpark", "unpark <project:epic/NN>", "reopen a needs-answer ticket and retire its Needs Answer section into Comments", cobra.ExactArgs(1), nil)
+	verb("resume", "resume <project:epic/NN>", "reopen a paused ticket and retire its Paused section into Comments", cobra.ExactArgs(1), nil)
+	verb("unpark", "unpark <project:epic/NN>", "alias of resume", cobra.ExactArgs(1), nil).Hidden = true
 	verb("verify", "verify <project:epic[/NN]>", "report whether each ticket's commits landed on the feature branch", cobra.ExactArgs(1), nil)
 }
 

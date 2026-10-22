@@ -279,9 +279,9 @@ func (c *Client) QueueMove(ctx context.Context, address string, position int) (s
 	return c.queueWrite(ctx, "move", server.QueueRequest{Address: address, Position: position})
 }
 
-// TicketPark parks a ticket needs-repair with a required one-line reason.
-func (c *Client) TicketPark(ctx context.Context, address, reason string) (server.QueueResult, error) {
-	return c.queueWriteTo(ctx, "/v1/tickets/park", server.QueueRequest{Address: address, ParkReason: reason})
+// TicketPause pauses a ticket with a required one-line reason.
+func (c *Client) TicketPause(ctx context.Context, address, reason string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/pause", server.QueueRequest{Address: address, ParkReason: reason})
 }
 
 // TicketUnmute clears a ticket's mutes and reopens it if it was parked needs-repair.
@@ -528,7 +528,7 @@ func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRe
 	return res, err
 }
 
-// Repair runs a repair verb ("land", "reset", "unpark" or "verify"). A refusal
+// Repair runs a repair verb ("land", "reset", "resume" or "verify"). A refusal
 // is a result (Refused set), not an error.
 func (c *Client) Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
 	var res server.RepairResult

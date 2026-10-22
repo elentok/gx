@@ -14,9 +14,10 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Refusal reasons of the ticket writes (park, relaunch, unmute).
+// Refusal reasons of the ticket writes (pause, relaunch, unmute).
 const (
 	ReasonReasonRequired   = "reason-required"
+	ReasonAlreadyPaused    = "already-paused"
 	ReasonNotMuted         = "not-muted"
 	ReasonIterationRunning = "iteration-running"
 	ReasonTicketDone       = "ticket-done"
@@ -113,8 +114,9 @@ func (s *Server) resolvedWrite(req QueueRequest, do func(ticketRef) (QueueResult
 	return do(ref)
 }
 
-// ticketPark parks a ticket needs-repair with a person's one-line reason.
-func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
+// ticketPause pauses a ticket with a person's one-line reason. It refuses a
+// running, done, already paused or map-epic ticket.
+func (s *Server) ticketPause(req QueueRequest) (QueueResult, error) {
 	reason := strings.TrimSpace(req.ParkReason)
 	if reason == "" {
 		return refusal(ReasonReasonRequired, "a one-line reason is required"), nil
@@ -122,6 +124,13 @@ func (s *Server) ticketPark(req QueueRequest) (QueueResult, error) {
 	return s.ticketWrite(req, func(ref ticketRef) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
+		}
+		switch schema.Status(ref.ticket.Status) {
+		case schema.StatusPaused, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+			return refusal(ReasonAlreadyPaused, ref.addr.String()+" is already paused"), nil
+		}
+		if ref.epic.IsMap {
+			return refusal(ReasonMapEpic, ref.addr.String()+" is in a map epic; its tickets are resolved by hand, not scheduled"), nil
 		}
 		run, _ := s.registry.tracked(ref.addr.String())
 		if err := s.parkTicket(ref.projectDir, ref.addr, ref.ticket.Path, events.Manual, reason, run.Run); err != nil {

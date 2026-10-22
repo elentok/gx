@@ -34,6 +34,7 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 		{"land an open ticket", "land", server.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
 		{"reset without a reason", "reset", server.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
 		{"unpark an open ticket", "unpark", server.RepairRequest{Address: addr}, repair.ReasonNotParked},
+		{"resume an open ticket", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotParked},
 		{"bad address", "unpark", server.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
 		{"unknown project", "reset", server.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
 	}

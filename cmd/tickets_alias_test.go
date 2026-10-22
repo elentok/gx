@@ -19,6 +19,20 @@ func TestOldRepairVerbsAreUnknownTicketsCommands(t *testing.T) {
 	}
 }
 
+func TestServerTicketsPauseAndResumeKeepHiddenAliases(t *testing.T) {
+	root := newRootCmd(deps{})
+	for verb, hidden := range map[string]bool{"pause": false, "resume": false, "park": true, "unpark": true} {
+		c, _, err := root.Find([]string{"server", "tickets", verb})
+		if err != nil || c.Name() != verb {
+			t.Errorf("gx server tickets %s: %v (found %v)", verb, err, c.Name())
+			continue
+		}
+		if c.Hidden != hidden {
+			t.Errorf("gx server tickets %s: hidden = %v, want %v", verb, c.Hidden, hidden)
+		}
+	}
+}
+
 func TestRootHelpGroupsCommands(t *testing.T) {
 	root := newRootCmd(deps{})
 	var help bytes.Buffer

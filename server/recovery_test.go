@@ -1260,7 +1260,7 @@ func TestRecovery_ParentDefectScanSkipsDrafts(t *testing.T) {
 func TestRecovery_ManualAndUnmatchedBlockedPaneParksForkNothing(t *testing.T) {
 	park := map[string]func(*servertest.Harness) error{
 		"manual park": func(h *servertest.Harness) error {
-			res, err := h.Client.TicketPark(context.Background(), "proj:epic-a/01", "broken")
+			res, err := h.Client.TicketPause(context.Background(), "proj:epic-a/01", "broken")
 			if err == nil && res.Refused {
 				err = errors.New(res.Reason)
 			}

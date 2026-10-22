@@ -52,7 +52,7 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 		)
 		switch verb {
 		case serverVerbPark:
-			res, err = api.TicketPark(ctx, address, serverParkReason)
+			res, err = api.TicketPause(ctx, address, serverParkReason)
 		case serverVerbCancel:
 			res, err = api.TicketCancel(ctx, address, true)
 		case serverVerbRelaunch:

@@ -86,7 +86,7 @@ func (f fakeServerAPI) QueueAdd(_ context.Context, address, agent string) (serve
 	return f.addRes[address], nil
 }
 
-func (f fakeServerAPI) TicketPark(_ context.Context, address, _ string) (server.QueueResult, error) {
+func (f fakeServerAPI) TicketPause(_ context.Context, address, _ string) (server.QueueResult, error) {
 	f.record("park " + address)
 	return server.QueueResult{}, nil
 }

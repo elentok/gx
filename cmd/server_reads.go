@@ -626,21 +626,24 @@ func newServerTicketsCmd() *cobra.Command {
 	changed.Flags().BoolVar(&changedJSON, "json", false, "emit the acknowledged address as JSON")
 	cmd.AddCommand(changed)
 
-	var parkJSON bool
-	var parkReason string
-	park := &cobra.Command{
-		Use:   "park <project:epic/NN>",
-		Short: "park a ticket needs-repair with a required reason",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, parkJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
-				return cl.TicketPark(ctx, args[0], parkReason)
-			})
-		},
+	for _, name := range []string{"pause", "park"} {
+		var pauseJSON bool
+		var pauseReason string
+		pause := &cobra.Command{
+			Use:    name + " <project:epic/NN>",
+			Short:  "pause a ticket with a required reason",
+			Args:   cobra.ExactArgs(1),
+			Hidden: name == "park",
+			RunE: func(c *cobra.Command, args []string) error {
+				return serverQueueWrite(c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+					return cl.TicketPause(ctx, args[0], pauseReason)
+				})
+			},
+		}
+		pause.Flags().StringVar(&pauseReason, "reason", "", "one-line reason written into the ticket (required)")
+		pause.Flags().BoolVar(&pauseJSON, "json", false, "emit the structured result (or refusal) as JSON")
+		cmd.AddCommand(pause)
 	}
-	park.Flags().StringVar(&parkReason, "reason", "", "one-line reason written into the ticket (required)")
-	park.Flags().BoolVar(&parkJSON, "json", false, "emit the structured result (or refusal) as JSON")
-	cmd.AddCommand(park)
 
 	var unmuteJSON bool
 	unmute := &cobra.Command{

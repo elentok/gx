@@ -35,7 +35,7 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	start, _, _ := registerLaunch(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if res, err := h.Client.TicketPark(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
+	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
 		t.Fatalf("park = %+v, %v", res, err)
 	}
 	h.Server.RecordSpend("spent", 6)

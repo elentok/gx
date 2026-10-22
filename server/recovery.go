@@ -485,7 +485,7 @@ type recoveryVerbs struct{ s *Server }
 var recoveryVerbHandlers = map[string]func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error){
 	recovery.VerbPark: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
 		req.ParkReason = c.Text
-		return s.ticketPark(req)
+		return s.ticketPause(req)
 	},
 	recovery.VerbRelaunch: func(s *Server, req QueueRequest, _ recovery.Call) (QueueResult, error) {
 		return s.ticketRelaunch(req)
