@@ -111,7 +111,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 	} else {
 		d.State = epicStateFor(root, e, s.registry.startedAtOf)
 		if epicMergeBlocked(e) {
-			d.MergeBlockKind, d.MergeBlockReason = e.LandBlockKind, e.LandBlockReason
+			d.MergeBlockKind, d.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 		}
 	}
 	addr := func(id string) string {
@@ -132,7 +132,7 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		if at, ok := s.registry.startedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 			row.ClaimedAt = at
 		}
-		if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusNeedsAnswer {
+		if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusPausedAnswer {
 			row.Asking, row.Question = true, open.Summary
 		}
 		if t.Status == string(schema.StatusDone) {

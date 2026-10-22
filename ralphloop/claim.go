@@ -41,7 +41,7 @@ func ClaimWithBase(path, resolvedBase string) error {
 		}
 		t.IterationStatus = ""
 		t.IterationFinishedAt = time.Time{}
-		t.ParkKind = ""
+		t.PauseKind = ""
 		t.PauseReason = ""
 		*body = schema.DemoteSection(*body, "## Needs Repair", time.Now())
 	})
@@ -68,10 +68,10 @@ func MarkBuiltAwaitingLand(path string) error {
 // markNeedsAnswer writes status: needs-answer into the ticket file at path,
 // stamping parkKind so a later reader can tell which of the three producers
 // parked it.
-func markNeedsAnswer(path string, parkKind schema.ParkKind) error {
+func markNeedsAnswer(path string, parkKind schema.PauseKind) error {
 	return parkWrite(path, false, func(t *schema.Ticket, _ *string) {
 		t.Status = schema.StatusPaused
-		t.ParkKind = ""
+		t.PauseKind = ""
 		t.PauseReason = schema.PausedReason(string(parkKind), schema.PauseClassAnswer)
 	})
 }
@@ -99,14 +99,14 @@ func parkWrite(path string, reparkDone bool, mutate func(*schema.Ticket, *string
 // full failure is readable by opening the ticket file even when the live
 // UI's status subtext truncates it. Fails without writing anything if reason
 // is empty — see FormatNeedsRepairBody's write-conditional validation.
-func markNeedsRepairWithReason(path, reason string, parkKind schema.ParkKind, state schema.NeedsRepairState, reparkDone bool) error {
-	section, err := schema.FormatNeedsRepairBody(reason, state)
+func markNeedsRepairWithReason(path, reason string, parkKind schema.PauseKind, state schema.FaultState, reparkDone bool) error {
+	section, err := schema.FormatFaultBody(reason, state)
 	if err != nil {
 		return err
 	}
 	return parkWrite(path, reparkDone, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusPaused
-		t.ParkKind = ""
+		t.PauseKind = ""
 		t.PauseReason = schema.PausedReason(string(parkKind), schema.PauseClassRepair)
 		*body += section
 	})

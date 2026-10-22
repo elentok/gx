@@ -265,12 +265,12 @@ func parseCSVIDs(value string) []schema.TicketID {
 // orchestrationStatuses are the statuses `set` no longer writes: claims, parks,
 // landing and cancellation belong to the server's orchestration path.
 var orchestrationStatuses = map[schema.Status]bool{
-	schema.StatusClaimed:     true,
-	schema.StatusDone:        true,
-	schema.StatusNeedsAnswer: true,
-	schema.StatusNeedsRepair: true,
-	schema.StatusPaused:      true,
-	schema.StatusCancelled:   true,
+	schema.StatusClaimed:      true,
+	schema.StatusDone:         true,
+	schema.StatusLegacyAnswer: true,
+	schema.StatusLegacyRepair: true,
+	schema.StatusPaused:       true,
+	schema.StatusCancelled:    true,
 }
 
 // mapEpicStatuses are the orchestration statuses `set` does write for a ticket

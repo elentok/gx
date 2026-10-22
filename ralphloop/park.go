@@ -21,7 +21,7 @@ type parkRequest struct {
 	Kind       events.Kind
 	Reason     string
 	// Repair is rendered into the ticket's "## Needs Repair" section.
-	Repair schema.NeedsRepairState
+	Repair schema.FaultState
 	// Event carries optional agent context (runner, label, pane, session, cwd) merged
 	// into the appended event; park overwrites its type, ticket, kind and reason.
 	Event Event
@@ -65,11 +65,11 @@ func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 		text += "\n\n" + reason
 	}
 	ev := tickets.LogEvent{
-		Type:     tickets.EventParkQuestion,
-		By:       "gx",
-		ParkKind: string(kind),
-		Summary:  summary,
-		Text:     text,
+		Type:      tickets.EventPauseQuestion,
+		By:        "gx",
+		PauseKind: string(kind),
+		Summary:   summary,
+		Text:      text,
 	}
 	_, err := tickets.AppendLogIf(ticketPath, ev, func(evs []tickets.LogEvent) error {
 		if tickets.OpenQuestion(evs) != nil {
@@ -104,7 +104,7 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 	}
 	// The guard re-checks under the ticket lock: an answer may have landed since the read.
 	_, err = tickets.AppendLogIf(ticketPath, tickets.LogEvent{
-		Type: tickets.EventParkClosed, Question: q.Seq, Reason: reason,
+		Type: tickets.EventPauseClosed, Question: q.Seq, Reason: reason,
 	}, func(evs []tickets.LogEvent) error {
 		if cur := tickets.OpenQuestion(evs); cur == nil || cur.Seq != q.Seq {
 			return errQuestionGone
@@ -127,9 +127,9 @@ func isParkType(t events.Type) bool {
 // show for a pause of this kind.
 func PauseStatus(k events.Kind) string {
 	if k.AwaitsAnswer() {
-		return string(schema.StatusNeedsAnswer)
+		return string(schema.StatusLegacyAnswer)
 	}
-	return string(schema.StatusNeedsRepair)
+	return string(schema.StatusLegacyRepair)
 }
 
 // RecordManualLand writes done through the park path and appends the one
@@ -166,13 +166,13 @@ func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch {
 	case req.Type == events.Paused && !req.Kind.AwaitsAnswer():
-		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.ParkKind(req.Kind), req.Repair, req.ReparkDone)
+		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.PauseKind(req.Kind), req.Repair, req.ReparkDone)
 	case req.Type == events.Paused:
 		if err := logGxQuestion(req.Path, req.Kind, reason); err != nil {
 			// A silent park is the bug this path exists to remove: park anyway.
 			reason = fmt.Sprintf("%s (also failed logging question: %v)", reason, err)
 		}
-		writeErr = markNeedsAnswer(req.Path, schema.ParkKind(req.Kind))
+		writeErr = markNeedsAnswer(req.Path, schema.PauseKind(req.Kind))
 	case req.Type == events.ManualMerge:
 		if !req.AlreadyDone {
 			writeErr = MarkDone(req.Path)

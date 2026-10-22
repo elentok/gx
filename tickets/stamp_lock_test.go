@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// A `set`/`section` write that lands while the stamp is in flight holds the
+// A `set`/`section` write that arrives while the stamp is in flight holds the
 // ticket lock; the stamp must wait for it and re-read, not write back stale
 // content over it.
 func TestStampEpicStarted_TicketMDWaitsForLockAndKeepsConcurrentWrite(t *testing.T) {

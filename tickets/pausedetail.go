@@ -5,32 +5,33 @@ import (
 	"strings"
 )
 
-// The headings a park appends to a parked ticket's body.
+// The headings an old pause appended to a paused ticket's body. Read shim only:
+// nothing writes them any more.
 const (
-	NeedsAnswerHeading = "## Needs Answer"
-	NeedsRepairHeading = "## Needs Repair"
+	LegacyAnswerHeading = "## Needs Answer"
+	LegacyRepairHeading = "## Needs Repair"
 )
 
 var markdownMarkerPattern = regexp.MustCompile(`[*_` + "`" + `]+`)
 
-// ParkReason is the Park reason of t as the epic renders it. A needs-answer
-// ticket's reason is its open question's summary from the log; an old ticket
+// PauseDetail is the pause text of t as the epic renders it. A ticket paused
+// for an answer shows its open question's summary from the log; an old ticket
 // that still carries a Needs Answer section falls back to that section. A
-// needs-repair ticket's reason is the first non-empty line after its Needs
+// ticket paused for a repair shows the first non-empty line after its Needs
 // Repair heading, markdown markers stripped, unclipped. An error ticket's
-// reason is what broke it. It is "" for any other status, and for a parked
+// text is what broke it. It is "" for any other status, and for a paused
 // ticket with neither an open question nor a section.
-func ParkReason(e Epic, t Ticket) string {
+func PauseDetail(e Epic, t Ticket) string {
 	switch status := e.RenderedStatus(t); status {
-	case StatusNeedsAnswer:
+	case StatusPausedAnswer:
 		if evs, err := ReadLog(t.Path); err == nil {
 			if q := OpenQuestion(evs); q != nil && q.Summary != "" {
 				return strings.TrimSpace(markdownMarkerPattern.ReplaceAllString(q.Summary, ""))
 			}
 		}
-		return parkSectionLine(t.Body, NeedsAnswerHeading)
-	case StatusNeedsRepair:
-		return parkSectionLine(t.Body, NeedsRepairHeading)
+		return headingLine(t.Body, LegacyAnswerHeading)
+	case StatusPausedRepair:
+		return headingLine(t.Body, LegacyRepairHeading)
 	case StatusError:
 		for _, msg := range []string{t.ReadErr, t.GraphErr, t.BlockedByErr} {
 			if msg != "" {
@@ -42,9 +43,9 @@ func ParkReason(e Epic, t Ticket) string {
 	return ""
 }
 
-// parkSectionLine finds heading as an exact line in body and returns the first
+// headingLine finds heading as an exact line in body and returns the first
 // non-empty line after it, markers stripped, or "" if either isn't found.
-func parkSectionLine(body, heading string) string {
+func headingLine(body, heading string) string {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
 		if line != heading {

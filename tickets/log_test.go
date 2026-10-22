@@ -16,7 +16,7 @@ func logTicketPath(t *testing.T) string {
 }
 
 func question(by string) LogEvent {
-	return LogEvent{Type: EventParkQuestion, By: by, ParkKind: "question", Summary: "which?", Text: "which one?", Handoff: "h"}
+	return LogEvent{Type: EventPauseQuestion, By: by, PauseKind: "question", Summary: "which?", Text: "which one?", Handoff: "h"}
 }
 
 func TestReadLog_MissingLogIsEmpty(t *testing.T) {
@@ -47,7 +47,7 @@ func TestReadLog_SkipsTornLastLine(t *testing.T) {
 	}
 
 	// The next append cuts the torn tail off and continues the sequence.
-	ev, err := AppendLog(path, LogEvent{Type: EventParkAnswer, Question: 1, Source: "cli", Text: "a"})
+	ev, err := AppendLog(path, LogEvent{Type: EventPauseAnswer, Question: 1, Source: "cli", Text: "a"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +56,28 @@ func TestReadLog_SkipsTornLastLine(t *testing.T) {
 	}
 	if events, err = ReadLog(path); err != nil || len(events) != 2 {
 		t.Fatalf("ReadLog after append = %d events, %v", len(events), err)
+	}
+}
+
+// Read shim: a log written before the rename keeps its old event types and
+// kind field, and reads back in the current spelling.
+func TestReadLog_FoldsOldEventTypesAndKind(t *testing.T) {
+	path := logTicketPath(t)
+	writeFile(t, LogPath(path), `{"seq":1,"ts":"2026-01-01T00:00:00Z","type":"park.question","by":"gx","park_kind":"zero-commit","summary":"s"}`+"\n"+
+		`{"seq":2,"ts":"2026-01-01T00:00:01Z","type":"park.answer","question":1}`+"\n")
+
+	events, err := ReadLog(path)
+	if err != nil || len(events) != 2 {
+		t.Fatalf("ReadLog = %v, %v; want 2 events", events, err)
+	}
+	if events[0].Type != EventPauseQuestion || events[0].PauseKind != "zero-commit" || events[0].LegacyKind != "" {
+		t.Errorf("question = %+v, want pause.question with kind zero-commit", events[0])
+	}
+	if events[1].Type != EventPauseAnswer {
+		t.Errorf("answer type = %q, want %q", events[1].Type, EventPauseAnswer)
+	}
+	if q := OpenQuestion(events); q != nil {
+		t.Errorf("OpenQuestion = %+v, want none: the old answer closes the old question", q)
 	}
 }
 
@@ -76,7 +98,7 @@ func TestAppendLog_SeqMonotonicUnderConcurrentAppends(t *testing.T) {
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			if _, err := AppendLog(path, LogEvent{Type: EventParkAnswer, Question: 1, Source: "cli"}); err != nil {
+			if _, err := AppendLog(path, LogEvent{Type: EventPauseAnswer, Question: 1, Source: "cli"}); err != nil {
 				t.Error(err)
 			}
 		})
@@ -128,13 +150,13 @@ func TestAppendLog_AgentQuestionNeedsHandoff(t *testing.T) {
 func TestOpenQuestionAndRounds(t *testing.T) {
 	mk := func(seq int, typ string, q int) LogEvent { return LogEvent{Seq: seq, Type: typ, Question: q} }
 	events := []LogEvent{
-		mk(1, EventParkQuestion, 0),
-		mk(2, EventParkPermission, 0),
-		mk(3, EventParkAnswer, 1),
-		mk(4, EventParkQuestion, 0),
-		mk(5, EventParkClosed, 4),
-		mk(6, EventParkQuestion, 0),
-		mk(7, EventParkPermission, 0),
+		mk(1, EventPauseQuestion, 0),
+		mk(2, EventPausePermission, 0),
+		mk(3, EventPauseAnswer, 1),
+		mk(4, EventPauseQuestion, 0),
+		mk(5, EventPauseClosed, 4),
+		mk(6, EventPauseQuestion, 0),
+		mk(7, EventPausePermission, 0),
 	}
 
 	rounds := Rounds(events)
@@ -144,8 +166,8 @@ func TestOpenQuestionAndRounds(t *testing.T) {
 	if rounds[0].End == nil || rounds[0].End.Seq != 3 {
 		t.Errorf("round 1 end = %v, want seq 3", rounds[0].End)
 	}
-	if rounds[1].End == nil || rounds[1].End.Type != EventParkClosed {
-		t.Errorf("round 2 end = %v, want park.closed", rounds[1].End)
+	if rounds[1].End == nil || rounds[1].End.Type != EventPauseClosed {
+		t.Errorf("round 2 end = %v, want pause.closed", rounds[1].End)
 	}
 	if rounds[2].End != nil {
 		t.Errorf("round 3 end = %v, want open", rounds[2].End)

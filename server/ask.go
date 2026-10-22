@@ -31,7 +31,7 @@ func (s *Server) ticketAsk(req QueueRequest) (QueueResult, error) {
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		ev := tickets.LogEvent{
-			Type:    tickets.EventParkQuestion,
+			Type:    tickets.EventPauseQuestion,
 			By:      askAuthorAgent,
 			Summary: q.Summary,
 			Text:    q.Detail,

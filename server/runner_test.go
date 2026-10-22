@@ -792,8 +792,8 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	}
 	assertPaused(t, tk, schema.PauseClassRepair, schema.PauseHandleMismatch)
 	body, _ := os.ReadFile(ticketPath)
-	if !strings.Contains(string(body), "## Needs Repair") {
-		t.Errorf("ticket has no Needs Repair section:\n%s", body)
+	if !strings.Contains(string(body), schema.PausedHeading) {
+		t.Errorf("ticket has no Paused section:\n%s", body)
 	}
 	logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
 	if err != nil {

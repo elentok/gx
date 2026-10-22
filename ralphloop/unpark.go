@@ -33,7 +33,7 @@ func unparkAnswered(d Deps, epicName, worktreeDir string, agentKind AgentKind, s
 		if !scope.Contains(t, epic) {
 			continue
 		}
-		if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
+		if epic.RenderedStatus(t) != tickets.StatusPausedAnswer {
 			continue
 		}
 		if !clearableParkedTicket(d, epicName, worktreeDir, agentKind, epic, t) {
@@ -60,7 +60,7 @@ func hasLiveParkedTicket(d Deps, epicName, worktreeDir string, agentKind AgentKi
 		if !scope.Contains(t, epic) {
 			continue
 		}
-		if epic.RenderedStatus(t) != tickets.StatusNeedsAnswer {
+		if epic.RenderedStatus(t) != tickets.StatusPausedAnswer {
 			continue
 		}
 		status, live := liveAgent(d, epicName, agentKind, worktreeDir, t)
@@ -96,10 +96,10 @@ func hasLiveParkedTicket(d Deps, epicName, worktreeDir string, agentKind AgentKi
 // diverge.
 func clearableParkedTicket(d Deps, epicName, worktreeDir string, agentKind AgentKind, epic tickets.Epic, t tickets.Ticket) bool {
 	switch epic.RenderedStatus(t) {
-	case tickets.StatusNeedsAnswer:
+	case tickets.StatusPausedAnswer:
 		status, live := liveAgent(d, epicName, agentKind, worktreeDir, t)
 		return clearableNeedsAnswer(d, worktreeDir, epicName, t, status, live)
-	case tickets.StatusNeedsRepair, tickets.StatusDraft:
+	case tickets.StatusPausedRepair, tickets.StatusDraft:
 		// These statuses never carry park_kind (only a needs-answer park
 		// does) and stay on the same liveness-only rule ralph-loop has
 		// always applied to them.
@@ -136,11 +136,11 @@ func clearableNeedsAnswer(d Deps, worktreeDir, epicName string, t tickets.Ticket
 	if !live || status.State == agentrunner.StateBlocked {
 		return false
 	}
-	kind := t.ParkKind
+	kind := t.PauseKind
 	if kind == "" {
-		kind = schema.ParkKindZeroCommit
+		kind = schema.PauseKindZeroCommit
 	}
-	if kind == schema.ParkKindZeroCommit {
+	if kind == schema.PauseKindZeroCommit {
 		return parkedTicketHasNewCommits(d, worktreeDir, epicName, t)
 	}
 	return true

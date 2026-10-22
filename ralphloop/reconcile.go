@@ -128,7 +128,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 				reattach(t)
 				reattached = append(reattached, t)
 			} else {
-				sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", eventsc.Kind(t.ParkKind), "no live iteration found")
+				sink.TicketNeedsHuman(t.Identifier, epic.Name, "needs-repair", eventsc.Kind(t.PauseKind), "no live iteration found")
 			}
 			continue
 		}

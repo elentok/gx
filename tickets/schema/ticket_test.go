@@ -93,7 +93,7 @@ func TestTicketID_Valid(t *testing.T) {
 func TestStatus_Valid(t *testing.T) {
 	canonical := []Status{
 		StatusDraft, StatusOpen, StatusClaimed,
-		StatusNeedsAnswer, StatusNeedsRepair, StatusDone, StatusCancelled,
+		StatusLegacyAnswer, StatusLegacyRepair, StatusDone, StatusCancelled,
 	}
 	if len(canonical) != 7 {
 		t.Fatalf("expected exactly 7 canonical statuses, got %d", len(canonical))

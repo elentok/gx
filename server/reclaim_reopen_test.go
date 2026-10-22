@@ -99,7 +99,7 @@ func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
 	stampRun(t, h, "herdr", deadSession)
 	h.Restart(t)
 
-	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	if _, err := os.Stat(wtPath); err != nil {
 		t.Errorf("worktree gone: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestReclaim_DeadClaimWithWorkPauses(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
 				store, _, wtPath, ticketPath := restartDead(t, headless, work)
-				waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+				waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 				if _, err := os.Stat(wtPath); err != nil {
 					t.Errorf("worktree gone: %v", err)
 				}

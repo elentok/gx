@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/git"
 )
 
-// The trunk resolver runs on every server snapshot, claim and land, and each
+// The trunk resolver runs on every server snapshot, claim and merge, and each
 // resolve costs several git processes. The git reads it makes are cached
 // here, each with a stamp of the ref files that can change its answer. A
 // lookup re-stats those files (no process) and asks git again on any change,

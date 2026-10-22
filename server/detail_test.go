@@ -18,7 +18,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Status != string(schema.StatusNeedsAnswer) || d.PauseReason != string(schema.PauseSelfReported) || d.Title == "" {
+	if d.Status != string(schema.StatusLegacyAnswer) || d.PauseReason != string(schema.PauseSelfReported) || d.Title == "" {
 		t.Errorf("header = %+v", d)
 	}
 	if d.State != state {
@@ -47,11 +47,11 @@ func TestDetail_GxQuestionOffersResumeOnly(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
-		tk.Status, tk.ParkKind = schema.StatusNeedsAnswer, schema.ParkKindZeroCommit
+		tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindZeroCommit
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "gx", Summary: "no commits"}); err != nil {
+	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "no commits"}); err != nil {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)
@@ -64,7 +64,7 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventParkAnswer, Question: 1, Source: "web", Choice: "b"}); err != nil {
+	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: 1, Source: "web", Choice: "b"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusOpen }); err != nil {
@@ -79,14 +79,14 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	}
 
 	// A second round: the first is now one line, and a closed round is read-only.
-	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusNeedsAnswer }); err != nil {
+	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusLegacyAnswer }); err != nil {
 		t.Fatal(err)
 	}
-	q, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "agent", Summary: "again", Handoff: "h"})
+	q, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "again", Handoff: "h"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventParkClosed, Question: q.Seq, Reason: "unparked"}); err != nil {
+	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseClosed, Question: q.Seq, Reason: "unparked"}); err != nil {
 		t.Fatal(err)
 	}
 	d, err = h.Client.Detail(context.Background(), answerAddr)
@@ -102,7 +102,7 @@ func TestDetail_StuckHasNoAnswerAction(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
-	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusNeedsRepair }); err != nil {
+	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) { tk.Status = schema.StatusLegacyRepair }); err != nil {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)

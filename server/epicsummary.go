@@ -137,7 +137,7 @@ func answeredLatest(evs []tickets.LogEvent) bool {
 		return false
 	}
 	end := rounds[len(rounds)-1].End
-	return end != nil && end.Type == tickets.EventParkAnswer
+	return end != nil && end.Type == tickets.EventPauseAnswer
 }
 
 // summarizeEpic applies the state rules, first match wins. A claimed ticket
@@ -153,15 +153,15 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		info := SummaryTicket{Address: addr, Title: t.Title, Status: status.Word()}
 		switch {
 		case isPaused(e, t):
-			info.Recovery, info.Reason = recoveryOf(addr), tickets.ParkReason(e, t)
+			info.Recovery, info.Reason = recoveryOf(addr), tickets.PauseDetail(e, t)
 			open := tickets.OpenQuestion(logOf(t))
 			info.Summary = info.Reason
 			if open != nil {
 				info.Summary = open.Summary
 			}
-			info.Answerable = status == tickets.StatusNeedsAnswer && open != nil
+			info.Answerable = status == tickets.StatusPausedAnswer && open != nil
 			sum.Paused = append(sum.Paused, info)
-			sum.HasRepair = sum.HasRepair || status == tickets.StatusNeedsRepair || status == tickets.StatusError
+			sum.HasRepair = sum.HasRepair || status == tickets.StatusPausedRepair || status == tickets.StatusError
 		case status == tickets.StatusOpen && answeredLatest(logOf(t)):
 			// An answered gone-agent ticket is open again until gx claims it, yet a
 			// person still wants to see it was answered.
@@ -184,8 +184,8 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		sum.Reason, sum.More = pausedEpicReason(e)
 		switch {
 		case root.Epic != OneOffsEpic && epicMergeBlocked(e):
-			sum.Reason, sum.Detail = EpicReasonMergeBlocked, e.LandBlockReason
-			sum.MergeBlocked, sum.MergeBlockKind = true, e.LandBlockKind
+			sum.Reason, sum.Detail = EpicReasonMergeBlocked, e.MergeBlockReason
+			sum.MergeBlocked, sum.MergeBlockKind = true, e.MergeBlockKind
 		case epicStateOf(e) == epicCycle:
 			sum.Reason, sum.Detail = EpicReasonDeadlock, cycleReason(root, e)
 		}
@@ -206,7 +206,7 @@ func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 			continue
 		}
 		if n == 0 {
-			reason = tickets.ParkReason(e, t)
+			reason = tickets.PauseDetail(e, t)
 		}
 		n++
 	}
@@ -215,7 +215,7 @@ func pausedEpicReason(e tickets.Epic) (reason string, more int) {
 
 // epicMergeBlocked reports whether e is done and unmerged, with its last merge blocked.
 func epicMergeBlocked(e tickets.Epic) bool {
-	return epicStateOf(e) == epicDone && e.MergedAt.IsZero() && e.LandBlockReason != ""
+	return epicStateOf(e) == epicDone && e.MergedAt.IsZero() && e.MergeBlockReason != ""
 }
 
 // onlyMergeTicketsRemain reports whether every ticket is done or cancelled

@@ -57,14 +57,14 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 		{
 			name: "done, unmerged with a stored reason is merge-blocked",
 			epic: tickets.Epic{
-				Name: "epic", CompletedAt: time.Unix(50, 0), LandBlockKind: "dirty-trunk", LandBlockReason: "trunk dirty",
+				Name: "epic", CompletedAt: time.Unix(50, 0), MergeBlockKind: "dirty-trunk", MergeBlockReason: "trunk dirty",
 				Tickets: []tickets.Ticket{summaryTicket("01", "done")},
 			},
 			wantState: EpicStatePaused, wantDone: 1, wantReason: EpicReasonMergeBlocked, wantDetail: "trunk dirty", wantKind: "dirty-trunk",
 		},
 		{
 			name:      "merged epic ignores a stale reason",
-			epic:      tickets.Epic{Name: "epic", MergedAt: time.Unix(60, 0), LandBlockReason: "stale", Tickets: []tickets.Ticket{summaryTicket("01", "done")}},
+			epic:      tickets.Epic{Name: "epic", MergedAt: time.Unix(60, 0), MergeBlockReason: "stale", Tickets: []tickets.Ticket{summaryTicket("01", "done")}},
 			wantState: EpicStateFinished, wantDone: 1,
 		},
 		{
@@ -194,11 +194,11 @@ func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T)
 	repair.Body = "## Needs Repair\n\nthe repair reason\n"
 	answered := summaryTicket("03", "open")
 	question := func(seq int, summary string) tickets.LogEvent {
-		return tickets.LogEvent{Type: tickets.EventParkQuestion, Seq: seq, Summary: summary}
+		return tickets.LogEvent{Type: tickets.EventPauseQuestion, Seq: seq, Summary: summary}
 	}
 	logs := map[string][]tickets.LogEvent{
 		"01": {question(1, "which one?")},
-		"03": {question(1, "old"), {Type: tickets.EventParkAnswer, Seq: 2, Question: 1}},
+		"03": {question(1, "old"), {Type: tickets.EventPauseAnswer, Seq: 2, Question: 1}},
 	}
 	epic := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{asked, repair, answered}}
 	got := summarizeEpic(root, epic,

@@ -1091,7 +1091,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 // tells finishIteration to swallow this failure rather than also blaming the
 // parent.
 func parkConflictResolutionChildNeedsRepair(p iterationParams, childPath, childID, label, reason string) error {
-	state := schema.NeedsRepairState{
+	state := schema.FaultState{
 		Label:    label,
 		Branch:   p.FeatureBranch,
 		Worktree: p.FeatureWorktree,

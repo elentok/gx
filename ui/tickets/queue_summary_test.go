@@ -113,8 +113,8 @@ func fixtureSummaries(epics []gxtickets.Epic, claimedAt map[string]time.Time) []
 					sum.Active = append(sum.Active, info)
 					sum.State = server.EpicStateRunning
 				}
-			case gxtickets.StatusNeedsAnswer, gxtickets.StatusNeedsRepair:
-				info.Status, info.Reason = status.Word(), gxtickets.ParkReason(epic, t)
+			case gxtickets.StatusPausedAnswer, gxtickets.StatusPausedRepair:
+				info.Status, info.Reason = status.Word(), gxtickets.PauseDetail(epic, t)
 				sum.Paused = append(sum.Paused, info)
 			}
 		}

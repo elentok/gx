@@ -32,7 +32,7 @@ func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 		if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
-		waitStatus(t, h.TicketStore+"/proj/epic-a/issues/01-first.md", schema.StatusNeedsAnswer)
+		waitStatus(t, h.TicketStore+"/proj/epic-a/issues/01-first.md", schema.StatusLegacyAnswer)
 		assertPauseRecordsRun(t, store, events.Paused, "fake", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "session-1"})
 	})
 }

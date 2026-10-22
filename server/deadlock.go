@@ -41,7 +41,7 @@ func (d *deadlocks) leave(root rootRef) {
 // isPaused is tickets.Epic.IsPaused, the rule shared with ralph-loop and the
 // Queue tab, except that map epics hold no work, so none of their tickets are.
 func isPaused(e tickets.Epic, t tickets.Ticket) bool {
-	return !e.IsMap && e.IsParked(t)
+	return !e.IsMap && e.IsPaused(t)
 }
 
 // epicState is how far e can move.

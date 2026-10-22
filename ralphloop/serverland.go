@@ -391,7 +391,7 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 		_, err := park(p.Sink, parkRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,
-			Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
+			Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},
 			Event:  p.agentEvent(built.job.pane, built.job.sessionID, built.job.path),
 		})
 		return err

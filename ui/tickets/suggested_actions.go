@@ -40,7 +40,7 @@ const actionUnmuteReopen = serverVerbUnmute
 // resumeSuggested, investigateSuggested and unmuteSuggested decide which
 // ticket Context menu items move to Suggested.
 func resumeSuggested(status tickets.RenderedStatus) bool {
-	return status == tickets.StatusNeedsAnswer
+	return status == tickets.StatusPausedAnswer
 }
 
 // investigateSuggested whitelists the statuses that signal an actual problem
@@ -48,7 +48,7 @@ func resumeSuggested(status tickets.RenderedStatus) bool {
 // WaitingForChildren are healthy too, with no live or stalled session worth
 // investigating, and a status added to the enum later fails closed.
 func investigateSuggested(status tickets.RenderedStatus) bool {
-	return status == tickets.StatusNeedsAnswer || status == tickets.StatusNeedsRepair || status == tickets.StatusError
+	return status == tickets.StatusPausedAnswer || status == tickets.StatusPausedRepair || status == tickets.StatusError
 }
 
 func unmuteSuggested(ticket tickets.Ticket) bool {

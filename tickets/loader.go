@@ -182,7 +182,7 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	ticket.Agent = parsed.Agent
 	ticket.PauseReason = parsed.PauseReason
 	if parsed.PauseReason != "" {
-		ticket.ParkKind = schema.ParkKind(parsed.PauseReason)
+		ticket.PauseKind = schema.PauseKind(parsed.PauseReason)
 	}
 	ticket.Mutes = parsed.Mutes
 	ticket.Base = parsed.Base
@@ -268,8 +268,8 @@ type ticketMDYAML struct {
 	CreatedAt   *time.Time `yaml:"created_at"`
 	MergedAt    *time.Time `yaml:"merged_at"`
 
-	LandBlockKind   string `yaml:"land_block_kind"`
-	LandBlockReason string `yaml:"land_block_reason"`
+	MergeBlockKind   string `yaml:"land_block_kind"`
+	MergeBlockReason string `yaml:"land_block_reason"`
 }
 
 // WriteEpicTicketMD writes a minimal ticket.md for the epic at epicPath, with
@@ -324,8 +324,8 @@ func loadEpicTicketMD(epic *Epic) {
 	if wire.MergedAt != nil {
 		epic.MergedAt = *wire.MergedAt
 	}
-	epic.LandBlockKind = wire.LandBlockKind
-	epic.LandBlockReason = wire.LandBlockReason
+	epic.MergeBlockKind = wire.MergeBlockKind
+	epic.MergeBlockReason = wire.MergeBlockReason
 	loadEpicEvolveFields(epic, fm)
 }
 

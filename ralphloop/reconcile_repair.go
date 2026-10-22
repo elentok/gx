@@ -115,7 +115,7 @@ func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tick
 func markDoneTicketUnrecoverable(sink EventSink, paths reconcilePaths, featureBranch string, t tickets.Ticket) error {
 	branch := iterBranch(featureBranch, t.Identifier)
 	reason := fmt.Sprintf("done but commits missing from %s and iteration branch %s no longer exists to recover them", featureBranch, branch)
-	state := schema.NeedsRepairState{
+	state := schema.FaultState{
 		Label:    iterLabel(featureBranch, t.Identifier),
 		Branch:   branch,
 		Worktree: iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier),

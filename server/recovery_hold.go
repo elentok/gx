@@ -117,7 +117,7 @@ func recoveryState(held, address string, all []TicketInfo) string {
 		}
 		switch schema.Status(t.Status) {
 		case schema.StatusDone, schema.StatusCancelled:
-		case schema.StatusPaused, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+		case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
 			state = RecoveryEscalated
 		default:
 			return RecoveryPending

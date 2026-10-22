@@ -48,14 +48,14 @@ type Epic struct {
 	// CreatedAt is when the epic was created; zero on an epic that predates
 	// the field and hasn't been migrated.
 	CreatedAt time.Time
-	// MergedAt is when the epic's branch landed on its target; a Merged epic
+	// MergedAt is when the epic's branch merged into its target; a Merged epic
 	// is one with it set.
 	MergedAt time.Time
-	// LandBlockKind and LandBlockReason are why the last land parked the epic;
-	// the land step clears both before it decides. The kind is empty for a
-	// needs-rebase park.
-	LandBlockKind   string
-	LandBlockReason string
+	// MergeBlockKind and MergeBlockReason are why the last merge paused the epic;
+	// the merge step clears both before it decides. The kind is empty for a
+	// needs-rebase pause.
+	MergeBlockKind   string
+	MergeBlockReason string
 	// MergeTarget is the branch the epic merges into. Only a server snapshot
 	// sets it; the loader leaves it empty.
 	MergeTarget string

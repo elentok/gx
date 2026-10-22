@@ -52,7 +52,7 @@ func TestPause_WritesStatusSectionAndOneEvent(t *testing.T) {
 		t.Fatalf("pause = %+v, %v", res, err)
 	}
 	data, _ := os.ReadFile(path)
-	for _, want := range []string{"status: paused", "pause_reason: manual", "## Needs Repair", "needs a human look"} {
+	for _, want := range []string{"status: paused", "pause_reason: manual", "## Paused", "needs a human look"} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("ticket lacks %q:\n%s", want, data)
 		}

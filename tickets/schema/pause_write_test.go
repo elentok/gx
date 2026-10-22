@@ -6,8 +6,8 @@ import (
 )
 
 func TestMarshalTicket_WritesOnlyTheNewPauseForm(t *testing.T) {
-	for _, status := range []Status{StatusNeedsAnswer, StatusNeedsRepair} {
-		out, err := MarshalTicket(Ticket{ID: "01", Status: status, Type: TypeImplement, ParkKind: "land-conflict"}, "")
+	for _, status := range []Status{StatusLegacyAnswer, StatusLegacyRepair} {
+		out, err := MarshalTicket(Ticket{ID: "01", Status: status, Type: TypeImplement, PauseKind: "land-conflict"}, "")
 		if err != nil {
 			t.Fatal(err)
 		}

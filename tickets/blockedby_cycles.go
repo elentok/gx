@@ -26,8 +26,8 @@ func crossEpicRef(ref string) bool {
 }
 
 // EpicRelease is when a whole-epic blocker releases its dependents, from the
-// project's landing policy and auto-ff-merge. The zero value is the default
-// on-landed policy.
+// project's merge-release policy and auto-ff-merge. The zero value is the
+// default on-merge policy.
 type EpicRelease struct {
 	OnDone      bool
 	AutoFFMerge bool
@@ -39,8 +39,8 @@ func EpicReleaseOf(pf config.ProjectFile) EpicRelease {
 }
 
 // stamped reports whether e carries the stamp its policy needs. Under on-done
-// with auto-ff-merge, completed_at alone is not enough: a root park stamps it
-// without the branch ever landing.
+// with auto-ff-merge, completed_at alone is not enough: a root pause stamps it
+// without the branch ever merging.
 func (r EpicRelease) stamped(e Epic) bool {
 	if !r.OnDone {
 		return !e.MergedAt.IsZero()
@@ -165,15 +165,15 @@ func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
 	case !ok:
 		return "", &AddressError{CodeUnknownEpic, fmt.Sprintf("%q names no epic in this project", ref)}
 	case target.IsMap:
-		return "", &AddressError{CodeBlockedByMapEpic, fmt.Sprintf("%q names a map epic, which never lands", ref)}
+		return "", &AddressError{CodeBlockedByMapEpic, fmt.Sprintf("%q names a map epic, which never merges", ref)}
 	}
 	return name, nil
 }
 
 // widen turns a ticket key in another epic into that epic's key unless the
-// ticket is commitless: its code only reaches this epic once its epic lands.
+// ticket is commitless: its code only reaches this epic once its epic merges.
 // The file keeps the ticket token, so it narrows back if the ticket turns
-// commitless. A map epic never lands, so its tickets stay tickets.
+// commitless. A map epic never merges, so its tickets stay tickets.
 func (g *projectGraph) widen(epic, key string) string {
 	target := key[:strings.Index(key, "/")]
 	if target == epic || g.tickets[key].Commitless || g.epics[target].IsMap {

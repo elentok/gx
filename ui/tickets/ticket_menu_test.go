@@ -278,7 +278,7 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 		t.Errorf("resume key = %q, want enter", got)
 	}
 
-	parked := ticketMenuInput{rendered: tickets.StatusNeedsRepair, ticket: tickets.Ticket{Status: "needs-repair"}, herdrDown: true}
+	parked := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: "needs-repair"}, herdrDown: true}
 	if got := disabled(parked, "Park"); got != alreadyParked {
 		t.Errorf("park on a parked ticket = %q", got)
 	}
@@ -382,7 +382,7 @@ func TestTicketMenu_ArchivedRowOnlyReads(t *testing.T) {
 
 func TestTicketMenuItems_ArchivedKeepsReadActions(t *testing.T) {
 	items := ticketMenuItems(ticketMenuInput{
-		rendered: tickets.StatusNeedsRepair,
+		rendered: tickets.StatusPausedRepair,
 		ticket:   tickets.Ticket{Status: "needs-repair"},
 		archived: true,
 	})
@@ -414,8 +414,8 @@ func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
 		rendered tickets.RenderedStatus
 		wantKey  string
 	}{
-		{"needs-answer", tickets.StatusNeedsAnswer, ""},
-		{"needs-repair", tickets.StatusNeedsRepair, "enter"},
+		{"needs-answer", tickets.StatusPausedAnswer, ""},
+		{"needs-repair", tickets.StatusPausedRepair, "enter"},
 	} {
 		items := ticketMenuItems(ticketMenuInput{
 			rendered: tt.rendered,

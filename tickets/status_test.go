@@ -12,8 +12,8 @@ func TestEpic_RenderedStatus_BaseStates(t *testing.T) {
 		{"ready-for-agent", StatusError},
 		{"ready-for-human", StatusError},
 		{"claimed", StatusClaimed},
-		{"needs-answer", StatusNeedsAnswer},
-		{"needs-repair", StatusNeedsRepair},
+		{"needs-answer", StatusPausedAnswer},
+		{"needs-repair", StatusPausedRepair},
 		{"needs-triage", StatusError},
 		{"done", StatusDone},
 		{"draft", StatusDraft},
@@ -98,25 +98,25 @@ func TestEpic_RenderedStatus_ResolvedBlockerDropsOverlay(t *testing.T) {
 	}
 }
 
-func TestEpic_RenderedStatus_NeedsAnswerNotOverlaidByBlocked(t *testing.T) {
+func TestEpic_RenderedStatus_PausedAnswerNotOverlaidByBlocked(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, Status: "needs-answer", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
-	if got != StatusNeedsAnswer {
-		t.Errorf("RenderedStatus = %v, want StatusNeedsAnswer (blocked overlay only applies to open/claimed)", got)
+	if got != StatusPausedAnswer {
+		t.Errorf("RenderedStatus = %v, want StatusPausedAnswer (blocked overlay only applies to open/claimed)", got)
 	}
 }
 
-func TestEpic_RenderedStatus_NeedsRepairNotOverlaidByBlocked(t *testing.T) {
+func TestEpic_RenderedStatus_PausedRepairNotOverlaidByBlocked(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 1, Status: "needs-repair", BlockedBy: []string{"2"}},
 		{Number: 2, Status: "open"},
 	}}
 	got := epic.RenderedStatus(epic.Tickets[0])
-	if got != StatusNeedsRepair {
-		t.Errorf("RenderedStatus = %v, want StatusNeedsRepair", got)
+	if got != StatusPausedRepair {
+		t.Errorf("RenderedStatus = %v, want StatusPausedRepair", got)
 	}
 }
 
@@ -586,18 +586,18 @@ func TestEpic_RenderedStatus_ForkChildBlockedOnParentsOwnDone(t *testing.T) {
 	}
 }
 
-// TestEpic_RenderedStatus_ForkChildHeldByParentParkState covers a parent
-// stuck in either park status: a broken or question-blocked parent must not
+// TestEpic_RenderedStatus_ForkChildHeldByPausedParent covers a parent
+// stuck in either pause class: a broken or question-blocked parent must not
 // silently seed a child iteration.
-func TestEpic_RenderedStatus_ForkChildHeldByParentParkState(t *testing.T) {
+func TestEpic_RenderedStatus_ForkChildHeldByPausedParent(t *testing.T) {
 	parent := "01"
-	for _, parkStatus := range []string{"needs-answer", "needs-repair"} {
+	for _, pausedStatus := range []string{"needs-answer", "needs-repair"} {
 		epic := Epic{Tickets: []Ticket{
-			{Number: 1, Identifier: "01", Status: parkStatus},
+			{Number: 1, Identifier: "01", Status: pausedStatus},
 			{Number: 1, Identifier: "01a", Status: "open", Parent: &parent},
 		}}
 		if got := epic.RenderedStatus(epic.Tickets[1]); got != StatusBlocked {
-			t.Errorf("RenderedStatus(01a) = %v, want StatusBlocked while parent 01 is %s", got, parkStatus)
+			t.Errorf("RenderedStatus(01a) = %v, want StatusBlocked while parent 01 is %s", got, pausedStatus)
 		}
 	}
 }
@@ -669,8 +669,9 @@ func TestEpic_CancelledBlockerResolvesAndEpicCompletes(t *testing.T) {
 	}
 }
 
-func TestEpic_IsParked(t *testing.T) {
+func TestEpic_IsPaused(t *testing.T) {
 	cases := map[string]bool{
+		"paused":       true,
 		"needs-answer": true,
 		"needs-repair": true,
 		"draft":        true,
@@ -681,8 +682,8 @@ func TestEpic_IsParked(t *testing.T) {
 	}
 	for status, want := range cases {
 		epic := Epic{Tickets: []Ticket{{Number: 1, Status: status}}}
-		if got := epic.IsParked(epic.Tickets[0]); got != want {
-			t.Errorf("IsParked(%q) = %v, want %v", status, got, want)
+		if got := epic.IsPaused(epic.Tickets[0]); got != want {
+			t.Errorf("IsPaused(%q) = %v, want %v", status, got, want)
 		}
 	}
 }

@@ -652,7 +652,7 @@ func (s *Server) reopenEmptyClaim(t trackedRun) (bool, error) {
 		return false, err
 	}
 	const reason = "agent gone, no commits, no edits"
-	if err := tickets.Reset(t.TicketPath, time.Now(), "reopened automatically after restart: "+reason); err != nil {
+	if err := tickets.StartOver(t.TicketPath, time.Now(), "reopened automatically after restart: "+reason); err != nil {
 		return false, err
 	}
 	if err := ralphloop.AppendEvent(dir, addr.Epic, ralphloop.Event{

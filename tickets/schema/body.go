@@ -73,7 +73,7 @@ func joinBodySections(preamble string, sections []bodySection) string {
 // appending a fresh copy of heading on top is what fixes the live stacking
 // bug: a body with no such section is returned unchanged, so retiring the
 // same section twice in a row (e.g. two claims, or a claim after an
-// automatic unpark already retired it) is a no-op here.
+// automatic resume already retired it) is a no-op here.
 func DemoteSection(body, heading string, now time.Time) string {
 	preamble, sections := splitBodySections(body)
 

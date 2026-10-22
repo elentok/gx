@@ -880,7 +880,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				Type:       events.Paused,
 				Kind:       kind,
 				Reason:     reason,
-				Repair: schema.NeedsRepairState{
+				Repair: schema.FaultState{
 					Label:    iterLabel(opts.EpicName, r.ticket.Identifier),
 					Branch:   iterBranch(opts.EpicName, r.ticket.Identifier),
 					Worktree: iterationWorktreePath(wtDir, opts.EpicName, r.ticket.Identifier),
@@ -932,7 +932,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 					// commonly) is no longer launched, so a human clearing
 					// its status puts it back in the frontier for this run
 					// instead of only for the next one.
-					if landedEpic.IsParked(t) {
+					if landedEpic.IsPaused(t) {
 						parked = true
 						delete(launched, t.Identifier)
 					}
@@ -1008,7 +1008,7 @@ func TicketVerdict(epic tickets.Epic, scope RunScope, t tickets.Ticket, claimed,
 	case status == tickets.StatusError:
 		d.Decision = DecisionError
 		d.Reason = cmp.Or(t.ReadErr, t.GraphErr, t.BlockedByErr, "unrecognized status "+t.Status)
-	case epic.IsParked(t):
+	case epic.IsPaused(t):
 		d.Decision = DecisionStalled
 	case inFrontier:
 		d.Decision = DecisionFrontier
@@ -1045,7 +1045,7 @@ func allDone(e tickets.Epic) bool {
 func stalledTickets(e tickets.Epic, scope RunScope) []tickets.Ticket {
 	var stalled []tickets.Ticket
 	for _, t := range e.Tickets {
-		if scope.Contains(t, e) && e.IsParked(t) {
+		if scope.Contains(t, e) && e.IsPaused(t) {
 			stalled = append(stalled, t)
 		}
 	}

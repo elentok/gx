@@ -357,10 +357,10 @@ func TestRenderTicketPreview_NeedsAnswerAppendsParkRounds(t *testing.T) {
 	if err := os.WriteFile(file, []byte("---\nid: \"20\"\nstatus: needs-answer\ntype: research\n---\n\n# 20 — A\n\nThe body text.\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(file, tickets.LogEvent{Type: tickets.EventParkQuestion, Summary: "Which store?", Text: "Details."}); err != nil {
+	if _, err := tickets.AppendLog(file, tickets.LogEvent{Type: tickets.EventPauseQuestion, Summary: "Which store?", Text: "Details."}); err != nil {
 		t.Fatal(err)
 	}
-	rendered := tickets.StatusNeedsAnswer
+	rendered := tickets.StatusPausedAnswer
 	ticket := tickets.Ticket{Identifier: "20", Title: "A", Path: "gx:alpha/20", File: file, Status: "needs-answer", Rendered: &rendered}
 
 	content, target, ok := renderTicketPreview(tickets.Epic{Tickets: []tickets.Ticket{ticket}}, ticket, 80)

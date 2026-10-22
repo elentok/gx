@@ -53,7 +53,7 @@ func qualifiedRefs(refs []string) []string {
 // ticket's blockers resolved project-wide. A ticket is runnable only if its own
 // blocked_by refs and its epic's are all resolved; children never copy an
 // ancestor's blocked_by, the epic's refs are applied here instead. Unresolved
-// cross-epic refs land in Ticket.ExternalBlockers (rendering the ticket
+// cross-epic refs go into Ticket.ExternalBlockers (rendering the ticket
 // blocked); bad refs and wait cycles set BlockedByErr (rendering it error),
 // the same check ValidateRefs runs. release decides
 // when a whole-epic ref is resolved.

@@ -29,7 +29,7 @@ func dependentStatus(release EpicRelease, epics []Epic) RenderedStatus {
 }
 
 func TestResolveCrossEpic_WholeEpicReleasesOnPolicyStamp(t *testing.T) {
-	onLanded := EpicRelease{}
+	onMerged := EpicRelease{}
 	onDone := EpicRelease{OnDone: true}
 	onDoneFF := EpicRelease{OnDone: true, AutoFFMerge: true}
 	for _, tc := range []struct {
@@ -38,12 +38,12 @@ func TestResolveCrossEpic_WholeEpicReleasesOnPolicyStamp(t *testing.T) {
 		completed, merged bool
 		want              RenderedStatus
 	}{
-		{"on-landed unstamped", onLanded, false, false, StatusBlocked},
-		{"on-landed completed only", onLanded, true, false, StatusBlocked},
-		{"on-landed merged", onLanded, true, true, StatusOpen},
+		{"on-merge unstamped", onMerged, false, false, StatusBlocked},
+		{"on-merge completed only", onMerged, true, false, StatusBlocked},
+		{"on-merge merged", onMerged, true, true, StatusOpen},
 		{"on-done unstamped", onDone, false, false, StatusBlocked},
 		{"on-done completed", onDone, true, false, StatusOpen},
-		{"on-done+ff completed only (root park)", onDoneFF, true, false, StatusBlocked},
+		{"on-done+ff completed only (root pause)", onDoneFF, true, false, StatusBlocked},
 		{"on-done+ff merged without completed", onDoneFF, false, true, StatusBlocked},
 		{"on-done+ff completed and merged", onDoneFF, true, true, StatusOpen},
 	} {
@@ -246,7 +246,7 @@ func TestLoadResolved_ReadsReleasePolicyFromProjectFile(t *testing.T) {
 		return d.RenderedStatus(d.Tickets[0])
 	}
 	if got := status(); got != StatusBlocked {
-		t.Errorf("default on-landed, completed_at only: got %v, want blocked", got)
+		t.Errorf("default on-merge, completed_at only: got %v, want blocked", got)
 	}
 	write(filepath.Join(dir, "project.json"), `{"landing":"on-done"}`)
 	if got := status(); got != StatusOpen {

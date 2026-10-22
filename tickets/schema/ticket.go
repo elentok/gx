@@ -45,11 +45,11 @@ const (
 	// StatusDraft is written down but deliberately not offered to anyone: it
 	// never enters an epic's frontier and never renders as open (see
 	// tickets.StatusDraft).
-	StatusDraft       Status = "draft"
-	StatusOpen        Status = "open"
-	StatusClaimed     Status = "claimed"
-	StatusNeedsAnswer Status = "needs-answer"
-	StatusNeedsRepair Status = "needs-repair"
+	StatusDraft        Status = "draft"
+	StatusOpen         Status = "open"
+	StatusClaimed      Status = "claimed"
+	StatusLegacyAnswer Status = "needs-answer"
+	StatusLegacyRepair Status = "needs-repair"
 	// StatusPaused is stopped and waiting; PauseReason says why and its class
 	// says whether a person answers or repairs. It replaces the two statuses
 	// above, which are still written until the read shim is wired in.
@@ -62,14 +62,14 @@ const (
 )
 
 var validStatuses = map[Status]bool{
-	StatusDraft:       true,
-	StatusOpen:        true,
-	StatusClaimed:     true,
-	StatusNeedsAnswer: true,
-	StatusNeedsRepair: true,
-	StatusPaused:      true,
-	StatusDone:        true,
-	StatusCancelled:   true,
+	StatusDraft:        true,
+	StatusOpen:         true,
+	StatusClaimed:      true,
+	StatusLegacyAnswer: true,
+	StatusLegacyRepair: true,
+	StatusPaused:       true,
+	StatusDone:         true,
+	StatusCancelled:    true,
 }
 
 // retiredStatusReplacements names every status spelling this clean cut
@@ -79,8 +79,8 @@ var validStatuses = map[Status]bool{
 // other never-valid value gets — the loader must never silently read
 // "needs-info"/"needs-attention" as their new equivalents.
 var retiredStatusReplacements = map[Status]Status{
-	"needs-info":      StatusNeedsAnswer,
-	"needs-attention": StatusNeedsRepair,
+	"needs-info":      StatusLegacyAnswer,
+	"needs-attention": StatusLegacyRepair,
 }
 
 // Valid reports whether s is one of the canonical status values.
@@ -101,21 +101,21 @@ const (
 	TypeTask       TicketType = "task"
 	TypeCodeReview TicketType = "code-review"
 	// TypeConflictResolution is system-generated only: gx forks one as a
-	// child of a landing ticket when its cherry-pick hits a conflict (see
+	// child of a ticket being merged when its cherry-pick hits a conflict (see
 	// ralphloop's cherryPickWithConflictResolution). Never authored by a
 	// person, and never allocated via a plain `gx tickets add` without
 	// `--parent`.
 	TypeConflictResolution TicketType = "conflict-resolution"
-	// TypePrompt is a one-off prompt run; it never lands a commit.
+	// TypePrompt is a one-off prompt run; it never merges a commit.
 	TypePrompt TicketType = "prompt"
 	// TypeInvestigate is system-generated only: recovery forks one as a commitless
-	// child of a parked ticket when a failure needs judgment.
+	// child of a paused ticket when a failure needs judgment.
 	TypeInvestigate TicketType = "investigate"
 	// TypeEvolve is a commitless, top-level-only run of gx-evolve over an epic's
 	// retros; it is never forked from another ticket.
 	TypeEvolve TicketType = "evolve"
 	// TypeMerge rebases an epic's feature branch onto its target, in the feature
-	// worktree itself; the commits it makes land with the epic, not as its own.
+	// worktree itself; the commits it makes merge with the epic, not as its own.
 	TypeMerge TicketType = "merge"
 	// TypeDiagnose is a commitless, top-level-only run of gx-investigate on gx
 	// itself, filed by the server (a CPU spike) rather than by recovery.
@@ -172,9 +172,9 @@ const (
 	IterationStatusAsking   IterationStatus = "asking"
 	IterationStatusFinished IterationStatus = "finished"
 
-	// iterationStatusLegacyNeedsAnswer is the pre-rename spelling of asking.
+	// iterationStatusLegacyAnswer is the pre-rename spelling of asking.
 	// Reads fold it into asking; writes never emit it.
-	iterationStatusLegacyNeedsAnswer IterationStatus = "needs-answer"
+	iterationStatusLegacyAnswer IterationStatus = "needs-answer"
 )
 
 var validIterationStatuses = map[IterationStatus]bool{
@@ -186,7 +186,7 @@ var validIterationStatuses = map[IterationStatus]bool{
 
 // normalizeIterationStatus folds the legacy needs-answer spelling into asking.
 func normalizeIterationStatus(s IterationStatus) IterationStatus {
-	if s == iterationStatusLegacyNeedsAnswer {
+	if s == iterationStatusLegacyAnswer {
 		return IterationStatusAsking
 	}
 	return s
@@ -198,24 +198,25 @@ func (s IterationStatus) Valid() bool {
 	return validIterationStatuses[s]
 }
 
-// ParkKind records why a ticket was parked: it is the park event's kind (see
-// events.Kind), copied into the frontmatter as current state. The frontmatter
-// copy is cleared on resume/claim; the event keeps the history. The three
-// constants are the needs-answer producers' kinds; a needs-repair park carries
-// any other kind in the events enum. Like IterationStatus, the empty string is
-// valid: it means no park has stamped this ticket, not an error.
-type ParkKind string
+// PauseKind records why a ticket was paused: it is the pause event's kind (see
+// events.Kind), copied into the in-memory ticket as current state. It is
+// cleared on resume/claim; the event keeps the history. The three
+// constants are the kinds of the pauses that ask for an answer; a pause for a
+// repair carries any other kind in the events enum. Like IterationStatus, the
+// empty string is valid: it means no pause has stamped this ticket, not an
+// error.
+type PauseKind string
 
 const (
-	ParkKindBlockedPane  ParkKind = ParkKind(events.BlockedPane)
-	ParkKindSelfReported ParkKind = ParkKind(events.SelfReported)
-	ParkKindZeroCommit   ParkKind = ParkKind(events.ZeroCommit)
-	// ParkKindMergeUnreported is the one needs-repair kind late-finish adoption reads.
-	ParkKindMergeUnreported ParkKind = ParkKind(events.MergeUnreported)
+	PauseKindBlockedPane  PauseKind = PauseKind(events.BlockedPane)
+	PauseKindSelfReported PauseKind = PauseKind(events.SelfReported)
+	PauseKindZeroCommit   PauseKind = PauseKind(events.ZeroCommit)
+	// PauseKindMergeUnreported is the one repair kind late-finish adoption reads.
+	PauseKindMergeUnreported PauseKind = PauseKind(events.MergeUnreported)
 )
 
 // Valid reports whether k is an events kind or the empty "absent" value.
-func (k ParkKind) Valid() bool {
+func (k PauseKind) Valid() bool {
 	return k == "" || events.Kind(k).Valid()
 }
 
@@ -237,9 +238,9 @@ type Ticket struct {
 	ExpectedContextWindow int
 	ActualContextWindow   int
 	ElapsedTime           int
-	// ActualCost is the USD cost of the session(s) that landed this ticket,
+	// ActualCost is the USD cost of the session(s) that finished this ticket,
 	// summed across every assistant turn and priced by each turn's own model
-	// (see ralphloop's turnCost). Zero for tickets landed before this field
+	// (see ralphloop's turnCost). Zero for tickets finished before this field
 	// existed, or when the transcript's cost couldn't be computed.
 	ActualCost  float64
 	Compactions int
@@ -253,14 +254,14 @@ type Ticket struct {
 	// for this ticket (e.g. the agent decided no code change was warranted,
 	// or a mid-flight split closed it with no work of its own) rather than a
 	// stalled/crashed agent. ralph-loop's finishIteration checks it before
-	// marking a zero-commit ticket needs-answer, and startup reconciliation's
-	// classifyDoneTicket skips its landed-commit verification for a done
+	// pausing a zero-commit ticket, and startup reconciliation's
+	// classifyDoneTicket skips its merged-commit verification for a done
 	// ticket with this set. Prefer IsCommitless over reading this field
 	// directly — research/grilling/code-review tickets are commitless by
 	// type, without needing the flag set explicitly.
 	Commitless bool
 	// Notify asks the server to send the ticket's ## Result to chat when it
-	// lands; parks notify regardless. Set by a one-off submit's --notify.
+	// merges; pauses notify regardless. Set by a one-off submit's --notify.
 	Notify bool
 	// Manual marks a merge ticket the manual trigger forked.
 	Manual bool
@@ -280,7 +281,7 @@ type Ticket struct {
 	IterationStatus IterationStatus
 	// IterationFinishedAt is when the agent last reported IterationStatus finished
 	// through `tickets set`, so late-finish adoption can tell a report made
-	// after a park from one already on file. gx's own finished write
+	// after a pause from one already on file. gx's own finished write
 	// (MarkBuiltAwaitingLand) leaves it alone.
 	IterationFinishedAt time.Time
 	// ClaimedAt is when the ticket last entered claimed; DoneAt is when it
@@ -291,10 +292,10 @@ type Ticket struct {
 	// CompletedAt is when the server archived a one-off that ended done; the
 	// archive sweep stamps it, and a cancelled one gets none.
 	CompletedAt time.Time
-	// ParkKind records which needs-answer producer parked this ticket (see
-	// the ParkKind type doc). Never checked by Validate, same as
+	// PauseKind records which answer-seeking producer paused this ticket (see
+	// the PauseKind type doc). Never checked by Validate, same as
 	// IterationStatus.
-	ParkKind ParkKind
+	PauseKind PauseKind
 	// PauseReason is why a Paused ticket is paused (see the PauseReason type
 	// doc). Never checked by Validate, same as IterationStatus.
 	PauseReason PauseReason
@@ -324,17 +325,17 @@ type MuteRecord struct {
 	TrippedAt time.Time `yaml:"tripped_at" json:"tripped_at"`
 }
 
-// IsCommitless reports whether t is exempt from landed-commit verification:
+// IsCommitless reports whether t is exempt from merged-commit verification:
 // either explicitly flagged Commitless, or a type that never produces
 // commits in the first place. TypeResearch and TypeGrilling tickets record
 // their deliverable in the ticket body itself; TypeCodeReview reviews the
-// epic rather than landing code of its own — none of the three lands a
+// epic rather than adding code of its own — none of the three adds a
 // commit on the feature branch even when finished correctly, so requiring
 // one would misclassify every one of them as a stalled/crashed agent.
-// TypeConflictResolution resolves its conflict directly inside the landing
+// TypeConflictResolution resolves its conflict directly inside the merging
 // ticket's own cherry-pick sequence rather than a branch/commit of its own,
-// so the same landed-commit verification doesn't apply to it either.
-// TypePrototype is deliberately excluded: a prototype can legitimately land
+// so the same merged-commit verification doesn't apply to it either.
+// TypePrototype is deliberately excluded: a prototype can legitimately add
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {

@@ -26,42 +26,42 @@ func TestSplitReason_MultiLine_SummaryPlusDetail(t *testing.T) {
 	}
 }
 
-func TestFormatNeedsRepairBody_EmptyReason_Rejected(t *testing.T) {
-	if _, err := FormatNeedsRepairBody("", NeedsRepairState{}); err == nil {
+func TestFormatFaultBody_EmptyReason_Rejected(t *testing.T) {
+	if _, err := FormatFaultBody("", FaultState{}); err == nil {
 		t.Fatal("expected error for empty reason, got nil")
 	}
-	if _, err := FormatNeedsRepairBody("   ", NeedsRepairState{}); err == nil {
+	if _, err := FormatFaultBody("   ", FaultState{}); err == nil {
 		t.Fatal("expected error for whitespace-only reason, got nil")
 	}
 }
 
-func TestFormatNeedsRepairBody_SingleLineReason_NoDetailSection(t *testing.T) {
-	body, err := FormatNeedsRepairBody("agent stalled", NeedsRepairState{})
+func TestFormatFaultBody_SingleLineReason_NoDetailSection(t *testing.T) {
+	body, err := FormatFaultBody("agent stalled", FaultState{})
 	if err != nil {
-		t.Fatalf("FormatNeedsRepairBody: %v", err)
+		t.Fatalf("FormatFaultBody: %v", err)
 	}
-	if !strings.Contains(body, "## Needs Repair") {
-		t.Errorf("body = %q, want a ## Needs Repair heading", body)
+	if !strings.Contains(body, PausedHeading) {
+		t.Errorf("body = %q, want a %s heading", body, PausedHeading)
 	}
 	if !strings.Contains(body, "agent stalled") {
 		t.Errorf("body = %q, want the summary line", body)
 	}
 }
 
-func TestFormatNeedsRepairBody_MultiLineReason_SummaryPlusDetail(t *testing.T) {
-	body, err := FormatNeedsRepairBody("agent stalled\n\nfull stack trace", NeedsRepairState{})
+func TestFormatFaultBody_MultiLineReason_SummaryPlusDetail(t *testing.T) {
+	body, err := FormatFaultBody("agent stalled\n\nfull stack trace", FaultState{})
 	if err != nil {
-		t.Fatalf("FormatNeedsRepairBody: %v", err)
+		t.Fatalf("FormatFaultBody: %v", err)
 	}
 	if !strings.Contains(body, "agent stalled") || !strings.Contains(body, "full stack trace") {
 		t.Errorf("body = %q, want both summary and detail", body)
 	}
 }
 
-func TestFormatNeedsRepairBody_StateOmitsUnavailableFields(t *testing.T) {
-	body, err := FormatNeedsRepairBody("agent stalled", NeedsRepairState{Branch: "epic/04"})
+func TestFormatFaultBody_StateOmitsUnavailableFields(t *testing.T) {
+	body, err := FormatFaultBody("agent stalled", FaultState{Branch: "epic/04"})
 	if err != nil {
-		t.Fatalf("FormatNeedsRepairBody: %v", err)
+		t.Fatalf("FormatFaultBody: %v", err)
 	}
 	if !strings.Contains(body, "epic/04") {
 		t.Errorf("body = %q, want the branch present", body)
@@ -71,30 +71,30 @@ func TestFormatNeedsRepairBody_StateOmitsUnavailableFields(t *testing.T) {
 	}
 }
 
-func TestFormatNeedsRepairBody_NoHandoffSection(t *testing.T) {
-	body, err := FormatNeedsRepairBody("agent stalled", NeedsRepairState{
+func TestFormatFaultBody_NoHandoffSection(t *testing.T) {
+	body, err := FormatFaultBody("agent stalled", FaultState{
 		Label: "epic-04", Branch: "epic/04", Worktree: "/tmp/wt/epic-04",
 	})
 	if err != nil {
-		t.Fatalf("FormatNeedsRepairBody: %v", err)
+		t.Fatalf("FormatFaultBody: %v", err)
 	}
 	if strings.Contains(body, "## Handoff") {
 		t.Errorf("body = %q, want no Handoff section from a fault write", body)
 	}
 }
 
-func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
+func TestFaultWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
 
-	section, err := FormatNeedsRepairBody("agent stalled\n\nfull trace", NeedsRepairState{
+	section, err := FormatFaultBody("agent stalled\n\nfull trace", FaultState{
 		Label: "epic-04b", Branch: "epic/04b", Worktree: "/tmp/wt/epic-04b",
 	})
 	if err != nil {
-		t.Fatalf("FormatNeedsRepairBody: %v", err)
+		t.Fatalf("FormatFaultBody: %v", err)
 	}
 
 	err = UpdateTicket(path, func(tk *Ticket) {
-		tk.Status = StatusNeedsRepair
+		tk.Status = StatusLegacyRepair
 	})
 	if err != nil {
 		t.Fatalf("UpdateTicket: %v", err)
@@ -104,7 +104,7 @@ func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	// UpdateTicket leaves the body untouched; the section append is a
-	// separate concern (ralphloop.markNeedsRepairWithReason composes both).
+	// separate concern (the ralphloop fault path composes both).
 	// Simulate that composition here to exercise the full round trip this
 	// ticket's test seam calls for: a fault write produces the documented
 	// shape on disk.
@@ -125,7 +125,7 @@ func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	body := string(final)
-	for _, want := range []string{"## Needs Repair", "agent stalled", "full trace", "epic-04b", "epic/04b", "/tmp/wt/epic-04b"} {
+	for _, want := range []string{PausedHeading, "agent stalled", "full trace", "epic-04b", "epic/04b", "/tmp/wt/epic-04b"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("ticket body = %q, want it to contain %q", body, want)
 		}
@@ -135,7 +135,7 @@ func TestNeedsRepairWrite_RoundTripThroughUpdateTicket(t *testing.T) {
 	}
 }
 
-func TestParseTicket_HandAuthoredFileWithoutNeedsRepairSection_StillLoads(t *testing.T) {
+func TestParseTicket_HandAuthoredFileWithoutPausedSection_StillLoads(t *testing.T) {
 	path := writeTemp(t, "05-ticket.md", "---\nid: \"05\"\nstatus: needs-repair\ntype: implement\n---\nNo section here, just a note in prose.\n")
 
 	if _, err := ParseTicket(path); err != nil {

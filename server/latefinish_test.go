@@ -59,7 +59,7 @@ func pauseZeroCommit(t *testing.T, headless bool) zeroCommitPaused {
 		if res, err := p.h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
-		waitStatus(t, p.ticketPath, schema.StatusNeedsAnswer)
+		waitStatus(t, p.ticketPath, schema.StatusLegacyAnswer)
 		p.agentGone = func() {
 			if sess, ok, _ := fake.Find("epic-a-iter-01"); ok {
 				_ = fake.Runner.Stop(sess)
@@ -197,7 +197,7 @@ func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
 	p.adopted(t)
 	evs, _ = tickets.ReadLog(p.ticketPath)
 	last := evs[len(evs)-1]
-	if last.Type != tickets.EventParkClosed || last.Question != q.Seq || last.Reason != "adopted" {
+	if last.Type != tickets.EventPauseClosed || last.Question != q.Seq || last.Reason != "adopted" {
 		t.Errorf("last event = %+v, want pause.closed{question: %d, reason: adopted}", last, q.Seq)
 	}
 }

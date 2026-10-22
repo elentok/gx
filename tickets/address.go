@@ -81,7 +81,7 @@ func AddressOfPath(path, id string) (Address, bool) {
 	return Address{Project: ProjectName(filepath.Dir(epicDir)), Epic: filepath.Base(epicDir), ID: id}, true
 }
 
-// SplitTrailerValue is the inverse of Address.String for a landing trailer
+// SplitTrailerValue is the inverse of Address.String for a commit trailer
 // value, tolerating the legacy "epic/id" form that carries no project.
 func SplitTrailerValue(v string) (epic, id string, ok bool) {
 	if i := strings.IndexByte(v, ':'); i >= 0 {

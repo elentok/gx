@@ -639,8 +639,8 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	if strings.Contains(string(rawTicket), "status: done") {
 		t.Errorf("ticket = %s, want not done", rawTicket)
 	}
-	if !strings.Contains(string(rawTicket), "## Needs Repair") || !strings.Contains(string(rawTicket), evidence) {
-		t.Errorf("ticket = %s, want a durable Needs Repair note naming the exhaustion evidence", rawTicket)
+	if !strings.Contains(string(rawTicket), schema.PausedHeading) || !strings.Contains(string(rawTicket), evidence) {
+		t.Errorf("ticket = %s, want a durable Paused note naming the exhaustion evidence", rawTicket)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, epicName)

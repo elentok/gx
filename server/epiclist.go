@@ -219,7 +219,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 	}
 	row.State = epicListState(e, queued, epicStateFor(root, e, s.registry.startedAtOf))
 	if row.State == EpicListMergeBlocked {
-		row.MergeBlockKind, row.MergeBlockReason = e.LandBlockKind, e.LandBlockReason
+		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
 	return row
 }

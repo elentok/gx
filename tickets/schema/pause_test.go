@@ -79,22 +79,22 @@ func TestShimLegacyPause(t *testing.T) {
 	cases := []struct {
 		name   string
 		status Status
-		kind   ParkKind
+		kind   PauseKind
 		want   PauseReason
 	}{
-		{"answer with kind", StatusNeedsAnswer, "blocked-pane", PauseBlockedPane},
-		{"answer without kind", StatusNeedsAnswer, "", PauseZeroCommit},
-		{"repair with kind", StatusNeedsRepair, "budget-killed", PauseBudgetKilled},
-		{"repair old spelling", StatusNeedsRepair, "land-conflict", PauseMergeConflict},
-		{"repair without kind", StatusNeedsRepair, "", PauseIterationError},
-		{"class mismatch", StatusNeedsRepair, "zero-commit", PauseIterationError},
-		{"unknown kind", StatusNeedsAnswer, "bogus", PauseZeroCommit},
+		{"answer with kind", StatusLegacyAnswer, "blocked-pane", PauseBlockedPane},
+		{"answer without kind", StatusLegacyAnswer, "", PauseZeroCommit},
+		{"repair with kind", StatusLegacyRepair, "budget-killed", PauseBudgetKilled},
+		{"repair old spelling", StatusLegacyRepair, "land-conflict", PauseMergeConflict},
+		{"repair without kind", StatusLegacyRepair, "", PauseIterationError},
+		{"class mismatch", StatusLegacyRepair, "zero-commit", PauseIterationError},
+		{"unknown kind", StatusLegacyAnswer, "bogus", PauseZeroCommit},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := ShimLegacyPause(Ticket{ID: "01", Status: c.status, ParkKind: c.kind})
-			if got.Status != StatusPaused || got.PauseReason != c.want || got.ParkKind != "" {
-				t.Errorf("got %q/%q/%q, want paused/%q", got.Status, got.PauseReason, got.ParkKind, c.want)
+			got := ShimLegacyPause(Ticket{ID: "01", Status: c.status, PauseKind: c.kind})
+			if got.Status != StatusPaused || got.PauseReason != c.want || got.PauseKind != "" {
+				t.Errorf("got %q/%q/%q, want paused/%q", got.Status, got.PauseReason, got.PauseKind, c.want)
 			}
 		})
 	}

@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// RenderRounds renders the "Park rounds" block of a ticket's log: earlier
+// RenderRounds renders the "Pause rounds" block of a ticket's log: earlier
 // rounds one line each, the latest round in full. It returns "" when the log
-// holds no park.question. Plain text, no ANSI: the CLI and the TUI preview
+// holds no pause.question. Plain text, no ANSI: the CLI and the TUI preview
 // share it.
 func RenderRounds(events []LogEvent) string {
 	rounds := Rounds(events)
@@ -16,7 +16,7 @@ func RenderRounds(events []LogEvent) string {
 	}
 
 	var b strings.Builder
-	b.WriteString("Park rounds\n")
+	b.WriteString("Pause rounds\n")
 	last := len(rounds) - 1
 	for i, r := range rounds[:last] {
 		fmt.Fprintf(&b, "%d. %s: %s", i+1, roundState(r), r.Question.Summary)
@@ -42,11 +42,11 @@ func RenderRounds(events []LogEvent) string {
 	return b.String()
 }
 
-func roundState(r ParkRound) string {
+func roundState(r PauseRound) string {
 	switch {
 	case r.End == nil:
 		return "open"
-	case r.End.Type == EventParkClosed:
+	case r.End.Type == EventPauseClosed:
 		return "closed"
 	default:
 		return "answered"
@@ -54,11 +54,11 @@ func roundState(r ParkRound) string {
 }
 
 // roundOutcome is the answer or close reason of a finished round, "" while open.
-func roundOutcome(r ParkRound) string {
+func roundOutcome(r PauseRound) string {
 	if r.End == nil {
 		return ""
 	}
-	if r.End.Type == EventParkClosed {
+	if r.End.Type == EventPauseClosed {
 		if r.End.Reason == "" {
 			return "closed"
 		}

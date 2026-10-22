@@ -250,7 +250,7 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 	}
 	summary := "Should the cache be per-project?"
 	if _, err := tickets.AppendLog(path, tickets.LogEvent{
-		Type: tickets.EventParkQuestion, By: "agent", Summary: summary, Handoff: "h",
+		Type: tickets.EventPauseQuestion, By: "agent", Summary: summary, Handoff: "h",
 	}); err != nil {
 		t.Fatal(err)
 	}

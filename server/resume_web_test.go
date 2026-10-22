@@ -76,7 +76,7 @@ func answerEvents(t *testing.T, ticketPath string) []tickets.LogEvent {
 	}
 	var out []tickets.LogEvent
 	for _, ev := range evs {
-		if ev.Type == tickets.EventParkAnswer {
+		if ev.Type == tickets.EventPauseAnswer {
 			out = append(out, ev)
 		}
 	}

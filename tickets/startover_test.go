@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-func TestReset_ParkedTicketReturnsToFreshOpen(t *testing.T) {
+func TestStartOver_PausedTicketReturnsToFreshOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, `---
 id: "05"
@@ -43,8 +43,8 @@ Earlier note.
 `)
 
 	now := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
-	if err := Reset(path, now, ""); err != nil {
-		t.Fatalf("Reset: %v", err)
+	if err := StartOver(path, now, ""); err != nil {
+		t.Fatalf("StartOver: %v", err)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -63,7 +63,7 @@ Earlier note.
 		ExpectedContextWindow: 25000,
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("frontmatter after reset:\n got %+v\nwant %+v", got, want)
+		t.Fatalf("frontmatter after start over:\n got %+v\nwant %+v", got, want)
 	}
 
 	body := schema.ParseBody(string(raw))
@@ -77,12 +77,12 @@ Earlier note.
 	}
 }
 
-func TestReset_RetiresNeedsRepairSection(t *testing.T) {
+func TestStartOver_RetiresOldRepairSection(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-repair\ntype: implement\n---\n\n## Needs Repair\n\nBroke.\n")
 
-	if err := Reset(path, time.Now(), ""); err != nil {
-		t.Fatalf("Reset: %v", err)
+	if err := StartOver(path, time.Now(), ""); err != nil {
+		t.Fatalf("StartOver: %v", err)
 	}
 
 	raw, _ := os.ReadFile(path)
@@ -92,52 +92,52 @@ func TestReset_RetiresNeedsRepairSection(t *testing.T) {
 	}
 }
 
-func TestReset_NoteLandsInSameWrite(t *testing.T) {
+func TestStartOver_NoteIsWrittenInSameWrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
 
-	if err := Reset(path, time.Now(), "reset note text\n"); err != nil {
-		t.Fatalf("Reset: %v", err)
+	if err := StartOver(path, time.Now(), "restart note text\n"); err != nil {
+		t.Fatalf("StartOver: %v", err)
 	}
 
 	raw, _ := os.ReadFile(path)
-	if !strings.Contains(string(raw), "status: open") || !strings.Contains(string(raw), "reset note text") {
-		t.Fatalf("reset and note not both present:\n%s", raw)
+	if !strings.Contains(string(raw), "status: open") || !strings.Contains(string(raw), "restart note text") {
+		t.Fatalf("restart and note not both present:\n%s", raw)
 	}
 }
 
-func TestReset_ClosesOpenQuestion(t *testing.T) {
+func TestStartOver_ClosesOpenQuestion(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, "---\nid: \"05\"\nstatus: needs-answer\ntype: implement\n---\n\n# 05 — Thing\n")
-	q, err := AppendLog(path, LogEvent{Type: EventParkQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
+	q, err := AppendLog(path, LogEvent{Type: EventPauseQuestion, By: "gx", Summary: "Which?", Text: "Which?"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := Reset(path, time.Now(), ""); err != nil {
-		t.Fatalf("Reset: %v", err)
+	if err := StartOver(path, time.Now(), ""); err != nil {
+		t.Fatalf("StartOver: %v", err)
 	}
 
 	evs, _ := ReadLog(path)
-	if len(evs) != 2 || evs[1].Type != EventParkClosed || evs[1].Question != q.Seq || evs[1].Reason != "reset" {
-		t.Fatalf("log = %+v, want park.closed{question: %d, reason: reset}", evs, q.Seq)
+	if len(evs) != 2 || evs[1].Type != EventPauseClosed || evs[1].Question != q.Seq || evs[1].Reason != "start-over" {
+		t.Fatalf("log = %+v, want pause.closed{question: %d, reason: start-over}", evs, q.Seq)
 	}
-	// A second reset has no open question: no write, no error.
-	if err := Reset(path, time.Now(), ""); err != nil {
-		t.Fatalf("second Reset: %v", err)
+	// A second start over has no open question: no write, no error.
+	if err := StartOver(path, time.Now(), ""); err != nil {
+		t.Fatalf("second StartOver: %v", err)
 	}
 	if evs, _ = ReadLog(path); len(evs) != 2 {
 		t.Fatalf("log grew without an open question: %+v", evs)
 	}
 }
 
-func TestReset_NoQuestionWritesNoLog(t *testing.T) {
+func TestStartOver_NoQuestionWritesNoLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "05-thing.md")
 	writeFile(t, path, "---\nid: \"05\"\nstatus: claimed\ntype: implement\n---\n\n# 05 — Thing\n")
-	if err := Reset(path, time.Now(), ""); err != nil {
-		t.Fatalf("Reset: %v", err)
+	if err := StartOver(path, time.Now(), ""); err != nil {
+		t.Fatalf("StartOver: %v", err)
 	}
 	if _, err := os.Stat(LogPath(path)); !os.IsNotExist(err) {
-		t.Fatalf("log exists after reset with no question: %v", err)
+		t.Fatalf("log exists after start over with no question: %v", err)
 	}
 }

@@ -11,5 +11,5 @@ func Answered(status schema.Status, events []LogEvent) bool {
 	}
 	rounds := Rounds(events)
 	n := len(rounds)
-	return n > 0 && rounds[n-1].End != nil && rounds[n-1].End.Type == EventParkAnswer
+	return n > 0 && rounds[n-1].End != nil && rounds[n-1].End.Type == EventPauseAnswer
 }

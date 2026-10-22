@@ -216,7 +216,7 @@ func pendingMerge(e tickets.Epic, t tickets.Ticket) bool {
 		return false
 	}
 	switch schema.Status(t.Status) {
-	case schema.StatusOpen, schema.StatusClaimed, schema.StatusPaused, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+	case schema.StatusOpen, schema.StatusClaimed, schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
 		return true
 	}
 	return false

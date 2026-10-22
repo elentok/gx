@@ -104,7 +104,7 @@ func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 		if err := runner.Answer(sess, answer); err != nil {
 			return answerRefusal(err)
 		}
-		ev := tickets.LogEvent{Type: tickets.EventParkPermission, Decision: req.Decision, Source: req.Source, Note: note}
+		ev := tickets.LogEvent{Type: tickets.EventPausePermission, Decision: req.Decision, Source: req.Source, Note: note}
 		if statusErr == nil {
 			ev.Shown = permissionShown(st.Pending)
 		}

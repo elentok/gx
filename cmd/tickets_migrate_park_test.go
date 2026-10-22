@@ -39,7 +39,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 		t.Fatalf("parked log has %d events, want 1: %+v", len(events), events)
 	}
 	q := events[0]
-	if q.Type != tickets.EventParkQuestion || q.By != "agent" || q.ParkKind != "self-reported" ||
+	if q.Type != tickets.EventPauseQuestion || q.By != "agent" || q.PauseKind != "self-reported" ||
 		q.Summary != "Which store?" || q.Handoff != "Resume at step 3." {
 		t.Errorf("question = %+v", q)
 	}
@@ -51,8 +51,8 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 2 || events[0].ParkKind != "zero-commit" ||
-		events[1].Type != tickets.EventParkAnswer || events[1].Question != events[0].Seq {
+	if len(events) != 2 || events[0].PauseKind != "zero-commit" ||
+		events[1].Type != tickets.EventPauseAnswer || events[1].Question != events[0].Seq {
 		t.Fatalf("answered log = %+v, want question (zero-commit) then its answer", events)
 	}
 	if tickets.OpenQuestion(events) != nil {

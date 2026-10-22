@@ -67,7 +67,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 			if err != nil {
 				return FinishOutcome{}, fmt.Errorf("marking ticket needs-repair: %w", err)
 			}
-			return FinishOutcome{Status: schema.StatusNeedsRepair, Kind: kind, Reason: reason}, nil
+			return FinishOutcome{Status: schema.StatusLegacyRepair, Kind: kind, Reason: reason}, nil
 		}
 		if adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID); err != nil {
 			return FinishOutcome{}, err

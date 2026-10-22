@@ -66,7 +66,7 @@ func TestQueueModel_DraftRowUnaffectedByParkRendering(t *testing.T) {
 func TestHighlightParkSection_NeedsRepairRed(t *testing.T) {
 	t.Parallel()
 	rendered := "intro\n" + needsRepairHeading + "\nsome reason\n"
-	out, target, ok := highlightParkSection(rendered, tickets.StatusNeedsRepair)
+	out, target, ok := highlightParkSection(rendered, tickets.StatusPausedRepair)
 	if !ok || target != 1 {
 		t.Fatalf("highlightParkSection() ok=%v target=%d, want ok=true target=1", ok, target)
 	}
@@ -74,7 +74,7 @@ func TestHighlightParkSection_NeedsRepairRed(t *testing.T) {
 	if !strings.Contains(out, wantRed) {
 		t.Fatalf("expected needs-repair heading styled red in:\n%s", out)
 	}
-	if _, _, ok := highlightParkSection(rendered, tickets.StatusNeedsAnswer); ok {
+	if _, _, ok := highlightParkSection(rendered, tickets.StatusPausedAnswer); ok {
 		t.Fatal("needs-answer must not highlight a body section")
 	}
 }
@@ -82,9 +82,9 @@ func TestHighlightParkSection_NeedsRepairRed(t *testing.T) {
 func TestRenderParkRoundsBlock_OnlyLatestRoundIsOrange(t *testing.T) {
 	t.Parallel()
 	events := []tickets.LogEvent{
-		{Seq: 1, Type: tickets.EventParkQuestion, Summary: "First?"},
-		{Seq: 2, Type: tickets.EventParkAnswer, Question: 1, Choice: "yes"},
-		{Seq: 3, Type: tickets.EventParkQuestion, Summary: "Second?", Text: "detail"},
+		{Seq: 1, Type: tickets.EventPauseQuestion, Summary: "First?"},
+		{Seq: 2, Type: tickets.EventPauseAnswer, Question: 1, Choice: "yes"},
+		{Seq: 3, Type: tickets.EventPauseQuestion, Summary: "Second?", Text: "detail"},
 	}
 	block, line, ok := renderParkRoundsBlock(events, 80)
 	if !ok {

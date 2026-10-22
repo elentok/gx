@@ -10,21 +10,21 @@ import (
 // "" means trunk. t is the ticket being claimed, in epic.
 //
 // An explicit base: wins (the ticket's, else the epic's): a node ref gives its
-// epic's feature branch while that node is unlanded and trunk once it lands,
+// epic's feature branch while that node is unmerged and trunk once it merges,
 // and anything that is not a node ref is a raw branch. Otherwise the base is
 // the one commitful blocker's feature branch, or trunk when there is none. A
 // whole-epic blocker (written or widened) is commitful when any of its
 // tickets is.
-// Two or more such blockers are ambiguous; see the leaf tickets for parking
-// that. Under the on-landed landing policy (onLanded) a blocker releases its
-// dependents only once it has landed, so a derived base is always trunk; only
+// Two or more such blockers are ambiguous; see the leaf tickets for pausing
+// on that. Under the on-merge release policy (onMerged) a blocker releases its
+// dependents only once it has merged, so a derived base is always trunk; only
 // an explicit base: can point elsewhere. Under on-done the blocker's branch is
 // the base even once the blocker is done.
 //
-// A blocker epic with merged_at has landed whatever its branch says, so it is
-// never the base: its branch may already be deleted. Branch ancestry (see the
-// server's retargetIfLanded) stays the fallback for an unstamped epic.
-func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLanded bool) (string, error) {
+// A blocker epic with merged_at has merged whatever its branch says, so it is
+// never the base: its branch may already be deleted. Branch ancestry (the
+// server's retarget step) stays the fallback for an unstamped epic.
+func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onMerged bool) (string, error) {
 	g := newProjectGraph(project, epics)
 	var e Epic
 	merged := map[string]bool{}
@@ -39,12 +39,12 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLande
 		if err != nil {
 			return base, nil
 		}
-		if b := unlandedBranch(g, key); !merged[b] {
+		if b := unmergedBranch(g, key); !merged[b] {
 			return b, nil
 		}
 		return "", nil
 	}
-	if onLanded {
+	if onMerged {
 		return "", nil
 	}
 	var branches []string
@@ -70,19 +70,19 @@ func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onLande
 	return "", &AmbiguousBaseError{Blockers: branches}
 }
 
-// AmbiguousBaseError means two or more unlanded commitful blockers could each
+// AmbiguousBaseError means two or more unmerged commitful blockers could each
 // be the base and the ticket names none with base:. Blockers are what the
 // person has to choose between.
 type AmbiguousBaseError struct{ Blockers []string }
 
 func (e *AmbiguousBaseError) Error() string {
-	return "ambiguous base: unlanded blockers " + strings.Join(e.Blockers, ", ")
+	return "ambiguous base: unmerged blockers " + strings.Join(e.Blockers, ", ")
 }
 
 // DeriveLeafBase returns the identifier of the sibling whose iteration branch
 // the leaf t starts from; "" means the epic's feature branch tip, which is
 // also where a commitless ticket reads. Only same-epic blockers count: an
-// unlanded commitful one is the base, and two or more are ambiguous. An
+// unmerged commitful one is the base, and two or more are ambiguous. An
 // explicit base: on the ticket opts out of derivation.
 func DeriveLeafBase(project string, epics []Epic, epic string, t Ticket) (string, error) {
 	if t.Commitless || t.Base != "" {
@@ -108,9 +108,9 @@ func DeriveLeafBase(project string, epics []Epic, epic string, t Ticket) (string
 	return "", &AmbiguousBaseError{Blockers: siblings}
 }
 
-// unlandedBranch is the feature branch of the epic holding key, or "" once
-// key (and its fork subtree) has landed.
-func unlandedBranch(g *projectGraph, key string) string {
+// unmergedBranch is the feature branch of the epic holding key, or "" once
+// key (and its fork subtree) has merged.
+func unmergedBranch(g *projectGraph, key string) string {
 	if !g.blocking(key) {
 		return ""
 	}

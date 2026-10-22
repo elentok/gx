@@ -33,7 +33,7 @@ func (s PauseStep) Note() string {
 // needs-repair ticket under root, without writing. Map epics are skipped, and
 // so is a file that does not parse (Migrate reports it).
 //
-// Plan before Migrate and the park-section migration run: both rewrite through
+// Plan before Migrate and the question-section migration run: both rewrite through
 // the read shim, which replaces a repair ticket's missing reason with the
 // default and so loses the one the event log holds.
 func PlanPauseMigration(root string) ([]PauseStep, error) {
@@ -84,9 +84,9 @@ func planPauseStep(path string) (PauseStep, bool, error) {
 	t := parsed.Ticket
 	var class schema.PauseClass
 	switch migratedStatusOf(t.Status) {
-	case schema.StatusNeedsAnswer:
+	case schema.StatusLegacyAnswer:
 		class = schema.PauseClassAnswer
-	case schema.StatusNeedsRepair:
+	case schema.StatusLegacyRepair:
 		class = schema.PauseClassRepair
 	default:
 		return PauseStep{}, false, nil
@@ -95,7 +95,7 @@ func planPauseStep(path string) (PauseStep, bool, error) {
 	step := PauseStep{Path: path}
 	recorded := t.PauseReason
 	if recorded == "" {
-		recorded = schema.ParsePauseReason(string(t.ParkKind))
+		recorded = schema.ParsePauseReason(string(t.PauseKind))
 	}
 	switch {
 	case recorded == "" && class == schema.PauseClassRepair:
@@ -120,8 +120,8 @@ func latestLoggedReason(path string, class schema.PauseClass) (schema.PauseReaso
 		return "", fmt.Errorf("reading log of %s: %w", path, err)
 	}
 	for _, ev := range slices.Backward(events) {
-		if ev.Type == EventParkQuestion {
-			return schema.PausedReason(ev.ParkKind, class), nil
+		if ev.Type == EventPauseQuestion {
+			return schema.PausedReason(ev.PauseKind, class), nil
 		}
 	}
 	return class.DefaultReason(), nil
@@ -129,14 +129,14 @@ func latestLoggedReason(path string, class schema.PauseClass) (schema.PauseReaso
 
 // ApplyPauseMigration writes each planned step: status paused, the chosen
 // reason, no park_kind, and the old body headings renamed to "## Paused". Run
-// it after MigrateParkSections, which still looks for "## Needs Answer".
+// it after MigrateQuestionSections, which still looks for "## Needs Answer".
 func ApplyPauseMigration(steps []PauseStep) ([]MigrationChange, error) {
 	var changes []MigrationChange
 	for _, s := range steps {
 		err := schema.UpdateTicketWithBody(s.Path, func(t *schema.Ticket, body *string) {
 			t.Status = schema.StatusPaused
 			t.PauseReason = s.Reason
-			t.ParkKind = ""
+			t.PauseKind = ""
 			*body = renamePauseHeadings(*body)
 		})
 		if err != nil {
@@ -150,7 +150,7 @@ func ApplyPauseMigration(steps []PauseStep) ([]MigrationChange, error) {
 func renamePauseHeadings(body string) string {
 	lines := strings.Split(body, "\n")
 	for i, line := range lines {
-		if line == NeedsAnswerHeading || line == NeedsRepairHeading {
+		if line == LegacyAnswerHeading || line == LegacyRepairHeading {
 			lines[i] = schema.PausedHeading
 		}
 	}

@@ -19,19 +19,19 @@ const answerAddr = "proj:epic-a/01"
 func pauseWithQuestion(t *testing.T, ticketPath, block string) string {
 	t.Helper()
 	err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
-		tk.Status = schema.StatusNeedsAnswer
-		tk.ParkKind = schema.ParkKindSelfReported
+		tk.Status = schema.StatusLegacyAnswer
+		tk.PauseKind = schema.PauseKindSelfReported
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ev, err := tickets.AppendLog(ticketPath, tickets.LogEvent{
-		Type: tickets.EventParkQuestion, By: "agent", Summary: "which?", Handoff: "h", Block: block,
+		Type: tickets.EventPauseQuestion, By: "agent", Summary: "which?", Handoff: "h", Block: block,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return answerToken(ev.Seq, schema.StatusNeedsAnswer)
+	return answerToken(ev.Seq, schema.StatusLegacyAnswer)
 }
 
 func answerToken(seq int, status schema.Status) string {
@@ -46,7 +46,7 @@ func answerCount(t *testing.T, ticketPath string) int {
 	}
 	n := 0
 	for _, ev := range evs {
-		if ev.Type == tickets.EventParkAnswer {
+		if ev.Type == tickets.EventPauseAnswer {
 			n++
 		}
 	}
@@ -84,10 +84,10 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	for name, pause := range map[string]func(*schema.Ticket){
 		"zero-commit park": func(tk *schema.Ticket) {
-			tk.Status, tk.ParkKind = schema.StatusNeedsAnswer, schema.ParkKindZeroCommit
+			tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindZeroCommit
 		},
 		"needs-repair": func(tk *schema.Ticket) {
-			tk.Status, tk.ParkKind = schema.StatusNeedsRepair, schema.ParkKindSelfReported
+			tk.Status, tk.PauseKind = schema.StatusLegacyRepair, schema.PauseKindSelfReported
 		},
 	} {
 		if err := schema.UpdateTicket(ticketPath, pause); err != nil {

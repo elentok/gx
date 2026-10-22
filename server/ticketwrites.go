@@ -126,7 +126,7 @@ func (s *Server) ticketPause(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
 		switch schema.Status(ref.ticket.Status) {
-		case schema.StatusPaused, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+		case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
 			return refusal(ReasonAlreadyPaused, ref.addr.String()+" is already paused"), nil
 		}
 		if ref.epic.IsMap {

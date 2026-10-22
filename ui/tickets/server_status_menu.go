@@ -33,7 +33,7 @@ var serverDirectStatuses = []schema.Status{schema.StatusOpen, schema.StatusDraft
 // resumes: an answer pause needs the Answer action's own confirmation.
 func isRepairPause(t tickets.Ticket) bool {
 	switch schema.Status(t.Status) {
-	case schema.StatusNeedsRepair:
+	case schema.StatusLegacyRepair:
 		return true
 	case schema.StatusPaused:
 		return t.PauseReason.Class() == schema.PauseClassRepair

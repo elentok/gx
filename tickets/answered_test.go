@@ -8,10 +8,10 @@ import (
 )
 
 func TestAnswered(t *testing.T) {
-	q := tickets.LogEvent{Type: tickets.EventParkQuestion, Seq: 1}
-	answer := tickets.LogEvent{Type: tickets.EventParkAnswer, Seq: 2, Question: 1}
-	closed := tickets.LogEvent{Type: tickets.EventParkClosed, Seq: 2, Question: 1}
-	q2 := tickets.LogEvent{Type: tickets.EventParkQuestion, Seq: 3}
+	q := tickets.LogEvent{Type: tickets.EventPauseQuestion, Seq: 1}
+	answer := tickets.LogEvent{Type: tickets.EventPauseAnswer, Seq: 2, Question: 1}
+	closed := tickets.LogEvent{Type: tickets.EventPauseClosed, Seq: 2, Question: 1}
+	q2 := tickets.LogEvent{Type: tickets.EventPauseQuestion, Seq: 3}
 	cases := []struct {
 		name   string
 		status schema.Status

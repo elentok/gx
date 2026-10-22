@@ -46,23 +46,23 @@ type Ticket struct {
 	Rendered *RenderedStatus
 	Body     string // raw markdown after the leading metadata lines, unmodified
 
-	// ActualContextWindow and ElapsedTime are the landing-time metrics
-	// ralphloop/report_metrics.go's writeLandedMetrics stamps into a done
+	// ActualContextWindow and ElapsedTime are the finish-time metrics
+	// ralphloop/report_metrics.go stamps into a done
 	// ticket's frontmatter. Both zero for a ticket that's never run, or one
-	// landed before metrics existed (report.go's readSessionStats found
+	// finished before metrics existed (report.go's readSessionStats found
 	// nothing to stamp).
 	ActualContextWindow int
 	// ExpectedContextWindow mirrors schema.Ticket.ExpectedContextWindow: the
-	// ticket author's pre-landing estimate, shown in the preview only until
+	// ticket author's up-front estimate, shown in the preview only until
 	// ActualContextWindow is populated (see ui/tickets/preview_frontmatter.go).
 	ExpectedContextWindow int
 	ElapsedTime           int
 	// ActualCost mirrors schema.Ticket.ActualCost: the USD cost of the
-	// session(s) that landed this ticket. Zero for a ticket that's never run,
-	// or one landed before this field existed.
+	// session(s) that finished this ticket. Zero for a ticket that's never run,
+	// or one finished before this field existed.
 	ActualCost float64
 	// Compactions mirrors schema.Ticket.Compactions: how many compaction
-	// boundaries the landing iteration's session crossed.
+	// boundaries the final iteration's session crossed.
 	Compactions int
 
 	// Commitless mirrors schema.Ticket.Commitless: true means a zero-commit
@@ -93,8 +93,8 @@ type Ticket struct {
 	// paused.
 	PauseReason schema.PauseReason
 
-	// ParkKind is PauseReason as an events.Kind. Derived on load, never stored.
-	ParkKind schema.ParkKind
+	// PauseKind is PauseReason as an events.Kind. Derived on load, never stored.
+	PauseKind schema.PauseKind
 
 	// Mutes mirrors schema.Ticket.Mutes: notification event types that have
 	// tripped a throttle for this ticket, oldest first.

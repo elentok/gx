@@ -277,9 +277,9 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 		return icons.TicketClaimed, statusClaimedStyle
 	case tickets.StatusBlocked:
 		return icons.TicketBlocked, statusBlockedStyle
-	case tickets.StatusNeedsAnswer:
+	case tickets.StatusPausedAnswer:
 		return icons.TicketNeedsAnswer, statusNeedsAnswerStyle
-	case tickets.StatusNeedsRepair:
+	case tickets.StatusPausedRepair:
 		return icons.TicketNeedsRepair, statusNeedsRepairStyle
 	case tickets.StatusWaitingForChildren:
 		return icons.TicketWaitingForChildren, statusWaitingForChildrenStyle
@@ -294,7 +294,7 @@ func statusIconAndStyle(icons ui.IconSet, status tickets.RenderedStatus) (string
 // blocked/needs-answer ticket, filtered to still-unresolved blockers. Empty
 // for any other status or once every blocker has resolved.
 func blockedBySuffix(epic tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) string {
-	if status != tickets.StatusBlocked && status != tickets.StatusNeedsAnswer {
+	if status != tickets.StatusBlocked && status != tickets.StatusPausedAnswer {
 		return ""
 	}
 	unresolved := epic.UnresolvedBlockers(t)

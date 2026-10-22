@@ -203,14 +203,14 @@ func migratedStatusOf(s schema.Status) schema.Status {
 	case legacyStatusNeedsTriage:
 		return schema.StatusDraft
 	case legacyStatusReadyForHuman:
-		// "Handed back to a human" is exactly what needs-answer now covers;
+		// "Handed back to a human" is exactly what a pause for an answer covers;
 		// mapping to open would let the orchestrator re-claim a ticket that
 		// was deliberately handed back.
-		return schema.StatusNeedsAnswer
+		return schema.StatusLegacyAnswer
 	case legacyStatusNeedsInfo:
-		return schema.StatusNeedsAnswer
+		return schema.StatusLegacyAnswer
 	case legacyStatusNeedsAttention:
-		return schema.StatusNeedsRepair
+		return schema.StatusLegacyRepair
 	default:
 		return s
 	}

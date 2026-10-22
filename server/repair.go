@@ -349,7 +349,7 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResu
 			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
 		return tickets.LogEvent{
-			Type: tickets.EventParkAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: req.Base,
+			Type: tickets.EventPauseAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: req.Base,
 		}, nil
 	})
 	var refused resumeRefused

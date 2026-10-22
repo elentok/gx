@@ -73,7 +73,7 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 	park(sink, parkRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.IterationError, Reason: "boom",
-		Repair: schema.NeedsRepairState{Label: "l", Branch: "b", Worktree: "w"},
+		Repair: schema.FaultState{Label: "l", Branch: "b", Worktree: "w"},
 	})
 
 	assertPaused(t, mustParse(t, path), schema.PauseClassRepair, schema.PauseIterationError)
@@ -105,7 +105,7 @@ func TestPark_RefusesDoneTicket(t *testing.T) {
 
 			_, err := park(sink, parkRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-				Type: events.Paused, Kind: kind, Reason: "late", Repair: schema.NeedsRepairState{Label: "l"},
+				Type: events.Paused, Kind: kind, Reason: "late", Repair: schema.FaultState{Label: "l"},
 			})
 
 			if !errors.Is(err, ErrParkDone) {
@@ -179,7 +179,7 @@ func TestPark_LogsGxQuestionPerKind(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(evs) != 1 || evs[0].By != "gx" || evs[0].ParkKind != string(kind) || evs[0].Summary != summary {
+			if len(evs) != 1 || evs[0].By != "gx" || evs[0].PauseKind != string(kind) || evs[0].Summary != summary {
 				t.Errorf("log = %+v, want one by-gx %s question %q", evs, kind, summary)
 			}
 		})
@@ -253,16 +253,16 @@ func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T)
 		status   schema.Status
 		question bool // the log carries an open question afterwards
 	}{
-		{events.Manual, schema.StatusNeedsRepair, false},
-		{events.AmbiguousBase, schema.StatusNeedsAnswer, true},
-		{events.BlockedPane, schema.StatusNeedsAnswer, true},
-		{events.StrandedCommits, schema.StatusNeedsAnswer, true},
-		{events.BackgroundTaskGate, schema.StatusNeedsAnswer, true},
-		{events.ZeroCommit, schema.StatusNeedsAnswer, true},
-		{events.BudgetKilled, schema.StatusNeedsRepair, false},
-		{events.HandleMismatch, schema.StatusNeedsRepair, false},
-		{events.AmbiguousMerge, schema.StatusNeedsRepair, false},
-		{events.IterationError, schema.StatusNeedsRepair, false},
+		{events.Manual, schema.StatusLegacyRepair, false},
+		{events.AmbiguousBase, schema.StatusLegacyAnswer, true},
+		{events.BlockedPane, schema.StatusLegacyAnswer, true},
+		{events.StrandedCommits, schema.StatusLegacyAnswer, true},
+		{events.BackgroundTaskGate, schema.StatusLegacyAnswer, true},
+		{events.ZeroCommit, schema.StatusLegacyAnswer, true},
+		{events.BudgetKilled, schema.StatusLegacyRepair, false},
+		{events.HandleMismatch, schema.StatusLegacyRepair, false},
+		{events.AmbiguousMerge, schema.StatusLegacyRepair, false},
+		{events.IterationError, schema.StatusLegacyRepair, false},
 	}
 	for _, c := range cases {
 		t.Run(string(c.kind), func(t *testing.T) {

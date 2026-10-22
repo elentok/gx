@@ -23,7 +23,7 @@ func newTicketsLogCmd(d deps) *cobra.Command {
 			return runTicketsLog(cwd, args[0], eventType, c.OutOrStdout())
 		},
 	}
-	cmd.Flags().StringVar(&eventType, "type", "", "only events of this type, e.g. park.question")
+	cmd.Flags().StringVar(&eventType, "type", "", "only events of this type, e.g. pause.question")
 	return cmd
 }
 

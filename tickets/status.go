@@ -17,11 +17,11 @@ const (
 	StatusOpen RenderedStatus = iota
 	StatusClaimed
 	StatusBlocked
-	StatusNeedsAnswer
-	StatusNeedsRepair
+	StatusPausedAnswer
+	StatusPausedRepair
 	StatusDone
 	StatusError
-	// StatusDraft is a ticket its author has explicitly parked: written down,
+	// StatusDraft is a ticket its author has explicitly set aside: written down,
 	// but not yet offered to anyone. It is neither open (never enters an
 	// epic's frontier, so no agent ever claims it) nor done (it still counts
 	// as outstanding work).
@@ -56,17 +56,17 @@ var openStatuses = map[string]bool{
 
 var claimedStatuses = map[string]bool{"claimed": true}
 
-// needsAnswerStatuses covers raw values meaning work is stalled on someone
+// legacyAnswerStatuses covers raw values meaning work is stalled on someone
 // providing more information before it can proceed.
-var needsAnswerStatuses = map[string]bool{
+var legacyAnswerStatuses = map[string]bool{
 	"needs-answer": true,
 }
 
-var needsRepairStatuses = map[string]bool{
+var legacyRepairStatuses = map[string]bool{
 	"needs-repair": true,
 }
 
-// draftStatuses covers raw values meaning the ticket is parked by its author
+// draftStatuses covers raw values meaning the ticket is set aside by its author
 // and must not be scheduled (see StatusDraft).
 var draftStatuses = map[string]bool{
 	"draft": true,
@@ -139,15 +139,15 @@ func (t Ticket) baseStatus() RenderedStatus {
 		return StatusCancelled
 	case claimedStatuses[status]:
 		return StatusClaimed
-	case needsAnswerStatuses[status]:
-		return StatusNeedsAnswer
-	case needsRepairStatuses[status]:
-		return StatusNeedsRepair
+	case legacyAnswerStatuses[status]:
+		return StatusPausedAnswer
+	case legacyRepairStatuses[status]:
+		return StatusPausedRepair
 	case status == string(schema.StatusPaused):
 		if t.PauseReason.Class() == schema.PauseClassAnswer {
-			return StatusNeedsAnswer
+			return StatusPausedAnswer
 		}
-		return StatusNeedsRepair
+		return StatusPausedRepair
 	case openStatuses[status]:
 		return StatusOpen
 	default:
@@ -157,13 +157,13 @@ func (t Ticket) baseStatus() RenderedStatus {
 
 // RenderedStatus computes t's rendered status within e: t's base status,
 // overlaid with "blocked" when t has an unresolved Blocked by: and its base
-// status is open or claimed (needs-answer and done tickets keep their own
+// status is open or claimed (paused and done tickets keep their own
 // state regardless of Blocked by:). A type: code-review ticket's Blocked by:
 // is synthesized rather than read from its file (see effectiveBlockedBy),
 // but is otherwise resolved the same way as every other ticket's.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	base := t.baseStatus()
-	if base == StatusDone && e.Blocking(t) || e.parkedOnInvestigation(t, base) {
+	if base == StatusDone && e.Blocking(t) || e.pausedOnInvestigation(t, base) {
 		return StatusWaitingForChildren
 	}
 	if base != StatusOpen && base != StatusClaimed {
@@ -175,25 +175,25 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 	return base
 }
 
-// IsParked reports whether t is stalled on a person rather than on the run:
-// needs-answer, needs-repair, error, or draft (a stub nobody has filled in).
-// None of these is ever schedulable, but a person can clear any of them,
-// which is what separates parking from a deadlock. The one rule the server,
+// IsPaused reports whether t is stalled on a person rather than on the run:
+// paused for an answer or a repair, error, or draft (a stub nobody has filled
+// in). None of these is ever schedulable, but a person can clear any of them,
+// which is what separates a pause from a deadlock. The one rule the server,
 // ralph-loop and the Queue tab share.
-func (e Epic) IsParked(t Ticket) bool {
+func (e Epic) IsPaused(t Ticket) bool {
 	switch e.RenderedStatus(t) {
-	case StatusNeedsAnswer, StatusNeedsRepair, StatusError, StatusDraft:
+	case StatusPausedAnswer, StatusPausedRepair, StatusError, StatusDraft:
 		return true
 	}
 	return false
 }
 
-// parkedOnInvestigation reports whether t is parked while an investigate child
+// pausedOnInvestigation reports whether t is paused while an investigate child
 // of it is still unfinished: it renders as waiting for that child. An
-// investigate ticket is the one fork child that works on a parked parent, so
+// investigate ticket is the one fork child that works on a paused parent, so
 // ParentDone never holds it back.
-func (e Epic) parkedOnInvestigation(t Ticket, base RenderedStatus) bool {
-	if base != StatusNeedsRepair && base != StatusNeedsAnswer {
+func (e Epic) pausedOnInvestigation(t Ticket, base RenderedStatus) bool {
+	if base != StatusPausedRepair && base != StatusPausedAnswer {
 		return false
 	}
 	for _, child := range e.forkChildren()[ticketKey(t)] {
@@ -205,13 +205,13 @@ func (e Epic) parkedOnInvestigation(t Ticket, base RenderedStatus) bool {
 }
 
 // ParentDone reports whether t's Parent ticket (see Ticket.Parent) has
-// landed its own work — Parent's raw Status alone, via IsDone, never its
+// finished its own work — Parent's raw Status alone, via IsDone, never its
 // fork subtree. This is the implicit edge every fork child carries on its
 // parent: recursing into the subtree here (as Blocking does for explicit
 // Blocked by: tokens) would deadlock every fork, since a parent isn't done-
 // with-subtree-resolved until its children are, and the children can't start
 // until it is. A ticket with no Parent is trivially "done" by this measure —
-// it has nothing to wait on. A parent in needs-answer or needs-repair, like
+// it has nothing to wait on. A paused parent, like
 // any non-done status, holds the child; a commitless-done parent still has
 // Status: done (see ticket 08), so it releases the child same as any other.
 func (e Epic) ParentDone(t Ticket) bool {
@@ -441,9 +441,9 @@ func (s RenderedStatus) Word() string {
 		return "claimed"
 	case StatusBlocked:
 		return "blocked"
-	case StatusNeedsAnswer:
+	case StatusPausedAnswer:
 		return "needs-answer"
-	case StatusNeedsRepair:
+	case StatusPausedRepair:
 		return "needs-repair"
 	case StatusDone:
 		return "done"

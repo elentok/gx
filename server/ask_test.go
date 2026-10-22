@@ -46,7 +46,7 @@ func TestAsk_AppendsQuestionAndSetsIterationStatus(t *testing.T) {
 				t.Fatalf("log has %d events, want 1", len(evs))
 			}
 			ev := evs[0]
-			if ev.Type != tickets.EventParkQuestion || ev.By != "agent" || ev.Summary != "Should we keep the cache?" ||
+			if ev.Type != tickets.EventPauseQuestion || ev.By != "agent" || ev.Summary != "Should we keep the cache?" ||
 				ev.Text != "It costs memory." || ev.Handoff != "Cache code is half done." ||
 				!strings.Contains(ev.Block, "type: yes-no") {
 				t.Errorf("event = %+v", ev)

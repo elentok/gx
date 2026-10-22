@@ -192,7 +192,7 @@ func (s *Server) permissionCard(addr tickets.Address) (*PermissionCard, error) {
 
 // detailActions is what a person may do with the ticket right now. Approve
 // joins when the permission card can be approved from here.
-func detailActions(t schema.Ticket, latest *tickets.ParkRound, agentGone bool, card *PermissionCard) []string {
+func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, card *PermissionCard) []string {
 	actions := []string{}
 	if card != nil && card.RequestID != "" {
 		actions = append(actions, ActionApprove)
@@ -211,11 +211,11 @@ func detailActions(t schema.Ticket, latest *tickets.ParkRound, agentGone bool, c
 }
 
 // detailRound reads a round's question leniently: a bad block is free text.
-func detailRound(r tickets.ParkRound, full bool) DetailRound {
+func detailRound(r tickets.PauseRound, full bool) DetailRound {
 	out := DetailRound{Seq: r.Question.Seq, By: r.Question.By, Summary: r.Question.Summary, Outcome: RoundOpen}
 	if r.End != nil {
 		out.Outcome = RoundClosed
-		if r.End.Type == tickets.EventParkAnswer {
+		if r.End.Type == tickets.EventPauseAnswer {
 			out.Outcome = RoundAnswered
 		}
 	}
@@ -231,7 +231,7 @@ func detailRound(r tickets.ParkRound, full bool) DetailRound {
 	if r.End == nil {
 		return out
 	}
-	if r.End.Type == tickets.EventParkAnswer {
+	if r.End.Type == tickets.EventPauseAnswer {
 		out.Answer = &DetailAnswer{Source: r.End.Source, Choice: r.End.Choice, Text: r.End.Text, Note: r.End.Note}
 	} else {
 		out.ClosedReason = r.End.Reason

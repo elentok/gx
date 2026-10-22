@@ -18,9 +18,9 @@ func resumeEvents(t *testing.T, ticketPath string) (closed []tickets.LogEvent, a
 	}
 	for _, ev := range evs {
 		switch ev.Type {
-		case tickets.EventParkClosed:
+		case tickets.EventPauseClosed:
 			closed = append(closed, ev)
-		case tickets.EventParkAnswer:
+		case tickets.EventPauseAnswer:
 			answers++
 		}
 	}

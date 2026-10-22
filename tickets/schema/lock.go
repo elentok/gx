@@ -11,7 +11,7 @@ const ticketLockTimeout = 10 * time.Second
 // LockTicket takes an exclusive per-ticket lock (a sidecar "<path>.lock" file,
 // same O_EXCL scheme as tickets.LockEpic) and returns its unlock func. Every
 // read-modify-write of a ticket file must hold it, so a fork parent's
-// full-content write can't land over its child's concurrent `claimed`.
+// full-content write can't overwrite its child's concurrent `claimed`.
 func LockTicket(path string) (unlock func(), err error) {
 	lockPath := path + ".lock"
 	deadline := time.Now().Add(ticketLockTimeout)

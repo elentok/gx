@@ -93,12 +93,12 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 		})
 		path := filepath.Join(store, "proj", "work", "issues", "06-f.md")
 		if err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
-			tk.Status, tk.ParkKind = schema.StatusNeedsAnswer, schema.ParkKindSelfReported
+			tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindSelfReported
 		}); err != nil {
 			t.Fatal(err)
 		}
 		question = "Which base?"
-		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "agent", Summary: question, Handoff: "h"}); err != nil {
+		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: question, Handoff: "h"}); err != nil {
 			t.Fatal(err)
 		}
 	})

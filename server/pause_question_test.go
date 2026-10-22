@@ -23,7 +23,7 @@ func assertGxQuestion(t *testing.T, ticketPath string, kind events.Kind, summary
 	}
 	got := evs[0]
 	// The text is the fixed summary, then the pause reason when it adds detail.
-	if got.Type != tickets.EventParkQuestion || got.By != "gx" || got.ParkKind != string(kind) || got.Summary != summary || !strings.HasPrefix(got.Text, summary) {
+	if got.Type != tickets.EventPauseQuestion || got.By != "gx" || got.PauseKind != string(kind) || got.Summary != summary || !strings.HasPrefix(got.Text, summary) {
 		t.Errorf("event = %+v, want a by-gx %s question %q", got, kind, summary)
 	}
 }
@@ -35,7 +35,7 @@ func TestPause_ZeroCommitLogsGxQuestion(t *testing.T) {
 	h := servertest.StartWithStore(t, store)
 	runToZeroCommitPause(t, h, "done")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	waitStatus(t, path, schema.StatusNeedsAnswer)
+	waitStatus(t, path, schema.StatusLegacyAnswer)
 	assertGxQuestion(t, path, events.ZeroCommit,
 		"The agent finished with no commits. Adopt it as done, or reopen the ticket?")
 }

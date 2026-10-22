@@ -118,7 +118,7 @@ func renderTicketPreview(epic tickets.Epic, t tickets.Ticket, width int) (string
 		target += prefixLines
 	}
 	b.WriteString(body)
-	if status == tickets.StatusNeedsAnswer {
+	if status == tickets.StatusPausedAnswer {
 		if block, line, found := renderParkRoundsBlock(ticketLogEvents(t), width); found {
 			if !strings.HasSuffix(body, "\n") {
 				b.WriteString("\n")
@@ -196,7 +196,7 @@ func renderParkRoundsBlock(events []tickets.LogEvent, width int) (block string, 
 // Returns rendered unchanged with ok=false for any other status or when the
 // heading isn't found.
 func highlightParkSection(rendered string, status tickets.RenderedStatus) (out string, target int, ok bool) {
-	if status != tickets.StatusNeedsRepair {
+	if status != tickets.StatusPausedRepair {
 		return rendered, 0, false
 	}
 	heading := needsRepairHeading

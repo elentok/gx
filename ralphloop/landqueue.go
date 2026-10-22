@@ -263,7 +263,7 @@ func landOne(d Deps, lp landQueueParams, job landJob) outcome {
 			if _, perr := park(p.Sink, parkRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.Paused, Kind: events.AmbiguousMerge, Reason: amb.Error(),
-				Repair: schema.NeedsRepairState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},
+				Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: job.branch, Worktree: job.path},
 			}); perr != nil {
 				return outcome{ticket: job.ticket, err: perr}
 			}

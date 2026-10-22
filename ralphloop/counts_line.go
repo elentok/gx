@@ -46,7 +46,7 @@ func (s RunScope) Counts(epic tickets.Epic) EpicCounts {
 			counts.Done++
 		case tickets.StatusClaimed:
 			counts.InProgress++
-		case tickets.StatusNeedsAnswer, tickets.StatusNeedsRepair:
+		case tickets.StatusPausedAnswer, tickets.StatusPausedRepair:
 			counts.PausedIdentifiers = append(counts.PausedIdentifiers, ticket.Identifier)
 		case tickets.StatusBlocked, tickets.StatusWaitingForChildren:
 			counts.Blocked++

@@ -49,7 +49,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 			if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", c.agent); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
-			waitStatus(t, ticketPath, schema.StatusNeedsAnswer)
+			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 			waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
 			if _, ok, err := fake.Find("epic-a-iter-01"); err != nil || ok {
 				t.Errorf("session still live: ok=%v err=%v", ok, err)
@@ -79,7 +79,7 @@ func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	waitStatus(t, ticketPath, schema.StatusNeedsAnswer)
+	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		t.Fatal(err)

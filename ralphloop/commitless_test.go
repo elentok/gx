@@ -102,7 +102,7 @@ func TestFinishCommitless_StrandedCommitsParkAndKeepWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Status != schema.StatusNeedsAnswer || out.Kind != events.StrandedCommits {
+	if out.Status != schema.StatusLegacyAnswer || out.Kind != events.StrandedCommits {
 		t.Errorf("outcome = %+v, want needs-answer/%s", out, events.StrandedCommits)
 	}
 	if _, err := os.Stat(wt.Path); err != nil {

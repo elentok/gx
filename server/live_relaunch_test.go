@@ -105,7 +105,7 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 	h, _, _, path := startWithLeftover(t, agentrunner.StateIdle)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "gx", Summary: "q?"}); err != nil {
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "q?"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -116,7 +116,7 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) != 2 || evs[1].Type != tickets.EventParkClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" {
+	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" {
 		t.Errorf("log = %+v, want the question then pause.closed{question 1, relaunch}", evs)
 	}
 }

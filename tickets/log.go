@@ -13,22 +13,31 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Park event types in a ticket's log.
+// Pause event types in a ticket's log.
 const (
-	EventParkQuestion   = "park.question"
-	EventParkAnswer     = "park.answer"
-	EventParkPermission = "park.permission"
-	EventParkClosed     = "park.closed"
+	EventPauseQuestion   = "pause.question"
+	EventPauseAnswer     = "pause.answer"
+	EventPausePermission = "pause.permission"
+	EventPauseClosed     = "pause.closed"
 )
+
+// legacyEventTypes maps the event types logs used to store to their current
+// spelling. readLog folds them on read, so a log is never rewritten.
+var legacyEventTypes = map[string]string{
+	"park.question":   EventPauseQuestion,
+	"park.answer":     EventPauseAnswer,
+	"park.permission": EventPausePermission,
+	"park.closed":     EventPauseClosed,
+}
 
 const (
 	// MaxLogTextChars caps every free-text field of a log event.
 	MaxLogTextChars = 4000
-	// MaxLogSummaryChars caps a park.question summary.
+	// MaxLogSummaryChars caps a pause.question summary.
 	MaxLogSummaryChars = 120
 )
 
-// PermissionShown is what the person saw when a permission prompt parked.
+// PermissionShown is what the person saw when a permission prompt paused the ticket.
 type PermissionShown struct {
 	RequestID   string `json:"request_id,omitempty"`
 	Tool        string `json:"tool,omitempty"`
@@ -45,16 +54,20 @@ type LogEvent struct {
 	TS   time.Time `json:"ts"`
 	Type string    `json:"type"`
 
-	// park.question
-	By       string `json:"by,omitempty"`
-	Session  string `json:"session,omitempty"`
-	ParkKind string `json:"park_kind,omitempty"`
-	Summary  string `json:"summary,omitempty"`
-	Text     string `json:"text,omitempty"`
-	Block    string `json:"block,omitempty"`
-	Handoff  string `json:"handoff,omitempty"`
+	// pause.question
+	By        string `json:"by,omitempty"`
+	Session   string `json:"session,omitempty"`
+	PauseKind string `json:"pause_kind,omitempty"`
+	Summary   string `json:"summary,omitempty"`
+	Text      string `json:"text,omitempty"`
+	Block     string `json:"block,omitempty"`
+	Handoff   string `json:"handoff,omitempty"`
 
-	// park.answer, park.permission and park.closed
+	// LegacyKind is the old spelling of PauseKind. readLog moves it into
+	// PauseKind, so it is empty on every event a caller sees.
+	LegacyKind string `json:"park_kind,omitempty"`
+
+	// pause.answer, pause.permission and pause.closed
 	Question int              `json:"question,omitempty"`
 	Source   string           `json:"source,omitempty"`
 	Choice   string           `json:"choice,omitempty"`
@@ -191,6 +204,13 @@ func readLog(logPath string) ([]LogEvent, int64, error) {
 			}
 			return nil, 0, fmt.Errorf("%s line %d: malformed event: %w", logPath, lineNo, err)
 		}
+		if t, ok := legacyEventTypes[ev.Type]; ok {
+			ev.Type = t
+		}
+		if ev.PauseKind == "" {
+			ev.PauseKind = ev.LegacyKind
+		}
+		ev.LegacyKind = ""
 		events = append(events, ev)
 		validLen += int64(len(line))
 		if terminated {
@@ -220,16 +240,16 @@ func validateLogEvent(ev LogEvent) error {
 			return fmt.Errorf("%s is %d characters, max %d", name, n, MaxLogTextChars)
 		}
 	}
-	if ev.Type == EventParkQuestion && ev.By == "agent" && ev.Handoff == "" {
-		return fmt.Errorf("park.question by agent needs a handoff")
+	if ev.Type == EventPauseQuestion && ev.By == "agent" && ev.Handoff == "" {
+		return fmt.Errorf("pause.question by agent needs a handoff")
 	}
 	return nil
 }
 
 var errNoOpenQuestion = errors.New("no open question")
 
-// CloseOpenQuestion writes park.closed{question, reason} for the ticket's open
-// question, for a path that leaves needs-answer without a person's answer. A
+// CloseOpenQuestion writes pause.closed{question, reason} for the ticket's open
+// question, for a path that leaves the paused state without a person's answer. A
 // ticket with no open question (a pre-migration one) gets no write and no error.
 func CloseOpenQuestion(ticketPath, reason string) error {
 	_, err := appendLogWith(ticketPath, func(evs []LogEvent) (LogEvent, error) {
@@ -237,7 +257,7 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 		if open == nil {
 			return LogEvent{}, errNoOpenQuestion
 		}
-		return LogEvent{Type: EventParkClosed, Question: open.Seq, Reason: reason}, nil
+		return LogEvent{Type: EventPauseClosed, Question: open.Seq, Reason: reason}, nil
 	})
 	if errors.Is(err, errNoOpenQuestion) {
 		return nil
@@ -245,24 +265,24 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 	return err
 }
 
-// ParkRound is a park.question and the event that ended it, if any.
-type ParkRound struct {
+// PauseRound is a pause.question and the event that ended it, if any.
+type PauseRound struct {
 	Question LogEvent
-	// End is the park.answer or park.closed naming Question, nil while open.
+	// End is the pause.answer or pause.closed naming Question, nil while open.
 	End *LogEvent
 }
 
-// Rounds pairs each park.question with the park.answer or park.closed that
-// names its seq. Other events (park.permission) belong to no round.
-func Rounds(events []LogEvent) []ParkRound {
-	var rounds []ParkRound
+// Rounds pairs each pause.question with the pause.answer or pause.closed that
+// names its seq. Other events (pause.permission) belong to no round.
+func Rounds(events []LogEvent) []PauseRound {
+	var rounds []PauseRound
 	bySeq := map[int]int{}
 	for _, ev := range events {
 		switch ev.Type {
-		case EventParkQuestion:
+		case EventPauseQuestion:
 			bySeq[ev.Seq] = len(rounds)
-			rounds = append(rounds, ParkRound{Question: ev})
-		case EventParkAnswer, EventParkClosed:
+			rounds = append(rounds, PauseRound{Question: ev})
+		case EventPauseAnswer, EventPauseClosed:
 			i, ok := bySeq[ev.Question]
 			if ok && rounds[i].End == nil {
 				end := ev
@@ -273,7 +293,7 @@ func Rounds(events []LogEvent) []ParkRound {
 	return rounds
 }
 
-// OpenQuestion is the latest park.question with neither an answer nor a close,
+// OpenQuestion is the latest pause.question with neither an answer nor a close,
 // or nil.
 func OpenQuestion(events []LogEvent) *LogEvent {
 	rounds := Rounds(events)

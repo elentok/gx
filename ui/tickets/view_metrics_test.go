@@ -117,8 +117,8 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 	}{
 		{tickets.StatusOpen, statusOpenStyle},
 		{tickets.StatusClaimed, statusClaimedStyle},
-		{tickets.StatusNeedsRepair, statusNeedsRepairStyle},
-		{tickets.StatusNeedsAnswer, statusNeedsAnswerStyle},
+		{tickets.StatusPausedRepair, statusNeedsRepairStyle},
+		{tickets.StatusPausedAnswer, statusNeedsAnswerStyle},
 		{tickets.StatusDone, statusDoneStyle},
 		{tickets.StatusBlocked, statusBlockedStyle},
 		{tickets.StatusWaitingForChildren, statusWaitingForChildrenStyle},
@@ -142,7 +142,7 @@ func TestStatusIconAndStyle_Colors(t *testing.T) {
 	if _, style := statusIconAndStyle(icons, tickets.StatusClaimed); style.GetForeground() != ui.ColorOrange {
 		t.Errorf("StatusClaimed foreground = %v, want ColorOrange", style.GetForeground())
 	}
-	if _, style := statusIconAndStyle(icons, tickets.StatusNeedsRepair); style.GetForeground() != ui.ColorRed {
+	if _, style := statusIconAndStyle(icons, tickets.StatusPausedRepair); style.GetForeground() != ui.ColorRed {
 		t.Errorf("StatusNeedsRepair foreground = %v, want ColorRed", style.GetForeground())
 	}
 }

@@ -19,12 +19,12 @@ func TestDeriveLeafBase(t *testing.T) {
 		want      string
 		ambiguous []string
 	}{
-		"unlanded sibling is the base":   {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: leaf("01"), want: "01"},
-		"landed sibling gives the tip":   {tickets: []Ticket{sib(1, "01", "done", false)}, leaf: leaf("01")},
+		"unmerged sibling is the base":   {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: leaf("01"), want: "01"},
+		"merged sibling gives the tip":   {tickets: []Ticket{sib(1, "01", "done", false)}, leaf: leaf("01")},
 		"commitless sibling is ignored":  {tickets: []Ticket{sib(1, "01", "open", true)}, leaf: leaf("01")},
 		"commitless ticket reads at tip": {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: func() Ticket { l := leaf("01"); l.Commitless = true; return l }()},
 		"explicit base opts out":         {tickets: []Ticket{sib(1, "01", "open", false)}, leaf: func() Ticket { l := leaf("01"); l.Base = "x"; return l }()},
-		"two unlanded siblings are ambiguous": {
+		"two unmerged siblings are ambiguous": {
 			tickets: []Ticket{sib(1, "01", "open", false), sib(2, "02", "claimed", false)}, leaf: leaf("01", "02"), ambiguous: []string{"01", "02"},
 		},
 	} {
@@ -91,7 +91,7 @@ func TestDeriveRootBase(t *testing.T) {
 			e[1].BlockedBy, e[1].Base = nil, "a/01"
 			return e
 		}(), want: "a"},
-		"base node ref landed": {epics: func() []Epic {
+		"base node ref merged": {epics: func() []Epic {
 			e := baseEpics("done")
 			e[1].BlockedBy, e[1].Base = nil, "a/01"
 			return e

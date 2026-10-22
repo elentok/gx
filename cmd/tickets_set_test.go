@@ -585,7 +585,7 @@ func TestExecute_TicketsSet_IterationStatusAskingAcceptedWithOpenQuestion(t *tes
 	dir := t.TempDir()
 	path := filepath.Join(dir, "04b-ticket.md")
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: claimed\ntype: implement\n---\nBody.\n")
-	q := tickets.LogEvent{Type: tickets.EventParkQuestion, By: "agent", Summary: "Which?", Text: "Which?", Handoff: "Resume after the answer."}
+	q := tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "Which?", Text: "Which?", Handoff: "Resume after the answer."}
 	if _, err := tickets.AppendLog(path, q); err != nil {
 		t.Fatal(err)
 	}

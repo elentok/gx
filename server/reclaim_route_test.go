@@ -147,7 +147,7 @@ func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Restart(t)
-	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	body, _ := os.ReadFile(ticketPath)
 	if !strings.Contains(string(body), `invalid root "corrupt"`) {
 		t.Errorf("ticket lacks the reclaim error in its reason:\n%s", body)
@@ -156,7 +156,7 @@ func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
 
 func TestReclaim_UnavailableRunnerPausesStuckNamingIt(t *testing.T) {
 	_, ticketPath := restartUnder(t, "pty", newRenamedFake("headless", nativerunner.VerdictLive), nil)
-	waitStatus(t, ticketPath, schema.StatusNeedsRepair)
+	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	body, _ := os.ReadFile(ticketPath)
 	if !strings.Contains(string(body), "started by pty; pty unavailable") {
 		t.Errorf("ticket lacks the runner in its reason:\n%s", body)

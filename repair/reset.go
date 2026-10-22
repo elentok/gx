@@ -92,7 +92,7 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 		return ResetResult{}, err
 	}
 
-	if err := tickets.Reset(t.Path, in.Now, resetNote(in, attic)); err != nil {
+	if err := tickets.StartOver(t.Path, in.Now, resetNote(in, attic)); err != nil {
 		return ResetResult{}, fmt.Errorf("resetting ticket %s: %w", in.ID, err)
 	}
 

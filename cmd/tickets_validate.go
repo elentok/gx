@@ -51,7 +51,7 @@ func validateTicketLog(path string, ticket schema.Ticket, stderr io.Writer) erro
 		return fmt.Errorf("%s: status is needs-answer but the log has no open question", ticketLabel(path))
 	}
 	for _, ev := range events {
-		if ev.Type != tickets.EventParkQuestion {
+		if ev.Type != tickets.EventPauseQuestion {
 			continue
 		}
 		if n := utf8.RuneCountInString(ev.Summary); n > tickets.MaxLogSummaryChars {

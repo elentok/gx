@@ -51,7 +51,7 @@ func pauseActionLabel(reason schema.PauseReason) string {
 // under an old needs-answer / needs-repair status.
 func isPausedTicket(t tickets.Ticket) bool {
 	switch schema.Status(t.Status) {
-	case schema.StatusPaused, schema.StatusNeedsAnswer, schema.StatusNeedsRepair:
+	case schema.StatusPaused, schema.StatusLegacyAnswer, schema.StatusLegacyRepair:
 		return true
 	}
 	return false

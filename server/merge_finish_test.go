@@ -75,7 +75,7 @@ func TestMergeFinish_TargetNotAnAncestorPausesStuck(t *testing.T) {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
 		return "finished"
 	})
-	assertFixturePaused(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "is not an ancestor of "+schedEpic)
+	assertFixturePaused(t, f, tk, schema.StatusLegacyRepair, events.IterationError, "is not an ancestor of "+schedEpic)
 }
 
 func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
@@ -89,17 +89,17 @@ func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
 		}
 		return "finished"
 	})
-	assertFixturePaused(t, f, tk, schema.StatusNeedsRepair, events.IterationError, "rebase still in progress")
+	assertFixturePaused(t, f, tk, schema.StatusLegacyRepair, events.IterationError, "rebase still in progress")
 }
 
 func TestMergeFinish_SelfReportedAskingPausesAsking(t *testing.T) {
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "needs-answer" })
-	assertFixturePaused(t, f, tk, schema.StatusNeedsAnswer, events.SelfReported, "")
+	assertFixturePaused(t, f, tk, schema.StatusLegacyAnswer, events.SelfReported, "")
 }
 
 func TestMergeFinish_AgentStoppingWithoutAReportPausesStuck(t *testing.T) {
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "" })
-	assertFixturePaused(t, f, tk, schema.StatusNeedsRepair, events.MergeUnreported, "without reporting")
+	assertFixturePaused(t, f, tk, schema.StatusLegacyRepair, events.MergeUnreported, "without reporting")
 }
 
 // reportMergeFinishedLate is the paused merge agent reporting finished after

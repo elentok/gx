@@ -25,7 +25,7 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		"08-broken.md":         "no frontmatter at all\n",
 	})
 	path := func(name string) string { return filepath.Join(issuesDir, name) }
-	if _, err := tickets.AppendLog(path("04-repair-log.md"), tickets.LogEvent{Type: tickets.EventParkQuestion, By: "gx", ParkKind: "spinning", Summary: "stuck"}); err != nil {
+	if _, err := tickets.AppendLog(path("04-repair-log.md"), tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", PauseKind: "spinning", Summary: "stuck"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,8 +89,8 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if got.Status != schema.StatusPaused || got.PauseReason != reason || got.ParkKind != "" {
-			t.Errorf("%s = status %q reason %q park_kind %q, want paused %q", name, got.Status, got.PauseReason, got.ParkKind, reason)
+		if got.Status != schema.StatusPaused || got.PauseReason != reason || got.PauseKind != "" {
+			t.Errorf("%s = status %q reason %q park_kind %q, want paused %q", name, got.Status, got.PauseReason, got.PauseKind, reason)
 		}
 		if strings.Contains(string(raw), "park_kind") {
 			t.Errorf("%s still has park_kind:\n%s", name, raw)

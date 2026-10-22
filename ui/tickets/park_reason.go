@@ -13,7 +13,7 @@ const parkReasonMaxRunes = 60
 
 // needsRepairHeading is the literal heading markNeedsRepairWithReason
 // (ralphloop/claim.go) appends to a parked ticket's body.
-const needsRepairHeading = tickets.NeedsRepairHeading
+const needsRepairHeading = tickets.LegacyRepairHeading
 
 // needsAnswerHint is rendered under the preview's "Park rounds" heading.
 const needsAnswerHint = "Answer in the web UI or run `gx tickets answer <addr>`."

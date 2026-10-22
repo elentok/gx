@@ -52,7 +52,7 @@ func (e answerEnv) permissionEvents(t *testing.T) []tickets.LogEvent {
 	}
 	var out []tickets.LogEvent
 	for _, ev := range evs {
-		if ev.Type == tickets.EventParkPermission {
+		if ev.Type == tickets.EventPausePermission {
 			out = append(out, ev)
 		}
 	}

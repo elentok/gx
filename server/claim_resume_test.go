@@ -47,12 +47,12 @@ func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *r
 	if err := os.WriteFile(path, []byte(withSession), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventParkQuestion, By: "agent", Summary: "which one?", Handoff: "half done"}); err != nil {
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "agent", Summary: "which one?", Handoff: "half done"}); err != nil {
 		t.Fatal(err)
 	}
-	end := tickets.LogEvent{Type: tickets.EventParkClosed, Question: 1, Reason: "unpark"}
+	end := tickets.LogEvent{Type: tickets.EventPauseClosed, Question: 1, Reason: "unpark"}
 	if answered {
-		end = tickets.LogEvent{Type: tickets.EventParkAnswer, Question: 1, Source: "web", Choice: "a"}
+		end = tickets.LogEvent{Type: tickets.EventPauseAnswer, Question: 1, Source: "web", Choice: "a"}
 	}
 	if _, err := tickets.AppendLog(path, end); err != nil {
 		t.Fatal(err)

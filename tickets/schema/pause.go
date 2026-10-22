@@ -120,18 +120,17 @@ func ParsePauseReason(s string) PauseReason {
 	return PauseReason(s)
 }
 
-// LegacyStatus is the stored status this class used before `paused`. Park
-// events and notification wording still use it as their label.
+// LegacyStatus is the stored status this class used before `paused`.
+// Wire formats and notification wording still use it as their label.
 func (c PauseClass) LegacyStatus() Status {
 	if c == PauseClassAnswer {
-		return StatusNeedsAnswer
+		return StatusLegacyAnswer
 	}
-	return StatusNeedsRepair
+	return StatusLegacyRepair
 }
 
-// LegacyKind is r spelled as the park event kind (the old `park_kind`). The
-// spellings differ from the events kinds for four reasons until the event log
-// is renamed.
+// LegacyKind is r spelled as the old event kind (the old `park_kind`). The
+// spellings differ from the current reasons for four reasons.
 func (r PauseReason) LegacyKind() string {
 	for old, nu := range legacyReasons {
 		if nu == r {
@@ -155,9 +154,9 @@ func PausedReason(kind string, class PauseClass) PauseReason {
 // needs-answer / needs-repair status), else "".
 func (t Ticket) PausedClass() PauseClass {
 	switch t.Status {
-	case StatusNeedsAnswer:
+	case StatusLegacyAnswer:
 		return PauseClassAnswer
-	case StatusNeedsRepair:
+	case StatusLegacyRepair:
 		return PauseClassRepair
 	case StatusPaused:
 		return t.PauseReason.Class()
@@ -178,21 +177,21 @@ const PausedHeading = "## Paused"
 func ShimLegacyPause(t Ticket) Ticket {
 	var class PauseClass
 	switch t.Status {
-	case StatusNeedsAnswer:
+	case StatusLegacyAnswer:
 		class = PauseClassAnswer
-	case StatusNeedsRepair:
+	case StatusLegacyRepair:
 		class = PauseClassRepair
 	default:
 		return t
 	}
 	t.Status = StatusPaused
 	if t.PauseReason == "" {
-		t.PauseReason = ParsePauseReason(string(t.ParkKind))
+		t.PauseReason = ParsePauseReason(string(t.PauseKind))
 	}
 	if t.PauseReason.Class() != class {
 		t.PauseReason = class.DefaultReason()
 	}
-	t.ParkKind = ""
+	t.PauseKind = ""
 	return t
 }
 
