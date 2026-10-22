@@ -1,0 +1,7 @@
+# Maintainer data for scripts/sync-vendored-skills.sh. Not part of the installed bundle.
+# Columns, whitespace separated:
+#   gx-skill  upstream-repo  upstream-skill-path  upstream-license-path  last-synced-commit  [strategy]
+# strategy is "merge" or "port"; "merge" when absent.
+gx-tdd         mattpocock/skills  skills/engineering/tdd          LICENSE  bd453a6  merge
+gx-to-tickets  mattpocock/skills  skills/engineering/to-tickets   LICENSE  19c50d5  port
+gx-implement   mattpocock/skills  skills/engineering/implement    LICENSE  386d4ff  port
