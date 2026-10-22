@@ -420,8 +420,8 @@ func TestLoadSkillsConfigDefaultsWhenBlockAbsent(t *testing.T) {
 	if cfg.Skills.Implement != "gx-implement" {
 		t.Fatalf("Skills.Implement = %q, want gx-implement", cfg.Skills.Implement)
 	}
-	if len(cfg.Skills.CodeReview) != 1 || cfg.Skills.CodeReview[0] != "thermo-nuclear-code-quality-review" {
-		t.Fatalf("Skills.CodeReview = %+v, want [thermo-nuclear-code-quality-review]", cfg.Skills.CodeReview)
+	if len(cfg.Skills.CodeReview) != 1 || cfg.Skills.CodeReview[0] != "gx-thermo-nuclear-code-quality-review" {
+		t.Fatalf("Skills.CodeReview = %+v, want [gx-thermo-nuclear-code-quality-review]", cfg.Skills.CodeReview)
 	}
 }
 
@@ -447,8 +447,8 @@ func TestLoadSkillsConfigPreservesUnspecifiedDefault(t *testing.T) {
 	if cfg.Skills.Implement != "my-implement-skill" {
 		t.Fatalf("Skills.Implement = %q, want my-implement-skill", cfg.Skills.Implement)
 	}
-	if len(cfg.Skills.CodeReview) != 1 || cfg.Skills.CodeReview[0] != "thermo-nuclear-code-quality-review" {
-		t.Fatalf("Skills.CodeReview = %+v, want default [thermo-nuclear-code-quality-review]", cfg.Skills.CodeReview)
+	if len(cfg.Skills.CodeReview) != 1 || cfg.Skills.CodeReview[0] != "gx-thermo-nuclear-code-quality-review" {
+		t.Fatalf("Skills.CodeReview = %+v, want default [gx-thermo-nuclear-code-quality-review]", cfg.Skills.CodeReview)
 	}
 }
 

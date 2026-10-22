@@ -49,12 +49,13 @@ stop and fix the ticket's frontmatter before doing anything else.
 ## 2. Read the configured review skills
 
 `gx config show` prints the effective config as JSON; read `.skills["code-review"]`. If the list is
-empty or the field is absent, fall back to a single-element list: `["thermo-nuclear-code-quality-review"]`.
+empty or the field is absent, fall back to a single-element list: `["gx-thermo-nuclear-code-quality-review"]`.
 
 Resolve each name to a `SKILL.md` path, taking the first that exists: `skills/<name>/SKILL.md` from
-the repo root, then `~/.claude/skills/<name>/SKILL.md`. Subagents Read that file rather than call the
-Skill tool, because a skill with `disable-model-invocation: true` (the default one sets it) is not
-listed there, and the quality axis used to degrade silently into a manual review.
+the reviewed repo's root, then `../<name>/SKILL.md` relative to this file. Subagents Read that file
+rather than call the Skill tool, because a skill with `disable-model-invocation: true` (the vendored
+default one keeps upstream's flag) is not listed there, and the quality axis used to degrade silently
+into a manual review.
 
 If any name resolves to no file, don't review with a partial list. Follow
 [gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop rule: run `gx tickets ask`, with the question naming which names didn't resolve

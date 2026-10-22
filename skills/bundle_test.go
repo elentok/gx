@@ -73,6 +73,9 @@ var requiredFiles = []string{
 	"gx-to-spec/LICENSE",
 	"gx-to-spec/README.md",
 	"gx-to-spec/agents/openai.yaml",
+	"gx-thermo-nuclear-code-quality-review/SKILL.md",
+	"gx-thermo-nuclear-code-quality-review/LICENSE",
+	"gx-thermo-nuclear-code-quality-review/README.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -200,6 +203,8 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-prototype":                 false,
 	"gx-wayfinder":                 true,
 	"gx-to-spec":                   true,
+
+	"gx-thermo-nuclear-code-quality-review": true,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
@@ -441,10 +446,13 @@ func TestCodeReviewReadsQualitySkillsByPath(t *testing.T) {
 	if strings.Contains(raw, "Skill(skill:") {
 		t.Error("gx-code-review must not tell subagents to invoke review skills via the Skill tool")
 	}
-	for _, want := range []string{"`skills/<name>/SKILL.md`", "`~/.claude/skills/<name>/SKILL.md`", "gx tickets ask"} {
+	for _, want := range []string{"`skills/<name>/SKILL.md`", "`../<name>/SKILL.md`", "gx tickets ask"} {
 		if !strings.Contains(raw, want) {
 			t.Errorf("gx-code-review must name %s", want)
 		}
+	}
+	if strings.Contains(raw, "~/.claude/skills") {
+		t.Error("gx-code-review must not look review skills up under ~/.claude/skills")
 	}
 }
 

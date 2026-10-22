@@ -245,7 +245,7 @@ sequenceDiagram
 
 Key points:
 - Sub-agent skills are configured per-repo (`.skills["code-review"]`, defaults to
-  `["thermo-nuclear-code-quality-review"]`), fired as parallel `Agent` calls in one message.
+  `["gx-thermo-nuclear-code-quality-review"]`), fired as parallel `Agent` calls in one message.
 - The **consultant** is a single fresh-context, read-only subagent, explicitly run at the
   highest-tier model — it never edits anything. Its job is to de-duplicate, prioritize by actual
   impact (not vote count across reviewers), and issue an approve/reject/defer decision per
