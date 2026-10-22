@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Reports which vendored skills have upstream changes. See docs/specs/vendored-skills.md.
 #
-# Usage: sync-vendored-skills.sh --check [--manifest FILE]
+# Usage: sync-vendored-skills.sh --check|--merge [--manifest FILE] [--skills-dir DIR]
+#
+# --check lists skills with upstream changes. --merge 3-way merges them into the gx copies under
+# --skills-dir (default ../skills) and reports; the pin does not move.
 #
 # GX_UPSTREAM_BASE replaces https://github.com as the place upstream repos are fetched from
 # (<base>/<owner>/<repo>), so tests never touch the network.
@@ -9,13 +12,19 @@ set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 manifest="$script_dir/vendored-skills.manifest"
+skills_dir="$script_dir/../skills"
 mode=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--check) mode=check ;;
+	--merge) mode=merge ;;
 	--manifest)
 		manifest="${2:?--manifest needs a file}"
+		shift
+		;;
+	--skills-dir)
+		skills_dir="${2:?--skills-dir needs a directory}"
 		shift
 		;;
 	*)
@@ -26,8 +35,8 @@ while [ $# -gt 0 ]; do
 	shift
 done
 
-if [ "$mode" != check ]; then
-	echo "usage: $0 --check [--manifest FILE]" >&2
+if [ -z "$mode" ]; then
+	echo "usage: $0 --check|--merge [--manifest FILE] [--skills-dir DIR]" >&2
 	exit 2
 fi
 
@@ -49,15 +58,89 @@ fetch() {
 	echo "$dir"
 }
 
+# Prints the files under <path> at <rev>, relative to <path>.
+upstream_files() {
+	git -C "$1" ls-tree -r --name-only "$2:$3"
+}
+
+# 3-way merges one skill into gx's copy: base = upstream at the pin, ours = gx, theirs = latest.
+# The pin does not move.
+merge_skill() {
+	local skill=$1 dir=$2 path=$3 pin=$4 ours_dir="$skills_dir/$1"
+	local clean=() conflicted=() f b o t rc
+	local tmp="$work/merge"
+	rm -rf "$tmp"
+	mkdir -p "$tmp"
+
+	while read -r f; do
+		case "$f" in LICENSE | README.md) continue ;; esac
+		b=0 o=0 t=0
+		git -C "$dir" cat-file -e "$pin:$path/$f" 2>/dev/null && b=1
+		[ -f "$ours_dir/$f" ] && o=1
+		git -C "$dir" cat-file -e "$latest:$path/$f" 2>/dev/null && t=1
+		[ $b = 1 ] && git -C "$dir" show "$pin:$path/$f" >"$tmp/base"
+		[ $t = 1 ] && git -C "$dir" show "$latest:$path/$f" >"$tmp/theirs"
+
+		case "$b$o$t" in
+		111)
+			if cmp -s "$tmp/base" "$tmp/theirs"; then continue; fi
+			rc=0
+			git merge-file "$ours_dir/$f" "$tmp/base" "$tmp/theirs" || rc=$?
+			if [ "$rc" -eq 0 ]; then clean+=("$f"); else conflicted+=("$f"); fi
+			;;
+		001)
+			mkdir -p "$(dirname "$ours_dir/$f")"
+			cp "$tmp/theirs" "$ours_dir/$f"
+			clean+=("$f")
+			;;
+		011)
+			cmp -s "$ours_dir/$f" "$tmp/theirs" || conflicted+=("$f")
+			;;
+		110)
+			if cmp -s "$ours_dir/$f" "$tmp/base"; then
+				rm "$ours_dir/$f"
+				clean+=("$f")
+			else
+				conflicted+=("$f")
+			fi
+			;;
+		101)
+			cmp -s "$tmp/base" "$tmp/theirs" || conflicted+=("$f")
+			;;
+		esac
+	done < <({
+		upstream_files "$dir" "$pin" "$path"
+		upstream_files "$dir" "$latest" "$path"
+		[ -d "$ours_dir" ] && (cd "$ours_dir" && find . -type f | sed 's|^\./||')
+		true
+	} | sort -u)
+
+	echo "clean files:"
+	[ ${#clean[@]} -eq 0 ] || printf '  %s\n' "${clean[@]}"
+	echo "conflicted files:"
+	[ ${#conflicted[@]} -eq 0 ] || printf '  %s\n' "${conflicted[@]}"
+}
+
 found=0
-while read -r skill repo path _license pin _strategy; do
+while read -r skill repo path _license pin strategy; do
 	case "$skill" in '' | '#'*) continue ;; esac
 	dir=$(fetch "$repo")
-	count=$(git -C "$dir" rev-list --count "$pin..HEAD" -- "$path")
-	if [ "$count" -gt 0 ]; then
-		echo "$skill: $count new upstream commits since $pin"
-		found=1
+	latest=$(git -C "$dir" rev-parse HEAD)
+	count=$(git -C "$dir" rev-list --count "$pin..$latest" -- "$path")
+	if [ "$count" -eq 0 ]; then
+		continue
 	fi
+	found=1
+	if [ "$mode" = check ]; then
+		echo "$skill: $count new upstream commits since $pin"
+		continue
+	fi
+	[ "${strategy:-merge}" = merge ] || continue
+	echo "== $skill: $count new upstream commits since $pin =="
+	git -C "$dir" log --oneline "$pin..$latest" -- "$path"
+	echo "upstream diff:"
+	git -C "$dir" diff "$pin" "$latest" -- "$path"
+	merge_skill "$skill" "$dir" "$path" "$pin"
 done <"$manifest"
 
 [ "$found" = 1 ] || echo "All vendored skills are up to date."

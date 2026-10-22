@@ -85,7 +85,7 @@ func newSyncFixture(t *testing.T) *syncFixture {
 
 func (f *syncFixture) runSync(t *testing.T, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("bash", append([]string{"sync-vendored-skills.sh", "--manifest", f.manifest}, args...)...)
+	cmd := exec.Command("bash", append([]string{"sync-vendored-skills.sh", "--manifest", f.manifest, "--skills-dir", filepath.Dir(f.gxSkill)}, args...)...)
 	cmd.Env = append(os.Environ(), "GX_UPSTREAM_BASE="+f.base)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -163,6 +163,161 @@ func TestSyncCheck_WritesNothing(t *testing.T) {
 	}
 	if gitIn(t, f.upstream, "rev-parse", "HEAD") != upstreamHead || gitIn(t, f.upstream, "status", "--porcelain") != upstreamStatus {
 		t.Error("upstream repo changed")
+	}
+}
+
+// newMergeFixture extends the base fixture with a multi-file alpha skill, pinned at its first state.
+func newMergeFixture(t *testing.T) *syncFixture {
+	t.Helper()
+	f := newSyncFixture(t)
+	f.pin = f.commitUpstream(t, "alpha files", map[string]string{
+		"skills/alpha/a.md":      "1\n2\n3\n4\n5\n6\n7\n",
+		"skills/alpha/gone.md":   "gone\n",
+		"skills/alpha/gxgone.md": "gxgone\n",
+		"skills/alpha/README.md": "readme v1\n",
+	})
+	for name, c := range map[string]string{
+		"a.md": "1\n2\n3\n4\n5\n6\n7\n", "gone.md": "gone\n", "README.md": "readme v1\n",
+	} {
+		writeFile(t, filepath.Join(f.gxSkill, name), c)
+	}
+	writeFile(t, f.manifest, "gx-alpha "+fixtureRepo+" skills/alpha LICENSE "+f.pin+"\n")
+	return f
+}
+
+func readGx(t *testing.T, f *syncFixture, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(f.gxSkill, name))
+	if err != nil {
+		return "<missing>"
+	}
+	return string(b)
+}
+
+func TestSyncMerge_CleanMergeKeepsGxEditsAndTakesUpstreamChanges(t *testing.T) {
+	f := newMergeFixture(t)
+	writeFile(t, filepath.Join(f.gxSkill, "a.md"), "1\n2\n3\n4\n5\n6\ngx\n")
+	f.commitUpstream(t, "edit top", map[string]string{
+		"skills/alpha/a.md": "up\n2\n3\n4\n5\n6\n7\n", "skills/alpha/README.md": "readme v2\n",
+	})
+
+	out := f.runSync(t, "--merge")
+
+	if got := readGx(t, f, "a.md"); got != "up\n2\n3\n4\n5\n6\ngx\n" {
+		t.Errorf("a.md = %q", got)
+	}
+	if got := readGx(t, f, "README.md"); got != "readme v1\n" {
+		t.Errorf("README.md must be untouched, got %q", got)
+	}
+	for _, want := range []string{"1 new upstream commits", "edit top", "+up", "clean files:\n  a.md\n", "conflicted files:\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "conflicted files:\n  ") {
+		t.Errorf("nothing should conflict:\n%s", out)
+	}
+}
+
+func TestSyncMerge_ConflictLeavesMarkersAndListsFile(t *testing.T) {
+	f := newMergeFixture(t)
+	writeFile(t, filepath.Join(f.gxSkill, "a.md"), "gx\n2\n3\n4\n5\n6\n7\n")
+	f.commitUpstream(t, "edit top", map[string]string{"skills/alpha/a.md": "up\n2\n3\n4\n5\n6\n7\n"})
+
+	out := f.runSync(t, "--merge")
+
+	if got := readGx(t, f, "a.md"); !strings.Contains(got, "<<<<<<<") || !strings.Contains(got, ">>>>>>>") {
+		t.Errorf("want conflict markers, got %q", got)
+	}
+	if !strings.Contains(out, "conflicted files:\n  a.md\n") {
+		t.Errorf("a.md should be conflicted:\n%s", out)
+	}
+}
+
+func TestSyncMerge_UpstreamAddedFileIsCopiedIn(t *testing.T) {
+	f := newMergeFixture(t)
+	f.commitUpstream(t, "add", map[string]string{"skills/alpha/sub/new.md": "new\n"})
+
+	out := f.runSync(t, "--merge")
+
+	if got := readGx(t, f, "sub/new.md"); got != "new\n" {
+		t.Errorf("new.md = %q", got)
+	}
+	if !strings.Contains(out, "clean files:\n  sub/new.md\n") {
+		t.Errorf("report:\n%s", out)
+	}
+}
+
+func TestSyncMerge_UpstreamDeletedFile(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		gxEdit     bool
+		wantExists bool
+		wantList   string
+	}{
+		{"unchanged in gx is deleted", false, false, "clean files:\n  gone.md\n"},
+		{"changed in gx conflicts", true, true, "conflicted files:\n  gone.md\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newMergeFixture(t)
+			if tc.gxEdit {
+				writeFile(t, filepath.Join(f.gxSkill, "gone.md"), "gx edit\n")
+			}
+			gitIn(t, f.upstream, "rm", "-q", "skills/alpha/gone.md")
+			gitIn(t, f.upstream, "commit", "-q", "-m", "delete")
+
+			out := f.runSync(t, "--merge")
+
+			if exists := readGx(t, f, "gone.md") != "<missing>"; exists != tc.wantExists {
+				t.Errorf("exists = %v, want %v", exists, tc.wantExists)
+			}
+			if !strings.Contains(out, tc.wantList) {
+				t.Errorf("report missing %q:\n%s", tc.wantList, out)
+			}
+		})
+	}
+}
+
+func TestSyncMerge_GxDeletedFile(t *testing.T) {
+	// gxgone.md is in base but gx never had it.
+	t.Run("upstream unchanged stays deleted", func(t *testing.T) {
+		f := newMergeFixture(t)
+		f.commitUpstream(t, "other", map[string]string{"skills/alpha/a.md": "up\n2\n3\n4\n5\n6\n7\n"})
+
+		out := f.runSync(t, "--merge")
+
+		if got := readGx(t, f, "gxgone.md"); got != "<missing>" {
+			t.Errorf("gxgone.md came back: %q", got)
+		}
+		if strings.Contains(out, "gxgone.md") {
+			t.Errorf("gxgone.md should not be reported:\n%s", out)
+		}
+	})
+	t.Run("upstream changed conflicts", func(t *testing.T) {
+		f := newMergeFixture(t)
+		f.commitUpstream(t, "edit", map[string]string{"skills/alpha/gxgone.md": "gxgone v2\n"})
+
+		out := f.runSync(t, "--merge")
+
+		if got := readGx(t, f, "gxgone.md"); got != "<missing>" {
+			t.Errorf("gxgone.md written: %q", got)
+		}
+		if !strings.Contains(out, "conflicted files:\n  gxgone.md\n") {
+			t.Errorf("report:\n%s", out)
+		}
+	})
+}
+
+func TestSyncMerge_DoesNotMoveThePin(t *testing.T) {
+	f := newMergeFixture(t)
+	f.commitUpstream(t, "edit", map[string]string{"skills/alpha/a.md": "up\n2\n3\n4\n5\n6\n7\n"})
+	before, _ := os.ReadFile(f.manifest)
+
+	f.runSync(t, "--merge")
+
+	after, _ := os.ReadFile(f.manifest)
+	if string(before) != string(after) {
+		t.Error("manifest changed")
 	}
 }
 
