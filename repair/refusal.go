@@ -11,7 +11,7 @@ import (
 )
 
 // Stable machine-readable refusal codes shared by the repair verbs
-// (land, verify, reset, unpark). Callers branch on these, never on message text.
+// (merge, verify, start-over, resume). Callers branch on these, never on message text.
 const (
 	ReasonLandLocked             = "land_locked"
 	ReasonIterationBranchMissing = "iteration_branch_missing"
@@ -21,11 +21,11 @@ const (
 	ReasonStatusRefused          = "status_refused"
 	ReasonCommitless             = "commitless"
 	ReasonRalphLoopCwd           = "ralph_loop_cwd"
-	ReasonLandConflictPending    = "land_conflict_pending"
-	ReasonLandBlocked            = "land_blocked"
-	ReasonNoPendingLand          = "no_pending_land"
-	ReasonLandNotResolved        = "land_not_resolved"
-	ReasonLandSuperseded         = "land_superseded"
+	ReasonMergeConflictPending   = "merge_conflict_pending"
+	ReasonMergeBlocked           = "merge_blocked"
+	ReasonNoPendingMerge         = "no_pending_merge"
+	ReasonMergeNotResolved       = "merge_not_resolved"
+	ReasonMergeSuperseded        = "merge_superseded"
 	ReasonReasonRequired         = "reason_required"
 	ReasonWrongRepo              = "wrong_repo"
 	ReasonNotRecoverable         = "not_recoverable"

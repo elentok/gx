@@ -528,7 +528,7 @@ func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRe
 	return res, err
 }
 
-// Repair runs a repair verb ("land", "reset", "resume" or "verify"). A refusal
+// Repair runs a repair verb ("merge", "start-over", "resume" or "verify"). A refusal
 // is a result (Refused set), not an error.
 func (c *Client) Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
 	var res server.RepairResult

@@ -19,6 +19,25 @@ func TestOldRepairVerbsAreUnknownTicketsCommands(t *testing.T) {
 	}
 }
 
+func TestServerTicketsMergeAndStartOverReplaceLandAndReset(t *testing.T) {
+	root := newRootCmd(deps{})
+	for _, verb := range []string{"merge", "start-over"} {
+		c, _, err := root.Find([]string{"server", "tickets", verb})
+		if err != nil || c.Name() != verb {
+			t.Errorf("gx server tickets %s: %v (found %v)", verb, err, c.Name())
+		}
+	}
+	start, _, _ := root.Find([]string{"server", "tickets", "start-over"})
+	if !strings.Contains(start.Short, "backup branch") {
+		t.Errorf("start-over help = %q, want it to mention the backup branch", start.Short)
+	}
+	for _, old := range []string{"land", "reset"} {
+		if c, _, _ := root.Find([]string{"server", "tickets", old}); c.Name() == old {
+			t.Errorf("gx server tickets %s still exists", old)
+		}
+	}
+}
+
 func TestServerTicketsPauseAndResumeKeepHiddenAliases(t *testing.T) {
 	root := newRootCmd(deps{})
 	for verb, hidden := range map[string]bool{"pause": false, "resume": false, "park": true, "unpark": true} {

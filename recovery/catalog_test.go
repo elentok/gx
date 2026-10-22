@@ -334,7 +334,7 @@ func TestDefaultR3LaunchesDisabledAsMediumAgentEntriesWithVerifyAndLand(t *testi
 			continue
 		}
 		n++
-		if e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"verify", "land"}) {
+		if e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"verify", "merge"}) {
 			t.Errorf("R3 = %+v, want medium agent entry with verify and land", e)
 		}
 	}

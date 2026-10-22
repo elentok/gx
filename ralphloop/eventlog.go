@@ -174,13 +174,13 @@ type Event struct {
 	// turn" from "idle because it never left this launch state" (see
 	// noActivitySinceLaunch).
 	StateChangeSeq int `json:"state_change_seq,omitempty"`
-	// Outcome (manual-land/ticket-reset, recovery-applied) is what the
+	// Outcome (manual-merge/ticket-started-over, recovery-applied) is what the
 	// recovery command or remedy concluded: "ok" or the remedy's error.
 	Outcome string `json:"outcome,omitempty"`
-	// TrailerValue (manual-land/ticket-reset only) is the trailer value the
+	// TrailerValue (manual-merge/ticket-started-over only) is the trailer value the
 	// command matched or wrote on the landed commits.
 	TrailerValue string `json:"trailer_value,omitempty"`
-	// AtticRef (manual-land/ticket-reset only) is the ref that preserves the
+	// AtticRef (manual-merge/ticket-started-over only) is the ref that preserves the
 	// commits the command set aside.
 	AtticRef string `json:"attic_ref,omitempty"`
 	// TaskID (background-task gate events only) is the gated task, so readers

@@ -49,17 +49,17 @@ func addServerRepairCmds(parent *cobra.Command) {
 		return c
 	}
 
-	verb("land", "land <project:epic/NN>", "land a stuck ticket's commits onto the feature branch and mark it done", cobra.ExactArgs(1), func(c *cobra.Command) {
+	verb("merge", "merge <project:epic/NN>", "merge a stuck ticket's commits onto the feature branch and mark it done", cobra.ExactArgs(1), func(c *cobra.Command) {
 		c.Flags().StringVar(&req.From, "from", "", "exclusive base of an explicit commit range (requires --to)")
 		c.Flags().StringVar(&req.To, "to", "", "tip of an explicit commit range (requires --from)")
-		c.Flags().BoolVar(&req.IgnoreLiveTab, "ignore-live-tab", false, "land even though the iteration's herdr tab exists")
-		c.Flags().BoolVar(&req.Continue, "continue", false, "finish a conflicted land after resolving it")
-		c.Flags().BoolVar(&req.Abort, "abort", false, "abandon a conflicted land")
+		c.Flags().BoolVar(&req.IgnoreLiveTab, "ignore-live-tab", false, "merge even though the iteration's herdr tab exists")
+		c.Flags().BoolVar(&req.Continue, "continue", false, "finish a conflicted merge after resolving it")
+		c.Flags().BoolVar(&req.Abort, "abort", false, "abandon a conflicted merge")
 	})
-	verb("reset", "reset <project:epic/NN>", "send a stuck ticket back to open, keeping its commits reachable", cobra.ExactArgs(1), func(c *cobra.Command) {
-		c.Flags().StringVar(&req.Reason, "reason", "", "why the ticket is being reset (required)")
-		c.Flags().BoolVar(&req.Force, "force", false, "allow resetting a done ticket")
-		c.Flags().BoolVar(&req.DeleteBranch, "delete-branch", false, "delete the iteration branch instead of keeping it under ralph-loop/attic/")
+	verb("start-over", "start-over <project:epic/NN>", "send a stuck ticket back to open and keep its commits on a backup branch", cobra.ExactArgs(1), func(c *cobra.Command) {
+		c.Flags().StringVar(&req.Reason, "reason", "", "why the ticket is being started over (required)")
+		c.Flags().BoolVar(&req.Force, "force", false, "allow starting over a done ticket")
+		c.Flags().BoolVar(&req.DeleteBranch, "delete-branch", false, "delete the backup branch instead of keeping it under ralph-loop/attic/")
 	})
 	verb("resume", "resume <project:epic/NN>", "reopen a paused ticket and retire its Paused section into Comments", cobra.ExactArgs(1), nil)
 	verb("unpark", "unpark <project:epic/NN>", "alias of resume", cobra.ExactArgs(1), nil).Hidden = true

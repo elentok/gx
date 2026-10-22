@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// LandResult is the --json success payload of `gx server tickets land`.
+// LandResult is the --json success payload of `gx server tickets merge`.
 type LandResult struct {
 	Outcome        string `json:"outcome"`
 	SHA            string `json:"sha"`
@@ -139,7 +139,7 @@ func landLockedRefusal(lockDir, epicPath, id string) *RefusalError {
 	msg := "another land is in progress (land lock is held)"
 	owner, err := ralphloop.OrphanLandLock(lockDir)
 	if err == nil && owner != nil {
-		msg = fmt.Sprintf("land lock is held by %s with no conflict pending; if that land crashed, clear it with `gx server tickets land %s --abort`", owner.Describe(), EpicTicketLabel(epicPath, id))
+		msg = fmt.Sprintf("land lock is held by %s with no conflict pending; if that land crashed, clear it with `gx server tickets merge %s --abort`", owner.Describe(), EpicTicketLabel(epicPath, id))
 	}
 	return &RefusalError{Reason: ReasonLandLocked, Message: msg}
 }
@@ -152,7 +152,7 @@ func abortOrphanLock(epicPath, lockDir, id string) (LandResult, string, error) {
 		return LandResult{}, "", err
 	}
 	if owner == nil {
-		return LandResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", id)}
+		return LandResult{}, "", &RefusalError{Reason: ReasonNoPendingMerge, Message: fmt.Sprintf("no conflicted merge of ticket %s is pending", id)}
 	}
 	if owner.Alive() {
 		return LandResult{}, "", &RefusalError{Reason: ReasonLandLocked, Message: fmt.Sprintf("land lock is held by running %s; wait for it to finish", owner.Describe())}
@@ -163,7 +163,7 @@ func abortOrphanLock(epicPath, lockDir, id string) (LandResult, string, error) {
 	return LandResult{Outcome: "unlocked"}, fmt.Sprintf("%s: cleared stale land lock held by %s", EpicTicketLabel(epicPath, id), owner.Describe()), nil
 }
 
-// recordLanded writes status: done (unless already) and the manual-land event
+// recordLanded writes status: done (unless already) and the manual-merge event
 // through the park path.
 func recordLanded(epicPath, epic string, t tickets.Ticket, status schema.Status, res ralphloop.LandResult, session ralphloop.LandSession) error {
 	ev := ralphloop.Event{
@@ -205,7 +205,7 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 		return abortOrphanLock(in.EpicPath, lockDir, in.ID)
 	}
 	if marker == nil || marker.Ticket != in.ID {
-		return LandResult{}, "", &RefusalError{Reason: ReasonNoPendingLand, Message: fmt.Sprintf("no conflict landing ticket %s is pending", in.ID)}
+		return LandResult{}, "", &RefusalError{Reason: ReasonNoPendingMerge, Message: fmt.Sprintf("no conflicted merge of ticket %s is pending", in.ID)}
 	}
 	featurePath, err := featureWorktree(d, in.Cwd, epic)
 	if err != nil {
@@ -225,30 +225,30 @@ func resolveLand(in LandInput, d ralphloop.Deps) (LandResult, string, error) {
 		if err := ralphloop.ClearLand(lockDir); err != nil {
 			return LandResult{}, "", fmt.Errorf("clearing land marker: %w", err)
 		}
-		return LandResult{Outcome: "aborted"}, fmt.Sprintf("%s: land aborted", EpicTicketLabel(in.EpicPath, in.ID)), nil
+		return LandResult{Outcome: "aborted"}, fmt.Sprintf("%s: merge aborted", EpicTicketLabel(in.EpicPath, in.ID)), nil
 	}
 
 	if inProgress {
-		return LandResult{}, "", &RefusalError{Reason: ReasonLandConflictPending, Message: fmt.Sprintf("the cherry-pick for ticket %s is still in progress; resolve it and run `git cherry-pick --continue` first", in.ID)}
+		return LandResult{}, "", &RefusalError{Reason: ReasonMergeConflictPending, Message: fmt.Sprintf("the cherry-pick for ticket %s is still in progress; resolve it and run `git cherry-pick --continue` first", in.ID)}
 	}
 	head, err := d.RevParse(featurePath, "HEAD")
 	if err != nil {
 		return LandResult{}, "", fmt.Errorf("resolving %s HEAD: %w", epic, err)
 	}
 	if head == marker.PrePickHead {
-		return LandResult{}, "", &RefusalError{Reason: ReasonLandNotResolved, Message: fmt.Sprintf("%s has not moved since the conflict; nothing was committed (use --abort to give up)", epic)}
+		return LandResult{}, "", &RefusalError{Reason: ReasonMergeNotResolved, Message: fmt.Sprintf("%s has not moved since the conflict; nothing was committed (use --abort to give up)", epic)}
 	}
 	// HEAD moving is not proof this ticket's pick finished: other landings move
 	// it too, and stamping would then mark one of their commits as this one.
 	// The resolved pick is unstamped, so any ticket trailer since the conflict
 	// is someone else's landing.
 	if ok, err := d.IsAncestor(featurePath, marker.PrePickHead, head); err != nil || !ok {
-		return LandResult{}, "", &RefusalError{Reason: ReasonLandSuperseded, Message: fmt.Sprintf("%s no longer descends from the pre-conflict head %s; the conflicted pick for ticket %s is gone (run --abort, then land again)", epic, marker.PrePickHead, in.ID)}
+		return LandResult{}, "", &RefusalError{Reason: ReasonMergeSuperseded, Message: fmt.Sprintf("%s no longer descends from the pre-conflict head %s; the conflicted pick for ticket %s is gone (run --abort, then merge again)", epic, marker.PrePickHead, in.ID)}
 	}
 	if others, err := d.TrailerMap(featurePath, marker.PrePickHead+"..HEAD", ralphloop.TicketTrailerKey); err != nil {
 		return LandResult{}, "", fmt.Errorf("reading landings since the conflict on %s: %w", epic, err)
 	} else if len(others) > 0 {
-		return LandResult{}, "", &RefusalError{Reason: ReasonLandSuperseded, Message: fmt.Sprintf("other tickets landed on %s since the conflict; the conflicted pick for ticket %s is gone (run --abort, then land again)", epic, in.ID)}
+		return LandResult{}, "", &RefusalError{Reason: ReasonMergeSuperseded, Message: fmt.Sprintf("other tickets merged into %s since the conflict; the conflicted pick for ticket %s is gone (run --abort, then merge again)", epic, in.ID)}
 	}
 
 	parsed, err := schema.ParseTicket(t.Path)
@@ -296,10 +296,10 @@ func checkLandable(id string, t schema.Ticket) error {
 	case t.Status == schema.StatusDone, t.Status == schema.StatusClaimed, t.PausedClass() == schema.PauseClassRepair:
 	case t.PausedClass() == schema.PauseClassAnswer && (t.PauseReason == "" || t.PauseReason == schema.PauseZeroCommit):
 	default:
-		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; land accepts only done, claimed, needs-repair or a zero-commit needs-answer", id, describeStatus(t))}
+		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; merge accepts only done, claimed, needs-repair or a zero-commit needs-answer", id, describeStatus(t))}
 	}
 	if t.Commitless {
-		return &RefusalError{Reason: ReasonCommitless, Message: fmt.Sprintf("ticket %s is flagged commitless; there is nothing to land", id)}
+		return &RefusalError{Reason: ReasonCommitless, Message: fmt.Sprintf("ticket %s is flagged commitless; there is nothing to merge", id)}
 	}
 	return nil
 }
@@ -364,11 +364,11 @@ func preflightLand(lockDir, epic, id, featurePath string, d ralphloop.Deps) erro
 	}
 	switch verdict {
 	case ralphloop.LandConflictPending:
-		return &RefusalError{Reason: ReasonLandConflictPending, Message: fmt.Sprintf("a conflict landing ticket %s is pending; resolve it, then --continue or --abort", id)}
+		return &RefusalError{Reason: ReasonMergeConflictPending, Message: fmt.Sprintf("a conflicted merge of ticket %s is pending; resolve it, then --continue or --abort", id)}
 	case ralphloop.LandOtherTicket:
-		return &RefusalError{Reason: ReasonLandBlocked, Message: "a conflict landing a different ticket is pending; finish or abort it first"}
+		return &RefusalError{Reason: ReasonMergeBlocked, Message: "a conflicted merge of a different ticket is pending; finish or abort it first"}
 	case ralphloop.LandUnknownPick:
-		return &RefusalError{Reason: ReasonLandBlocked, Message: "a cherry-pick is in progress on the feature branch with no land marker; refusing to trample it"}
+		return &RefusalError{Reason: ReasonMergeBlocked, Message: "a cherry-pick is in progress on the feature branch with no merge marker; refusing to trample it"}
 	}
 	return nil
 }

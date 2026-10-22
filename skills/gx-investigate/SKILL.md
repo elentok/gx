@@ -136,10 +136,10 @@ bug that isn't fixed yet, the line itself carries the symptom, cause and recover
 ## Recovering a stuck ticket
 
 Charter: **never edits _product_ code — may repair ralph-loop state.** The repair tools are
-`gx server tickets land | verify | reset | unpark`. All four share one `--json` contract: exit 0 with the
+`gx server tickets merge | verify | start-over | resume`. All four share one `--json` contract: exit 0 with the
 result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`. Branch on `reason`
 (`land_locked`, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
-`commitless`, `land_conflict_pending`, …), never on `message`.
+`commitless`, `merge_conflict_pending`, …), never on `message`.
 
 **Go-ahead.** Every write (`land`, `reset`, `unpark`, `land --continue/--abort`) needs the
 human's explicit go-ahead in this session. `verify` is read-only and always free. In attended mode
@@ -203,17 +203,17 @@ exactly as before.
   open question (`m` menu → "Answer…", `gx tickets answer`, or "Watch" to jump to a live pane), then
   `gx server tickets unpark <project:epic/NN>` (or `m` → "Resume (I answered)").
 - `claimed` / `needs-repair` (`land` also accepts `done`; `reset` needs `--force` for `done`):
-  - Complete → `gx server tickets land <project:epic/NN> --json`. Commits already landed with a
+  - Complete → `gx server tickets merge <project:epic/NN> --json`. Commits already landed with a
     stale status is the common case; `land` just writes `status: done`.
-  - Incomplete → `gx server tickets reset <project:epic/NN> --reason "<why>" --json`. The branch is kept under
+  - Incomplete → `gx server tickets start-over <project:epic/NN> --reason "<why>" --json`. The branch is kept under
     `ralph-loop/attic/`; the reason is written to Comments as unverified partial work.
 - `draft` / `open` → nothing ran; neither ending applies.
 
 **Every failure stops and reports.** Name the reason code and the human's next gesture, including
 the `m` menu path (`m` on the ticket → Investigate / Answer… / Resume). Examples:
 `fork_children` → reset a child instead; `iteration_branch_missing` → `land --from/--to` with an
-explicit range; `land_conflict_pending` → resolve in the feature worktree, then
-`land --continue` or `--abort`; `land_locked` → retry later. Don't retry around a refusal.
+explicit range; `merge_conflict_pending` → resolve in the feature worktree, then
+`merge --continue` or `--abort`; `land_locked` → retry later. Don't retry around a refusal.
 
 **A live agent on the tab starts an investigation, not a stop.** `live_agent_on_tab` stands — don't
 use `--ignore-live-tab` to get past it. Read iteration status, the run log, the transcript and

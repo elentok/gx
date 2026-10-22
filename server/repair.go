@@ -79,9 +79,9 @@ func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult,
 	s.settings.Store(&Settings{})
 	var do func(RepairRequest) (RepairResult, error)
 	switch verb {
-	case "land":
+	case "merge":
 		do = s.repairLand
-	case "reset":
+	case "start-over":
 		do = s.repairReset
 	case "resume", "unpark":
 		do = s.repairUnpark

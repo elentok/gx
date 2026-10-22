@@ -43,7 +43,7 @@ type ResetInput struct {
 // ResetLiveRunWarning is shown on every successful reset: a running
 // ralph-loop keeps its in-memory launched set, so a reset ticket is not
 // re-queued until the run restarts.
-const ResetLiveRunWarning = "if a ralph-loop run is live, this reset is only half effective: downstream tickets unblock but this ticket is not re-queued until the run restarts"
+const ResetLiveRunWarning = "if a ralph-loop run is live, this start-over is only half effective: downstream tickets unblock but this ticket is not re-queued until the run restarts"
 
 // GitCommitSubjects is the production ResetInput.Subjects.
 func GitCommitSubjects(dir, base, branch string) ([]string, error) {
@@ -97,13 +97,13 @@ func Reset(in ResetInput, d ralphloop.Deps) (ResetResult, error) {
 	}
 
 	res := ResetResult{Ticket: in.ID, Status: string(schema.StatusOpen), AtticRef: attic.Ref, Warning: ResetLiveRunWarning}
-	ev := ralphloop.Event{Type: string(events.TicketStartedOver), Ticket: t.Identifier, Outcome: "reset", Reason: in.Reason}
+	ev := ralphloop.Event{Type: string(events.TicketStartedOver), Ticket: t.Identifier, Outcome: "started-over", Reason: in.Reason}
 	if attic.Ref != nil {
 		ev.AtticRef = *attic.Ref
 		ev.SHA = attic.Tip
 	}
 	if err := ralphloop.AppendEvent(filepath.Dir(filepath.Clean(in.EpicPath)), epicName, ev); err != nil {
-		return ResetResult{}, fmt.Errorf("logging ticket-reset: %w", err)
+		return ResetResult{}, fmt.Errorf("logging ticket-started-over: %w", err)
 	}
 	return res, nil
 }
@@ -155,7 +155,7 @@ func clearIteration(in ResetInput, d ralphloop.Deps, wtDir, epic, id, branch str
 func checkResettable(in ResetInput, epic tickets.Epic, t tickets.Ticket) error {
 	for _, other := range epic.Tickets {
 		if other.Parent != nil && *other.Parent == t.Identifier {
-			return &RefusalError{Reason: ReasonForkChildren, Message: fmt.Sprintf("ticket %s has fork child %s; reset %s instead", in.ID, other.Identifier, other.Identifier)}
+			return &RefusalError{Reason: ReasonForkChildren, Message: fmt.Sprintf("ticket %s has fork child %s; start over %s instead", in.ID, other.Identifier, other.Identifier)}
 		}
 	}
 	// Raw status, not RenderedStatus: blockers render a claimed ticket
@@ -164,10 +164,10 @@ func checkResettable(in ResetInput, epic tickets.Epic, t tickets.Ticket) error {
 	case schema.StatusClaimed, schema.StatusPaused:
 	case schema.StatusDone:
 		if !in.Force {
-			return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is done and already landed; pass --force to reset it anyway (the landing is not reverted)", in.ID)}
+			return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is done and already merged; pass --force to start it over anyway (the merge is not reverted)", in.ID)}
 		}
 	default:
-		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %v; reset accepts only claimed, needs-repair or needs-answer (done with --force)", in.ID, status)}
+		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %v; start-over accepts only claimed or paused (done with --force)", in.ID, status)}
 	}
 	return nil
 }

@@ -29,14 +29,14 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 		req    server.RepairRequest
 		reason string
 	}{
-		{"land from a ralph-loop branch", "land", server.RepairRequest{Address: addr, Branch: "ralph-loop/epic-a"}, repair.ReasonRalphLoopCwd},
-		{"land continue and abort", "land", server.RepairRequest{Address: addr, Continue: true, Abort: true}, repair.ReasonError},
-		{"land an open ticket", "land", server.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
-		{"reset without a reason", "reset", server.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
+		{"merge from a ralph-loop branch", "merge", server.RepairRequest{Address: addr, Branch: "ralph-loop/epic-a"}, repair.ReasonRalphLoopCwd},
+		{"merge continue and abort", "merge", server.RepairRequest{Address: addr, Continue: true, Abort: true}, repair.ReasonError},
+		{"merge an open ticket", "merge", server.RepairRequest{Address: addr, Cwd: t.TempDir()}, repair.ReasonStatusRefused},
+		{"start-over without a reason", "start-over", server.RepairRequest{Address: addr}, repair.ReasonReasonRequired},
 		{"unpark an open ticket", "unpark", server.RepairRequest{Address: addr}, repair.ReasonNotParked},
 		{"resume an open ticket", "resume", server.RepairRequest{Address: addr}, repair.ReasonNotParked},
 		{"bad address", "unpark", server.RepairRequest{Address: "nonsense"}, server.ReasonInvalidAddress},
-		{"unknown project", "reset", server.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
+		{"unknown project", "start-over", server.RepairRequest{Address: "nope:epic-a/01", Reason: "x"}, server.ReasonUnknownTicket},
 	}
 	for _, c := range cases {
 		res, err := h.Client.Repair(ctx, c.verb, c.req)
@@ -69,7 +69,7 @@ func TestRepair_LandAcceptsAZeroCommitParkWithCommits(t *testing.T) {
 	h, ticketPath := parkedIteration(t, string(events.ZeroCommit), true)
 
 	// A caller outside the repo still lands: the repo comes from the project.
-	res, err := h.Client.Repair(context.Background(), "land", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("land = %+v, %v; want landed", res, err)
 	}
@@ -91,7 +91,7 @@ func TestRepair_LandRefusesOtherParks(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			h, _ := parkedIteration(t, c.kind, c.commit)
-			res, err := h.Client.Repair(context.Background(), "land", server.RepairRequest{Address: "proj:epic-a/01"})
+			res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
 			if err != nil || !res.Refused || res.Reason != c.reason {
 				t.Errorf("land = %+v, %v; want refusal %s", res, err, c.reason)
 			}
@@ -108,7 +108,7 @@ func TestRepair_LandWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "land", server.RepairRequest{Address: "proj:epic-a/01"})
+	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonWrongRepo {
 		t.Errorf("land = %+v, %v; want %s", res, err, repair.ReasonWrongRepo)
 	}
@@ -119,7 +119,7 @@ func TestRepair_RalphLoopGuardIsServerSide(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)
 
-	res, err := h.Client.Repair(context.Background(), "land", server.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
+	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Branch: "ralph-loop/other"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonRalphLoopCwd {
 		t.Errorf("land = %+v, %v; want %s", res, err, repair.ReasonRalphLoopCwd)
 	}

@@ -326,7 +326,7 @@ var (
 func r3Unrecoverable() Entry {
 	return Entry{
 		ID: "R3", Type: events.Paused, Kind: events.AmbiguousMerge,
-		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "land"},
+		Executor: ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "merge"},
 	}
 }
 
@@ -334,7 +334,7 @@ func r3ClaimedPresent() Entry {
 	return Entry{
 		ID: "R3", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool { return claimsWorkPresentRE.MatchString(seq[len(seq)-1].Text) },
-		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "land"},
+		Executor:  ExecutorAgent, Authority: AuthorityMedium, Verbs: []string{"verify", "merge"},
 	}
 }
 

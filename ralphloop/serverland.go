@@ -387,7 +387,7 @@ func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
 		// person (or recovery) can land it again.
 		reason := "land conflict not resolved: " + r.childReason +
 			"\nThe cherry-pick was rolled back; the iteration branch " + built.job.branch +
-			" is intact. Land it again with `gx server tickets land`."
+			" is intact. Merge it again with `gx server tickets merge`."
 		_, err := park(p.Sink, parkRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,

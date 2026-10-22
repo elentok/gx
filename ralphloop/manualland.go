@@ -2,7 +2,7 @@ package ralphloop
 
 import "github.com/elentok/gx/agentrunner"
 
-// Exported seams for `gx server tickets land`: the label/branch naming and the
+// Exported seams for `gx server tickets merge`: the label/branch naming and the
 // session recovery stay private to this package so a hand landing can never
 // derive them differently from the live loop.
 
