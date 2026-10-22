@@ -851,3 +851,19 @@ states within one epic (`done · in progress · parked · blocked · ready · to
 line** tallies the epic states across the Queue (`done · in progress · parked · failed · total`).
 Zero clauses are suppressed except `done` and `total`, which always render. Counts are always
 **epic-truth** — recomputed from disk over the whole epic — never scoped to one run's own progress.
+
+## Skills
+
+**Bundled skill** — a skill that ships inside gx and is installed with it. Every bundled skill is
+named `gx-*`. A bundled skill calls only other bundled skills, so gx works without any skill the
+person installed separately.
+
+**Vendored skill** — a bundled skill copied from a third-party repo, its **upstream**, and kept in
+step with it. gx may change its copy; a sync pulls the upstream's later changes and keeps gx's.
+Contrast with a bundled skill gx wrote itself (e.g. `gx-verify`), which has no upstream.
+_Avoid_: external skill (for a vendored one).
+
+**Sync strategy** — how a sync brings a vendored skill's upstream changes into gx's copy. **Merge**:
+a 3-way merge of the upstream change into gx's copy, then a review of the result. **Port**: no
+merge; each upstream change is read and carried over by hand only if it matters to gx's copy. Port
+suits a copy gx has largely rewritten.
