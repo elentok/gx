@@ -28,6 +28,27 @@ describe("QueueScreen", () => {
     expect(screen.getByText("Waiting for a slot")).toBeTruthy();
   });
 
+  it("labels a Merge blocked card with its reason and a Merging card with its live agent", () => {
+    const base = snap.epics[0];
+    const blocked = { ...base, address: "gx:blocked", name: "blocked-epic", state: "merge-blocked", active: [], parked: [], reason: "rebase clash in a.go" };
+    const merging = {
+      ...base,
+      address: "gx:merging",
+      name: "merging-epic",
+      state: "merging",
+      parked: [],
+      reason: undefined,
+      active: [{ address: "gx:merging/09", title: "Merge agent", status: "claimed", answerable: false, answered: false, needs_approval: false }],
+    };
+    const epics = [blocked, merging] as unknown as Snapshot["epics"];
+    const { container } = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, epics } })} />);
+    expect(screen.getByText("Merge blocked")).toBeTruthy();
+    expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
+    expect(screen.getByText("Merging")).toBeTruthy();
+    expect(screen.getByText("Merge agent").closest("[data-tone]")?.querySelector("[role=img]")).not.toBeNull();
+    expect(container.querySelectorAll("[data-live]")).toHaveLength(1);
+  });
+
   it("shows the server build in the header, and nothing when the server sends none", () => {
     const { unmount } = renderThemed(<QueueScreen state={state({ snapshot: { ...snap, build: "v1.2.3" } })} />);
     expect(screen.getByTestId("server-build").textContent).toBe("v1.2.3");

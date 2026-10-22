@@ -164,6 +164,13 @@ test("search is case-insensitive, flat, A to Z, with state badges, and clearing 
   expect(screen.getAllByRole("region").length).toBeGreaterThan(0);
 });
 
+test("search rows badge the Merge blocked and Merging states", async () => {
+  await loaded(listOf([row("blocked-epic", { state: "merge-blocked" }), row("merge-epic", { state: "merging" })]));
+  fireEvent.change(screen.getByRole("searchbox", { name: "Search epics" }), { target: { value: "epic" } });
+  expect(screen.getByText("Merge blocked")).toBeTruthy();
+  expect(screen.getByText("Merging")).toBeTruthy();
+});
+
 test("a search with no match says so", async () => {
   await loaded(listOf([row("x")]));
   fireEvent.change(screen.getByRole("searchbox", { name: "Search epics" }), { target: { value: "zzz" } });

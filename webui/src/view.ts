@@ -49,10 +49,12 @@ export interface SnapshotView {
 const STATES: Record<EpicState, { order: number; tone: Tone; label: string }> = {
   parked: { order: 0, tone: "parked", label: "Parked" },
   deadlocked: { order: 1, tone: "deadlocked", label: "Deadlocked" },
-  running: { order: 2, tone: "running", label: "Running" },
-  waiting: { order: 3, tone: "waiting", label: "Waiting for a slot" },
-  "awaiting-merge": { order: 4, tone: "muted", label: "Awaiting merge" },
-  finished: { order: 5, tone: "muted", label: "Finished" },
+  "merge-blocked": { order: 2, tone: "parked", label: "Merge blocked" },
+  running: { order: 3, tone: "running", label: "Running" },
+  merging: { order: 4, tone: "running", label: "Merging" },
+  waiting: { order: 5, tone: "waiting", label: "Waiting for a slot" },
+  "awaiting-merge": { order: 6, tone: "muted", label: "Awaiting merge" },
+  finished: { order: 7, tone: "muted", label: "Finished" },
 };
 
 // Only Waiting changes with the queue mode: a paused or draining queue is why
@@ -106,7 +108,7 @@ export function epicView(epic: EpicSummary, mode?: QueueMode, queue: string[] = 
     project: epic.project,
     tone: STATES[epic.state].tone,
     badge: epicBadge(epic.state, mode),
-    live: epic.state === "running",
+    live: epic.state === "running" || epic.state === "merging",
     done: epic.done,
     total: epic.total,
     reason: epic.reason,

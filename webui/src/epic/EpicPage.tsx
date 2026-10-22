@@ -1,8 +1,7 @@
 import { Box, Heading, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { QueueButton } from "../epics/QueueButton";
-import { BackLink } from "../nav/BackLink";
+import { QueueButton } from "../epics/QueueButton";import { BackLink } from "../nav/BackLink";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { Markdown } from "../markdown/Markdown";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -104,6 +103,11 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
             <Heading as="h1" fontFamily="condensed" fontSize="2xl">
               {address.slice(address.indexOf(":") + 1)}
             </Heading>
+            {detail.state === "merge-blocked" && detail.land_block_reason && (
+              <Text data-reason mt="2" fontSize="sm" color="text.muted">
+                {detail.land_block_reason}
+              </Text>
+            )}
             {detail.queueable && (
               <Box mt="2" display="flex" alignItems="center" gap="2">
                 <QueueButton address={address} state={detail.state ?? ""} onQueued={refetch} />

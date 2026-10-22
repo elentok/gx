@@ -258,6 +258,15 @@ test("a waiting epic says Not queued until it holds a queue item", async () => {
   expect(await screen.findByText("Waiting for a slot · 0 of 1 done · $0.00 · 0s of agent time")).toBeTruthy();
 });
 
+test("a Merge blocked epic shows its label and land-block reason; a Merging epic its label", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merge-blocked", total: 1, done: 1, land_block_reason: "rebase clash in a.go" }));
+  expect(await screen.findByText(/^Merge blocked · 1 of 1 done/)).toBeTruthy();
+  expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
+  cleanup();
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merging", total: 2, done: 1 }));
+  expect(await screen.findByText(/^Merging · 1 of 2 done/)).toBeTruthy();
+});
+
 test("the done fold counts done tickets and adds cancelled only when above zero", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
   expect(await screen.findByText("✓ 1 done · 1 cancelled")).toBeTruthy();
