@@ -130,7 +130,7 @@ From the person's view:
 ### Dirty trunk and other land errors
 
 27. As a project owner whose trunk checkout has local changes that block the ff, I want the root
-    parked with "uncommitted changes on `<target>` (`<files>`) clash with `<epic>`; commit or
+    parked with "uncommitted changes on `<target>` (`<dir>`) clash with `<files>`; commit or
     discard them, then merge again", so that I know exactly what to fix.
 28. As a project owner, I want local changes that do not overlap the land to be ignored, so that a
     dirty trunk only matters when git actually refuses.
@@ -318,7 +318,7 @@ From the person's view:
 - Retry cap, derived from the store: count `type: merge` tickets in the epic from the latest
   `manual: true` merge ticket onward, that ticket included (all of them if none is manual). Order
   is ticket ID (allocation order). 0 or 1 → fork one. 2 or more → park the root as today ("needs
-  rebase … run gx server epics merge <project:epic>"). So every run gets 2 merge tickets at most.
+  rebase … rebase it, then merge again"). So every run gets 2 merge tickets at most.
 - Retro: `submitRetro` runs only at the epic's final outcome, the land or a root park. Forking a
   merge ticket is not an outcome, so no retro goes out then.
 - Per-trunk land mutex in the server, keyed by repo + trunk, held around the whole `landRoot`.
@@ -348,7 +348,7 @@ From the person's view:
   chat park as needs-answer, reason text, root stays queued. No ticket gets a status or
   `park_kind`. New event kinds on `root-parked`: `dirty-trunk` and `land-error`.
 - Reason texts:
-  - Dirty trunk: `uncommitted changes on <target> (<files>) clash with <epic>; commit or discard
+  - Dirty trunk: `uncommitted changes on <target> (<dir>) clash with <files>; commit or discard
     them, then merge again`. Only clashing files are listed, capped at about 5, then `+N more`.
   - Other: `land failed: <git error>; fix it, then merge again`.
   - "Merge again" means `gx server epics merge <project:epic>` or the web Merge button.

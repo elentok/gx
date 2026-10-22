@@ -27,7 +27,7 @@ rule serves both. This also fixes the two TUI bugs above.
 
 1. As the person running gx, I want to open a URL on my phone and see the Queue, so that I can check progress away from my desk.
 2. As the person running gx, I want every epic in the Server queue to appear, so that nothing running, waiting or stuck is hidden.
-3. As the person running gx, I want each epic to carry a state label (Running, Waiting for a slot, Parked, Deadlocked or Awaiting merge), so that I see at a glance which epics need me.
+3. As the person running gx, I want each epic to carry a state label (Running, Waiting for a slot, Parked, Deadlocked, Awaiting merge, Merge blocked or Merging), so that I see at a glance which epics need me.
 4. As the person running gx, I want Parked and Deadlocked epics at the top, so that the epics that need my attention come first.
 5. As the person running gx, I want epics in the same state to keep the server queue order, so that the order matches what the TUI and the scheduler use.
 6. As the person running gx, I want each epic to show its name and project, so that I know what it is.
