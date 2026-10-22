@@ -89,7 +89,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 	case asked && p.KeepAskedAgent:
 	case !adopted:
 		if _, err := p.pauseAsking(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
-			return FinishOutcome{}, fmt.Errorf("marking ticket needs-answer: %w", err)
+			return FinishOutcome{}, fmt.Errorf("pausing ticket to ask: %w", err)
 		}
 	default:
 		if err := cleanupCommitless(d, o, w, commitlessSession(w, pane)); err != nil {
@@ -123,7 +123,7 @@ func pauseStrandedCommits(d Deps, p iterationParams, w IterationWorktree, pane, 
 	}
 	reason := fmt.Sprintf("commitless ticket committed on its detached worktree %s; merge or drop: %s", w.Path, strings.Join(commits, "; "))
 	if _, err := p.pauseAsking(events.StrandedCommits, reason, pane, sessionID, w.Path); err != nil {
-		return false, fmt.Errorf("marking ticket needs-answer: %w", err)
+		return false, fmt.Errorf("pausing ticket to ask: %w", err)
 	}
 	return true, nil
 }

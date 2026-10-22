@@ -132,7 +132,7 @@ func markDoneTicketUnrecoverable(sink EventSink, paths reconcilePaths, featureBr
 		Repair:      state,
 		RepauseDone: true,
 	}); err != nil {
-		return fmt.Errorf("marking ticket needs-repair: %w", err)
+		return fmt.Errorf("pausing ticket for repair: %w", err)
 	}
 	return nil
 }

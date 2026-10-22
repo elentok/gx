@@ -412,7 +412,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 			// tab in place for inspection instead of silently marking done or
 			// retrying, and let the scheduler move on to other unblocked tickets.
 			if _, err := p.pauseAsking(events.ZeroCommit, zeroCommitReason(d, path), pane, sessionID, path); err != nil {
-				return fmt.Errorf("marking ticket needs-answer: %w", err)
+				return fmt.Errorf("pausing ticket to ask: %w", err)
 			}
 			return nil
 		}
@@ -584,8 +584,8 @@ func adoptAskingReport(p iterationParams, path, pane, sessionID string) (adopted
 		return false, nil
 	}
 
-	if _, err := p.pauseAsking(events.SelfReported, "agent reported needs-answer via iteration_status", pane, sessionID, path); err != nil {
-		return false, fmt.Errorf("adopting needs-answer report: %w", err)
+	if _, err := p.pauseAsking(events.SelfReported, "agent asked via iteration_status", pane, sessionID, path); err != nil {
+		return false, fmt.Errorf("adopting ask report: %w", err)
 	}
 	return true, nil
 }

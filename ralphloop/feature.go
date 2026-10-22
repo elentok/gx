@@ -65,7 +65,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 				Event: p.agentEvent(pane, sessionID, w.Path),
 			})
 			if err != nil {
-				return FinishOutcome{}, fmt.Errorf("marking ticket needs-repair: %w", err)
+				return FinishOutcome{}, fmt.Errorf("pausing ticket for repair: %w", err)
 			}
 			return FinishOutcome{Status: schema.StatusLegacyRepair, Kind: kind, Reason: reason}, nil
 		}
@@ -97,7 +97,7 @@ func MergeFinishFault(d Deps, o OneIteration, dir, target string) (events.Kind, 
 		return "", "", fmt.Errorf("reading ticket %s for its finish check: %w", o.Ticket.Path, err)
 	}
 	if t.IterationStatus != schema.IterationStatusFinished {
-		return events.MergeUnreported, "merge agent stopped without reporting finished or needs-answer", nil
+		return events.MergeUnreported, "merge agent stopped without reporting finished or asking", nil
 	}
 	rebasing, err := d.RebaseInProgress(dir)
 	if err != nil {

@@ -73,7 +73,7 @@ func TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testin
 	if len(sink.ticketNeedsHumanCalls) != 1 {
 		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.ticketNeedsHumanCalls)
 	}
-	if got := sink.ticketNeedsHumanCalls[0][3]; got != "agent reported needs-answer via iteration_status" {
+	if got := sink.ticketNeedsHumanCalls[0][3]; got != "agent asked via iteration_status" {
 		t.Errorf("TicketNeedsHuman reason = %q, want the self-reported message, not a zero-commit message", got)
 	}
 }

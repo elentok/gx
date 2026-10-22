@@ -85,7 +85,7 @@ export const galleryEntries: GalleryEntry[] = [
         ),
       },
       {
-        label: "needs repair",
+        label: "attention",
         node: <TicketLine id={ticket.address} title={ticket.title} tone="paused" reason="Worktree is dirty" hint="Fix it in the TUI" />,
       },
       {

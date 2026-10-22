@@ -17,7 +17,7 @@ import (
 // Refusal reasons of the answer verb.
 const (
 	ReasonStale         = "stale"
-	ReasonNotPaused     = "not-parked"
+	ReasonNotPaused     = "not-paused"
 	ReasonNotAnswerable = "not-answerable"
 	ReasonBadChoice     = "bad-choice"
 	ReasonEmptyAnswer   = "empty-answer"
