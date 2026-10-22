@@ -436,7 +436,8 @@ Set per project; detected from the repo when unset. A top-level ticket's **Targe
 _Avoid_: target branch, main branch, master.
 
 **Dirty trunk** — a **Trunk** checked out in a worktree whose local changes make git refuse a land.
-Changes the land doesn't touch don't count. gx never discards them: the epic waits for a person.
+Changes the land doesn't touch don't count. gx never discards them: the epic is **Merge blocked**
+until a person commits or discards them and merges again.
 _Avoid_: unclean trunk, trunk conflict (a conflict is between branches, not with a checkout).
 
 **Missing trunk** — a project whose **Trunk** names no local branch, whether set or detected. gx
@@ -653,6 +654,15 @@ _Avoid_: land ticket, rebase ticket.
 yet; once it has, the epic is also a **Merged epic**. A map epic can be complete but never merged,
 since it has no branch.
 _Avoid_: closed epic, finished epic.
+
+**Merge blocked** — an epic state: a **Complete epic** whose land failed and waits for a person. It
+carries the reason (a **Dirty trunk**, a git error, a branch that still needs a rebase after the
+merge-ticket cap) and the fix. A person fixes the cause and merges again.
+_Avoid_: merge failed, root parked (the server's internal name for the same event).
+
+**Merging** — an epic state: every ticket is done or cancelled except an open or claimed **Merge
+ticket**, so an agent is rebasing the branch before the server lands it.
+_Avoid_: landing (the land itself is instant), rebasing.
 
 **Merged epic** — an epic whose branch has landed on its target. Distinct from a complete epic,
 whose tickets are all done but whose branch may not have landed yet.
