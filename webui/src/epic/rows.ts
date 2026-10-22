@@ -27,6 +27,7 @@ const BUCKET_TONES: Record<Bucket, Tone> = {
 
 export const isCancelled = (row: EpicDetailRow) => row.rendered_status === "cancelled";
 export const isFolded = (row: EpicDetailRow) => bucketOf(row) === "done";
+export const isRunning = (row: EpicDetailRow) => bucketOf(row) === "running";
 export const toneOf = (row: EpicDetailRow): Tone => BUCKET_TONES[bucketOf(row)];
 
 export function segmentsOf(rows: EpicDetailRow[]): Segment[] {

@@ -276,6 +276,14 @@ test("live tickets show their status word, elapsed time and cost; the draft word
   expect(screen.getByText("blocked · $0.10")).toBeTruthy();
 });
 
+test("only a claimed ticket on the epic page spins", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  await screen.findByText("claimed · 1h 1m");
+  const arcs = screen.getAllByRole("img", { name: "Running" });
+  expect(arcs).toHaveLength(1);
+  expect(arcs[0].parentElement?.closest("[data-tone]")?.textContent).toContain("Title 03");
+});
+
 test("a map epic shows only N of M done and rows with title and status", async () => {
   renderAt(
     "/e/gx:m",

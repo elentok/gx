@@ -18,6 +18,7 @@ import {
   idOf,
   isCancelled,
   isFolded,
+  isRunning,
   nestFolded,
   nestLive,
   rowContext,
@@ -75,6 +76,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
               inlineReason
               hint={r.needs_answer ? r.question : undefined}
               href={r.needs_answer ? `#/t/${r.address}` : undefined}
+              live={isRunning(r)}
             />
           </Box>
         ))}

@@ -1,5 +1,6 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import type { EpicView } from "../view";
+import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Card } from "../ui/card/Card";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
@@ -7,14 +8,15 @@ import { TicketLine } from "../ui/ticket-line/TicketLine";
 
 export function EpicCard({ epic }: { epic: EpicView }) {
   return (
-    <Card tone={epic.tone}>
+    <Card tone={epic.tone} live={epic.live}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb="1">
         <Badge tone={epic.tone}>{epic.badge}</Badge>
         <Text as="span" fontSize="sm" color="text.muted">
           {epic.project}
         </Text>
       </Box>
-      <Text fontFamily="condensed" fontSize="xl" fontWeight="600" mb="2">
+      <Text fontFamily="condensed" fontSize="xl" fontWeight="600" mb="2" display="flex" alignItems="center" gap="2">
+        {epic.live && <Arc tone={epic.tone} label="Running" />}
         <Link href={`#/e/${epic.address}`} color="inherit">
           {epic.name}
         </Link>
@@ -42,6 +44,7 @@ export function EpicCard({ epic }: { epic: EpicView }) {
           hint={t.hint}
           state={t.state}
           linkLabel={t.linkLabel}
+          live={t.live}
         />
       ))}
       {epic.reason && (

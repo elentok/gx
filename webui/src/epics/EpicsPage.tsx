@@ -3,6 +3,7 @@ import { Fragment, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { EpicListRow, FollowUpCount } from "../generated/server";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
+import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -43,6 +44,7 @@ function EpicRow({
   return (
     <Box display="flex" alignItems="baseline" gap="2" py="1" fontFamily="condensed" fontSize="lg">
       {withBadge && <Badge tone={badge.tone}>{badge.label}</Badge>}
+      {row.state === "running" && <Arc label="Running" />}
       <Link href={epicLink(row.address)} color="inherit" fontWeight="600">
         {row.name}
       </Link>

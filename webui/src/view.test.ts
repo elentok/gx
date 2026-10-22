@@ -39,6 +39,15 @@ describe("snapshotView", () => {
     ]);
   });
 
+  it("marks only a running epic and its working tickets as live", () => {
+    expect(byName("run").live).toBe(true);
+    expect(byName("wait").live).toBe(false);
+    expect(byName("run").tickets.map((t) => [t.address, t.live ?? false])).toEqual([
+      ["gx:run/03", true],
+      ["gx:run/04", false],
+    ]);
+  });
+
   it("gives an answerable row its summary and a ticket route", () => {
     expect(byName("wait").tickets[0]).toMatchObject({
       detail: "Which option do you want?",

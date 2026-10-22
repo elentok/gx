@@ -12,6 +12,7 @@ export interface TicketLineView {
   hint?: string;
   state?: string;
   linkLabel?: string;
+  live?: boolean;
 }
 
 export interface EpicView {
@@ -20,6 +21,7 @@ export interface EpicView {
   project: string;
   tone: Tone;
   badge: string;
+  live: boolean;
   done: number;
   total: number;
   reason?: string;
@@ -87,7 +89,7 @@ function activeLine(t: SummaryTicket): TicketLineView {
   if (t.needs_approval) {
     return { ...base, tone: "parked", state: "needs approval", href: `#/t/${t.address}`, linkLabel: "Review →" };
   }
-  return { ...base, tone: "muted" };
+  return { ...base, tone: "muted", live: true };
 }
 
 function ticketLines(epic: EpicSummary, queue: string[]): TicketLineView[] {
@@ -104,6 +106,7 @@ export function epicView(epic: EpicSummary, mode?: QueueMode, queue: string[] = 
     project: epic.project,
     tone: STATES[epic.state].tone,
     badge: epicBadge(epic.state, mode),
+    live: epic.state === "running",
     done: epic.done,
     total: epic.total,
     reason: epic.reason,

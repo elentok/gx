@@ -1,4 +1,4 @@
-import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
+import { createSystem, defaultConfig, defineConfig, type SystemStyleObject } from "@chakra-ui/react";
 import { TONES, type Tone } from "./tone";
 
 // The only file allowed to hold raw colors and font names; see raw-style.test.ts.
@@ -22,8 +22,14 @@ export const themeConfig = defineConfig({
       color: "text",
       fontFamily: "text",
     },
+    // Registered so the live Card's border gradient can animate its angle. The cast is because
+    // Chakra types globalCss values as style objects, which @property's descriptors are not.
+    "@property --gx-orbit-angle": { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" } as SystemStyleObject,
   },
   theme: {
+    keyframes: {
+      orbit: { to: { "--gx-orbit-angle": "360deg" } },
+    },
     // border is semantic so it replaces Chakra's built-in light/dark "border" token.
     semanticTokens: {
       colors: {

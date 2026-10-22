@@ -11,6 +11,13 @@ describe("TicketLine", () => {
     expect(container.querySelector("[data-tone]")!.getAttribute("data-tone")).toBe(tone);
   });
 
+  it("shows a running arc only when live", () => {
+    const live = renderThemed(<TicketLine id="a" title="b" live />);
+    expect(live.getByRole("img", { name: "Running" })).toBeTruthy();
+    live.unmount();
+    expect(renderThemed(<TicketLine id="c" title="d" />).queryByRole("img")).toBeNull();
+  });
+
   it("omits the reason when none is given", () => {
     const { container } = renderThemed(<TicketLine id="a" title="b" />);
     expect(container.querySelector("[data-reason]")).toBeNull();

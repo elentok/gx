@@ -1,4 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
+import { Arc } from "../arc/Arc";
 import type { Tone } from "../tone";
 
 interface TicketLineProps {
@@ -15,6 +16,8 @@ interface TicketLineProps {
   inlineReason?: boolean;
   // The link's words; "Answer →" unless the row asks for something else.
   linkLabel?: string;
+  // Puts a spinning arc before the id while an agent works the ticket.
+  live?: boolean;
 }
 
 export function TicketLine({
@@ -28,10 +31,16 @@ export function TicketLine({
   state,
   inlineReason,
   linkLabel = "Answer →",
+  live,
 }: TicketLineProps) {
   return (
     <Box data-tone={tone}>
       <Box display={inlineReason ? "block" : "flex"} gap="2" alignItems="baseline">
+        {live && (
+          <Box as="span" mr={inlineReason ? "2" : undefined} alignSelf="center" display="inline-flex">
+            <Arc label="Running" />
+          </Box>
+        )}
         <Text as="span" fontFamily="condensed" fontSize="sm" color={`tone.${tone}.fg`} mr={inlineReason ? "2" : undefined}>
           {id}
         </Text>

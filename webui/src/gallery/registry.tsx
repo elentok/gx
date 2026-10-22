@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
+import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
@@ -33,6 +34,7 @@ const perTone = (render: (tone: Tone) => ReactNode): GalleryCase[] =>
 // Add one entry per primitive; the gallery page renders every case.
 export const galleryEntries: GalleryEntry[] = [
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
+  { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
   { name: "Badge", cases: perTone((tone) => <Badge tone={tone}>{tone}</Badge>) },
   {
     name: "ProgressBar",
@@ -60,6 +62,8 @@ export const galleryEntries: GalleryEntry[] = [
     name: "TicketLine",
     cases: [
       ...perTone((tone) => <TicketLine id={ticket.address} title={ticket.title} tone={tone} />),
+      { label: "live", node: <TicketLine id={ticket.address} title={ticket.title} live /> },
+      { label: "live, inline reason", node: <TicketLine id={ticket.address} title={ticket.title} reason="claimed 4m ago" tone="running" inlineReason live /> },
       { label: "with reason", node: <TicketLine id={ticket.address} title={ticket.title} reason="Blocked by 01" /> },
       { label: "clamped reason", node: <TicketLine id={ticket.address} title={ticket.title} reason={longReason} /> },
       {
@@ -87,6 +91,14 @@ export const galleryEntries: GalleryEntry[] = [
         </Card>
       )),
       { label: "no title", node: <Card>{ticket.title}</Card> },
+      {
+        label: "live",
+        node: (
+          <Card title="running" tone="running" live>
+            {ticket.title}
+          </Card>
+        ),
+      },
     ],
   },
   {

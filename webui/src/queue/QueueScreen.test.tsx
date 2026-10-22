@@ -77,6 +77,16 @@ describe("QueueScreen", () => {
     expect(screen.getByText("Active one").closest("[data-tone]")?.querySelector("a")).toBeNull();
   });
 
+  it("runs the orbit round running epics and spins only working tickets", () => {
+    const { container } = renderThemed(<QueueScreen state={state()} />);
+    const running = snap.epics.filter((e) => e.state === "running").length;
+    expect(container.querySelectorAll("[data-live]")).toHaveLength(running);
+    const activeRow = screen.getByText("Active one").closest("[data-tone]")!;
+    expect(activeRow.querySelector("[role=img]")).not.toBeNull();
+    const approvalRow = screen.getByText("Second active").closest("[data-tone]")!;
+    expect(approvalRow.querySelector("[role=img]")).toBeNull();
+  });
+
   it("shows an answered row in the waiting tone with its queue position", () => {
     renderThemed(<QueueScreen state={state()} />);
     const state_ = screen.getByText("Answered · #2 in queue");
