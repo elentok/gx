@@ -44,6 +44,15 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	if e.IsMap {
 		return refusal(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand"), nil
 	}
+	if root.Epic == OneOffsEpic {
+		return refusal(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges"), nil
+	}
+	// The web page sends the state it shows; the socket route sends none.
+	if shown := EpicState(req.State); shown != "" {
+		if now := epicStateFor(root, e, s.registry.startedAtOf); shown != now {
+			return refusal(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown)), nil
+		}
+	}
 	first, _, target, err := s.epicRefs(a.Project, epics, a.Epic, repo)
 	if err != nil {
 		return QueueResult{}, err
@@ -84,6 +93,8 @@ func (s *Server) epicMergeLocked(root rootRef, one ralphloop.OneIteration, repo 
 	if id == "" {
 		return landDecision{}, errors.New("fork manual merge ticket for " + root.String())
 	}
+	// landEpic clears the block for the land paths; a fork that failed keeps it.
+	s.clearLandBlock(root, e.Path)
 	return landDecision{result: QueueResult{MergeTicket: tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}, nil
 }
 

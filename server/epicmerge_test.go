@@ -47,6 +47,9 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	servertest.WriteTicketWith(t, f.store, "proj", "pending", "01", "t", done)
 	servertest.WriteTicketWith(t, f.store, "proj", "pending", "02", "merge", servertest.TicketOpts{Type: "merge"})
 	servertest.WriteTicketWith(t, f.store, "proj", "open", "01", "t", servertest.TicketOpts{})
+	// The stored reason of a refused merge must survive it byte for byte.
+	testutil.WriteFile(t, filepath.Join(f.store, "proj", "open"), "ticket.md", "---\nland_block_kind: dirty-trunk\nland_block_reason: trunk dirty\n---\n# Open\n")
+	servertest.WriteTicketWith(t, f.store, "proj", server.OneOffsEpic, "01", "t", servertest.TicketOpts{})
 	for _, branch := range []string{"map-epic", "merged", "pending", "open"} {
 		gitOut(t, f.repo, "branch", branch)
 	}
@@ -54,15 +57,16 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	before := ticketFiles(t, f.store)
 
 	for addr, want := range map[string]string{
-		"proj:" + schedEpic + "/01": server.ReasonInvalidAddress,
-		"::":                        server.ReasonInvalidAddress,
-		"proj:nope":                 server.ReasonUnknownTicket,
-		"nope:" + schedEpic:         server.ReasonUnknownTicket,
-		"proj:map-epic":             server.ReasonMapEpic,
-		"proj:merged":               server.ReasonAlreadyMerged,
-		"proj:pending":              server.ReasonMergePending,
-		"proj:open":                 server.ReasonNotComplete,
-		"proj:" + schedEpic:         server.ReasonBranchMissing,
+		"proj:" + schedEpic + "/01":  server.ReasonInvalidAddress,
+		"::":                         server.ReasonInvalidAddress,
+		"proj:nope":                  server.ReasonUnknownTicket,
+		"nope:" + schedEpic:          server.ReasonUnknownTicket,
+		"proj:map-epic":              server.ReasonMapEpic,
+		"proj:" + server.OneOffsEpic: server.ReasonOneOffsEpic,
+		"proj:merged":                server.ReasonAlreadyMerged,
+		"proj:pending":               server.ReasonMergePending,
+		"proj:open":                  server.ReasonNotComplete,
+		"proj:" + schedEpic:          server.ReasonBranchMissing,
 	} {
 		res, err := f.h.Client.EpicMerge(context.Background(), addr)
 		if err != nil || !res.Refused || res.Reason != want {
@@ -300,6 +304,26 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishLandsTheEpic(t *testing.T) 
 	f.assertStamps(t, true)
 	if f.rootQueued(t) {
 		t.Error("root still queued after the land")
+	}
+}
+
+func TestEpicMerge_ForkingAManualTicketClearsTheStoredBlock(t *testing.T) {
+	f := newForkFixture(t, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f.schedFixture)
+	block := map[string]any{"land_block_kind": "dirty-trunk", "land_block_reason": "trunk dirty"}
+	if err := tickets.StampEpicFields(filepath.Join(f.store, "proj", schedEpic), block); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.assertManualTicket(t, res, "02")
+	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+		t.Errorf("fork left the block on the epic:\n%s", md)
 	}
 }
 

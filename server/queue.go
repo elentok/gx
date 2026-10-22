@@ -38,6 +38,7 @@ const (
 	ReasonMergePending     = "merge-pending"
 	ReasonNotComplete      = "not-complete"
 	ReasonBranchMissing    = "branch-missing"
+	ReasonOneOffsEpic      = "one-offs-epic"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.

@@ -136,9 +136,7 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string,
 	project := root.Project
 	// A stored block is the last land's; this land decides afresh, and a new
 	// park writes it again.
-	if err := tickets.ClearEpicFields(e.Path, landBlockKindKey, landBlockReasonKey); err != nil {
-		s.log.Warn("clear land block", "root", root, "err", err)
-	}
+	s.clearLandBlock(root, e.Path)
 	fresh := tickets.LoadEpicTicketMD(e.Path)
 	already := !fresh.MergedAt.IsZero()
 	first := fresh.CompletedAt.IsZero()
@@ -293,6 +291,12 @@ const (
 	landBlockKindKey   = "land_block_kind"
 	landBlockReasonKey = "land_block_reason"
 )
+
+func (s *Server) clearLandBlock(root rootRef, epicPath string) {
+	if err := tickets.ClearEpicFields(epicPath, landBlockKindKey, landBlockReasonKey); err != nil {
+		s.log.Warn("clear land block", "root", root, "err", err)
+	}
+}
 
 // storeLandBlock records a park's kind and reason on the epic, so the epic's
 // state outlives the event and a server restart. A needs-rebase park has no kind.
