@@ -4,8 +4,8 @@ description:
   Investigate a reported gx/ralph-loop bug — tickets stuck in the queue, wrong scheduling
   decisions, ticket status or Queue-tab state that looks wrong, a stalled or misbehaving agent
   session, or gx itself (server or TUI) using too much CPU. Gives the ralph-loop background and the log/state-file inventory needed to diagnose
-  from evidence instead of guessing. Never edits product code; may repair ralph-loop state (land,
-  reset, unpark a stuck ticket) with the human's explicit go-ahead. Publishes findings as a research
+  from evidence instead of guessing. Never edits product code; may repair ralph-loop state (merge,
+  start over, resume a stuck ticket) with the human's explicit go-ahead. Publishes findings as a research
   ticket or a report.
 ---
 
@@ -120,7 +120,7 @@ run logs, as in "Where state lives".
 A diagnose ticket runs unattended (see below). File the cause and a fix direction with the
 `gx-follow-up` skill, target `gx`, `unattended`: Source names the spike's evidence dir, Evidence
 gives the profile lines or goroutine stacks and the file:line of the loop. Then add a one-line
-entry to gotchas.md only if the fix has landed.
+entry to gotchas.md only if the fix is merged.
 
 ## Known gotchas
 
@@ -133,15 +133,33 @@ commit to gotchas.md yourself. Don't re-explain what the linked commit already d
 cite a ticket: tickets get archived and renumbered, and the tracker isn't on every machine. For a
 bug that isn't fixed yet, the line itself carries the symptom, cause and recovery.
 
+## Old words in old logs
+
+<!-- old-words:begin -->
+
+Logs, run-log events and old tickets written before the Paused rename use these words. Read each as
+the new name:
+
+- `land`, landing, `manual-land` → merge (ticket level), `manual-merge`
+- `reset`, `ticket-reset` → start over, `ticket-started-over`
+- `park`, parked, `unpark` → pause, Paused, resume
+- `park_kind` → `pause_reason`
+- `park.question`, `park.answer`, `park.closed` → the question, answer and closing events of a pause round
+- `needs-answer`, `needs-repair` → Paused, class `answer` or `repair`
+- `land_locked` → the merge-lock refusal
+- `drain` (queue) → Finish and pause
+
+<!-- old-words:end -->
+
 ## Recovering a stuck ticket
 
 Charter: **never edits _product_ code — may repair ralph-loop state.** The repair tools are
 `gx server tickets merge | verify | start-over | resume`. All four share one `--json` contract: exit 0 with the
 result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`. Branch on `reason`
-(`land_locked`, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
+(the merge-lock refusal, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
 `commitless`, `merge_conflict_pending`, …), never on `message`.
 
-**Go-ahead.** Every write (`land`, `reset`, `unpark`, `land --continue/--abort`) needs the
+**Go-ahead.** Every write (`merge`, `start-over`, `resume`, `merge --continue/--abort`) needs the
 human's explicit go-ahead in this session. `verify` is read-only and always free. In attended mode
 this is the only rule; unattended mode is below.
 
@@ -155,11 +173,11 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
 <unattended-verbs>
 
 - allowed: exactly the verbs the matched entry lists in its `verbs` (as named in the prompt),
-  whatever they are — e.g. R3's entry grants its `land`. The entry's verbs are the whole grant,
+  whatever they are — e.g. R3's entry grants its `merge`. The entry's verbs are the whole grant,
   with one exception: filing a tooling bug via the `gx-follow-up` skill (target `gx`, `unattended`)
   is always allowed. The prompt's entry is the authority, not your own judgment of what would help.
-- never: a pane nudge or any other verb the matched entry does not list (an unlisted `land`,
-  `reset`, `unpark` or `land --continue/--abort` included), or editing product code. The one
+- never: a pane nudge or any other verb the matched entry does not list (an unlisted `merge`,
+  `start-over`, `resume` or `merge --continue/--abort` included), or editing product code. The one
   exception is filing via the `gx-follow-up` skill, above.
 
 </unattended-verbs>
@@ -167,7 +185,7 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
 - **Entry matched** → diagnose, then apply only the entry's verbs against the failed ticket (the
   investigate ticket's `parent`). Report at the action, as above.
 - **`No catalog entry matched`** → write the diagnosis to `## Findings` on your own ticket, report
-  it, and park the failed ticket. Do nothing else;
+  it, and pause the failed ticket. Do nothing else;
   propose any other command in the report for a human to run.
 - Never wait for a go-ahead, and never ask: an unattended session has no one to answer. Never end
   with an offer ("say go and I'll…", "want me to file this?"). Do the allowed action, or name the
@@ -177,50 +195,51 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
   Do this in every unattended ending, including `No catalog entry matched`.
 - **Last step, always:** report on _your own_ ticket (not the failed one):
   `gx tickets set <your-addr> --iteration-status finished --commitless true`. Do it after the
-  action, including when you only parked the failed ticket or filed a follow-up. Without it the
-  server finds no report and parks your ticket `zero-commit` ("no result reported"), which spawns
+  action, including when you only paused the failed ticket or filed a follow-up. Without it the
+  server finds no report and pauses your ticket `zero-commit` ("no result reported"), which spawns
   another investigate ticket.
 
 A diagnose ticket (`type: diagnose`) is unattended too, with no catalog entry: it grants no
 repair verbs at all, only filing via the `gx-follow-up` skill. It is about gx itself, not a
-parked ticket, so there is no ticket to park. It ends the same way: after filing, report
+paused ticket, so there is no ticket to pause. It ends the same way: after filing, report
 `gx tickets set <your-addr> --iteration-status finished --commitless true`.
 
 Attended mode (`m` → Investigate opens an interactive tab, not a ticket) keeps the human go-ahead
 exactly as before.
 
-**Completeness is your job, not `land`'s.** `land` always leaves the ticket `done`, so judge first:
+**Completeness is your job, not `merge`'s.** `merge` always leaves the ticket `done`, so judge first:
 
 - Check each acceptance criterion against the diff of the iteration branch.
 - Run the repo's checks in the iteration worktree.
 - The transcript is advisory only — an agent's account never outweighs the diff.
 - Thin evidence (no worktree, unreadable diff, checks can't run) blocks _your_ autonomy to propose
-  `land`. It never blocks the human's explicit "land it anyway".
+  `merge`. It never blocks the human's explicit "merge it anyway".
 
 **Choose the ending by status first, then completeness.**
 
-- `needs-answer` → never land or reset. Route to answer-then-unpark: the human answers the
-  open question (`m` menu → "Answer…", `gx tickets answer`, or "Watch" to jump to a live pane), then
-  `gx server tickets unpark <project:epic/NN>` (or `m` → "Resume (I answered)").
-- `claimed` / `needs-repair` (`land` also accepts `done`; `reset` needs `--force` for `done`):
-  - Complete → `gx server tickets merge <project:epic/NN> --json`. Commits already landed with a
-    stale status is the common case; `land` just writes `status: done`.
+- `paused`, class `answer` → never merge or start over. Route to answer-then-resume: the human
+  answers the open question (`m` menu → "Answer…", `gx tickets answer`, or "Watch" to jump to a live
+  pane), then `gx server tickets resume <project:epic/NN>` (or `m` → "Resume (I answered)").
+- `claimed` / `paused`, class `repair` (`merge` also accepts `done`; `start-over` needs `--force` for
+  `done`):
+  - Complete → `gx server tickets merge <project:epic/NN> --json`. Commits already merged with a
+    stale status is the common case; `merge` just writes `status: done`.
   - Incomplete → `gx server tickets start-over <project:epic/NN> --reason "<why>" --json`. The branch is kept under
     `ralph-loop/attic/`; the reason is written to Comments as unverified partial work.
 - `draft` / `open` → nothing ran; neither ending applies.
 
 **Every failure stops and reports.** Name the reason code and the human's next gesture, including
 the `m` menu path (`m` on the ticket → Investigate / Answer… / Resume). Examples:
-`fork_children` → reset a child instead; `iteration_branch_missing` → `land --from/--to` with an
-explicit range; `merge_conflict_pending` → resolve in the feature worktree, then
-`merge --continue` or `--abort`; `land_locked` → retry later. Don't retry around a refusal.
+`fork_children` → start a child over instead; `iteration_branch_missing` → `merge --from/--to` with
+an explicit range; `merge_conflict_pending` → resolve in the feature worktree, then
+`merge --continue` or `--abort`; the merge-lock refusal → retry later. Don't retry around a refusal.
 
 **A live agent on the tab starts an investigation, not a stop.** `live_agent_on_tab` stands — don't
 use `--ignore-live-tab` to get past it. Read iteration status, the run log, the transcript and
 `gx server tickets verify <project:epic/NN>` to answer _why it is not finishing_.
 
-**Report at the action, not in the write-up.** `land` and `reset` write their own run-log event
-(`manual-land`, `ticket-reset`). After a landing, add a `## Comments` note on the ticket: what you
+**Report at the action, not in the write-up.** `merge` and `start-over` write their own run-log event
+(`manual-merge`, `ticket-started-over`). After a merge, add a `## Comments` note on the ticket: what you
 verified, and that recovered elapsed time is the least trustworthy of the three metrics. Do not
 repeat this in the diagnosis ticket.
 
@@ -239,7 +258,7 @@ looking at when you found it:
   plumbing) surfaced *while* running some epic, but not part of what that epic's tickets asked
   for — file it with the `gx-follow-up` skill instead, even though you found it investigating a
   specific epic. Don't clutter that epic's own issue list with a finding about gx itself.
-  - Target `gx` (and `unattended` when running unattended); the skill decides where it lands.
+  - Target `gx` (and `unattended` when running unattended); the skill decides where it goes.
     Name the epic/investigation in Source and put log lines and ticket IDs in Evidence.
   - This is scoped to diagnosis tickets filed by this skill only — other "file into whatever epic
     is active" call sites (code-review fix tickets, spec-review follow-ups) are untouched.
@@ -259,6 +278,6 @@ published ticket; the report stays scannable but complete. Unattended, the repor
 1. **Verdict and root cause** — one or two lines.
 2. **Evidence** — the log lines, commits and `file:line` references the diagnosis rests on.
 3. **Examined** — the tickets (full addresses) and sessions you looked at.
-4. **Actions taken** — each repair verb run (land, reset, unpark), with its result. Say "none" if none.
+4. **Actions taken** — each repair verb run (merge, start over, resume), with its result. Say "none" if none.
 5. **Filed** — every address written: research ticket, follow-ups, seen-again entries. Say "none" if none.
 6. **Next** — one line: what the person should do now.

@@ -1,7 +1,7 @@
 ---
 name: gx-resolve-follow-ups
 description: >-
-  Drain a project's `follow-ups` epic: verify each item against the code, dedupe, route every item
+  Empty a project's `follow-ups` epic: verify each item against the code, dedupe, route every item
   to a ready epic or an area map epic, and close what is fixed or obsolete. Manual; one approval of
   one table. Never grills.
 disable-model-invocation: true
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 # gx Resolve Follow-ups
 
-Drain `<project>:follow-ups` until it holds no tickets. The project is the current one, or the one
+Empty `<project>:follow-ups` until it holds no tickets. The project is the current one, or the one
 named by `--project <name>`. Read [gx-local-tracker.md](../gx-local-tracker.md) for the ticket
 commands, the Follow-ups format and the Map epics section; don't restate them here.
 

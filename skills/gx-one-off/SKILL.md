@@ -17,7 +17,7 @@ commands.
 3. Write the outcome with `gx tickets section <addr> Result <content|->`. Put the answer there, not
    only in the chat: the person waiting reads `## Result`.
 4. Report with `gx tickets set <addr> --iteration-status finished --commitless true`. A one-off never
-   lands a commit; without `--commitless true` the run looks stalled.
+   makes a commit; without `--commitless true` the run looks stalled.
 
 Submitting a one-off takes no `--commits` or `--base`, and a `--file` payload with a `commits:` or
 `base:` key is refused with `option-removed`. For work that commits, create a normal ticket.

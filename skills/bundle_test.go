@@ -279,7 +279,7 @@ func TestRelativeReferencesResolve(t *testing.T) {
 // the needs-answer/needs-repair rename removed: the `children` frontmatter
 // field (fork descendants are derived from `parent` alone), the statuses the
 // loader no longer accepts, and `isHumanClearable`'s old name (now
-// `isParked`). A skill file naming any of them hands an agent an instruction
+// `isPaused`). A skill file naming any of them hands an agent an instruction
 // that produces a ticket gx itself rejects, so the bundle bans them
 // outright — including in prose, where a historical mention has to be
 // reworded rather than quoted verbatim.
@@ -484,7 +484,7 @@ func TestEveryVendoredSkillHasManifestRow(t *testing.T) {
 }
 
 // TestBundleHasNoNeedsAnswerSectionWrite pins that no skill tells an agent to
-// park by hand-writing the retired sections; `gx tickets ask` is the one route.
+// pause by hand-writing the retired sections; `gx tickets ask` is the one route.
 func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
 	banned := regexp.MustCompile(`gx tickets section [^\n]*"?(Needs Answer|Handoff)|write (the )?` + "`## (Needs Answer|Handoff)`")
 	for _, rel := range bundleMarkdownFiles(t) {
@@ -494,15 +494,36 @@ func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
 	}
 }
 
+// TestBundleHasNoRetiredPauseWords pins the Paused rename: no skill file uses
+// any form of land, drain or park. gx-investigate's old-words section is the
+// one place that names them, so a reader can map an old log line to the new
+// word.
+func TestBundleHasNoRetiredPauseWords(t *testing.T) {
+	retired := regexp.MustCompile(`(?i)\b(land\w*|drain\w*|park\w*|unpark\w*)`)
+	oldWords := regexp.MustCompile(`(?s)<!-- old-words:begin -->.*?<!-- old-words:end -->`)
+	for _, rel := range bundleMarkdownFiles(t) {
+		if rel == "gx-unslop/SKILL.md" {
+			continue // "landscape" in its list of AI vocabulary
+		}
+		raw := oldWords.ReplaceAllString(readFile(t, rel), "")
+		if loc := retired.FindString(raw); loc != "" {
+			t.Errorf("%s still uses the retired word %q", rel, loc)
+		}
+	}
+	if !oldWords.MatchString(readFile(t, "gx-investigate/SKILL.md")) {
+		t.Error("gx-investigate/SKILL.md lost its old-words section")
+	}
+}
+
 // TestTrackerAnnounceAndStopUsesAsk pins that the tracker teaches `gx tickets
-// ask` and no longer tells an agent to hand-write the retired park sections.
+// ask` and no longer tells an agent to hand-write the retired pause sections.
 func TestTrackerAnnounceAndStopUsesAsk(t *testing.T) {
 	raw := readFile(t, "gx-local-tracker.md")
 	for _, want := range []string{
 		"gx tickets ask",
 		"gx tickets answer",
 		"gx tickets log",
-		"Park rounds",
+		"Pause rounds",
 		"Never use the AskUserQuestion tool. To ask a person, run `gx tickets ask`.",
 		"After `gx tickets ask`, end your turn. The person's reply reaches you as a new message, in this session or in a fresh one that starts from your handoff. If the reply leaves anything unclear, or you need more, run `gx tickets ask` again. Never end a turn with a question in plain text and no `ask` call. No one is told, and the ticket stalls.",
 		"Retry `ask` after a minute and do not end your turn",
@@ -538,7 +559,7 @@ func TestTrackerEqualsGXSystemPrompt(t *testing.T) {
 
 // TestInvestigateUnattendedVerbs pins that the unattended gx-investigate grant
 // is the matched entry's verbs and nothing else: a fixed list in the skill
-// would block an entry's own verbs (R3's land) or grant ones it doesn't list.
+// would block an entry's own verbs (R3's merge) or grant ones it doesn't list.
 func TestInvestigateUnattendedVerbs(t *testing.T) {
 	raw := readFile(t, "gx-investigate/SKILL.md")
 	block := regexp.MustCompile(`(?s)<unattended-verbs>(.*?)</unattended-verbs>`).FindStringSubmatch(raw)
@@ -566,7 +587,7 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 	if !strings.Contains(allowed, "`gx-follow-up` skill (target `gx`, `unattended`)") {
 		t.Errorf("allowed bullet must always grant filing via gx-follow-up: %q", allowed)
 	}
-	for _, verb := range []string{"park", "relaunch"} {
+	for _, verb := range []string{"pause", "relaunch"} {
 		if strings.Contains(allowed, "`"+verb+"`") {
 			t.Errorf("allowed bullet pins a fixed verb %q: %q", verb, allowed)
 		}

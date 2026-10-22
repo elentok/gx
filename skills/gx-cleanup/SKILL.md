@@ -2,7 +2,7 @@
 name: gx-cleanup
 description:
   Scan this repo's epics and branches for cleanup opportunities (archivable done epics,
-  mergeable done-but-unmerged epics, deletable landed branches/worktrees), investigate the
+  mergeable done-but-unmerged epics, deletable merged branches/worktrees), investigate the
   cases the deterministic scan can't resolve on its own, present one confirmable plan, and
   on confirm execute the safe half (archive, safe deletes, review-ticket stubs,
   housekeeping) plus the ff-only merges, in the same run, off the same confirm.
@@ -15,11 +15,11 @@ disable-model-invocation: true
 
 A repo driven by ralph-loop accumulates epics in the ticket store (`gx tickets root`) and the branches/worktrees it
 created for them long after they stop being useful: epics fully done and already merged, epics
-fully done but never merged, and iteration/feature/other branches whose commits already landed
+fully done but never merged, and iteration/feature/other branches whose commits already merged
 elsewhere. `gx cleanup scan` classifies all of this deterministically from git and ticket state.
 This skill turns that classification into a report you can act on: it investigates the handful of
 cases the scan can't resolve on its own, then stops at a single confirm. On confirm, the
-mechanically-safe actions — archiving, deleting cleanly-landed branches/worktrees, stamping out
+mechanically-safe actions — archiving, deleting cleanly-merged branches/worktrees, stamping out
 review-ticket stubs, and housekeeping — run immediately (see "Step 6" below), and the ff-only
 merge candidates run immediately after, in the same invocation (see "Step 7" below).
 
@@ -32,7 +32,7 @@ gx cleanup scan --json
 ```
 
 If it fails (e.g. trunk is missing or `project.json` is unreadable), report the error and stop —
-take no action at all, since every "landed?" check depends on trunk.
+take no action at all, since every "merged?" check depends on trunk.
 
 Trunk is `project.json`'s `trunk`, else the repo's detected default. The `merged_to_main` fields
 below are checked against trunk despite their name. An epic's `merged_to_main` reads its
@@ -45,8 +45,8 @@ The result has three parts:
   `merged_to_main`, `has_code_review_ticket`, `code_review_done`.
 - **`worktrees`** — one entry per local branch other than trunk: `kind`
   (`"iteration"` | `"feature"` | `"other"`), `active` (recent commit or uncommitted changes —
-  never propose an action against this one), `epic`/`ticket_id`/`ticket_done`/`landed` (iteration
-  branches only), `merged_to_main` (feature/other branches only), and `recommendation`
+  never propose an action against this one), `epic`/`ticket_id`/`ticket_done` and the flag that follows it
+  (whether the commits already reached the target; iteration branches only), `merged_to_main` (feature/other branches only), and `recommendation`
   (`"delete"`, `"merge"`, or `""` when the scan itself can't call it — always `""` when `active`
   is true).
 - **`housekeeping`** — a legacy-only check: tracked files that leaked under the old `.scratch`
@@ -80,7 +80,7 @@ parallel. Give each sub-agent:
 
 - the item's scan fields from Step 1
 - for a case-2.2 epic: the diff between the epic's feature branch and trunk
-- for a branch: the diff between the branch and its landing target — the epic's feature branch
+- for a branch: the diff between the branch and its merge target — the epic's feature branch
   for `kind == "iteration"`, trunk for `kind == "feature"`/`"other"` — plus its last
   commit's age
 - any related ticket/run-log state under `<root>/<epic>/` (`gx tickets root` for `<root>`; see

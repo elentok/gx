@@ -63,7 +63,7 @@ gx merge <branch> --json
 
 Branch it three ways on `status`:
 
-- **`"merged"`** — done. Report it (`target` names the branch it landed on)
+- **`"merged"`** — done. Report it (`target` names the branch it merged into)
   and stop.
 - **`"needs_rebase"`** — continue to Step 2.
 - anything else (a plain command error, e.g. trunk is missing) — **stop:
@@ -93,7 +93,7 @@ only runs when one is checked out for `branch`:
 
 - **`worktree_path` is empty** — no worktree is checked out for `branch`, and
   none may be created or checked out to run the rebase in: doing so risks
-  landing the rebase in trunk's own worktree, checking `branch` out there and
+  running the rebase in trunk's own worktree, checking `branch` out there and
   leaving trunk's checkout off trunk (violating ADR 0015's guarantee that this
   flow never touches a worktree's current branch out from under it). **Stop:
   `<branch> has no worktree, so gx-merge can't rebase it`.** The caller (e.g.
@@ -139,7 +139,7 @@ The first time typecheck or lint/format fails in this run, launch **one**
 fixer subagent in `worktree_path` with the failing output. It fixes only what
 the output names, without changing behaviour, and commits on the rebased
 branch with the subject
-`<branch>: Fix typecheck/lint after rebase onto <target>`. The commit lands
+`<branch>: Fix typecheck/lint after rebase onto <target>`. The commit goes
 with the branch, so a merge ticket stays commitless.
 
 Then rerun **all** checks from the start. The fixer runs once per run: if

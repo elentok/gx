@@ -26,8 +26,8 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    process until all commits are rebased.
 
 6. **Never edit a ticket file or its status.** You may read tickets for context, but gx closes the
-   conflict-resolution ticket itself when you exit; a hand-written status can park the parent.
+   conflict-resolution ticket itself when you exit; a hand-written status can pause the parent.
 
 7. **Finish with zero background shells.** If a call was moved to the background, read its output,
    then stop it (TaskStop). `TaskStop` is a deferred tool: if it isn't callable, load it first with
-   `ToolSearch` query `select:TaskStop`. ralph-loop will not land a ticket while one is open.
+   `ToolSearch` query `select:TaskStop`. ralph-loop will not merge a ticket while one is open.

@@ -67,7 +67,7 @@ Then, while working:
   never a bare `cat`. Stdin never closes here, so it hangs forever.
 - **Finish with zero background shells.** If a call was moved to the background, read its output,
   then stop it (TaskStop) before reporting finished. `TaskStop` is a deferred tool: if it isn't
-  callable, load it first with `ToolSearch` query `select:TaskStop`. ralph-loop will not land a
+  callable, load it first with `ToolSearch` query `select:TaskStop`. ralph-loop will not merge a
   ticket while one is open.
 - **One check per Bash call.** A chained call (`rg ...; go test; gofmt -l`) can return the output
   of one segment only. Run each check in its own call.
@@ -106,8 +106,8 @@ When either trigger fires:
    parallel iteration doing the same fork at the same time), writes the stub straight to
    `<id>-<slug>.md` (`--slug` is required, so there's no separate rename step to remember), and
    writes the child's `parent`, which is the only edge a fork produces: give the new ticket no
-   `blocked_by` naming the original, and record nothing about it on the original. The stub lands
-   `draft` and is printed by address; fill in its body with `gx tickets section <new-addr> <heading>
+   `blocked_by` naming the original, and record nothing about it on the original. The stub is created
+   as `draft` and is printed by address; fill in its body with `gx tickets section <new-addr> <heading>
    <content|->` per section, then `gx tickets set <new-addr> --status open` to hand it over — this
    is the one `--status` write an iteration agent ever makes, since a fresh fork must be handed
    over and nothing else can do it. (Or pass `--body -` to `gx tickets add` to write the body and
@@ -118,8 +118,8 @@ When either trigger fires:
 4. **Close the original**, with `gx tickets set <addr> --iteration-status finished` and a body note
    of the token count from the last budget check (e.g. `Tokens used: ~85K`) — so it can be matched
    against the ticket's `expected_context_window` later. (`actual_context_window` itself is
-   gx-written at cherry-pick time, not by the agent; so is landing `status: done` — the report can
-   only start a landing, never conclude one, gx's own commit count decides that.) Nothing about the
+   gx-written at cherry-pick time, not by the agent; so is the merge that sets `status: done` — the report can
+   only start a merge, never conclude one, gx's own commit count decides that.) Nothing about the
    new tickets is recorded on the original; their own `parent` is the whole edge. If step 1 had
    nothing to commit (design/exploration only, no diff), also pass `--commitless true`:
    `gx tickets set <addr> --iteration-status finished --commitless true`. Without it, ralph-loop's
@@ -153,7 +153,7 @@ A comment quoting a measured value duplicates it, and duplicates drift - stale f
 ## Other notes
 
 Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams. Every declared seam needs a
-real assertion; if one cannot be observed, park `needs-answer` naming the seam instead of finishing
+real assertion; if one cannot be observed, pause the ticket with `gx tickets ask`, naming the seam, instead of finishing
 (see "When only a person can answer").
 
 Run typechecking regularly and single test files regularly. At the end, test only the packages you
@@ -179,9 +179,9 @@ the same parallel block as the commit. A rejected commit (a hook, a failed check
 `finished` report leaves the ticket finished with nothing committed.
 
 Once done, run `gx tickets set <addr> --iteration-status finished`. This report can only _start_ a
-landing, never conclude one: gx adopts it and decides `status: done` itself from its own commit
+merge, never conclude one: gx adopts it and decides `status: done` itself from its own commit
 count and cherry-pick outcome — never write `--status done` yourself, even paired with
-`--iteration-status finished`; landing status is gx's alone to set (the one exception is the
+`--iteration-status finished`; merge status is gx's alone to set (the one exception is the
 draft→open fork handover in step 3 above). Code review runs separately, batched across the epic,
 not per-ticket — do not invoke it from here.
 

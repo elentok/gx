@@ -48,11 +48,11 @@ means agreed in the ticket, not negotiated live:
 three named backends, or one of three actions) counts as a gap. A weak check such as `cmd != nil`
 or "did not error" does not cover a seam that names specific behavior. If you find a seam cannot be
 observed (e.g. the code returns an opaque `tea.Cmd`), do not skip it and finish. Commit what is
-green, then park the ticket with `gx tickets ask` (see
+green, then pause the ticket with `gx tickets ask` (see
 [gx-local-tracker.md](../gx-local-tracker.md)): the question names the seam and why it
 cannot be observed, so the ticket author can approve a different seam.
 
-You can't test everything — agreeing the seams up front (in the ticket) is how testing effort lands
+You can't test everything — agreeing the seams up front (in the ticket) is how testing effort goes
 on the critical paths and complex logic instead of every edge case.
 
 ## Anti-patterns

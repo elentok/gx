@@ -38,9 +38,9 @@ lines can still blow the budget once you add:
   (e.g. three distinct row badges, or a list-view change plus a separate preview-pane change). Each
   variant typically needs its own wiring and its own test assertion — treat N independent variants
   the same as threading a large file N times, and split by variant group if N is more than a couple.
-  This is not optional when the variants also land in different test files (see next bullet) — that
+  This is not optional when the variants also fall in different test files (see next bullet) — that
   conjunction, not variant count alone, is what blows a budget: one past ticket named 3
-  variants sharing one root cause and forked 4 times before landing, because the variant count alone
+  variants sharing one root cause and forked 4 times before merging, because the variant count alone
   didn't trigger a split.
 - **Test-file fan-out.** Count how many *distinct existing test files* the ticket's Test Seams will
   need new cases in. Each file usually means its own read of existing fixtures/conventions before a
@@ -104,12 +104,12 @@ together, each on its own branch, and cherry-picks them back one by one. Two rul
   tickets editing one command file and its test the same single blocker; all three conflicted.
 - **A cross-cutting ticket (logging, config, metrics, tracing) is blocked by the features it
   instruments** — or, if it's plumbing they should call, the features are blocked by it. Never run
-  it beside them: it can't see code that hasn't landed yet, so it ships incomplete and code review
+  it beside them: it can't see code that isn't merged yet, so it ships incomplete and code review
   spawns a follow-up to wire it in.
 
 **Wide refactors are the exception to vertical slicing.** A **wide refactor** is one mechanical
 change — rename a column, retype a shared symbol — whose **blast radius** fans across the whole
-codebase, so a single edit breaks thousands of call sites at once and no vertical slice can land
+codebase, so a single edit breaks thousands of call sites at once and no vertical slice can stay
 green. Don't force it into a tracer bullet; sequence it as **expand–contract**. First expand: add
 the new form beside the old so nothing breaks. Then migrate the call sites over in batches sized by
 blast radius (per package, per directory), each batch its own ticket blocked by the expand, keeping
@@ -119,7 +119,7 @@ green alone, keep the sequence but let them share an integration branch that all
 integrate-and-verify ticket — green is promised only there.
 
 **Explore/implement split for foreseeably-wide test/e2e changes.** Trigger this whenever a ticket's
-Test Seams will land in 3+ distinct existing test files (test-file fan-out, above) — not only when
+Test Seams will fall in 3+ distinct existing test files (test-file fan-out, above) — not only when
 the ticket reads as "mostly test work" as a whole. It's foreseeable in advance that implementing it
 requires reading a lot of files first (e.g. surveying an existing test suite's conventions,
 fixtures, and helpers across many files before writing new cases); split it into two tickets
@@ -293,8 +293,8 @@ implementation list.
 
 See [gx-local-tracker.md](../gx-local-tracker.md) for the full field reference. New tickets are
 published as `open` unless instructed otherwise, with no `--blocked-by` when nothing gates them —
-`gx tickets add --body` lands the body, the fields and the status in one write, so there's no window where an
-empty ticket is schedulable. Without `--body`, the stub lands
+`gx tickets add --body` writes the body, the fields and the status in one write, so there's no window where an
+empty ticket is schedulable. Without `--body`, the stub is
 `draft`; fill in the body first, then `gx tickets set <addr> --status open` to publish it.
 
 `parent` is only for descendants — a mid-flight fork or a code-review fix ticket — and is written on

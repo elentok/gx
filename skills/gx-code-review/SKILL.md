@@ -157,6 +157,6 @@ If the consultant deferred zero findings, skip this step.
     follow-up it became, was appended to, or was dropped against; or why it was rejected.
 - `gx tickets set <addr> --iteration-status finished --commitless true` — this skill never commits
   code of its own, so `commitless: true` is always correct here, not just the no-findings case.
-  `--status done` will be refused on a `ralph-loop/*` branch (landing status is gx's alone to set);
-  `iteration_status: finished` is the self-report ralph-loop's landing logic actually watches for on
+  `--status done` will be refused on a `ralph-loop/*` branch (merge status is gx's alone to set);
+  `iteration_status: finished` is the self-report ralph-loop's merge logic actually watches for on
   a claimed ticket, so set it even though `--status done` isn't yours to set directly.

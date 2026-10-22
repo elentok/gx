@@ -59,10 +59,10 @@ Fields:
 
 - **`id`** (string, required) — the ticket identifier, matching the filename prefix, e.g. `"04"` or
   `"04b"`. Fixed at creation.
-- **`status`** (enum, required) — exactly one of `draft`, `open`, `claimed`, `needs-answer`,
-  `needs-repair`, `done`, `cancelled`. There is no default: a ticket with no `status:` is rejected by
+- **`status`** (enum, required) — exactly one of `draft`, `open`, `claimed`, `paused`,
+  `done`, `cancelled`. There is no default: a ticket with no `status:` is rejected by
   the loader rather than read as `open`, so a half-written file can never be handed to an agent. Only
-  `open` is schedulable — `draft` is work its author parked deliberately, neither offered to an agent
+  `open` is schedulable — `draft` is work its author set aside deliberately, neither offered to an agent
   nor counted as finished. `cancelled` is terminal like `done` but means the ticket was withdrawn,
   not performed; it stops counting as outstanding. **Only `draft` and `open` can be written with
   `gx tickets set --status`** (plus `claimed` and `done` in a map epic). Every other status is an
@@ -79,7 +79,7 @@ Fields:
   verify it. To wait on work in another epic of the same project, qualify the token:
   `blocked_by: [epic/06]` (`project:epic/06` is accepted for the ticket's own project; another
   project's prefix fails `gx tickets validate`, cross-project blocking being unsupported). Always
-  block on the other epic's ticket this way — never park the ticket as a stand-in. Cycles, including
+  block on the other epic's ticket this way — never pause the ticket as a stand-in. Cycles, including
   cross-epic ones, fail `validate`, which reports every edge of the chain. A `type: code-review`
   ticket carries no `blocked_by` at all; see its own frontier rule below.
 - **`parent`** (ticket ID) — the ticket this one was produced from: a mid-flight fork names the
@@ -98,20 +98,20 @@ Fields:
   claimed-but-stalled.
 - **`base`** (string) — optional override of the branch this ticket's work starts from: a branch
   name or a ticket reference. Normally omit it: gx derives the base at claim time (a commitful ticket
-  blocked by one unlanded commitful ticket bases on that blocker's branch; otherwise leaf → parent's
-  branch, root → trunk). With two or more unlanded commitful blockers and no `base`, gx parks the
-  ticket `needs-answer` naming them. Not allowed on a `commitless` ticket (`validate` rejects it).
+  blocked by one unmerged commitful ticket bases on that blocker's branch; otherwise leaf → parent's
+  branch, root → trunk). With two or more unmerged commitful blockers and no `base`, gx pauses the
+  ticket (reason `ambiguous-base`) naming them. Not allowed on a `commitless` ticket (`validate` rejects it).
   The target is always derived, never stored.
-- **`park_kind`** (enum) — why the ticket is parked (e.g. `blocked-pane`, `self-reported`,
-  `zero-commit`). Machine-written alongside a park, cleared on resume; never set it by hand. The full
-  closed kind enum is printed by `gx server events kinds`.
+- **`pause_reason`** (enum) — why the ticket is paused (e.g. `blocked-pane`, `self-reported`,
+  `zero-commit`). Machine-written alongside `status: paused`, cleared on claim; never set it by
+  hand. The full closed enum is printed by `gx server events kinds`.
 - **`actual_context_window`**, **`elapsed_time`**, **`resolved_base`**, **`mutes`** — read-only,
-  gx-managed. The first two are stamped at landing time, `resolved_base` (ref + SHA) at every claim,
+  gx-managed. The first two are stamped at merge time, `resolved_base` (ref + SHA) at every claim,
   `mutes` when a notification throttle trips; never set these by hand.
 
 ### The `code-review` type
 
-A ticket with `type: code-review` reviews the whole epic once every other ticket in it has landed,
+A ticket with `type: code-review` reviews the whole epic once every other ticket in it has merged,
 rather than one specific piece of work — so it carries no `blocked_by` list of its own. Its
 frontier-eligibility rule is different from every other type: it becomes eligible once every *other*
 ticket in the epic is `done`, independent of any `blocked_by`. Fix tickets it opens (if any) name it
@@ -178,7 +178,7 @@ real content can't hand an empty ticket to an agent. Promoting it is a deliberat
 fill in the body first, then `gx tickets set <addr> --status open`. That `set` call is the handoff:
 before it, the ticket belongs to its author; after it, the scheduler may claim it at any moment, so
 nothing about it should still be in flux. A ticket created with `gx tickets add --body` is
-written `open` in one write, since its body lands in the same write as its status.
+written `open` in one write, since its body is written in the same write as its status.
 
 ## Frontier
 
@@ -212,7 +212,7 @@ Exception: in a **map epic** the server schedules nothing, so `claimed` and `don
 hand there — see "Map epics".
 
 Orchestration changes a person may need go through server verbs, each with a `--json` result or a
-`{"refused":true,"reason":…}` refusal: `gx server tickets park | cancel | relaunch`,
+`{"refused":true,"reason":…}` refusal: `gx server tickets pause | cancel | relaunch`,
 `gx server queue add | remove | replace | move`, and read verbs such as
 `gx server tickets explain <addr>` ("why isn't this running") and `history <addr>`. The repair verbs
 are `gx server tickets merge | start-over | resume | verify`. If the server is down, only these four run
@@ -228,9 +228,9 @@ writes the statuses directly:
 
 - **Claim** before any work: `gx tickets set <addr> --status claimed`.
 - **Close** once resolved: write the answer with `gx tickets section <addr> Resolution -`, then
-  `gx tickets set <addr> --status done --commitless true` (a decision lands no commits).
+  `gx tickets set <addr> --status done --commitless true` (a decision makes no commits).
 
-`needs-answer`, `needs-repair` and `cancelled` stay server-only, even here.
+`paused` and `cancelled` stay server-only, even here.
 
 A map epic seeded by gx-resolve-follow-ups carries **`provisional_destination: true`** in its
 `ticket.md`: the Destination is a guess from the follow-ups, not yet confirmed. gx-design confirms
@@ -310,7 +310,7 @@ Rules every gx skill follows when it names a model or launches a sub-agent:
 An agent never claims a ticket. gx writes `status: claimed` before the agent's prompt is sent, so a
 crashed iteration leaves the ticket visibly claimed rather than silently open, and a restart doesn't
 double-pick it. gx re-reads the ticket file at claim time and refuses if it changed since the
-scheduler decided. If a launch fails, gx retries, then parks the ticket `needs-repair` with the
+scheduler decided. If a launch fails, gx retries, then pauses the ticket (reason `iteration-error`) with the
 launch error.
 
 ## Resolution
@@ -318,20 +318,21 @@ launch error.
 An iteration agent never writes a terminal status. When the work is finished it reports
 `gx tickets set <addr> --iteration-status finished [--commitless true]`, and gx adopts that into
 `status: done` only after checking its own commit count and cherry-pick outcome; the report can start
-a landing, never conclude one. The CLI refuses `--status done` from a `ralph-loop/*` branch outright,
+a merge, never conclude one. The CLI refuses `--status done` from a `ralph-loop/*` branch outright,
 even paired with `--iteration-status finished`.
 
-A ticket closed by a mid-flight fork rather than by landing its own work (see below) is reported
+A ticket closed by a mid-flight fork rather than by merging its own work (see below) is reported
 the same way: `--iteration-status finished --commitless true`.
 
 Other outcomes gx writes:
 
-- **`needs-answer`** — work is stalled on information only a human can supply. The agent reports
-  `gx tickets ask`, described under Announce-and-stop, and gx parks the ticket. gx also parks `needs-answer` itself in a few cases (`blocked-pane`, `zero-commit`, two or more
-  unlanded blockers with no `base`), recording `park_kind`.
-- **`needs-repair`** — something needs human judgment before work can continue (e.g. a crashed
-  iteration, a handle mismatch, repeated launch failures `retry-exhausted`, a park/re-claim loop
-  `spinning`, lost commits).
+- **`paused`, class `answer`** — work is stalled on information only a human can supply. The agent
+  reports `gx tickets ask`, described under Announce-and-stop, and gx pauses the ticket. gx also
+  pauses a ticket this way itself in a few cases (`blocked-pane`, `zero-commit`, two or more
+  unmerged blockers with no `base`), recording `pause_reason`.
+- **`paused`, class `repair`** — something needs human judgment before work can continue (e.g. a
+  crashed iteration, a handle mismatch, repeated launch failures `retry-exhausted`, a
+  pause/re-claim loop `spinning`, lost commits).
 
 A ticket finished with zero commits must also pass `--commitless true` in the same `set` call, or it
 reads as a stalled agent rather than an intentional no-op finish.
@@ -355,7 +356,7 @@ Interactive tools block the pane and write nothing gx can read. A question asked
 invisible by construction. `gx tickets ask` records the question in the ticket's log, where gx, the
 web UI, the TUI and the CLI all read it.
 
-`ask` validates the body, appends one `park.question` to the ticket log, sets
+`ask` validates the body, appends one question event to the ticket log, sets
 `iteration_status: asking` and returns at once. It writes nothing and refuses with a reason
 when the body is invalid, the handoff is empty, the ticket is unknown, or an earlier question is
 still open. It works for every ticket type. Do not write `--iteration-status asking` yourself
@@ -391,27 +392,27 @@ options:               # options only: 2 to 6 entries
 - `ask` fails with the reason on bad YAML, an unknown type, duplicate ids, or a `recommended` outside
   the options.
 
-### Answers, the log and the park rounds
+### Answers, the log and the pause rounds
 
 - A person replies with `gx tickets answer <addr> [--choice x] --body -` (or in the web UI). The body
-  is the note, or the text for a free-text question. gx appends a `park.answer` and delivers it to your
+  is the note, or the text for a free-text question. gx appends an answer event and delivers it to your
   session. The ticket goes back to `claimed`.
 - If your agent is gone (crash, kill, budget stop), the answer reopens the ticket and shows it as
   **answered**. That state is derived, never stored: `status` is `open` and the latest question has an
   answer. It clears when gx claims the ticket. The next claim tries to resume your last session, and
   falls back to a cold start from the latest question and its handoff.
-- `gx tickets show <addr>` ends with a generated **Park rounds** block: earlier rounds on one line
+- `gx tickets show <addr>` ends with a generated **Pause rounds** block: earlier rounds on one line
   each, the latest in full with its question, handoff and answer.
 - `gx tickets log <addr> [--type ...]` prints the raw log events. `show` never prints raw events.
-- A claim after a plain unpark (no answer) cold-starts from the handoff.
+- A claim after a plain resume (no answer) cold-starts from the handoff.
 
-### Plain unpark
+### Plain resume
 
-- `unpark` on a live, waiting `self-reported` park refuses and names `gx tickets answer`. It neither
+- `resume` on a live, waiting `self-reported` pause refuses and names `gx tickets answer`. It neither
   kills the agent nor sends a prompt.
-- `unpark` on a `self-reported` park whose agent is gone is allowed. gx writes `park.closed`, sets the
-  ticket `open`, and the next claim cold-starts from the handoff. No `park.answer` is logged, so the
-  ticket is not **answered**.
+- `resume` on a `self-reported` pause whose agent is gone is allowed. gx writes a closing event, sets
+  the ticket `open`, and the next claim cold-starts from the handoff. No answer event is logged, so
+  the ticket is not **answered**.
 
 Scope is **voluntary** asks only: a question the agent itself decides it needs answered. An
 involuntary interactive prompt gx catches from outside (herdr reporting the pane as `blocked`) is the
@@ -420,8 +421,8 @@ orchestrator gate's problem, not the agent's, and follows a different path.
 ## The `## Needs Repair` section
 
 When gx itself — not an agent — hits a fault it can't resolve (a crashed iteration, an operator
-intervention gx observed from outside, commits that vanished before landing), it parks the ticket
-`needs-repair` and appends a `## Needs Repair` section, in this shape:
+intervention gx observed from outside, commits that vanished before merging), it pauses the ticket
+(class `repair`) and appends a `## Needs Repair` section, in this shape:
 
 1. A **summary line**, guaranteed one line by a helper that splits the fault's reason at its first
    newline. Every fault path passes its error through unmodified rather than each deciding for itself
@@ -436,7 +437,7 @@ live agent to author one. Writing a synthetic one would produce a section that r
 wrote it, when nothing did.
 
 The `## Needs Repair` section carries a required one-line reason, and a question carries its summary
-line, so the Queue can say *why* a ticket is parked without anyone opening the file. That requirement
+line, so the Queue can say *why* a ticket is paused without anyone opening the file. That requirement
 is **write-conditional**: it is enforced by the write path that sets the status, never by the loader.
 Enforcing it at load time would reject a hand-authored ticket that never wrote the section, making the
 loader fail on a file it merely observes rather than one it produced.
@@ -449,14 +450,14 @@ to mix a plumbing/infra concern with a feature-on-top concern. `parent` is the w
 1. New ticket(s) get a flat sibling number off the root ticket: `04` forks into `04b`, `04c`, ...
    (skip `a` if the original ticket's own number, unlettered, is still in use as its identifier).
    Allocate each ID with `gx tickets add <epic> --parent <original-id> --slug <descriptive-slug>`
-   rather than picking the number by hand — it's atomic against concurrent forks landing at the
+   rather than picking the number by hand — it's atomic against concurrent forks running at the
    same time, `--slug` (required) writes the stub straight to its final `<id>-<slug>.md` filename,
    and `--parent` writes the child's `parent` frontmatter at creation.
 2. Fill in the new ticket's body, moving any not-yet-finished acceptance criteria off the original
    onto it — don't leave a criterion sitting on a ticket that's about to close. Then promote it with
    `gx tickets set <addr> --status open`.
 3. The original is finished by reporting `--iteration-status finished`, with `--commitless true` if
-   it lands zero commits of its own. gx then writes it `done`.
+   it makes zero commits of its own. gx then writes it `done`.
 
 Nothing else is written. In particular a fork child gets **no** `blocked_by` naming the original, and
 the original records nothing about what it forked. `parent` on the child is the only structural edge
@@ -469,7 +470,7 @@ and a fork child, having no token of its own, is free to start immediately.
 
 **Once step 3 hands off (original marked `done`), the original's agent must not
 write to a child ticket's file again for any reason.** Ticket files are shared, unlocked plain
-files, not per-worktree or git-tracked — a later raw write can land after the child's own
+files, not per-worktree or git-tracked — a later raw write can arrive after the child's own
 independent iteration has already been claimed and launched, clobbering its `status` back to
 `open` and racing the scheduler into reclaiming/relaunching it under the same deterministic agent
 name (`agent_name_taken`). Once handoff happens, the original's job is done; any further changes

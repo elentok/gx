@@ -119,7 +119,7 @@ sections. No repo file.
 
 `gx tickets set <addr> --iteration-status finished --commitless true`. This skill never commits, so
 `--commitless true` is always correct, including when nothing was filed. Never write `--status
-done`; landing status is gx's alone to set.
+done`; merge status is gx's alone to set.
 
 If only a person can answer, follow the tracker's announce-and-stop rule
 ([gx-local-tracker.md](../gx-local-tracker.md)): run `gx tickets ask` and end your turn. Never call
