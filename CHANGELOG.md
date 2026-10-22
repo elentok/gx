@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Changed the ticket word "parked" to "paused". Read this before you upgrade.
+  - The migration is a one-way door. An older gx rejects `status: paused`, so update all gx binaries first, then run `gx tickets migrate`.
+  - The `park`, `unpark`, `drain` and resume-on-start aliases still work. The next release removes them.
+
 ## v0.35.9 - 2026-10-22
 
 - Added land visibility for epics, so a stuck or running merge no longer looks like `Awaiting merge`.
