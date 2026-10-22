@@ -251,10 +251,8 @@ it because the ticket left `needs-answer` another way. The ticket's open questio
 question with neither. Not an iteration, and not a `park` event in the run log.
 
 **Action card** — the part of a ticket's page that asks a person to act: the open question and its
-answer form, a pending permission prompt, the Needs Repair text, unpark, and the result of an answer
-or unpark just sent. It shows only while it holds one of these, or while the ticket is **answered**,
-so it can appear on a ticket that is not **parked**.
-_Avoid_: Park area
+answer form, a pending permission prompt, the text that says why the ticket stopped, the action that
+sends it back to work, and the result of an action just taken. It can show on a running ticket.
 
 ## Agent Runners
 
