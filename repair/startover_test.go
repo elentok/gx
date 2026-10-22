@@ -14,9 +14,9 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-// resetFixture is a claimed ticket 01 of epic-a whose agent is live in
+// startOverFixture is a claimed ticket 01 of epic-a whose agent is live in
 // runner, with no iteration branch or worktree to clear.
-func resetFixture(t *testing.T, state agentrunner.State) (repair.ResetInput, ralphloop.Deps, *runnerfake.Runner, string) {
+func startOverFixture(t *testing.T, state agentrunner.State) (repair.StartOverInput, ralphloop.Deps, *runnerfake.Runner, string) {
 	t.Helper()
 	epicPath := filepath.Join(t.TempDir(), "epic-a")
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
@@ -38,17 +38,17 @@ func resetFixture(t *testing.T, state agentrunner.State) (repair.ResetInput, ral
 		RevParse:       func(string, string) (string, error) { return "", git.ErrRefNotFound },
 		WorktreeExists: func(string) (bool, error) { return false, nil },
 	}
-	in := repair.ResetInput{EpicPath: epicPath, ID: "01", Reason: "stuck", Now: time.Now()}
+	in := repair.StartOverInput{EpicPath: epicPath, ID: "01", Reason: "stuck", Now: time.Now()}
 	return in, d, runner, label
 }
 
-func TestReset_ClosesAnIdleOrDoneAgentAndResets(t *testing.T) {
+func TestStartOver_ClosesAnIdleOrDoneAgentAndStartsOver(t *testing.T) {
 	for _, state := range []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone} {
 		t.Run(string(state), func(t *testing.T) {
-			in, d, runner, label := resetFixture(t, state)
-			res, err := repair.Reset(in, d)
+			in, d, runner, label := startOverFixture(t, state)
+			res, err := repair.StartOver(in, d)
 			if err != nil {
-				t.Fatalf("Reset: %v", err)
+				t.Fatalf("StartOver: %v", err)
 			}
 			if res.Status != "open" {
 				t.Errorf("status = %q, want open", res.Status)
@@ -60,11 +60,11 @@ func TestReset_ClosesAnIdleOrDoneAgentAndResets(t *testing.T) {
 	}
 }
 
-func TestReset_RefusesAWorkingAgent(t *testing.T) {
+func TestStartOver_RefusesAWorkingAgent(t *testing.T) {
 	for _, state := range []agentrunner.State{agentrunner.StateWorking, agentrunner.StateBlocked} {
 		t.Run(string(state), func(t *testing.T) {
-			in, d, runner, label := resetFixture(t, state)
-			_, err := repair.Reset(in, d)
+			in, d, runner, label := startOverFixture(t, state)
+			_, err := repair.StartOver(in, d)
 			var r *repair.RefusalError
 			if !errors.As(err, &r) || r.Reason != repair.ReasonLiveAgentOnTab {
 				t.Fatalf("err = %v, want a %s refusal", err, repair.ReasonLiveAgentOnTab)

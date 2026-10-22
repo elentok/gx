@@ -90,7 +90,7 @@ type RecoveryConfig struct {
 	// FollowUps is the epic (project:epic) that receives the draft research
 	// tickets an investigate ticket's report files. Empty means the default.
 	FollowUps string `json:"follow-ups,omitempty"`
-	// NotifyHold is how long a park's chat message waits for recovery before
+	// NotifyHold is how long a pause's chat message waits for recovery before
 	// it is sent anyway.
 	NotifyHold time.Duration `json:"-"`
 }

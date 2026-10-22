@@ -34,7 +34,7 @@ type RepairRequest struct {
 	Continue      bool   `json:"continue,omitempty"`
 	Abort         bool   `json:"abort,omitempty"`
 
-	// reset
+	// start-over
 	Reason       string `json:"reason,omitempty"`
 	Force        bool   `json:"force,omitempty"`
 	DeleteBranch bool   `json:"delete_branch,omitempty"`
@@ -82,7 +82,7 @@ func RunRepairDirect(ticketStore, verb string, req RepairRequest) (RepairResult,
 	case "merge":
 		do = s.repairMerge
 	case "start-over":
-		do = s.repairReset
+		do = s.repairStartOver
 	case "resume", "unpark":
 		do = s.repairResume
 	case "verify":
@@ -204,25 +204,25 @@ func (s *Server) freshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket
 	return tickets.Epic{}, tickets.Ticket{}, false
 }
 
-func (s *Server) repairReset(req RepairRequest) (RepairResult, error) {
+func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 	epicPath, id, cwd, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	res, err := repair.Reset(repair.ResetInput{
+	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
 		DeleteBranch: req.DeleteBranch, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
-	}, s.resetDeps(req.Address))
+	}, s.startOverDeps(req.Address))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
 	return repairOK(res)
 }
 
-// resetDeps talks to the runner hosting address's iteration, so reset sees
-// and closes the agent where it actually runs. A direct reset has no server
+// startOverDeps talks to the runner hosting address's iteration, so start-over sees
+// and closes the agent where it actually runs. A direct start-over has no server
 // runner and keeps the default.
-func (s *Server) resetDeps(address string) ralphloop.Deps {
+func (s *Server) startOverDeps(address string) ralphloop.Deps {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if s.cfg.Runner == nil || err != nil {
 		return ralphloop.DefaultDeps()
