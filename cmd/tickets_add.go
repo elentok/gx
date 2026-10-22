@@ -21,11 +21,11 @@ import (
 // number under a lettered parent regardless of whether parent itself
 // already carries trailing digits — see tickets.NextTicketID) and writes a
 // minimal stub ticket file for the caller to fill in, printing the created
-// file's path to w. The stub is written status: draft — parked work that
+// file's path to w. The stub is written status: draft — held-back work that
 // never enters an epic's frontier — so a freshly allocated, still-empty
 // ticket can never be handed to an agent; `set --status open` is what
 // promotes it once the body has real content. slug must be non-empty — it
-// becomes the stub's filename suffix (<id>-<slug>.md), so the file lands
+// becomes the stub's filename suffix (<id>-<slug>.md), so the file is written
 // with a real name instead of a placeholder the caller has to remember to
 // rename.
 func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
@@ -312,7 +312,7 @@ func printNotices(w io.Writer, notices []string) {
 // projectEpicRe matches `project:epic`, the cross-project spelling of an epic.
 var projectEpicRe = regexp.MustCompile(`^([^:/\s]+):([^:/\s]+)$`)
 
-// followUpsEpic is the epic every project's contributor outbox lands in; its
+// followUpsEpic is the epic every project's contributor outbox is filed in; its
 // tickets must say what kind of follow-up they are.
 const followUpsEpic = "follow-ups"
 

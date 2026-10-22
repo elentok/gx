@@ -56,9 +56,9 @@ type InputsRow struct {
 	Sessions         []string       `json:"sessions,omitempty"`
 	ConflictSessions []string       `json:"conflict_sessions,omitempty"`
 	Events           map[string]int `json:"events,omitempty"`
-	// Landed is true when the epic's branch carries this ticket's
+	// Merged is true when the epic's branch carries this ticket's
 	// Ralph-Loop-Ticket trailer.
-	Landed     bool     `json:"landed"`
+	Merged     bool     `json:"merged"`
 	FixTickets []string `json:"fix_tickets,omitempty"`
 	Flags      []string `json:"flags"`
 	Severity   int      `json:"severity"`
@@ -79,8 +79,8 @@ type InputsTable struct {
 }
 
 // buildInputsTable derives every row from frontmatter, the run log and the
-// landed set; none of it needs a transcript. landed may be nil (no repo).
-func buildInputsTable(t evolveTarget, evs []ralphloop.Event, landed map[string]bool) (InputsTable, error) {
+// merged set; none of it needs a transcript. merged may be nil (no repo).
+func buildInputsTable(t evolveTarget, evs []ralphloop.Event, merged map[string]bool) (InputsTable, error) {
 	e := t.epic
 	forkParents := e.ForkParents()
 
@@ -131,7 +131,7 @@ func buildInputsTable(t evolveTarget, evs []ralphloop.Event, landed map[string]b
 			ActualContext:   tk.ActualContextWindow,
 			ElapsedSeconds:  tk.ElapsedTime,
 			Cost:            tk.ActualCost,
-			Landed:          landed[tk.Identifier],
+			Merged:          merged[tk.Identifier],
 			FixTickets:      fixes[tk.Identifier],
 			Flags:           []string{},
 		}
@@ -266,14 +266,14 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	if err != nil {
 		return err
 	}
-	var landed map[string]bool
-	if env.landed != nil {
-		// An unreadable repo only costs the landed column.
-		if landed, err = env.landed(t.project, t.name); err != nil {
-			landed = nil
+	var merged map[string]bool
+	if env.merged != nil {
+		// An unreadable repo only costs the merged column.
+		if merged, err = env.merged(t.project, t.name); err != nil {
+			merged = nil
 		}
 	}
-	table, err := buildInputsTable(t, evs, landed)
+	table, err := buildInputsTable(t, evs, merged)
 	if err != nil {
 		return err
 	}
@@ -328,9 +328,9 @@ func formatEventCounts(m map[string]int) string {
 	return strings.Join(parts, " ")
 }
 
-// defaultLanded reads the epic's Ralph-Loop-Ticket trailers off its branch.
-// A project with no repo reports nothing landed, not an error.
-func defaultLanded(storePath string) func(project, epic string) (map[string]bool, error) {
+// defaultMerged reads the epic's Ralph-Loop-Ticket trailers off its branch.
+// A project with no repo reports nothing merged, not an error.
+func defaultMerged(storePath string) func(project, epic string) (map[string]bool, error) {
 	return func(project, epic string) (map[string]bool, error) {
 		dir, err := tickets.ProjectDirByName(storePath, project)
 		if err != nil {
@@ -348,13 +348,13 @@ func defaultLanded(storePath string) func(project, epic string) (map[string]bool
 		if err != nil {
 			return nil, err
 		}
-		landed := map[string]bool{}
+		merged := map[string]bool{}
 		for value := range trailers {
 			if e, id, ok := tickets.SplitTrailerValue(value); ok && e == epic {
-				landed[id] = true
+				merged[id] = true
 			}
 		}
-		return landed, nil
+		return merged, nil
 	}
 }
 

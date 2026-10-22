@@ -358,7 +358,7 @@ log shows no open question on the web. A second run changes nothing.`,
 	addCmd.Flags().String("commitless", "", "with --body, set commitless (true/false)")
 	addCmd.Flags().String("category", "", "with --body, set category (bug or idea)")
 	addCmd.Flags().StringVar(&addParent, "parent", "", "allocate a lettered child of this ticket ID (or, if parent is itself lettered, one numeric level past it)")
-	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; stub lands at <id>-<slug>.md)")
+	addCmd.Flags().StringVar(&addSlug, "slug", "", "descriptive filename slug, e.g. \"wire-tree-model-selection\" (required; the stub is written to <id>-<slug>.md)")
 	addCmd.Flags().StringVar(&addBody, "body", "", "ticket body, or - to read it from stdin; the ticket is written open and printed by address")
 	addCmd.Flags().BoolVar(&addJSON, "json", false, "with --body, emit {address, path} JSON")
 	cmd.AddCommand(addCmd)

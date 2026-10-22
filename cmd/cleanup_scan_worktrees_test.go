@@ -12,7 +12,7 @@ import (
 // ticket 02's test-seams note, this repo's own dev history already has a
 // real current-pattern iteration branch, a real legacy-pattern one, real
 // feature/other branches, and (via the very branch this ticket's commits
-// land on) a real very-recent-commit worktree — exactly the fixtures the
+// merge into) a real very-recent-commit worktree — exactly the fixtures the
 // ticket asks to assert against directly, instead of synthesizing new ones.
 // If a named branch is missing (e.g. it was since cleaned up), the caller
 // skips rather than failing, since this test's fixtures live outside the
@@ -79,7 +79,7 @@ func requireEpic(t *testing.T, epics []tickets.Epic, epicName string) {
 	t.Skipf("fixture epic %q not present in this repo's current (non-archived) state", epicName)
 }
 
-func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_LandedAndDone(t *testing.T) {
+func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_MergedAndDone(t *testing.T) {
 	t.Parallel()
 	byBranch, epics := realDevRepoScanWithEpics(t)
 	requireEpic(t, epics, "bugs-01")
@@ -94,12 +94,12 @@ func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_LandedAndDone(t *t
 	if !scan.TicketDone {
 		t.Errorf("TicketDone = false, want true (bugs-01 ticket 04 is done)")
 	}
-	if !scan.Landed {
-		t.Errorf("Landed = false, want true (cherry-picked onto bugs-01)")
+	if !scan.Merged {
+		t.Errorf("Merged = false, want true (cherry-picked onto bugs-01)")
 	}
 }
 
-func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_LandedAndDone(t *testing.T) {
+func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_MergedAndDone(t *testing.T) {
 	t.Parallel()
 	byBranch, epics := realDevRepoScanWithEpics(t)
 	requireEpic(t, epics, "gx-tickets-set-retrofit")
@@ -114,8 +114,8 @@ func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_LandedAndDone(t *te
 	if !scan.TicketDone {
 		t.Errorf("TicketDone = false, want true (gx-tickets-set-retrofit ticket 01 is done)")
 	}
-	if !scan.Landed {
-		t.Errorf("Landed = false, want true (branch tip is an ancestor of gx-tickets-set-retrofit)")
+	if !scan.Merged {
+		t.Errorf("Merged = false, want true (branch tip is an ancestor of gx-tickets-set-retrofit)")
 	}
 }
 
@@ -147,7 +147,7 @@ func TestScanWorktrees_RealRepo_OtherBranch(t *testing.T) {
 
 // TestScanWorktrees_RealRepo_ActiveWorkNeverRecommended exercises the
 // active-work exclusion against this ticket's own branch: by the time this
-// test runs, ticket 01's commit landed on it moments ago, so it's a real
+// test runs, ticket 01's commit was added to it moments ago, so it's a real
 // worktree with a genuinely recent commit - not a synthesized one.
 func TestScanWorktrees_RealRepo_ActiveWorkNeverRecommended(t *testing.T) {
 	t.Parallel()

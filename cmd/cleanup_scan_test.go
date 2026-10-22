@@ -259,8 +259,8 @@ func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	registerWithTrunk(t, dir, "develop")
 	testutil.MustGitExported(t, dir, "checkout", "-b", "develop")
-	commitFile(t, dir, "landed.txt", "x")
-	testutil.MustGitExported(t, dir, "branch", "landed-on-develop")
+	commitFile(t, dir, "merged.txt", "x")
+	testutil.MustGitExported(t, dir, "branch", "merged-on-develop")
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	var stdout bytes.Buffer
@@ -280,8 +280,8 @@ func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
 	if _, ok := byBranch["develop"]; ok {
 		t.Errorf("trunk develop listed in worktree scan: %+v", result.Worktrees)
 	}
-	if !byBranch["landed-on-develop"].MergedToTrunk {
-		t.Errorf("landed-on-develop not merged to trunk: %+v", byBranch["landed-on-develop"])
+	if !byBranch["merged-on-develop"].MergedToTrunk {
+		t.Errorf("merged-on-develop not merged to trunk: %+v", byBranch["merged-on-develop"])
 	}
 	if _, ok := byBranch["main"]; !ok {
 		t.Errorf("main (not trunk) missing from worktree scan: %+v", result.Worktrees)

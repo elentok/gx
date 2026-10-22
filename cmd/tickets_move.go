@@ -17,7 +17,7 @@ import (
 // runTicketsMove moves one flat, never-run ticket of the cwd-resolved source
 // to another epic of the same project, written directly like `add`. Both epic
 // locks are held, in path order, from the checks through the write; the new
-// file lands before the old one is deleted so a crash never loses the ticket.
+// file is written before the old one is deleted so a crash never loses the ticket.
 func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w io.Writer) error {
 	cwd, err := d.getwd()
 	if err != nil {

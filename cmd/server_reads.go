@@ -504,7 +504,7 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		if kind == "" {
 			kind = "needs-rebase"
 		}
-		return fmt.Errorf("parked (%s): %s", kind, res.Message)
+		return fmt.Errorf("paused (%s): %s", kind, res.Message)
 	}
 	if res.Merged {
 		_, err := fmt.Fprintln(w, "merged")
@@ -587,7 +587,7 @@ func newServerTicketsCmd() *cobra.Command {
 	var detailJSON bool
 	detail := &cobra.Command{
 		Use:   "detail <project:epic/NN>",
-		Short: "show a ticket's park rounds, state token and applicable actions",
+		Short: "show a ticket's pause rounds, state token and applicable actions",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverRead(c.Context(), detailJSON, c.OutOrStdout(),
@@ -648,7 +648,7 @@ func newServerTicketsCmd() *cobra.Command {
 	var unmuteJSON bool
 	unmute := &cobra.Command{
 		Use:   "unmute <project:epic/NN>",
-		Short: "clear a ticket's mutes and reopen it if it was parked needs-repair",
+		Short: "clear a ticket's mutes and reopen it if it was paused by a fault",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return serverQueueWrite(c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {

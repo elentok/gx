@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-// TestMain keeps land locks (which live in the state dir) off the machine's
+// TestMain keeps merge locks (which live in the state dir) off the machine's
 // real one, and serves the herdr fake's helper process.
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()

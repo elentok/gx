@@ -31,7 +31,7 @@ func newServerEpicsCmd() *cobra.Command {
 	var jsonOut bool
 	merge := &cobra.Command{
 		Use:   "merge <project:epic>",
-		Short: "merge a complete epic now: land it directly, or fork a merge ticket when it is not a fast-forward",
+		Short: "merge a complete epic now: merge it directly, or fork a merge ticket when it is not a fast-forward",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {

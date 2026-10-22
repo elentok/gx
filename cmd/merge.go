@@ -72,7 +72,7 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 // stampMergedEpic stamps merged_at on the epic whose feature branch is
 // branch (an epic's branch is named after its directory). A branch of no
 // epic, or a repo no project registers, stamps nothing. completed_at is left
-// alone: it records the epic's outcome, not its land.
+// alone: it records the epic's outcome, not its merge.
 func stampMergedEpic(repoRoot, branch string) error {
 	if branch == "" || filepath.Base(branch) != branch {
 		return nil

@@ -37,9 +37,9 @@ type evolveEnv struct {
 	// confirm asks a yes/no question; `evolve all` asks before each submit.
 	confirm func(string) (bool, error)
 	now     func() time.Time
-	// landed reports the epic's tickets that carry a Ralph-Loop-Ticket trailer
+	// merged reports the epic's tickets that carry a Ralph-Loop-Ticket trailer
 	// on its branch; nil when there is no way to ask.
-	landed func(project, epic string) (map[string]bool, error)
+	merged func(project, epic string) (map[string]bool, error)
 	// homeDir (claude transcripts), stateDir (native agent logs) and codexHome
 	// (rollouts) are where `evolve inputs` finds sessions; "" skips that source.
 	// tempDir is where its digest dir goes ("" = the OS temp dir).
@@ -362,7 +362,7 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 		return evolveEnv{}, err
 	}
 	env := evolveEnv{storePath: cfg.TicketStore.Path, cfg: cfg, now: time.Now, confirm: d.confirmForce,
-		landed: defaultLanded(cfg.TicketStore.Path)}
+		merged: defaultMerged(cfg.TicketStore.Path)}
 	// Missing dirs only cost digests, which then report "missing".
 	env.homeDir, _ = d.userHomeDir()
 	env.stateDir, _ = config.StateDir()

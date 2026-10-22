@@ -23,14 +23,14 @@ const ticketsSchemaText = `Ticket frontmatter fields:
 
 Settable fields:
   status (enum, --status): draft, open. Orchestration statuses (claimed, done,
-    needs-answer, needs-repair, cancelled) are the server's alone and refused here — gx
-    claims, parks and lands a ticket itself. Exception: in a map epic (ticket.md
+    paused, cancelled) are the server's alone and refused here — gx
+    claims, pauses and merges a ticket itself. Exception: in a map epic (ticket.md
     kind: map), claimed and done are settable, since nothing schedules a map.
-    Required on every ticket. draft is parked work: it never enters an epic's
+    Required on every ticket. draft is held-back work: it never enters an epic's
     frontier, so no agent is ever handed it.
   blocked_by (comma-separated ticket IDs, --blocked-by): e.g. 01,03. A bare ID names a ticket in
     this epic; epic/06 (or project:epic/06 for this project) names one in another epic of the
-    project. To wait on another epic's work, block on it this way — never park the ticket as a
+    project. To wait on another epic's work, block on it this way — never pause the ticket as a
     stand-in. Dangling refs, another project's prefix and cycles are refused before writing.
   parent (ticket ID, --parent): the ticket this one was produced from. Must name an
     existing ticket in the same epic, and may not point into this ticket's own fork
@@ -45,20 +45,20 @@ Settable fields:
 Agent-only settable fields:
   iteration_status (enum, --iteration-status): working, asking, finished. The
     agent's own self-report for the current claim, distinct from status. This report
-    can only start a landing, never conclude one — gx's own commit count and
-    cherry-pick decide whether the ticket actually lands. Never pair finished with
-    --status=done: landing status is gx's alone to write.
+    can only start a merge, never conclude one — gx's own commit count and
+    cherry-pick decide whether the ticket is actually merged. Never pair finished with
+    --status=done: the merge status is gx's alone to write.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
-  actual_context_window — stamped by ralphloop at land time
-  elapsed_time — stamped by ralphloop at land time
+  actual_context_window — stamped by ralphloop at merge time
+  elapsed_time — stamped by ralphloop at merge time
   mutes — notification throttles tripped for this ticket (event type + timestamp),
     machine-written only
   iteration_finished_at (RFC3339 timestamp) — stamped when an agent reports
     --iteration-status finished, cleared otherwise
   claimed_at (RFC3339 timestamp) — stamped on every move into claimed, including a
-    re-claim after a reset or unpark; cleared with done_at
+    re-claim after a start-over or resume; cleared with done_at
   done_at (RFC3339 timestamp) — stamped when the ticket moves into done, cleared by
     a new claim
   exported_at (RFC3339 timestamp) — when gx exported the ticket
@@ -83,9 +83,9 @@ An epic's ticket.md also holds epic-level timing. These fields are gx-managed, n
 settable via ` + "`tickets set`" + `, and unset until gx stamps them.
   started_at (RFC3339 timestamp) — when work on the epic began
   created_at (RFC3339 timestamp) — when the epic was created
-  completed_at (RFC3339 timestamp) — when the epic's last ticket landed (a map: when its
+  completed_at (RFC3339 timestamp) — when the epic's last ticket merged (a map: when its
     <map>-impl epic was created)
-  merged_at (RFC3339 timestamp) — when the epic's branch landed on its target
+  merged_at (RFC3339 timestamp) — when the epic's branch merged into its target
     (stamped by the server or ` + "`gx merge`" + `); a merged epic is one with merged_at set
 
 Evolve fields (optional, validated):
@@ -262,8 +262,8 @@ func parseCSVIDs(value string) []schema.TicketID {
 	return ids
 }
 
-// orchestrationStatuses are the statuses `set` no longer writes: claims, parks,
-// landing and cancellation belong to the server's orchestration path.
+// orchestrationStatuses are the statuses `set` no longer writes: claims, pauses,
+// merging and cancellation belong to the server's orchestration path.
 var orchestrationStatuses = map[schema.Status]bool{
 	schema.StatusClaimed:      true,
 	schema.StatusDone:         true,
@@ -395,7 +395,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 	return nil
 }
 
-// checkAgentStatusGuard is the landing-decision guard rail: it refuses a
+// checkAgentStatusGuard is the merge-decision guard rail: it refuses a
 // --status write from an iteration agent's own worktree unless it's the one
 // promotion mid-flight forking depends on, draft -> open. The guard is keyed
 // off the caller's git branch rather than a flag or env var — see
@@ -421,7 +421,7 @@ func checkAgentStatusGuard(path string, newStatus schema.Status, getwd func() (s
 	}
 
 	return fmt.Errorf(
-		"%s: --status %s refused from a ralph-loop/* branch (%s); an iteration agent may only promote a draft ticket to open, landing status is gx's to set",
+		"%s: --status %s refused from a ralph-loop/* branch (%s); an iteration agent may only promote a draft ticket to open, the merge status is gx's to set",
 		path, newStatus, branch,
 	)
 }
@@ -488,8 +488,8 @@ func lockEpicForParentWrite(path, parentID string) (unlock func(), err error) {
 
 // checkIterationStatusFinishedGuard validates --iteration-status's value.
 // Per no-silent-stalls Story 26/27, an agent's finished report can only start
-// a landing, never conclude one — the zero-commit fault check belongs solely
-// to ralphloop's own landing path, which has real git access to count
+// a merge, never conclude one — the zero-commit fault check belongs solely
+// to ralphloop's own merge path, which has real git access to count
 // commits (tickets 07/08), not to a CLI-visible proxy flag. Earlier this
 // guard demanded --status=done alongside a non-commitless finished report,
 // but checkAgentStatusGuard refuses that same --status write from a
@@ -503,8 +503,8 @@ func checkIterationStatusFinishedGuard(c *cobra.Command, path string) error {
 	return nil
 }
 
-// checkOpenQuestionGuard keeps `status: needs-answer` meaning "the latest
-// question is open": moving a parked ticket to open, or reporting
+// checkOpenQuestionGuard keeps a self-reported pause meaning "the latest
+// question is open": moving a paused ticket to open, or reporting
 // --iteration-status asking, both need a question in the log, and
 // the refusal names the verb that writes one (ask) or ends one (answer).
 func checkOpenQuestionGuard(c *cobra.Command, path string) error {

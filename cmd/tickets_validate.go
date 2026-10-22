@@ -39,7 +39,7 @@ func runTicketsValidate(path string, w, stderr io.Writer) error {
 }
 
 // validateTicketLog checks the ticket's log: a malformed middle line is an
-// error (ReadLog skips a torn last line), a needs-answer ticket must have an
+// error (ReadLog skips a torn last line), a ticket paused for an answer must have an
 // open latest question, and an over-long question summary only warns. This
 // lives here rather than in schema.Validate, which stays free of log checks.
 func validateTicketLog(path string, ticket schema.Ticket, stderr io.Writer) error {
@@ -48,7 +48,7 @@ func validateTicketLog(path string, ticket schema.Ticket, stderr io.Writer) erro
 		return err
 	}
 	if ticket.PausedClass() == schema.PauseClassAnswer && tickets.OpenQuestion(events) == nil {
-		return fmt.Errorf("%s: status is needs-answer but the log has no open question", ticketLabel(path))
+		return fmt.Errorf("%s: ticket is paused for an answer but the log has no open question", ticketLabel(path))
 	}
 	for _, ev := range events {
 		if ev.Type != tickets.EventPauseQuestion {

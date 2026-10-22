@@ -132,7 +132,7 @@ func TestOneOffWait_WakesOnItsInvestigation(t *testing.T) {
 		want                 int
 	}{
 		"escalated": {[]string{"needs-repair", "needs-repair"}, []string{pending, escalated}, exitWaitEscalated},
-		"landed":    {[]string{"needs-repair", "needs-repair", "done"}, []string{pending, pending}, 0},
+		"merged":    {[]string{"needs-repair", "needs-repair", "done"}, []string{pending, pending}, 0},
 	} {
 		f := &fakeSource{statuses: tc.statuses, recoveries: tc.recoveries, investigation: true}
 		if _, code := runWait(t, f); code != tc.want {

@@ -429,7 +429,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 
 	err := execute([]string{"tickets", "set", path, "--iteration-status=finished"}, d)
 	if err != nil {
-		t.Fatalf("execute tickets set: %v, want a bare finished report accepted — the zero-commit check belongs to ralphloop's landing path, not this CLI guard", err)
+		t.Fatalf("execute tickets set: %v, want a bare finished report accepted — the zero-commit check belongs to ralphloop's merge path, not this CLI guard", err)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -441,7 +441,7 @@ func TestExecute_TicketsSet_IterationStatusFinishedBareAccepted(t *testing.T) {
 	}
 }
 
-// Late-finish adoption compares iteration_finished_at with the park time, so only a
+// Late-finish adoption compares iteration_finished_at with the pause time, so only a
 // finished report stamps it and any other report clears it.
 func TestExecute_TicketsSet_IterationStatusStampsIterationFinishedAt(t *testing.T) {
 	t.Parallel()

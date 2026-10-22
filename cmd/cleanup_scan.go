@@ -69,7 +69,7 @@ func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
-	// A "landed?" check against an unresolved trunk can't be trusted, so
+	// A "merged?" check against an unresolved trunk can't be trusted, so
 	// stop before reporting anything the gx-cleanup skill would delete on.
 	openRepo, err := tickets.OpenRepo(cwd)
 	if err != nil {
@@ -134,7 +134,7 @@ func scanEpic(repo git.Repo, epic tickets.Epic) (EpicScan, error) {
 		}
 	}
 
-	// merged_at outlives the branch, which may be deleted once landed.
+	// merged_at outlives the branch, which may be deleted once merged.
 	if !epic.MergedAt.IsZero() {
 		scan.MergedToTrunk = true
 		return scan, nil
@@ -239,7 +239,7 @@ func printCleanupScanText(w io.Writer, result CleanupScanResult) {
 		detail := ws.Kind
 		switch ws.Kind {
 		case "iteration":
-			detail = fmt.Sprintf("iteration epic=%s ticket=%s done=%t landed=%t", ws.Epic, ws.TicketID, ws.TicketDone, ws.Landed)
+			detail = fmt.Sprintf("iteration epic=%s ticket=%s done=%t merged=%t", ws.Epic, ws.TicketID, ws.TicketDone, ws.Merged)
 		case "feature":
 			detail = fmt.Sprintf("feature epic=%s merged=%t", ws.Epic, ws.MergedToTrunk)
 		case "other":

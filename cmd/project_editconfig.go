@@ -125,7 +125,7 @@ func warnTrunkChange(out io.Writer, dir string, orig, edited []byte) {
 		return
 	}
 	epics, _ := tickets.Load(dir)
-	fmt.Fprintf(out, "%d tickets in flight will land on %s\n", rootsInFlight(epics, repo, oldTrunk), newTrunk)
+	fmt.Fprintf(out, "%d tickets in flight will merge into %s\n", rootsInFlight(epics, repo, oldTrunk), newTrunk)
 }
 
 // effectiveTrunk mirrors tickets.Trunk without its existence check, so
@@ -142,7 +142,7 @@ func effectiveTrunk(pf config.ProjectFile, repo string) string {
 
 // rootsInFlight counts roots, never their children: a root is in flight while
 // any of its tickets is claimed or its feature branch has not reached trunk.
-// An unresolvable trunk counts the branch as not landed.
+// An unresolvable trunk counts the branch as not merged.
 func rootsInFlight(epics []tickets.Epic, repo, trunk string) int {
 	n := 0
 	for _, e := range epics {
@@ -152,19 +152,19 @@ func rootsInFlight(epics []tickets.Epic, repo, trunk string) int {
 		claimed := slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
 			return t.Status == string(schema.StatusClaimed)
 		})
-		if claimed || (repo != "" && branchUnlanded(repo, e.Name, trunk)) {
+		if claimed || (repo != "" && branchUnmerged(repo, e.Name, trunk)) {
 			n++
 		}
 	}
 	return n
 }
 
-func branchUnlanded(repo, branch, trunk string) bool {
+func branchUnmerged(repo, branch, trunk string) bool {
 	if _, err := git.RevParse(repo, "refs/heads/"+branch); err != nil {
 		return false
 	}
-	landed, err := git.IsAncestor(repo, "refs/heads/"+branch, trunk)
-	return err != nil || !landed
+	merged, err := git.IsAncestor(repo, "refs/heads/"+branch, trunk)
+	return err != nil || !merged
 }
 
 // projectDirFor resolves a bare project name, or with none the cwd's project.

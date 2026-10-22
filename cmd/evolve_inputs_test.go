@@ -38,7 +38,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 		{Type: "iteration-started", Ticket: "02", AgentSession: "s2"},
 		{Type: "iteration-started", Ticket: "02", AgentSession: "s2b"},
 		{Type: "nudged", Ticket: "02"},
-		{Type: "conflict-hit", Ticket: "04", AgentSession: "land-1"},
+		{Type: "conflict-hit", Ticket: "04", AgentSession: "merge-1"},
 		{Type: "conflict-resolved", Ticket: "04", AgentSession: "res-1"},
 		{Type: "recovery-applied", Ticket: "07", Kind: "zero-commit"},
 		{Type: "deadlocked", Kind: "all-paused"},
@@ -47,7 +47,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 			t.Fatal(err)
 		}
 	}
-	f.env.landed = func(string, string) (map[string]bool, error) { return map[string]bool{"01": true}, nil }
+	f.env.merged = func(string, string) (map[string]bool, error) { return map[string]bool{"01": true}, nil }
 	return f
 }
 
@@ -97,10 +97,10 @@ func TestEvolveInputs_FlagsAndSeverityOrder(t *testing.T) {
 			t.Errorf("ticket %s severity = %d, want %d", id, rows[id].Severity, s)
 		}
 	}
-	if !rows["01"].Landed || rows["02"].Landed {
-		t.Errorf("landed = %v/%v", rows["01"].Landed, rows["02"].Landed)
+	if !rows["01"].Merged || rows["02"].Merged {
+		t.Errorf("merged = %v/%v", rows["01"].Merged, rows["02"].Merged)
 	}
-	if got := rows["04"].ConflictSessions; !reflect.DeepEqual(got, []string{"land-1", "res-1"}) {
+	if got := rows["04"].ConflictSessions; !reflect.DeepEqual(got, []string{"merge-1", "res-1"}) {
 		t.Errorf("conflict sessions = %v", got)
 	}
 	if got := rows["02"].Sessions; !reflect.DeepEqual(got, []string{"s2", "s2b"}) {
@@ -198,6 +198,6 @@ func TestEvolveInputs_WritesDigests(t *testing.T) {
 	check("02", 0, "s2", "main", "native", "native-s2")
 	check("02", 1, "s2b", "main", "missing", "")
 	check("03", 0, "s3", "main", "codex", "codex-s3")
-	check("04", 0, "land-1", "conflict", "missing", "")
+	check("04", 0, "merge-1", "conflict", "missing", "")
 	check("04", 1, "res-1", "conflict", "claude", "resolved")
 }

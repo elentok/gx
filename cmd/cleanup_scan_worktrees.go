@@ -32,12 +32,12 @@ type WorktreeScan struct {
 	// "feature" (the epic itself) kinds.
 	Epic string `json:"epic,omitempty"`
 
-	// TicketID/TicketDone/Landed are set only for Kind == "iteration".
+	// TicketID/TicketDone/Merged are set only for Kind == "iteration".
 	TicketID   string `json:"ticket_id,omitempty"`
 	TicketDone bool   `json:"ticket_done,omitempty"`
-	// Landed is true when the branch's commits are already cherry-picked
+	// Merged is true when the branch's commits are already cherry-picked
 	// into the epic's feature branch, or already reachable from main.
-	Landed bool `json:"landed,omitempty"`
+	Merged bool `json:"merged,omitempty"`
 
 	// MergedToTrunk is set for Kind == "feature" and "other".
 	MergedToTrunk bool `json:"merged_to_main,omitempty"`
@@ -110,13 +110,13 @@ func classifyBranch(repo git.Repo, branch, path string, epicByName map[string]ti
 			}
 		}
 
-		landed, err := iterationLanded(repo, branch, epicName)
+		merged, err := iterationMerged(repo, branch, epicName)
 		if err != nil {
 			return WorktreeScan{}, err
 		}
-		scan.Landed = landed
+		scan.Merged = merged
 
-		if !scan.Active && scan.TicketDone && scan.Landed {
+		if !scan.Active && scan.TicketDone && scan.Merged {
 			scan.Recommendation = "delete"
 		}
 		return scan, nil
@@ -169,14 +169,14 @@ func parseIterationBranch(branch string) (epic, ticketID string, ok bool) {
 	return "", "", false
 }
 
-// iterationLanded reports whether branch's commits are already cherry-picked
+// iterationMerged reports whether branch's commits are already cherry-picked
 // into the epic's feature branch (epicName), or already reachable from trunk
-// — either way there's nothing left to land. Checked as an ancestor first
+// — either way there's nothing left to merge. Checked as an ancestor first
 // (the common case where the branch was never diverged/rebased away), then
 // via patch-id equivalence (git cherry), since CherryPickRange produces
 // fresh commit hashes on the feature branch that are never literally
 // reachable from the source iteration branch.
-func iterationLanded(repo git.Repo, branch, epicName string) (bool, error) {
+func iterationMerged(repo git.Repo, branch, epicName string) (bool, error) {
 	if git.IsLocalBranch(repo.Root, epicName) {
 		anc, err := git.IsAncestor(repo.Root, branch, epicName)
 		if err != nil {

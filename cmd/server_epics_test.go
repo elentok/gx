@@ -64,10 +64,10 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 	}{
 		"merged": {res: server.QueueResult{Merged: true}, out: "merged\n"},
 		"forked": {res: server.QueueResult{MergeTicket: "proj:epic/07"}, out: "proj:epic/07\n"},
-		"parked": {res: server.QueueResult{Paused: true, PauseKind: "conflict", Message: "merge conflict in a.go"},
-			errPart: "parked (conflict): merge conflict in a.go"},
-		"parked needs-rebase": {res: server.QueueResult{Paused: true, Message: "branch is behind trunk"},
-			errPart: "parked (needs-rebase): branch is behind trunk"},
+		"paused": {res: server.QueueResult{Paused: true, PauseKind: "conflict", Message: "merge conflict in a.go"},
+			errPart: "paused (conflict): merge conflict in a.go"},
+		"paused needs-rebase": {res: server.QueueResult{Paused: true, Message: "branch is behind trunk"},
+			errPart: "paused (needs-rebase): branch is behind trunk"},
 	}
 	for _, code := range []string{
 		server.ReasonInvalidAddress, server.ReasonUnknownTicket, server.ReasonMapEpic, server.ReasonAlreadyMerged,

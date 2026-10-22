@@ -511,7 +511,7 @@ func processAlive(pid int) bool {
 }
 
 // stopTimeout outlasts server.DefaultMergeStopTimeout so a stop that waits for a
-// land is not reported as a failure.
+// merge is not reported as a failure.
 const stopTimeout = server.DefaultMergeStopTimeout + 15*time.Second
 
 func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {

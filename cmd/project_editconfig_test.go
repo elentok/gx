@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
 
 const editConfigOrig = `{"name": "proj"}`
@@ -37,12 +37,14 @@ func newEditConfigEnv(t *testing.T, tty bool, answers string, saves ...string) *
 		t.Fatal(err)
 	}
 	e.d = deps{
-		stdin:           strings.NewReader(answers),
-		stdout:          &e.out,
-		stderr:          &e.errOut,
-		getwd:           func() (string, error) { return t.TempDir(), nil },
-		getenv:          func(string) string { return "vi" },
-		loadConfig:      func() (config.Config, error) { return config.Config{TicketStore: config.TicketStoreConfig{Path: e.store}}, nil },
+		stdin:  strings.NewReader(answers),
+		stdout: &e.out,
+		stderr: &e.errOut,
+		getwd:  func() (string, error) { return t.TempDir(), nil },
+		getenv: func(string) string { return "vi" },
+		loadConfig: func() (config.Config, error) {
+			return config.Config{TicketStore: config.TicketStoreConfig{Path: e.store}}, nil
+		},
 		stdinIsTerminal: func() bool { return tty },
 		runEditor: func(_, path string, _ io.Reader, _, _ io.Writer) error {
 			if e.edits >= len(saves) {
@@ -105,8 +107,8 @@ func TestProjectEditConfig_NoChanges(t *testing.T) {
 
 func TestProjectEditConfig_InvalidSaveLoops(t *testing.T) {
 	invalid := map[string]string{
-		"key":   `{"name": "proj", "bogus": 1}`,
-		"type":  `{"name": "proj", "max-agents": "two"}`,
+		"key":     `{"name": "proj", "bogus": 1}`,
+		"type":    `{"name": "proj", "max-agents": "two"}`,
 		"landing": `{"name": "proj", "landing": "pr"}`,
 		"vcs":     `{"name": "proj", "vcs": "hg"}`,
 		"trunk":   `{"name": "proj", "trunk": "bad branch.."}`,
@@ -194,21 +196,21 @@ func TestProjectEditConfig_UnregisteredRepoNeverCreatesProjectJSON(t *testing.T)
 }
 
 // newInFlightEnv gives proj a repo on trunk main and four roots: one with a
-// claimed ticket and a claimed child, one with an unlanded feature branch, one
+// claimed ticket and a claimed child, one with an unmerged feature branch, one
 // whose branch is on main, and one never started.
 func newInFlightEnv(t *testing.T, saved string) *editConfigEnv {
 	t.Helper()
 	repo := testutil.TempRepo(t)
 	e := newEditConfigEnv(t, false, "", strings.ReplaceAll(saved, "REPO", repo))
 	testutil.WriteFile(t, filepath.Dir(e.live), config.ProjectFileName, `{"name": "proj", "repo": "`+repo+`", "trunk": "main"}`)
-	testutil.MustGitExported(t, repo, "branch", "landed")
-	testutil.MustGitExported(t, repo, "switch", "-qc", "unlanded")
+	testutil.MustGitExported(t, repo, "branch", "merged")
+	testutil.MustGitExported(t, repo, "switch", "-qc", "unmerged")
 	testutil.MustGitExported(t, repo, "commit", "-q", "--allow-empty", "-m", "wip")
 	testutil.MustGitExported(t, repo, "switch", "-q", "main")
 	roots := map[string]string{
 		"claimed":  "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# a\n",
-		"unlanded": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# a\n",
-		"landed":   "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# a\n",
+		"unmerged": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# a\n",
+		"merged":   "---\nid: \"01\"\nstatus: done\ntype: implement\n---\n# a\n",
 		"idle":     "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# a\n",
 	}
 	for epic, body := range roots {
@@ -227,7 +229,7 @@ func TestProjectEditConfig_TrunkChangeWarnsRootsInFlight(t *testing.T) {
 	if err := runProjectEditConfig(e.d, "proj"); err != nil {
 		t.Fatal(err)
 	}
-	if want := "2 tickets in flight will land on develop\n"; !strings.HasSuffix(e.out.String(), want) {
+	if want := "2 tickets in flight will merge into develop\n"; !strings.HasSuffix(e.out.String(), want) {
 		t.Errorf("out = %q, want suffix %q", e.out.String(), want)
 	}
 }

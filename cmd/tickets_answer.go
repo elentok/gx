@@ -10,7 +10,7 @@ import (
 	"github.com/elentok/gx/server"
 )
 
-// newTicketsAnswerCmd is `gx tickets answer`: a person's reply to a parked
+// newTicketsAnswerCmd is `gx tickets answer`: a person's reply to a paused
 // agent's question. The server mirror also takes the state token of the
 // question being answered. It never starts the server.
 func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
@@ -19,7 +19,7 @@ func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "answer <project:epic/NN>",
-		Short: "answer the question a parked ticket's live agent is waiting on",
+		Short: "answer the question a paused ticket's live agent is waiting on",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			req.Address, req.Source = args[0], "cli"

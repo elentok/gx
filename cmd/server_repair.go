@@ -63,10 +63,10 @@ func addServerRepairCmds(parent *cobra.Command) {
 	})
 	verb("resume", "resume <project:epic/NN>", "reopen a paused ticket and retire its Paused section into Comments", cobra.ExactArgs(1), nil)
 	verb("unpark", "unpark <project:epic/NN>", "alias of resume", cobra.ExactArgs(1), nil).Hidden = true
-	verb("verify", "verify <project:epic[/NN]>", "report whether each ticket's commits landed on the feature branch", cobra.ExactArgs(1), nil)
+	verb("verify", "verify <project:epic[/NN]>", "report whether each ticket's commits merged into the feature branch", cobra.ExactArgs(1), nil)
 }
 
-const directNotice = "server not running — ran directly under land lock"
+const directNotice = "server not running — ran directly under merge lock"
 
 // directRepair runs a verb in-process against the configured ticket store.
 func directRepair(verb string, req server.RepairRequest) (server.RepairResult, error) {
