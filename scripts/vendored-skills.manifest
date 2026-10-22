@@ -10,3 +10,5 @@ gx-domain-modeling  mattpocock/skills  skills/engineering/domain-modeling   LICE
 gx-unslop           cursor/plugins     pstack/skills/unslop                 pstack/LICENSE eb4db2b  merge
 gx-research         mattpocock/skills  skills/engineering/research          LICENSE        5beb35b  merge
 gx-prototype        mattpocock/skills  skills/engineering/prototype         LICENSE        5beb35b  merge
+gx-wayfinder        mattpocock/skills  skills/engineering/wayfinder         LICENSE        5beb35b  merge
+gx-to-spec          mattpocock/skills  skills/engineering/to-spec           LICENSE        5beb35b  merge

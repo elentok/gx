@@ -65,6 +65,14 @@ var requiredFiles = []string{
 	"gx-prototype/LICENSE",
 	"gx-prototype/README.md",
 	"gx-prototype/agents/openai.yaml",
+	"gx-wayfinder/SKILL.md",
+	"gx-wayfinder/LICENSE",
+	"gx-wayfinder/README.md",
+	"gx-wayfinder/agents/openai.yaml",
+	"gx-to-spec/SKILL.md",
+	"gx-to-spec/LICENSE",
+	"gx-to-spec/README.md",
+	"gx-to-spec/agents/openai.yaml",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -190,6 +198,8 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-unslop":                    false,
 	"gx-research":                  false,
 	"gx-prototype":                 false,
+	"gx-wayfinder":                 true,
+	"gx-to-spec":                   true,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
