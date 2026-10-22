@@ -140,8 +140,8 @@ diagnosis or a decision handed to a *person* to plan, which is why `gx-investiga
 decision schedulable and hands a design question to an unattended agent that cannot ask you
 anything.
 
-When the work needs a decision rather than a fact, it belongs in a charting session (`/wayfinder`,
-`/myway`) *before* this skill runs — that's where grilling lives, and grilling must never end up
+When the work needs a decision rather than a fact, it belongs in a charting session (`/gx-design`)
+*before* this skill runs — that's where grilling lives, and grilling must never end up
 inside an implementation ticket. Bounded fact-finding that genuinely belongs inside the epic is an
 explore ticket, typed `implement`. A diagnosis or idea for a person to plan is a follow-up: file it
 with the `gx-follow-up` skill (passing `unattended` when this skill runs unattended), never with a

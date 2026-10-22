@@ -3,8 +3,7 @@ name: gx-design
 description: >-
   Walk one epic through map, review and implement: chart and resolve a wayfinder map, draft and
   review a spec, then publish an `<epic>-impl` epic. Detects the next step from tracker state; run
-  `/gx-design <epic>`, or `/gx-design <epic/NN>` to resolve one map ticket. Manual; depends on
-  external skills.
+  `/gx-design <epic>`, or `/gx-design <epic/NN>` to resolve one map ticket. Manual.
 disable-model-invocation: true
 ---
 
@@ -22,27 +21,19 @@ Three phases: **map** (wayfinder charts and resolves the map) → **review** (sp
 design-reviewed, grilled) → **implement** (tickets published). Each run inspects tracker and disk
 state and runs the next step. There is no phase field: the detection list below is the state machine.
 
-## 0. Dependency check
+## Calling other skills
 
-This skill does not vendor its helpers. `wayfinder`, `to-spec`, `grilling` and `domain-modeling`
-must exist in the agent's skill root (`~/.claude/skills/` for Claude, `~/.codex/skills/` for Codex).
-Check each with a test that follows symlinks, such as `test -f ~/.claude/skills/<name>/SKILL.md`.
-Never grep a directory listing: the skills are often symlinks, and compacting `ls` wrappers (rtk)
-hide them. If any is missing, stop. Name the missing ones and say they come from
-`https://github.com/mattpocock/skills`. Do not continue without them.
-
-`wayfinder` and `to-spec` set `disable-model-invocation: true`, so the Skill tool can't reach
-them. Wherever a step says "follow wayfinder's…" or "follow to-spec's…", `Read` that skill's
-`SKILL.md` directly and execute it inline, or hand a subagent the same instruction. Never call the
-Skill tool for them. Tell wayfinder to use the tracker's **Map epics** section for every ticket
-operation (chart, claim, close, frontier). `gx-to-tickets` is model-invocable and can be called
-normally.
+Every call between bundled skills is a relative link to the callee's `SKILL.md`: `Read` it and
+follow it inline, or hand a subagent the same link. Wherever a step says "follow gx-wayfinder's…"
+or "follow gx-to-spec's…", that means [gx-wayfinder](../gx-wayfinder/SKILL.md) and
+[gx-to-spec](../gx-to-spec/SKILL.md). Never call the Skill tool for them.
 
 ## Asking questions
 
-Whenever you grill the person (wayfinder's Destination and frontier grilling, a HITL ticket, the
-provisional Destination, the review), call the Skill tool for `grilling`, `domain-modeling` and
-`unslop` first, and print each round in the format `grilling` defines. gx marks the session
+Whenever you grill the person (gx-wayfinder's Destination and frontier grilling, a HITL ticket, the
+provisional Destination, the review), read [gx-grilling](../gx-grilling/SKILL.md),
+[gx-domain-modeling](../gx-domain-modeling/SKILL.md) and [gx-unslop](../gx-unslop/SKILL.md) first,
+and print each round in the format `gx-grilling` defines. gx marks the session
 Actionable itself when it sees a round, so call nothing to raise it.
 
 The questions must be the last thing in the turn: no tool call, and no text, after them. The UI can
@@ -56,20 +47,20 @@ marks the session as a design run. Outside a gx session it prints a note and doe
 
 Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the first match.
 
-1. **No map epic** (`gx tickets epics --maps` doesn't list it) → follow wayfinder's "Chart the map"
+1. **No map epic** (`gx tickets epics --maps` doesn't list it) → follow gx-wayfinder's "Chart the map"
    for the epic, including its Destination grilling.
-2. **`provisional_destination: true`** → follow `grilling` on the Destination alone, then clear the
+2. **`provisional_destination: true`** → follow `gx-grilling` on the Destination alone, then clear the
    flag with `gx tickets set <project:epic> --provisional-destination false`. Continue to step 3 in
    the same session, unless the grilling changed the Destination enough that seeded tickets must
    change. Then rework them and stop.
-3. **Open tickets, or a non-empty `## Not yet specified`** → follow wayfinder's "Work through the
+3. **Open tickets, or a non-empty `## Not yet specified`** → follow gx-wayfinder's "Work through the
    map", resolving exactly **one** ticket. Never more per run: HITL tickets must stay interactive.
    For a `grilling` ticket, load the skills named under "Asking questions" before the first
    question. Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
    open, or its `blocked_by` are not all closed, say so and stop. A ticket address only ever runs
    this step: when step 1 or 2 matches first, run that step instead and name the ticket in the
    "Next:" line.
-4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read `to-spec` and follow it. Seed it with
+4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read [gx-to-spec](../gx-to-spec/SKILL.md) and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies. The spec is where the map's gaps first show, so tell the subagent to sort
    every fact the map never decided:
@@ -84,7 +75,7 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
    `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none.
-6. **Unchecked findings** → run a `grilling` session on them, resident in this same run. Amend
+6. **Unchecked findings** → run a `gx-grilling` session on them, resident in this same run. Amend
    `docs/specs/<epic>.md` as each finding resolves, and check it off with
    `gx tickets section <project:epic> "Review findings" -`. Do not `/clear` between rounds. When
    every finding is checked, continue to step 7 in the same run.

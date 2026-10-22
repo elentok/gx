@@ -5,13 +5,33 @@ into both Claude's and Codex's user skill/prompt roots (see the `gx skills` comm
 
 ## Origin
 
-`gx-to-tickets`, `gx-tdd`, `gx-implement`, and `gx-resolving-merge-conflicts` are gx-specific
-adaptations of four skills from [Matt Pocock's skills repo](https://github.com/mattpocock/skills):
-`skills/engineering/to-tickets/SKILL.md`, `skills/engineering/tdd/SKILL.md`,
-`skills/engineering/implement/SKILL.md`, and
-`skills/engineering/resolving-merge-conflicts/SKILL.md`. They're inlined here, rather than fetched
-at install time, for the same reason the personal dotfiles skill tree inlines its own copies:
-security and ease-of-deployment — no network fetch during an unattended ralph-loop run.
+These skills are gx-specific adaptations of upstream skills. They're inlined here, rather than
+fetched at install time: security and ease-of-deployment — no network fetch during an unattended
+ralph-loop run. Each vendored directory has a `LICENSE` (MIT) and a `README.md` naming its upstream.
+
+From [Matt Pocock's skills repo](https://github.com/mattpocock/skills) (Matt Pocock):
+
+| Skill | Upstream path |
+| --- | --- |
+| `gx-to-tickets` | `skills/engineering/to-tickets` |
+| `gx-tdd` | `skills/engineering/tdd` |
+| `gx-implement` | `skills/engineering/implement` |
+| `gx-research` | `skills/engineering/research` |
+| `gx-prototype` | `skills/engineering/prototype` |
+| `gx-wayfinder` | `skills/engineering/wayfinder` |
+| `gx-to-spec` | `skills/engineering/to-spec` |
+| `gx-domain-modeling` | `skills/engineering/domain-modeling` |
+| `gx-grilling` | `skills/productivity/grilling` |
+
+From [cursor/plugins](https://github.com/cursor/plugins):
+
+| Skill | Upstream path | Author |
+| --- | --- | --- |
+| `gx-unslop` | `pstack/skills/unslop` | Lauren Tan (`pstack`) |
+| `gx-thermo-nuclear-code-quality-review` | `cursor-team-kit/skills/thermo-nuclear-code-quality-review` | Cursor (`cursor-team-kit`) |
+
+`gx-resolving-merge-conflicts` came from a skill Matt Pocock's repo has since removed, so it has no
+upstream to pin; gx owns it now. `gx-verify` is gx's own.
 
 ## gx-specific adaptations
 
@@ -22,10 +42,7 @@ Linear, ...) selected by a separate setup step. gx's bundle drops both assumptio
   [gx-local-tracker.md](gx-local-tracker.md)) — through `gx tickets` subcommands, not hand-edited
   YAML. There's no provider-selection step and no dependency on a personal dotfiles skill tree,
   setup workflow, or triage-label mapping file: `gx-local-tracker.md` is the complete, self-contained
-  contract. The one exception is `gx-design`: it drives `wayfinder`, `to-spec`, `grilling` and
-  `domain-modeling`, which are not vendored. They must already be in the agent's skill root (same on
-  Codex), from [mattpocock/skills](https://github.com/mattpocock/skills). `gx-design` checks for
-  them first and stops, naming any that are missing.
+  contract. Every call between bundled skills is a relative link to the callee's `SKILL.md`.
 - **Seams are decided in the ticket, not live.** Upstream `tdd` asks a human "what's the public
   interface, and which seams should we test?" at the start of every cycle. gx-to-tickets instead
   requires every generated ticket to declare its approved test seams up front (an explicit `none`
@@ -66,6 +83,13 @@ would block. `gx-investigate` likewise carries no flag: a bug report should
 reflexively pull in ralph-loop's log/state inventory without a human having to name the skill.
 `gx-follow-up` carries no flag either: filing a follow-up is a cheap, safe write that a person often
 asks for in passing, and other skills must be able to call it.
+
+The vendored skills keep their upstream policy. `gx-wayfinder`, `gx-to-spec` and
+`gx-thermo-nuclear-code-quality-review` set `disable-model-invocation: true`, as upstream does: a
+person starts a map, a spec or a harsh review, and other skills reach them by reading their
+`SKILL.md` by relative link, not through the Skill tool. `gx-research`, `gx-prototype`,
+`gx-grilling`, `gx-domain-modeling`, `gx-unslop` and `gx-verify` carry no flag, so the model and
+other skills can call them.
 
 Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
 `/name` invocation, never launched by the model on its own. That's already at least as restrictive as
@@ -159,6 +183,40 @@ skills/
   gx-design/
     SKILL.md
   gx-follow-up/
+    SKILL.md
+  gx-grilling/            — vendored; each vendored directory also has LICENSE and README.md
+    SKILL.md
+    LICENSE
+    README.md
+  gx-domain-modeling/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-unslop/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-research/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-prototype/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-wayfinder/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-to-spec/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-thermo-nuclear-code-quality-review/
+    SKILL.md
+    LICENSE
+    README.md
+  gx-verify/
     SKILL.md
 ```
 
