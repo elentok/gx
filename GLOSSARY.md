@@ -287,6 +287,10 @@ resume, which belongs to the pause **Gate**. _Avoid_: restart (sounds like a fre
 when the session is created, and shown with the session. It never changes the ticket's status: the
 person in the session works the ticket. _Avoid_: assignee, claim (a claim is a ticket status).
 
+**Design** — the web UI's name for a map epic. A Design is **Live** while one of its design sessions
+has not Exited. _Avoid_: "design session" for the map epic itself (a design session is the agent
+session working on it).
+
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
 map. It runs in the project's trunk checkout. A map epic or map ticket can have more than one at a
 time. _Avoid_: planning session.
