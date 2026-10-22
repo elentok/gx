@@ -429,6 +429,60 @@ func TestBundleHasNoConflictMarkers(t *testing.T) {
 	}
 }
 
+// manifestSkills returns the first field of every non-comment manifest row.
+func manifestSkills(manifest string) map[string]bool {
+	rows := map[string]bool{}
+	for _, line := range strings.Split(manifest, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || strings.HasPrefix(fields[0], "#") {
+			continue
+		}
+		rows[fields[0]] = true
+	}
+	return rows
+}
+
+// unlistedVendoredSkills returns the skill directories that carry a LICENSE
+// but have no manifest row. The sync script skips such skills silently.
+func unlistedVendoredSkills(t *testing.T, manifest string) []string {
+	t.Helper()
+	// gx-resolving-merge-conflicts is gx's own skill: it has a LICENSE but no
+	// upstream to sync from.
+	exempt := map[string]bool{"gx-resolving-merge-conflicts": true}
+	rows := manifestSkills(manifest)
+	var missing []string
+	for name := range bundleSkillNames(t) {
+		if _, err := os.Stat(filepath.Join(name, "LICENSE")); err != nil || exempt[name] || rows[name] {
+			continue
+		}
+		missing = append(missing, name)
+	}
+	sort.Strings(missing)
+	return missing
+}
+
+func TestEveryVendoredSkillHasManifestRow(t *testing.T) {
+	manifest, err := os.ReadFile(filepath.Join("..", "scripts", "vendored-skills.manifest"))
+	if err != nil {
+		t.Fatalf("reading manifest: %v", err)
+	}
+	for _, name := range unlistedVendoredSkills(t, string(manifest)) {
+		t.Errorf("%s has a LICENSE but no row in scripts/vendored-skills.manifest", name)
+	}
+
+	// Dropping a row must be caught.
+	var kept []string
+	for _, line := range strings.Split(string(manifest), "\n") {
+		if !strings.HasPrefix(line, "gx-tdd ") {
+			kept = append(kept, line)
+		}
+	}
+	got := unlistedVendoredSkills(t, strings.Join(kept, "\n"))
+	if len(got) != 1 || got[0] != "gx-tdd" {
+		t.Errorf("removing the gx-tdd row reported %v, want [gx-tdd]", got)
+	}
+}
+
 // TestBundleHasNoNeedsAnswerSectionWrite pins that no skill tells an agent to
 // park by hand-writing the retired sections; `gx tickets ask` is the one route.
 func TestBundleHasNoNeedsAnswerSectionWrite(t *testing.T) {
