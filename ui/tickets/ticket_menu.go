@@ -90,7 +90,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		}
 		return it
 	}
-	parked := isParkedStatus(in.ticket.Status)
+	parked := isRepairPause(in.ticket)
 	answer := resumeSuggested(in.rendered)
 
 	var items []contextmenu.Item[ticketTarget]
@@ -113,14 +113,13 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		items = append(items, item("Set "+string(status), "", contextmenu.Status, why, ticketMenuPickMsg{status: status}))
 	}
 
-	// A needs-answer Resume clears an announce-and-stop park, which the
-	// status doesn't show as parked; enter only unparks needs-repair, so it
-	// gets no hint.
+	// An answer pause's action clears an announce-and-stop pause, which "enter"
+	// does not (see isRepairPause), so it gets no hint.
 	resumeKey := reasonIf(parked || !answer, "enter")
 	unmute := unmuteSuggested(in.ticket)
 	items = append(items,
 		server("Park", "", serverVerbPark, reasonIf(parked, alreadyParked)),
-		suggest(answer, server(resumeLabel, resumeKey, actionResume, reasonIf(!parked && !answer, notParked))),
+		suggest(answer, server(pauseActionLabel(in.ticket.PauseReason), resumeKey, actionResume, reasonIf(!parked && !answer, notParked))),
 		server("Cancel", "", serverVerbCancel, ""),
 		server("Relaunch", "", serverVerbRelaunch, ""),
 		// A mute outlives the status (see actionUnmuteReopen), so a finished

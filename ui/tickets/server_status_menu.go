@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -28,8 +29,16 @@ const (
 // statuses only the server's verbs change.
 var serverDirectStatuses = []schema.Status{schema.StatusOpen, schema.StatusDraft, schema.StatusDone}
 
-func isParkedStatus(status string) bool {
-	return schema.Status(status) == schema.StatusNeedsRepair
+// isRepairPause is a ticket paused for a fault, the only pause that "enter"
+// resumes: an answer pause needs the Answer action's own confirmation.
+func isRepairPause(t tickets.Ticket) bool {
+	switch schema.Status(t.Status) {
+	case schema.StatusNeedsRepair:
+		return true
+	case schema.StatusPaused:
+		return t.PauseReason.Class() == schema.PauseClassRepair
+	}
+	return false
 }
 
 // serverWriteMsg reports a finished server verb: the refusal or error, if any.
@@ -89,7 +98,7 @@ func (m Model) handleServerUnparkEnter() (cmd tea.Cmd, handled bool) {
 		return nil, false
 	}
 	ticket := m.epicAt(r).Tickets[r.ticketIdx]
-	if !isParkedStatus(ticket.Status) {
+	if !isRepairPause(ticket) {
 		return nil, false
 	}
 	return cmdServerWrite(m.serverAPI, serverVerbUnpark, ticket.Path), true
