@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Reports which vendored skills have upstream changes. See docs/specs/vendored-skills.md.
 #
-# Usage: sync-vendored-skills.sh --check|--merge [--manifest FILE] [--skills-dir DIR]
+# Usage: sync-vendored-skills.sh --check|--merge [--accept-license SKILL]... [--manifest FILE]
+#        [--skills-dir DIR]
 #
-# --check lists skills with upstream changes. --merge 3-way merges them into the gx copies under
-# --skills-dir (default ../skills) and reports; the pin does not move.
+# --check lists skills with upstream changes. --merge 3-way merges `merge` skills into the gx copies
+# under --skills-dir (default ../skills) and reports; `port` skills only get the upstream diff. The
+# pin does not move. A changed upstream LICENSE blocks its skill until a reviewer re-runs with
+# --accept-license SKILL, which copies the new LICENSE. README.md is never touched.
 #
 # GX_UPSTREAM_BASE replaces https://github.com as the place upstream repos are fetched from
 # (<base>/<owner>/<repo>), so tests never touch the network.
@@ -14,11 +17,16 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 manifest="$script_dir/vendored-skills.manifest"
 skills_dir="$script_dir/../skills"
 mode=""
+accepted=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--check) mode=check ;;
 	--merge) mode=merge ;;
+	--accept-license)
+		accepted="$accepted ${2:?--accept-license needs a skill name}"
+		shift
+		;;
 	--manifest)
 		manifest="${2:?--manifest needs a file}"
 		shift
@@ -121,11 +129,42 @@ merge_skill() {
 	[ ${#conflicted[@]} -eq 0 ] || printf '  %s\n' "${conflicted[@]}"
 }
 
+# Returns 0 when the skill may be synced. A changed upstream LICENSE blocks it unless the skill was
+# named with --accept-license; an accepted one is copied word for word.
+license_gate() {
+	local skill=$1 dir=$2 license=$3 pin=$4
+	local old="$work/license.old" new="$work/license.new"
+	git -C "$dir" show "$pin:$license" >"$old" 2>/dev/null || : >"$old"
+	git -C "$dir" show "$latest:$license" >"$new" 2>/dev/null || : >"$new"
+	cmp -s "$old" "$new" && return 0
+	case " $accepted " in
+	*" $skill "*)
+		mkdir -p "$skills_dir/$skill"
+		cp "$new" "$skills_dir/$skill/LICENSE"
+		echo "$skill: license change accepted, LICENSE updated"
+		found=1
+		return 0
+		;;
+	esac
+	found=1
+	echo "$skill: license changed; nothing written for this skill"
+	diff -u "$old" "$new" || true
+	return 1
+}
+
 found=0
-while read -r skill repo path _license pin strategy; do
+while read -r skill repo path license pin strategy; do
 	case "$skill" in '' | '#'*) continue ;; esac
 	dir=$(fetch "$repo")
 	latest=$(git -C "$dir" rev-parse HEAD)
+	if ! git -C "$dir" cat-file -e "$latest:$path" 2>/dev/null; then
+		found=1
+		echo "$skill: upstream path $path no longer exists at $latest; nothing written for this skill"
+		continue
+	fi
+	if [ "$mode" = merge ]; then
+		license_gate "$skill" "$dir" "$license" "$pin" || continue
+	fi
 	count=$(git -C "$dir" rev-list --count "$pin..$latest" -- "$path")
 	if [ "$count" -eq 0 ]; then
 		continue
@@ -135,12 +174,13 @@ while read -r skill repo path _license pin strategy; do
 		echo "$skill: $count new upstream commits since $pin"
 		continue
 	fi
-	[ "${strategy:-merge}" = merge ] || continue
 	echo "== $skill: $count new upstream commits since $pin =="
 	git -C "$dir" log --oneline "$pin..$latest" -- "$path"
 	echo "upstream diff:"
 	git -C "$dir" diff "$pin" "$latest" -- "$path"
-	merge_skill "$skill" "$dir" "$path" "$pin"
+	if [ "${strategy:-merge}" = merge ]; then
+		merge_skill "$skill" "$dir" "$path" "$pin"
+	fi
 done <"$manifest"
 
 [ "$found" = 1 ] || echo "All vendored skills are up to date."

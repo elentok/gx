@@ -321,6 +321,104 @@ func TestSyncMerge_DoesNotMoveThePin(t *testing.T) {
 	}
 }
 
+func assertSnapshotUnchanged(t *testing.T, before, after map[string]string) {
+	t.Helper()
+	if len(before) != len(after) {
+		t.Errorf("files changed: %v -> %v", before, after)
+	}
+	for p, c := range before {
+		if after[p] != c {
+			t.Errorf("%s changed", p)
+		}
+	}
+}
+
+func TestSyncPort_PrintsTheDiffAndWritesNothing(t *testing.T) {
+	f := newSyncFixture(t)
+	f.commitUpstream(t, "beta 2", map[string]string{"skills/beta/SKILL.md": "beta v2\n"})
+	before := snapshot(t, filepath.Dir(f.gxSkill))
+
+	out := f.runSync(t, "--merge")
+
+	for _, want := range []string{"gx-beta: ", "+beta v2"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report missing %q:\n%s", want, out)
+		}
+	}
+	assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
+}
+
+func TestSyncLicense(t *testing.T) {
+	setup := func(t *testing.T, license string) *syncFixture {
+		f := newMergeFixture(t)
+		writeFile(t, filepath.Join(f.gxSkill, "LICENSE"), "MIT\n")
+		f.commitUpstream(t, "edit", map[string]string{
+			"skills/alpha/a.md": "up\n2\n3\n4\n5\n6\n7\n", "LICENSE": license,
+		})
+		return f
+	}
+
+	t.Run("unchanged is left alone", func(t *testing.T) {
+		f := setup(t, "MIT\n")
+
+		out := f.runSync(t, "--merge")
+
+		if strings.Contains(out, "license") {
+			t.Errorf("no license report expected:\n%s", out)
+		}
+		if got := readGx(t, f, "LICENSE"); got != "MIT\n" {
+			t.Errorf("LICENSE = %q", got)
+		}
+		if got := readGx(t, f, "a.md"); !strings.HasPrefix(got, "up\n") {
+			t.Errorf("skill should still merge, a.md = %q", got)
+		}
+	})
+
+	t.Run("changed is reported and nothing is written", func(t *testing.T) {
+		f := setup(t, "MIT v2\n")
+		before := snapshot(t, filepath.Dir(f.gxSkill))
+
+		out := f.runSync(t, "--merge")
+
+		for _, want := range []string{"gx-alpha: license changed", "-MIT", "+MIT v2"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("report missing %q:\n%s", want, out)
+			}
+		}
+		assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
+	})
+
+	t.Run("accepted change is copied and the skill updates", func(t *testing.T) {
+		f := setup(t, "MIT v2\n")
+
+		f.runSync(t, "--merge", "--accept-license", "gx-alpha")
+
+		if got := readGx(t, f, "LICENSE"); got != "MIT v2\n" {
+			t.Errorf("LICENSE = %q", got)
+		}
+		if got := readGx(t, f, "a.md"); !strings.HasPrefix(got, "up\n") {
+			t.Errorf("a.md = %q", got)
+		}
+		if got := readGx(t, f, "README.md"); got != "readme v1\n" {
+			t.Errorf("README.md must be untouched, got %q", got)
+		}
+	})
+}
+
+func TestSyncMissingUpstreamPath_IsReportedAndNothingIsWritten(t *testing.T) {
+	f := newMergeFixture(t)
+	gitIn(t, f.upstream, "rm", "-rq", "skills/alpha")
+	gitIn(t, f.upstream, "commit", "-q", "-m", "drop alpha")
+	before := snapshot(t, filepath.Dir(f.gxSkill))
+
+	out := f.runSync(t, "--merge")
+
+	if !strings.Contains(out, "gx-alpha: upstream path skills/alpha no longer exists") {
+		t.Errorf("report:\n%s", out)
+	}
+	assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
+}
+
 func TestRealManifest_SeedsTheBundledSkills(t *testing.T) {
 	b, err := os.ReadFile("vendored-skills.manifest")
 	if err != nil {
