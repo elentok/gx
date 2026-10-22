@@ -12,11 +12,13 @@ type EpicState string
 
 const (
 	EpicStateAwaitingMerge EpicState = "awaiting-merge"
-	EpicStateFinished      EpicState = "finished"
-	EpicStateRunning       EpicState = "running"
-	EpicStateWaiting       EpicState = "waiting"
-	EpicStateParked        EpicState = "parked"
-	EpicStateDeadlocked    EpicState = "deadlocked"
+	// EpicStateMergeBlocked is a done, unmerged epic whose last land parked.
+	EpicStateMergeBlocked EpicState = "merge-blocked"
+	EpicStateFinished     EpicState = "finished"
+	EpicStateRunning      EpicState = "running"
+	EpicStateWaiting      EpicState = "waiting"
+	EpicStateParked       EpicState = "parked"
+	EpicStateDeadlocked   EpicState = "deadlocked"
 )
 
 // SummaryTicket is one ticket in an EpicSummary: an active one carries
@@ -52,8 +54,11 @@ type EpicSummary struct {
 	// HasRepair is set when a parked ticket is broken (needs-repair or error), so
 	// both clients show a fault in the alarm color instead of a question.
 	HasRepair bool `json:"has_repair"`
-	// Reason names what holds a Deadlocked epic.
+	// Reason names what holds a Deadlocked epic, or the park reason of a
+	// MergeBlocked one.
 	Reason string `json:"reason,omitempty"`
+	// ParkKind is the park kind of a MergeBlocked epic; empty for a needs-rebase park.
+	ParkKind string `json:"park_kind,omitempty"`
 }
 
 // epicSummaries summarizes every epic with a queue item, in queue order. A
@@ -161,6 +166,9 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 	if sum.State == EpicStateDeadlocked {
 		sum.Reason = cycleReason(root, e)
 	}
+	if sum.State == EpicStateMergeBlocked {
+		sum.Reason, sum.ParkKind = e.LandBlockReason, e.LandBlockKind
+	}
 	if sum.State != EpicStateRunning {
 		sum.Active = []SummaryTicket{}
 	}
@@ -176,6 +184,9 @@ func epicStateFor(root rootRef, e tickets.Epic, claimedAt func(string) (time.Tim
 			return EpicStateWaiting
 		}
 		if e.MergedAt.IsZero() {
+			if e.LandBlockReason != "" {
+				return EpicStateMergeBlocked
+			}
 			return EpicStateAwaitingMerge
 		}
 		return EpicStateFinished

@@ -38,3 +38,24 @@ func TestStampEpicFields_KeepsOtherKeysAndNeverOverwrites(t *testing.T) {
 		t.Errorf("existing completed_at was overwritten:\n%s", got)
 	}
 }
+
+func TestClearEpicFields_RemovesOnlyTheNamedKeys(t *testing.T) {
+	epic := t.TempDir()
+	path := filepath.Join(epic, "ticket.md")
+	original := "---\nstatus: open\nland_block_kind: dirty-trunk\nland_block_reason: trunk dirty\nbase: main\n---\n\n# epic\n"
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ClearEpicFields(epic, "land_block_kind", "land_block_reason", "absent"); err != nil {
+		t.Fatal(err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "---\nstatus: open\nbase: main\n---\n\n# epic\n"; string(raw) != want {
+		t.Errorf("ticket.md =\n%q\nwant\n%q", raw, want)
+	}
+}

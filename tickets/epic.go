@@ -51,6 +51,11 @@ type Epic struct {
 	// MergedAt is when the epic's branch landed on its target; a Merged epic
 	// is one with it set.
 	MergedAt time.Time
+	// LandBlockKind and LandBlockReason are why the last land parked the epic;
+	// the land step clears both before it decides. The kind is empty for a
+	// needs-rebase park.
+	LandBlockKind   string
+	LandBlockReason string
 	// MergeTarget is the branch the epic merges into. Only a server snapshot
 	// sets it; the loader leaves it empty.
 	MergeTarget string

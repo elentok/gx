@@ -99,6 +99,66 @@ func TestLandError_DirtyTrunkParksTheRootWithACappedFileList(t *testing.T) {
 	}
 }
 
+// dirtyTrunkFixture parks the epic on a dirty trunk; clean undoes the dirt.
+func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
+	t.Helper()
+	turns := 0
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+		turns++
+		commitFiles(t, p, fmt.Sprintf("a%d.txt", turns), "a.txt")
+		testutil.WriteFile(t, f.repo, "a.txt", "local")
+	})
+	return f, func() {
+		if err := os.Remove(filepath.Join(f.repo, "a.txt")); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestLandError_ParkStoresKindAndReasonUntilALaterLandClearsThem(t *testing.T) {
+	f, clean := dirtyTrunkFixture(t)
+	ev := f.parkRoot(t)
+
+	md := f.epicMD(t)
+	if !strings.Contains(md, "land_block_kind: "+string(events.DirtyTrunk)) || !strings.Contains(md, "land_block_reason:") {
+		t.Errorf("park not stored on the epic:\n%s", md)
+	}
+	if !strings.Contains(md, "trunk dirty") || ev.Message == "" {
+		t.Errorf("reason not stored:\n%s", md)
+	}
+
+	clean()
+	res, err := f.h.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	if err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v", res, err)
+	}
+	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+		t.Errorf("land left the block on the epic:\n%s", md)
+	}
+}
+
+func TestLandError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
+	f, _ := dirtyTrunkFixture(t)
+	f.parkRoot(t)
+
+	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil {
+		t.Fatal(err)
+	}
+	// Reopen the ticket, so its second finish runs the land step again.
+	path := f.ticketFile(t, "01")
+	reopened := strings.Replace(readFile(t, path), "status: done", "status: open", 1)
+	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), reopened)
+	evs := f.queueEpic(ctx, t, "01")
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
+
+	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+		t.Errorf("default-path finish left the block on the epic:\n%s", md)
+	}
+}
+
 func TestLandError_NonOverlappingLocalChangeDoesNotBlockTheLand(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)

@@ -37,6 +37,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 		wantActive []string
 		wantParked []string
 		wantReason string
+		wantKind   string
 		wantRepair bool
 	}{
 		{
@@ -48,6 +49,19 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 			name:      "completed but unmerged stays awaiting merge",
 			epic:      tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), Tickets: []tickets.Ticket{summaryTicket("01", "done")}},
 			wantState: EpicStateAwaitingMerge, wantDone: 1,
+		},
+		{
+			name: "done, unmerged with a stored reason is merge-blocked",
+			epic: tickets.Epic{
+				Name: "epic", CompletedAt: time.Unix(50, 0), LandBlockKind: "dirty-trunk", LandBlockReason: "trunk dirty",
+				Tickets: []tickets.Ticket{summaryTicket("01", "done")},
+			},
+			wantState: EpicStateMergeBlocked, wantDone: 1, wantReason: "trunk dirty", wantKind: "dirty-trunk",
+		},
+		{
+			name:      "merged epic ignores a stale reason",
+			epic:      tickets.Epic{Name: "epic", MergedAt: time.Unix(60, 0), LandBlockReason: "stale", Tickets: []tickets.Ticket{summaryTicket("01", "done")}},
+			wantState: EpicStateFinished, wantDone: 1,
 		},
 		{
 			name:      "merged epic is finished",
@@ -119,6 +133,9 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 			}
 			if got.Reason != tc.wantReason {
 				t.Errorf("reason = %q, want %q", got.Reason, tc.wantReason)
+			}
+			if got.ParkKind != tc.wantKind {
+				t.Errorf("park kind = %q, want %q", got.ParkKind, tc.wantKind)
 			}
 		})
 	}

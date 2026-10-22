@@ -134,6 +134,11 @@ func parkDecision(first bool, reason string, kind events.Kind) landDecision {
 // land.
 func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string, epics []tickets.Epic, e tickets.Epic, target string, force bool) landDecision {
 	project := root.Project
+	// A stored block is the last land's; this land decides afresh, and a new
+	// park writes it again.
+	if err := tickets.ClearEpicFields(e.Path, landBlockKindKey, landBlockReasonKey); err != nil {
+		s.log.Warn("clear land block", "root", root, "err", err)
+	}
 	fresh := tickets.LoadEpicTicketMD(e.Path)
 	already := !fresh.MergedAt.IsZero()
 	first := fresh.CompletedAt.IsZero()
@@ -158,6 +163,7 @@ func (s *Server) landEpic(root rootRef, one ralphloop.OneIteration, repo string,
 		}
 		if reason != "" {
 			s.stampEpic(root, e.Path, "completed_at")
+			s.storeLandBlock(root, e.Path, kind, reason)
 			return parkDecision(first, reason, kind)
 		}
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
@@ -280,6 +286,23 @@ func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
 	}
 	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("stamp epic", "root", root, "keys", keys, "err", err)
+	}
+}
+
+const (
+	landBlockKindKey   = "land_block_kind"
+	landBlockReasonKey = "land_block_reason"
+)
+
+// storeLandBlock records a park's kind and reason on the epic, so the epic's
+// state outlives the event and a server restart. A needs-rebase park has no kind.
+func (s *Server) storeLandBlock(root rootRef, epicPath string, kind events.Kind, reason string) {
+	fields := map[string]any{landBlockReasonKey: reason}
+	if kind != "" {
+		fields[landBlockKindKey] = string(kind)
+	}
+	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
+		s.log.Warn("store land block", "root", root, "err", err)
 	}
 }
 

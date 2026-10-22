@@ -260,6 +260,9 @@ type ticketMDYAML struct {
 	CompletedAt *time.Time `yaml:"completed_at"`
 	CreatedAt   *time.Time `yaml:"created_at"`
 	MergedAt    *time.Time `yaml:"merged_at"`
+
+	LandBlockKind   string `yaml:"land_block_kind"`
+	LandBlockReason string `yaml:"land_block_reason"`
 }
 
 // WriteEpicTicketMD writes a minimal ticket.md for the epic at epicPath, with
@@ -314,6 +317,8 @@ func loadEpicTicketMD(epic *Epic) {
 	if wire.MergedAt != nil {
 		epic.MergedAt = *wire.MergedAt
 	}
+	epic.LandBlockKind = wire.LandBlockKind
+	epic.LandBlockReason = wire.LandBlockReason
 	loadEpicEvolveFields(epic, fm)
 }
 
@@ -390,7 +395,54 @@ func OverwriteEpicFields(epicPath string, fields map[string]any) error {
 	return stampEpicFields(epicPath, fields, true)
 }
 
+// ClearEpicFields removes each key from the epic's ticket.md frontmatter. A key
+// that is not there is skipped, and the file is untouched when none is.
+func ClearEpicFields(epicPath string, keys ...string) error {
+	return editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
+		changed := false
+		for _, key := range keys {
+			for i := 0; i+1 < len(mapping.Content); i += 2 {
+				if mapping.Content[i].Value == key {
+					mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+					changed = true
+					break
+				}
+			}
+		}
+		return changed, nil
+	})
+}
+
 func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) error {
+	return editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
+		changed := false
+		for key, value := range fields {
+			exists := hasMappingKey(mapping, key)
+			if exists && !overwrite {
+				continue
+			}
+			var val yaml.Node
+			if err := val.Encode(value); err != nil {
+				return false, fmt.Errorf("encoding %s: %w", key, err)
+			}
+			if exists {
+				for i := 0; i+1 < len(mapping.Content); i += 2 {
+					if mapping.Content[i].Value == key {
+						mapping.Content[i+1] = &val
+					}
+				}
+			} else {
+				mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
+			}
+			changed = true
+		}
+		return changed, nil
+	})
+}
+
+// editEpicFrontmatter runs edit on the epic's ticket.md frontmatter mapping
+// under the ticket lock, and writes the file back only when edit reports a change.
+func editEpicFrontmatter(epicPath string, edit func(mapping *yaml.Node) (bool, error)) error {
 	ticketPath := filepath.Join(epicPath, "ticket.md")
 	if _, err := os.Stat(ticketPath); err != nil {
 		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
@@ -416,26 +468,9 @@ func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) err
 		return fmt.Errorf("%s: frontmatter is not a mapping", ticketPath)
 	}
 	mapping := doc.Content[0]
-	changed := false
-	for key, value := range fields {
-		exists := hasMappingKey(mapping, key)
-		if exists && !overwrite {
-			continue
-		}
-		var val yaml.Node
-		if err := val.Encode(value); err != nil {
-			return fmt.Errorf("encoding %s: %w", key, err)
-		}
-		if exists {
-			for i := 0; i+1 < len(mapping.Content); i += 2 {
-				if mapping.Content[i].Value == key {
-					mapping.Content[i+1] = &val
-				}
-			}
-		} else {
-			mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
-		}
-		changed = true
+	changed, err := edit(mapping)
+	if err != nil {
+		return err
 	}
 	if !changed {
 		return nil

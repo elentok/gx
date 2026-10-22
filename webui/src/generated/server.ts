@@ -327,12 +327,16 @@ export interface EpicList {
  * EpicState is EpicSummary.State.
  */
 export const EpicStateAwaitingMerge = "awaiting-merge";
+/**
+ * EpicStateMergeBlocked is a done, unmerged epic whose last land parked.
+ */
+export const EpicStateMergeBlocked = "merge-blocked";
 export const EpicStateFinished = "finished";
 export const EpicStateRunning = "running";
 export const EpicStateWaiting = "waiting";
 export const EpicStateParked = "parked";
 export const EpicStateDeadlocked = "deadlocked";
-export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
+export type EpicState = typeof EpicStateAwaitingMerge | typeof EpicStateMergeBlocked | typeof EpicStateFinished | typeof EpicStateRunning | typeof EpicStateWaiting | typeof EpicStateParked | typeof EpicStateDeadlocked;
 /**
  * SummaryTicket is one ticket in an EpicSummary: an active one carries
  * ClaimedAt, a Parked one carries Recovery and its unclipped Park reason.
@@ -382,9 +386,14 @@ export interface EpicSummary {
    */
   has_repair: boolean;
   /**
-   * Reason names what holds a Deadlocked epic.
+   * Reason names what holds a Deadlocked epic, or the park reason of a
+   * MergeBlocked one.
    */
   reason?: string;
+  /**
+   * ParkKind is the park kind of a MergeBlocked epic; empty for a needs-rebase park.
+   */
+  park_kind?: string;
 }
 
 //////////
